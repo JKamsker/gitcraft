@@ -344,4 +344,103 @@ mod tests {
                 .contains_key(key)
         );
     }
+    #[cfg(unix)]
+    #[test]
+    fn owned_host_script_repairs_pinned_tree_and_receipts_a_stale_retry() -> Result<(), String> {
+        let f = crate::push_preflight::tests::Fixture::new()?;
+        if !supported_version(f.git(&["--version"])?.as_bytes()) {
+            eprintln!(
+                "Git before 2.50: repair capability refusal is covered by the owned native fixture"
+            );
+            return Ok(());
+        }
+        let old = f.git(&["rev-parse", "HEAD"])?;
+        let new = f.commit("next", "repaired source\n", "Next")?;
+        f.git(&["reset", "--hard", &old])?;
+        let branch = "refs/heads/main";
+        let index = f.repo.join(".git/index").to_string_lossy().into_owned();
+        let original = f
+            .repo
+            .join(".git/hooks/reference-transaction")
+            .to_string_lossy()
+            .into_owned();
+        let proof = format!("{branch}\n{old}\n{new}\n");
+        let wrapper = script(HookScript {
+            original: &original,
+            branch,
+            old: &old,
+            new: &new,
+            index: &index,
+            shared: None,
+            affected: &["next".into()],
+            proof: &proof,
+            needs_checkout: true,
+        });
+        let version = f.git(&["--version"])?;
+        for (name, success) in [("complete", true), ("stale", false)] {
+            let nonce = format!("ownedhost{name}");
+            let directory = f.root.join(format!("host-{name}"));
+            let guard = f.root.join("active-host-repair");
+            let mut command = std::process::Command::new("sh");
+            command
+                .current_dir(&f.repo)
+                .arg("-c")
+                .arg(include_str!("remote_repair.sh"));
+            crate::shell_path::apply(&mut command);
+            for (key, value) in [
+                (
+                    "GITCRAFT_REPAIR_DIR",
+                    directory.to_string_lossy().into_owned(),
+                ),
+                (
+                    "GITCRAFT_REPAIR_GUARD",
+                    guard.to_string_lossy().into_owned(),
+                ),
+                ("GITCRAFT_REPAIR_NONCE", nonce.clone()),
+                ("GITCRAFT_REPAIR_BRANCH", branch.into()),
+                ("GITCRAFT_REPAIR_OLD", old.clone()),
+                ("GITCRAFT_REPAIR_NEW", new.clone()),
+                ("GITCRAFT_REPAIR_INDEX", index.clone()),
+                ("GITCRAFT_REPAIR_SHARED", String::new()),
+                ("GITCRAFT_REPAIR_REFS", "files".into()),
+                ("GITCRAFT_REPAIR_OBJECTS", "sha1".into()),
+                ("GITCRAFT_REPAIR_VERSION", version.clone()),
+                ("GITCRAFT_REPAIR_KIND", "rewrite".into()),
+                ("GITCRAFT_REPAIR_BASE", String::new()),
+            ] {
+                command.env(key, value);
+            }
+            let output = crate::processes::run(
+                command,
+                crate::processes::Options {
+                    input: Some(wrapper.clone().into_bytes()),
+                    timeout: Some(std::time::Duration::from_secs(15)),
+                    output_limit: 2 * 1024 * 1024,
+                    ..Default::default()
+                },
+            )?
+            .complete()?;
+            assert_eq!(
+                output.status.success(),
+                success,
+                "host protocol: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let receipt = std::fs::read(directory.join("outcome")).map_err(|e| e.to_string())?;
+            assert!(terminal_receipt(&receipt, &nonce, "rewrite"));
+            assert!(!guard.exists());
+            if success {
+                assert_eq!(output.stdout, format!("complete:{nonce}\n").as_bytes());
+            } else {
+                assert!(output.stdout.is_empty());
+            }
+            assert_eq!(f.git(&["rev-parse", "HEAD"])?, new);
+            assert_eq!(f.git(&["status", "--porcelain"])?, "");
+            assert_eq!(
+                std::fs::read(f.repo.join("next")).map_err(|e| e.to_string())?,
+                b"repaired source\n"
+            );
+        }
+        Ok(())
+    }
 }
