@@ -297,7 +297,7 @@ pub fn pull_rebase(
     onto: &str,
 ) -> Result<Prediction, String> {
     let picks = match fork_point(repo, upstream, branch) {
-        Some(fork) => picks_since(repo, branch, &fork)?,
+        Some(fork) => picks_since(repo, branch, upstream, &fork)?,
         None => rebase_picks(repo, branch, onto)?,
     };
     finish_rebase(repo, features, branch, onto, &picks)
@@ -348,10 +348,12 @@ fn fork_point(repo: &Path, upstream: &str, branch: &str) -> Option<String> {
     .filter(|s| !s.is_empty())
 }
 
-/// The commits of `branch` after `base`, oldest first, less merges: what `git rebase --onto
-/// <upstream> <base>` picks.
-fn picks_since(repo: &Path, branch: &str, base: &str) -> Result<Vec<Pick>, String> {
-    let range = format!("{base}..{branch}");
+/// The commits of `branch` after `base` that `upstream` lacks, oldest first, less merges:
+/// what `git rebase --fork-point` picks (`upstream...branch ^base`, so commits a merge
+/// brought in from `upstream` aren't replayed again).
+fn picks_since(repo: &Path, branch: &str, upstream: &str, base: &str) -> Result<Vec<Pick>, String> {
+    let range = format!("{upstream}...{branch}");
+    let exclude = format!("^{base}");
     let out = run(
         Some(repo),
         &[
@@ -361,9 +363,12 @@ fn picks_since(repo: &Path, branch: &str, base: &str) -> Result<Vec<Pick>, Strin
             "--format=%H%x00%P%x00%s%x00",
             "--reverse",
             "--topo-order",
+            "--right-only",
+            "--cherry-pick",
             "--no-merges",
             END_OPTS,
             &range,
+            &exclude,
         ],
     )?;
     Ok(parse_picks(&out))

@@ -629,3 +629,26 @@ fn a_pull_rebase_starts_from_the_fork_point() -> Result<(), String> {
     assert_eq!(pulled.outcome, Outcome::Clean { changes: true });
     Ok(())
 }
+
+#[test]
+fn a_pull_rebase_skips_work_upstream_already_took() -> Result<(), String> {
+    let repo = forked("fork-point-picked")?;
+    let Some(features) = features_here(&repo)? else {
+        return Ok(());
+    };
+    repo.git(&["checkout", "-q", "-b", "topic"])?;
+    repo.write("f.txt", b"a\nX\nc\n")?;
+    let taken = repo.commit("own work, taken upstream")?;
+    repo.write("own.txt", b"mine\n")?;
+    let head = repo.commit("own work")?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.write("other.txt", b"theirs\n")?;
+    repo.commit("upstream work")?;
+    repo.git(&["cherry-pick", &taken])?;
+    repo.write("f.txt", b"a\nY\nc\n")?;
+    let upstream = repo.commit("upstream builds on it")?;
+    let pulled = pull_rebase(repo.path(), features, &head, "main", &upstream)?;
+    assert_eq!(pulled.commits, 1);
+    assert_eq!(pulled.outcome, Outcome::Clean { changes: true });
+    Ok(())
+}
