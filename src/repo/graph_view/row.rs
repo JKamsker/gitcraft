@@ -90,17 +90,14 @@ impl RepoTab {
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
         let label = || {
             format!(
-                "{}. {}",
+                "{}. {}{}",
                 self.graph_description(i),
-                format!(
-                    "{}{}",
-                    if self.graph_motion.new_commit(&commit.hash) {
-                        "Newly received commit. "
-                    } else {
-                        ""
-                    },
-                    self.row_label(commit, viewport.now)
-                )
+                if self.graph_motion.new_commit(&commit.hash) {
+                    "Newly received commit. "
+                } else {
+                    ""
+                },
+                self.row_label(commit, viewport.now)
             )
         };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));

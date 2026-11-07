@@ -74,7 +74,7 @@ impl RepoTab {
     }
 
     pub(super) fn graph_motion_loaded(&mut self, read: u64, ctx: &egui::Context) {
-        if !self.graph_motion.ready.is_some_and(|min| read >= min) {
+        if self.graph_motion.ready.is_none_or(|min| read < min) {
             return;
         }
         self.graph_motion.ready = None;
@@ -96,7 +96,7 @@ impl RepoTab {
             .into_iter()
             .filter_map(|(name, (hash, _))| {
                 let (old_hash, old_row) = before.refs.get(&name)?;
-                (old_hash != &hash).then(|| (name, (hash, *old_row)))
+                (old_hash != &hash).then_some((name, (hash, *old_row)))
             })
             .take(MAX_MARKS)
             .collect();

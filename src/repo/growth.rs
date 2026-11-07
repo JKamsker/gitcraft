@@ -136,7 +136,7 @@ impl RepoTab {
             let reduced=crate::a11y::motion::reduced(ctx);
             if reduced {view.playing=false;ui.label("Reduced motion is enabled. Scrub or step through static frames.");}
             ui.horizontal_wrapped(|ui| {
-                if ui.add_enabled(!reduced,egui::Button::new(if view.playing {"Pause growth"} else {"Play growth"})).clicked() {view.playing=!view.playing;view.last=Instant::now();}
+                if ui.add_enabled(!reduced,egui::Button::new(if view.playing {"Pause growth"} else {"Play growth"})).clicked() {view.playing = !view.playing;view.last=Instant::now();}
                 if ui.button("Previous commit").clicked() {view.cursor=view.cursor.saturating_sub(1);view.playing=false;}
                 if ui.button("Next commit").clicked() {view.cursor=(view.cursor+1).min(data.frames.len()-1);view.playing=false;}
                 ui.add(egui::Slider::new(&mut view.speed,0.5..=8.0).text("commits / second"));

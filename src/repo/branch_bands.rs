@@ -118,10 +118,10 @@ impl Preferences {
             };
             let mut first = true;
             while let Some(commit) = index.get(at) {
-                if let Some(existing) = hints.get(at) {
-                    if !first || existing.band != hint.band || existing.colour != hint.colour {
-                        break;
-                    }
+                if let Some(existing) = hints.get(at)
+                    && (!first || existing.band != hint.band || existing.colour != hint.colour)
+                {
+                    break;
                 }
                 hints.insert(at.to_owned(), hint);
                 first = false;

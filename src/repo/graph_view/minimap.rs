@@ -2,7 +2,7 @@
 use super::ROW_PITCH;
 use crate::repo::RepoTab;
 use crate::theme::Tokens;
-use egui::{Align2, FontId, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{Align2, FontId, Rect, Sense, Stroke, StrokeKind, Ui, pos2};
 const BINS: usize = 512;
 const LANES: usize = 24;
 #[derive(Clone, Default)]
@@ -238,6 +238,7 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::vec2;
     #[test]
     fn actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection() {
         use std::sync::Arc;

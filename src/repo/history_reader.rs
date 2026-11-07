@@ -3,10 +3,11 @@
 use super::messages::{JobSender, Msg, spawn_or};
 use std::sync::mpsc::{self, Receiver};
 type Job<T> = Box<dyn FnOnce(&dyn Fn() -> bool) -> Result<T, String> + Send>;
+type Running<T> = (u64, crate::tasks::Cancellation, Receiver<Result<T, String>>);
 pub(super) struct Reader<T> {
     generation: u64,
     pending: Option<Job<T>>,
-    running: Option<(u64, crate::tasks::Cancellation, Receiver<Result<T, String>>)>,
+    running: Option<Running<T>>,
 }
 impl<T> Default for Reader<T> {
     fn default() -> Self {

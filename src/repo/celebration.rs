@@ -81,7 +81,7 @@ impl RepoTab {
     }
 
     pub(super) fn celebration_loaded(&mut self, read: u64, ctx: &egui::Context) {
-        if !self.celebration.min_read.is_some_and(|min| read >= min) {
+        if self.celebration.min_read.is_none_or(|min| read < min) {
             return;
         }
         self.celebration.min_read = None;

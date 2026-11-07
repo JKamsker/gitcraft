@@ -276,7 +276,8 @@ impl RepoTab {
                 result.push_str(&format!("; shared ancestor {} (author date {}). Git does not record a branch creation date", common.hash.get(..8).unwrap_or(&common.hash), common.date));
             } else { result.push_str("; no shared ancestor in loaded history"); }
             let mut descendants=HashSet::new(); let mut todo=vec![selected];
-            while let Some(row)=todo.pop() { if !active(){return Err("Narration cancelled".into());} if descendants.insert(row) {todo.extend(topology.children.get(row).into_iter().flatten());} }
+            while let Some(row)=todo.pop() { if !active(){return Err("Narration cancelled".into());}
+ if descendants.insert(row) {todo.extend(topology.children.get(row).into_iter().flatten());} }
             for (release,tip) in releases {
                 let ancestors=topology.ancestors(tip,active);
                 let merges=ancestors.iter().filter(|row|topology.parents.get(**row).is_some_and(|parents| parents.len()>1 && !descendants.contains(&parents[0]) && parents.iter().skip(1).any(|p|descendants.contains(p)))).count();
