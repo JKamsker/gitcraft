@@ -517,8 +517,22 @@ impl RepoTab {
 
         match response.inner {
             Outcome::Done(action) => {
+                // Content's next step consumes the current results/preview.
+                // Closing the modal here is a handoff, not a dismissal.
+                let content_step = matches!(
+                    action,
+                    Action::ContentSearch(_)
+                        | Action::ContentInspect(..)
+                        | Action::ContentPrepare(_)
+                        | Action::ContentPerform(_)
+                );
                 acts.push(action);
-                self.dismiss_dialog();
+                if content_step {
+                    self.cancel_draft_reads();
+                    self.dialog = None;
+                } else {
+                    self.dismiss_dialog();
+                }
             }
             Outcome::Cancel => self.dismiss_dialog(),
             Outcome::Open if response.should_close() => self.dismiss_dialog(),
