@@ -6,22 +6,20 @@
   "user_steering": "ONE final giant PR; rebuild clean branch from dev with one commit per feature, all authored exactly Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> matching028242cd4bc3. Preserve published branches/history; each new unit still commit+push before next/riskytest.",
   "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
   "agents": {
-    "audit_32_38": "Fix Drafts reader actual completion ownership; content recovery backend8f992 preserved",
-    "audit_39_44": "Standalone file tools plan/implementation fromc56; both Windowsbab and filecdd integrated",
-    "audit_45_50": "Portability two reviewed fix regressions23816bd, own local gates; integration handed back",
-    "baseline_validation": "Completed safe evidence handoff after platform account-security block; do not retry blocked old runtime action",
-    "implement_gerrit": "SOPS ambiguity format fix0fc; plan SSH key helper afterward",
-    "review_weather": "Gate1 five recordingPASS accepted; Gate2 owned temp realGit fixtures authorized",
-    "review_portability_and_file_views": "Filecdd scoped independent PASS; Windows static pass, exact nativeCI pending",
-    "review_push_repair_protocol": "SOPS60cbPASS merged; Preflight8b STATICPASS, final whole-feature after runtime still pending",
-    "review_portable_setup": "Portability238 fixes re-review preliminary; Content801 root identity race fix with author"
+    "audit_32_38": "Content e1 exactreviewPASS frozen; SavedViews80b full878+3 frozenawaitreview; LineDossier implementation thenSymbol/Coupling",
+    "audit_39_44": "Standalone7fb full842+3 frozen, independentreview_portable_setup active",
+    "audit_45_50": "GitLab then Azure/Bitbucket oncodex/forge-providers fromd182; plan3af6f24 pushed",
+    "implement_gerrit": "SOLEintegrationwriter SSHbcb merge d2bc962 localgatespending; then Content e1 authorized; publish eachgreenSHA",
+    "implement_object_storage": "Linux rootpina3b local886+3; Windows320 crosscheckPASS; ownedremotehelperimplementation; fixedreviewpending; neverretryblockedoldharness",
+    "review_weather": "Preflight local926+3 incl21productioncases; remote explicitcompletion/dispatch/uncertainrecovery staticunit underway; reviewbeforefixture",
+    "review_portable_setup": "Content e1 independent22PASS notes45e980; lifecycle d182 staticPASS09a1d493. NOWstandalone7fb independentreview"
   },
   "integration": {
     "worktree": "/workspace/work/integration",
     "branch": "codex/remaining-features",
-    "remote_green_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+    "remote_green_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
     "state": "/workspace/work/integration-state.json",
-    "checks": "LOCAL fmt/strictClippy/full866pass3ignored0filtered869names PASS; CI DEFERRED until all our side finished",
+    "checks": "LOCALfmt/strictClippy/full891pass3ignore0filtered894registeredPASS; CIdeferred",
     "features": [
       "Gerrit",
       "Clone",
@@ -39,20 +37,22 @@
       "Three-state staging lens",
       "File versions across branches",
       "Encrypted files explicitSOPS",
-      "Working tree drafts"
+      "Working tree drafts",
+      "Repositorytour",
+      "Portablepublicsetup"
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
-    "platform_gates": "Linux/local green, actualWindowsCI failure11 from da0143c; no finalPR untilfixed andWindowsPASS. See ci-recovered-status.json.",
-    "pending_candidate": null,
-    "sole_writer": "root; audit_45_50 integration handback complete",
+    "platform_gates": "NativeWindows finalvalidation stillrequired. Do not poll/rerun/dispatchCI until ALL implementation+finalhistory+localchecks+independentwhole-review complete.",
+    "pending_candidate": "d2bc962 SSHintegration localgatespending",
+    "sole_writer": "implement_gerrit",
     "pending_features": [
-      "SOPS60cb579 independentPASS",
-      "Drafts3cef22c independentPASS"
+      "SSHhelperbcb independentPASS",
+      "Contente1 independentPASS"
     ]
   },
   "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
-  "cleanup": "All reviewed+integrated private targets Gerrit/clone/practice/contrast/structural/weather removed after checking noactivecargo tosave32GBdisk; source/logs/manifests/reviews preserved. Integrationtarget activekeep. Rootcache cargo clean-pgitcraft done, dependenciesretained. Monitor df; delete only completed inactive artifacts.",
+  "cleanup": "Completed private application caches only cleaned after reviews:Content,Portability,processcontainment plus earlierSOPS/Drafts/Windows; source/deps/logs/manifests retained. Activeintegration/standalone/object/preflight/history/SSH targets and SavedViews frozen copiedbinary preserved. 7.4GiBfree aftercleanup.",
   "integration_contract": "All local Git read/write/raw/piped/bounded commands must use practice-aware repository_command before with_profile. New profile/history/bundle transports may bypass whenbaseddev: adaptandaddactualhostileenvpractice cross-feature testbeforegreen. Profile snapshot/context pinning wins normaltabs butpracticebypassesprofile/ambient creds. SolewriterintegrationresolvesadditiveAction/Dialog/painter/Gerritmarker conflicts; preserveallfeaturetestnames.",
   "audits": [
     "/workspace/work/audit_32_38.json (28eligible57excluded)",
@@ -64,13 +64,13 @@
     "/workspace/work/prs.json (99originalopenPRs,allinflightfeaturesexcludedwhole-namedbullet)"
   ],
   "scope_rule": "Namedidea with anyopenPR excludedwholeevenifomissions. Registry #38excludedbecausePR75sharedkeymap. ContrasteligiblePR66explicitlyexcludesit.",
-  "new_feature_base": "b5df68070a6df9d91cd29ca5d6270db80c9040c9 (local17features green; CI prohibited until final side completion)",
+  "new_feature_base": "d18210503b376c77e76c6e4825e24b182b1f7eeb (19features localgreen)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
-  "communications": "User is impatient: keep updates brief, prioritize coding/local verification, avoid repeated orchestration/CI polling. Status at last answer15verified+2merged undergoing localcombined gates;49queued.",
+  "communications": "User asked delay:19/72integrated+891localpasses, SSH/Content independentlyPASS next, SavedViewsreadyreview; two complexownershipblockerspreflight/object. CIoff. Everyunitcommitpush.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
-  "verified_remote_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "verified_remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
   "backup": {
     "url": "https://raw.githubusercontent.com/JKamsker/gitcraft/f6896061a3bc6c3a049f5cdd592ff21860ccb50b/recovery/gitcraft-recovery-20261107.zip",
     "sha256": "0816c7c383acb5c130d3d019efacd573d6c70a8872f9cd91b67b076ccb887bf7",

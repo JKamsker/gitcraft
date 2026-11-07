@@ -1,0 +1,240 @@
+{
+  "feature": "Issue #44 standalone gitcraft difftool / mergetool and arbitrary two-file comparison",
+  "status": "IMPLEMENTED; local Linux gates PASS; independent feature/static Windows protocol review PENDING; native Windows/macOS NOT RUN; NO CI",
+  "created_utc": "2026-11-07T05:19:35.305287+00:00",
+  "worktree": "/workspace/work/standalone-file-tools",
+  "branch": "codex/standalone-file-tools",
+  "head": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "tree": "6fb37833541172109ec37ac21089f02e7fb25f04",
+  "source_clean": true,
+  "remote_branch_sha": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": {
+      "path": "/workspace/work/standalone-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": [],
+      "pass": true
+    },
+    "clippy": {
+      "path": "/workspace/work/standalone-clippy.log",
+      "sha256": "a088836920064f6fa2887b51a61c8c1ba432cbb0bbbc779cd3f31f3ecf0a361f",
+      "results": [],
+      "pass": true
+    },
+    "targeted": {
+      "path": "/workspace/work/standalone-targeted.log",
+      "sha256": "4eaea269d6a9d9aed6b9d26bbbff806602a66de80dd68fb7f07375944a612a70",
+      "results": [
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 820 filtered out; finished in 0.19s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s"
+      ],
+      "pass": true
+    },
+    "cli-targeted": {
+      "path": "/workspace/work/standalone-cli-targeted.log",
+      "sha256": "3a775c089fdf0a3c7d8b0162867dfa4b5658626016c75b24aa5b120b446c1c24",
+      "results": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+      ],
+      "pass": true
+    },
+    "test": {
+      "path": "/workspace/work/standalone-test.log",
+      "sha256": "798f9fa9fa038efcdfa155518f3ff74a40c695e1233b223055eb47466fd9cb12",
+      "results": [
+        "test result: ok. 839 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 17.85s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "pass": true
+    }
+  },
+  "full_summary": {
+    "library_passed": 839,
+    "executable_integration_passed": 3,
+    "aggregate_passed": 842,
+    "ignored": 3,
+    "failures": 0,
+    "filtered": 0,
+    "new_feature_tests_passed": 25
+  },
+  "test_names": {
+    "path": "/workspace/work/standalone-7fb68f2-test-names.json",
+    "sha256": "8fa3994c035b7a9454edceb32a106082f373a51d693248cb3cd3334ededb6ddd"
+  },
+  "feature_tests": [
+    {
+      "name": "standalone::cli::tests::file_modes_have_exact_arity_and_option_looking_names_stay_native",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::cli::tests::non_utf8_arguments_are_not_reconstructed_from_display_strings",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::files::tests::native_byte_paths_and_explicit_input_links_are_read_only",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::files::tests::native_snapshots_keep_binary_bytes_detect_edits_and_bound_reads",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::binary_whole_side_choices_preserve_bytes_and_stale_inputs_refuse_save",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::existing_result_is_kept_and_computed_conflicts_require_a_choice",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::file_modes_work_under_a_profile_error_without_repository_fallback",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::nonoverlapping_three_way_merge_preserves_the_missing_final_newline",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::permissions::tests::edited_results_keep_bounded_user_metadata_and_executable_mode_without_privileged_bits",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::registered_shell_commands_pass_literal_native_file_paths_and_propagate_status",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::isolated_global_registration_preserves_relative_override_meaning",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::destination_drift_and_concurrent_creators_are_preserved_without_success",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::explicit_save_retains_the_old_inode_and_never_writes_inputs",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::missing_outputs_install_create_only_aliases_and_read_only_outputs_are_refused",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::swapped_parents_and_output_links_never_redirect_writes",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::registration_settings_do_not_write_until_the_user_clicks_the_concrete_action",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_diff_close_succeeds_but_unsaved_merge_close_cancels_and_load_error_is_distinct",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_result_editor_and_conflict_choice_save_exact_bytes_with_success",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_save_refuses_changed_destination_and_reports_nonzero_without_overwrite",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::windows_metadata::tests::metadata_protocol_records_only_constant_script_and_literal_native_path_data",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::explicit_temp_config_registration_keeps_unrelated_defaults_and_supports_opt_in",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::hostile_profile_cannot_redirect_the_standalone_background_ui",
+      "result": "ok"
+    },
+    {
+      "name": "native_non_utf8_file_arguments_never_panic_in_utf8_helper_dispatch",
+      "result": "ok"
+    },
+    {
+      "name": "malformed_native_helper_fields_fail_closed_instead_of_opening_a_repository",
+      "result": "ok"
+    },
+    {
+      "name": "help_and_usage_exit_without_repository_profile_or_display_fallback",
+      "result": "ok"
+    }
+  ],
+  "commands": [
+    "cargo fmt --check",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked standalone::",
+    "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked --test standalone_cli",
+    "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked"
+  ],
+  "environment": {
+    "private_target": "/workspace/work/standalone-file-tools/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "real_difftastic": "/workspace/work/difft-bin",
+    "optional_live_ssh_wsl": "unset",
+    "ci": "not used"
+  },
+  "acceptance": {
+    "native_cli": {
+      "implementation": "args_os parser with --diff A B, --merge/--mergetool BASE LOCAL REMOTE MERGED, optional --, exact arity; dispatch before repository/Settings/profile initialization",
+      "evidence": "cli native non-UTF8 test plus actual executable help/usage/helper fail-closed tests"
+    },
+    "read_only_diff": {
+      "implementation": "same content-only comparison renderer as file views; raw native snapshots; no repository action/profile/decryption fallback",
+      "evidence": "actual UI renders expected removed/added lines, diff native close returns0; hostile-profile load/save fixtures"
+    },
+    "merge_editor": {
+      "implementation": "shared result/conflict editor plus Base/Local/Remote input panels; existing MERGED starts intact, computed isolated diff3 opt-in; whole-side binary selection is exact bytes",
+      "evidence": "UI manual editor/per-conflict Local save, model binary, nonoverlap/no-final-LF, original-result preservation"
+    },
+    "guarded_save": {
+      "implementation": "owned anchored parent handles; raw input/output identity+metadata+bytes guards; exclusively reserved lock/recovery; retain displaced inode and install create-only hardlink; restore create-only; no blind truncate/overwrite of MERGED",
+      "evidence": "real temp filesystem drift before move/install/after install, retained old inode with late writer, stale input refusal, new output, input hardlink alias, parent symlink swap and output link sentinels"
+    },
+    "exits": {
+      "implementation": "0 loaded diff normal close/Done, or explicit successful merge save;1 explicit Cancel/Escape/unsaved merge close;2 usage/load/save error; pending save owns transaction and defers close",
+      "evidence": "actual UI outcome atomics plus subprocess exit status usage/help/helper cases"
+    },
+    "registration": {
+      "implementation": "Settings Git file tools shows concrete quoted executable-specific global config preview; explicit action only; trustExitCode=true; default diff.tool/merge.tool opt-in; bounded isolated Git config commands",
+      "evidence": "owned temp config retains unrelated/default entries, actual Settings panel explicit click, shell metachar/native-byte argv fixture, relative global override anchored fixture"
+    },
+    "metadata": {
+      "implementation": "Unix owner/group/mode guard/preservation; Linux bounded xattrs/access ACL and explicit unsupported refusal, privileged bits/capability/integrity not restored; macOS safe rustix clone; Windows constant managed ACL/owner/group helper with exact SDDL verification, reject named streams and unsupported attributes",
+      "evidence": "Linux executable/uid/gid/xattr/retained original fixture PASS; Windows command/script literal-path recording-only test PASS; native Windows/macOS unexecuted"
+    }
+  },
+  "review_focus": [
+    "src/main.rs and src/app/mod.rs helper dispatch/native argument isolation",
+    "src/standalone/save.rs and directory.rs retained-inode/create-only transaction on Unix/Windows",
+    "src/standalone/permissions.rs/platform access metadata refusal",
+    "src/standalone/windows_metadata.rs requires independent STATIC protocol review before native invocation",
+    "src/standalone/registration.rs quoting/config scope/no implicit writes",
+    "shared ConflictEditor refactor and renderer visibility changes"
+  ],
+  "limits": [
+    "2 MiB per file/default stream and result;20,000 text input lines;200 editable conflict blocks;whole-file byte fallback",
+    "Installed Git supporting --no-lazy-fetch required for text alignment/computed merge; no repository/profile/filter/forge/decryption fallback",
+    "Missing input paths error except /dev/null or bare Windows NUL empty sentinel; output may not alias an input or be a link/device",
+    "Save requires safe hardlinks; refuses unsupported filesystem/platform metadata operations before moving original",
+    "Previous result intentionally retained in sibling recovery directory; late writes remain recoverable; brief destination absence is documented",
+    "Windows named streams and native attributes beyond ARCHIVE/NORMAL refused; shipped Windows PowerShell required; native helper not executed pending static review",
+    "macOS native clone path source-reviewed only; no native macOS runtime evidence",
+    "Git registration is explicit local global-config write in product; development wrote owned temporary config only",
+    "No real services/credentials/user merges/network writes; no CI and no PR"
+  ],
+  "docs": [
+    "docs/standalone-file-tools.md",
+    "docs/standalone-file-tools-plan.md",
+    "src/manual.rs"
+  ]
+}

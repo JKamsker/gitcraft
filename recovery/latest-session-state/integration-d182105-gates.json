@@ -1,0 +1,226 @@
+{
+  "head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "tree": "60b4ae6146a22083c657d1745bcc3e5d4b67ba2e",
+  "source_tree": "fd8c51103c41a6cf7700f690b05eea59501ee587",
+  "starting_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "worktree": "/workspace/work/integration",
+  "branch": "codex/remaining-features",
+  "remote_verified": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "source_diff_sha256": "44e0348a6b6cd2324094cf98c7ea14730ae7ded5b8f73876905445c1b54ed789",
+  "merge": {
+    "reviewed_application": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+    "merge_commit": "0447e56a42564bd87debda9988e1809a3fa90119",
+    "review_report": "/workspace/work/review-portable-setup/docs/validation/independent-portable-setup-55df0d2/review.md",
+    "review_notes_commit": "e664e6c",
+    "feature_names": [
+      "#45 A tour of this repository",
+      "#45 New machine, same setup"
+    ]
+  },
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "focused_cross_feature_ui": "PASS1/1 (893filtered)",
+    "full_default": "891 passed;0 failed;3 ignored;0 filtered;894 total",
+    "test_list_union": "Exact869 baseline+25 feature names; no collisions, no losses; all25 feature cases actually pass"
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean_at_merge": true,
+  "clean_log": "/workspace/work/integration-0447e56-clean.log",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_env": "unset",
+  "safety_exclusions": 0,
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/integration-d182105-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "targeted": {
+      "path": "/workspace/work/integration-d182105-targeted.log",
+      "sha256": "589942b5cf4d6c440a3ef4d8a56f259829388bbba8ce6858eee4a7c34904a15b",
+      "bytes": 601
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-d182105-clippy.log",
+      "sha256": "79296ab72856052d8e8db20ab6c9437f3ccf3e538e0db397f2d2796565cc1c14",
+      "bytes": 132
+    },
+    "test": {
+      "path": "/workspace/work/integration-d182105-test.log",
+      "sha256": "8508f24b635b7e6450811041e4892df4123463f995902b53b8b23cb58365a195",
+      "bytes": 75158
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-d182105-test-list.log",
+      "sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
+      "bytes": 69329
+    }
+  },
+  "unique_reviewed_files": {
+    "src/repo/diff/encrypted/SAFETY.md": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "3bea3eca0ec403f45af7e1889ed65a434bc97d68343e5ce95b79eaa6e7843e8e"
+    },
+    "src/repo/diff/encrypted/mod.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "f4568e16b4a00449ba2c2eff08150474c574f89c97eb3278fd32dc621adaa95e"
+    },
+    "src/repo/diff/encrypted/model.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "dd4b06f31e20ff26e7aae8e9be04f1eee5f04d13045c6a569116aef75c02aa54"
+    },
+    "src/repo/diff/encrypted/tests.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "bf795473a0ee9f1180c6b00e21e42f2291588c61f505d9e15bf2c87cc32caa03"
+    },
+    "src/repo/diff/encrypted/tool.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "4b933c64e6d9f1a8634fdecda84e3597f0f28a10d15b9ad92a0ffdb5a9cccf2e"
+    },
+    "src/repo/diff/encrypted/view.rs": {
+      "reviewed_commit": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "sha256": "ed7e9f96fd619aa3c9ef7fe47e6530f28ddaf383f8eca20e6dec42fe04056793"
+    },
+    "src/git/command/completion.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "fc179dcf3e288f3005b2f4cc61cc205fd22735929e39f595dfdca56d8254c9ec"
+    },
+    "src/git/drafts/context.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "df04c4b46833f544cd291012bb28c2fd770a70635bd9879ced235a97e845a36c"
+    },
+    "src/git/drafts/mod.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "9d9dc06f77a8c9a60663c2d9a7b9f1901df50bad715aca336e555c160f4171b8"
+    },
+    "src/git/drafts/restore.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "3dd10e4b40f08ce4ede47f7b81ff7fb28cfe5915b7410784977ed881c3a298de"
+    },
+    "src/git/drafts/tests.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "9bc4cb13b5a9b8ecd42b88f317620eceb59e63b6557e89c085099b8302ae50a5"
+    },
+    "src/repo/drafts.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "4c0f94a159794a5c0a20548ed9c58647f8af2617a0cbc3b93bb6369045bd8a86"
+    },
+    "src/repo/dialogs/drafts.rs": {
+      "reviewed_commit": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+      "sha256": "1c8dac30eeeb6187ec58645a312aef289f215271776702a5d51ce4de5be06c95"
+    },
+    "docs/portable-setup.md": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "351de93c61842fc1d7143286d14e43fe38106e2c462c2942c801551e3b3c116c",
+      "integration_adaptation": false
+    },
+    "src/app/setup/files.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "41ef50952932f21c0d61fd394cd45d7d0b5dbc7a8d97667354fa2e64be626f3f",
+      "integration_adaptation": false
+    },
+    "src/app/setup/mod.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "e3b7517df4b7e9ed47d2f292095c8886ccad04dfddb8b7bf7c18f11efaea1f43",
+      "integration_adaptation": false
+    },
+    "src/app/setup/pending.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "7bc2ac8f6a6a3854f660c93e91676d88509ff53d4527f57286d6abed9820eed2",
+      "integration_adaptation": false
+    },
+    "src/app/setup/tests.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "bf677fdb6663e78b29a5b9ee09209681dcd1d1ec560d1ade06232a20e8a2c6df",
+      "integration_adaptation": false
+    },
+    "src/git/command/setup.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "276a3dae546abd17225ebda0d0cbf2c81dc335d532b57bc24c5b7e770f15f290",
+      "integration_adaptation": false
+    },
+    "src/git/command/setup/tests.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "dd94c855905eac8be8b96ce3c3417b97e14c6912ba046d429e60f499cf57d179",
+      "integration_adaptation": false
+    },
+    "src/portability.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "217532a587d3b51ea8f90b70c5e5eb3b9592963b55015eabf8587074e5292c1e",
+      "integration_adaptation": false
+    },
+    "src/portability/repository.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "71a0e78336440ab4fd3acb9174321f06977b1c64364323b313be161d56a399cb",
+      "integration_adaptation": false
+    },
+    "src/portability/restore.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "36cad7a88ae02886e1810c5b4a269f700ad77b8dc04e99fab5dcd41fc2e72107",
+      "integration_adaptation": false
+    },
+    "src/portability/tests.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "c8e1d4def0b6d110ffc957b390e33108a3016c7874e7e0a50e6a4e35420856f8",
+      "integration_adaptation": false
+    },
+    "src/portability/url.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "9cda6b984784fb3adda55803f28e68c6e5c306c9ae1fd562009bfff1f6a4e5c8",
+      "integration_adaptation": false
+    },
+    "src/repo/tour/mod.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "fb67ac7ea5ba23a6691448ae319b70b348a9f0ceb29885d91dc4ed8ed63db670",
+      "integration_adaptation": true
+    },
+    "src/tour.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "e773aef16045914d7a36fc1ef02c915c8fcabf6030856d7d5780f0e46e32b13c",
+      "integration_adaptation": false
+    },
+    "src/tour/tests.rs": {
+      "reviewed_commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "sha256": "c2943598f30188506478743fe6aa433986e0e57cb808f32d52617bc0be385b12",
+      "integration_adaptation": false
+    }
+  },
+  "merge_conflicts": [
+    {
+      "file": "src/repo/apply.rs",
+      "resolution": "Retained all file-comparison and Tour action arms additively."
+    }
+  ],
+  "integration_only_followup": {
+    "commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "files": [
+      "src/repo/tour/mod.rs",
+      "src/repo/file_comparison/mod.rs",
+      "src/repo/load.rs"
+    ],
+    "change": "Tour and comparison mutually drop old reader states; profileconnection reload drops Tour and Activity snapshots. Existing realPractice UI test exercises dispatch transitions and weak-generation cancellation. No added test names or transport API adaptation."
+  },
+  "expected_tests_manifest": "/workspace/work/integration-d182105-expected-tests.json",
+  "expected_tests_sha256": "e00e2ab396d4e4aa10acfb1ccedc8c7681eeca9d0a6ab806ded67f04e49f1a79",
+  "workflow": {
+    "matches_original_dev_bytes": true,
+    "push_branches": [
+      "master"
+    ],
+    "ci_used": false,
+    "ci_policy": "Deferred until all implementation, final history assembly, local tests and adversarial reviews complete."
+  },
+  "application_only_merge": "Incoming old b05 validation files omitted; evidence-only76500e5 not merged. Product documentation retained.",
+  "limits": [
+    "Local Linux only; nativeWindows/liveSSH/WSL/provider credentials not exercised. Recording-only transport fixtures.",
+    "Independent unit PASS and local combined gates do not replace final whole-scope adversarial review."
+  ],
+  "binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "8303695f07d51c135701b7bfbd63437e2c4b8231cb7f5a42a67dacbbd4501333",
+    "source_binding": "Fresh compilation from /workspace/work/integration after private package clean at merge; final candidate rebuild and focused actualUI plus full default executed on immutable pushed d182105."
+  }
+}

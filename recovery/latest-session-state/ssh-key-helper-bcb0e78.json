@@ -1,0 +1,258 @@
+{
+  "feature": "Issue #43 named bullet: SSH key helper",
+  "status": "CORRECTED LOCAL GATES PASS; INDEPENDENT RE-REVIEW PENDING",
+  "head": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+  "tree": "9946698fef1a2b66b6f50ef4ab0d0172b98cc362",
+  "remote_sha": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+  "branch": "codex/ssh-key-helper",
+  "worktree": "/workspace/work/ssh-key-helper",
+  "accepted_green_base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "eligibility": {
+    "queue": "/workspace/work/implementation-queue.json: SSH key helper",
+    "source": "/workspace/work/issues.json issue43",
+    "acceptance": [
+      "Explicit ed25519 creation",
+      "Add selected key to agent",
+      "Register public key on GitHub/Forgejo/Gitea via existing login",
+      "Test with ssh -T",
+      "For SSH/WSL repositories all steps run there"
+    ],
+    "overlap": "audit_39_44.json confirms none; PR95 explicitly leaves SSH-key case explanation-only for this helper; supplied prs.json reviewed."
+  },
+  "source_sha256": {
+    "README.md": "d9615aa9f4e19e9de91e8d9fd278985dffe5abdf89dbaf4e7cc04d132f268651",
+    "src/connections.rs": "9abc0d95c06c0600adbf540a7283a889a6cd8c20801eb45136deea100d509e66",
+    "src/forge/gitea/mod.rs": "ba62e71f70d60620a33c21212c7400809ec2f10a9311e44346cf4a6b0f343f5b",
+    "src/forge/http.rs": "d5e83998842bafd474b4577437804065720d4fbb40e6dcae9261378cd87bb1bc",
+    "src/forge/mod.rs": "44fef484111c8e235637439e485e6d44d0414e13cbec412d79605a7929117def",
+    "src/forge/ssh_keys.rs": "34de7f6b44fb4275e9584f9fa3d4b4fa75169ad4b655de09c8dbb6b53f100890",
+    "src/forge/ssh_keys/public_key.rs": "4adb69a59dfac6e58ee52a8df19c5a8085fedbc8a3b13989c64811cb191d50c7",
+    "src/manual.rs": "5fe7f0a38c20453ca54ffe8e05c02a9e5aa00e096a4065406275e9a46fda78f4",
+    "src/repo/actions.rs": "b049703fd78dd65411532af782f26296eb89493bc2651672815385ec714fe80d",
+    "src/repo/apply.rs": "6e3f9260819bc3a2d43b8a22f283bd2628929a2794769e988e8c85ddb0e5740b",
+    "src/repo/keyboard.rs": "2e95047c95d79057b978a6ed40c27a014a4d6b13c56aa5c99a55b6b7b98b263c",
+    "src/repo/keyboard/tests.rs": "329ef29229ce55588b11d8c18d4bef413d30722170da9c31534f6d8fa3556379",
+    "src/repo/layout.rs": "65f01cc12c8c760dd9ebb31de92bd3f679e370261bd127618e8ad953758ff777",
+    "src/repo/mod.rs": "d0fd12450ee442f7c2a15bb283f3186de0cbb3decae26926328bcdc7a5b342e3",
+    "src/repo/ssh_setup/PLAN.md": "3f1cbd5ff6acfa241eab21cec66a04c6c25eda7b02337e57025c34e19be8cf28",
+    "src/repo/ssh_setup/mod.rs": "261afd60344bb16282888f3e880c36dfc024a4ed2a437b60bc97b11c4b820eeb",
+    "src/repo/ssh_setup/plan.rs": "a1b7f00aa294811826dea37acd1645806ce56caca47363ee8be479d7afa640c2",
+    "src/repo/ssh_setup/tests.rs": "e9efc8abab51a57bd37d8e33629eda2c0c27ca5667dc8c1929ae47e6f7e325fe",
+    "src/repo/worktree_tab/mod.rs": "5baabf90363ec917a13ae31bcb67932cbade16eba5ea42e6ca53a7c9ee79b4c7",
+    "src/terminal/mod.rs": "cd840453c6ef3d845987b7db29e07e0fab6075703b6e2e6d19ed28eab39f9b55"
+  },
+  "logs_sha256": {
+    "/workspace/work/ssh-key-helper-targeted-bcb0e78.log": "33676a71e49cf141c03b584a40f26ce853ebaea879138c98558faae0ed339c19",
+    "/workspace/work/ssh-key-helper-fmt-bcb0e78.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/workspace/work/ssh-key-helper-clippy-bcb0e78.log": "011d0a948e66deb21b86643f549b2a8f1624d852e2319d2ae4c561bd19b6b129",
+    "/workspace/work/ssh-key-helper-test-bcb0e78.log": "0bc852bd2e73d5ab64f619d4e0df66cf0415e4c2c32f3737847898201c5b18eb",
+    "/workspace/work/ssh-key-helper-test-list-bcb0e78.log": "aeea4af9e2de8bcd389244d87a7f4ce224bc7c707fa165fabc226d7b8377401d"
+  },
+  "tested_library_binary": {
+    "path": "/workspace/work/ssh-key-helper/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "sha256": "317b9450f7142030a3d1245bcf74f0e0479e9dbf235bfa11e4b69a7f9bde9c83"
+  },
+  "commits": [
+    {
+      "sha": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Use result inspection for the WSL fallback no-operation assertion"
+    },
+    {
+      "sha": "904d76ecfc66f6ba2b800b66f978b071014de04a",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Refuse reserved WSL UNC shares before Windows SSH setup fallback"
+    },
+    {
+      "sha": "32f72244ca8b0386915173eacbbb9f87e39d25ad",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Bind SSH transport fixtures and manual to the explicit agent boundary"
+    },
+    {
+      "sha": "3cf4e2a32dec42627e6ef424e2f5a5ff91860a6a",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Keep remote SSH setup keys out of this computer\u2019s forwarded agent"
+    },
+    {
+      "sha": "660d88625f583ab3e96ee759d955cc37c9555bd3",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Keep SSH setup terminal prompts visible in the minimum application viewport"
+    },
+    {
+      "sha": "7b991690b23e637bdef2134c94bf801b3a981a7a",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Complete fail-closed SSH setup construction and local public-path guard"
+    },
+    {
+      "sha": "62cb96c3a5de629dbcc2fa672ddf4f0deb5d993f",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Refuse invalid repository machines and unselected SSH upload paths"
+    },
+    {
+      "sha": "d71e65dad23190f7abcf50ed61ac6ab9c72cb94e",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Keep SSH setup status handling portable and clarify remote tea server selection"
+    },
+    {
+      "sha": "9a3996afc08bb0fb394da01487045957d404af5c",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Keep repository shortcuts and queued staging out of SSH setup input"
+    },
+    {
+      "sha": "584fc744c1f4840f279b32fc79966ee5ef0af9e4",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Verify opening SSH helper has no key or account side effects"
+    },
+    {
+      "sha": "d7f616c45cdb37e78e5874d3d66fc76e0b972425",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Verify Forgejo and Gitea public-key API requests against owned loopback fixtures"
+    },
+    {
+      "sha": "1ba6633b4658fe7c909f088ce770f58081666271",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Record remote SSH setup effects with isolated fake tools and scrub tea identity environment"
+    },
+    {
+      "sha": "5d2bfaff89e4db960f1efb233ba58261dad4dfd1",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Exercise SSH account pinning and public-only payloads with recording CLI fixtures"
+    },
+    {
+      "sha": "3c51d183b199fc49e46efb484d045ee08e59ffbb",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Wire explicit repository SSH setup with owned terminals and pinned account uploads"
+    },
+    {
+      "sha": "71c89006dde8b96231ca4fa51c51827513530165",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Constrain SSH registration to validated public keys and captured accounts"
+    },
+    {
+      "sha": "1269c54e8c72391e9f6b388c06d6bdac6e06220a",
+      "author": "Jonas Kamsker",
+      "email": "11245306+JKamsker@users.noreply.github.com",
+      "title": "Plan explicit SSH setup commands without process execution"
+    }
+  ],
+  "gates": {
+    "targeted": "cargo test --locked ssh_ -- --nocapture:41 passed,799 filtered;20 current helper cases plus21 existing SSH cases",
+    "fmt": "cargo fmt --all -- --check PASS",
+    "clippy": "cargo clippy --locked --all-targets -- -D warnings PASS",
+    "full": "cargo test --locked -- --nocapture:837 passed,3 ignored,0 filtered; no skips",
+    "registered": "840 library tests,0 main,0 doc tests"
+  },
+  "new_tests": [
+    "forge::ssh_keys::public_key::tests::only_public_key_fields_leave_the_validator",
+    "forge::ssh_keys::tests::account_mismatch_cancel_and_diagnostics_never_submit_or_leak_private_input",
+    "forge::ssh_keys::tests::checked_github_upload_pins_token_across_login_and_profile_changes",
+    "forge::ssh_keys::tests::forgejo_and_gitea_registration_posts_only_public_key_to_user_keys",
+    "repo::keyboard::tests::ssh_setup_owns_repository_keys_and_refuses_previously_queued_file_actions",
+    "repo::ssh_setup::plan::tests::chosen_identity_test_ignores_other_identity_files_and_agent_keys",
+    "repo::ssh_setup::plan::tests::local_generation_is_interactive_and_requires_exclusive_new_folder",
+    "repo::ssh_setup::plan::tests::ordinary_unc_and_local_paths_keep_their_platform_boundary",
+    "repo::ssh_setup::plan::tests::remote_scripts_quote_paths_without_local_key_or_credential_routing",
+    "repo::ssh_setup::plan::tests::windows_reserved_wsl_unc_never_falls_back_after_parse_failure",
+    "repo::ssh_setup::tests::closing_worker_drops_late_results_without_applying_an_action",
+    "repo::ssh_setup::tests::exclusive_folder_reservation_never_reuses_or_removes_existing_files",
+    "repo::ssh_setup::tests::invalid_locations_and_unselected_local_upload_paths_refuse_before_any_io",
+    "repo::ssh_setup::tests::opening_setup_ui_exposes_each_step_without_running_tools_or_changing_profiles",
+    "repo::ssh_setup::tests::owned_recording_terminal_reports_actual_exit_without_generating_a_key",
+    "repo::ssh_setup::tests::practice_backstop_refuses_before_any_setup_job",
+    "repo::ssh_setup::tests::recording::remote_generation_agent_and_test_use_recording_tools_and_never_overwrite",
+    "repo::ssh_setup::tests::recording::remote_registration_uploads_only_validated_public_fields_using_named_login",
+    "repo::ssh_setup::tests::remote_plans_never_need_local_profile_key_or_token_values",
+    "repo::ssh_setup::tests::ssh_setup_terminal_prompt_remains_visible_at_minimum_window_height"
+  ],
+  "environment": {
+    "private_target": "/workspace/work/ssh-key-helper/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "optional_SSH_WSL": "unset",
+    "CI": "No CI use/dispatch/rerun/poll/wait; user explicitly defers CI to final consolidated completion",
+    "cache": "Hardlinked accepted SOPS dependency cache then private package clean; actual compile path is ssh-key-helper worktree."
+  },
+  "contracts": [
+    "No action when helper opens; explicit per-step execution; Practice backstop before every worker action.",
+    "Keys generated only inside exclusively created new folder; local create_dir and UNIX0700, remote mkdir without-p; never overwrite/reuse folders or delete key material.",
+    "Passphrases go through installed OpenSSH in existing PTY, never app fields/argv/settings/activity; no app private-key reads.",
+    "Local upload accepts typed validated public fields only; bounded input, SSH wire checks, no comments/private headers/extra lines.",
+    "GitHub account check and eventual one-use upload share exact captured token environment; Gitea API captures its checked login. No global account switch.",
+    "SSH/WSL setup uses own machine tools/logins; local credentials/paths not copied. SSH transport-a disables local-agent forwarding.",
+    "Remote public upload is reduced/validated before CLI; tea gets only owned temporary public data and explicit login/account confirmation.",
+    "All account/file reservation work runs in connections::spawn with captured Context and private active/receiver ownership. Close/profile changes discard late results.",
+    "Repository keyboard capture and queued file actions refuse while setup is open; helper keeps parked worktrees unfinished until closed.",
+    "No new process controller, host PID selector/watchdog/signals or remote session APIs; existing owned Terminal and bounded_process only."
+  ],
+  "fixture_scope": [
+    "Pure command/path/format assertions cover POSIX/native-Windows/SSH/WSL routing.",
+    "New executable fixtures use env_clear, isolated HOME/TMPDIR, owned recording fake ssh-keygen/ssh-add/ssh/gh/tea only; no user keys/accounts or actual remote transport.",
+    "Local GH fixtures verify exact-token pinning across simulated login/profile changes, cancellation and diagnostic redaction.",
+    "Owned loopback HTTP fixtures verify Forgejo/Gitea POST /api/v1/user/keys with dummy token and public-only payload.",
+    "Actual egui rendering proves setup has no startup side effects and terminal prompt remains visible in supported800x500 viewport."
+  ],
+  "limits": [
+    "Existing OpenSSH tools and an already available agent are required; helper does not launch daemon/change global SSH configuration.",
+    "Remote Forgejo/Gitea upload requires tea0.16+; command syntax inspected from official Go module source, not an actual remote service.",
+    "Direct SSH test deliberately ignores additive identities/agent keys and SSH aliases/proxies; enter actual destination/port and read forge greeting because exit1 may indicate authenticated no-shell account.",
+    "Closing cannot undo an already submitted remote/API mutation; new key folders/files are retained.",
+    "Native Windows and live SSH/WSL/forge accounts were not exercised. CI remains deferred by explicit user policy.",
+    "Independent exact-candidate review and final combined source/tests are still required before the one final PR.",
+    "Native Windows cases were added but not executed on Linux; exact Windows fallback function was exercised with explicit platform=true pure fixtures. No CI was used."
+  ],
+  "prior_evidence": {
+    "check_3c51d18": "all-target check passed with unused import fixed5d2bfaf",
+    "targeted_5d2bfaf": "31pass/1fail: invalid WSL fixture name corrected1ba6633",
+    "targeted_584fc74": "35pass/1fail: overbroad assertion also matched valid bounded public read; narrowed9a3996a; real payload recording already passed",
+    "clippy_9a3996a": "37 targeted passed; collapsible-if fixedd71e65d",
+    "full_d71e65d": "833 passed+3ignored; final path and viewport/agent refinements followed",
+    "full_7b99169": "834 passed+3ignored",
+    "full_660d886": "835 passed+3ignored; final transport-a boundary followed",
+    "partial_static_62cb96c": "Model/test checkpoint only; full application wiring completed7b99169 before any check/execution",
+    "clippy_904d76e": "41 focused passed; test-only manual_inspect lint corrected in separate pushedbcb0e78 before final gates."
+  },
+  "created_utc": "2026-11-07T05:22:26.779923+00:00",
+  "tea_source": {
+    "url": "https://proxy.golang.org/code.gitea.io/tea/@v/v0.16.0.zip",
+    "sha256": "561f33e999ef89403fda25990e394b21f45a2e1215ffd1b5803a407b5f3352d8",
+    "use": "CLI syntax/API source inspection only; not executed or installed"
+  },
+  "correction": {
+    "finding": "P2: reject malformed reserved WSL UNC shares before native Windows local fallback",
+    "review": "/workspace/work/review-ssh-key-helper/SSH_HELPER_REVIEW.md",
+    "original_review_head": "32f72244ca8b0386915173eacbbb9f87e39d25ad",
+    "original_source_tree_unchanged": true,
+    "all20_original_source_hashes_verified_from_git_object": true,
+    "production_fix_commit": "904d76ecfc66f6ba2b800b66f978b071014de04a",
+    "test_lint_commit": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+    "changed_paths_from_reviewed_original": [
+      "src/repo/ssh_setup/plan.rs",
+      "src/repo/ssh_setup/tests.rs"
+    ],
+    "behavior": "Successful remote parsing remains authoritative. If parsing fails, native Windows reserved wsl.localhost/wsl$ UNC authorities, including case/separator/extended forms, are rejected before local fallback. Whole server components are matched; ordinary UNC/local paths and non-Windows share semantics are preserved.",
+    "linux_executed_new_tests": [
+      "repo::ssh_setup::plan::tests::windows_reserved_wsl_unc_never_falls_back_after_parse_failure",
+      "repo::ssh_setup::plan::tests::ordinary_unc_and_local_paths_keep_their_platform_boundary"
+    ],
+    "native_windows_added_not_executed": [
+      "repo::ssh_setup::plan::tests::native_windows_valid_wsl_unc_variants_stay_remote",
+      "repo::ssh_setup::tests::failed_open_wsl_unc_cannot_construct_a_local_setup_view"
+    ],
+    "native_test_containment": "Valid UNC parsing is pure. Failed-open UI fixture constructs the existing watcher on an owned local directory, then replaces only the model path; no UNC filesystem lookup or WSL process is needed."
+  }
+}

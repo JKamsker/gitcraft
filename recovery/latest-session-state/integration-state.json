@@ -2,12 +2,12 @@
   "branch": "codex/remaining-features",
   "worktree": "/workspace/work/integration",
   "base": "74027116e8f20334716a6b1208717bb33c9c6280",
-  "head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
   "remote": "origin",
-  "remote_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
   "pushed": true,
   "remote_branch_url": "https://github.com/JKamsker/gitcraft/tree/codex/remaining-features",
-  "status": "17 eligible ideas integrated. Fresh private Linux fmt/strict all-target Clippy/full866passed3ignored0filtered PASS; exact869 test-name union verified. CI deferred by explicit user policy. Final all-scope implementation/history assembly/review pending.",
+  "status": "19 eligible ideas integrated. Fresh private Linux fmt/strict all-target Clippy/full891passed3ignored0filtered PASS; exact894 test-name union verified. CI deferred by explicit user policy. Final all-scope implementation/history assembly/review pending.",
   "merged_features": [
     {
       "feature": "gerrit",
@@ -125,6 +125,19 @@
       "strategy": "merge --no-ff; additive conflict resolution; incoming transient validation artifacts omitted",
       "individual_review": "PASS",
       "review_report": "/workspace/work/review-working-drafts-3cef22c.json"
+    },
+    {
+      "feature": "tour_and_portable_setup",
+      "named_features": [
+        "#45 A tour of this repository",
+        "#45 New machine, same setup"
+      ],
+      "reviewed_sha": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "integration_merge_sha": "0447e56a42564bd87debda9988e1809a3fa90119",
+      "integration_followup_sha": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+      "strategy": "merge --no-ff; additive conflict; transient validation artifacts omitted",
+      "individual_review": "PASS",
+      "review_report": "/workspace/work/review-portable-setup/docs/validation/independent-portable-setup-55df0d2/review.md"
     }
   ],
   "merge_conflicts": [
@@ -211,6 +224,13 @@
         "src/repo/mod.rs"
       ],
       "resolution": "Kept both Drafts and file-comparison modules; kept file-comparison reset plus Drafts cancellation on Profile reload; retained completion-aware forecast_spawn which itself captures immutable Profile context; SOPS per-view choice/drop/raw staging lifecycle preserved."
+    },
+    {
+      "merge": "tour_and_portable_setup",
+      "files": [
+        "src/repo/apply.rs"
+      ],
+      "resolution": "Retained all file-comparison and Tour action arms additively."
     }
   ],
   "integration_only_changes": [
@@ -299,6 +319,15 @@
         "AGENTS.md"
       ],
       "change": "Merge independently approved aab2a25 fixture containment; production PID0/1 stop no-op, synthetic process-table and recording-only signals in default test. Add exact author identity and clean per-feature final-history policy. Application files identical to approved aab2a25; no new test run claimed."
+    },
+    {
+      "sha": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+      "files": [
+        "src/repo/tour/mod.rs",
+        "src/repo/file_comparison/mod.rs",
+        "src/repo/load.rs"
+      ],
+      "change": "Tour and comparison mutually drop old reader states; profileconnection reload drops Tour and Activity snapshots. Existing realPractice UI test exercises dispatch transitions and weak-generation cancellation. No added test names or transport API adaptation."
     }
   ],
   "preservation_checks": {
@@ -321,7 +350,8 @@
     "all_eleven_reviewed_commits_ancestors_of_head": true,
     "profile_unshared_unique_files_byte_identical_to_reviewed_head": 13,
     "new_sops_drafts_unique_files_byte_identical_to_reviewed_heads": true,
-    "workflow_exact_original_dev_master_only": true
+    "workflow_exact_original_dev_master_only": true,
+    "tour_portability_unique_files_byte_identical_except_declared_tour_lifecycle": true
   },
   "combined_checks": {
     "private_target": "/workspace/work/integration/target",
@@ -331,13 +361,13 @@
     "fmt": "PASS",
     "clippy": "PASS --all-targets -- -D warnings",
     "tests": {
-      "passed": 866,
+      "passed": 891,
       "failed": 0,
       "ignored": 3,
       "filtered_out": 0,
-      "registered": 869
+      "registered": 894
     },
-    "expected_tests_manifest": "/workspace/work/integration-b5df680-expected-tests.json",
+    "expected_tests_manifest": "/workspace/work/integration-d182105-expected-tests.json",
     "feature_new_tests": {
       "gerrit": 8,
       "clone": 8,
@@ -353,7 +383,8 @@
       "file_comparison_views": 26,
       "windows_portability": 2,
       "sops_encrypted_comparisons": 22,
-      "working_drafts": 27
+      "working_drafts": 27,
+      "tour_and_portable_setup": 25
     },
     "feature_net_test_increase": {
       "gerrit": 8,
@@ -370,36 +401,37 @@
       "file_comparison_views": 26,
       "windows_portability": 2,
       "sops_encrypted_comparisons": 22,
-      "working_drafts": 27
+      "working_drafts": 27,
+      "tour_and_portable_setup": 25
     },
     "contrast_replaced_baseline_test": [
       "theme::catalog::tests::every_theme_keeps_its_text_readable"
     ],
     "logs": {
-      "clean": {
-        "path": "/workspace/work/integration-b5df680-clean.log",
-        "sha256": "a0b7d2b060fbf2188bf8b8bfb513257e7be7fb287b38c466dd4c16e968172703",
-        "bytes": 36
-      },
       "fmt": {
-        "path": "/workspace/work/integration-b5df680-fmt.log",
+        "path": "/workspace/work/integration-d182105-fmt.log",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "bytes": 0
       },
+      "targeted": {
+        "path": "/workspace/work/integration-d182105-targeted.log",
+        "sha256": "589942b5cf4d6c440a3ef4d8a56f259829388bbba8ce6858eee4a7c34904a15b",
+        "bytes": 601
+      },
       "clippy": {
-        "path": "/workspace/work/integration-b5df680-clippy.log",
-        "sha256": "e0a13be946bc946193ab4edacd58dc15a919e88ef5a4cd5a30493a06c21c5743",
-        "bytes": 160
+        "path": "/workspace/work/integration-d182105-clippy.log",
+        "sha256": "79296ab72856052d8e8db20ab6c9437f3ccf3e538e0db397f2d2796565cc1c14",
+        "bytes": 132
       },
       "test": {
-        "path": "/workspace/work/integration-b5df680-test.log",
-        "sha256": "0edb2a825b5f095d686ac6c24a5c824d1abadaaf11c4e1039497872b21b27e85",
-        "bytes": 72610
+        "path": "/workspace/work/integration-d182105-test.log",
+        "sha256": "8508f24b635b7e6450811041e4892df4123463f995902b53b8b23cb58365a195",
+        "bytes": 75158
       },
       "test-list": {
-        "path": "/workspace/work/integration-b5df680-test-list.log",
-        "sha256": "be4e189122d87d72f53d3d6576c0aa3c8cb123f9e41f22f220346ce6d9443b62",
-        "bytes": 66902
+        "path": "/workspace/work/integration-d182105-test-list.log",
+        "sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
+        "bytes": 69329
       }
     },
     "integration_cross_feature_regressions": {
@@ -429,20 +461,28 @@
           "sha256": "add01b50ae7d33db9a35ce4e8f98f4596b261c29d0607d799fd114e1a5aac077",
           "result": "PASS: actual hostile-profile and hostile-env App paths with normal-repo profile controls"
         }
+      },
+      "tour_comparison_profile_lifetime": {
+        "test": "repo::tour::tests::tour_ui_checklist_and_close_button_are_connected",
+        "result": "PASS focused1/1 and in fullsuite; immutable source pushed before execution",
+        "log": {
+          "path": "/workspace/work/integration-d182105-targeted.log",
+          "sha256": "589942b5cf4d6c440a3ef4d8a56f259829388bbba8ce6858eee4a7c34904a15b",
+          "bytes": 601
+        }
       }
     },
     "additional_integration_tests": [
       "bounded_process::tests::configured_stream_caps_are_independent_and_keep_boundary_bytes"
     ],
-    "prior_gates_state": "/workspace/work/integration-state-8989a1f-pre-sops-drafts.json",
-    "source_commit": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
-    "test_list": "/workspace/work/integration-b5df680-test-list.log",
-    "test_list_sha256": "be4e189122d87d72f53d3d6576c0aa3c8cb123f9e41f22f220346ce6d9443b62",
+    "prior_gates_state": "/workspace/work/integration-state-b5df680-pre-tour-portability.json",
+    "source_commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "test_list": "/workspace/work/integration-d182105-test-list.log",
+    "test_list_sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
     "independent_supporting_unit_review": "/workspace/work/review-process-test-containment-aab2a25-final.json",
     "cargo_incremental": "0"
   },
   "not_merged": [
-    "Tour/Portability b05 full809pass3ignored but independent review FAIL: ambient network URL rewrite and Windows locked-worktree retry spelling. Separate corrective unit now assigned; not integrated.",
     "Push Preflight protocol43c1691 static FAIL3ownership/capability blockers; local correction and remote owned completion follow-up pending",
     "Content recovery8f992 backend WIP; standalone file tools and SSH helper assigned; other eligible queued ideas remain in scope"
   ],
@@ -453,8 +493,8 @@
     "instructions": "Return integration write ownership to parent after this handoff. No CI use until final assembled all-scope candidate is locally validated and independently reviewed.",
     "final_branch_history": "Rebuild from dev with one correctly authored commit per feature, preserving existing source/recovery branches. Rebuilt exact candidate must pass tests and independent adversarial review before ONE PR."
   },
-  "previous_head": "8989a1fe580f52d08704011fe883081a1a9f26bc",
-  "previous_round_state": "/workspace/work/integration-state-8989a1f-pre-sops-drafts.json",
+  "previous_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
+  "previous_round_state": "/workspace/work/integration-state-b5df680-pre-tour-portability.json",
   "next_batch_cross_feature_requirements": [
     "Preserve practice context recognition and sandbox routing before active-profile/global application, including credential helpers, raw reads, piped history and terminals.",
     "When profile connections merge, rerun actualApp hostile caller/global/profile practice integration regression plus normal-tab profile control; add explicit cross-feature account-model coverage as needed.",
@@ -462,13 +502,13 @@
     "Keepnewboundedbinarybundlelocalroute onsharedrepository_command; extendedPractice hostileApp test mustcontinuepassing afterprofile/account/workerscope merges.",
     "Preserve fallible repository_command and Practice-first error/SSH/credential bypass; rerun combined hostile selected-connection App fixture after further transport/account changes."
   ],
-  "tree": "b190db7e84d3db04c305daf31dca79e207bb85de",
-  "source_diff_sha256": "8b8c670d53a54c742214388663ca6ebf1534c087d2b2ecb75473838d7532dfc4",
+  "tree": "60b4ae6146a22083c657d1745bcc3e5d4b67ba2e",
+  "source_diff_sha256": "44e0348a6b6cd2324094cf98c7ea14730ae7ded5b8f73876905445c1b54ed789",
   "held_keyboard_candidate_evidence": "/workspace/work/integration-candidate-04b737d.json",
   "application_validation_binding": {
-    "application_commit": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
-    "source_tree": "8242b08664d754c8d8360d5287ce7c53ed56da98",
-    "manifest": "/workspace/work/integration-b5df680-gates.json",
+    "application_commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "source_tree": "fd8c51103c41a6cf7700f690b05eea59501ee587",
+    "manifest": "/workspace/work/integration-d182105-gates.json",
     "fresh_private_package_clean": true,
     "actual_compile_worktree": "/workspace/work/integration",
     "cargo_tests_repeated": true,
@@ -476,22 +516,22 @@
     "scope": "Exact combined local Linux gates; no CI or final whole-scope approval"
   },
   "workflow_validation": {
-    "commit": "8989a1fe580f52d08704011fe883081a1a9f26bc",
+    "commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
     "branch_filter": [
       "master"
     ],
-    "validation": "Byte-identical to original dev7402711 workflow; unchanged by both integration merge units.",
+    "validation": "Byte-identical original dev7402711 master-only workflow; unchanged through application merge and lifecycle followup.",
     "ci_used_during_this_unit": false,
     "actions_result": "NOT REQUESTED/POLLED/AWAITED; explicit user policy defers CI until all side work, final assembly, local gates and independent reviews complete.",
     "prior_historical_ci_records": "Archived in prior integration-state; not current validation/acceptance."
   },
   "unit_preservation": {
-    "commit": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
-    "status": "SOPS and Drafts merge units separately committed/pushed; exact author and remote SHA verified before fresh private gates",
+    "commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "status": "Reviewed application merge and narrow lifecycle unit separately committed/pushed; correct author and remoteSHA verified before exact private gates",
     "author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
     "author_name": "Jonas Kamsker",
     "author_email": "11245306+JKamsker@users.noreply.github.com",
-    "combined_gate_manifest": "/workspace/work/integration-b5df680-gates.json",
+    "combined_gate_manifest": "/workspace/work/integration-d182105-gates.json",
     "giant_pr_created": false
   },
   "supporting_units": [

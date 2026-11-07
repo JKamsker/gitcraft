@@ -65,14 +65,14 @@
           "Open #57 handles rejected pushes and leases; #96 DCO is distinct; #106 LFS tools and #52/#134 autosquash helpers could be reused after merge."
         ]
       },
-      "status": "fixing_static_protocol_review_blockers",
+      "status": "implementing_remote_repair",
       "agent": "review_weather",
       "branch": "codex/push-preflight",
       "worktree": "/workspace/work/push-preflight",
       "base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93",
-      "commit": "3ef21abfb112cc0105b437737427291ce44c4842",
+      "commit": "1c6d1611ead6f39b0ab60947a08af504cfa4aa19",
       "reviewer": "baseline_validation",
-      "validation": "private fmt/clippy/test PASS711+3ignored714total23feature+2duplicateprocess tests",
+      "validation": "Local full926pass3ignored929registered; local production Gate2 independent21/21 PASS. Remote automaticrepair and final whole-feature review pending.",
       "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto",
       "latest_preserved_head": "43c169159af81b3e85c13b8e6a19e1d040ddc4d3",
       "review_report": "/workspace/work/review-push-repair-protocol/review-evidence/push-repair-protocol-43c1691.json",
@@ -103,13 +103,15 @@
           "Needs Git object reader and content search, remote background command support."
         ]
       },
-      "status": "implementing",
+      "status": "reviewed_ready_to_integrate",
       "agent": "audit_32_38",
       "branch": "codex/content-recovery",
       "worktree": "/workspace/work/content-recovery",
       "latest_preserved_head": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
-      "validation": "Targeted19retry, root identity race fix in progress",
-      "reviewer": "review_portable_setup"
+      "validation": "Local full811pass3ignored814registered; exact independent22/22PASS; queued after SSH integration.",
+      "reviewer": "review_portable_setup",
+      "commit": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+      "review_commit": "45e980e49d940b983cf72fa287666aa910258f93"
     },
     {
       "issue": 32,
@@ -548,7 +550,12 @@
           "Open #73 search operators and #84 graph order/first-parent are distinct and should compose."
         ]
       },
-      "status": "queued"
+      "status": "awaiting_independent_review",
+      "agent": "audit_32_38",
+      "branch": "codex/history-investigations",
+      "worktree": "/workspace/work/history-investigations",
+      "commit": "80b2e50f069d8215b0801c7d674a03331da8d819",
+      "validation": "Local878pass3ignored881registered;12new focusedcases. Frozen copiedreviewbinary bound in manifest."
     },
     {
       "issue": 36,
@@ -575,7 +582,10 @@
           "Open #110 history of selected lines is narrower and does not provide dossier/review comments."
         ]
       },
-      "status": "queued"
+      "status": "implementing",
+      "agent": "audit_32_38",
+      "branch": "codex/history-investigations",
+      "worktree": "/workspace/work/history-investigations"
     },
     {
       "issue": 36,
@@ -601,7 +611,9 @@
           "Language parsers/grammars, rename/body-similarity index, repository history cache and PR linkage."
         ]
       },
-      "status": "queued"
+      "status": "assigned",
+      "agent": "audit_32_38",
+      "branch": "codex/history-investigations"
     },
     {
       "issue": 36,
@@ -628,7 +640,9 @@
           "Open #128 generated-file patterns may supply reusable exclusions."
         ]
       },
-      "status": "queued"
+      "status": "assigned",
+      "agent": "audit_32_38",
+      "branch": "codex/history-investigations"
     },
     {
       "issue": 37,
@@ -1110,7 +1124,10 @@
         ],
         "effort": "L"
       },
-      "status": "queued"
+      "status": "implementing",
+      "agent": "audit_45_50",
+      "branch": "codex/forge-providers",
+      "worktree": "/workspace/work/forge-providers"
     },
     {
       "issue": 43,
@@ -1134,7 +1151,10 @@
         ],
         "effort": "L"
       },
-      "status": "queued"
+      "status": "assigned",
+      "agent": "audit_45_50",
+      "branch": "codex/forge-providers",
+      "worktree": "/workspace/work/forge-providers"
     },
     {
       "issue": 43,
@@ -1199,12 +1219,15 @@
         ],
         "effort": "S-M"
       },
-      "status": "implementing",
+      "status": "integrating",
       "agent": "implement_gerrit",
       "branch": "codex/ssh-key-helper",
       "worktree": "/workspace/work/ssh-key-helper",
       "latest_preserved_head": "3c51d183b199fc49e46efb484d045ee08e59ffbb",
-      "validation": "Plan/public-key registration/UI wired; initial compile ongoing"
+      "validation": "Local837pass3ignored840registered; independent41focusedPASS; integrationd2bc962 gatespending.",
+      "commit": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+      "reviewer": "review_ssh_key_helper",
+      "review_commit": "057e74ec27a17e4344a23148ab100c00a0138eb4"
     },
     {
       "issue": 43,
@@ -1254,12 +1277,14 @@
         ],
         "effort": "M"
       },
-      "status": "implementing",
+      "status": "independent_review",
       "agent": "audit_39_44",
       "branch": "codex/standalone-file-tools",
       "worktree": "/workspace/work/standalone-file-tools",
       "latest_preserved_head": "15fb8de83c051575d6671b563f2e2419ed336769",
-      "validation": "Foundation8PASS; UI/main wiring ongoing"
+      "validation": "Local842pass3ignored including3executabletests; fmtstrictClippyPASS; independentreviewinprogress.",
+      "commit": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+      "reviewer": "review_portable_setup"
     },
     {
       "issue": 45,
@@ -1340,15 +1365,17 @@
         ],
         "estimated_effort": "M"
       },
-      "status": "implementing",
+      "status": "integrated",
       "agent": "audit_45_50",
       "branch": "codex/onboarding-portability",
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
       "latest_preserved_head": "23816bd15ae471e9346730522d7941a491185dde",
-      "validation": "Two reviewed fixes/source regressions pushed; gates ongoing",
-      "reviewer": "review_portable_setup"
+      "validation": "Individual25PASS; main19local891pass3ignored894registered. Lifecycle d182 staticPASS09a1d493.",
+      "reviewer": "review_portable_setup",
+      "commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "integration_merge": "0447e56a42564bd87debda9988e1809a3fa90119"
     },
     {
       "issue": 45,
@@ -1382,15 +1409,17 @@
         ],
         "estimated_effort": "S-M"
       },
-      "status": "implementing",
+      "status": "integrated",
       "agent": "audit_45_50",
       "branch": "codex/onboarding-portability",
       "worktree": "/workspace/work/onboarding-portability",
       "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
       "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked",
       "latest_preserved_head": "23816bd15ae471e9346730522d7941a491185dde",
-      "validation": "Two reviewed fixes/source regressions pushed; gates ongoing",
-      "reviewer": "review_portable_setup"
+      "validation": "Individual25PASS; main19local891pass3ignored894registered. Lifecycle d182 staticPASS09a1d493.",
+      "reviewer": "review_portable_setup",
+      "commit": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+      "integration_merge": "0447e56a42564bd87debda9988e1809a3fa90119"
     },
     {
       "issue": 46,
@@ -2059,7 +2088,12 @@
         ],
         "estimated_effort": "M"
       },
-      "status": "queued"
+      "status": "implementing",
+      "agent": "implement_object_storage",
+      "branch": "codex/object-storage",
+      "worktree": "/workspace/work/object-storage",
+      "commit": "320fab90947667e6c4048dae7e72bd977496533a",
+      "validation": "Linux correctedrootownershipa3b4d7d full886pass3ignored889registered; Windows320 modulecross-typecheckPASS; remoteownedhelperimplementationongoing. Newfixedcandidateindependentreviewpending; originalcandidateFAIL/incomplete, blockedharnessmustnotrerun."
     },
     {
       "issue": 49,
@@ -2152,7 +2186,12 @@
         ],
         "estimated_effort": "M"
       },
-      "status": "queued"
+      "status": "implementing",
+      "agent": "implement_object_storage",
+      "branch": "codex/object-storage",
+      "worktree": "/workspace/work/object-storage",
+      "commit": "320fab90947667e6c4048dae7e72bd977496533a",
+      "validation": "Linux correctedrootownershipa3b4d7d full886pass3ignored889registered; Windows320 modulecross-typecheckPASS; remoteownedhelperimplementationongoing. Newfixedcandidateindependentreviewpending; originalcandidateFAIL/incomplete, blockedharnessmustnotrerun."
     },
     {
       "issue": 49,
@@ -2278,7 +2317,7 @@
     "single_final_pr": true,
     "integration_branch": "codex/remaining-features",
     "integration_worktree": "/workspace/work/integration",
-    "integration_agent": "review_weather",
+    "integration_agent": "implement_gerrit",
     "interim_prs_to_close": [
       153,
       154,
@@ -2291,13 +2330,24 @@
       154,
       155
     ],
-    "integration_remote_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+    "integration_remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
     "initial_combined_validation": "fmt/clippy/fulltest PASS686+3ignored689total",
-    "combined_validation": "fmt/clippy/fulltest PASS789+3ignored792total"
+    "combined_validation": "Latest green d182 LOCAL fmt/strictClippy/full891passed3ignored894registered; SSHmerge d2bc962 gatespending; all CI deferred."
   },
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
-  "recovery_status": "Filesystem restored after outage; execution paused for backup.",
-  "verified_remote_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+  "recovery_status": "Filesystem recovered; all current completed source/review units committed and pushed. Initial immutableZIP retained; live recoverymetadata updated separately.",
+  "verified_remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
   "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS.",
-  "final_commit_author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7"
+  "final_commit_author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
+  "status_counts": {
+    "integrated": 19,
+    "implementing_remote_repair": 1,
+    "reviewed_ready_to_integrate": 1,
+    "queued": 41,
+    "awaiting_independent_review": 1,
+    "implementing": 4,
+    "assigned": 3,
+    "integrating": 1,
+    "independent_review": 1
+  }
 }

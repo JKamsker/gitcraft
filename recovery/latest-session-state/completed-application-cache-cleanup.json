@@ -1,0 +1,51 @@
+[
+  {
+    "worktree": "/workspace/work/encrypted-diffs",
+    "target": "/workspace/work/encrypted-diffs/target",
+    "kind": "completed reviewed application cache only",
+    "status": "cleaned",
+    "output": "Removed 83 files, 2.4GiB total"
+  },
+  {
+    "worktree": "/workspace/work/working-drafts",
+    "target": "/workspace/work/working-drafts/target",
+    "kind": "completed reviewed application cache only",
+    "status": "cleaned",
+    "output": "Removed 134 files, 3.4GiB total"
+  },
+  {
+    "worktree": "/workspace/work/windows-portability-fixes",
+    "target": "/workspace/work/windows-portability-fixes/target",
+    "kind": "completed reviewed application cache only",
+    "status": "cleaned",
+    "output": "Removed 83 files, 2.3GiB total"
+  },
+  {
+    "worktree": "/workspace/work/content-recovery",
+    "target": "/workspace/work/content-recovery/target",
+    "kind": "completed reviewed or abandoned candidate application cache only; source, dependencies and evidence retained",
+    "status": "cleaned",
+    "output": "Removed 83 files, 2.4GiB total"
+  },
+  {
+    "worktree": "/workspace/work/onboarding-portability",
+    "target": "/workspace/work/onboarding-portability/target",
+    "kind": "completed reviewed or abandoned candidate application cache only; source, dependencies and evidence retained",
+    "status": "cleaned",
+    "output": "Removed 108 files, 2.4GiB total"
+  },
+  {
+    "worktree": "/workspace/work/process-test-containment",
+    "target": "/workspace/work/process-test-containment/target",
+    "kind": "completed reviewed or abandoned candidate application cache only; source, dependencies and evidence retained",
+    "status": "cleaned",
+    "output": "Removed 6 files, 1.4GiB total"
+  },
+  {
+    "worktree": "/workspace/work/review-file-comparison-146a2e3",
+    "target": "/workspace/work/review-file-comparison-146a2e3/target",
+    "kind": "completed reviewed or abandoned candidate application cache only; source, dependencies and evidence retained",
+    "status": "failed",
+    "output": "error: could not find `Cargo.toml` in `/workspace/work/review-file-comparison-146a2e3` or any parent directory"
+  }
+]

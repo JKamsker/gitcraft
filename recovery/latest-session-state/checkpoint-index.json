@@ -1,0 +1,65 @@
+{
+  "note": "19-feature exact green preserved; SSH integration pending, Content independentPASS, CIdeferred. Source units preserved separately on taskbranches; initial ZIP immutable.",
+  "files": {
+    "implementation-queue.json": {
+      "sha256": "2fec7b34cd014f34976417206f2b6b0613a5341e56cdbf67003316ee88937ba8",
+      "bytes": 125710
+    },
+    "root-operating-notes.json": {
+      "sha256": "4b13cc9b17299dac7a8f93bb85bb3641d751f889f30b40fd6b673790185df99b",
+      "bytes": 7766
+    },
+    "integration-state.json": {
+      "sha256": "2c2c292397544043f71934a879f00f900aed50fe040946e23e8bf88fb7682ffe",
+      "bytes": 27858
+    },
+    "completed-application-cache-cleanup.json": {
+      "sha256": "014f4676507f2f1f52c0da01796fdbf6345ae8c64198fcf4ec96d8eef482ee38",
+      "bytes": 2148
+    },
+    "integration-d182105-gates.json": {
+      "sha256": "f9f0c4058bec6180667cf3031a55b2bf731f5699bca64025be40b6b810a9d119",
+      "bytes": 10450
+    },
+    "integration-d182105-expected-tests.json": {
+      "sha256": "e00e2ab396d4e4aa10acfb1ccedc8c7681eeca9d0a6ab806ded67f04e49f1a79",
+      "bytes": 72590
+    },
+    "integration-d182105-fmt.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "integration-d182105-clippy.log": {
+      "sha256": "79296ab72856052d8e8db20ab6c9437f3ccf3e538e0db397f2d2796565cc1c14",
+      "bytes": 132
+    },
+    "integration-d182105-test.log": {
+      "sha256": "8508f24b635b7e6450811041e4892df4123463f995902b53b8b23cb58365a195",
+      "bytes": 75158
+    },
+    "integration-d182105-test-list.log": {
+      "sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
+      "bytes": 69329
+    },
+    "integration-d182105-targeted.log": {
+      "sha256": "589942b5cf4d6c440a3ef4d8a56f259829388bbba8ce6858eee4a7c34904a15b",
+      "bytes": 601
+    },
+    "saved-graph-views-validation.json": {
+      "sha256": "7a4ebe7759b9907d77afb0c3888d57b60918602c711552f5b4e2c257fafe68d6",
+      "bytes": 42511
+    },
+    "standalone-7fb68f2.json": {
+      "sha256": "401f3a39a11ee24771947d67043ec6b2e9adae4c70788a9f197a7d805861bda3",
+      "bytes": 11921
+    },
+    "content-recovery-validation.json": {
+      "sha256": "fe4d2bd10a372a169c1148476c3b0a97086829176866c5b5adab751d4f34f2b1",
+      "bytes": 12653
+    },
+    "ssh-key-helper-bcb0e78.json": {
+      "sha256": "f7668fd556c9a8accdf6be93d6ce4bc1203bf2ad1f934241c30d773680023f36",
+      "bytes": 16798
+    }
+  }
+}
