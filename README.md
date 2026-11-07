@@ -637,7 +637,8 @@ final proof restores borrowing or reports that backup's exact recovery path.
 Incomplete/promisor repositories, HTTP/cyclic/malformed alternates, linked worktrees,
 symlinked store metadata and packs beyond the bounded copy size are refused safely.
 
-Making a clone independent requires a local Linux or Windows conventional clone.
+Making a clone independent supports conventional clones on local Linux or Windows,
+or on Linux through the installed SSH/WSL helper described below.
 The action retains actual directory/file handles from the repository's ancestors
 through `.git/objects/info` and `pack`; it stages and verifies the copy before
 installing through those handles. Alternate removal is a create-only guarded rename,
@@ -645,8 +646,8 @@ and recovery publishes captured bytes through the held info directory without
 overwriting newer metadata.
 Windows holds every ancestor without delete sharing and exclusively owns the actual
 alternate file while clearing its contents; its held-file recovery cannot overwrite
-replacement metadata. SSH, WSL and other platforms retain read-only inspection and explain why this action
-is unavailable. Private `objects/gitcraft-independent-stage-*` directories are kept
+replacement metadata. Unsupported platforms retain read-only inspection and explain
+which independence capability is missing. Private `objects/gitcraft-independent-stage-*` directories are kept
 as recovery evidence; Linux installs share pack data with the stage; Windows retains protected copies.
 
 SSH/WSL independence requires the `gitcraft-object-storage-helper` executable supplied
