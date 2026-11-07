@@ -15,6 +15,8 @@ pub(crate) struct Reach {
     /// same commit are answered for.
     rows: Vec<Arc<Commit>>,
     sets: Vec<Set>,
+    /// First-parent reads can omit an arbitrary side path even with both endpoints loaded.
+    complete: Option<Vec<bool>>,
 }
 
 struct Set {
@@ -35,6 +37,7 @@ impl Reach {
         commits: &[Arc<Commit>],
         index: &HashMap<String, usize>,
         hashes: &[&str],
+        first_parent: bool,
     ) -> Self {
         let mut sets: Vec<Set> = Vec::new();
         for hash in hashes {
@@ -51,9 +54,20 @@ impl Reach {
                 descendants: descendants(commits, index, row),
             });
         }
+        let complete = first_parent.then(|| {
+            let mut complete = vec![false; commits.len()];
+            for i in (0..commits.len()).rev() {
+                complete[i] = commits[i]
+                    .parents
+                    .iter()
+                    .all(|p| index.get(p).is_some_and(|&p| p > i && complete[p]));
+            }
+            complete
+        });
         Self {
             rows: commits.to_vec(),
             sets,
+            complete,
         }
     }
 
@@ -130,13 +144,21 @@ impl Ancestry for GraphAncestry<'_> {
                 continue;
             }
             if set.hash == of {
-                return set.ancestors.get(a).copied();
+                return self.answer(set.ancestors[a], b);
             }
             if set.hash == ancestor {
-                return set.descendants.get(b).copied();
+                return self.answer(set.descendants[b], b);
             }
         }
         None
+    }
+}
+
+impl GraphAncestry<'_> {
+    fn answer(&self, ancestor: bool, of: usize) -> Option<bool> {
+        // A positive path is proof even in partial history. An omitted first-parent side
+        // path cannot prove a negative and must not turn an ancestor into a cherry-pick.
+        (ancestor || self.reach.complete.as_ref().is_none_or(|c| c[of])).then_some(ancestor)
     }
 }
 
@@ -175,7 +197,7 @@ mod tests {
             ("c", &["a"]),
             ("a", &["g"]),
         ]);
-        let reach = Reach::new(&commits, &index, &["e", "c"]);
+        let reach = Reach::new(&commits, &index, &["e", "c"], false);
         let known = reach.ancestry(&commits, &index);
         assert_eq!(known.is_ancestor("a", "e"), Some(true));
         assert_eq!(known.is_ancestor("d", "e"), Some(false));
@@ -202,7 +224,7 @@ mod tests {
             ("b", &["c"]),
             ("c", &[]),
         ]);
-        let reach = Reach::new(&commits, &index, &["h"]);
+        let reach = Reach::new(&commits, &index, &["h"], false);
         let (mut now, _) = rows(&[("f", &["c"])]);
         let mut reloaded: Vec<Arc<Commit>> = commits.clone();
         reloaded[2] = Arc::clone(&reloaded[3]);
@@ -220,7 +242,7 @@ mod tests {
     #[test]
     fn rows_that_moved_since_know_nothing() {
         let (commits, index) = rows(&[("b", &["a"]), ("a", &[])]);
-        let reach = Reach::new(&commits, &index, &["b"]);
+        let reach = Reach::new(&commits, &index, &["b"], false);
         // A reload put a row on top.
         let (moved, moved_index) = rows(&[("c", &["b"]), ("b", &["a"]), ("a", &[])]);
         assert_eq!(
@@ -231,5 +253,37 @@ mod tests {
             reach.ancestry(&commits, &index).is_ancestor("a", "b"),
             Some(true)
         );
+    }
+}
+
+#[cfg(test)]
+mod first_parent_tests {
+    use super::*;
+    #[test]
+    fn omitted_side_paths_never_prove_negative_ancestry() {
+        let rows: Vec<_> = [
+            ("head", vec!["base", "omitted"]),
+            ("other", vec!["base"]),
+            ("base", vec![]),
+        ]
+        .into_iter()
+        .map(|(hash, parents)| {
+            Arc::new(Commit {
+                hash: hash.into(),
+                parents: parents.into_iter().map(str::to_owned).collect(),
+                ..Default::default()
+            })
+        })
+        .collect();
+        let index = rows
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.hash.clone(), i))
+            .collect();
+        let reach = Reach::new(&rows, &index, &["head", "other"], true);
+        let ancestry = reach.ancestry(&rows, &index);
+        assert_eq!(ancestry.is_ancestor("base", "head"), Some(true));
+        assert_eq!(ancestry.is_ancestor("other", "head"), None);
+        assert_eq!(ancestry.is_ancestor("head", "other"), Some(false));
     }
 }

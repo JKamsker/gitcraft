@@ -70,7 +70,7 @@ pub(super) enum Msg {
     Watcher(u64, Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
     /// moved the commits it skipped, so then it no longer fits.
-    More(u64, Result<Vec<Commit>, String>),
+    More(u64, Vec<String>, Result<Vec<Commit>, String>),
     /// The working tree, from the read numbered so (see `RepoTab::reads`).
     Status(u64, Result<WorkStatus, String>),
     Detail(String, Result<CommitDetail, String>),
@@ -479,8 +479,14 @@ impl RepoTab {
                     self.reload(ctx);
                 }
             }
-            Msg::More(generation, _) if generation != self.history_gen => {}
-            Msg::More(_, result) => self.more_loaded(result, ctx),
+            Msg::More(generation, _, _) if generation != self.history_gen => {}
+            Msg::More(_, excluded, _)
+                if excluded != super::history_filter::rules(ctx, self.repo_key()).excludes() =>
+            {
+                self.loading_more = false;
+                self.log_stream = Default::default();
+            }
+            Msg::More(_, _, result) => self.more_loaded(result, ctx),
             // Older than the working tree shown (a reload started since came in first).
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => match result {

@@ -172,7 +172,7 @@ impl RepoTab {
         let lanes = lane_layout(&settings, self.graph.width);
         let prefs = preferred_cols(&settings, lanes);
         let available = ui.available_width();
-        let cols = prefs.squeezed(available, None);
+        let cols = prefs.allocated(available, settings.description_space);
         egui::ScrollArea::horizontal()
             .id_salt("graph-horizontal")
             .auto_shrink(false)
