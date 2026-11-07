@@ -924,6 +924,43 @@ mod native_windows_ownership {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor() -> Result<(), String> {
+    crate::connections::Context::default().run(|| {
+        for change in ["refs", "alternate identity", "missing donor"] {
+            let f = Fixture::new()?;
+            let (donor, borrower) = f.borrowing()?;
+            let ticket = helper::fixture_server_prepare(&borrower)?;
+            let objects = borrower.join(".git/objects");
+            let alt = objects.join("info/alternates");
+            let before = std::fs::read(&alt).map_err(|e| e.to_string())?;
+            match change {
+                "refs" => {
+                    Fixture::git(&borrower, &["update-ref", "refs/heads/after-prepare", "HEAD"])?;
+                }
+                "alternate identity" => {
+                    std::fs::rename(&alt, alt.with_file_name("owned-original-alternates"))
+                        .map_err(|e| e.to_string())?;
+                    std::fs::write(&alt, &before).map_err(|e| e.to_string())?;
+                }
+                _ => {
+                    std::fs::rename(&donor, f.0.join("removed donor"))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            let result = helper::fixture_server_execute(&borrower, ticket);
+            assert!(result.is_err(), "Changed {change} cannot execute a prepared helper ticket");
+            assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, before);
+            assert!(!std::fs::read_dir(&objects).map_err(|e| e.to_string())?
+                .filter_map(Result::ok)
+                .any(|entry| entry.file_name().to_string_lossy().starts_with("gitcraft-independent-stage-")),
+                "Changed {change} must refuse before creating an independence stage");
+        }
+        Ok(())
+    })
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion() -> Result<(), String> {
     const HELPER: &str = "GITCRAFT_OWNED_OBJECT_HELPER_FIXTURE";
     const CHILD: &str = "GITCRAFT_OWNED_OBJECT_CLIENT_FIXTURE";

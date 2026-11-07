@@ -359,3 +359,25 @@ pub(super) fn fixture_roundtrip(target: &remote::Target) -> Result<String, Strin
         _ => Err("No exact completion proof".into()),
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn fixture_server_prepare(repo: &Path) -> Result<Ticket, String> {
+    match process(Request {
+        protocol: PROTOCOL.into(),
+        repo: repo.to_string_lossy().into_owned(),
+        ticket: None,
+    })? {
+        Payload::Prepared(ticket) => Ok(ticket),
+        _ => Err("Server fixture did not prepare ownership".into()),
+    }
+}
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn fixture_server_execute(repo: &Path, ticket: Ticket) -> Result<String, String> {
+    let transaction = ticket.transaction.clone();
+    let result = process(Request {
+        protocol: PROTOCOL.into(),
+        repo: repo.to_string_lossy().into_owned(),
+        ticket: Some(ticket),
+    })?;
+    completed(result, &transaction, "owned fixture recovery")
+}
