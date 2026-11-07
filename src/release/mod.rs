@@ -539,23 +539,38 @@ fn check_publication_destination(
 /// insensitive; GitLab's captured subgroup/project spelling must remain exact. GitHub,
 /// Forgejo and Gitea identify owner/repository names without regard to ASCII case.
 fn same_publication_repository(url: &str, hosting: &Hosting) -> bool {
-    let Some(web) = crate::forge::web_url(url) else {
+    let Some((host, path)) = crate::forge::location(url) else {
         return false;
     };
-    let Some((scheme, rest)) = web.split_once("://") else {
+    if !host.eq_ignore_ascii_case(&hosting.host) {
         return false;
-    };
-    let Some((authority, path)) = rest.split_once('/') else {
-        return false;
-    };
-    let base = format!("{scheme}://{authority}");
-    base.eq_ignore_ascii_case(hosting.web.trim_end_matches('/'))
-        && match hosting.forge {
-            Forge::GitLab => path == hosting.path,
-            Forge::GitHub | Forge::Forgejo | Forge::Gitea => {
-                path.eq_ignore_ascii_case(&hosting.path)
-            }
+    }
+    // SSH identifies the Git repository independently of the forge's configured
+    // web port or reverse-proxy prefix. HTTP transports must also match the web
+    // authority and scheme; a different port can serve another repository.
+    let web_transport = url.split_once("://").is_some_and(|(scheme, _)| {
+        scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+    });
+    if web_transport {
+        let Some(web) = crate::forge::web_url(url) else {
+            return false;
+        };
+        let authority = |web: &str| {
+            web.split_once("://").map(|(scheme, rest)| {
+                format!("{scheme}://{}", rest.split('/').next().unwrap_or_default())
+            })
+        };
+        let (Some(actual), Some(expected)) = (authority(&web), authority(&hosting.web)) else {
+            return false;
+        };
+        if !actual.eq_ignore_ascii_case(&expected) {
+            return false;
         }
+    }
+    match hosting.forge {
+        Forge::GitLab => path == hosting.path,
+        Forge::GitHub | Forge::Forgejo | Forge::Gitea => path.eq_ignore_ascii_case(&hosting.path),
+    }
 }
 
 /// Writes the new version (and the notes in the changelog) and commits those files only.

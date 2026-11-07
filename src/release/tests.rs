@@ -457,3 +457,27 @@ fn review10_destination_identity_keeps_gitlab_path_case_and_web_authority() {
         ));
     }
 }
+
+#[test]
+fn ssh_publication_identity_preserves_custom_web_ports_and_proxy_prefixes() {
+    for forge in [Forge::GitLab, Forge::Forgejo, Forge::Gitea] {
+        let hosting = Hosting {
+            forge,
+            host: "forge.example.test".into(),
+            path: "Owner/Project".into(),
+            web: "https://forge.example.test:8443/reviews".into(),
+        };
+        assert!(same_publication_repository(
+            "ssh://git@forge.example.test:2222/Owner/Project.git",
+            &hosting
+        ));
+        assert!(!same_publication_repository(
+            "ssh://git@other.example.test:2222/Owner/Project.git",
+            &hosting
+        ));
+        assert!(!same_publication_repository(
+            "ssh://git@forge.example.test:2222/Other/Project.git",
+            &hosting
+        ));
+    }
+}
