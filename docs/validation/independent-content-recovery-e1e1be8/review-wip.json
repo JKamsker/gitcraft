@@ -1,0 +1,8 @@
+{
+  "application_candidate": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+  "status": "WIP static corrective diff reviewed; frozen gates/manifest pending; no final verdict",
+  "changed_file": "src/git/recovery/file.rs",
+  "sha256": "7cbdec5297380569562fdd5986f5e62b5dc6e193290823089675b6aaeef3379e",
+  "assessment": "Windows physical_ancestors enumerates rooted absolute canonical volume/share-root-to-working-root path components; each is opened NOFOLLOW with no-delete sharing, reparse/type checked and held before next full-path lookup. Final root fileID is compared with captured RootPin; destination descendants are likewise held through CREATE_NEW. This removes dependence on whether a held child prevents an ancestor rename. No additional API/unsafe/process logic. Drive/UNC pure tests registered for native Windows. No actionable finding in corrective diff.",
+  "limits": "No freshcompile/runtime/native Windows execution at e1e1be8 yet; pending author frozen gate evidence. Existing531focused22PASS preserved separately. No CI."
+}
