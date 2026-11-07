@@ -105,6 +105,8 @@ pub struct Settings {
     pub keep_submodules: bool,
     /// Running portable: keep sign-ins in this computer's credential store all the same.
     pub portable_credential_store: bool,
+    /// A local branch with no commit for this many days is marked stale; 0 marks none.
+    pub stale_branch_days: u32,
     /// Saved as `profiles` by the versions before profiles were what they are now.
     #[serde(rename = "profiles")]
     pub identities: Vec<SavedIdentity>,
@@ -160,6 +162,7 @@ impl Default for Settings {
             merge_tool: Default::default(),
             keep_submodules: false,
             portable_credential_store: false,
+            stale_branch_days: 90,
             identities: Vec::new(),
             user_profiles: vec![UserProfile::default()],
             active_profile: UserProfile::default().id,
@@ -674,6 +677,25 @@ impl Settings {
                                  each one is at the commit the repository now records.",
                             );
                     });
+                    card.row(
+                        "Stale branches",
+                        "stale branch cleanup old days merged delete",
+                        |ui| {
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::DragValue::new(&mut self.stale_branch_days)
+                                        .range(0..=3650)
+                                        .suffix(" days"),
+                                )
+                                .on_hover_text(
+                                    "A local branch with no commit for this long is marked \
+                                     Stale in the sidebar and offered by Select stale or \
+                                     merged branches…",
+                                );
+                                layout::note(ui, "0 marks none");
+                            });
+                        },
+                    );
                     card.row_hint(
                         "Editor command",
                         "Opens a folder or file",

@@ -117,6 +117,57 @@ pub struct PullRequest {
     pub draft: bool,
 }
 
+/// A merged pull request: what branch cleanup needs of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergedPullRequest {
+    pub number: u64,
+    /// The branch it proposed.
+    pub branch: String,
+    /// Its last commit.
+    pub sha: String,
+    /// The branch it was merged into.
+    pub base: String,
+}
+
+/// The merged pull requests in a forge's JSON list, `pointers` saying where its number, branch,
+/// last commit and base are in each item.
+fn parse_merged(
+    json: &str,
+    pointers: [&str; 4],
+    tool: &str,
+) -> Result<Vec<MergedPullRequest>, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("unexpected {tool} output: {e}"))?;
+    Ok(merged_items(
+        value.as_array().map_or(&[][..], Vec::as_slice),
+        pointers,
+    ))
+}
+
+/// [`parse_merged`] of items already read.
+fn merged_items(items: &[serde_json::Value], pointers: [&str; 4]) -> Vec<MergedPullRequest> {
+    let [number, branch, sha, base] = pointers;
+    let text = |v: &serde_json::Value, p: &str| {
+        v.pointer(p)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    items
+        .iter()
+        .map(|item| MergedPullRequest {
+            number: item
+                .pointer(number)
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0),
+            branch: text(item, branch),
+            sha: text(item, sha),
+            base: text(item, base),
+        })
+        .filter(|pr| !pr.branch.is_empty() && !pr.sha.is_empty())
+        .collect()
+}
+
 /// What a forge does for gitcraft.
 pub trait Provider: Sync {
     /// "GitHub", "Forgejo"…
@@ -132,6 +183,12 @@ pub trait Provider: Sync {
 
     /// The open pull requests.
     fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String>;
+
+    /// The latest pull requests merged (up to 100): a local branch still at or behind the last
+    /// commit of one it proposed was merged, even squashed or rebased into other commits.
+    fn merged(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
+        Ok(Vec::new())
+    }
 
     /// Opens a pull request; returns its URL (or whatever the forge said).
     fn create(
@@ -356,6 +413,33 @@ fn parse_commit_avatars(json: &str) -> HashMap<String, String> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod merged_tests {
+    use super::*;
+
+    #[test]
+    fn merged_lists_are_read_with_their_base() {
+        let json = r#"[{"number": 5, "headRefName": "fix/ü", "headRefOid": "abc", "baseRefName": "main"},
+                       {"number": 6, "headRefName": "", "headRefOid": "def", "baseRefName": "main"}]"#;
+        let read = parse_merged(
+            json,
+            ["/number", "/headRefName", "/headRefOid", "/baseRefName"],
+            "gh",
+        );
+        assert_eq!(
+            read,
+            Ok(vec![MergedPullRequest {
+                number: 5,
+                branch: "fix/ü".to_owned(),
+                sha: "abc".to_owned(),
+                base: "main".to_owned(),
+            }])
+        );
+        assert_eq!(parse_merged("[]", ["", "", "", ""], "gh"), Ok(Vec::new()));
+        assert!(parse_merged("not json", ["", "", "", ""], "gh").is_err());
+    }
 }
 
 #[cfg(test)]

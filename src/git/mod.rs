@@ -2,6 +2,7 @@
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
 mod backlinks;
+mod branch_health;
 mod command;
 mod commit_msg;
 mod commits;
@@ -30,6 +31,7 @@ mod timed;
 mod worktree;
 
 pub use self::backlinks::*;
+pub use self::branch_health::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;

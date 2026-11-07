@@ -1,6 +1,7 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
 mod branch;
+mod cleanup;
 mod confirm;
 mod fold;
 mod preview;
@@ -121,6 +122,8 @@ pub enum Dialog {
     Custom(Box<CustomDialog>),
     /// A checkout would leave the commits of a detached HEAD on no branch.
     KeepDetached(Box<super::detached::KeepDialog>),
+    /// Select stale or merged branches…
+    Cleanup(Box<cleanup::CleanupDialog>),
 }
 
 impl Dialog {
@@ -191,6 +194,18 @@ impl Dialog {
             *undo = how;
         }
         self
+    }
+
+    /// The checklist of `candidates` to delete; `checking` while which are merged is still being
+    /// read, `error` when reading it failed.
+    pub fn cleanup(
+        candidates: Vec<crate::repo::branch_cleanup::Candidate>,
+        checking: bool,
+        error: Option<String>,
+    ) -> Self {
+        Dialog::Cleanup(Box::new(cleanup::CleanupDialog::new(
+            candidates, checking, error,
+        )))
     }
 
     pub fn credentials(url: &str, refused: bool) -> Self {
@@ -451,6 +466,7 @@ impl RepoTab {
                 Dialog::Fold(plan) => fold::fold(ui, enter, plan),
                 Dialog::Custom(custom) => custom::custom(ui, enter, custom),
                 Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
+                Dialog::Cleanup(dialog) => cleanup::cleanup(ui, dialog),
                 Dialog::Confirm {
                     title,
                     body,

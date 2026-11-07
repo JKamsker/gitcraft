@@ -107,6 +107,8 @@ pub(crate) enum Action {
     CloseTerminal(usize),
     SelectTerminal(usize),
     ToggleSearch,
+    /// Open the checklist of stale or merged branches to delete.
+    SelectStaleBranches,
     SearchStep(i32),
     CreatePr {
         branch: String,
@@ -444,6 +446,11 @@ impl RepoTab {
                 },
             ),
             ("Reload".into(), label(Command::Reload), Action::Reload),
+            (
+                "Select stale or merged branches…".into(),
+                "branch".into(),
+                Action::SelectStaleBranches,
+            ),
             (
                 reveal_label().into(),
                 "folder".into(),

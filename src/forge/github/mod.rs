@@ -9,7 +9,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{Hosting, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -62,6 +62,21 @@ impl Provider for GitHub {
             ],
         )?;
         parse_list(&out)
+    }
+
+    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
+        let args = [
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--limit",
+            "100",
+            "--json",
+            "number,headRefName,headRefOid,baseRefName",
+        ];
+        let pointers = ["/number", "/headRefName", "/headRefOid", "/baseRefName"];
+        super::parse_merged(&gh(repo, &args)?, pointers, TOOL)
     }
 
     fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {

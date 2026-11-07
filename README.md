@@ -185,6 +185,17 @@ so your config, credentials and hooks apply as usual.
 - Local branches with ahead/behind; right-click: check out (or in a new worktree), fast-forward,
   merge into / (interactively) rebase onto the current branch, push, create a pull request,
   rename, delete (here, or here and on the remote in one go)…
+- _Pin to top_ (a branch's menu) keeps a branch at the top of _Local_; _Name_ / _Recent_ in the
+  panel's header sorts the others by name or by their last commit, newest first. Both are kept
+  per repository.
+- _merged_ and _stale_ marks on the branches whose work is in the default branch (merged,
+  rebased or cherry-picked, or squash-merged by a pull request into it) or that had no commit
+  for 90 days (Settings → Git), next to _gone_ for an upstream deleted on the remote. The brush
+  in the panel's header (or _Select stale or merged branches…_ in the palette) lists them, and
+  those gone, with why; only the merged ones start ticked. It deletes the ticked ones here, and
+  if asked their branches of the same name on the remote, in one go that Undo brings back, after
+  checking that nothing would be refused. It never offers the checked-out branch, the default
+  one, or one checked out in a worktree.
 - Hide a branch from the graph with the eye on its row (on hover), or _Solo_ some from their
   menu to see only those; the graph then has just the commits of the branches it shows and the
   checked-out one. _Viewing 12 of 55_ at the top says how many it shows, with _Show all_. Kept
@@ -682,6 +693,9 @@ was made this way, on a demo repository.
 | `src/repo/push/` | Push and Sync; a refused push read from `--porcelain`, the remote checked, the banner and the force push with lease |
 | `src/repo/pinned_sections.rs` | sidebar section headers that stay in view and jump to their section |
 | `src/repo/branch_tree.rs` | branch names and file paths as a tree of folders, and its rows |
+| `src/repo/branch_health.rs` | which local branches are merged (or rebased, or squash-merged), stale or gone |
+| `src/repo/branch_cleanup.rs` | the branches _Select stale or merged branches…_ offers, read when the branches change |
+| `src/repo/branch_order.rs` | pinned branches and the sort of _Local_, kept per repository |
 | `src/repo/columns.rs` | widths of the graph's columns: what a drag changes and what gets squeezed |
 | `src/repo/worktree_tab.rs` | worktrees in the same tab: parked views, the tab's chip and switcher |
 | `src/repo/graph_view.rs` | commit graph, pills, search bar, commit menu                                       |
