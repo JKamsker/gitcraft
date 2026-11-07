@@ -331,6 +331,8 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    outbox_last: Option<std::time::Instant>,
+    outbox_reading: bool,
     /// The release being prepared or cut (its dialog).
     release: Option<release::ReleaseView>,
     /// The hotfix flow: the dialog that finishes one, and the push after it.
@@ -651,6 +653,8 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            outbox_last: None,
+            outbox_reading: false,
             release: None,
             hotfix: hotfix::Hotfix::default(),
             package: None,

@@ -84,3 +84,5 @@ pub(crate) mod routes;
 pub(crate) mod submodule_conflict;
 
 pub(crate) mod sharing;
+
+pub(crate) mod outbox;

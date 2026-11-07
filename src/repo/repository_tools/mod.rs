@@ -1,3 +1,4 @@
+mod outbox;
 mod sharing;
 use crate::git::repository_tools::sharing as borrowing;
 mod dependencies;
@@ -27,10 +28,18 @@ enum Tool {
     SubmoduleConflict,
     Dependencies,
     Sharing,
+    Outbox,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Outbox,
+    QueuePush(Box<crate::git::repository_tools::outbox::View>, bool),
+    PrepareOutbox(String),
+    ReviewOutbox(String),
+    SendOutbox(Box<crate::git::repository_tools::outbox::Prepared>),
+    AutoOutbox(String),
+    RemoveOutbox(Box<crate::git::repository_tools::outbox::View>, String),
     Sharing,
     MakeIndependent(Box<borrowing::Plan>),
     AllRefs(String),
@@ -60,6 +69,8 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Outbox(crate::git::repository_tools::outbox::View),
+    PreparedOutbox(Box<crate::git::repository_tools::outbox::Prepared>),
     Sharing(borrowing::Sharing),
     Refs(all_refs::Browser),
     Object(object::Inspection),
@@ -85,6 +96,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match outbox::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match act {
             Act::MakeIndependent(plan) => {
                 self.repository_tool_mutation(
@@ -202,6 +217,13 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Outbox => (String::new(), Tool::Outbox),
+            Act::ReviewOutbox(..)
+            | Act::QueuePush(..)
+            | Act::PrepareOutbox(..)
+            | Act::SendOutbox(..)
+            | Act::RemoveOutbox(..)
+            | Act::AutoOutbox(..) => return,
             Act::Sharing => (String::new(), Tool::Sharing),
             Act::MakeIndependent(..) => return,
             Act::AllRefs(q) => (q, Tool::Refs),
@@ -249,6 +271,7 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Outbox => crate::git::repository_tools::outbox::read(&path).map(Data::Outbox),
                 Tool::Sharing => borrowing::inspect(&path).map(Data::Sharing),
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
@@ -335,6 +358,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Outbox {
+        outbox::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Sharing {
         sharing::show(ui, state, acts);
         return;

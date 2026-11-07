@@ -697,6 +697,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Push outbox: queue exact commit or send selected entries…".into(),
+                "Offline publication".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Outbox),
+            ),
+            (
                 "Shared and borrowed objects".into(),
                 "Inspect shared Git directories and donors; make a clone independent".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Sharing),

@@ -1353,3 +1353,8 @@ pub(super) fn recording_input(
     )?
     .complete()
 }
+
+/// Credential-free routing/identity stamp for durable outbox endpoint identity.
+pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
+    config_stamp(repo, &|| !crate::tasks::cancellation().is_cancelled())
+}
