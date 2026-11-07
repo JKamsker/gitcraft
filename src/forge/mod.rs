@@ -10,6 +10,7 @@
 mod cli;
 pub(crate) use cli::tool_location;
 mod gitea;
+pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 mod github;
 mod gitlab;
 mod http;

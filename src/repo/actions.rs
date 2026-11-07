@@ -13,6 +13,7 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    Keyboard(super::keyboard::Request),
     Select(usize),
     OpenFileComparison(super::file_comparison::Page),
     RefreshFileComparison,
@@ -33,6 +34,9 @@ pub(crate) enum Action {
         whole: bool,
     },
     ComparisonNormalPatch,
+    OpenActivity(super::activity::Page),
+    ActivityCommit(String),
+    CloseActivity,
     SelectHash(String),
     SelectStash(usize),
     OpenDiff(DiffKey),
@@ -368,6 +372,16 @@ impl RepoTab {
                 "File versions across branches".into(),
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
+            (
+                "Activity calendar".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Calendar),
+            ),
+            (
+                "Contributor statistics".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Contributors),
             ),
             ("Fetch".into(), "remote".into(), Action::Fetch),
             ("Pull".into(), "remote".into(), Action::Pull),

@@ -23,6 +23,7 @@ impl RepoTab {
         }
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
         self.shortcuts(&ctx, &mut acts);
+        self.keyboard_panes(&ctx);
 
         egui::Panel::top("repo_toolbar")
             .frame(
@@ -50,6 +51,7 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
+                let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                 if self.file_comparison.is_some() {
                     self.file_comparison_view(ui, &mut acts);
                 } else if self.conflict.is_some() {
@@ -64,8 +66,13 @@ impl RepoTab {
                     self.ci_view_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.activity.is_some() {
+                    self.activity_view(ui, &mut acts);
                 } else {
                     self.graph_view(ui, &mut acts);
+                }
+                if self.file_comparison.is_none() {
+                    self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
                 }
             });
 
@@ -135,6 +142,8 @@ impl RepoTab {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {
                 acts.push(Action::CloseRebase);
+            } else if esc && self.activity.is_some() {
+                acts.push(Action::CloseActivity);
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() {
@@ -195,7 +204,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.sidebar(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Sidebar, pane_rect);
                 } else {
                     self.folded_sidebar(ui, area.left(), acts);
                 }
@@ -231,7 +242,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.detail_panel(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Detail, pane_rect);
                 }
             },
         );

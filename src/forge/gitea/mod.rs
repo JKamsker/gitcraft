@@ -60,7 +60,7 @@ impl GiteaFamily {
             &hosting.host,
             find_login(&hosting.web),
         )
-        .on_refused(forget_login)
+        .on_refused_key(forget_login, &login_key(&hosting.web))
     }
 }
 
@@ -215,11 +215,19 @@ fn forget_login(web: &str) {
 /// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. What's
 /// found is kept: a login until the server refuses it, the lack of one for a while. One lookup
 /// runs at a time, so that a credential helper asks once.
+fn login_key(web: &str) -> String {
+    let context = crate::connections::current();
+    format!(
+        "{web}\0{:?}\0{}",
+        context.git_config, context.choices.tea_login
+    )
+}
+
 fn find_login(web: &str) -> Option<Login> {
     let Ok(mut found) = found_logins().lock() else {
         return None;
     };
-    let entry = found.entry(web.to_owned()).or_default();
+    let entry = found.entry(login_key(web)).or_default();
     let fresh = match (&entry.login, entry.at) {
         (Some(_), _) => true,
         (None, Some(at)) => at.elapsed() < NO_LOGIN_FOR,
@@ -228,17 +236,32 @@ fn find_login(web: &str) -> Option<Login> {
     if !fresh {
         let refused = &entry.refused;
         let usable = |login: &Login| !refused.contains(login);
-        let login = env_login(web)
-            .filter(usable)
-            .or_else(|| tea_login(web).filter(usable))
-            .or_else(|| {
-                crate::git::stored_credentials(web)
-                    .map(|c| Login::Basic {
-                        user: c.username,
-                        password: c.password,
-                    })
-                    .filter(usable)
-            });
+        let selected = crate::connections::current().choices.tea_login;
+        let login = if selected.is_empty() {
+            env_login(web)
+                .filter(usable)
+                .or_else(|| tea_login(web).filter(usable))
+        } else if same_server(
+            &format!("https://{}", crate::connections::current().choices.tea_host),
+            web,
+        ) {
+            selected_tea_login(&tea_logins(), web, &selected)
+                .map(|login| Login::Token(login.token.clone()))
+                .filter(usable)
+        } else {
+            None
+        }
+        .or_else(|| {
+            if !selected.is_empty() {
+                return None;
+            }
+            crate::git::stored_credentials(web)
+                .map(|c| Login::Basic {
+                    user: c.username,
+                    password: c.password,
+                })
+                .filter(usable)
+        });
         entry.login = login;
         entry.at = Some(Instant::now());
     }
@@ -259,6 +282,33 @@ fn tea_login(web: &str) -> Option<Login> {
         .map(|login| Login::Token(login.token))
 }
 
+fn selected_tea_login<'a>(logins: &'a [TeaLogin], web: &str, alias: &str) -> Option<&'a TeaLogin> {
+    logins.iter().find(|login| {
+        login.name == alias && same_server(&login.url, web) && !login.token.is_empty()
+    })
+}
+
+pub(crate) fn selected_tea_metadata(alias: &str) -> Option<(String, String)> {
+    let logins = tea_logins();
+    let login = logins.iter().find(|login| login.name == alias)?;
+    let web = login.url.trim().trim_end_matches('/');
+    let authority = web.strip_prefix("https://")?;
+    if authority.is_empty() || authority.contains(['/', '@', '\n', '\r']) {
+        return None;
+    }
+    Some((authority.to_owned(), login.user.clone()))
+}
+
+pub(crate) fn selected_tea_secret(alias: &str, host: &str) -> Result<(String, String), String> {
+    let logins = tea_logins();
+    let login = selected_tea_login(&logins, &format!("https://{host}"), alias)
+        .ok_or("The selected tea login is unavailable for this server")?;
+    if login.user.is_empty() {
+        return Err("The tea login must include its account username".to_owned());
+    }
+    Ok((login.user.clone(), login.token.clone()))
+}
+
 /// Whether two base URLs are the same server: scheme, host and port, whatever the case or a slash
 /// at the end.
 fn same_server(a: &str, b: &str) -> bool {
@@ -272,6 +322,15 @@ fn same_server(a: &str, b: &str) -> bool {
 pub(super) fn tea_servers() -> Vec<(String, String)> {
     tea_logins()
         .iter()
+        .filter(|login| {
+            let selected = crate::connections::current().choices.tea_login;
+            selected.is_empty()
+                || (login.name == selected
+                    && same_server(
+                        &login.url,
+                        &format!("https://{}", crate::connections::current().choices.tea_host),
+                    ))
+        })
         .filter_map(|login| {
             let web = login.url.trim().trim_end_matches('/');
             let (host, _) = super::location(&format!("{web}/x/y"))?;
@@ -282,6 +341,8 @@ pub(super) fn tea_servers() -> Vec<(String, String)> {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct TeaLogin {
+    name: String,
+    user: String,
     url: String,
     token: String,
 }
@@ -353,6 +414,8 @@ fn parse_tea_config(text: &str) -> Vec<TeaLogin> {
             .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
             .unwrap_or(value);
         match key.trim() {
+            "name" => login.name = value.to_owned(),
+            "user" => login.user = value.to_owned(),
             "url" => login.url = value.to_owned(),
             "token" => login.token = value.to_owned(),
             _ => {}
@@ -414,10 +477,14 @@ mod tests {
             logins,
             [
                 TeaLogin {
+                    name: "codeberg".into(),
+                    user: String::new(),
                     url: "https://codeberg.org".into(),
                     token: "abc123".into()
                 },
                 TeaLogin {
+                    name: "home".into(),
+                    user: "me".into(),
                     url: "https://git.home.example:3000/".into(),
                     token: "def".into()
                 },
@@ -441,5 +508,73 @@ mod tests {
         ));
         assert!(!same_server("http://codeberg.org", "https://codeberg.org"));
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
+    }
+}
+
+#[cfg(test)]
+mod profile_connection_tests {
+    use super::*;
+    use crate::connections::{Choices, Context};
+
+    #[test]
+    fn a_selected_alias_never_becomes_another_account_or_another_server() {
+        let logins = parse_tea_config(
+            "logins:\n- name: personal\n  url: https://forge.example\n  user: alice\n  token: fixture-a\n- name: work\n  url: https://forge.example\n  user: bob\n  token: fixture-b\n",
+        );
+        assert_eq!(
+            selected_tea_login(&logins, "https://forge.example", "work")
+                .map(|login| login.user.as_str()),
+            Some("bob")
+        );
+        assert!(selected_tea_login(&logins, "https://other.example", "work").is_none());
+        assert!(selected_tea_login(&logins, "https://forge.example", "missing").is_none());
+        let a = Context {
+            choices: Choices {
+                tea_login: "personal".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let b = Context {
+            choices: Choices {
+                tea_login: "work".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let ka = a.run(|| login_key("https://forge.example"));
+        let kb = b.run(|| login_key("https://forge.example"));
+        assert_ne!(ka, kb);
+        {
+            let mut cache = found_logins()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            cache.insert(
+                ka.clone(),
+                Found {
+                    login: Some(Login::Token("fixture-a".into())),
+                    ..Default::default()
+                },
+            );
+            cache.insert(
+                kb.clone(),
+                Found {
+                    login: Some(Login::Token("fixture-b".into())),
+                    ..Default::default()
+                },
+            );
+        }
+        // A refusal that arrives after switching still invalidates only its captured key.
+        b.run(|| forget_login(&ka));
+        let mut cache = found_logins()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert_eq!(cache.get(&ka).and_then(|entry| entry.login.clone()), None);
+        assert_eq!(
+            cache.get(&kb).and_then(|entry| entry.login.clone()),
+            Some(Login::Token("fixture-b".into()))
+        );
+        cache.remove(&ka);
+        cache.remove(&kb);
     }
 }

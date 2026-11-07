@@ -112,6 +112,8 @@ impl RepoTab {
             .selected_hash()
             .filter(|h| h != super::WIP_HASH)
             .unwrap_or_else(|| "HEAD".into());
+        self.keyboard_clear_cursor();
+        self.activity = None;
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;

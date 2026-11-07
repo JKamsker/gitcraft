@@ -57,6 +57,14 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "History activity",
+        &[
+            "Activity in the toolbar opens the activity calendar and contributor statistics; both are also in Ctrl+P. Click a day, drag across dates, pick a month or apply a date range. Select a commit to open its detail.",
+            "Choose author or committer dates. Days use each timestamp’s recorded timezone, and date ranges include both ends. Authors follow Git’s .mailmap. Counts show distinct paths, active days and first/last activity within the selected period; renames touch both paths and merge changes compare with their first parent.",
+            "Each reachable commit counts once across local/remote branches, tags and HEAD. Stash and app-only refs are excluded. Coverage says when the snapshot is partial or shallow. Scan more history expands the initial 5,000 commits up to 100,000, within a 64 MiB snapshot and 16 MiB page limit. Cancel stops waiting; Refresh takes a new snapshot without fetching. Analysis needs Git with --no-lazy-fetch support and reads tree changes without file contents; missing trees or metadata are reported as errors.",
+        ],
+    ),
+    (
         "Compare",
         &[
             "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
@@ -72,9 +80,10 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
             "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
             "Write the summary and description and commit; amend the last commit; pick the identity you commit as, or Use the profile's author to take a repository's own one out.",
-            "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author and commit signing. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
+            "Profiles (title bar, or Settings → Profile): each has its own tabs, recent repositories, theme, git author, commit signing, SSH key and forge accounts. A repository's own git config (user.name, user.email, signing) still wins over the profile's.",
             "Themes: the palette icon in the title bar, or Settings → Appearance with a thumbnail of each (point at one to preview it). Import a VS Code theme or a Base16 scheme, follow VS Code's theme, or save a copy of one as a file to edit; set your own accent, corners and lane colours for any.",
             "Point at a setting and the panel beside it shows what it does, drawn with the values set now.",
+            "Settings → Profile → Profile’s connections chooses a local SSH private key, named gh/glab accounts and a tea login alias. Check account verifies a named forge account in the background. GitHub uses gh’s existing named accounts; glab can use a separate configuration folder for another account on the same server. Selected accounts override inherited token variables per command, without switching a global login. HTTPS Git uses the same accounts. Git in WSL or over SSH keeps that machine’s own credentials.",
             "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default, in your global git config; Settings → Profile can sign just for the profile instead.",
             "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
             "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
@@ -108,6 +117,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+P", "Command palette: every action and branch"),
             ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
+            (
+                "Cmd+Alt+1 / 2 / 3",
+                "Focus sidebar / graph or diff / detail pane",
+            ),
             ("F1", "This manual"),
         ],
     ),
@@ -126,6 +139,16 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Changes",
         &[
             ("Cmd+Enter", "Commit (from the message fields)"),
+            ("j / k", "Next / previous file in the focused detail pane"),
+            (
+                "Space",
+                "Stage / unstage the selected file; conflicts are excluded",
+            ),
+            ("Enter", "Open the selected file's diff"),
+            (
+                "S / U / D",
+                "Stage / unstage / confirm discard of the current diff hunk",
+            ),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",

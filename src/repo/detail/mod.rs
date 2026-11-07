@@ -47,7 +47,22 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let scope = match files.first().map(|f| key(&f.path)) {
+            Some(DiffKey::Commit { hash, .. }) => egui::Id::new((tree, hash)),
+            Some(DiffKey::Range { from, to, .. }) => egui::Id::new((tree, from, to)),
+            _ => egui::Id::new(tree),
+        };
+        self.keyboard_files(
+            ui,
+            (scope, Some(id)),
+            files,
+            |file| file.path.as_str(),
+            |file| key(&file.path),
+            acts,
+        );
+        let selected = |f: &&ChangedFile| {
+            self.open_key() == Some(&key(&f.path)) || self.keyboard_file_selected(&key(&f.path))
+        };
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
         ui.push_id(("file-list", tree, rev), |ui| {
@@ -67,8 +82,10 @@ impl RepoTab {
                         selected(&f),
                         RowExtra::Stats(f.added, f.removed),
                     );
+                    self.keyboard_file_row(ui, r.row.rect, &key(&f.path));
                     widgets::file_menu(&r.row, &f.path, rev, false, acts);
                     if r.row.clicked() {
+                        self.keyboard_select_file(scope, key(&f.path));
                         acts.push(Action::OpenDiff(key(&f.path)));
                     }
                 },

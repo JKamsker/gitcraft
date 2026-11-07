@@ -247,7 +247,7 @@ impl App {
             self.profile_git_seen = now;
             for tab in &mut self.tabs {
                 if let Tab::Repo(r) = tab {
-                    r.reload_identity(ctx);
+                    r.reload_profile_connections(ctx);
                 }
             }
         }
