@@ -16,6 +16,7 @@ pub(in crate::repo) mod link;
 mod lines;
 pub(super) mod line_diff;
 mod map;
+mod notebook;
 mod paint;
 mod parse;
 mod patch;
@@ -97,6 +98,8 @@ pub struct DiffData {
     pub binary: Option<binary::BinaryPair>,
     /// The program git turned the file into text with (`textconv`), when it did.
     pub textconv: Option<String>,
+    /// A Jupyter notebook: its cells compared, shown instead of its JSON unless that is picked.
+    pub notebook: Option<notebook::NotebookData>,
     /// The patch's file header (`diff --git`, `index`, `---`, `+++`), for partial patches.
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
@@ -279,6 +282,9 @@ fn prepare(
     let compare = image
         .as_ref()
         .and_then(|pair| image_compare::compare(repo, key, &path, pair));
+    let notebook = (notebook::is_notebook(&path) && lfs.is_none())
+        .then(|| notebook::load(repo, key, &path, renamed_from(&text)))
+        .flatten();
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut uncut = std::collections::HashMap::new();
@@ -309,6 +315,7 @@ fn prepare(
         lfs,
         binary,
         textconv,
+        notebook,
         header,
         partial,
         revertable,

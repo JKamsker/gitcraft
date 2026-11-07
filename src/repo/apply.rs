@@ -389,6 +389,7 @@ impl RepoTab {
             Action::TestLane(act) => self.test_lane_act(act, ctx),
             Action::Rehearse(act) => self.rehearse_act(act, ctx),
             Action::Interaction(act) => self.interaction_act(act, ctx),
+            Action::StripNotebookOutputs(on) => self.strip_notebook_outputs(on, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::KeepBoth(path) => self.keep_both(path, ctx),
             Action::Archaeology(act) => self.archaeology_act(act, ctx),
@@ -546,6 +547,46 @@ impl RepoTab {
             Refresh::Status,
             kind,
             ctx,
+        );
+    }
+
+    /// Turns stripping notebooks' outputs when committing on or off, then shows the diff again.
+    fn strip_notebook_outputs(&mut self, on: bool, ctx: &egui::Context) {
+        let path = self.path.clone();
+        self.then(
+            ctx,
+            move || {
+                let done = git::set_strip_outputs(&path, on);
+                (done, git::strip_state(&path))
+            },
+            move |tab, (result, state), ctx| {
+                tab.status = Some(match result {
+                    Ok(Some(command)) => {
+                        let tool = if command == "nbstripout" { "nbstripout" } else { "Python" };
+                        (
+                            format!(
+                                "Notebooks are staged without their outputs from now on (by \
+                                 {tool}, in this clone): git status may show them changed until \
+                                 they are committed once so"
+                            ),
+                            false,
+                        )
+                    }
+                    Ok(_) => match state {
+                        git::StripState::Other(name) => (
+                            format!("gitcraft no longer strips outputs, but the repository's {name} filter still does"),
+                            false,
+                        ),
+                        _ => ("Notebooks are staged with their outputs again".to_owned(), false),
+                    },
+                    Err(e) => (
+                        format!("Could not change how notebooks are staged: {e}"),
+                        true,
+                    ),
+                });
+                tab.reload_status(ctx);
+                tab.refresh_diff(ctx);
+            },
         );
     }
 

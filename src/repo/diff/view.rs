@@ -7,6 +7,7 @@ use super::binary::{binary_view, textconv_note};
 use super::image_compare::compare_view;
 use super::images::image_view;
 use super::lfs::lfs_view;
+use super::notebook::notebook_bar;
 use super::link::LineLinks;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, old_name, picked_in_file, unstage_args};
@@ -677,6 +678,12 @@ fn ready_data<'a>(
     }
     if let Some(binary) = &data.binary {
         binary_view(ui, binary, view.key.path());
+        return None;
+    }
+    // A notebook shows its cells, unless its JSON is picked.
+    if let Some(nb) = &data.notebook
+        && !notebook_bar(ui, nb, view.key.path(), acts)
+    {
         return None;
     }
     if data.lines.is_empty() {

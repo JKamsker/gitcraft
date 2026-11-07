@@ -197,6 +197,8 @@ pub(crate) enum Action {
     Decisions(super::conflict::decisions::Act),
     /// Something done for the repository's Unity project.
     Unity(super::unity::UnityAct),
+    /// Strip notebooks' outputs when committing in this repository, or stop.
+    StripNotebookOutputs(bool),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.

@@ -658,6 +658,16 @@ so your config, credentials and hooks apply as usual.
   same factor); a picture that doesn't decode (an `.ico`) shows before / after as before.
   Below, the picture's history is a strip of thumbnails, newest first; click one to see that
   commit's change.
+- Jupyter notebooks (`.ipynb`) diff cell by cell: each changed cell's source line by line, its
+  outputs (text, errors, pictures; HTML and SVG as their source, long ones cut) before and
+  after, a changed metadata shown line by line, a new execution count only noted, unchanged
+  cells folded into a line; cells matched by their ids, or by their sources in order, and moved
+  ones marked. Nothing in a notebook is run. _JSON_ switches back to the file's own lines (to
+  stage a part of them). _Strip outputs when committing_ sets a clean filter in this clone only
+  (`.git/config`, not shared with others), using nbstripout when it is installed, else a small
+  Python 3 script: what is staged has no outputs, execution counts or widget state while the
+  file on disk keeps them, so a notebook whose outputs alone changed no longer shows as
+  modified. A filter set by another tool is shown and left alone.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.
