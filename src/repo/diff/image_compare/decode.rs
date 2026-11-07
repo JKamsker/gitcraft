@@ -187,6 +187,9 @@ pub fn difference(a: &ColorImage, b: &ColorImage) -> Difference {
 
 /// The largest difference of a channel (alpha included) between two pixels.
 fn distance(p: Color32, q: Color32) -> u8 {
+    if p == q {
+        return 0;
+    }
     let (p, q) = (p.to_srgba_unmultiplied(), q.to_srgba_unmultiplied());
     (0..4).map(|i| p[i].abs_diff(q[i])).max().unwrap_or(0)
 }
@@ -194,6 +197,47 @@ fn distance(p: Color32, q: Color32) -> u8 {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn corrupt_and_truncated_images_report_decode_errors() {
+        let bytes = png(64, 64, [20, 40, 60, 128]);
+        for invalid in [
+            &b"not an image"[..],
+            &bytes[..30],
+            &bytes[..bytes.len() / 2],
+        ] {
+            assert!(decode(invalid).is_err_and(|e| e.starts_with("Could not read the picture:")));
+        }
+    }
+
+    #[test]
+    fn pixel_distance_preserves_alpha_and_thresholds() {
+        for alpha in 0..=255 {
+            let p = Color32::from_rgba_unmultiplied(200, 90, 20, alpha);
+            assert_eq!(distance(p, p), 0);
+            let q = Color32::from_rgba_unmultiplied(90, 200, 23, alpha);
+            let (a, b) = (p.to_srgba_unmultiplied(), q.to_srgba_unmultiplied());
+            let expected = a
+                .into_iter()
+                .zip(b)
+                .map(|(x, y)| x.abs_diff(y))
+                .max()
+                .unwrap_or(0);
+            assert_eq!(distance(p, q), expected);
+        }
+        let additive = Color32::from_rgba_premultiplied(20, 30, 40, 0);
+        assert_eq!(distance(additive, additive), 0);
+        let a = ColorImage::new([2, 1], vec![Color32::BLACK; 2]);
+        let b = ColorImage::new(
+            [2, 1],
+            vec![Color32::from_rgb(2, 0, 0), Color32::from_rgb(3, 0, 0)],
+        );
+        let diff = difference(&a, &b);
+        assert_eq!(diff.changed, 1);
+        assert_eq!(diff.image.pixels[0], Color32::TRANSPARENT);
+        let small = ColorImage::new([1, 1], vec![Color32::BLACK]);
+        assert_eq!(difference(&a, &small).changed, 1);
+    }
 
     /// A PNG of `w` × `h` pixels of one colour.
     pub(crate) fn png(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {

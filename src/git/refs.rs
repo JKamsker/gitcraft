@@ -88,6 +88,7 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
         if full.starts_with("refs/heads/") {
             if branch.is_head {
                 refs.current = Some(branch.name.clone());
+                refs.head = branch.target.clone();
             }
             refs.local.push(branch);
         } else if let Some(rest) = full.strip_prefix("refs/remotes/") {
@@ -103,7 +104,9 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
             refs.tags.push(branch);
         }
     }
-    refs.head = head(repo);
+    if refs.current.is_none() {
+        refs.head = head(repo);
+    }
     Ok(refs)
 }
 

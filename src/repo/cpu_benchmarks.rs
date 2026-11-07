@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use super::{DiffKey, RepoTab, diff, highlight};
 use crate::{git, graph, settings::Settings};
 
+mod workflows;
+
 #[derive(Deserialize)]
 struct Inputs {
     repo: PathBuf,
@@ -40,14 +42,35 @@ struct Measurement {
 
 struct Bench {
     filter: String,
+    exact: bool,
     samples: usize,
     sample_time: Duration,
     results: Vec<Measurement>,
 }
 
 impl Bench {
+    fn family(&self, prefixes: &[&str]) -> bool {
+        !self.exact || prefixes.iter().any(|p| self.filter.starts_with(p))
+    }
+    fn wants(&self, name: &str) -> bool {
+        self.filter.is_empty()
+            || if self.exact {
+                name == self.filter
+            } else {
+                name.contains(&self.filter)
+            }
+    }
+
+    fn try_measure<T>(&mut self, name: &str, mut run: impl FnMut() -> Result<T, String>) {
+        self.measure(name, || {
+            let result = run();
+            assert!(result.is_ok(), "{name} failed: {:?}", result.as_ref().err());
+            drop(black_box(result));
+        });
+    }
+
     fn measure(&mut self, name: &str, mut run: impl FnMut()) {
-        if !self.filter.is_empty() && !name.contains(&self.filter) {
+        if !self.wants(name) {
             return;
         }
         for _ in 0..3 {
@@ -60,6 +83,7 @@ impl Bench {
             .clamp(1.0, 10_000.0) as usize;
         let mut samples_ms = Vec::new();
         let mut cpu_samples_ms = Vec::new();
+        println!("BENCH_START {name}");
         for _ in 0..self.samples {
             let cpu_start = cpu_time_ms();
             let start = Instant::now();
@@ -114,6 +138,7 @@ fn real_world_cpu() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let mut bench = Bench {
         filter: std::env::var("GITCRAFT_BENCH_FILTER").unwrap_or_default(),
+        exact: std::env::var_os("GITCRAFT_BENCH_EXACT").is_some(),
         samples: std::env::var("GITCRAFT_BENCH_SAMPLES")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -256,6 +281,7 @@ fn real_world_cpu() -> Result<(), String> {
     }
     bench.measure("ui/graph-warm-frame", || draw(false));
     bench.measure("ui/graph-scroll-frame", || draw(true));
+    workflows::run(&mut bench, &inputs)?;
     if bench.results.is_empty() {
         return Err("No benchmarks matched".to_owned());
     }

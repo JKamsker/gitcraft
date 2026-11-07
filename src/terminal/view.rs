@@ -21,6 +21,28 @@ struct Grid {
     cell: Vec2,
 }
 
+/// Benchmark the same row painting and font layout without starting an interactive shell.
+#[cfg(test)]
+pub(crate) fn cpu_paint(ui: &Ui, screen: &vt100::Screen) {
+    let t = Tokens::get(ui.ctx());
+    let font = theme::mono(13.0);
+    let glyph = ui
+        .painter()
+        .layout_no_wrap("M".into(), font.clone(), t.text);
+    let grid = Grid {
+        inner: ui.available_rect_before_wrap(),
+        cell: glyph.size(),
+    };
+    let palette = Palette::new(&t);
+    let (rows, cols) = screen.size();
+    for row in 0..rows.get() {
+        let job = paint_row(ui.painter(), screen, row, cols.get(), grid, &palette, &font);
+        let galley = ui.fonts_mut(|f| f.layout_job(job));
+        ui.painter()
+            .galley(grid.cells(row, 0, 0.0).left_top(), galley, t.text);
+    }
+}
+
 impl Grid {
     /// `n` cells of `row` from `col` on.
     fn cells(&self, row: u16, col: u16, n: f32) -> Rect {

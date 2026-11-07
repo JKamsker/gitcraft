@@ -1401,7 +1401,8 @@ cargo test
 
 The default syntax highlighter compiles bundled Oniguruma with the platform's C compiler.
 `cargo run --release --no-default-features` selects the pure-Rust regex backend instead.
-For reproducible browsing and diff CPU benchmarks, see [CPU performance](docs/cpu-performance.md).
+For reproducible CPU benchmarks, stack profiles and source-line coverage, see
+[CPU performance](docs/cpu-performance.md) and the [workflow suite](docs/cpu-workflows.md).
 
 Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3-dev` for the
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or

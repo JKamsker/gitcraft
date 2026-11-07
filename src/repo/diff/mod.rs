@@ -37,6 +37,11 @@ mod tests;
 mod view;
 mod weakened;
 
+#[cfg(test)]
+pub(super) use binary::{make_docx, make_pdf, make_zip};
+#[cfg(test)]
+pub(super) use image_compare::cpu as cpu_images;
+
 use std::path::Path;
 
 use super::DiffKey;

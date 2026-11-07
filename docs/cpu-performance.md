@@ -1,7 +1,13 @@
 # CPU performance: real browsing and diff workloads
 
+The follow-up [workflow suite and coverage inventory](cpu-workflows.md) expands this pass
+to 118 offline workloads, per-case stack profiles, and iterative LLVM source-line coverage.
+
 Measured on 2026-11-07: Apple M4 Max, macOS 27.2, Rust 1.95.0, Apple Git 2.54.0.
 The baseline is `81163fe`, including the earlier memory optimizations.
+Following the email-privacy rewrite needed to publish the branch, its identical public tree
+is at `a936407`. The earlier image-cache and title-bar commits `3d2df7d` and `c7ac524`
+correspond to public `4872136` and `5d8a0d2`. IDs below describe the captured local inputs.
 
 The benchmark exercises production code with this repository's actual history and source
 files. Commit IDs, branch tips, and file revisions are frozen in

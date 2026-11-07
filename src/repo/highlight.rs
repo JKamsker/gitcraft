@@ -149,6 +149,9 @@ pub(crate) const MAX_LINE_CHARS: usize = 5000;
 /// returns the line as it was when it was cut. Only what is shown: patches are made from the
 /// line as git printed it.
 pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) -> Option<String> {
+    if text.len() <= MAX_LINE_CHARS {
+        return None;
+    }
     let (cut, _) = text.char_indices().nth(MAX_LINE_CHARS)?;
     let note = format!(" … {} more characters", text[cut..].chars().count());
     let whole = text.clone();

@@ -1,0 +1,597 @@
+{
+  "expected": 118,
+  "profiled": 118,
+  "binary_sha256": "8d928ccdb2b495cbfc37f0a5f09ef3c5ad42ef61c09fbcc81dc17629afc3e724",
+  "cases": [
+    {
+      "name": "history/read-first-500",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "history/layout-1500",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/src/app/mod.rs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/src/repo/load.rs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/Cargo.lock",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "diff/open/src/repo/diff/image_compare/decode.rs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "diff/open/src/image_cache.rs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "diff/open/src/app/title_bar.rs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/graph-warm-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/graph-scroll-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/status-linked-worktree",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/status-clean-400-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/operation-state",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/identity",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/overview",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/refs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/worktrees",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/stashes",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/remotes",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/reload-metadata",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "files/tree",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "files/read-blob",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "files/history",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "files/blame-2000-lines",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "history/commit-detail",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "history/next-page-500",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "search/history-message",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "search/history-operators",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "search/code-history",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "branches/by-date",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "branches/merged",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "metadata/notes-namespaces",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "metadata/authorship",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "history/reflog",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/status-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/branches-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/log-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/show_commit-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/diff-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/blame-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/checkout-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/merge-reset-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/rebase-restore-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/status-merge-conflict",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "mcp/conflicts-json-response",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/status-rebase-conflict",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "transport/fetch-up-to-date-local",
+      "success": true,
+      "retried": true
+    },
+    {
+      "name": "transport/push-up-to-date-local",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "transport/clone-remove-local-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "repository/status-dirty-200-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "diff/index",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "diff/worktree",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/stage-unstage-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/stash-restore-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "operations/commit-reset-cycle",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/github-parse-400-rules",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/github-lookup-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/github-lint-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitlab-parse-400-rules",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitlab-lookup-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitlab-lint-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitea-parse-400-rules",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitea-lookup-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "owners/gitea-lint-1000-files",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "find/literal-50000-lines",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "find/regex-50000-lines",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "find/unicode-50000-lines",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/main.py",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/App.tsx",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/App.vue",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/Main.cs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/main.cpp",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/main.go",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/main.java",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "highlight/script.ps1",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/decode-png-1080p",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/decode-fit-pair-1080p",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/difference-identical-1080p",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/difference-one-percent-edited-1080p",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/difference-fully-edited-1080p",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "images/difference-resized",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/settings.json",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/settings.yaml",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/settings.toml",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/Cargo.lock",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/table.csv",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/README.md",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/openapi.json",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "rich/data.dvc",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "analysis/weakened-checks",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "text/myers-sparse",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "text/myers-rewrite",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "text/cap-50000-source-lines",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "startup/create-20-deferred-tabs",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "settings/serialize",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/palette-items",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/sidebar-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/diff-unified-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/diff-unified-scroll-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/diff-split-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/diff-split-scroll-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/whole-file-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/file-history-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "ui/blame-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "terminal/parse-build-output",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "terminal/paint-build-output-frame",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/report.pdf",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/plain.pdf",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/spec.docx",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/data.xlsx",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/slides.pptx",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/notes.odt",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/sources.zip",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/stable-ids.ipynb",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/without-ids.ipynb",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/schema.xml",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/model.bin",
+      "success": true,
+      "retried": false
+    },
+    {
+      "name": "documents/screenshot.png",
+      "success": true,
+      "retried": false
+    }
+  ]
+}

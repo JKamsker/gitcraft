@@ -3,6 +3,48 @@
 
 use super::*;
 
+#[test]
+fn batched_identity_preserves_last_values_empty_values_and_local_presence() -> Result<(), String> {
+    let repo = fixture::Repo::new("identity-batched")?;
+    repo.git(&["config", "--add", "user.name", " New\nName é "])?;
+    repo.git(&["config", "--add", "user.email", ""])?;
+    let identity = identity(repo.path());
+    assert_eq!(identity.name, "New\nName é");
+    assert_eq!(identity.email, "");
+    assert!(identity.local && identity.local_email);
+    repo.git(&["config", "--unset-all", "user.email"])?;
+    assert!(!super::identity(repo.path()).local_email);
+    // A valueless config entry exists and reads as empty, rather than being absent.
+    use std::io::Write as _;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(repo.dir.join(".git/config"))
+        .map_err(|e| e.to_string())?;
+    file.write_all(b"\n[user]\nemail\n")
+        .map_err(|e| e.to_string())?;
+    let identity = super::identity(repo.path());
+    assert!(identity.local_email);
+    assert_eq!(identity.email, "");
+    Ok(())
+}
+
+#[test]
+fn refs_head_matches_attached_detached_and_unborn_head() -> Result<(), String> {
+    let repo = fixture::Repo::new("refs-head")?;
+    let empty = refs(repo.path())?;
+    assert!(empty.head.is_empty());
+    assert_eq!(empty.current, None);
+    let head = repo.commit("initial", &[])?;
+    let attached = refs(repo.path())?;
+    assert_eq!(attached.head, head);
+    assert_eq!(attached.current.as_deref(), Some("main"));
+    repo.git(&["checkout", "--detach", "HEAD"])?;
+    let detached = refs(repo.path())?;
+    assert_eq!(detached.head, head);
+    assert_eq!(detached.current, None);
+    Ok(())
+}
+
 /// The user's config doesn't change what gitcraft reads, and a ref that looks like an option
 /// (a tag fetched from somewhere) is read as a ref.
 #[test]

@@ -1,0 +1,211 @@
+{
+  "scope": "LLVM-instrumented workspace targets on macOS arm64, default features; raw source lines include inline tests. Not production-only or cross-platform/feature coverage.",
+  "unit_tests_only_lines": {
+    "count": 159448,
+    "covered": 115004,
+    "percent": 72.12633585871255
+  },
+  "workflows_and_tests_before_iteration": {
+    "count": 159448,
+    "covered": 116790,
+    "percent": 73.24645025337412
+  },
+  "after_iteration": {
+    "count": 159467,
+    "covered": 116833,
+    "percent": 73.26468799187292
+  },
+  "library_tests": {
+    "passed": 3003,
+    "failed_preexisting": 5,
+    "ignored": 8
+  },
+  "profiled_workloads": 118,
+  "optimized_files": {
+    "src/codeowners/mod.rs": {
+      "before": {
+        "count": 241,
+        "covered": 230,
+        "percent": 95.4356846473029
+      },
+      "after": {
+        "count": 241,
+        "covered": 237,
+        "percent": 98.3402489626556
+      }
+    },
+    "src/git/status.rs": {
+      "before": {
+        "count": 218,
+        "covered": 199,
+        "percent": 91.28440366972477
+      },
+      "after": {
+        "count": 218,
+        "covered": 199,
+        "percent": 91.28440366972477
+      }
+    },
+    "src/git/refs.rs": {
+      "before": {
+        "count": 239,
+        "covered": 235,
+        "percent": 98.32635983263597
+      },
+      "after": {
+        "count": 239,
+        "covered": 235,
+        "percent": 98.32635983263597
+      }
+    },
+    "src/git/mod.rs": {
+      "before": {
+        "count": 154,
+        "covered": 123,
+        "percent": 79.87012987012987
+      },
+      "after": {
+        "count": 154,
+        "covered": 123,
+        "percent": 79.87012987012987
+      }
+    },
+    "src/repo/diff/rich/config.rs": {
+      "before": {
+        "count": 248,
+        "covered": 239,
+        "percent": 96.37096774193549
+      },
+      "after": {
+        "count": 248,
+        "covered": 247,
+        "percent": 99.59677419354838
+      }
+    },
+    "src/repo/diff/paint.rs": {
+      "before": {
+        "count": 234,
+        "covered": 213,
+        "percent": 91.02564102564102
+      },
+      "after": {
+        "count": 234,
+        "covered": 213,
+        "percent": 91.02564102564102
+      }
+    },
+    "src/repo/diff/image_compare/decode.rs": {
+      "before": {
+        "count": 274,
+        "covered": 271,
+        "percent": 98.90510948905109
+      },
+      "after": {
+        "count": 284,
+        "covered": 281,
+        "percent": 98.94366197183099
+      }
+    },
+    "src/repo/highlight.rs": {
+      "before": {
+        "count": 279,
+        "covered": 273,
+        "percent": 97.84946236559139
+      },
+      "after": {
+        "count": 279,
+        "covered": 273,
+        "percent": 97.84946236559139
+      }
+    },
+    "src/repo/find/scan.rs": {
+      "before": {
+        "count": 119,
+        "covered": 114,
+        "percent": 95.7983193277311
+      },
+      "after": {
+        "count": 119,
+        "covered": 114,
+        "percent": 95.7983193277311
+      }
+    }
+  },
+  "largest_remaining_files": {
+    "src/forge/gitea/live.rs": {
+      "count": 762,
+      "covered": 0,
+      "percent": 0.0
+    },
+    "src/repo/bakeoff/view.rs": {
+      "count": 564,
+      "covered": 56,
+      "percent": 9.929078014184398
+    },
+    "src/app/workspaces.rs": {
+      "count": 729,
+      "covered": 246,
+      "percent": 33.744855967078195
+    },
+    "src/repo/timeline/view.rs": {
+      "count": 518,
+      "covered": 43,
+      "percent": 8.301158301158301
+    },
+    "src/repo/apply.rs": {
+      "count": 647,
+      "covered": 201,
+      "percent": 31.066460587326123
+    },
+    "src/app/my_work.rs": {
+      "count": 601,
+      "covered": 162,
+      "percent": 26.955074875207984
+    },
+    "src/repo/pr_view/page.rs": {
+      "count": 420,
+      "covered": 0,
+      "percent": 0.0
+    },
+    "src/repo/reflog/view.rs": {
+      "count": 387,
+      "covered": 0,
+      "percent": 0.0
+    },
+    "src/repo/diff/view.rs": {
+      "count": 693,
+      "covered": 349,
+      "percent": 50.36075036075036
+    },
+    "src/repo/stack/section.rs": {
+      "count": 382,
+      "covered": 42,
+      "percent": 10.99476439790576
+    },
+    "src/forge/gitea/mod.rs": {
+      "count": 527,
+      "covered": 194,
+      "percent": 36.81214421252372
+    },
+    "src/folder_browser.rs": {
+      "count": 434,
+      "covered": 109,
+      "percent": 25.115207373271893
+    },
+    "src/repo/forks/mod.rs": {
+      "count": 368,
+      "covered": 43,
+      "percent": 11.684782608695652
+    },
+    "src/repo/stack/publish.rs": {
+      "count": 335,
+      "covered": 13,
+      "percent": 3.880597014925373
+    },
+    "src/repo/push/banner.rs": {
+      "count": 315,
+      "covered": 3,
+      "percent": 0.9523809523809524
+    }
+  }
+}
