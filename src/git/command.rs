@@ -113,6 +113,8 @@ pub(super) struct Extra {
     tool: bool,
     /// Find out which hook failed, if one does (see [`super::hooks`]).
     trace_hooks: bool,
+    /// On another machine: a test of a parallel bisect (see [`run_for_test`]).
+    test: Option<std::time::Duration>,
 }
 
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
@@ -227,7 +229,8 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
-        timeout: extra.tool.then_some(TOOL_FOR),
+        timeout: extra.test.or_else(|| extra.tool.then_some(TOOL_FOR)),
+        test: extra.test.is_some(),
         apart: false,
     }
 }
@@ -446,6 +449,31 @@ pub fn run_call(dir: Option<&Path>, args: &[&str], call: Call) -> Result<Vec<u8>
     })
 }
 
+/// How a git call ended: its exit code (`None`: ended by a signal) and what it printed.
+#[derive(Clone, Debug)]
+pub struct Exit {
+    pub code: Option<i32>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Runs git with `args` in `dir` for a parallel bisect's tests, whatever it exits with. On
+/// another machine it gets a shell of its own (as many run side by side as there are tests at
+/// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
+/// stops it (see `parallel_bisect::runner`).
+pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
+    let extra = Extra {
+        test: Some(limit),
+        ..Extra::default()
+    };
+    let out = execute(Some(dir), &extra, args)?;
+    Ok(Exit {
+        code: out.code,
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
 pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<String, String> {
     run_inner(dir, args, ok, None, false)
@@ -527,6 +555,7 @@ fn unattended_extra(unix: bool) -> Extra {
         tool: false,
         stdin: None,
         trace_hooks: false,
+        test: None,
     }
 }
 

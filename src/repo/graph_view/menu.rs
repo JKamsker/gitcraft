@@ -90,6 +90,9 @@ impl RepoTab {
             .current
             .as_deref()
             .and_then(|b| self.upstream_ref(b));
+        self.bisect_menu_items(ui, &hash, idle, acts);
+        self.parallel_menu_items(ui, &hash, acts);
+        ui.separator();
         let rewrite = Rewrite {
             tab: self,
             merge: commit.parents.len() > 1,

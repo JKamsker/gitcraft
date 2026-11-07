@@ -7,6 +7,7 @@ mod apply;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
+mod bisect;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -45,6 +46,7 @@ mod navigate;
 mod operations;
 mod palette;
 mod partial_stash;
+mod parallel_bisect;
 mod patches;
 mod pinned_sections;
 mod pr_merge;
@@ -232,6 +234,10 @@ pub struct RepoTab {
     target_watch: conflict_check::TargetWatch,
     /// The Keep both dialog of a conflicted file that can't be merged.
     keep_both: Option<conflict::KeepBoth>,
+    /// The bisect going on, and the output of `git bisect run`.
+    bisect: bisect::Bisecting,
+    /// The parallel bisect running, or the last one, and the answers by tree.
+    parallel: parallel_bisect::Parallel,
 
     commit_summary: String,
     commit_body: String,
@@ -409,6 +415,8 @@ impl RepoTab {
             conflict_checks: Default::default(),
             target_watch: Default::default(),
             keep_both: None,
+            bisect: Default::default(),
+            parallel: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),

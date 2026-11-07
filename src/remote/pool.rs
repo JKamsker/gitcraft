@@ -1,7 +1,6 @@
 //! The shells kept open per machine, in three lanes: quick reads (status, log, diffs…), long
 //! network operations (fetch, push…), which would otherwise take every shell of a machine for
-//! as long as they last and leave the tab waiting for its reads, and diff or merge tools, which
-//! stay open as long as the user works in them and would otherwise hold up fetch and push.
+//! as long as they last, diff and merge tools, and parallel test runs, each in its own lane.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
@@ -20,6 +19,7 @@ pub(super) enum Lane {
     Apart,
     /// A diff or merge tool (`git difftool`, `git mergetool`) the user works in.
     Tool,
+    Test,
 }
 
 impl Lane {
@@ -54,9 +54,13 @@ impl Lane {
                 self.max(),
                 host.label()
             ),
+            Lane::Test => TEST_SHELLS,
         }
     }
 }
+
+/// How many tests a parallel bisect runs at once on one machine, at most.
+pub const TEST_SHELLS: usize = 64;
 
 /// After a connection couldn't be made, commands fail at once with its error for this long
 /// (while none is open) rather than each trying, and waiting for, one of their own.
@@ -141,7 +145,10 @@ impl Pool {
             {
                 return Err(why.clone());
             }
-            let wait_for_first = connected == 0 && state.connecting > 0;
+            // Tests open their connections one at a time: ssh servers drop new ones at random
+            // past a few being made at once (`MaxStartups`), and a parallel bisect asks for many.
+            let one_at_a_time = connected == 0 || lane == Lane::Test;
+            let wait_for_first = one_at_a_time && state.connecting > 0;
             if !wait_for_first && state.open < lane.max() {
                 state.open += 1;
                 state.connecting += 1;

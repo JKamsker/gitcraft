@@ -105,7 +105,7 @@ pub(super) enum FsChange {
     /// The index (staging writes it, and so does any other tool's `git status`) or
     /// `.gitmodules`: re-reading the status and the submodules, whose commits the index holds.
     Index,
-    /// Refs, HEAD, merge state: a full reload.
+    /// Refs, HEAD, merge or bisect state: a full reload.
     Git,
 }
 
@@ -143,7 +143,8 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
                 || inside == "HEAD"
                 || inside == "packed-refs"
                 || (inside.ends_with("_HEAD") && inside != "FETCH_HEAD" && inside != "ORIG_HEAD")
-                || inside.starts_with("rebase-"))
+                || inside.starts_with("rebase-")
+                || inside.starts_with("BISECT_"))
             .then_some(FsChange::Git)
         }
     };

@@ -1,5 +1,6 @@
 //! For the tests that drive the window: actions a user takes, made from what a tab shows.
 
+use super::bisect::BisectAct;
 use super::file_view::FileTab;
 use super::reflog::{ReflogAct, Source};
 use super::partial_stash::StashRequest;
@@ -86,6 +87,19 @@ impl RepoTab {
                 }
                 acts.push(Action::RunRebase);
                 acts.push(Action::Stash(StashRequest::everything("sample")));
+                // A bisect from start to end, a run in it, and the dialog that starts one.
+                acts.push(Action::Dialog(self.start_bisect_dialog(&self.refs.head)));
+                acts.push(Action::Bisect(BisectAct::Start {
+                    bad: "HEAD".to_owned(),
+                    good: Some("HEAD~1".to_owned()),
+                }));
+                acts.push(Action::Bisect(BisectAct::Run("true".to_owned())));
+                acts.push(Action::Bisect(BisectAct::StopRun));
+                acts.push(Action::Bisect(BisectAct::Mark {
+                    mark: crate::git::Mark::Skip,
+                    rev: None,
+                }));
+                acts.push(Action::Bisect(BisectAct::Reset));
             }
         }
         acts

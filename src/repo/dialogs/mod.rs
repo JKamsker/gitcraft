@@ -1,5 +1,6 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
+mod bisect;
 mod branch;
 mod cleanup;
 mod confirm;
@@ -7,6 +8,7 @@ mod fold;
 mod preview;
 mod custom;
 mod keep_detached;
+mod parallel_bisect;
 mod remote;
 mod stash;
 mod upstream;
@@ -23,6 +25,8 @@ pub use custom::CustomDialog;
 pub use self::stash::Choice as StashChoice;
 pub(crate) use self::stash::sentence;
 use super::partial_stash::StagedSupport;
+pub use parallel_bisect::ParallelForm;
+
 use super::widgets;
 use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
@@ -124,6 +128,20 @@ pub enum Dialog {
     KeepDetached(Box<super::detached::KeepDialog>),
     /// Select stale or merged branches…
     Cleanup(Box<cleanup::CleanupDialog>),
+    /// Start a bisect from the commit `hash`, good or bad, with the other end `other`.
+    StartBisect {
+        hash: String,
+        this_good: bool,
+        other: String,
+        focus: bool,
+    },
+    /// `git bisect run` with the command typed.
+    BisectRun {
+        command: String,
+        focus: bool,
+    },
+    /// A parallel bisect: its ends, command, machine and limits.
+    ParallelBisect(Box<ParallelForm>),
 }
 
 impl Dialog {
@@ -311,6 +329,25 @@ impl Dialog {
         dialog
     }
 
+    /// Starts a bisect from `hash`: good with HEAD as the bad end, or bad with a good end to
+    /// pick.
+    pub fn start_bisect(hash: &str, this_good: bool) -> Self {
+        Dialog::StartBisect {
+            hash: hash.to_owned(),
+            this_good,
+            other: if this_good { "HEAD" } else { "" }.to_owned(),
+            focus: true,
+        }
+    }
+
+    /// Runs a command for the bisect, `last` (the one run before) offered.
+    pub fn bisect_run(last: &str) -> Self {
+        Dialog::BisectRun {
+            command: last.to_owned(),
+            focus: true,
+        }
+    }
+
     pub fn refresh(mut self, what: Refresh) -> Self {
         if let Dialog::Confirm { refresh, .. } = &mut self {
             *refresh = what;
@@ -345,6 +382,12 @@ impl RepoTab {
             }
             self.check_staged_stash(ctx);
         }
+        // What the bisect dialogs say.
+        let bisect_blocker = self.bisect_blocker();
+        let machine = match crate::remote::parse(&self.path) {
+            Some(target) => format!("on {}", target.host.label()),
+            None => "on this machine".to_owned(),
+        };
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -467,6 +510,24 @@ impl RepoTab {
                 Dialog::Custom(custom) => custom::custom(ui, enter, custom),
                 Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
                 Dialog::Cleanup(dialog) => cleanup::cleanup(ui, dialog),
+                Dialog::StartBisect {
+                    hash,
+                    this_good,
+                    other,
+                    focus,
+                } => bisect::start_bisect(
+                    ui,
+                    enter,
+                    hash,
+                    this_good,
+                    other,
+                    focus,
+                    bisect_blocker.as_deref(),
+                ),
+                Dialog::BisectRun { command, focus } => {
+                    bisect::bisect_run(ui, enter, &machine, command, focus)
+                }
+                Dialog::ParallelBisect(form) => parallel_bisect::parallel_bisect(ui, enter, form),
                 Dialog::Confirm {
                     title,
                     body,

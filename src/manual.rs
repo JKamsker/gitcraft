@@ -79,6 +79,27 @@ const FEATURES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "Bisect",
+        &[
+            "Right-click a commit and choose Start bisect here… to find the commit that brought a change in: say whether it is good (from before the change) or bad (it has the change), and give the other end (HEAD is the bad one unless you name another). It refuses while there are uncommitted changes, conflicts, or a merge or rebase in progress.",
+            "A banner over the graph then names the commit checked out for you to test and about how many steps are left; Good, Bad and Skip mark it, and right-clicking another commit marks that one. The graph tints good commits green, bad ones red and skipped ones grey.",
+            "Run a command… in the banner lets git bisect run test each commit for you, on the repository's machine (here, in WSL or over SSH): exit code 0 is good, 125 skips the commit, any other code up to 127 is bad, and 128 or more stops. Its output shows under the banner as it comes; Stop run stops it, and the bisect stays where it got to.",
+            "At the end the first bad commit is selected and its details open. Finish (or Stop, which asks first, before the end) runs git bisect reset, which checks out again what was checked out when it began.",
+            "A bisect started in a terminal shows in the banner as soon as gitcraft sees it, and goes on from there; each worktree has its own.",
+        ],
+    ),
+    (
+        "Parallel bisect",
+        &[
+            "Run in parallel… in the bisect banner (or Bisect in parallel from here… in a commit's menu, or the palette) tests several commits at once, each in a worktree of its own, until the first bad commit is found: about log base (k + 1) of n rounds instead of log base 2 of n. Your checkout isn't touched, and no git bisect needs to be going on.",
+            "Give the bad and the good commits, the test command (read as git bisect run reads it: exit code 0 is good, 125 skips, any other up to 127 is bad; 128 or more, a crash, stops it on an end and otherwise skips that commit with a warning), the machine (this computer, a WSL distribution or an SSH host of ~/.ssh/config), how many at once (that machine's cores by default, up to 16; at most 32) and how long one test may take (one that runs longer is stopped and counts as skipped).",
+            "On another machine than the repository's, the commits are sent there first, to a clone you name or to a copy gitcraft keeps in ~/.cache/gitcraft/bisect.",
+            "The two ends are tested in the first round, beside the first commits picked: when the good end already fails, or the bad end passes, it says so and stops. The banner gives the round, how many commits may still be the first bad one and how many are being tested; the graph marks those being tested, tints the tested ones green, red, grey (skipped) or amber (timed out), and draws a thin line by the commits still in question, which shrinks round after round. Hover a tested commit for the end of its output.",
+            "A commit whose tree was tested before (with the same command, on the same machine, while the tab is open) isn't tested again.",
+            "At the end the first bad commit is selected; when a bisect is going on between the same marks, Mark in the bisect marks it bad and its parents good there, which ends that bisect on the same commit. Cancel stops every test and removes the worktrees, as does any other end; what a crash leaves is removed when the tab opens again or the next parallel bisect starts.",
+        ],
+    ),
+    (
         "Changes and commits",
         &[
             "Stage, unstage or discard whole files from the right pane.",

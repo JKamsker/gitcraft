@@ -19,6 +19,7 @@ mod manual;
 mod menu_item;
 mod mergiraf;
 mod portable;
+mod parallel_bisect;
 mod pr_post;
 mod pr_threads;
 mod pull_request;

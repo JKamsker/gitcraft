@@ -51,6 +51,9 @@ pub struct Request {
     /// It goes over the network and may take minutes (fetch, push…): run in shells of their
     /// own, so the quick reads aren't left waiting behind it.
     pub long: bool,
+    /// A test run of a parallel bisect (which may take as long as its own limit): run in shells
+    /// of their own, as many side by side as there are tests at once.
+    pub test: bool,
     /// How long it may take before it is stopped; `None`: as long as its lane allows (see
     /// [`Request::time_limit`]).
     pub timeout: Option<std::time::Duration>,
@@ -76,6 +79,7 @@ impl Request {
     /// holds up a fetch or a push.
     pub(super) fn lane(&self) -> Lane {
         match self.timeout {
+            _ if self.test => Lane::Test,
             _ if self.apart => Lane::Apart,
             Some(limit) if limit > LONG_FOR => Lane::Tool,
             _ if self.long => Lane::Long,
@@ -85,8 +89,11 @@ impl Request {
 
     /// How long it may run before it is stopped.
     pub(super) fn time_limit(&self) -> Duration {
-        self.timeout
-            .unwrap_or(if self.long { LONG_FOR } else { QUICK_FOR })
+        self.timeout.unwrap_or(if self.long || self.test {
+            LONG_FOR
+        } else {
+            QUICK_FOR
+        })
     }
 }
 
@@ -108,6 +115,7 @@ impl std::fmt::Debug for Request {
             .field("unset", &self.unset)
             .field("stdin", &self.stdin.as_ref().map(Vec::len))
             .field("long", &self.long)
+            .field("test", &self.test)
             .field("timeout", &self.timeout)
             .field("apart", &self.apart)
             .finish()
@@ -164,8 +172,9 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
 
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
-/// processes are listed first, as one stopped leaves what it started to another parent.
-fn stop(host: Host, pid: u32) {
+/// processes are listed first, as one stopped leaves what it started to another parent. The
+/// thread doing it is given back, for a caller that has to wait for it.
+pub fn stop(host: Host, pid: u32) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let _ = exec(
             &host,
@@ -175,7 +184,7 @@ fn stop(host: Host, pid: u32) {
                 ..Request::default()
             },
         );
-    });
+    })
 }
 
 /// Stops the process `pid` on `host` and everything it started (see [`stop`]): a command the

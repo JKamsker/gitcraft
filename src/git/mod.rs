@@ -3,6 +3,7 @@
 
 mod backlinks;
 mod branch_health;
+mod bisect;
 mod command;
 mod commit_msg;
 mod commits;
@@ -29,12 +30,14 @@ mod signature;
 mod stash;
 mod remerge;
 mod status;
+mod stream;
 mod submodule;
 mod timed;
 mod worktree;
 
 pub use self::backlinks::*;
 pub use self::branch_health::*;
+pub use self::bisect::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;
@@ -56,6 +59,7 @@ pub use self::signature::*;
 pub use self::stash::*;
 pub use self::remerge::*;
 pub use self::status::*;
+pub use self::stream::*;
 pub use self::submodule::*;
 pub use self::timed::*;
 pub use self::worktree::*;
