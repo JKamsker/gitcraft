@@ -916,3 +916,44 @@ fn fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion() -> Result<(
     );
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn fixed_independence_preserves_borrowed_root_and_private_ref_objects() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let (donor, borrower) = f.borrowing()?;
+    let extra = Fixture::commit(&donor, b"root-only borrowed version\n")?;
+    let tree = Fixture::git(&donor, &["rev-parse", &format!("{extra}^{{tree}}")])?;
+    std::fs::write(borrower.join(".git/ORIG_HEAD"), format!("{extra}\n"))
+        .map_err(|e| e.to_string())?;
+    std::fs::write(borrower.join(".git/AUTO_MERGE"), format!("{tree}\n"))
+        .map_err(|e| e.to_string())?;
+    Fixture::git(
+        &borrower,
+        &["update-ref", "refs/gitcraft/private-copy-proof", &tree],
+    )?;
+    let plan = inspect(&borrower, "HEAD", &|| true)?
+        .independence
+        .ok_or("no plan")?;
+    independent::make_independent(&plan, &|| true)?;
+    std::fs::rename(&donor, f.0.join("removed donor")).map_err(|e| e.to_string())?;
+    assert_eq!(
+        Fixture::git(
+            &borrower,
+            &["show", "ORIG_HEAD:file ' $(touch ESCAPED).txt"]
+        )?,
+        "root-only borrowed version"
+    );
+    assert_eq!(
+        Fixture::git(&borrower, &["cat-file", "-t", "AUTO_MERGE"])?,
+        "tree"
+    );
+    assert_eq!(
+        Fixture::git(
+            &borrower,
+            &["cat-file", "-t", "refs/gitcraft/private-copy-proof"]
+        )?,
+        "tree"
+    );
+    Ok(())
+}

@@ -34,6 +34,7 @@ fn references(
     for args in [
         vec![
             "for-each-ref",
+            "--include-root-refs",
             "--format=%(refname)%00%(objectname)%00%(symref)",
         ],
         vec!["rev-parse", "--verify", "HEAD"],
@@ -117,6 +118,32 @@ fn current(snapshot: &Snapshot, active: &dyn Fn() -> bool) -> Result<(), String>
     }
     snapshot.ownership.current(true)
 }
+fn root_objects(
+    repo: &Path,
+    ownership: &Ownership,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    let output = ownership.run(
+        repo,
+        &[
+            "for-each-ref",
+            "--include-root-refs",
+            "--format=%(objectname)",
+        ],
+        Vec::new(),
+        16 * 1024 * 1024,
+        None,
+        active,
+    )?;
+    if !output
+        .split(|b| *b == b'\n')
+        .filter(|s| !s.is_empty())
+        .all(|line| std::str::from_utf8(line).is_ok_and(valid_oid))
+    {
+        return Err("A root/private ref did not resolve to a full object ID".into());
+    }
+    Ok(output)
+}
 fn required(
     repo: &Path,
     ownership: &Ownership,
@@ -132,8 +159,9 @@ fn required(
             "--indexed-objects",
             "--missing=print",
             "--no-object-names",
+            "--stdin",
         ],
-        Vec::new(),
+        root_objects(repo, ownership, active)?,
         16 * 1024 * 1024,
         None,
         active,
@@ -178,7 +206,7 @@ fn copy_pack(
             "--no-reuse-delta",
             "--no-reuse-object",
         ],
-        Vec::new(),
+        root_objects(repo, ownership, active)?,
         MAX_PACK_BYTES,
         None,
         active,
@@ -340,6 +368,7 @@ pub(crate) fn export_ticket(
     for args in [
         vec![
             "for-each-ref",
+            "--include-root-refs",
             "--format=%(refname)%00%(objectname)%00%(symref)",
         ],
         vec!["rev-parse", "--verify", "HEAD"],
