@@ -467,6 +467,11 @@ impl RepoTab {
     }
 
     /// The branch to compare the current one with: the local default base, or its remote one.
+    /// The name of the branch pull requests go into (see [`Self::base_ref`]).
+    pub(in crate::repo) fn base_branch_name(&self) -> Option<String> {
+        self.base_ref().map(|b| b.name)
+    }
+
     pub(in crate::repo) fn base_ref(&self) -> Option<OwnedBranch> {
         let base = self.default_base();
         if self.refs.local.iter().any(|b| b.name == base) {
@@ -574,7 +579,7 @@ fn badge(reasons: &[Reason]) -> Option<Badge> {
     } else {
         None
     }
-}
+    }
 
 /// `Merged into main` from `merged into main`.
 fn capitalise(text: &str) -> String {
@@ -582,7 +587,8 @@ fn capitalise(text: &str) -> String {
     chars.next().map_or_else(String::new, |first| {
         first.to_uppercase().chain(chars).collect()
     })
-}
+    }
+    crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
 
 /// A word on a branch's row saying it could be cleaned up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

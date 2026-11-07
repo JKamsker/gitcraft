@@ -146,6 +146,10 @@ impl RepoTab {
             ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
         let graph_label = crate::repo::graph_order::header_label(self.log_order);
         header::column_headers(ui, &t, header, &cols, &graph_label);
+        self.test_lane_frame(&settings, ui.ctx());
+        if self.test_lane.visible {
+            self.test_lane_header(ui, header, &cols, acts);
+        }
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
         order::order_button(

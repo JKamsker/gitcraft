@@ -95,6 +95,7 @@ impl RepoTab {
         self.bisect_menu_items(ui, &hash, idle, acts);
         self.parallel_menu_items(ui, &hash, acts);
         self.surgery_items(ui, &hash, idle, acts);
+        self.test_menu_items(ui, &hash, acts);
         ui.separator();
         let rewrite = Rewrite {
             tab: self,
@@ -234,6 +235,7 @@ impl RepoTab {
         {
             acts.push(interactive_rebase_action(git_ref));
         }
+        crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
         ui.separator();
         compare_items(ui, acts, git_ref, current);
     }

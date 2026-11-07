@@ -66,6 +66,8 @@ pub struct Settings {
     /// An absolute date column.
     pub show_date: bool,
     pub show_hash: bool,
+    /// The test lane: a pass / fail dot by each commit for the repository's test command.
+    pub show_test_lane: bool,
     /// The branches panel on the left of a repository tab.
     pub show_branches: bool,
     /// The commit detail / changes panel on the right of a repository tab.
@@ -178,6 +180,7 @@ impl Default for Settings {
             show_when: true,
             show_date: false,
             show_hash: false,
+            show_test_lane: false,
             show_branches: true,
             show_detail: true,
             worktrees_in_same_tab: true,
@@ -659,7 +662,7 @@ impl Settings {
                     card.row_hint(
                         "Columns",
                         "Or right-click the graph's header",
-                        "author when date hash show",
+                        "author when date hash tests show",
                         |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 ui.spacing_mut().item_spacing.x = 18.0;
@@ -667,6 +670,7 @@ impl Settings {
                                 ui.checkbox(&mut self.show_when, "When");
                                 ui.checkbox(&mut self.show_date, "Date");
                                 ui.checkbox(&mut self.show_hash, "Hash");
+                                ui.checkbox(&mut self.show_test_lane, "Tests");
                             });
                         },
                     );

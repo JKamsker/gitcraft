@@ -47,6 +47,7 @@ mod remerge;
 mod reviewed;
 mod rewrites;
 mod revert;
+mod rehearse;
 mod status;
 mod stream;
 mod submodule;
@@ -55,6 +56,7 @@ mod trees;
 mod unity;
 #[cfg(test)]
 pub(crate) use self::unity::tests as unity_tests;
+mod testlane;
 mod worktree;
 
 pub use self::backlinks::*;
@@ -91,12 +93,16 @@ pub use self::remerge::*;
 pub use self::reviewed::*;
 pub use self::rewrites::*;
 pub use self::revert::*;
+pub use self::rehearse::*;
 pub use self::status::*;
 pub use self::stream::*;
 pub use self::submodule::*;
 pub use self::timed::*;
 pub use self::trees::*;
 pub use self::unity::*;
+#[cfg(test)]
+pub(crate) use self::testlane::fixture;
+pub use self::testlane::*;
 pub use self::worktree::*;
 
 use std::path::{Path, PathBuf};

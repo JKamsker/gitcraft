@@ -9,6 +9,7 @@ use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
 use crate::a11y::labels;
 use crate::git::{self, Commit};
 use crate::repo::columns::Cols;
+use crate::repo::test_lane::LANE_W;
 use crate::repo::{Action, RepoTab, WIP_HASH, ci_status, widgets};
 use crate::theme::{self, Tokens};
 
@@ -128,7 +129,14 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            let dot_w = if ci.is_some() { 14.0 } else { 0.0 };
+            let lane = if self.test_lane.visible { LANE_W } else { 0.0 };
+            // With the lane, the CI dot's place is kept on every row, so the lane is straight.
+            let dots = if lane > 0.0 || ci.is_some() {
+                14.0
+            } else {
+                0.0
+            } + lane;
+            let dot_w = dots;
             // Only where the description has room for it beside some of the summary.
             let room = rect.right() - cols.trailing() - dot_w - (gx + cols.graph);
             let resolved = self
@@ -160,6 +168,11 @@ impl RepoTab {
             if let Some(badge) = resolved {
                 let end = pos2(rect.right() - cols.trailing() - 6.0 - dot_w, row.mid());
                 self.show_remerge_badge(ui, &painter, (i, &commit.hash), badge, end, acts);
+            }
+            if lane > 0.0 {
+                let center = pos2(rect.right() - cols.trailing() - 9.0 - 14.0, row.mid());
+                let id = ui.id().with(("test-dot", &commit.hash));
+                acts.extend(self.test_dot(ui, id, center, &commit.tree));
             }
         }
         if draggable {

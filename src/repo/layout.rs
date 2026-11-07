@@ -72,6 +72,16 @@ impl RepoTab {
                 .frame(egui::Frame::new().fill(t.card))
                 .show(ui, |ui| self.terminal_panel(ui, &mut acts));
         }
+        if self.test_lane.shows_banner() {
+            egui::Panel::top("repo_tests")
+                .frame(
+                    egui::Frame::new()
+                        .fill(t.chrome)
+                        .inner_margin(egui::Margin::symmetric(10, 6))
+                        .stroke(egui::Stroke::new(1.0, t.separator)),
+                )
+                .show(ui, |ui| self.test_banner(ui, &mut acts));
+        }
         if self.bisect.shows() {
             egui::Panel::top("repo_bisect")
                 .frame(
@@ -143,6 +153,8 @@ impl RepoTab {
         self.fence_window(&ctx, &mut acts);
         self.unity_ui(&ctx, &mut acts);
         self.drift_window(&ctx, &mut acts);
+        self.test_output_window(&ctx, &mut acts);
+        self.rehearse_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

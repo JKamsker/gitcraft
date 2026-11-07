@@ -23,6 +23,8 @@ pub struct Commit {
     pub body: String,
     /// Decorations (`HEAD -> main`, `origin/main`, `tag: v1`), as git prints them.
     pub refs: Vec<String>,
+    /// Its tree (what test results are kept by); empty for a row that isn't a commit.
+    pub tree: String,
 }
 
 /// The commits of every branch (stashes aside), or of the revisions `from` when given, newest
@@ -92,7 +94,7 @@ pub fn commits_of(repo: &Path, hashes: &[String]) -> Result<Vec<Commit>, String>
 /// How many fields [`log_args`]' format has, each ended by a NUL. No commit can hold one (git
 /// refuses it in a message), where the unit and record separators may well be in a message
 /// someone pasted, and would cut the commit in two or leave it out of the graph.
-const LOG_FIELDS: usize = 9;
+const LOG_FIELDS: usize = 10;
 
 /// The arguments of `log` / [`LogStream`]: the revisions `from` (else every branch) in `order`,
 /// after the first `skip`, at most `limit` (`--max-count=n`) when given.
@@ -104,7 +106,8 @@ fn log_args<'a>(
 ) -> LogArgs<'a> {
     LogArgs {
         order,
-        format: "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%ad%x00%s%x00%D%x00%b%x00".to_owned(),
+        format: "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%ad%x00%s%x00%D%x00%T%x00%b%x00"
+            .to_owned(),
         skip: format!("--skip={skip}"),
         limit,
         from,
@@ -142,13 +145,26 @@ fn parse_record<S: AsRef<str>>(fields: &[S]) -> Option<Commit> {
         date,
         summary,
         decor,
+        tree,
         body,
     ] = fields
     else {
         return None;
     };
-    let [parents, author, email, time, date, summary, decor, body] =
-        [parents, author, email, time, date, summary, decor, body].map(AsRef::as_ref);
+    let [
+        parents,
+        author,
+        email,
+        time,
+        date,
+        summary,
+        decor,
+        tree,
+        body,
+    ] = [
+        parents, author, email, time, date, summary, decor, tree, body,
+    ]
+    .map(AsRef::as_ref);
     // The line git ends each commit with is before the next one's hash.
     let hash = hash.as_ref().trim_start_matches('\n');
     if hash.is_empty() {
@@ -168,6 +184,7 @@ fn parse_record<S: AsRef<str>>(fields: &[S]) -> Option<Commit> {
             .filter(|s| !s.is_empty())
             .map(str::to_owned)
             .collect(),
+        tree: tree.to_owned(),
     })
 }
 

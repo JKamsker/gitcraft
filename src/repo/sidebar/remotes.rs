@@ -176,6 +176,7 @@ impl RepoTab {
             if rebase.clicked() {
                 acts.push(rebase_action(BranchRef::remote(&b.name), current));
             }
+            crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::remote(&b.name));
             ui.separator();
             graph_view::compare_items(ui, acts, BranchRef::remote(&b.name), current);
             ui.separator();

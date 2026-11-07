@@ -67,6 +67,8 @@ pub fn worktree_list(repo: &Path, current_changes: Option<usize>) -> Result<Vec<
             wt.path = crate::remote::encode(&target.host, &wt.path.to_string_lossy());
         }
     }
+    // gitcraft's own, for tests and rehearsals, come and go by themselves.
+    list.retain(|wt| !super::is_scratch_path(&wt.path.to_string_lossy()));
     let is_here = crate::remote::is_same_dir_as(repo);
     for wt in &mut list {
         wt.current = is_here(&wt.path);

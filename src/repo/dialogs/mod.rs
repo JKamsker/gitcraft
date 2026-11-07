@@ -9,8 +9,10 @@ mod preview;
 mod custom;
 mod keep_detached;
 mod parallel_bisect;
+mod rehearse;
 mod remote;
 mod stash;
+mod test_commits;
 mod upstream;
 mod worktree;
 
@@ -146,6 +148,21 @@ pub enum Dialog {
     },
     /// A parallel bisect: its ends, command, machine and limits.
     ParallelBisect(Box<ParallelForm>),
+    /// Rehearse a rebase or merge of the checked-out branch with `other`.
+    Rehearse {
+        other: String,
+        remote: bool,
+        rebase: bool,
+        compare: bool,
+        command: String,
+        focus: bool,
+    },
+    /// Test a range of commits; `stored` is the repository's test command.
+    TestCommits {
+        start: crate::repo::test_lane::StartTests,
+        stored: Option<String>,
+        focus: bool,
+    },
 }
 
 impl Dialog {
@@ -402,6 +419,8 @@ impl RepoTab {
             Some(target) => format!("on {}", target.host.label()),
             None => "on this machine".to_owned(),
         };
+        let is_remote = crate::remote::is_remote(&self.path);
+        let current_branch = self.refs.current.clone();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -545,6 +564,38 @@ impl RepoTab {
                     bisect::bisect_run(ui, enter, &machine, command, focus)
                 }
                 Dialog::ParallelBisect(form) => parallel_bisect::parallel_bisect(ui, enter, form),
+                Dialog::Rehearse {
+                    other,
+                    remote,
+                    rebase,
+                    compare,
+                    command,
+                    focus,
+                } => rehearse::rehearse(
+                    ui,
+                    enter,
+                    &machine,
+                    current_branch.as_deref(),
+                    other,
+                    *remote,
+                    rebase,
+                    compare,
+                    command,
+                    focus,
+                ),
+                Dialog::TestCommits {
+                    start,
+                    stored,
+                    focus,
+                } => test_commits::test_commits(
+                    ui,
+                    enter,
+                    &machine,
+                    is_remote,
+                    start,
+                    stored.as_deref(),
+                    focus,
+                ),
                 Dialog::Confirm {
                     title,
                     body,

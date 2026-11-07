@@ -141,7 +141,7 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
         if inside == "index" {
             Some(FsChange::Index)
         } else {
-            ((inside.starts_with("refs")
+            ((inside.starts_with("refs") && !inside.starts_with("refs/notes/")
                 && !inside.starts_with(super::timeline::snapshot::ROOT)
                 && inside != "refs/gitcraft")
                 || inside.starts_with("reftable")

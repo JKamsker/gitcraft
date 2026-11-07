@@ -82,6 +82,7 @@ mod remerge;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
+mod rehearse;
 mod rewrite;
 mod running;
 #[cfg(test)]
@@ -90,6 +91,7 @@ mod sidebar;
 mod state;
 mod surgery;
 mod terminals;
+mod test_lane;
 #[cfg(test)]
 mod tests;
 mod timeline;
@@ -123,6 +125,7 @@ use messages::{Msg, spawn};
 pub(crate) use palette::{PaletteGeneration, PaletteItem, PaletteRun, Pick};
 pub(crate) use state::{Compare, CompareData, DiffKey, DiffView, Refresh, Reword, Undo, UndoEntry};
 use state::{OpKind, PendingOp, Search};
+pub(crate) use test_lane::TEST_LANE_TIP;
 pub(crate) use toolbar::reveal_label;
 pub use widgets::primary_button;
 
@@ -300,6 +303,10 @@ pub struct RepoTab {
     rerere: conflict::rerere::Rerere,
     /// Conflict decisions taken as a file's save started, stored once it is saved.
     decisions_pending: Option<conflict::decisions::Pending>,
+    /// The test lane's results, and the run filling it.
+    test_lane: test_lane::TestLane,
+    /// The rehearsal shown in its window.
+    rehearsing: rehearse::Rehearsing,
 
     commit_summary: String,
     commit_body: String,
@@ -531,6 +538,8 @@ impl RepoTab {
             parallel: Default::default(),
             rerere: Default::default(),
             decisions_pending: None,
+            test_lane: Default::default(),
+            rehearsing: Default::default(),
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),
