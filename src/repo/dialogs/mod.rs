@@ -17,6 +17,7 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    ContentRecovery,
     GerritReview {
         remote: String,
         head: String,
@@ -291,6 +292,10 @@ pub(super) enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        if !matches!(self.dialog, Some(Dialog::ContentRecovery)) {
+            self.content_recovery.cancel();
+        }
+        let content_recovery = &mut self.content_recovery;
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -320,6 +325,7 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::ContentRecovery => content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
                     head,
@@ -492,8 +498,14 @@ impl RepoTab {
                 acts.push(action);
                 self.dialog = None;
             }
-            Outcome::Cancel => self.dialog = None,
-            Outcome::Open if response.should_close() => self.dialog = None,
+            Outcome::Cancel => {
+                self.content_recovery.cancel();
+                self.dialog = None;
+            }
+            Outcome::Open if response.should_close() => {
+                self.content_recovery.cancel();
+                self.dialog = None;
+            }
             Outcome::Open => {}
             Outcome::Suggest => dialog.suggest_path(),
         }

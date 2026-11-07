@@ -56,6 +56,7 @@ impl RepoTab {
     /// Account-specific permissions, viewer identity and cached private data must be read
     /// again after the profile's connection choices change. Request ids discard old replies.
     pub(crate) fn reload_profile_connections(&mut self, ctx: &egui::Context) {
+        self.content_recovery.cancel();
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {

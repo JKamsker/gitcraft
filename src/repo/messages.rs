@@ -18,6 +18,8 @@ pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Se
 
 /// Results coming back from background git calls.
 pub(super) enum Msg {
+    ContentRead(u64, Result<Box<super::content_recovery::Read>, String>),
+    ContentRecovered(Result<String, String>),
     Loaded(Result<Box<Loaded>, String>),
     /// The submodules, from the read numbered so (see `RepoTab::reads`).
     Submodules(u64, Vec<git::Submodule>),
@@ -226,6 +228,7 @@ impl RepoTab {
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }
+        self.poll_content_recovery(ctx);
         if !shown {
             return;
         }
@@ -281,6 +284,8 @@ impl RepoTab {
 
     fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
+            Msg::ContentRead(id, result) => self.content_read(id, result, ctx),
+            Msg::ContentRecovered(result) => self.content_recovered(result, ctx),
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
                 if Self::newer(read, &mut self.submodules_read) {

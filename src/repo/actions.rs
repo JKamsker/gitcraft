@@ -157,6 +157,11 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(git::recovery::Target),
+    ContentPerform(std::sync::Arc<git::recovery::Prepared>),
     OpenBundleExport,
     OpenBundleImport,
     ExportBundle {
@@ -372,6 +377,11 @@ impl RepoTab {
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Lost and found by content…".into(),
+                "recovery search staged blobs".into(),
+                Action::OpenContentRecovery,
+            ),
             (
                 "Export Git bundle…".into(),
                 "offline backup".into(),

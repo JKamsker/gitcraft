@@ -341,3 +341,161 @@ fn preview_rejects_forged_provenance_and_pruned_blob_identity() -> Result<(), St
     assert!(!f.0.join("untrusted").exists());
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn partial_promisor_search_does_not_download_or_call_network_helpers() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    f.write("file", b"parse_header promised content")?;
+    f.commit("base")?;
+    git::run(Some(&f.0), &["config", "uploadpack.allowFilter", "true"])?;
+    let oid = git::run(Some(&f.0), &["rev-parse", "HEAD:file"])?
+        .trim()
+        .to_owned();
+    let dest = f.0.join(".git/partial");
+    git::run(
+        None,
+        &[
+            "clone",
+            "--no-local",
+            "--filter=blob:none",
+            "--depth=1",
+            "--no-checkout",
+            "--",
+            f.0.to_str().ok_or("utf8")?,
+            dest.to_str().ok_or("utf8")?,
+        ],
+    )?;
+    assert!(git::run(Some(&dest), &["--no-lazy-fetch", "cat-file", "-e", &oid]).is_err());
+    let marker = f.0.join(".git/network-ran");
+    let helper = f.0.join(".git/upload-helper");
+    std::fs::write(
+        &helper,
+        format!(
+            "#!/bin/sh\ntouch {}\nexit 1\n",
+            remote::sh_quote(marker.to_str().ok_or("utf8")?)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    git::run(
+        Some(&dest),
+        &[
+            "config",
+            "remote.origin.uploadpack",
+            helper.to_str().ok_or("utf8")?,
+        ],
+    )?;
+    let objects = git::run(Some(&dest), &["count-objects", "-v"])?;
+    let refs = git::run(Some(&dest), &["show-ref"])?;
+    let results = search(&dest, "parse_header", &|| true)?;
+    assert!(results.report.hits.is_empty());
+    assert!(results.report.shallow);
+    assert!(results.report.missing > 0);
+    assert!(!marker.exists());
+    assert_eq!(git::run(Some(&dest), &["count-objects", "-v"])?, objects);
+    assert_eq!(git::run(Some(&dest), &["show-ref"])?, refs);
+    assert!(!dest.join(".git/index").exists());
+    assert!(git::run(Some(&dest), &["cat-file", "-e", &oid]).is_err());
+    assert!(marker.exists(), "Positive control must attempt the helper");
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
+fn filters_hooks_fsmonitor_signing_and_diff_helpers_never_execute_for_search_or_recovery()
+-> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    f.write("file", b"parse_header raw content\n")?;
+    f.write(".gitattributes", b"* filter=forbidden diff=forbidden\n")?;
+    f.commit("base")?;
+    let marker = f.0.join(".git/forbidden-ran");
+    let helper = f.0.join(".git/forbidden-helper");
+    std::fs::write(
+        &helper,
+        format!(
+            "#!/bin/sh\nprintf called >> {}\ncat\n",
+            remote::sh_quote(marker.to_str().ok_or("utf8")?)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    std::fs::create_dir(f.0.join(".git/forbidden-hooks")).map_err(|e| e.to_string())?;
+    std::fs::copy(
+        &helper,
+        f.0.join(".git/forbidden-hooks/reference-transaction"),
+    )
+    .map_err(|e| e.to_string())?;
+    for (key, value) in [
+        ("filter.forbidden.clean", helper.to_str().ok_or("utf8")?),
+        ("filter.forbidden.smudge", helper.to_str().ok_or("utf8")?),
+        ("filter.forbidden.required", "true"),
+        ("diff.forbidden.command", helper.to_str().ok_or("utf8")?),
+        ("diff.forbidden.textconv", helper.to_str().ok_or("utf8")?),
+        ("core.fsmonitor", helper.to_str().ok_or("utf8")?),
+        ("core.hooksPath", ".git/forbidden-hooks"),
+        ("commit.gpgSign", "true"),
+        ("log.showSignature", "true"),
+        ("gpg.program", helper.to_str().ok_or("utf8")?),
+    ] {
+        git::run(Some(&f.0), &["config", key, value])?;
+    }
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = results.report.hits.first().ok_or("No hit")?;
+    let preview = inspect(&f.0, &results, found, Some(0), &|| true)?;
+    let file = prepare(&f.0, &preview, Target::File("raw-copy".into()), &|| true)?;
+    perform(&f.0, &file, &|| true)?;
+    let branch = prepare(&f.0, &preview, Target::Branch("raw-rescue".into()), &|| {
+        true
+    })?;
+    perform(&f.0, &branch, &|| true)?;
+    assert!(!marker.exists());
+    assert_eq!(
+        std::fs::read(f.0.join("raw-copy")).map_err(|e| e.to_string())?,
+        b"parse_header raw content\n"
+    );
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    let _ = git::run(Some(&f.0), &["hash-object", "--path=file", "file"]);
+    assert!(
+        marker.exists(),
+        "Positive control must run the configured filter"
+    );
+    Ok(())
+}
+#[test]
+fn pruning_an_unattached_blob_after_preview_refuses_recovery_without_creating_a_file()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"base")?;
+    f.commit("base")?;
+    f.write("staged", b"parse_header staged only")?;
+    git::run(Some(&f.0), &["add", "staged"])?;
+    let oid = git::run(Some(&f.0), &["rev-parse", ":staged"])?
+        .trim()
+        .to_owned();
+    git::run(Some(&f.0), &["reset", "--hard", "HEAD"])?;
+    let results = search(&f.0, "parse_header", &|| true)?;
+    let found = hit(&results, &oid)?;
+    let preview = inspect(&f.0, &results, found, None, &|| true)?;
+    let prepared = prepare(&f.0, &preview, Target::File("recovered".into()), &|| true)?;
+    let object = f.0.join(".git/objects").join(&oid[..2]).join(&oid[2..]);
+    std::fs::File::open(&object)
+        .and_then(|file| {
+            file.set_times(
+                std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH),
+            )
+        })
+        .map_err(|e| e.to_string())?;
+    git::run(Some(&f.0), &["prune", "--expire=now"])?;
+    assert!(git::run(Some(&f.0), &["--no-lazy-fetch", "cat-file", "-e", &oid]).is_err());
+    assert!(perform(&f.0, &prepared, &|| true).is_err());
+    assert!(!f.0.join("recovered").exists());
+    Ok(())
+}

@@ -8,7 +8,8 @@ pub(crate) struct Preview {
     pub blob: String,
     pub source: Option<Provenance>,
     pub bytes: Arc<Vec<u8>>,
-    pub text: Arc<String>,
+    pub lines: Arc<Vec<String>>,
+    pub display_limited: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Target {
@@ -144,12 +145,25 @@ pub(crate) fn inspect(
         if text.contains('\0') || !text.contains(&results.query) {
             return Err("The saved content no longer matches the literal search".into());
         }
+        let mut display_limited = false;
+        let lines: Vec<String> = text
+            .lines()
+            .take(2000)
+            .map(|line| {
+                if line.chars().count() > 400 {
+                    display_limited = true;
+                }
+                line.chars().take(400).collect()
+            })
+            .collect();
+        display_limited |= text.lines().take(2001).count() > 2000;
         // Keep full immutable raw bytes for recovery; UI renders only bounded excerpts.
         Ok(Preview {
             identity: results.identity.clone(),
             blob: hit.blob.clone(),
             source: selected,
-            text: Arc::new(text.to_owned()),
+            lines: Arc::new(lines),
+            display_limited,
             bytes: Arc::new(bytes),
         })
     })
