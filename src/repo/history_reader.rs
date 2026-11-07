@@ -99,6 +99,48 @@ mod tests {
         time::{Duration, Instant},
     };
     #[test]
+    fn reader_owns_the_ambient_io_token_and_stage_guard() -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let tab =
+            crate::repo::RepoTab::new_deferred("/nonexistent/reader-token-contract".into(), &ctx);
+        let mut reader = Reader::default();
+        let (entered, entry) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let (finished, finish) = mpsc::channel();
+        reader.queue(move |active| {
+            let ambient = crate::tasks::cancellation();
+            assert!(!ambient.is_cancelled() && active());
+            entered.send(ambient.clone()).map_err(|e| e.to_string())?;
+            released
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?;
+            assert!(ambient.is_cancelled() && !active());
+            finished.send(()).map_err(|e| e.to_string())?;
+            Ok(())
+        });
+        reader.poll(&tab.tx, &ctx);
+        let ambient = entry
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        assert!(!ambient.is_cancelled());
+        reader.cancel();
+        assert!(ambient.is_cancelled());
+        assert!(!tab.tx.cancel.is_cancelled());
+        release.send(()).map_err(|e| e.to_string())?;
+        finish
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        let start = Instant::now();
+        while reader.busy() {
+            assert!(reader.poll(&tab.tx, &ctx).is_none());
+            if start.elapsed() > Duration::from_secs(5) {
+                return Err("Cancelled reader did not retire".into());
+            }
+            std::thread::yield_now();
+        }
+        Ok(())
+    }
+    #[test]
     fn replacement_keeps_one_owned_worker_until_completion_and_only_latest_answer()
     -> Result<(), String> {
         let ctx = egui::Context::default();

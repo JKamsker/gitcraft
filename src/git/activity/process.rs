@@ -1,4 +1,8 @@
 use std::path::Path;
+/// `active` checks stage/result validity (including profile guards). It is not
+/// a running-I/O cancellation callback. Local Service and remote requests inherit
+/// the ambient task Cancellation installed by the owned Reader/task pool. Close,
+/// replacement and tab retirement cancel that owned token during blocking I/O.
 pub(in crate::git) fn run(
     repo: &Path,
     args: &[&str],

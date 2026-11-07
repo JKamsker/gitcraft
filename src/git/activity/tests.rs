@@ -310,18 +310,52 @@ fn stash_and_application_refs_do_not_inflate_project_activity() -> Result<(), St
 #[test]
 #[ignore = "Owned-process cancellation is gated separately by the parent containment review"]
 fn cancelling_a_running_analysis_stops_process_descendants() -> Result<(), String> {
-    use std::time::{Duration, Instant};
+    use std::{
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
     let r = Repo::new()?;
     let marker = r.0.join("should-not-exist");
+    let ready = r.0.join("analysis-started");
     let alias = format!(
-        "alias.activitywait=!sleep 0.5; touch {}",
+        "alias.activitywait=!printf ready > {}; sleep 0.5; touch {}",
+        crate::remote::sh_quote(&ready.to_string_lossy()),
         crate::remote::sh_quote(&marker.to_string_lossy())
     );
+    // The production pool installs this same owned token as ambient cancellation,
+    // exactly as Reader::poll does. A separately expiring borrowed callback is
+    // only a stage/result guard and cannot be used as an I/O cancellation test.
+    let scope = crate::tasks::Scope::default();
+    let token = scope.0.child();
+    let (finished, result) = mpsc::channel();
+    let path = r.0.clone();
+    crate::tasks::pool()?
+        .submit(
+            token.clone(),
+            crate::tasks::Priority::Interactive,
+            None,
+            Box::new(move || {
+                let owned = crate::tasks::cancellation();
+                let out = process::run(&path, &["-c", &alias, "activitywait"], None, &|| {
+                    !owned.is_cancelled()
+                });
+                let _ = finished.send(out);
+            }),
+        )
+        .map_err(str::to_owned)?;
+    let waiting = Instant::now();
+    while !ready.exists() {
+        if waiting.elapsed() > Duration::from_secs(5) {
+            return Err("Analysis did not reach its owned child".into());
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
     let start = Instant::now();
-    let out = process::run(&r.0, &["-c", &alias, "activitywait"], None, &|| {
-        start.elapsed() < Duration::from_millis(100)
-    });
-    assert!(out.is_err_and(|e| e.contains("cancelled")));
+    token.cancel();
+    let out = result
+        .recv_timeout(Duration::from_secs(2))
+        .map_err(|e| e.to_string())?;
+    assert!(out.is_err_and(|e| e.to_ascii_lowercase().contains("cancelled")));
     assert!(start.elapsed() < Duration::from_secs(2));
     std::thread::sleep(Duration::from_millis(600));
     assert!(!marker.exists());
