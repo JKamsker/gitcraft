@@ -81,7 +81,7 @@ pub(crate) fn quoted_path(value: &str) -> Result<String, String> {
         return Err("Truncated quoted Git path".into());
     }
     let mut out = Vec::new();
-    let bytes = value[1..value.len() - 1].as_bytes();
+    let bytes = &value.as_bytes()[1..value.len() - 1];
     let mut i = 0;
     while i < bytes.len() {
         let b = bytes[i];
