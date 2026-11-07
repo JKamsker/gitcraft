@@ -114,6 +114,7 @@ impl RepoTab {
             .unwrap_or_else(|| "HEAD".into());
         self.keyboard_clear_cursor();
         self.activity = None;
+        self.tour = None;
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;

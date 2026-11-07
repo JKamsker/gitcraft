@@ -58,6 +58,8 @@ impl RepoTab {
     pub(crate) fn reload_profile_connections(&mut self, ctx: &egui::Context) {
         // Snapshot workers belong to the connection context that read them.
         self.file_comparison = None;
+        self.activity = None;
+        self.tour = None;
         self.cancel_draft_reads();
         self.reload_identity(ctx);
         self.load_prs(ctx);

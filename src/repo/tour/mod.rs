@@ -39,6 +39,7 @@ impl RepoTab {
                 .or_else(|| self.tour.as_ref().and_then(TourView::history))
         };
         self.activity = None;
+        self.file_comparison = None;
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;
@@ -229,6 +230,36 @@ mod tests {
         h.get_by_label("Close tour").click();
         h.run_steps(3);
         assert!(h.state().tour.is_none());
+        // Switching full-pane tools must retire the old reader, even though the tab lives.
+        let tab = h.state_mut();
+        tab.apply(
+            Action::OpenFileComparison(super::super::file_comparison::Page::Lens),
+            &ctx,
+        );
+        assert!(tab.file_comparison.is_some());
+        tab.apply(Action::OpenTour, &ctx);
+        assert!(tab.file_comparison.is_none());
+        let tour = Arc::downgrade(&tab.tour.as_ref().ok_or("tour")?.generation);
+        tab.apply(
+            Action::OpenFileComparison(super::super::file_comparison::Page::Lens),
+            &ctx,
+        );
+        assert!(tab.tour.is_none());
+        assert!(tour.upgrade().is_none());
+        tab.apply(Action::OpenTour, &ctx);
+        tab.apply(
+            Action::OpenActivity(super::super::activity::Page::Calendar),
+            &ctx,
+        );
+        assert!(tab.tour.is_none());
+        assert!(tab.activity.is_some());
+        tab.reload_profile_connections(&ctx);
+        assert!(tab.activity.is_none());
+        tab.apply(Action::OpenTour, &ctx);
+        let tour = Arc::downgrade(&tab.tour.as_ref().ok_or("tour")?.generation);
+        tab.reload_profile_connections(&ctx);
+        assert!(tab.tour.is_none());
+        assert!(tour.upgrade().is_none());
         drop(h);
         std::fs::remove_dir_all(root).map_err(|e| e.to_string())?;
         Ok(())
