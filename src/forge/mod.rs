@@ -894,3 +894,5 @@ mod tests {
         );
     }
 }
+
+pub(crate) mod history;

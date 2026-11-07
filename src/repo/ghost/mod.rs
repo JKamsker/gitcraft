@@ -289,6 +289,13 @@ impl RepoTab {
         self.start_ghost(key, ctx);
     }
 
+    pub(in crate::repo) fn timeline_ghost_active(&self) -> bool {
+        self.ghost
+            .hover
+            .as_ref()
+            .is_some_and(|(op, _)| matches!(op, GhostOp::Timeline { .. }))
+    }
+
     /// The key `op`'s outcome is cached by.
     fn ghost_key(&mut self, op: GhostOp) -> Key {
         let mut h = DefaultHasher::new();
@@ -360,14 +367,29 @@ impl RepoTab {
                 let result = cached.unwrap_or_else(|| {
                     Arc::new(
                         git_version(&repo, &version)
-                            .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop)),
+                            .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop))
+                            .map(|mut outcome| {
+                                if matches!(op, GhostOp::Timeline { .. }) {
+                                    let loaded: std::collections::HashSet<_> =
+                                        rows.iter().map(|c| c.hash.as_str()).collect();
+                                    outcome
+                                        .created
+                                        .retain(|c| !loaded.contains(c.hash.as_str()));
+                                }
+                                outcome
+                            }),
                     )
                 });
-                let head_ref = facts
-                    .refs
-                    .current
-                    .as_deref()
-                    .map(|c| format!("refs/heads/{c}"));
+                let head_ref = match &op {
+                    GhostOp::Timeline { state, .. } => {
+                        (!state.branch.is_empty()).then(|| format!("refs/heads/{}", state.branch))
+                    }
+                    _ => facts
+                        .refs
+                        .current
+                        .as_deref()
+                        .map(|c| format!("refs/heads/{c}")),
+                };
                 let view = match (&*result, stop()) {
                     (Ok(outcome), false) => Some(view::build(&rows, outcome, head_ref.as_deref())),
                     _ => None,

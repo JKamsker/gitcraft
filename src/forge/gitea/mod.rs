@@ -725,3 +725,13 @@ mod tests {
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
     }
 }
+
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    Api::new(
+        "Gitea / Forgejo",
+        &hosting.web,
+        &hosting.host,
+        find_login(&hosting.web),
+    )
+    .on_refused(forget_login)
+}

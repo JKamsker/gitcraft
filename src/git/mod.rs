@@ -29,6 +29,7 @@ mod fold;
 pub(crate) mod growth;
 mod hooks;
 mod interaction;
+pub(crate) mod investigations;
 mod lfs;
 #[cfg(test)]
 pub(crate) mod lfs_fixtures;
@@ -46,6 +47,7 @@ pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
+pub(crate) mod recovery;
 mod redact;
 mod reflog;
 mod refs;
@@ -383,3 +385,8 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) mod drafts;
+
+mod push_hooks;
+pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};

@@ -41,7 +41,7 @@ pub(super) const MAX_FILES: usize = 200;
 /// Where HEAD and the local branches are. In an entry, only the branches it changed are there
 /// (one that didn't exist on that side with no commit): the rest are as they are now, or as
 /// the entries around it have them (see [`Timeline::state_at`]).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct RefState {
     /// The branch checked out (`main`), empty when HEAD is detached or unborn.
     pub(crate) branch: String,

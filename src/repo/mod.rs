@@ -21,12 +21,14 @@ mod bundles;
 mod celebration;
 mod ci_status;
 mod ci_view;
+mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
 mod conflict;
 mod conflict_check;
+mod content_recovery;
 #[cfg(test)]
 mod cpu_benchmarks;
 pub(crate) mod custom_commands;
@@ -73,6 +75,7 @@ mod layout;
 mod lfs_locks;
 mod lfs_storage;
 mod lifecycle;
+mod line_dossier;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
@@ -81,7 +84,7 @@ mod nav_history;
 mod navigate;
 mod navigation;
 mod offline;
-mod operations;
+pub(crate) mod operations;
 mod owners;
 mod package;
 mod palette;
@@ -98,6 +101,7 @@ mod pr_view;
 mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
 mod reflog;
@@ -111,10 +115,12 @@ mod rewrite;
 mod running;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
 mod stack;
 mod state;
 mod surgery;
+mod symbol_biography;
 mod terminals;
 mod test_lane;
 #[cfg(test)]
@@ -127,6 +133,7 @@ mod watch;
 mod watch_remote;
 mod weakened_marks;
 pub(crate) mod widgets;
+mod working_drafts;
 pub(crate) mod worktree_tab;
 #[cfg(test)]
 mod worktree_tests;
@@ -202,6 +209,12 @@ pub struct RepoTab {
     refs: Refs,
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
+    content_recovery: content_recovery::State,
+    working_drafts: working_drafts::State,
+    dossier: line_dossier::State,
+    symbols: symbol_biography::State,
+    cochanges: cochanges::State,
+    saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
     pr_graph_head: Option<Arc<Commit>>,
@@ -328,6 +341,10 @@ pub struct RepoTab {
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
     /// refused push.
     push_flow: push::PushFlow,
+    plain_rebase_request: u64,
+    preflight_pending: Option<PendingOp>,
+    preflight_after: Option<(String, PendingOp)>,
+    preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
     /// The last operation started, to run again after signing in.
@@ -554,6 +571,12 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
+            content_recovery: Default::default(),
+            working_drafts: Default::default(),
+            dossier: Default::default(),
+            symbols: Default::default(),
+            cochanges: Default::default(),
+            saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,
             has_more: false,
@@ -632,6 +655,10 @@ impl RepoTab {
             package: None,
             reword: None,
             push_flow: Default::default(),
+            plain_rebase_request: 0,
+            preflight_pending: None,
+            preflight_after: None,
+            preflight_timeline: None,
             credentials: None,
             last_op: None,
             error_card: None,

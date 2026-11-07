@@ -124,6 +124,7 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    unset: Vec<&'static str>,
     output_limit: Option<usize>,
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
@@ -202,6 +203,9 @@ pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) ->
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
+    for name in &extra.unset {
+        cmd.env_remove(name);
+    }
     cmd.args(&extra.pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
@@ -232,7 +236,11 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
-        unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
+        unset: GIT_ENV_REMOVED
+            .iter()
+            .chain(extra.unset.iter())
+            .map(|n| (*n).to_owned())
+            .collect(),
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
@@ -1357,5 +1365,499 @@ mod tests {
         );
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
+    }
+}
+
+/// Bounded isolated object reads/replays on the shared process service. Task cancellation
+/// owns both local children and remote completion; no detached transport is introduced.
+pub(crate) fn forecast_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    draft_bytes(dir, args, env, Vec::new(), ok, active)
+}
+
+pub(crate) fn draft_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    input: Vec<u8>,
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    if !active() || crate::tasks::cancellation().is_cancelled() {
+        return Err("Read cancelled".into());
+    }
+    let extra = Extra {
+        env: env.to_vec(),
+        stdin: Some(input),
+        long: true,
+        timeout: Some(std::time::Duration::from_secs(15)),
+        output_limit: Some(64 << 20),
+        ..Default::default()
+    };
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ];
+    let (code, stdout, stderr) = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        let out = remote::exec(&target.host, &request)?;
+        (out.code, out.stdout, out.stderr)
+    } else {
+        let mut command = local_command(Some(dir), &extra, args);
+        for key in REMOVE {
+            command.env_remove(key);
+        }
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        let out = crate::processes::run(
+            command,
+            crate::processes::Options {
+                input: extra.stdin,
+                background: true,
+                timeout: extra.timeout,
+                output_limit: 64 << 20,
+                stderr_limit: Some(64 << 10),
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        (out.status.code().unwrap_or(-1), out.stdout, out.stderr)
+    };
+    if !active() {
+        return Err("Read cancelled".into());
+    }
+    if stdout.len() > 64 << 20 || stderr.len() > 64 << 10 {
+        return Err("Read output exceeds limit".into());
+    }
+    if ok.contains(&code) && stderr.is_empty() {
+        Ok(stdout)
+    } else {
+        Err(format!(
+            "Git command failed ({code}): {}",
+            String::from_utf8_lossy(&stderr).trim()
+        ))
+    }
+}
+
+pub(crate) fn forecast_run(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    forecast_bytes(dir, args, env, ok, active).map(|b| String::from_utf8_lossy(&b).into_owned())
+}
+
+pub(crate) fn forecast_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Read cancelled".into());
+    }
+    request.timeout = Some(std::time::Duration::from_secs(15));
+    request.long = true;
+    remote::exec(host, &request)
+}
+
+/// Raw object recovery transport with bounded output and current task ownership. It never
+/// abandons a remote call while that call still owns a session or remote process.
+pub(super) fn recovery_output(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    active: &dyn Fn() -> bool,
+    timeout: std::time::Duration,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Recovery cancelled".into());
+    }
+    const MAX: usize = 16 << 20;
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
+    let extra = Extra {
+        stdin: input.map(<[u8]>::to_vec),
+        timeout: Some(timeout),
+        long: true,
+        ..Default::default()
+    };
+    let out = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).into()));
+        let command = request
+            .script
+            .strip_prefix("exec ")
+            .unwrap_or(&request.script)
+            .to_owned();
+        request.script = format!(
+            "umask 077\nrecovery_io=$(mktemp -d) || exit 1\ntrap 'rm -rf -- \"$recovery_io\"' 0\n\
+             mkfifo \"$recovery_io/out\" \"$recovery_io/err\" || exit 1\n\
+             head -c {cap} <\"$recovery_io/out\" >\"$recovery_io/out-cap\" & recovery_stdout=$!\n\
+             head -c {cap} <\"$recovery_io/err\" >\"$recovery_io/err-cap\" & recovery_stderr=$!\n\
+             {command} >\"$recovery_io/out\" 2>\"$recovery_io/err\"; recovery_code=$?\n\
+             wait \"$recovery_stdout\"; wait \"$recovery_stderr\"\n\
+             cat \"$recovery_io/out-cap\"; cat \"$recovery_io/err-cap\" >&2\nexit \"$recovery_code\"",
+            cap = MAX + 1
+        );
+        remote::exec(&target.host, &request)?
+    } else {
+        let mut command = local_command(Some(dir), &extra, args);
+        for key in REMOVE {
+            command.env_remove(key);
+        }
+        let out = crate::processes::run(
+            command,
+            crate::processes::Options {
+                input: extra.stdin,
+                background: true,
+                timeout: Some(timeout),
+                output_limit: MAX,
+                stderr_limit: Some(MAX),
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if !active() {
+        return Err("Recovery cancelled".into());
+    }
+    if out.stdout.len() > MAX || out.stderr.len() > MAX {
+        return Err("Recovery output exceeds limit".into());
+    }
+    Ok(out)
+}
+
+pub(crate) struct PushTarget<'a> {
+    pub address: &'a str,
+    pub skip_hooks: bool,
+    pub alias: &'a str,
+    pub original_remote: &'a str,
+    pub lfs_config: &'a [(String, String)],
+    pub lfs_objects: &'a [String],
+    pub receive_pack: &'a str,
+}
+
+pub(crate) fn push_preflight_with(
+    dir: &Path,
+    args: &[String],
+    target: PushTarget<'_>,
+    creds: Option<&Credentials>,
+    control: Option<&std::sync::Arc<OpControl>>,
+) -> Result<String, String> {
+    let PushTarget {
+        address,
+        skip_hooks,
+        alias: opaque,
+        original_remote,
+        lfs_config,
+        lfs_objects,
+        receive_pack,
+    } = target;
+    let (source, destination) = args
+        .last()
+        .and_then(|s| s.split_once(':'))
+        .ok_or("Missing inspected refspec")?;
+    let remote_tip = args.iter().find_map(|a| {
+        a.strip_prefix("--force-with-lease=")
+            .and_then(|v| v.rsplit_once(':'))
+            .map(|v| v.1)
+    });
+    let hooks = super::push_hooks::Hooks::new(
+        dir,
+        original_remote,
+        super::push_hooks::Upload {
+            alias: opaque,
+            skip_original: skip_hooks,
+            objects: lfs_objects,
+            source,
+            destination,
+            remote_tip,
+        },
+    )?;
+    let placeholder = format!("gitcraft-preflight-address://{opaque}");
+    let mut values = vec![
+        (format!("url.{address}.insteadOf"), placeholder.clone()),
+        (format!("remote.{opaque}.url"), placeholder.clone()),
+        (format!("remote.{original_remote}.url"), placeholder.clone()),
+        (format!("remote.{original_remote}.pushurl"), placeholder),
+        ("core.hooksPath".into(), hooks.path()),
+    ];
+    for (source, value) in lfs_config {
+        if value.is_empty() {
+            continue;
+        }
+        let target = source
+            .strip_prefix(&format!("remote.{original_remote}."))
+            .map(|key| format!("remote.{opaque}.{key}"))
+            .unwrap_or_else(|| source.clone());
+        values.push((target.clone(), value.clone()));
+        if target != *source {
+            values.push((source.clone(), value.clone()));
+        }
+    }
+    if !receive_pack.is_empty() {
+        values.push((format!("remote.{opaque}.receivepack"), receive_pack.into()));
+    }
+    const VARS: [(&str, &str); 12] = [
+        ("GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"),
+        ("GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"),
+        ("GIT_CONFIG_KEY_2", "GIT_CONFIG_VALUE_2"),
+        ("GIT_CONFIG_KEY_3", "GIT_CONFIG_VALUE_3"),
+        ("GIT_CONFIG_KEY_4", "GIT_CONFIG_VALUE_4"),
+        ("GIT_CONFIG_KEY_5", "GIT_CONFIG_VALUE_5"),
+        ("GIT_CONFIG_KEY_6", "GIT_CONFIG_VALUE_6"),
+        ("GIT_CONFIG_KEY_7", "GIT_CONFIG_VALUE_7"),
+        ("GIT_CONFIG_KEY_8", "GIT_CONFIG_VALUE_8"),
+        ("GIT_CONFIG_KEY_9", "GIT_CONFIG_VALUE_9"),
+        ("GIT_CONFIG_KEY_10", "GIT_CONFIG_VALUE_10"),
+        ("GIT_CONFIG_KEY_11", "GIT_CONFIG_VALUE_11"),
+    ];
+    if values.len() > VARS.len() {
+        return Err("Too many pinned transport settings; no push was run.".into());
+    }
+    let mut extra = Extra {
+        pre: Vec::new(),
+        unset: PREFLIGHT_REMOVE.to_vec(),
+        env: vec![("GIT_CONFIG_COUNT", values.len().to_string())],
+        ..Default::default()
+    };
+    for ((key, value), (key_var, value_var)) in values.into_iter().zip(VARS) {
+        extra.env.extend([(key_var, key), (value_var, value)]);
+    }
+    if let Some(c) = creds {
+        extra.pre.extend(["-c", ENV_HELPER]);
+        extra.env.extend([
+            ("GITCRAFT_GIT_USERNAME", c.username.clone()),
+            ("GITCRAFT_GIT_PASSWORD", c.password.clone()),
+        ]);
+    }
+    let mapping: Vec<_> = extra
+        .env
+        .iter()
+        .filter(|(name, _)| name.starts_with("GIT_CONFIG_"))
+        .cloned()
+        .collect();
+    if forecast_run(
+        dir,
+        &["ls-remote", "--get-url", opaque],
+        &mapping,
+        &[0],
+        &|| true,
+    )
+    .map_err(|_| "The reviewed address could not be pinned; no push was run.")?
+    .trim_end()
+        != address
+    {
+        return Err("The reviewed address could not be pinned; no push was run.".into());
+    }
+    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    let out = execute_preflight(dir, &extra, &words, control)?;
+    if out.code == Some(0) {
+        Ok("Push completed.".into())
+    } else if is_auth_error(&String::from_utf8_lossy(&out.stderr)) {
+        Err("Authentication failed for the reviewed push target.".into())
+    } else {
+        Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||"The reviewed push was refused or failed. Fetch and reopen preflight before trying again; server diagnostics were withheld because they can contain credentials or secrets.".into()))
+    }
+}
+
+const PREFLIGHT_REMOVE: &[&str] = &[
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_SHALLOW_FILE",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG",
+    "GIT_CONFIG_COUNT",
+    "GIT_ATTR_SOURCE",
+];
+fn execute_preflight(
+    dir: &Path,
+    extra: &Extra,
+    words: &[&str],
+    control: Option<&std::sync::Arc<OpControl>>,
+) -> Result<Ran, String> {
+    if let Some(control) = control {
+        return watched::reviewed(dir, extra, words, control);
+    }
+    if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, extra, words);
+        request
+            .unset
+            .extend(PREFLIGHT_REMOVE.iter().map(|s| (*s).to_owned()));
+        let out = remote::exec(&target.host, &request)?;
+        Ok(Ran {
+            code: Some(out.code),
+            status: out.code.to_string(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+            failed_hook: None,
+        })
+    } else {
+        let mut cmd = local_command(Some(dir), &Extra::default(), &[]);
+        for name in PREFLIGHT_REMOVE {
+            cmd.env_remove(name);
+        }
+        cmd.args(&extra.pre).args(words);
+        for (name, value) in &extra.env {
+            cmd.env(name, value);
+        }
+        let out = crate::processes::run(
+            cmd,
+            crate::processes::Options {
+                background: true,
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        Ok(Ran {
+            code: out.status.code(),
+            status: out.status.to_string(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+            failed_hook: None,
+        })
+    }
+}
+pub(crate) fn local_repair_input(
+    dir: &Path,
+    args: &[&str],
+    input: &[u8],
+    env: &[(&'static str, String)],
+) -> Result<std::process::Output, String> {
+    if remote::is_remote(dir) {
+        return Err("Local repair expected a local repository".into());
+    }
+    let mut command = local_command(Some(dir), &Extra::default(), &[]);
+    for name in PREFLIGHT_REMOVE {
+        command.env_remove(name);
+    }
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    command
+        .env("GIT_NO_LAZY_FETCH", "1")
+        .arg("--no-lazy-fetch")
+        .args(args);
+    crate::processes::run(
+        command,
+        crate::processes::Options {
+            input: Some(input.to_vec()),
+            timeout: Some(std::time::Duration::from_secs(15)),
+            output_limit: 1024 * 1024,
+            ..Default::default()
+        },
+    )?
+    .complete()
+}
+pub(crate) fn repair_host(
+    dir: &Path,
+    script: &str,
+    input: Vec<u8>,
+    env: &[(&'static str, String)],
+) -> Result<remote::Output, String> {
+    let target = remote::parse(dir).ok_or("Expected remote repository")?;
+    let mut request = remote_request(&target, &Extra::default(), &[]);
+    request.script = script.into();
+    request.stdin = Some(input);
+    request.long = true;
+    request.timeout = Some(std::time::Duration::from_secs(15));
+    request.env.push(("GIT_NO_LAZY_FETCH".into(), "1".into()));
+    request
+        .env
+        .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
+    request
+        .unset
+        .extend(PREFLIGHT_REMOVE.iter().map(|s| (*s).into()));
+    remote::exec(&target.host, &request)
+}
+
+fn reviewed_refusal(bytes: &[u8], source: &str, destination: &str) -> Option<String> {
+    let out = std::str::from_utf8(bytes).ok()?;
+    for line in out.lines() {
+        let mut fields = line.splitn(3, '\t');
+        if fields.next() != Some("!") {
+            continue;
+        }
+        let refs = fields.next()?;
+        let status = fields.next()?;
+        if refs != format!("{source}:{destination}") {
+            continue;
+        }
+        let safe = match status {
+            "[rejected] (non-fast-forward)"
+            | "[rejected] (fetch first)"
+            | "[rejected] (stale info)"
+            | "[rejected] (remote ref updated since checkout)" => status,
+            s if s.starts_with("[remote rejected]") => {
+                "[remote rejected] (remote policy refused the update; details withheld)"
+            }
+            _ => "[rejected] (update refused; details withheld)",
+        };
+        return Some(format!("!\t{source}:{destination}\t{safe}"));
+    }
+    None
+}
+#[cfg(test)]
+mod reviewed_push_tests {
+    use super::*;
+    #[test]
+    fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() {
+        let source = "a".repeat(40);
+        let destination = "refs/heads/main";
+        let good = format!(
+            "server secret should disappear\n!\t{source}:{destination}\t[rejected] (stale info)\n"
+        );
+        let safe = reviewed_refusal(good.as_bytes(), &source, destination).unwrap();
+        assert!(!safe.contains("secret"));
+        assert!(safe.ends_with("[rejected] (stale info)"));
+        let hook =
+            format!("!\t{source}:{destination}\t[remote rejected] (password=hidden-secret)\n");
+        let safe = reviewed_refusal(hook.as_bytes(), &source, destination).unwrap();
+        assert!(!safe.contains("hidden-secret"));
+        assert!(safe.contains("[remote rejected]"));
+        assert!(reviewed_refusal(good.as_bytes(), &source, "refs/heads/other").is_none());
     }
 }

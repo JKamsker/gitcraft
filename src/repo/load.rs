@@ -59,6 +59,7 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.saved_views.cancel();
         // Not read yet, or suspended: woken as when shown, which watches and reads once.
         if self.sleeping() {
             self.start_deferred(ctx);
@@ -305,6 +306,10 @@ impl RepoTab {
     }
 
     pub(super) fn load_more(&mut self, ctx: &egui::Context) {
+        if self.saved_views.active() {
+            self.load_graph_view_page();
+            return;
+        }
         if self.loading_more || !self.has_more || self.history.len() >= MAX_HISTORY {
             return;
         }
@@ -545,6 +550,7 @@ impl RepoTab {
         }
         let previous = self.selected_hash();
         self.rebuild_rows();
+        self.saved_views.dirty = true;
         self.restore_selection(previous, ctx);
         self.take_prepared_message();
         self.refresh_work_diff(ctx);
@@ -568,6 +574,7 @@ impl RepoTab {
     /// The WIP pseudo-commit (when the tree is dirty), then `history` with its stashes, laid out
     /// as the graph.
     pub(super) fn rebuild_rows(&mut self) {
+        self.saved_views.dirty = true;
         let old_rows = std::mem::take(&mut self.commits);
         if !self.work.is_clean() {
             self.commits.push(Arc::new(Commit {

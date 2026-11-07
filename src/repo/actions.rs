@@ -15,6 +15,29 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    OpenLineDossier(Option<git::investigations::dossier::Seed>),
+    CloseLineDossier,
+    OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
+    CloseSymbolBiography,
+    OpenPinnedFileLine(git::investigations::dossier::Seed),
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftUndo,
+    DraftPreview {
+        id: crate::git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(crate::git::recovery::Target),
+    ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.
@@ -94,6 +117,10 @@ pub(crate) enum Action {
     Pull,
     PullWith(PullMode),
     Push,
+    SubmitPreflight(Box<crate::push_preflight::Plan>),
+    FixPreflight(Box<crate::push_preflight::Plan>, String),
+    PreflightMessages(Box<crate::push_preflight::Plan>),
+    ReloadPreflight(Box<crate::push_preflight::Plan>),
     /// Pull, then push the checked-out branch.
     Sync,
     /// A button of the banner after a refused push.
@@ -310,6 +337,11 @@ pub(crate) enum Action {
     /// the fold's.
     AbortFold,
     RunRebase,
+    ConfirmedRebase(u64),
+    AskRebase {
+        onto: String,
+        label: String,
+    },
     CloseRebase,
     /// Open the split editor on a commit of the checked-out branch.
     OpenSplit(String),
@@ -485,11 +517,9 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 }
 
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
-    Action::UndoableOps {
+    Action::AskRebase {
+        onto: onto.full(),
         label: format!("Rebase {current} onto {}", onto.name),
-        ops: ops(&[&["rebase", &onto.full()]]),
-        refresh: Refresh::All,
-        undo: Undo::HeadMove { mode: "--keep" },
     }
 }
 
