@@ -1,3 +1,5 @@
+mod dependencies;
+use crate::git::repository_tools::dependencies as dependency;
 mod submodule_conflict;
 use crate::git::repository_tools::submodule_conflict as subconflict;
 mod routes;
@@ -21,6 +23,7 @@ enum Tool {
     Routes,
     ForceRoute,
     SubmoduleConflict,
+    Dependencies,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
@@ -47,6 +50,9 @@ pub(crate) enum Act {
     ForceConfirmed(Box<routing::Force>),
     SubmoduleConflict(String),
     ResolveSubmodule(Box<subconflict::Conflict>, String),
+    Dependencies,
+    CheckDependencies(Box<dependency::Plan>),
+    PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
     Refs(all_refs::Browser),
@@ -58,6 +64,7 @@ enum Data {
     Routes(routing::Browser),
     Force(routing::Force),
     SubmoduleConflict(subconflict::Conflict),
+    Dependencies(dependency::Plan),
 }
 pub(crate) struct State {
     id: u64,
@@ -73,6 +80,14 @@ pub(crate) struct State {
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
         let act = match act {
+            Act::CheckDependencies(plan) => {
+                self.dependency_job(*plan, false, ctx);
+                return;
+            }
+            Act::PublishDependencies(plan) => {
+                self.dependency_job(*plan, true, ctx);
+                return;
+            }
             Act::ResolveSubmodule(c, oid) => {
                 self.repository_tool_mutation(
                     "Resolve submodule pointer",
@@ -182,6 +197,8 @@ impl RepoTab {
             Act::ForceBranch(name, oid) => (format!("{name}\0{oid}"), Tool::ForceRoute),
             Act::ForceConfirmed(..) => return,
             Act::SubmoduleConflict(path) => (path, Tool::SubmoduleConflict),
+            Act::Dependencies => (String::new(), Tool::Dependencies),
+            Act::CheckDependencies(..) | Act::PublishDependencies(..) => return,
             Act::ResolveSubmodule(..) => return,
             Act::SaveRoutes(..) | Act::PushBranch(..) => return,
             Act::SaveGroup(..) | Act::PreparePublication(..) | Act::PublishGroup(..) => return,
@@ -221,6 +238,7 @@ impl RepoTab {
                 Tool::Remote => remote_config::inspect(&path, &query).map(Data::Remote),
                 Tool::Publication => publishing::read(&path, &query).map(Data::Publication),
                 Tool::Routes => routing::read(&path, &query).map(Data::Routes),
+                Tool::Dependencies => dependency::read(&path).map(Data::Dependencies),
                 Tool::SubmoduleConflict => {
                     subconflict::read(&path, &query).map(Data::SubmoduleConflict)
                 }
@@ -299,6 +317,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Dependencies {
+        dependencies::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::SubmoduleConflict {
         submodule_conflict::show(ui, state, acts);
         return;
@@ -677,5 +699,80 @@ impl RepoTab {
                 match result { Ok(m) => state.result = Some(Ok(Data::Publication(m))), Err(e) => tab.status = Some((e, true)) }
             }
         });
+    }
+}
+
+impl RepoTab {
+    fn dependency_job(&mut self, plan: dependency::Plan, publish: bool, ctx: &egui::Context) {
+        if self.busy_op.is_some() {
+            return;
+        }
+        if let Some(pause) = crate::network::refused() {
+            self.status = Some((pause.why().into(), true));
+            return;
+        }
+        let Some(Dialog::RepositoryTools(state)) = &self.dialog else {
+            return;
+        };
+        let id = state.id;
+        let label = if publish {
+            "Publish dependencies, then parent"
+        } else {
+            "Check submodule publication dependencies"
+        };
+        let control = self.follow_op(&super::ops(&[&["push"]]), false, ctx);
+        self.busy_op = Some(label.into());
+        self.op_started = Some(std::time::Instant::now());
+        self.last_op = None;
+        self.timeline_op_started(false, super::Refresh::All);
+        let repo = self.path.clone();
+        let credentials = self.credentials.clone();
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || {
+                let runner = guard::Runner {
+                    repo: &repo,
+                    control: &control,
+                    credentials: credentials.as_ref(),
+                };
+                if publish {
+                    dependency::publish(&runner, plan)
+                } else {
+                    dependency::check(&runner, plan)
+                }
+            },
+            move |tab, result, ctx| {
+                let outcome = result.as_ref().map_err(Clone::clone).and_then(|p| {
+                    if p.parent_result.as_ref().is_some_and(Result::is_err) {
+                        Err("Parent publication stopped; inspect per-repository outcomes".into())
+                    } else if p.dependencies.iter().any(|n| n.problem.is_some()) {
+                        Err("Dependency check found blockers; inspect each submodule".into())
+                    } else {
+                        Ok("Dependency operation completed".into())
+                    }
+                });
+                tab.op_done(
+                    label.into(),
+                    outcome,
+                    super::Refresh::All,
+                    super::OpKind::plain(),
+                    false,
+                    ctx,
+                );
+                if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
+                    && state.id == id
+                {
+                    match result {
+                        Ok(p) => {
+                            state.result = Some(Ok(Data::Dependencies(p)));
+                            state.acknowledged = false;
+                        }
+                        Err(e) => tab.status = Some((e, true)),
+                    }
+                }
+            },
+        );
     }
 }

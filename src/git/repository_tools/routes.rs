@@ -230,7 +230,9 @@ pub(crate) fn rewrite_plain_push(
         .to_owned();
     let target = last(repo, &format!("branch.{branch}.gitcraftPushBranch"))?;
     if target.is_empty() {
-        return Ok(None);
+        let mut checked: Vec<String> = args.iter().map(|s| (*s).into()).collect();
+        checked.push("--recurse-submodules=check".into());
+        return Ok(Some(checked));
     }
     let browser = read(repo, &branch)?;
     let route = browser
@@ -243,6 +245,7 @@ pub(crate) fn rewrite_plain_push(
     }
     text(repo, &["check-ref-format", &format!("refs/heads/{target}")])?;
     let mut rewritten: Vec<String> = args.iter().map(|s| (*s).into()).collect();
+    rewritten.push("--recurse-submodules=check".into());
     rewritten.extend([
         "--".into(),
         route.push.remote.clone(),
@@ -271,6 +274,7 @@ pub(crate) fn push_branch(
     runner.run(&[
         "push",
         "--porcelain",
+        "--recurse-submodules=check",
         "--",
         &b.push.remote,
         &format!("{}:refs/heads/{}", b.oid, b.push.branch),

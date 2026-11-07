@@ -86,6 +86,9 @@ impl Runner<'_> {
             guarded.extend(["-c", "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f"]);
         }
         guarded.extend(args);
-        git::run_watched(Some(repo), &guarded, self.credentials, false, self.control)
+        let (result, record) =
+            git::run_watched_recorded(Some(repo), &guarded, self.credentials, false, self.control);
+        self.control.record(record);
+        result
     }
 }

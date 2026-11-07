@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Publish submodule dependencies before parent…".into(),
+                "submodules publish remote".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Dependencies),
+            ),
+            (
                 "Pull and push routes…".into(),
                 "triangular upstream ahead behind".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Routes(String::new())),

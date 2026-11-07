@@ -160,6 +160,7 @@ pub(crate) fn publish(
         destination.result = Some(runner.run(&[
             "push",
             "--porcelain",
+            "--recurse-submodules=check",
             "--",
             &destination.url,
             &format!("{}:refs/heads/{}", plan.commit, plan.branch),

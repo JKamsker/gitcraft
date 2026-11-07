@@ -56,6 +56,7 @@ pub(super) fn read(
     }
     Ok(out.stdout)
 }
+pub(crate) mod dependencies;
 pub(crate) mod guard;
 pub(crate) mod publication;
 pub(crate) mod reftable;
