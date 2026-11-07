@@ -115,7 +115,9 @@ fn sources_distinguish_commit_index_working_tree_root_and_deletion() -> Result<(
 #[test]
 fn rename_uses_the_old_name_even_when_git_quotes_it() -> Result<(), String> {
     let repo = Repo::new()?;
-    let (old, new) = ("old \"ü.rs", "new ü.rs");
+    let old = if cfg!(windows) { "old 'ü.rs" } else { "old \"ü.rs" };
+    let new = "new ü.rs";
+    repo.git(&["config", "core.quotePath", "true"])?;
     repo.write(old, "fn a() {}\n")?;
     let before = repo.commit()?;
     repo.git(&["mv", "--", old, new])?;
