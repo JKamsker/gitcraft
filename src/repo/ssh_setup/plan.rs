@@ -250,8 +250,8 @@ pub(super) fn remote_registration(
         // A named remote account overrides ambient tokens without changing global login.
         // The transient token travels only through a shell variable and command environment.
         format!(
-            "set +x\nset -eu\nunset GH_DEBUG GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_HOST GH_REPO\nkey={}\nhost={}\nuser={}\ntoken=$(gh auth token --hostname \"$host\" --user \"$user\")\nexport GH_TOKEN=\"$token\" GH_ENTERPRISE_TOKEN=\"$token\"\nactual=$(gh api --hostname \"$host\" user --jq .login)\n[ \"$actual\" = \"$user\" ] || {{ printf '%s\\n' 'Account mismatch; public key was not uploaded.' >&2; exit 1; }}\ngh api --hostname \"$host\" --method POST user/keys --field {} --field \"key=@$key.pub\" >/dev/null\nprintf '%s\\n' 'Public key registered for the selected GitHub account.'\n",
-            sh_path(key),
+            "set +x\nset -eu\nunset GH_DEBUG GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_HOST GH_REPO\n{}host={}\nuser={}\ntoken=$(gh auth token --hostname \"$host\" --user \"$user\" 2>/dev/null) || {{ printf '%s\\n' 'Could not load the named GitHub login.' >&2; exit 1; }}\nexport GH_TOKEN=\"$token\" GH_ENTERPRISE_TOKEN=\"$token\"\nactual=$(gh api --hostname \"$host\" user --jq .login 2>/dev/null)\n[ \"$actual\" = \"$user\" ] || {{ printf '%s\\n' 'Account mismatch; public key was not uploaded.' >&2; exit 1; }}\nif gh api --hostname \"$host\" --method POST user/keys --raw-field {} --raw-field \"key=$public\" >/dev/null 2>&1; then printf '%s\\n' 'Public key registered for the selected GitHub account.'; else printf '%s\\n' 'Registration failed; check key-management permission.' >&2; exit 1; fi\n",
+            public_input(key),
             sh_quote(host),
             sh_quote(user),
             sh_quote(&format!("title={title}"))
@@ -264,8 +264,8 @@ pub(super) fn remote_registration(
         // tea0.16+ exposes this explicit-login command. Its preview contains metadata
         // only; the user confirms that this alias's URL/account is the intended server.
         format!(
-            "set +x\nset -eu\nkey={}\ntea login -- {}\nprintf '%s' 'Check the login URL/account above. Type UPLOAD to register this public key: '\nIFS= read -r answer\n[ \"$answer\" = UPLOAD ] || exit 1\nexec tea ssh-keys add --login {} --title {} -- \"$key.pub\"\n",
-            sh_path(key),
+            "set +x\nset -eu\n{}tea login -- {} 2>/dev/null\nprintf '%s' 'Check the login URL/account above. Type UPLOAD to register this public key: '\nIFS= read -r answer\n[ \"$answer\" = UPLOAD ] || exit 1\npublic_file=$(mktemp \"${{TMPDIR:-/tmp}}/gitcraft-public-key.XXXXXXXX\")\ntrap 'rm -f -- \"$public_file\"' EXIT\nprintf '%s\\n' \"$public\" > \"$public_file\"\nif tea ssh-keys add --login {} --title {} -- \"$public_file\" >/dev/null 2>&1; then printf '%s\\n' 'Public key registered for the chosen tea login.'; else printf '%s\\n' 'Registration failed; check tea0.16+ and key-management permission.' >&2; exit 1; fi\n",
+            public_input(key),
             sh_quote(login),
             sh_quote(login),
             sh_quote(title)
@@ -276,10 +276,20 @@ pub(super) fn remote_registration(
     machine.script(&script, "Register public SSH key there")
 }
 
+/// Reduce the chosen .pub companion to validated public fields before any upload.
+/// Comments, extra lines and whole-file forwarding never reach the forge command.
+fn public_input(key: &str) -> String {
+    const CHECK: &str = r#"public=$(head -c 16385 -- "$key.pub" | awk 'NR==1 && NF>=2 && $1 ~ /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh.com|sk-ecdsa-sha2-nistp256@openssh.com)$/ && $2 ~ /^[A-Za-z0-9+\/=]+$/ {print $1 " " $2; ok=1; exit} END {if(!ok)exit 1}') || { printf '%s\n' 'A valid OpenSSH .pub companion is required; no key was uploaded.' >&2; exit 1; }
+[ "${#public}" -le 16384 ] || exit 1
+printf '%s\n' "$public" | ssh-keygen -l -f /dev/stdin >/dev/null 2>&1 || { printf '%s\n' 'Invalid public key; no key was uploaded.' >&2; exit 1; }
+"#;
+    format!("key={}\n{CHECK}", sh_path(key))
+}
+
 pub(super) fn text(value: &str, label: &str) -> Result<(), String> {
     if value.chars().any(char::is_control) || value.len() > 512 {
         Err(format!(
-            "The {label} cannot contain control characters and must fit within512 bytes."
+            "The {label} cannot contain control characters and must fit within 512 bytes."
         ))
     } else {
         Ok(())

@@ -52,6 +52,14 @@ pub(super) static GITEA: GiteaFamily = GiteaFamily {
     word: "gitea",
 };
 
+/// Capture the same selected tea account used by forge requests, for explicit SSH-key setup.
+pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
+    match hosting.forge {
+        Forge::Forgejo => FORGEJO.api(hosting),
+        _ => GITEA.api(hosting),
+    }
+}
+
 impl GiteaFamily {
     fn api(&self, hosting: &Hosting) -> Api {
         Api::new(

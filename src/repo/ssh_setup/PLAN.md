@@ -14,7 +14,7 @@ gates are still required before claiming the feature implemented.
 - Key generation and agent entry use the existing PTY, with passphrase prompts
   owned by installed OpenSSH. No passphrase/private bytes enter arguments or app
   fields/settings/activity. Upload reads only the selected key's .pub companion.
-- Local registration will reuse captured Profile gh/tea account helpers and forge
+- Local registration reuses captured Profile gh/tea account helpers and forge
   API. Remote steps execute on that repository machine, using installed gh/tea
   and explicit account metadata there. Local credentials/keys are never copied.
 - SSH/WSL use existing Terminal ownership; no new process cleanup, PID selector,
@@ -30,3 +30,11 @@ gates are still required before claiming the feature implemented.
 - Remaining units: captured local registration/API; per-repository setup UI and
   terminal status/lifecycle, Profile-key adoption; inert/fake-tool fixtures,
   appropriate private-target gates and independent review.
+
+The second static unit adds a typed public-key boundary and captured local registration.
+The validator strips comments, rejects extra lines/private-key headers, bounds bytes and
+checks SSH wire fields. No raw selected file can be passed to local registration. Remote
+plans similarly reduce/validate public fields; tea receives a new temporary file containing
+only those public fields, never a copy of the original file. Remote GH token lookup/output
+is suppressed and its checked named-account token stays transient in shell/environment.
+These components remain unwired WIP until the next UI/runner unit; no runtime claim.
