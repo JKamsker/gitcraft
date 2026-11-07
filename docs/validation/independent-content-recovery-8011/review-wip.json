@@ -1,7 +1,7 @@
 {
   "application_candidate": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
   "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
-  "status": "WIP static review; author final local gates/manifest pending; no approval",
+  "status": "FAIL on8011 static: initial file-recovery root identity can be replaced; author acknowledged and correcting before final freeze",
   "reviewed_files_sha256": {
     "README.md": "d6b03f64a310552abd130644d9b168564d99cc7595c622d420c7edbfed4f9b77",
     "docs/plans/content-recovery.md": "e25b6d2b3d069cfc3f53cfc54e559cf3736ef32a577821e943694c62dc73e5ee",
@@ -33,8 +33,24 @@
     "UI latest-only reader ownership until actual remote exec return",
     "Practice/profile command routing and source test evidence"
   ],
-  "open_questions": [
-    "Unix initial root open intentionally removes NOFOLLOW; assess rename/symlink replacement between final identity verification and file creation. Sent to author before source freeze."
+  "open_questions": [],
+  "author_evidence": "No final manifest yet; author reports17targeted on8aa310f and19targeted8011 upcoming. Not independently executed.",
+  "findings": [
+    {
+      "id": "CONTENT-1",
+      "priority": "P2",
+      "file": "src/git/recovery/file.rs",
+      "line": 153,
+      "title": "Pin the selected worktree root before exclusive file recovery",
+      "trigger": "After perform verifies the string repository identity, physical worktree root or an ancestor is renamed/replaced by a symlink before file::parent opens it.",
+      "behavior": "Unix initial root open subtracts NOFOLLOW. Stored Results/Preview identity contains path strings only, so the opened replacement is not compared with the searched root inode/device. A new recovery filename can be created outside the selected repository. Exclusive final name creation preserves existing files but does not preserve destination ownership. Windows initial root similarly follows the root and needs stable opened-directory identity.",
+      "evidence_scope": "Static source finding; no runtime reproduction or native Windows execution. Author audit_32_38 independently agreed in coordination message and plans pinned opened-root identity + NOFOLLOW regression fix.",
+      "recommendation": "Capture stable filesystem root identity during search/preview; reject links and compare opened root handle identity immediately before parent traversal/file creation, retaining handles. Cover root and ancestor replacement using owned temp fixtures."
+    }
   ],
-  "author_evidence": "No final manifest yet; author reports17targeted on8aa310f and19targeted8011 upcoming. Not independently executed."
+  "other_review_notes": [
+    "No further blocker identified in static review of framing, budgets, provenance, create-only refs, stash old-tip CAS/membership, latest-only lifecycle, and Practice/profile command routing.",
+    "Real pointer search-hit-preview-prepare-confirm UI roundtrip suggested to author; source currently has reader/Escape tests only.",
+    "Lower concern communicated: analysis_output active check after update-ref can report cancellation after successful ref mutation; no finalized blocker."
+  ]
 }
