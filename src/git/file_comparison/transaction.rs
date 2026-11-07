@@ -356,7 +356,7 @@ mod owned_remote_correction_tests {
     #[test]
     fn owned_remote_program_preserves_foreign_locks_and_applies_native_sharing_policy()
     -> Result<(), String> {
-        for case in ["0600", "group", "foreign-file", "foreign-link"] {
+        for case in ["0600", "group", "acl", "foreign-file", "foreign-link"] {
             let r = Repo::new()?;
             let path = "a ' $(literal) ü";
             r.write(path, "before\n")?;
@@ -364,7 +364,29 @@ mod owned_remote_correction_tests {
             r.commit()?;
             let sharing = if case == "group" { "group" } else { "0600" };
             r.git(&["config", "core.sharedRepository", sharing])?;
+            // A no-op add can retain the old index inode/mode. Force native writes
+            // before taking the reference policy, just as the real mutation will.
+            r.write(path, "native reference rewrite\n")?;
             r.git(&["add", path])?;
+            r.write(path, "before\n")?;
+            r.git(&["add", path])?;
+            #[cfg(target_os = "macos")]
+            if case == "acl" {
+                exacl::setfacl(
+                    &[r.0.join(".git/index")],
+                    &[exacl::AclEntry::allow_user(
+                        "nobody",
+                        exacl::Perm::READ,
+                        None,
+                    )],
+                    None,
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            #[cfg(target_os = "macos")]
+            let expected_acl =
+                exacl::getfacl(r.0.join(".git/index"), exacl::AclOption::SYMLINK_ACL)
+                    .map_err(|e| e.to_string())?;
             let expected = std::fs::metadata(r.0.join(".git/index"))
                 .map_err(|e| e.to_string())?
                 .permissions()
@@ -452,6 +474,12 @@ mod owned_remote_correction_tests {
                     expected
                 );
                 assert!(!r.0.join(".git/index.lock").exists());
+                #[cfg(target_os = "macos")]
+                assert_eq!(
+                    exacl::getfacl(r.0.join(".git/index"), exacl::AclOption::SYMLINK_ACL)
+                        .map_err(|e| e.to_string())?,
+                    expected_acl
+                );
             }
             assert_eq!(r.git(&["show", ":unrelated"])?, "unchanged");
             assert_eq!(
@@ -459,6 +487,26 @@ mod owned_remote_correction_tests {
                 b"after\n"
             );
         }
+        let r = Repo::new()?;
+        r.git(&["config", "core.sharedRepository", "0600"])?;
+        r.write("new", "new\n")?;
+        let lens = r.lens("new")?;
+        let patch = patch_header("new", None, Some("100644")) + "@@ -0,0 +1 @@\n+new\n";
+        let out = run(&r, &remote_apply_script(&lens, &patch, false)?, None)?;
+        assert!(
+            out.status.success(),
+            "absent index: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(r.git(&["show", ":new"])?, "new");
+        assert_eq!(
+            std::fs::metadata(r.0.join(".git/index"))
+                .map_err(|e| e.to_string())?
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
         Ok(())
     }
     #[cfg(target_os = "macos")]

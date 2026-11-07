@@ -511,6 +511,36 @@ mod tests {
         );
         Ok(())
     }
+    #[test]
+    fn index_owner_comparison_and_real_group_drift_refuse_stale_publication() -> Result<(), String>
+    {
+        use std::os::unix::fs::MetadataExt;
+        let (r, lens, patch) = fixture()?;
+        let parent = Directory::open(&r.0.join(".git")).map_err(|e| e.to_string())?;
+        let before = Snapshot::read(&parent, OsStr::new("index"))?.ok_or("index")?;
+        let mut synthetic = Snapshot::read(&parent, OsStr::new("index"))?.ok_or("index")?;
+        synthetic.uid = synthetic.uid.wrapping_add(1);
+        assert!(!synthetic.same(&before));
+        let idx = r.0.join(".git/index");
+        let group = std::fs::metadata(&idx).map_err(|e| e.to_string())?.gid();
+        let groups = rustix::process::getgroups().map_err(|e| e.to_string())?;
+        if let Some(gid) = groups.iter().find(|g| g.as_raw() != group) {
+            let mut hook_error = None;
+            let result = apply(&r.0, &lens, &patch, false, &mut |phase| {
+                if phase == Phase::Prepared {
+                    if let Err(e) = std::os::unix::fs::chown(&idx, None, Some(gid.as_raw())) {
+                        hook_error = Some(e.to_string());
+                    }
+                }
+            });
+            if let Some(e) = hook_error {
+                return Err(e);
+            }
+            assert!(result.is_err());
+            assert_eq!(bytes(&idx)?, before.bytes);
+        }
+        Ok(())
+    }
     #[cfg(target_os = "macos")]
     #[test]
     fn native_index_acl_is_preserved_and_acl_only_drift_cannot_succeed() -> Result<(), String> {
