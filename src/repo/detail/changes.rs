@@ -18,7 +18,9 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
 
-        // The commit box stays at the bottom.
+        // Keep both staging and composition reachable after reopening in a short window.
+        // Always use the same scroll container, so resizing preserves editor/scroll state.
+        let composer_height = (ui.available_height() * 0.65 - 20.0).max(1.0);
         egui::Panel::bottom("commit_box")
             .frame(
                 egui::Frame::new()
@@ -26,7 +28,13 @@ impl RepoTab {
                     .inner_margin(egui::Margin::symmetric(12, 10))
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
-            .show(ui, |ui| self.commit_box(ui, acts));
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("commit_box_scroll")
+                    .max_height(composer_height)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| self.commit_box(ui, acts));
+            });
 
         egui::ScrollArea::vertical()
             .id_salt("changes_scroll")

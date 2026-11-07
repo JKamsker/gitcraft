@@ -39,7 +39,7 @@ Widths are physical pixels; tests divide the layout width by 1, 1.25 or 1.5 and 
 | 7.7 Preserve commit/staging/continuation/templates/coauthors/AI/hooks/DCO/amend | Complete | Existing action/operation paths are reused. Focused UI regressions exercise toolbar presence and action safety; existing compose, DCO, fold, algorithm and remerge tests are run as focused compatibility checks. |
 
 
-## Actual validation
+## Original implementation validation (followup results below)
 
 - `cargo +1.95.0 check --lib`: passed.
 - `cargo +1.95.0 fmt --all -- --check` and `git diff --check`: passed.
@@ -60,3 +60,42 @@ Screenshot output: **146 PNGs**, `/tmp/gitcraft-c-final-evidence/`. Representati
 Also inspect `diff-overflow-algorithm.png`, `detail-auto-collapsed.png`, `extras-240-1.5.png`, `all-files-360-1.5.png`, and `pr-comment-360-1.5.png` in that directory. Header fixtures, File mode, horizontal-scroll variants, and every other width/scale combination are exported there too. Screenshots were rendered with the real egui widgets and bundled fonts; key narrow and normal outputs were opened for visual review.
 
 The headless harness does not exercise a physical display, a running forge, external AI processes or actual hook execution from the UI. Existing operation tests cover the underlying workflows; no live PR comment, history rewrite, or commit operation is performed by these visual fixtures.
+
+
+## Independent review followup: four confirmed findings
+
+All four review findings are addressed in the original Area C worktree; no dev merge or incoming structural-diff selector changes are included. The 21 original checkbox mappings above remain applicable.
+
+| Finding | Status | Fix and regression evidence |
+| --- | --- | --- |
+| Short forced reopen clips composition/actions | Complete | The bottom composition panel always uses one stable vertical ScrollArea, bounded to 65% of remaining height (including its frame). Files retain their independent scroll area. `responsive_followup_short_reopen_scrolls_composer_actions_into_view` reopens the real detail panel, scrolls to and clicks Commit, then scrolls back to and toggles Skip hooks. It checks drafts across 400/500/650 physical heights at 100/125/150%, reserving 70 logical points above the panels for application chrome and the integrated wrapped toolbar. Commit is queued in the fixture, never executed. |
+| Divider narrowing after forced reopen leaves blank expanded detail | Complete | The below-240 collapse rule applies during forced reopening too and clears forced state. Interior focus is remembered before a divider/footer takes focus, so dragging does not replace the editor's saved focus; moving focus to another panel clears it. `responsive_followup_forced_reopen_divider_collapses_and_restores_state` performs a real pointer drag down to approximately 163 points, checks collapse, then reopens and verifies the draft, Amend, keyboard focus and preferred width. |
+| Namespace field click dismisses popup | Complete | Uses CloseOnClickOutside, with explicit close after choosing an existing namespace or submitting a new one. `responsive_followup_namespace_field_keeps_popup_open_for_typing_and_submission` clicks the field, types, submits with Enter, then selects an existing namespace; both dispatch the correct command and close the popup. |
+| Many namespaces overflow viewport | Complete | Existing namespaces have their own vertical ScrollArea bounded by viewport height with room reserved for creation controls. Popup width also respects viewport width. `responsive_followup_many_namespaces_scroll_and_keep_creation_reachable` uses 20 realistic namespace names at 360/420/800 physical widths, a 400-pixel height and all three scales; it checks the creation controls stay visible and scrolls to/clicks the last namespace. |
+
+The four new regressions were run against original production code before fixing it: **all four failed**. The strengthened real-drag and stable-popup-frame versions are also verified against the original production code (log `/tmp/gitcraft-c-followup-before-final.log`).
+
+Validation uses a **private APFS-cloned target** `/tmp/gitcraft-c-followup-target` (cloned with `cp -cR` from the existing shared debug cache, then `src/lib.rs` touched to rebuild this worktree). The parent's `/tmp/gitcraft-167-171/target` was never used. The generated test executable's inventory is checked for all four new tests before compatibility validation.
+
+```sh
+CARGO_BUILD_JOBS=3 CARGO_TARGET_DIR=/tmp/gitcraft-c-followup-target \
+  GITCRAFT_UI_EVIDENCE=/tmp/gitcraft-c-followup-evidence \
+  cargo +1.95.0 test --lib responsive_ -- --test-threads=1
+```
+
+Final validation:
+
+- **16 responsive tests passed**, comprising the original 12 and four new regressions (log `/tmp/gitcraft-c-followup-final.log`). The exact strengthened four tests fail against original production code (0 passed, 4 failed).
+- **101 focused compatibility tests passed**, run sequentially from the verified private test executable: compose 39, DCO 16, Fold 30, algorithms 6, extras 5 and remerge 5. Logs: `/tmp/gitcraft-c-followup-compat-0.log` through `-5.log`; inventory `/tmp/gitcraft-c-followup-inventory.log`.
+- `cargo +1.95.0 fmt --all -- --check`, `git diff --check`, and `cargo +1.95.0 clippy --lib --tests` **passed**. Clippy used `CARGO_BUILD_JOBS=3` and the private target; log `/tmp/gitcraft-c-followup-clippy.log`. Only existing platform dead-code warnings remain.
+- No full suite was run; the parent owns integrated validation.
+
+Screenshots: **175 PNGs** in `/tmp/gitcraft-c-followup-evidence/`, including the original full matrix rerendered with the fixes. The following new screenshots were opened for visual inspection:
+
+- `/tmp/gitcraft-c-followup-evidence/followup-short-composer-500-1.5.png`: commit action scrolled into view at the reported 800×500, 150% viewport.
+- `/tmp/gitcraft-c-followup-evidence/followup-short-toolbar-500-1.5.png`: compact toolbar scrolled back into view at the same size.
+- `/tmp/gitcraft-c-followup-evidence/followup-forced-divider-collapsed.png`: real divider drag ends in a collapsed strip, with a reopening control.
+- `/tmp/gitcraft-c-followup-evidence/followup-namespace-typing.png`: new namespace text remains visible inside the open popup.
+- `/tmp/gitcraft-c-followup-evidence/followup-namespaces-420-1.png`: 20 realistic namespaces use a bounded list; creation controls remain inside the 420×400 viewport.
+
+Headless evidence reserves the parent's extra toolbar height but does not run its unmerged toolbar or incoming structural-diff selector. Native cross-platform displays, live hooks, external AI and forge posting remain unexercised. Existing safety/action dispatch paths are unchanged.
