@@ -689,6 +689,18 @@ so your config, credentials and hooks apply as usual.
   the operation's entry when clicked. The last 100 operations are kept, each command's output
   up to 64 KiB (its start and its end); a background fetch only when it fails, and the same
   failure again and again as one entry, counted.
+- The taskbar button shows how far a clone, fetch, pull or push is (the least advanced, when
+  several run). When one fails while the window is in the background it turns red on Windows
+  (on Linux the launcher asks for attention, as each dock shows it), until the window is looked
+  at or another operation starts. On Windows that is the taskbar's own progress; on Linux the
+  launcher's (the `LauncherEntry` signal that Ubuntu's dock, Dash to Dock, KDE's task manager
+  and others show).
+- The taskbar button's menu (Windows: its jump list; Linux: the launcher's actions) lists the
+  recent repositories, then _Clone…_ and _Open…_ (`gitcraft --clone`, `gitcraft --open`). On
+  Linux they go into the AppImage's menu entry, or, for the .deb and .rpm, into a copy of the
+  package's entry in `~/.local/share/applications` (one you wrote yourself is left alone); the
+  package's own entry has _Clone…_ and _Open…_. The OS calls this takes on Windows are in a small
+  crate of their own, `crates/gitcraft-os`, so that gitcraft itself keeps forbidding unsafe code.
 - Background fetch every few minutes (Settings; 0 turns it off).
 - Offline mode (Settings → Git, or _Go offline_ in the palette): nothing goes on the network by
   itself (the background fetch, avatars, update checks and downloads, the polling of builds and

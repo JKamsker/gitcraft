@@ -54,6 +54,19 @@ rustix = { version = "1", features = ["fs"] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
+# The taskbar button's progress and the jump list: COM calls, in a crate of their own.
+gitcraft-os = { path = "crates/gitcraft-os" }
+# The window's handle, for the taskbar button (the version winit uses).
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The launcher's progress: a signal on the session bus (the version notify-rust uses).
+zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
+
+[workspace]
+members = [".", "crates/gitcraft-os"]
+# `cargo test` and `cargo clippy` at the root check both.
+default-members = [".", "crates/gitcraft-os"]
 
 [lints.rust]
 # Denied everywhere; the one exception, asking Windows where an open file really is

@@ -171,6 +171,7 @@ impl App {
         self.cloning = None;
         match result {
             Err(_) if cancelled => {
+                self.clone_failed = false;
                 self.error = Some(format!("Clone into {}: cancelled", dest.display()));
             }
             // On another machine, it opens once reached again, the credentials along.
@@ -215,7 +216,10 @@ impl App {
                 }
                 None => self.error = Some(format!("Clone failed: {e}")),
             },
-            Err(e) => self.error = Some(format!("Clone failed: {e}")),
+            Err(e) => {
+                self.clone_failed = true;
+                self.error = Some(format!("Clone failed: {e}"));
+            }
         }
         self.cloning_form = None;
     }

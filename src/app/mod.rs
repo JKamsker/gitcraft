@@ -10,6 +10,7 @@ mod home;
 mod home_filter;
 mod home_recent;
 mod my_work;
+mod os_shell;
 mod palette;
 mod panels;
 mod profiles;
@@ -114,6 +115,14 @@ pub struct App {
     cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
+    /// Started to pick a folder to open (`--open`, the launcher's Open…): done on the first frame.
+    pick_on_start: bool,
+    /// The last clone failed (for the taskbar button, which turns red).
+    clone_failed: bool,
+    /// What the taskbar button shows.
+    taskbar: crate::os_shell::Taskbar,
+    /// The recent repositories the taskbar button's menu was made for.
+    menu_for: Option<Vec<PathBuf>>,
     /// The dialog that opens a repository in WSL or over SSH.
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
@@ -234,6 +243,10 @@ impl App {
             clone_form: None,
             cloning: None,
             cloning_form: None,
+            pick_on_start: false,
+            clone_failed: false,
+            taskbar: Default::default(),
+            menu_for: None,
             remote_form: None,
             connecting: Vec::new(),
             teleport: None,
@@ -274,10 +287,14 @@ impl App {
             app.tabs.push(Tab::Home);
         }
         app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
-        if let Some(path) = open_arg
-            && app.git_version.is_ok()
-        {
-            app.open_repo(&path, ctx);
+        // Started from the taskbar button's or launcher's menu, or with a folder to open.
+        if app.git_version.is_ok() {
+            match crate::os_shell::start_action(open_arg.as_deref().map(Path::as_os_str)) {
+                crate::os_shell::StartAction::Open(path) => app.open_repo(&path, ctx),
+                crate::os_shell::StartAction::Clone => app.start_clone(),
+                crate::os_shell::StartAction::PickFolder => app.pick_on_start = true,
+                crate::os_shell::StartAction::Nothing => {}
+            }
         }
         app
     }
@@ -582,7 +599,7 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
         // Column widths dragged in a graph header live in the context; keep them for saving.
@@ -611,6 +628,7 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
+        self.os_shell(&ctx, frame);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);

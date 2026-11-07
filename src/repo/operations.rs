@@ -55,7 +55,7 @@ impl RepoTab {
         }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
-        let control = self.follow_op(&ops, ctx);
+        let control = self.follow_op(&ops, quiet, ctx);
         let cancellable = self.can_cancel();
         self.note_checkout_move(&ops, ctx);
         if !quiet {
@@ -225,6 +225,10 @@ impl RepoTab {
         let running = self.running.take();
         let cancelled =
             result.is_err() && running.as_ref().is_some_and(|r| r.control.is_cancelled());
+        // For the taskbar button, which turns red.
+        if result.is_err() && !cancelled && running.as_ref().is_some_and(|r| r.network && !r.background) {
+            self.network_failed = true;
+        }
         let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
         self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self

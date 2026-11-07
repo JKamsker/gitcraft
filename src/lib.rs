@@ -27,6 +27,7 @@ mod mergiraf;
 mod portable;
 mod parallel_bisect;
 mod network;
+mod os_shell;
 mod pr_post;
 mod pr_threads;
 mod pull_request;
