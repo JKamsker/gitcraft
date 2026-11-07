@@ -166,7 +166,18 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             }
             read.bytes(&["cat-file", "blob", blob], MAX_BYTES)?
         }
-        None => crate::git::file_comparison::raw_working(read.repo, &path, read.active)?.bytes,
+        None => {
+            let version = crate::git::file_comparison::raw_working(read.repo, &path, read.active)?;
+            if version.warning.is_some()
+                || !matches!(version.mode.as_deref(), None | Some("100644" | "100755"))
+            {
+                return Err(
+                    "Encrypted source is not a safely readable regular file within 2 MiB".into(),
+                );
+            }
+            // Missing is distinct from a failed read. Only an actual missing side is empty.
+            version.bytes
+        }
     };
     if bytes.len() > MAX_BYTES {
         return Err("Syntax comparison is limited to 2 MiB per file.".to_owned());

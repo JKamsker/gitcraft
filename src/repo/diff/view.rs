@@ -93,6 +93,9 @@ impl RepoTab {
         if matches!(&view.data, Some(Ok(data)) if data.sops) {
             ui.horizontal_wrapped(|ui| {
                 ui.label("SOPS encrypted file");
+                if view.lines.is_some() {
+                    ui.label("Decryption compares the complete file versions, not selected history lines.");
+                }
                 let mut encoding = view.encrypted.json_encoding;
                 egui::ComboBox::from_id_salt("sops_json_encoding").selected_text(encoding.label()).show_ui(ui, |ui| {
                     use super::encrypted::JsonEncoding;

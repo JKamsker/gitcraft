@@ -222,7 +222,11 @@ pub fn load_lines(
         (Some(ranges), DiffKey::Commit { hash, path }) => {
             let text = git::line_diff(repo, hash, path, ranges)?;
             // Not the commit's patch: nothing of it is picked to revert.
-            Ok(prepare(repo, key, path, &text, false, true, dark))
+            // Line history always uses raw source lines, including its initial log query.
+            // Decryption remains an explicit whole-file comparison in the private owner.
+            let mut data = prepare(repo, key, path, &text, false, true, dark);
+            data.sops = encrypted::probe_checked(repo, key) == Some(true);
+            Ok(data)
         }
         _ => load(repo, key, opts, dark),
     }
