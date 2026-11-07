@@ -1,0 +1,21 @@
+[WARN  tini (1)] Reaped zombie process with pid=21
+[WARN  tini (1)] Reaped zombie process with pid=28
+[WARN  tini (1)] Reaped zombie process with pid=37
+
+thread 'app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated' (7) panicked at src/app/practice/isolation.rs:492:5:
+Child failed:
+
+running 1 test
+test app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated ... FAILED
+
+failures:
+
+failures:
+    app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 947 filtered out; finished in 20.03s
+
+
+Error: "Practice app did not settle: Some(\"error: cannot fork() for git-receive-pack '/tmp/gitcraft-practice-47-1794033095672324985-0/origin.git': Resource temporarily unavailable\\nfatal: unable to fork\")"
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

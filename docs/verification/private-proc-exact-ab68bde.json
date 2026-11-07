@@ -1,0 +1,88 @@
+{
+  "application_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "accepted_gates": "/workspace/work/integration-ab68bde-gates.json",
+  "accepted_gate_sha256": "4d5a360135e7163f72224c075d0529008deb8d68f9eb76347fbdd1d5129dd4a3",
+  "accepted_binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "77570ac410be281f89dca00a3b2abbbb4d537c9d242f25a68816dc8f71d0dffd",
+    "source_binding": "Fresh integration-only package clean and actual compile from this private worktree; all source gates on immutable pushed head"
+  },
+  "case": "app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated",
+  "command": [
+    "/usr/bin/unshare",
+    "--user",
+    "--map-current-user",
+    "--pid",
+    "--fork",
+    "--mount",
+    "--mount-proc",
+    "--propagation=private",
+    "--",
+    "/usr/local/bin/docker-init",
+    "-s",
+    "-w",
+    "-v",
+    "--",
+    "/bin/bash",
+    "--noprofile",
+    "--norc",
+    "-c",
+    "read -r proc_self_pid proc_rest < /proc/self/stat || exit 90\nread -r proc_numbered_pid proc_rest < \"/proc/$$/stat\" || exit 91\n[[ \"$BASHPID\" == \"$proc_self_pid\" && \"$$\" == \"$proc_numbered_pid\" && \"$PPID\" == 1 ]] || exit 92\nread -r init_comm < /proc/1/comm || exit 93\n[[ \"$init_comm\" == docker-init ]] || exit 94\nprintf 'NAMESPACE_IDENTITY shell_pid=%s proc_self_pid=%s proc_numbered_pid=%s parent_pid=%s init=%s\\n' \"$BASHPID\" \"$proc_self_pid\" \"$proc_numbered_pid\" \"$PPID\" \"$init_comm\"\nprintf 'UID_MAP\\n'; cat /proc/self/uid_map\nprintf 'GID_MAP\\n'; cat /proc/self/gid_map\ngit --version || exit 95\ndifft --version || exit 96\nexec \"$1\" --exact \"$2\" --nocapture\n",
+    "gitcraft-private-proc-exact",
+    "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated"
+  ],
+  "cwd": "/workspace/work/integration",
+  "environment": {
+    "CARGO_TARGET_DIR": "/workspace/work/integration/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "2",
+    "RAYON_NUM_THREADS": "2"
+  },
+  "path_prepend": "/workspace/work/difft-bin",
+  "tool_resolution": {
+    "git": "/usr/local/bin/git",
+    "difft": "/workspace/work/difft-bin/difft"
+  },
+  "optional_ssh_wsl": "unset",
+  "git_config_overrides_added": false,
+  "exit_status": 101,
+  "elapsed_seconds": 20.678,
+  "namespace_identity": [
+    "NAMESPACE_IDENTITY shell_pid=2 proc_self_pid=2 proc_numbered_pid=2 parent_pid=1 init=docker-init"
+  ],
+  "summary": [
+    "running 1 test",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 947 filtered out; finished in 20.10s"
+  ],
+  "counts_before": {
+    "visible_processes": 31318,
+    "visible_zombies": 31302
+  },
+  "counts_after": {
+    "visible_processes": 31318,
+    "visible_zombies": 31302
+  },
+  "zombie_delta": 0,
+  "tini_reaped_warning_count": 3,
+  "logs": {
+    "test": {
+      "path": "/workspace/work/private-proc-exact-ab68bde.test.log",
+      "bytes": 741,
+      "sha256": "b140eaf653638ea33ac2dc5983b3bff022269b612c8fe6fcbe61acd32a9faca0"
+    },
+    "tini": {
+      "path": "/workspace/work/private-proc-exact-ab68bde.tini.log",
+      "bytes": 923,
+      "sha256": "46c77064d686260febabeac2b8e7427bc82ac5a481316e623287a4fc108f9fa0"
+    }
+  },
+  "ci_used": false,
+  "containment": "fresh self-mapped USER/PID/MOUNT namespaces; private procfs and private propagation; maintained Tini namespacePID1; no host process/mount selection or signals",
+  "outcome": "failed; fork exhaustion persists under correctly matched private proc/PID namespace",
+  "failure": "Practice child cannot fork git-receive-pack: Resource temporarily unavailable; fatal unable to fork",
+  "private_proc_validation": "passed: BashPID2=proc/self/stat2=proc/2/stat2; parent1 docker-init",
+  "full_suite_conditional_gate": "not reached because exact case failed; full suite not run",
+  "integration_clean_after": true
+}

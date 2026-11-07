@@ -1,0 +1,25 @@
+NAMESPACE_IDENTITY shell_pid=2 proc_self_pid=2 proc_numbered_pid=2 parent_pid=1 init=docker-init
+UID_MAP
+      1000       1000          1
+GID_MAP
+      1000       1000          1
+git version 2.52.0
+Difftastic 0.72.0
+
+Revision:  6201bc9 2026-10-29
+Toolchain: 1.85.0
+System:    linux x86_64
+
+
+running 1 test
+test app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated ... FAILED
+
+failures:
+
+failures:
+    app::practice::isolation::normal_practice_tab_operations_and_shells_are_isolated
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 947 filtered out; finished in 20.10s
+
+[INFO  tini (1)] Spawned child process '/bin/bash' with pid '2'
+[INFO  tini (1)] Main child exited normally (with status '101')
