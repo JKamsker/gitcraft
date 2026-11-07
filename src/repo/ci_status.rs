@@ -460,7 +460,10 @@ mod tests {
 
     #[test]
     fn account_change_drops_all_routed_contributions_and_inflight_answers() {
-        let mut ci = CiStatuses { projects: only("me/fork"), ..CiStatuses::default() };
+        let mut ci = CiStatuses {
+            projects: only("me/fork"),
+            ..CiStatuses::default()
+        };
         ci.arrived(false, answer("me/fork", "abc"));
         ci.loading = true;
         ci.account_changed();

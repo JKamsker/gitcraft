@@ -11,6 +11,7 @@ pub(super) mod config;
 #[cfg(test)]
 mod config_tests;
 mod config_view;
+mod dependency_metadata;
 pub(super) mod deps;
 #[cfg(test)]
 mod deps_tests;
@@ -279,6 +280,7 @@ pub fn load(
 /// What a rich view keeps between frames.
 #[derive(Default)]
 pub struct RichState {
+    metadata: dependency_metadata::State,
     /// Runs of unchanged parts opened (by their place in the view).
     pub opened: std::collections::HashSet<usize>,
     /// The height of each thing shown, measured at `width`.
@@ -292,7 +294,7 @@ pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<
         RichDiff::Prose(prose) => prose_view::show(ui, prose, state, acts),
         RichDiff::Config(config) => config_view::show(ui, config, acts),
         RichDiff::Api(api) => api_view::show(ui, api, acts),
-        RichDiff::Deps(deps) => deps_view::show(ui, deps, acts),
+        RichDiff::Deps(deps) => deps_view::show(ui, deps, &mut state.metadata, acts),
         RichDiff::Table(table) => table_view::show(ui, table, state, acts),
         RichDiff::Dvc(dvc) => dvc_view::show(ui, dvc, acts),
     }
