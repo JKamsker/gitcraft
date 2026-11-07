@@ -2,11 +2,11 @@
 # the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
 name: CI
 
-# Pull requests, as they would be merged into their base, plus the default and consolidated
-# feature branches as they are. Other branches can be checked by hand (Actions › CI › Run workflow).
+# Pull requests, as they would be merged into their base, and the default branch as it is. Any
+# other branch can be checked by hand (Actions › CI › Run workflow).
 on:
   push:
-    branches: [master, codex/remaining-features]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
