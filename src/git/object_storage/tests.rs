@@ -485,3 +485,86 @@ fn fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment() -> 
     );
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn fake_wsl_uses_production_bounded_object_request_without_a_live_distribution()
+-> Result<(), String> {
+    const CHILD: &str = "GITCRAFT_OBJECT_STORAGE_WSL_FIXTURE";
+    const NAME: &str = "git::object_storage::tests::fake_wsl_uses_production_bounded_object_request_without_a_live_distribution";
+    if let Some(path) = std::env::var_os(CHILD) {
+        let path = PathBuf::from(path);
+        let target = remote::Target {
+            host: remote::Host::Wsl("ObjectsFixture".into()),
+            path: path.to_str().ok_or("path")?.into(),
+        };
+        let oid = Fixture::git(&path, &["rev-parse", "HEAD:file ' $(touch ESCAPED).txt"])?;
+        let request = super::super::command::object_storage_request(
+            &target,
+            &[
+                "cat-file",
+                "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+            ],
+            format!("{oid}\n").into_bytes(),
+            4096,
+        );
+        assert!(request.script.contains("--no-lazy-fetch"));
+        assert!(request.unset.iter().any(|s| s == "GIT_DIR"));
+        assert!(
+            request
+                .unset
+                .iter()
+                .any(|s| s == "GIT_ALTERNATE_OBJECT_DIRECTORIES")
+        );
+        let out = remote::exec(&target.host, &request)?;
+        assert_eq!(out.code, 0, "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout).trim(),
+            format!("{oid} blob 15")
+        );
+        let request = super::super::command::object_storage_request(
+            &target,
+            &["cat-file", "--batch-check=%(objectname) %(objecttype)"],
+            format!("{}\n", "f".repeat(40)).into_bytes(),
+            4096,
+        );
+        let out = remote::exec(&target.host, &request)?;
+        assert_eq!(out.code, 0);
+        assert!(String::from_utf8_lossy(&out.stdout).contains("missing"));
+        assert!(!path.join("ESCAPED").exists());
+        return Ok(());
+    }
+    let f = Fixture::new()?;
+    let (_donor, borrower) = f.borrowing()?;
+    let bin = f.0.join("fixture-bin");
+    std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    let wsl = bin.join("wsl.exe");
+    std::fs::write(&wsl, "#!/bin/sh\nexec /bin/sh\n").map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&wsl, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let output = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+        .args(["--exact", NAME, "--nocapture"])
+        .env(CHILD, borrower)
+        .env(
+            "PATH",
+            std::env::join_paths(paths).map_err(|e| e.to_string())?,
+        )
+        .env(
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "/nonexistent/ambient-donor",
+        )
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}

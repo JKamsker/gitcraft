@@ -206,7 +206,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
         }}
     });
     ui.label("For delta rows, inflated entry size is the delta program size; the object header above gives the logical content size.");
-    ui.label("Limits: 64 packs per store, 16 MiB per Git response, 2,000 tree entries and 128 delta levels; each Git analysis has a deadline.");
+    ui.label("Limits: 64 packs across all stores, 16 MiB per Git response, 2,000 tree entries and 128 delta levels; each Git analysis has a deadline.");
     if ui.button("Close").clicked() {
         outcome = Outcome::Cancel;
     }

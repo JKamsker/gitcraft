@@ -66,7 +66,7 @@ pub(super) fn run(
     cap: usize,
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
-    let out = object_storage_output(repo, args, input, cap, active)?;
+    let out = object_storage_output(repo, args, input, cap, active).map_err(|e| format!("Could not run object storage Git on the repository machine: {e}. Ensure Git 2.45+ is installed and the selected profile is available."))?;
     if out.code != 0 {
         return Err(format!(
             "Object storage Git failed ({}): {}. Install/update Git on the repository machine if --no-lazy-fetch or verify-pack is unavailable (Git 2.45+ required).",

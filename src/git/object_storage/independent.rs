@@ -100,6 +100,15 @@ fn current(snapshot: &Snapshot, active: &dyn Fn() -> bool) -> Result<(), String>
         return Err("The profile changed; prepare independence again.".into());
     }
     let topology = super::topology::read(&snapshot.repo, &snapshot.primary, active)?;
+    for path in [
+        snapshot.primary.clone(),
+        remote::join(&snapshot.primary, "info"),
+        remote::join(&snapshot.primary, "info/alternates"),
+    ] {
+        if remote::try_is_link(&path).map_err(|e| e.to_string())? {
+            return Err("Object store ownership changed to a symlink; borrowing is preserved. Inspect again.".into());
+        }
+    }
     if topology != snapshot.topology || references(&snapshot.repo, active)? != snapshot.refs {
         return Err("Refs, index, reflogs, worktrees or alternate donors changed; inspect again before making this clone independent.".into());
     }
@@ -339,7 +348,24 @@ pub(super) fn make_with_checkpoints(
             SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ),
     );
-    detach(snapshot, &backup)?;
+    if let Err(error) = detach(snapshot, &backup) {
+        let recovery = match files::read(
+            &remote::join(&snapshot.primary, "info/alternates"),
+            64 * 1024,
+            &|| true,
+        ) {
+            Ok(None) => match restore(snapshot, &backup) {
+                Ok(()) => "Borrowing was restored.".into(),
+                Err(e) => format!("Restore could not be confirmed: {e}"),
+            },
+            Ok(Some(_)) => "An alternate link is still present; it was not overwritten.".into(),
+            Err(e) => format!("Cannot confirm link state: {e}"),
+        };
+        return Err(format!(
+            "{error}. {recovery} Recovery backup (if created): {}",
+            remote::display(&backup)
+        ));
+    }
     // Verify the clone with the alternate gone. Cancellation after detaching also restores it.
     let proof = (|| {
         checkpoint("detached")?;

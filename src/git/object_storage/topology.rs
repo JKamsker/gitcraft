@@ -188,3 +188,22 @@ pub(super) fn read(
     }
     Ok(topology)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn git_quoted_alternate_paths_and_invalid_escapes() -> Result<(), String> {
+        assert_eq!(unquote(br#""/donor\040with\011tab""#)?, "/donor with\ttab");
+        assert_eq!(
+            unquote(br#""/donor\\slash\"quote""#)?,
+            "/donor\\slash\"quote"
+        );
+        assert!(unquote(br#""/bad\999""#).is_err());
+        assert_eq!(
+            normalize(Path::new("/a/../b/./objects")),
+            PathBuf::from("/b/objects")
+        );
+        Ok(())
+    }
+}
