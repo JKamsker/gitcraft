@@ -576,7 +576,7 @@ mod sequential_exchange_tests {
         let target = Bar::Author.drag_shown(&shown, &shown, 20.0, 3000.0);
         let space = DescriptionSpace::exchanged(3000.0, &prefs, &target, Bar::Author);
         // Oversized raw preferences and hidden columns must not manufacture compression.
-        assert_eq!(space.compression.unwrap(), [0.0; 6]);
+        assert_eq!(space.compression, Some([0.0; 6]));
         let mut saved = prefs;
         saved.author = target.author;
         assert_eq!(saved.allocated(3000.0, space), target);

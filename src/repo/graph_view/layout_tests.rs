@@ -520,7 +520,10 @@ fn exchange_harness(
 }
 
 fn painted(h: &egui_kittest::Harness<RepoTab>) -> PaintedColumns {
-    h.ctx.data(|d| d.get_temp(painted_columns_id())).unwrap()
+    let Some(geometry) = h.ctx.data(|d| d.get_temp(painted_columns_id())) else {
+        panic!("production graph renderer did not record its column geometry");
+    };
+    geometry
 }
 
 fn raw_width(settings: &Settings, bar: Bar) -> f32 {
@@ -700,7 +703,9 @@ fn assert_exchange(
         (Bar::When, "WHEN"),
         (Bar::Date, "DATE"),
     ] {
-        let clip = texts.iter().find(|(_, text, _)| text == label).unwrap().0;
+        let Some((clip, _, _)) = texts.iter().find(|(_, text, _)| text == label) else {
+            panic!("production renderer did not paint the {label} header");
+        };
         assert!(
             (clip.width() + 12.0 - after.cols.width(other)).abs() <= 1.1 / now.ui_scale,
             "{other:?} clip {clip:?}"
@@ -742,14 +747,16 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         Bar::Refs,
                     ] {
                         let geometry = painted(&h);
-                        let donor = Bar::ALL
+                        let Some(donor) = Bar::ALL
                             .into_iter()
                             .filter(|&other| other != bar && other != Bar::Refs)
                             .max_by(|&a, &b| {
                                 (geometry.cols.width(a) - a.min())
                                     .total_cmp(&(geometry.cols.width(b) - b.min()))
                             })
-                            .unwrap();
+                        else {
+                            panic!("each divider must have a visible sibling donor");
+                        };
                         let donation = (geometry.cols.width(donor) - donor.min()).min(30.0);
                         assert!(donation >= 10.0);
                         release_exchange(&mut h, donor, -donation);
