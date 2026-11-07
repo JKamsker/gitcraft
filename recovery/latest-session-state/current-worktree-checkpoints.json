@@ -1,0 +1,44 @@
+[
+  {
+    "worktree": "/workspace/work/integration",
+    "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "branch": "codex/remaining-features",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/integration-standalone",
+    "head": "396b02e0747cb6c9e198f695bd3a0c0bbca08a31",
+    "branch": "codex/integration-standalone",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/history-investigations",
+    "head": "adb6294145f3233e2cabee91b4373f967d8464b9",
+    "branch": "codex/history-investigations",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/forge-providers",
+    "head": "0e08eb181e8465f219ef9cce3e0f718f60954232",
+    "branch": "codex/forge-providers",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/push-preflight",
+    "head": "dec360644898985a4e79f609ae5a5db69534f96a",
+    "branch": "codex/push-preflight",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/object-storage",
+    "head": "51f95f3c7121082c7ff4afcdf65e1533e27da049",
+    "branch": "codex/object-storage",
+    "status": ""
+  },
+  {
+    "worktree": "/workspace/work/standalone-file-tools",
+    "head": "f1ee4f33cea9f0b3efdd9c9f38e5afc4ea976083",
+    "branch": "codex/standalone-file-tools",
+    "status": ""
+  }
+]

@@ -2,7 +2,9 @@
 
 22 of 72 eligible named features integrated. 41 features remain queued. Other active work includes history investigations, forge providers, standalone tools and two remote mutation features.
 
-Latest verified combined branch: [`ab68bde`](https://github.com/JKamsker/gitcraft/tree/ab68bdedd387236c03f26f839572860d405a2f7f). Local formatting, strict Clippy and 945 tests pass; three baseline tests require external services or the system credential store and remain ignored in default runs. All 948 registered test names are accounted for.
+Latest verified combined branch: [`ab68bde`](https://github.com/JKamsker/gitcraft/tree/ab68bdedd387236c03f26f839572860d405a2f7f). Before process exhaustion, local formatting, strict Clippy and 945 tests passed; three baseline tests require external services or the system credential store and remain ignored in default runs. All 948 registered test names are accounted for.
+
+**Execution blocked:** fresh local checks fail because the workspace cannot fork child processes. Safe Tini, Docker and private-namespace recovery attempts did not restore application capacity. All completed source/review units are pushed. Standalone tools have passed feature review and have a pushed, unvalidated integration candidate.
 
 CI is deferred until implementation, final history assembly, local checks and independent adversarial review are complete. Exactly one final PR; none created yet. Every completed source and review unit is committed and pushed. Final commits use Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>, matching `028242cd4bc3`.
 
@@ -50,7 +52,7 @@ CI is deferred until implementation, final history assembly, local checks and in
 | [#43](https://github.com/JKamsker/gitcraft/issues/43) | Each profile with its own SSH key and forge account | Integrated; local combined checks pass |
 | [#43](https://github.com/JKamsker/gitcraft/issues/43) | SSH key helper | Integrated; local combined checks pass |
 | [#43](https://github.com/JKamsker/gitcraft/issues/43) | Dev containers | Not started |
-| [#44](https://github.com/JKamsker/gitcraft/issues/44) | gitcraft as git difftool / mergetool, and comparing any two files | Corrected; independent review in progress |
+| [#44](https://github.com/JKamsker/gitcraft/issues/44) | gitcraft as git difftool / mergetool, and comparing any two files | Feature review passed; combined candidate unvalidated |
 | [#45](https://github.com/JKamsker/gitcraft/issues/45) | Practice repositories and a glossary | Integrated; local combined checks pass |
 | [#45](https://github.com/JKamsker/gitcraft/issues/45) | A tour of this repository | Integrated; local combined checks pass |
 | [#45](https://github.com/JKamsker/gitcraft/issues/45) | New machine, same setup | Integrated; local combined checks pass |

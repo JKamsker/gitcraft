@@ -1,0 +1,52 @@
+{
+  "updated_utc": "2026-11-07T06:35:56.028998+00:00",
+  "status": "BLOCKED: application fork/thread creation fails with OS error11; file reads and lean Git operations remain possible.",
+  "hold": "No application builds or runtime fixtures until a working environment is available. Source-only edits must remain explicitly unvalidated, committed and pushed.",
+  "observed_zombies": 31302,
+  "init": "Existing workspace PID1 is tail and does not reap terminated children. No existing init/process mutation was performed.",
+  "last_successful_combined_gate": {
+    "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "features": 22,
+    "passed": 945,
+    "ignored": 3,
+    "registered": 948,
+    "fmt": "PASS",
+    "strict_clippy": "PASS",
+    "note": "Historical local gate before process exhaustion; fresh matched reruns currently fail for environmental fork errors."
+  },
+  "attempted_routes": [
+    {
+      "route": "Tini subreaper with two test threads",
+      "containment": "Own orphan smoke PASS; no zombie growth.",
+      "application": "Full attempt aborted in notify; it also lacked difftastic, so not a matched-environment gate."
+    },
+    {
+      "route": "Matched exact practice-isolation test",
+      "application": "Git2.52/difftastic0.72 verified; fails cannot fork git-receive-pack.",
+      "evidence_commit": "584b6485579f5febd516967f0ababd5b9ff2dc88"
+    },
+    {
+      "route": "Rootless Docker distinct-UID attempt",
+      "application": "Official Debian image pulled; owned container failed before startup because shim could not create OS thread. Owned failed container removed; no fixture ran.",
+      "evidence_commit": "82273cfb4b95abe6407de8982c80601a574a8848"
+    },
+    {
+      "route": "Self-mapped USER/PID namespace",
+      "application": "Tiny fork/wait smoke PASS.",
+      "evidence_commit": "d243f5e8c84f9f8b86bbadc337fd5a15cd6e3238"
+    },
+    {
+      "route": "Self-mapped USER/PID/private MOUNT/proc namespace",
+      "containment": "PID/proc identities correct; zombie delta0.",
+      "application": "Matched exact practice-isolation test still fails Git fork EAGAIN. Conditional full retry NOT run.",
+      "evidence_commit": "3181f7d9178f6ab426adf053c43231b29d3a2ec5"
+    }
+  ],
+  "init_reaping_assessment": {
+    "commit": "63fa52bb933d801dd00e1d329b85e8d9a63f5018",
+    "disposition": "Unsuitable; no debugger operation or user approval requested. No attach, signals, permission probes or existing-process changes."
+  },
+  "ci": "No CI started, dispatched, rerun, polled or awaited during this work. User forbids CI until all our-side work is done.",
+  "final_pr": null,
+  "restoration": "All completed source/review units are pushed. The latest recovery ZIP includes a complete verified30-ref Git bundle and task metadata. A working execution environment is needed for the required local gates."
+}

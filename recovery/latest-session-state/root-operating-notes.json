@@ -6,13 +6,15 @@
   "user_steering": "ONE final giant PR; rebuild clean branch from dev with one commit per feature, all authored exactly Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> matching028242cd4bc3. Preserve published branches/history; each new unit still commit+push before next/riskytest.",
   "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
   "agents": {
-    "audit_32_38": "Saved Views integrated; Line Dossier backend/UI and guarded ignore-file action underway using accepted Content 23dd.",
-    "audit_39_44": "Standalone 9bb final candidate frozen, full 845 passed / 3 ignored. Inactive while reviewer uses slot.",
-    "audit_45_50": "GitLab implementation and request ownership guard; Azure/Bitbucket assigned next.",
-    "implement_gerrit": "Independent Object f2b7968 static review; remote helper legacy stop dependency is open. Next graph bands/minimap/postcards reserved.",
-    "implement_object_storage": "Object f2b7968 frozen; helper runtime blocked on accepted owned transport. Independently reviewed Preflight e5d1c10 static PASS ba19e714.",
-    "review_weather": "Remote e5d1c10 static PASS; run defined recordings and owned fixtures, then extract minimal shared transport for Object integration.",
-    "review_portable_setup": "Standalone 9bb corrective re-review and integration-only lifecycle delta d182..ab68 static review."
+    "audit_32_38": "History source adb6294 pushed/clean; latest changes unvalidated. Runtime hold.",
+    "audit_39_44": "Source-only integration candidate396b02e pushed; no combined gates run.",
+    "audit_45_50": "GitLab source0e08eb1 pushed/clean; full gates pending. Azure/Bitbucket queued.",
+    "implement_gerrit": "Object Windows51f scopedSTATICPASS2b801c5 pushed; full helper transport findings remain open.",
+    "implement_object_storage": "Windows51f pushed/clean/uncompiled; waiting shared owned transport; runtime hold.",
+    "review_weather": "Remotee5 staticPASS and nine recordingsPASS; dec3606 pushed. Minimal shared transport cut/owned fixtures not completed.",
+    "review_portable_setup": "Standalone9bb PASS891b2f5 and ab68 integration lifecycleSTATICPASSe7b9f079, both pushed.",
+    "restore_test_capacity": "All standard safe isolation attempts documented/pushed; exact fixture still EAGAIN3181f7d. No recovery claim.",
+    "prepare_init_reaping": "Documentation-only assessment63fa52b: unsuitable, no operation authorized/performed."
   },
   "integration": {
     "worktree": "/workspace/work/integration",
@@ -47,11 +49,11 @@
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
     "platform_gates": "NativeWindows finalvalidation stillrequired. Do not poll/rerun/dispatchCI until ALL implementation+finalhistory+localchecks+independentwhole-review complete.",
-    "pending_candidate": null,
-    "sole_writer": "root; implement_gerrit handed back after Saved Views",
+    "pending_candidate": "codex/integration-standalone396b02e: source-only, NOT tested",
+    "sole_writer": "root; main ab68 remains clean and unchanged",
     "pending_features": [
-      "Standalone 9bb corrected; independent re-review active",
-      "Shared owned remote transport; static PASS, recordings/owned fixtures pending"
+      "Standalone9bb independentlyPASS; combined candidate unvalidated",
+      "Shared owned remote transport extraction/fixtures still pending"
     ]
   },
   "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
@@ -70,7 +72,7 @@
   "new_feature_base": "ab68bdedd387236c03f26f839572860d405a2f7f (22 features locally green)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
-  "communications": "Latest user status: 22 integrated, 945 local tests passing; one final PR, CI deferred, source units pushed. 41 features remain queued.",
+  "communications": "22 integrated, last successful combined945pass3ignored. Runtime exhaustion blocks fresh local checks. All source/review units pushed, no final PR/CI, complete recovery bundle prepared.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
   "verified_remote_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
@@ -83,5 +85,57 @@
   "commit_author_policy": "/workspace/work/commit-author-policy.json",
   "final_history_plan": "/workspace/work/final-history-plan.json",
   "ci_deferral_policy": "/workspace/work/ci-deferral-policy.json",
-  "local_checks": "Standing authorization after each source unit commit+push: needed local check/targeted/fmt/Clippy/full gates, private targets/INCR0/jobs2, optionalSSHWSLunset, avoid >3 active Cargo chains. New protocol/process-control execution still requires independent staticPASS first. No per-run root permission needed."
+  "local_checks": "Standing authorization after each source unit commit+push: needed local check/targeted/fmt/Clippy/full gates, private targets/INCR0/jobs2, optionalSSHWSLunset, avoid >3 active Cargo chains. New protocol/process-control execution still requires independent staticPASS first. No per-run root permission needed.",
+  "runtime_hold": {
+    "updated_utc": "2026-11-07T06:35:56.028998+00:00",
+    "status": "BLOCKED: application fork/thread creation fails with OS error11; file reads and lean Git operations remain possible.",
+    "hold": "No application builds or runtime fixtures until a working environment is available. Source-only edits must remain explicitly unvalidated, committed and pushed.",
+    "observed_zombies": 31302,
+    "init": "Existing workspace PID1 is tail and does not reap terminated children. No existing init/process mutation was performed.",
+    "last_successful_combined_gate": {
+      "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+      "features": 22,
+      "passed": 945,
+      "ignored": 3,
+      "registered": 948,
+      "fmt": "PASS",
+      "strict_clippy": "PASS",
+      "note": "Historical local gate before process exhaustion; fresh matched reruns currently fail for environmental fork errors."
+    },
+    "attempted_routes": [
+      {
+        "route": "Tini subreaper with two test threads",
+        "containment": "Own orphan smoke PASS; no zombie growth.",
+        "application": "Full attempt aborted in notify; it also lacked difftastic, so not a matched-environment gate."
+      },
+      {
+        "route": "Matched exact practice-isolation test",
+        "application": "Git2.52/difftastic0.72 verified; fails cannot fork git-receive-pack.",
+        "evidence_commit": "584b6485579f5febd516967f0ababd5b9ff2dc88"
+      },
+      {
+        "route": "Rootless Docker distinct-UID attempt",
+        "application": "Official Debian image pulled; owned container failed before startup because shim could not create OS thread. Owned failed container removed; no fixture ran.",
+        "evidence_commit": "82273cfb4b95abe6407de8982c80601a574a8848"
+      },
+      {
+        "route": "Self-mapped USER/PID namespace",
+        "application": "Tiny fork/wait smoke PASS.",
+        "evidence_commit": "d243f5e8c84f9f8b86bbadc337fd5a15cd6e3238"
+      },
+      {
+        "route": "Self-mapped USER/PID/private MOUNT/proc namespace",
+        "containment": "PID/proc identities correct; zombie delta0.",
+        "application": "Matched exact practice-isolation test still fails Git fork EAGAIN. Conditional full retry NOT run.",
+        "evidence_commit": "3181f7d9178f6ab426adf053c43231b29d3a2ec5"
+      }
+    ],
+    "init_reaping_assessment": {
+      "commit": "63fa52bb933d801dd00e1d329b85e8d9a63f5018",
+      "disposition": "Unsuitable; no debugger operation or user approval requested. No attach, signals, permission probes or existing-process changes."
+    },
+    "ci": "No CI started, dispatched, rerun, polled or awaited during this work. User forbids CI until all our-side work is done.",
+    "final_pr": null,
+    "restoration": "All completed source/review units are pushed. The latest recovery ZIP includes a complete verified30-ref Git bundle and task metadata. A working execution environment is needed for the required local gates."
+  }
 }
