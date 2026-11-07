@@ -340,9 +340,17 @@ fn malformed_line_ids_and_submodule_boundaries_are_read_only() -> Result<(), Str
     r.write("a", "edit\n")?;
     let mut h = harness(&r, Page::Lens)?;
     settle(&mut h)?;
-    let request = h.state().0.file_comparison.as_ref().ok_or("state")?.data_request;
+    let request = h
+        .state()
+        .0
+        .file_comparison
+        .as_ref()
+        .ok_or("state")?
+        .data_request;
     let ctx = h.ctx.clone();
-    h.state_mut().0.comparison_pick(request, 1, [usize::MAX].into(), false, &ctx);
+    h.state_mut()
+        .0
+        .comparison_pick(request, 1, [usize::MAX].into(), false, &ctx);
     assert!(h.state().0.busy_op.is_none());
     assert_eq!(r.git(&["show", ":0:a"])?, "base");
     let mut part = read(&r, "a")?.boundaries[1].clone();
@@ -351,8 +359,10 @@ fn malformed_line_ids_and_submodule_boundaries_are_read_only() -> Result<(), Str
     assert!(part.patch("a", Pick::Stage, &part.changed()).is_none());
     let mut snapshot = r.lens("a")?;
     snapshot.versions[0].mode = Some("160000".into());
-    assert!(files::apply_lens_patch(&r.0, &snapshot, &part.full, false)
-        .is_err_and(|e| e.contains("read-only")));
+    assert!(
+        files::apply_lens_patch(&r.0, &snapshot, &part.full, false)
+            .is_err_and(|e| e.contains("read-only"))
+    );
     assert_eq!(r.git(&["show", ":0:a"])?, "base");
     Ok(())
 }
@@ -368,10 +378,15 @@ fn intent_to_add_and_empty_file_creation_deletion_keep_commit_semantics() -> Res
     assert!(lens.snapshot.versions[0].mode.is_none());
     assert!(lens.snapshot.versions[1].mode.is_none());
     let p = &lens.boundaries[1];
-    let patch = p.patch("new", Pick::Stage, &changed(p, "one")).ok_or("intent-to-add patch")?;
+    let patch = p
+        .patch("new", Pick::Stage, &changed(p, "one"))
+        .ok_or("intent-to-add patch")?;
     files::apply_lens_patch(&r.0, &lens.snapshot, &patch, false)?;
     assert_eq!(r.git(&["show", ":0:new"])?, "one");
-    assert_eq!(std::fs::read(r.0.join("new")).map_err(|e| e.to_string())?, b"one\ntwo\n");
+    assert_eq!(
+        std::fs::read(r.0.join("new")).map_err(|e| e.to_string())?,
+        b"one\ntwo\n"
+    );
     r.write("empty", b"")?;
     let lens = read(&r, "empty")?;
     files::apply_lens_patch(&r.0, &lens.snapshot, &lens.boundaries[1].full, false)?;
@@ -386,24 +401,39 @@ fn intent_to_add_and_empty_file_creation_deletion_keep_commit_semantics() -> Res
 
 #[cfg(unix)]
 #[test]
-fn mode_only_boundaries_and_staged_rename_content_keep_paths_and_working_bytes() -> Result<(), String> {
+fn mode_only_boundaries_and_staged_rename_content_keep_paths_and_working_bytes()
+-> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let r = Repo::new()?;
     r.write("old", "base\n")?;
     r.commit()?;
-    std::fs::set_permissions(r.0.join("old"), std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+    std::fs::set_permissions(r.0.join("old"), std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| e.to_string())?;
     let lens = read(&r, "old")?;
     files::apply_lens_patch(&r.0, &lens.snapshot, &lens.boundaries[1].full, false)?;
-    assert!(r.git(&["ls-files", "--stage", "old"])?.starts_with("100755"));
+    assert!(
+        r.git(&["ls-files", "--stage", "old"])?
+            .starts_with("100755")
+    );
     r.git(&["mv", "old", "new"])?;
     r.write("new", "staged\n")?;
     r.git(&["add", "new"])?;
     r.write("new", "working\n")?;
-    let snapshot = files::read_lens(&r.0, &files::LensSpec {path: "new".into(), previous: Some("old".into())}, &|| true)?;
+    let snapshot = files::read_lens(
+        &r.0,
+        &files::LensSpec {
+            path: "new".into(),
+            previous: Some("old".into()),
+        },
+        &|| true,
+    )?;
     let lens = model::prepare_lens(snapshot, &|| true)?;
     files::apply_lens_patch(&r.0, &lens.snapshot, &lens.boundaries[0].full, true)?;
     assert_eq!(r.git(&["show", ":0:new"])?, "base");
     assert!(r.git(&["ls-files", "--error-unmatch", "old"]).is_err());
-    assert_eq!(std::fs::read(r.0.join("new")).map_err(|e| e.to_string())?, b"working\n");
+    assert_eq!(
+        std::fs::read(r.0.join("new")).map_err(|e| e.to_string())?,
+        b"working\n"
+    );
     Ok(())
 }

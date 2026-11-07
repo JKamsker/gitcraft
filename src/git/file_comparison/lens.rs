@@ -79,10 +79,24 @@ pub(crate) fn read_lens(
 
 fn intent_to_add(repo: &Path, path: &str, active: &dyn Fn() -> bool) -> Result<bool, String> {
     let names = |visibility| {
-        run(repo, &[
-            "--no-lazy-fetch", "--literal-pathspecs", "diff", "--cached", "--name-only", "-z",
-            "--no-ext-diff", "--no-textconv", "--no-renames", visibility, "--", path,
-        ], active)
+        run(
+            repo,
+            &[
+                "--no-lazy-fetch",
+                "--literal-pathspecs",
+                "diff",
+                "--cached",
+                "--name-only",
+                "-z",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-renames",
+                visibility,
+                "--",
+                path,
+            ],
+            active,
+        )
     };
     let visible = names("--ita-visible-in-index")?;
     let invisible = names("--ita-invisible-in-index")?;

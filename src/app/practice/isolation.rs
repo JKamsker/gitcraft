@@ -160,21 +160,34 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         &|| true,
     )?;
     for column in &matrix.columns {
-        let entry = column.files.get(b"greeting.txt".as_slice()).ok_or("Practice matrix file")?;
-        assert_eq!(git::file_comparison::blob(&path, Some(entry), &|| true)?.bytes, original);
+        let entry = column
+            .files
+            .get(b"greeting.txt".as_slice())
+            .ok_or("Practice matrix file")?;
+        assert_eq!(
+            git::file_comparison::blob(&path, Some(entry), &|| true)?.bytes,
+            original
+        );
     }
-    assert!(git::file_comparison::read_migration(
-        &path,
-        &git::file_comparison::MigrationSource::Staged,
-        &|| true,
-    )?.moves.is_empty());
+    assert!(
+        git::file_comparison::read_migration(
+            &path,
+            &git::file_comparison::MigrationSource::Staged,
+            &|| true,
+        )?
+        .moves
+        .is_empty()
+    );
     let active = harness.state().active;
     let action = match harness.state().tabs.get(active) {
-        Some(Tab::Repo(tab)) => tab.palette_items().into_iter()
+        Some(Tab::Repo(tab)) => tab
+            .palette_items()
+            .into_iter()
             .find(|(label, _, _)| label == "Three-state staging lens")
             .map(|(_, _, action)| action),
         _ => None,
-    }.ok_or("No staging lens command")?;
+    }
+    .ok_or("No staging lens command")?;
     apply(&mut harness, action)?;
     for (label, expected) in [
         ("Stage lens row 1", changed.as_slice()),
@@ -194,7 +207,8 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         }
         loop {
             harness.step();
-            let settled = matches!(harness.state().tabs.get(active), Some(Tab::Repo(tab)) if tab.settled());
+            let settled =
+                matches!(harness.state().tabs.get(active), Some(Tab::Repo(tab)) if tab.settled());
             if settled && git::run_bytes(Some(&path), &["show", ":0:greeting.txt"])? == expected {
                 break;
             }
@@ -203,7 +217,10 @@ fn exercise_app(root: &Path) -> Result<(), String> {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        assert_eq!(std::fs::read(path.join("greeting.txt")).map_err(|e| e.to_string())?, changed);
+        assert_eq!(
+            std::fs::read(path.join("greeting.txt")).map_err(|e| e.to_string())?,
+            changed
+        );
     }
     apply(&mut harness, Action::CloseFileComparison)?;
     std::fs::write(path.join("greeting.txt"), original).map_err(|e| e.to_string())?;

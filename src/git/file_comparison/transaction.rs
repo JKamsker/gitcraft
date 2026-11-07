@@ -72,7 +72,10 @@ fn verify_patch(path: &str, patch: &str) -> Result<(), String> {
 fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
     if lens.versions.iter().any(|v| {
         v.warning.is_some()
-            || !matches!(v.mode.as_deref(), None | Some("100644" | "100755" | "120000"))
+            || !matches!(
+                v.mode.as_deref(),
+                None | Some("100644" | "100755" | "120000")
+            )
     }) {
         return Err("This file type is read-only in the staging lens".into());
     }
@@ -123,7 +126,11 @@ pub(crate) fn apply_lens_patch(
         }
     }
     if lens.intent_to_add {
-        alternate(repo, &staged, &["update-index", "--force-remove", "--", &lens.spec.path])?;
+        alternate(
+            repo,
+            &staged,
+            &["update-index", "--force-remove", "--", &lens.spec.path],
+        )?;
     }
     let file = temp.0.join("patch");
     std::fs::write(&file, patch).map_err(|e| e.to_string())?;
@@ -271,7 +278,10 @@ fn remote_apply(
         patch_b64 = b64(patch.as_bytes()),
         index_limit = INDEX_LIMIT,
         remove_intent = if lens.intent_to_add {
-            format!("GIT_INDEX_FILE=\"$d/index\" git update-index --force-remove -- {} || exit 1", crate::remote::sh_quote(&lens.spec.path))
+            format!(
+                "GIT_INDEX_FILE=\"$d/index\" git update-index --force-remove -- {} || exit 1",
+                crate::remote::sh_quote(&lens.spec.path)
+            )
         } else {
             String::new()
         },
