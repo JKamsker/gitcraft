@@ -70,81 +70,20 @@ jobs:
           RUST_BACKTRACE: "1"
         run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
 
-  windows-build:
-    name: Windows test build
-    runs-on: windows-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          # Reuse the previous test matrix's Windows dependency cache.
-          shared-key: test
-          cache-on-failure: true
-      - name: Build test binaries
-        run: python ci/windows-test-build.py
-      - name: Verify complete and disjoint Windows test shards
-        run: python ci/test-shards.py --check-only
-      - name: Windows doctests (not included in compiled test executables)
-        run: cargo test --locked --doc
-      - name: Upload Windows test binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-test-binaries
-          path: |
-            target/debug/deps/*.exe
-            target/debug/deps/*.dll
-            target/debug/*.exe
-            target/debug/*.dll
-            ci/test-binaries.json
-          if-no-files-found: error
-          compression-level: 1
-          retention-days: 1
-
   windows-tests:
-    name: Windows tests (${{ matrix.shard }})
-    needs: windows-build
-    runs-on: windows-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard:
-          - git-a-m
-          - git-rest
-          - repo-a-c
-          - repo-d-f
-          - repo-g-m
-          - repo-n-p
-          - repo-q-r
-          - repo-s
-          - repo-rest
-          - core
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-test-binaries
-      - name: Run precompiled test shard
-        timeout-minutes: 20
-        env:
-          RUST_BACKTRACE: "1"
-        run: python ci/test-shards.py ${{ matrix.shard }}
+    uses: ./.github/workflows/windows-tests.yml
 
   windows-test-result:
     # Preserve the required branch protection check while running Windows tests in parallel.
     name: test (windows-latest)
-    needs: [windows-build, windows-tests]
+    needs: windows-tests
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Require the Windows build and every shard to pass
         env:
-          BUILD_RESULT: ${{ needs.windows-build.result }}
           TESTS_RESULT: ${{ needs.windows-tests.result }}
         run: |
-          test "$BUILD_RESULT" = success
           test "$TESTS_RESULT" = success
 
   forges:

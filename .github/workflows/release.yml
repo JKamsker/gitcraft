@@ -58,6 +58,13 @@ jobs:
           echo "label=$label" >> "$GITHUB_OUTPUT"
           echo "prerelease=$DEV" >> "$GITHUB_OUTPUT"
 
+  # Compile once and fan out the Windows tests, alongside the release builds.
+  windows-tests:
+    uses: ./.github/workflows/windows-tests.yml
+    with:
+      # The existing release cache contains both debug and release dependencies.
+      cache-key: build
+
   build:
     needs: version
     strategy:
@@ -102,7 +109,9 @@ jobs:
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
             libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
 
+      # Windows runs the shared shards in parallel with this packaging job.
       - name: Test
+        if: runner.os != 'Windows'
         run: cargo test --locked
 
       - name: Build
@@ -212,7 +221,7 @@ jobs:
             gitcraft-*.rpm
 
   release:
-    needs: [version, build]
+    needs: [version, build, windows-tests]
     if: startsWith(github.ref, 'refs/tags/') || needs.version.outputs.prerelease == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -221,6 +230,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          # Exclude the precompiled Windows test artifact from published files.
+          pattern: gitcraft-*
           merge-multiple: true
       # A dev build tags its own commit and never becomes the latest release, the one the
       # app's update check follows.
