@@ -14,7 +14,15 @@
   "latest": {
     "lint": "success",
     "linux": "success",
-    "windows": "in_progress"
+    "windows": "failure"
   },
-  "log": "/workspace/work/ci-windows-da0143c.log"
+  "log": "/workspace/work/ci-windows-da0143c.log",
+  "latestWindowsJob": 128283514757,
+  "latestWindowsResult": {
+    "passed": 724,
+    "failed": 11,
+    "ignored": 3,
+    "same_failures_as_previous": true
+  },
+  "latestLog": "/workspace/work/ci-windows-82189c4.log"
 }

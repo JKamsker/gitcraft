@@ -408,7 +408,7 @@
     ],
     "validation": "Prior YAML BaseLoader semantic comparison and diff review passed; only branch filter/comment changed; jobs/permissions/PR/manual triggers/manual-only forge guard preserved.",
     "push": "SUCCESS, remote SHA verified before recovery",
-    "actions_result": "Recovered via public Actions run IDs + GitHub plugin job/logs. da0143c run42329842602 Linux+lintPASS, WindowsFAIL11 (724pass3ignored). 82189c4 run42332992572 Linux+lintPASS, WindowsIN_PROGRESS. Not fully green.",
+    "actions_result": "Verified GitHub plugin jobs/logs: da0143c run42329842602 and82189c4 run42332992572 both Linux+lintPASS, WindowsFAIL same11 cases (724pass3ignored). Separate Windows correction queued; final PR blocked until full platform gates pass.",
     "recovered_status": "/workspace/work/ci-recovered-status.json"
   },
   "unit_preservation": {
