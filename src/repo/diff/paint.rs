@@ -131,8 +131,8 @@ pub(super) fn paint_line(
     // Text: syntax colours when known, the changed part on a stronger background.
     let strong = match line.kind {
         _ if moved.is_some_and(|(_, same)| same) => Color32::TRANSPARENT,
-        Kind::Add => t.success.gamma_multiply(0.35),
-        Kind::Del => t.danger.gamma_multiply(0.35),
+        Kind::Add => t.diff_strong_bg(true),
+        Kind::Del => t.diff_strong_bg(false),
         _ => Color32::TRANSPARENT,
     };
     let changed = data.changed.get(i).copied().flatten();

@@ -48,6 +48,11 @@ impl Builtin {
         ] {
             text_surfaces.push(bg);
             text_surfaces.push(over(t.accent.gamma_multiply(0.22), bg));
+            for added in [true, false] {
+                let strong = t.diff_strong_bg(added);
+                text_surfaces.push(over(strong, bg));
+                text_surfaces.push(over(strong, over(t.accent.gamma_multiply(0.22), bg)));
+            }
         }
         p.text = aa_foreground(p.text, &text_surfaces);
         // Pressed controls use normal or dim labels. Faint metadata belongs to rows/panels;
@@ -979,6 +984,18 @@ mod tests {
                 ("deleted line", t.diff_del_bg),
             ] {
                 check("diff text", t.text, name, over(fill, t.field));
+                let added = name == "added line";
+                for surface in [t.field, t.card] {
+                    let line = over(fill, surface);
+                    for bg in [line, over(t.accent.gamma_multiply(0.22), line)] {
+                        check(
+                            "intraline text",
+                            t.text,
+                            name,
+                            over(t.diff_strong_bg(added), bg),
+                        );
+                    }
+                }
             }
         }
         assert!(unreadable.is_empty(), "{unreadable:#?}");

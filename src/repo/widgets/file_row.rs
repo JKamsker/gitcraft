@@ -152,7 +152,7 @@ pub fn file_row_owned(
             Align2::RIGHT_CENTER,
             &owners.label,
             egui::FontId::proportional(11.0),
-            t.accent,
+            t.accent_fg,
         );
         right = r.left().max(clip.left()) - 8.0;
     }

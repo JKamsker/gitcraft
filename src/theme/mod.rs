@@ -441,6 +441,17 @@ impl Default for Tokens {
 }
 
 impl Tokens {
+    /// Intraline backgrounds follow the diff fill hue, independently from status text.
+    pub(crate) fn diff_strong_bg(&self, added: bool) -> Color32 {
+        let fill = if added {
+            self.diff_add_bg
+        } else {
+            self.diff_del_bg
+        };
+        let [r, g, b, _] = fill.to_srgba_unmultiplied();
+        Color32::from_rgb(r, g, b).gamma_multiply(0.35)
+    }
+
     /// Tint behind small status text, capped so the composited row still meets AA.
     pub(crate) fn text_tint(&self, color: Color32, opacity: f32, background: Color32) -> Color32 {
         palette::readable_tint(color, opacity, &[background], &[color])

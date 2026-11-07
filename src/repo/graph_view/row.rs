@@ -176,7 +176,7 @@ impl RepoTab {
                     Align2::CENTER_CENTER,
                     "↗",
                     FontId::proportional(14.0),
-                    t.accent,
+                    t.accent_fg,
                 );
                 if link
                     .on_hover_text(format!("Open Gerrit change {id}"))
