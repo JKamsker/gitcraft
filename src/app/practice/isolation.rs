@@ -8,7 +8,6 @@ use crate::app::{App, Tab};
 use crate::git;
 use crate::practice::Scenario;
 use crate::repo::{Action, Refresh, Undo};
-use egui_kittest::kittest::Queryable as _;
 
 type H<'a> = egui_kittest::Harness<'a, App>;
 
