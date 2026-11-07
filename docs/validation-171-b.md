@@ -207,3 +207,27 @@ other areas; shared load.rs, messages.rs, mod.rs and graph files need merge revi
   `/tmp/gitcraft-review9/area-b/{release-before.log,release-after.log,release-focused.log}`.
   `clippy.log` passes `--all-targets -- -D clippy::all` (only existing dead_code
   warnings); formatting and diff checks pass. Rust 1.95.0, jobs 3, private target.
+
+### Final Review 9 validation
+
+- Exact original-provider reproduction: restored all affected provider/CI source
+  files from `6e893e44`, added only the process recorder and current provider
+  tests, and ran the two `every_provider_action_uses_selected_repo_and_host`
+  cases. **Both ran and failed** because the selected repository was absent.
+  No forge process executed. Restored all committed sources afterward and
+  confirmed a clean worktree before rebuilding. Evidence:
+  `/tmp/gitcraft-review9/area-b/before-both-providers.log` and the reproducible
+  `baseline-providers.py` beside it.
+- Final private binary inventory: **3,113 tests**, including **12** named
+  `provider_boundary` regressions. Final focused runs were sequential with
+  Rust 1.95.0, CARGO_BUILD_JOBS=3 and GNU Git/sed on PATH: forge filter **144
+  passed, 6 live-server tests ignored**; CI filter **22 passed**; release filter
+  **17 passed** (including all 6 release-dialog tests). Total **183 passed**.
+  Logs and inventory are `/tmp/gitcraft-review9/area-b/{forge-focused.log,ci-focused.log,release-all.log,inventory.txt}`.
+- `cargo +1.95.0 fmt --check`, `git diff --check`, and clippy with
+  `--all-targets -- -D clippy::all` pass. Existing desktop/diagnostics dead-code
+  warnings remain. No integrated whole-suite claim is made; the parent owns
+  that run. Real authenticated gh/glab writes and real SSH login checks were
+  deliberately excluded; provider command preparation, input and trust refusal
+  are covered with recording-only fixtures. GitLab syntax was checked against
+  official docs because glab is absent on this machine.
