@@ -164,6 +164,7 @@ mod recording {
             f.git(&["config", "user.name", "Fixture author"])?;
             f.git(&["config", "user.email", "fixture@test.invalid"])?;
             f.git(&["config", "commit.gpgSign", "false"])?;
+            f.git(&["config", "protocol.allow", "never"])?;
             std::fs::write(f.repo.join("old name.rs"), "context\nold\ntail\n")
                 .map_err(|e| e.to_string())?;
             f.git(&["add", "."])?;
