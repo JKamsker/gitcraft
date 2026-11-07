@@ -339,10 +339,6 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State) {
     view::show(ui, state);
 }
 
-#[cfg(test)]
-fn submit(work: impl FnOnce() + Send + 'static) {
-    submit_with(crate::tasks::cancellation().child(), work);
-}
 fn submit_with(cancel: crate::tasks::Cancellation, work: impl FnOnce() + Send + 'static) {
     if let Ok(pool) = crate::tasks::pool() {
         let _ = pool.submit(

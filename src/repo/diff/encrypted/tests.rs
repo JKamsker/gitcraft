@@ -978,6 +978,8 @@ mod fixture {
             })
             .collect::<Vec<_>>()
             .join("\n");
+        out.shapes.clear();
+        out.textures_delta.clear();
         assert!(text.contains("fixture-private-new"));
         assert!(
             !text.contains("Stage file")

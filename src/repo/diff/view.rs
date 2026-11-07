@@ -451,6 +451,7 @@ impl RepoTab {
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -459,6 +460,7 @@ impl RepoTab {
                             && view.lines.is_none()
                             && self.stash_view.is_none()
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
