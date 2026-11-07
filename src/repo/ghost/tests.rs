@@ -615,3 +615,32 @@ fn the_key_follows_what_a_rebase_checks() -> Result<(), String> {
     assert_ne!(clean, with_tracked);
     Ok(())
 }
+
+#[test]
+fn timeline_hover_restores_multiple_branch_positions_without_writing() -> Result<(), String> {
+    let repo = TestRepo::new("undo-tree-ghost")?;
+    repo.commit(&[("base.txt", "base\n")], "base")?;
+    let old = crate::repo::timeline::RefState::of(&git::refs(&repo.dir)?);
+    repo.commit(&[("later.txt", "later\n")], "later")?;
+    let before = repo.snapshot()?;
+    let outcome = ghost(
+        &repo,
+        &GhostOp::Timeline {
+            state: old.clone(),
+            label: "Before later".into(),
+        },
+    )?;
+    let branch = old.branch;
+    assert_eq!(
+        moved_to(&outcome, &format!("refs/heads/{branch}")),
+        Some(old.head)
+    );
+    assert!(
+        outcome
+            .files
+            .as_ref()
+            .is_some_and(|files| files.iter().any(|f| f.path == "later.txt"))
+    );
+    assert_eq!(repo.snapshot()?, before);
+    Ok(())
+}

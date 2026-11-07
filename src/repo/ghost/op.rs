@@ -6,6 +6,10 @@ use crate::repo::pull::PullMode;
 /// An operation the graph can show the result of before it is done.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GhostOp {
+    Timeline {
+        state: crate::repo::timeline::RefState,
+        label: String,
+    },
     /// `git rebase <onto>` of the checked-out branch; `onto` a full ref name, `label` its short
     /// one.
     Rebase { onto: String, label: String },
@@ -26,6 +30,7 @@ impl GhostOp {
     pub(crate) fn title(&self, refs: &Refs) -> String {
         let current = refs.current.as_deref().unwrap_or("HEAD");
         match self {
+            GhostOp::Timeline { label, .. } => format!("Undo tree: {label}"),
             GhostOp::Rebase { label, .. } => format!("Rebase {current} onto {label}"),
             GhostOp::ResetHard { to } => format!("Hard reset of {current} to {}", short(to)),
             GhostOp::Pull(mode) => format!("{} into {current}", mode.label()),

@@ -92,7 +92,9 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        self.saved_graph_header(ui);
+        if self.timeline_view.is_none() {
+            self.saved_graph_header(ui);
+        }
         let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
@@ -213,7 +215,7 @@ impl RepoTab {
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let filtered = self.saved_views.active() && !ghost;
+        let filtered = self.saved_views.active() && !ghost && self.timeline_view.is_none();
         let total = if filtered {
             self.saved_views.len()
         } else {
