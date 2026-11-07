@@ -284,3 +284,81 @@ fn historical_file_and_shifted_working_blame_menus_trace_the_exact_committed_lin
     );
     Ok(())
 }
+
+#[test]
+fn ignore_flow_requires_review_and_confirmation_and_preserves_staged_state() -> Result<(), String> {
+    let r = crate::git::investigations::tests::Repo::new()?;
+    for (i, text) in ["fn f() { return 1; }\n", "fn f(){return 1;}\n"]
+        .into_iter()
+        .enumerate()
+    {
+        std::fs::write(r.0.join("f.rs"), text).map_err(|e| e.to_string())?;
+        r.git(&["add", "f.rs"])?;
+        r.commit("ignore@test.invalid", 1_700_000_000 + i as i64)?;
+    }
+    let index = std::fs::read(r.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let refs = r.git(&["show-ref"])?;
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred(r.0.clone(), &ctx);
+    tab.deferred = false;
+    tab.history_gen = 1;
+    tab.refs = crate::git::refs(&r.0)?;
+    tab.history = crate::git::log(&r.0, None, 0, 10)?
+        .into_iter()
+        .map(std::sync::Arc::new)
+        .collect();
+    tab.commits = tab.history.clone();
+    tab.graph = crate::graph::layout(&tab.commits);
+    let seed = Seed {
+        commit: tab.refs.head.clone(),
+        path: "f.rs".into(),
+        line: 1,
+    };
+    tab.apply(Action::OpenLineDossier(Some(seed)), &ctx);
+    let mut ui = UI {
+        ctx,
+        tab,
+        time: 0.0,
+    };
+    ui.wait()?;
+    ui.click("Review formatting ignore…")?;
+    let start = Instant::now();
+    loop {
+        ui.frame(vec![]);
+        if ui.tab.dossier.ignore.is_some() {
+            break;
+        }
+        if let Some(error) = &ui.tab.dossier.error {
+            return Err(error.clone());
+        }
+        if start.elapsed() > Duration::from_secs(8) {
+            return Err("Ignore preview did not load".into());
+        }
+        std::thread::yield_now();
+    }
+    assert!(!r.0.join(".git-blame-ignore-revs").exists());
+    ui.click("Append reviewed revision")?;
+    assert!(
+        !r.0.join(".git-blame-ignore-revs").exists(),
+        "Unchecked confirmation must not write"
+    );
+    ui.click("I reviewed the full patch and want this revision ignored")?;
+    ui.click("Append reviewed revision")?;
+    let start = Instant::now();
+    while ui.tab.busy_op.is_some() {
+        ui.frame(vec![]);
+        if start.elapsed() > Duration::from_secs(8) {
+            return Err("Confirmed append did not finish".into());
+        }
+        std::thread::yield_now();
+    }
+    let bytes = std::fs::read(r.0.join(".git-blame-ignore-revs")).map_err(|e| e.to_string())?;
+    assert!(String::from_utf8_lossy(&bytes).contains(&ui.tab.refs.head));
+    assert_eq!(
+        index,
+        std::fs::read(r.0.join(".git/index")).map_err(|e| e.to_string())?
+    );
+    assert_eq!(refs, r.git(&["show-ref"])?);
+    Ok(())
+}

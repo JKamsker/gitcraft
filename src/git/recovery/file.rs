@@ -21,7 +21,11 @@ impl RootPin {
     /// The shell's cwd then retains that object through subsequent relative operations.
     pub(crate) fn remote_guard(&self) -> String {
         use crate::remote::sh_quote;
-        format!("[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .)\" = {} ] || exit 1\n", sh_quote(&self.physical), sh_quote(&self.token))
+        format!(
+            "[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .)\" = {} ] || exit 1\n",
+            sh_quote(&self.physical),
+            sh_quote(&self.token)
+        )
     }
 }
 
@@ -110,8 +114,8 @@ fn native_token(file: &std::fs::File) -> Result<String, String> {
 #[cfg(unix)]
 pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64), String> {
     use std::os::unix::fs::MetadataExt;
-    let meta=file.metadata().map_err(|e|e.to_string())?;
-    Ok((format!("{}:{}",meta.dev(),meta.ino()),meta.nlink()))
+    let meta = file.metadata().map_err(|e| e.to_string())?;
+    Ok((format!("{}:{}", meta.dev(), meta.ino()), meta.nlink()))
 }
 #[cfg(windows)]
 fn local_pin(root: &Path) -> Result<RootPin, String> {
@@ -153,10 +157,13 @@ pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64)
     if info.nFileIndexHigh == 0 && info.nFileIndexLow == 0 {
         return Err("This filesystem does not expose a usable directory identity".into());
     }
-    Ok((format!(
-        "{}:{}:{}",
-        info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow
-    ),u64::from(info.nNumberOfLinks)))
+    Ok((
+        format!(
+            "{}:{}:{}",
+            info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow
+        ),
+        u64::from(info.nNumberOfLinks),
+    ))
 }
 #[cfg(not(any(unix, windows)))]
 fn local_pin(_: &Path) -> Result<RootPin, String> {

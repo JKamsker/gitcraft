@@ -7,6 +7,12 @@ use super::{Action, RepoTab};
 use crate::git::investigations::dossier::{self, Dossier, Seed};
 enum Answer {
     History { append: bool, history: Dossier },
+    Ignore(Box<IgnoreView>),
+}
+struct IgnoreView {
+    prepared: crate::git::investigations::ignore::Preview,
+    patch: Result<super::file_text::FileText, String>,
+    existing: Result<super::file_text::FileText, String>,
 }
 pub(super) struct State {
     pub open: bool,
@@ -17,6 +23,9 @@ pub(super) struct State {
     pub result: Option<Dossier>,
     error: Option<String>,
     selected: usize,
+    ignore: Option<IgnoreView>,
+    ignore_reviewed: bool,
+    show_existing: bool,
 }
 impl Default for State {
     fn default() -> Self {
@@ -29,6 +38,9 @@ impl Default for State {
             result: None,
             error: None,
             selected: 0,
+            ignore: None,
+            ignore_reviewed: false,
+            show_existing: false,
         }
     }
 }
@@ -39,6 +51,8 @@ impl State {
         self.result = None;
         self.error = None;
         self.selected = 0;
+        self.ignore = None;
+        self.ignore_reviewed = false;
     }
 }
 impl RepoTab {
@@ -69,6 +83,8 @@ impl RepoTab {
         self.dossier.path = seed.path.clone();
         self.dossier.line = seed.line;
         self.dossier.error = None;
+        self.dossier.ignore = None;
+        self.dossier.ignore_reviewed = false;
         if !append {
             self.dossier.result = None;
             self.dossier.selected = 0;
@@ -123,6 +139,13 @@ impl RepoTab {
                         self.dossier.result = Some(history);
                     }
                 }
+                Ok(Answer::Ignore(preview)) => {
+                    if self.dossier.open {
+                        self.dossier.ignore = Some(*preview);
+                        self.dossier.ignore_reviewed = false;
+                        self.dossier.show_existing = false;
+                    }
+                }
                 Err(error) => {
                     if self.dossier.open {
                         self.dossier.error = Some(error);
@@ -130,5 +153,78 @@ impl RepoTab {
                 }
             }
         }
+    }
+}
+
+impl RepoTab {
+    fn prepare_dossier_ignore(&mut self, commit: String, ctx: &egui::Context) {
+        let repo = self.path.clone();
+        let dark = ctx.style().visuals.dark_mode;
+        self.dossier.ignore = None;
+        self.dossier.ignore_reviewed = false;
+        self.dossier.error = None;
+        self.dossier.reader.queue(move |active| {
+            let prepared = crate::git::investigations::ignore::prepare(&repo, &commit, active)?;
+            let patch =
+                super::file_text::FileText::new(prepared.patch.as_bytes(), "formatting.diff", dark);
+            let existing = super::file_text::FileText::new(
+                prepared.existing.as_bytes(),
+                "ignore-revisions.txt",
+                dark,
+            );
+            Ok(Answer::Ignore(Box::new(IgnoreView {
+                prepared,
+                patch: Ok(patch),
+                existing: Ok(existing),
+            })))
+        });
+        ctx.request_repaint();
+    }
+    fn append_dossier_ignore(&mut self, ctx: &egui::Context) {
+        if !self.dossier.ignore_reviewed || self.busy_op.is_some() {
+            return;
+        }
+        let Some(preview) = self.dossier.ignore.take() else {
+            return;
+        };
+        self.dossier.ignore_reviewed = false;
+        let context = crate::connections::current();
+        self.busy_op = Some("Appending reviewed ignore revision".into());
+        self.op_started = Some(std::time::Instant::now());
+        super::messages::spawn_or(
+            &self.tx,
+            ctx,
+            |error| {
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.dossier_ignore_finished(Err(error), ctx)
+                }))
+            },
+            move || {
+                // Deliberately confirmed mutation owns its lifetime and Profile. UI close
+                // cannot retract a completed append or discard its acknowledgement.
+                let result = context.run(|| {
+                    crate::git::investigations::ignore::perform(&preview.prepared, &|| true)
+                });
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.dossier_ignore_finished(result, ctx)
+                }))
+            },
+        );
+    }
+    fn dossier_ignore_finished(
+        &mut self,
+        result: Result<crate::git::investigations::ignore::Appended, String>,
+        ctx: &egui::Context,
+    ) {
+        if self.busy_op.as_deref() == Some("Appending reviewed ignore revision") {
+            self.busy_op = None;
+            self.op_started = None;
+        }
+        self.status=Some(match result{
+            Ok(crate::git::investigations::ignore::Appended::Changed)=>("Revision appended to .git-blame-ignore-revs; staged contents preserved. Ordinary Git blame can use blame.ignoreRevsFile=.git-blame-ignore-revs.".into(),false),
+            Ok(crate::git::investigations::ignore::Appended::AlreadyPresent)=>("Revision already present; ignore file and index unchanged".into(),false),
+            Err(error)=>(format!("Ignore revision: {error}"),true),
+        });
+        self.reload_status(ctx);
     }
 }
