@@ -44,6 +44,7 @@ pub(super) struct Poller {
     last: Arc<Mutex<Option<Look>>>,
     running: Arc<AtomicBool>,
     next: Instant,
+    scope: crate::tasks::Scope,
 }
 
 impl Poller {
@@ -54,6 +55,7 @@ impl Poller {
         watch: u64,
     ) -> Self {
         Self {
+            scope: crate::tasks::Scope(arrived.cancel.child()),
             target,
             tx,
             arrived,
@@ -96,11 +98,11 @@ impl Poller {
         let finished = Finished(Arc::clone(&running));
         let submitted = crate::tasks::pool().and_then(|pool| {
             pool.submit(
-                arrived.cancel.clone(),
+                self.scope.0.clone(),
                 crate::tasks::Priority::Background,
                 None,
                 Box::new(move || {
-                    let _finished = finished;
+                    let finished = finished;
                     if let Some(look) = look_at(&target) {
                         let mut last = last
                             .lock()
@@ -119,6 +121,7 @@ impl Poller {
                             repaint.request_repaint_after(Duration::from_millis(500));
                         }
                     }
+                    drop(finished);
                     repaint.request_repaint();
                 }),
             )

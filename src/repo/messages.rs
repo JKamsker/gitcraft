@@ -28,6 +28,18 @@ impl std::ops::Deref for JobSender {
     }
 }
 
+/// Linked local worktrees share refs/stashes, hence one mutation key. Resolve the
+/// existing .git/commondir metadata without starting a process on the UI thread.
+pub(super) fn mutation_key(path: &std::path::Path) -> std::path::PathBuf {
+    if crate::remote::is_remote(path) {
+        return path.to_owned();
+    }
+    super::watch::linked_git_dirs(path)
+        .map(|(_, common)| common)
+        .or_else(|| std::fs::canonicalize(path.join(".git")).ok())
+        .unwrap_or_else(|| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned()))
+}
+
 /// What a background job leaves to do on the UI thread, with the tab (see `RepoTab::then`).
 pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Send>;
 
@@ -155,6 +167,48 @@ pub(super) fn spawn(
 }
 
 impl RepoTab {
+    /// Like `then`, but rejection, cancellation and panic have a feature-specific result.
+    pub(super) fn then_or<T: Send + 'static>(
+        &self,
+        ctx: &egui::Context,
+        mutation: bool,
+        failed: impl FnOnce(String) -> T + Send + 'static,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        let then = std::sync::Arc::new(std::sync::Mutex::new(Some(then)));
+        let failure_then = std::sync::Arc::clone(&then);
+        let failure = move |error| {
+            let found = failed(error);
+            Msg::Then(Box::new(move |tab, ctx| {
+                if let Some(then) = failure_then
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                {
+                    then(tab, found, ctx);
+                }
+            }))
+        };
+        let job = move || {
+            let found = work();
+            Msg::Then(Box::new(move |tab, ctx| {
+                if let Some(then) = then
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                {
+                    then(tab, found, ctx);
+                }
+            }))
+        };
+        if mutation {
+            spawn_mutation(&self.tx, ctx, failure, job);
+        } else {
+            spawn_or(&self.tx, ctx, failure, job);
+        }
+    }
+
     /// Runs `work` in the background, then `then` with what it gave, on the UI thread.
     pub(super) fn then<T: Send + 'static>(
         &self,
@@ -235,11 +289,24 @@ fn spawn_with(
     let rejected_ctx = ctx.clone();
     let failed = std::sync::Arc::new(std::sync::Mutex::new(Some(failed)));
     let rejected = std::sync::Arc::clone(&failed);
+    let cancelled = std::sync::Arc::clone(&failed);
+    let cancelled_tx = tx.clone();
+    let cancelled_ctx = ctx.clone();
     let submitted = crate::tasks::pool().and_then(|pool| {
-        pool.submit(
+        pool.submit_cancellable(
             tx.cancel.clone(),
             priority,
             key,
+            Some(Box::new(move || {
+                if let Some(failed) = cancelled
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                {
+                    let _ = cancelled_tx.send(failed("cancelled".into()));
+                    cancelled_ctx.request_repaint();
+                }
+            })),
             Box::new(move || {
                 // What the job owned goes with it; a lock it held is left poisoned, which those
                 // taking it handle.

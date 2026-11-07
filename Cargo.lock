@@ -1741,6 +1741,7 @@ dependencies = [
 name = "gitcraft-os"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "windows",
 ]
 

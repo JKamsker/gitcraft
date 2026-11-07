@@ -15,16 +15,22 @@ channels without moving UI state into a runtime.
   recursively submit leaf work. Single-tab parallelism remains, without seven scoped OS
   threads for every reload.
 - Managed processes: **8 active, 256 queued**, with at most **6 long/background commands**
-  active. Queued interactive reads pass background commands and can use the reserved slots.
-  Capacity counts both channel entries and the scheduler's pending list. No task or thread
+  active. Interactive reads can pass background commands blocked by that limit and use the reserved slots.
+  Oldest runnable requests dispatch first so reads cannot starve mutations, while the
+  background limit reserves capacity for interactive reads. Capacity counts both channel
+  entries and the scheduler's pending list. No task or thread
   is created just to wait for a process slot.
-- Operations started by `run_ops_ex` hold their normalized repository-path key across the
+- Operations started by `run_ops_ex` hold their repository key across the
   entire command sequence. Other tabs' operations with the same key wait FIFO, including
   between commands. Other paths and reads can run. External tools still use Git's locks.
+  Local linked worktrees share their common Git directory as the key; remote tabs use the
+  main worktree discovered by their initial read. Unity setup writes use the same queue.
 - stdout/stderr are drained concurrently with stdin and child exit notifications. Each
   captured stream is limited to **64 MiB**. Overflow stops/reaps the command and reports an
   error rather than silently returning truncated data. Watched stderr feeds the existing
   progress reader/repaint callback; stopped watched commands retain partial output in Activity.
+  Binary/blob reads have an explicit 512 MiB memory bound. Local patch exports stream straight
+  to a file, bypassing the capture bound; remote exports retain the persistent-shell protocol.
 - Remote polling uses egui timers and schedules one background look at a time. No thread
   stays parked between looks, and a slow look cannot accumulate duplicate polls.
 
@@ -45,19 +51,37 @@ reaped. Unix children own a process group. Windows children start suspended, ent
 kill-on-close Job Object, then resume, preventing descendants from escaping during startup.
 The small Win32 implementation lives behind a safe API in `gitcraft-os`.
 
+Timeouts include time waiting for a process slot. Cancelled queued operations send their typed
+completion without waiting for a worker. Failed reloads cancel and join unfinished sibling
+readers before clearing the loading state.
+
 Tabs own cancellation scopes inherited by jobs and reload readers. Closing a tab cancels
 queued work and migrated children. Suspension renews the scope/result channel so late results
 cannot repopulate a resumed view. App exit cancels jobs, drains/joins the process loop and
-closes idle persistent shells. No process-owner futures are aborted. Inherited open pipes have
+closes idle persistent shells. Shutdown also cancels/joins parallel bisects and waits for their
+remote stop requests. No process-owner futures are aborted. Inherited open pipes have
 a drain deadline; timed Git calls retain their completed result while cleaning up helpers.
 
 Watched standalone SSH/WSL streams use the event loop for ready/banner handling, PID markers
 and progress. Cancellation gives the PID marker a bounded grace period, then uses the existing
 remote stop protocol before returning. That blocking protocol runs on at most two Tokio
 blocking workers, apart from the I/O loop. Failed startup preserves authentication stderr.
+Credential-save callbacks use the same two-permit budget and start when the ready marker
+arrives, without blocking pipe draining.
+On Windows, Tokio's anonymous process pipes themselves use blocking I/O internally: the
+runtime allows at most `3 × active slots + 2` blocking workers (26 at the default limit),
+covering both output readers, stdin and cleanup without pipe starvation. This is a fixed
+budget per service, independent of queue depth. Unix pipes use event-driven I/O.
+
+Unix cleanup directly signals the child's process group through the OS helper crate and
+reports signaling errors. A descendant that deliberately calls `setsid` can escape that
+group; tracking snapshots alone cannot guarantee containment of daemonized descendants.
+This PR does not add cgroups or another OS containment policy. Windows Job Objects cover
+descendants before they can run.
 
 Persistent SSH pool/framing readers remain blocking, with their existing host/lane limits;
-their waits now observe tab cancellation. Paged history streams, PTYs, HTTP libraries, external
+their waits now observe tab cancellation. History pagination uses cancellable bounded commands
+on all platforms, trading a process per page for releasing the worker on tab close. PTYs, HTTP libraries, external
 interactive tools and unrelated app workers have not all been converted. Persistent shell
 reuse and SSH transport multiplexing are unchanged. Broken networks can still prevent
 confirmation of remote cleanup, as with the existing transport.
@@ -80,6 +104,8 @@ Only benchmark instrumentation belongs in the baseline checkout.
 
 These measurements compare the implementation before/after on the original workspace base,
 `35a26a5`. The PR targets `dev` and excludes that base's unrelated performance commits.
+The tables record the original implementation before review follow-ups to scheduling,
+Windows pipe budgets and cancellation; they are not a measurement of those follow-ups.
 
 Fresh test processes run 1/10/50/100 production background Git shell commands
 (`sleep 0.1; printf ok`) or independent one-commit repository clones with real reloads and
@@ -163,12 +189,14 @@ Validated on the macOS host:
   The excluded tests were also run against the saved unmodified baseline and failed there:
   the two checkpoint shell-parser cases, WSL tool path canonicalization, content-regex
   search, and the drag/drop rebase case using GNU `sed -i` syntax.
-- After separating the PR onto `dev`, the library suite passed 2,992 tests with 8 ignored
-  and the same 5 exclusions. Six timeline/version tests failed under the full-suite load;
-  all passed on focused reruns (43 timeline tests together and the version test separately).
-- All 25 focused process/job/timed-command/tab-lifecycle tests passed, including the real
-  loopback remote-stream progress/cancel path. The inherited-pipe timed-command regression
-  found during development was fixed and passes in the full run.
+- The review-follow-up library run on `dev` passed 3,003 cases with 8 ignored and the same
+  5 exclusions. It caught a Darwin zombie-only process-group error, fixed by reaping the
+  child before signaling; that case and the global-process-probe bisect timeout case pass
+  on rerun. The earlier six timeline/version full-suite failures did not recur.
+- All 32 focused process/job/timed-command/tab-lifecycle/export tests passed, including a
+  real 65 MiB Git blob read and disk export. After the Darwin fix and blocking-work budget,
+  all 29 core/remote-cancel/bisect-timeout cases passed again. Regression tests also check
+  descendant readiness and absence of a delayed write after cancellation.
 - `cargo +1.95.0 fmt --check`, `git diff --check`, and all-target Clippy passed. Clippy used
   `-D warnings -A dead_code` for the repository's existing macOS-only dead-code warnings.
 - The Windows process/job modules, their tests and the Win32 helper cross-check successfully

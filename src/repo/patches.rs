@@ -25,10 +25,7 @@ impl RepoTab {
         };
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
-            let result = git::run_bytes(Some(&path), &["format-patch", "-1", "--stdout", &hash])
-                .and_then(|patch| {
-                    std::fs::write(&file, patch).map_err(|e| format!("could not save it: {e}"))
-                });
+            let result = git::run_to_file(&path, &["format-patch", "-1", "--stdout", &hash], &file);
             Msg::PatchSaved(file, result)
         });
     }

@@ -950,6 +950,7 @@ fn on_path(name: &str) -> bool {
 /// version an update put in place, if it did.
 pub fn after_exit() {
     crate::tasks::shutdown();
+    crate::parallel_bisect::shutdown();
     crate::processes::shutdown();
     crate::remote::shutdown();
     crate::instance::shut_down();

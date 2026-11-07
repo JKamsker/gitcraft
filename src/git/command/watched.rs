@@ -12,7 +12,7 @@ use std::io::Read;
 use std::path::Path;
 #[cfg(all(test, unix))]
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 #[cfg(all(test, unix))]
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -33,7 +33,7 @@ pub const CANCELLED: &str = "cancelled";
 
 /// How the UI follows a running operation and stops it: shared with the thread that runs it.
 pub struct OpControl {
-    cancel: AtomicBool,
+    cancel: crate::tasks::Cancellation,
     progress: Mutex<Option<Progress>>,
     /// What each git call of the operation did so far, for the activity log.
     steps: Mutex<Vec<Recorded>>,
@@ -44,8 +44,15 @@ pub struct OpControl {
 impl OpControl {
     /// A control that calls `notify` when the progress moves.
     pub fn new(notify: impl Fn() + Send + Sync + 'static) -> Arc<Self> {
+        Self::scoped(notify, crate::tasks::Cancellation::default())
+    }
+
+    pub(crate) fn scoped(
+        notify: impl Fn() + Send + Sync + 'static,
+        cancel: crate::tasks::Cancellation,
+    ) -> Arc<Self> {
         Arc::new(Self {
-            cancel: AtomicBool::new(false),
+            cancel,
             progress: Mutex::new(None),
             steps: Mutex::new(Vec::new()),
             notify: Box::new(notify),
@@ -54,12 +61,17 @@ impl OpControl {
 
     /// Asks the operation to stop: the command running is stopped, and no step after it runs.
     pub fn cancel(&self) {
-        self.cancel.store(true, Ordering::SeqCst);
+        self.cancel.cancel();
+        crate::tasks::purge_cancelled();
         (self.notify)();
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.cancel.load(Ordering::SeqCst)
+        self.cancel.is_cancelled()
+    }
+
+    pub(crate) fn cancellation(&self) -> crate::tasks::Cancellation {
+        self.cancel.clone()
     }
 
     /// The latest progress the running command reported.
@@ -256,7 +268,6 @@ fn follow_command(
         background: true,
         ..Default::default()
     };
-    let mut attempt = None;
     let command = match target {
         Some(target) => {
             let streaming =
@@ -264,7 +275,7 @@ fn follow_command(
             options.input = Some(streaming.input);
             options.stdout_ready = Some(streaming.ready);
             options.timeout = Some(remote::NETWORK_LIMIT);
-            attempt = streaming.connected;
+            options.ready = streaming.connected;
             let (host, pid) = (target.host.clone(), Arc::clone(&remote_pid));
             options.stop_remote = Some(Box::new(move || {
                 let pid = pid.load(Ordering::SeqCst);
@@ -295,11 +306,6 @@ fn follow_command(
         }
     }));
     let out = crate::processes::run(command, options)?;
-    if remote_pid.load(Ordering::SeqCst) != 0
-        && let Some(attempt) = attempt
-    {
-        attempt();
-    }
     let stderr = std::mem::take(
         &mut *reader
             .lock()
@@ -579,7 +585,7 @@ mod tests {
             Some(&repo),
             &[
                 "-c",
-                "alias.stream=!printf 'Receiving objects: 42%% (42/100)\\r' >&2; printf partial-output; sleep 60",
+                "alias.stream=!printf partial-output; printf 'Receiving objects: 42%% (42/100)\\r' >&2; sleep 60",
                 "stream",
             ],
             None,

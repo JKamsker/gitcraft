@@ -7,6 +7,9 @@ license = "MIT OR Apache-2.0"
 description = "The few calls into the OS shell gitcraft makes (taskbar progress, jump list), behind a safe API"
 publish = false
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # gitcraft itself forbids unsafe code; the COM calls those features need live here, each one
 # behind a function that can't be misused.
 

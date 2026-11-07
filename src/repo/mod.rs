@@ -490,7 +490,7 @@ impl RepoTab {
         let tx = messages::JobSender {
             sender,
             cancel: jobs.0.clone(),
-            repo: path.clone(),
+            repo: messages::mutation_key(&path),
         };
         Self {
             path,

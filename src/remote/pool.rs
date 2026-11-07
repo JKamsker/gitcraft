@@ -174,7 +174,9 @@ impl Pool {
                     }
                     Err(why) => {
                         state.open -= 1;
-                        state.failed = Some((Instant::now(), why.clone()));
+                        if !cancel.is_cancelled() {
+                            state.failed = Some((Instant::now(), why.clone()));
+                        }
                         Err(why)
                     }
                 };
@@ -308,6 +310,7 @@ pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
 /// Close idle persistent shells at app exit; active jobs own and close their shells once
 /// their cancelled protocol read returns. The transport reuse policy is unchanged.
 pub(crate) fn shutdown() {
+    super::session::wait_for_cleanup();
     if let Some(pools) = POOLS.get() {
         let all: Vec<_> = lock(pools).values().cloned().collect();
         for pool in all {

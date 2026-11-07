@@ -49,6 +49,7 @@ vt100 = "0.18"
 # `gitcraft mcp`: the Model Context Protocol over stdio (the official SDK), on a small runtime.
 rmcp = { version = "3.7", default-features = false, features = ["server", "transport-io"] }
 tokio = { version = "1", features = ["rt", "io-std", "process", "io-util", "sync", "time", "macros"] }
+gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
@@ -61,8 +62,6 @@ rustix = { version = "1", features = ["fs"] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
-# The taskbar button's progress and the jump list: COM calls, in a crate of their own.
-gitcraft-os = { path = "crates/gitcraft-os" }
 # The window's handle, for the taskbar button (the version winit uses).
 raw-window-handle = "0.6"
 

@@ -22,6 +22,8 @@ parser.add_argument('--counts', nargs='+', type=int, default=[1, 10, 50, 100])
 args = parser.parse_args()
 if sys.platform == 'win32':
     parser.error('sampling uses Unix ps; the workload itself also runs in Windows tests')
+if any(count <= 0 for count in args.counts):
+    parser.error('counts must be positive')
 results = []
 outdir = Path('target/process-bench')
 outdir.mkdir(parents=True, exist_ok=True)
@@ -33,8 +35,12 @@ if args.binary is None:
                   and r.get('executable') and r['target']['name'] == 'gitcraft' and r['target']['kind'] == ['lib'])
     args.binary = outdir / f'{args.label}-tests'
     shutil.copy2(binary, args.binary)
+digest = hashlib.sha256()
+with args.binary.open('rb') as binary:
+    for chunk in iter(lambda: binary.read(1024 * 1024), b''):
+        digest.update(chunk)
 metadata = dict(platform=platform.platform(), cpu_count=os.cpu_count(),
-                binary_sha256=hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(),
+                binary_sha256=digest.hexdigest(),
                 sample_interval_ms=10, counts=args.counts, modes=args.modes)
 (outdir / f'{args.label}-metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
 for mode in args.modes:
@@ -70,8 +76,11 @@ for mode in args.modes:
         text = log.read_text()
         if child.returncode:
             raise SystemExit(text)
-        record = json.loads(next(line.removeprefix('PROCESS_BENCH ') for line in text.splitlines()
-                                 if line.startswith('PROCESS_BENCH ')))
+        payload = next((line.removeprefix('PROCESS_BENCH ') for line in text.splitlines()
+                        if line.startswith('PROCESS_BENCH ')), None)
+        if payload is None:
+            raise SystemExit(f'Missing PROCESS_BENCH output in {log}:\n{text}')
+        record = json.loads(payload)
         record.update(peak_os_threads=threads, peak_rss_kib=rss, peak_descendants=processes)
         results.append(record)
         print(json.dumps(record), flush=True)

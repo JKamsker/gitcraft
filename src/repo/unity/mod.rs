@@ -287,8 +287,10 @@ impl RepoTab {
         self.unity.busy = Some(doing.to_owned());
         let failed = format!("{doing} failed");
         let path = self.path.clone();
-        self.then(
+        self.then_or(
             ctx,
+            true,
+            Err,
             move || caught(|| work(&path)),
             move |tab, result, ctx| {
                 tab.unity.busy = None;

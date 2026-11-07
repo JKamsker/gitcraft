@@ -25,6 +25,9 @@ pub(crate) struct Options {
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stderr: Option<Chunk>,
+    pub ready: Option<Box<dyn FnOnce() + Send>>,
+    /// Stream stdout directly to a file instead of capturing it in memory.
+    pub stdout_file: Option<std::fs::File>,
     /// Cleanup on the other machine, before returning a cancelled/timed-out operation.
     /// This is a blocking protocol API, isolated from the I/O loop on bounded workers.
     pub stop_remote: Option<Box<dyn FnOnce() + Send>>,
@@ -42,6 +45,8 @@ impl Default for Options {
             cancel: crate::tasks::cancellation(),
             cancelled: None,
             stderr: None,
+            ready: None,
+            stdout_file: None,
             stop_remote: None,
             stop_ready: None,
             stdout_ready: None,
@@ -77,6 +82,7 @@ struct Request {
     options: Options,
     reply: mpsc::Sender<ResultOutput>,
     ticket: Cancellation,
+    deadline: Option<Instant>,
 }
 
 pub(crate) struct Ticket {
@@ -130,14 +136,19 @@ impl Service {
         let counters = Arc::new(Counters::default());
         let metrics = Arc::clone(&counters);
         // Build before starting the thread, so runtime failures reach the caller.
+        // Tokio's Windows anonymous pipes use blocking I/O internally. Each active child
+        // needs room for both readers and stdin, plus remote cleanup. The bound follows
+        // active children, never the number of queued requests.
+        let blocking_threads = if cfg!(windows) { 3 * active + 2 } else { 2 };
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .max_blocking_threads(2)
+            .max_blocking_threads(blocking_threads)
             .build()?;
         let thread = std::thread::Builder::new()
             .name("gitcraft-process-io".into())
             .spawn(move || {
                 runtime.block_on(async move {
+                    let blocking = Arc::new(tokio::sync::Semaphore::new(2));
                     let mut running = tokio::task::JoinSet::new();
                     let mut pending: VecDeque<Request> = VecDeque::new();
                     let mut background = 0usize;
@@ -151,22 +162,24 @@ impl Service {
                             let cancelled = request.ticket.is_cancelled()
                                 || request.options.cancel.is_cancelled()
                                 || request.options.cancelled.as_ref().is_some_and(|f| f());
-                            if cancelled {
+                            let expired = request.deadline.is_some_and(|at| Instant::now() >= at);
+                            if cancelled || expired {
                                 metrics.queued.fetch_sub(1, Ordering::Relaxed);
-                                let _ = request.reply.send(Err("cancelled".into()));
+                                let _ = request.reply.send(Err(if cancelled {
+                                    "cancelled"
+                                } else {
+                                    "process timed out and was stopped"
+                                }
+                                .into()));
                             }
-                            !cancelled
+                            !cancelled && !expired
                         });
                         while running.len() < active {
-                            // Keep two slots for short reads; queued reads pass long operations.
-                            let selected = pending
-                                .iter()
-                                .position(|r| !r.options.background)
-                                .or_else(|| {
-                                    (background < background_limit)
-                                        .then_some(0)
-                                        .filter(|_| !pending.is_empty())
-                                });
+                            // Reserve two slots for short reads; dispatch the oldest eligible
+                            // request so a stream of reads cannot starve long operations.
+                            let selected = pending.iter().position(|r| {
+                                !r.options.background || background < background_limit
+                            });
                             let Some(request) = selected.and_then(|i| pending.remove(i)) else {
                                 break;
                             };
@@ -177,15 +190,18 @@ impl Service {
                             }
                             let stats = Arc::clone(&metrics);
                             let stop = shutdown.clone();
+                            let blocking = Arc::clone(&blocking);
                             running.spawn(async move {
                                 let n = stats.active.fetch_add(1, Ordering::Relaxed) + 1;
                                 stats.peak.fetch_max(n, Ordering::Relaxed);
                                 let result = execute(
                                     request.command,
                                     request.options,
+                                    request.deadline,
                                     &request.ticket,
                                     &stop,
                                     &stats,
+                                    &blocking,
                                 )
                                 .await;
                                 stats.active.fetch_sub(1, Ordering::Relaxed);
@@ -229,6 +245,7 @@ impl Service {
         }
         let (reply, receive) = mpsc::channel();
         let ticket = Cancellation::default();
+        let deadline = options.timeout.map(|limit| Instant::now() + limit);
         let mut queued = self.counters.queued.load(Ordering::Relaxed);
         loop {
             if queued >= self.capacity {
@@ -251,6 +268,7 @@ impl Service {
                 options,
                 reply,
                 ticket: ticket.clone(),
+                deadline,
             })
             .is_err()
         {
@@ -317,9 +335,11 @@ pub(crate) fn shutdown() {
 async fn execute(
     command: Command,
     mut options: Options,
+    deadline: Option<Instant>,
     ticket: &Cancellation,
     shutdown: &Cancellation,
     stats: &Counters,
+    blocking: &Arc<tokio::sync::Semaphore>,
 ) -> ResultOutput {
     let cancelled = || {
         options.cancel.is_cancelled()
@@ -330,16 +350,25 @@ async fn execute(
     if cancelled() {
         return Err("cancelled".into());
     }
+    if deadline.is_some_and(|at| Instant::now() >= at) {
+        return Err("process timed out and was stopped".into());
+    }
     let mut cmd = tokio::process::Command::from(command);
     cmd.stdin(if options.input.is_some() {
         Stdio::piped()
     } else {
         Stdio::null()
     })
-    .stdout(Stdio::piped())
+    .stdout(
+        options
+            .stdout_file
+            .take()
+            .map_or_else(Stdio::piped, Stdio::from),
+    )
     .stderr(Stdio::piped())
     .kill_on_drop(true);
-    // All migrated commands own their descendants, including hooks and credential helpers.
+    // Ordinary hooks/helpers inherit this group. Deliberate setsid escapes require stronger
+    // OS containment; see docs/process-orchestration.md.
     #[cfg(unix)]
     cmd.process_group(0);
     #[cfg(windows)]
@@ -373,7 +402,6 @@ async fn execute(
     let mut written = 0;
     let mut status = None;
     let mut stopped = None;
-    let start = Instant::now();
     let mut drain_deadline = None;
     let mut stop_requested: Option<(String, Instant)> = None;
     let mut tick = tokio::time::interval(POLL);
@@ -394,6 +422,15 @@ async fn execute(
                                 if byte == b'\n' {
                                     if preamble.trim_ascii() == options.stdout_ready.unwrap_or_default().as_bytes() {
                                         ready = true;
+                                        if let Some(connected) = options.ready.take() {
+                                            // Saving a credential can block; it must not occupy the I/O loop.
+                                            let blocking = Arc::clone(blocking);
+                                            tokio::spawn(async move {
+                                                if let Ok(_permit) = blocking.acquire_owned().await {
+                                                    let _ = tokio::task::spawn_blocking(connected).await;
+                                                }
+                                            });
+                                        }
                                         append(&mut stdout, &obuf[i+1..n], options.output_limit, &mut stopped);
                                         break;
                                     }
@@ -442,7 +479,7 @@ async fn execute(
             }
             _ = tick.tick() => {
                 if cancelled() && status.is_none() { stop_requested.get_or_insert_with(|| ("cancelled".into(), Instant::now())); }
-                else if status.is_none() && options.timeout.is_some_and(|limit| start.elapsed() >= limit) {
+                else if status.is_none() && deadline.is_some_and(|at| Instant::now() >= at) {
                     stop_requested.get_or_insert_with(|| ("process timed out and was stopped".into(), Instant::now()));
                 } else if drain_deadline.is_some_and(|until| Instant::now() >= until) {
                     stopped = Some("process ended, but something it started kept its output open".into());
@@ -462,11 +499,27 @@ async fn execute(
     if stopped.is_some() {
         // Remote cleanup may need its PID marker. The stderr callback has consumed every
         // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
-        if let Some(stop) = options.stop_remote.take() {
+        if let Some(stop) = options.stop_remote.take()
+            && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
+        {
             let _ = tokio::task::spawn_blocking(stop).await;
         }
+        // The remote stop can also end the local loopback/SSH child. Reap it before
+        // signaling its group: Darwin rejects SIGKILL on a group containing only zombies.
+        if status.is_none() {
+            status = child
+                .try_wait()
+                .map_err(|e| format!("could not reap process: {e}"))?;
+        }
         #[cfg(unix)]
-        stop_tree(pid).await;
+        if let Some(pid) = pid
+            && let Err(error) = gitcraft_os::kill_process_group(pid)
+        {
+            stopped = Some(format!(
+                "{}; could not stop process group: {error}",
+                stopped.as_deref().unwrap_or_default()
+            ));
+        }
         #[cfg(windows)]
         drop(process_job.take());
         let _ = child.start_kill();
@@ -477,6 +530,32 @@ async fn execute(
                     .await
                     .map_err(|e| format!("could not reap process: {e}"))?,
             );
+        }
+        // Killing/reaping does not consume bytes already buffered in the pipes. Retain
+        // those diagnostics without waiting indefinitely for an inherited pipe to close.
+        let until = tokio::time::Instant::now() + options.drain_for;
+        let mut overflow = None;
+        while out.is_some() || err.is_some() {
+            tokio::select! {
+                result = async { match &mut out { Some(p) => p.read(&mut obuf).await, None => std::future::pending().await } } => {
+                    match result {
+                        Ok(0) | Err(_) => out = None,
+                        Ok(n) => if ready { append(&mut stdout, &obuf[..n], options.output_limit, &mut overflow); },
+                    }
+                }
+                result = async { match &mut err { Some(p) => p.read(&mut ebuf).await, None => std::future::pending().await } } => {
+                    match result {
+                        Ok(0) | Err(_) => err = None,
+                        Ok(n) => {
+                            if let Some(consume) = &mut options.stderr {
+                                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n])));
+                            }
+                            append(&mut stderr, &ebuf[..n], options.output_limit, &mut overflow);
+                        }
+                    }
+                }
+                _ = tokio::time::sleep_until(until) => break,
+            }
         }
     }
     if !ready && stopped.is_none() {
@@ -504,25 +583,6 @@ fn append(output: &mut Vec<u8>, bytes: &[u8], limit: usize, stopped: &mut Option
             limit >> 20
         ));
     }
-}
-
-#[cfg(unix)]
-async fn stop_tree(pid: Option<u32>) {
-    let Some(pid) = pid else {
-        return;
-    };
-    #[cfg(unix)]
-    let mut command = {
-        let mut command = tokio::process::Command::new("kill");
-        command.args(["-KILL", "--", &format!("-{pid}")]);
-        command
-    };
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    let _ = tokio::time::timeout(Duration::from_secs(5), command.status()).await;
 }
 
 #[cfg(test)]
@@ -559,20 +619,40 @@ mod tests {
                 eprintln!("child failed deliberately");
                 std::process::exit(7);
             }
+            "stdout-large" => {
+                for _ in 0..128 {
+                    std::io::stdout()
+                        .write_all(&[b'x'; 8192])
+                        .map_err(|e| e.to_string())?;
+                }
+            }
             "hang" => {
                 println!("partial stdout");
                 eprintln!("partial stderr");
                 std::thread::sleep(Duration::from_secs(60));
             }
             "descendant" => {
-                let child = command("hang")?
+                let marker =
+                    std::env::var_os("GITCRAFT_PROCESS_TEST_EFFECT").ok_or("missing marker")?;
+                let marker = std::path::PathBuf::from(marker);
+                let child = command("side-effect")?
                     .stdin(Stdio::null())
                     .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())
                     .spawn()
                     .map_err(|e| e.to_string())?;
                 println!("DESCENDANT={}", child.id());
+                until(|| marker.with_extension("ready").exists())?;
                 std::process::exit(0);
+            }
+            "side-effect" => {
+                let marker = std::path::PathBuf::from(
+                    std::env::var_os("GITCRAFT_PROCESS_TEST_EFFECT").ok_or("missing marker")?,
+                );
+                std::fs::write(marker.with_extension("ready"), b"ready")
+                    .map_err(|e| e.to_string())?;
+                std::thread::sleep(Duration::from_secs(1));
+                std::fs::write(marker, b"survived").map_err(|e| e.to_string())?;
             }
             "ready" => {
                 print!("login banner\nREADY_");
@@ -748,6 +828,31 @@ mod tests {
     }
 
     #[test]
+    fn exports_can_stream_to_disk_beyond_the_capture_limit() -> Result<(), String> {
+        let path =
+            std::env::temp_dir().join(format!("gitcraft-stream-export-{}", std::process::id()));
+        let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
+        let service = Service::new(1, 4).map_err(|e| e.to_string())?;
+        let out = service
+            .submit(
+                command("stdout-large")?,
+                Options {
+                    stdout_file: Some(file),
+                    output_limit: 1024,
+                    ..Default::default()
+                },
+            )?
+            .wait()?
+            .complete()?;
+        let size = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
+        let _ = std::fs::remove_file(path);
+        assert!(out.status.success());
+        assert!(out.stdout.is_empty());
+        assert!(size >= 1024 * 1024);
+        Ok(())
+    }
+
+    #[test]
     fn dropping_a_ticket_cancels_it_and_shutdown_cleans_up_running_and_queued_children()
     -> Result<(), String> {
         let service = Service::new(1, 2).map_err(|e| e.to_string())?;
@@ -774,7 +879,12 @@ mod tests {
     #[test]
     fn inherited_open_pipes_have_a_deadline_and_descendants_are_stopped() -> Result<(), String> {
         let service = Service::new(1, 2).map_err(|e| e.to_string())?;
-        let command = command("descendant")?;
+        let effect =
+            std::env::temp_dir().join(format!("gitcraft-descendant-effect-{}", std::process::id()));
+        let _ = std::fs::remove_file(&effect);
+        let _ = std::fs::remove_file(effect.with_extension("ready"));
+        let mut command = command("descendant")?;
+        command.env("GITCRAFT_PROCESS_TEST_EFFECT", &effect);
         let start = Instant::now();
         let out = service
             .submit(
@@ -791,6 +901,57 @@ mod tests {
                 .is_some_and(|s| s.contains("kept its output open"))
         );
         assert!(start.elapsed() < Duration::from_secs(10));
+        assert!(String::from_utf8_lossy(&out.stdout).contains("DESCENDANT="));
+        assert!(effect.with_extension("ready").exists());
+        std::thread::sleep(Duration::from_millis(1200));
+        let survived = effect.exists();
+        let _ = std::fs::remove_file(&effect);
+        let _ = std::fs::remove_file(effect.with_extension("ready"));
+        assert!(!survived, "a descendant survived process-tree cleanup");
+        Ok(())
+    }
+
+    #[test]
+    fn timeouts_expire_while_queued_without_spawning() -> Result<(), String> {
+        let service = Service::new(1, 4).map_err(|e| e.to_string())?;
+        let first = service.submit(command("hang")?, Options::default())?;
+        until(|| service.counts().spawned == 1)?;
+        let timed = service.submit(
+            command("short")?,
+            Options {
+                timeout: Some(Duration::from_millis(100)),
+                ..Default::default()
+            },
+        )?;
+        until(|| service.counts().queued == 0)?;
+        assert!(timed.wait().is_err_and(|e| e.contains("timed out")));
+        assert_eq!(service.counts().spawned, 1);
+        first.cancel();
+        assert_eq!(first.wait()?.stopped.as_deref(), Some("cancelled"));
+        Ok(())
+    }
+
+    #[test]
+    fn idle_pipes_do_not_starve_other_child_io() -> Result<(), String> {
+        let service = Service::new(3, 8).map_err(|e| e.to_string())?;
+        let first = service.submit(command("hang")?, Options::default())?;
+        let second = service.submit(command("hang")?, Options::default())?;
+        until(|| service.counts().spawned == 2)?;
+        let out = service
+            .submit(
+                command("short")?,
+                Options {
+                    timeout: Some(Duration::from_secs(3)),
+                    ..Default::default()
+                },
+            )?
+            .wait()?
+            .complete()?;
+        assert!(out.status.success());
+        first.cancel();
+        second.cancel();
+        assert_eq!(first.wait()?.stopped.as_deref(), Some("cancelled"));
+        assert_eq!(second.wait()?.stopped.as_deref(), Some("cancelled"));
         Ok(())
     }
     #[test]

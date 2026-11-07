@@ -76,7 +76,8 @@ impl RepoTab {
         ctx: &egui::Context,
     ) -> Arc<git::OpControl> {
         let repaint = ctx.clone();
-        let control = git::OpControl::new(move || repaint.request_repaint());
+        let control =
+            git::OpControl::scoped(move || repaint.request_repaint(), self.tx.cancel.child());
         let network = ops.iter().any(|op| {
             let args: Vec<&str> = op.iter().map(String::as_str).collect();
             git::goes_over_network(&args)

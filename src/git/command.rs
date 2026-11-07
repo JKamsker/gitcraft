@@ -115,6 +115,8 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    output_limit: Option<usize>,
+    stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
     /// What git reads on its input; nothing when `None`.
@@ -159,6 +161,13 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         cmd,
         crate::processes::Options {
             input: extra.stdin.clone(),
+            stdout_file: extra
+                .stdout_file
+                .as_ref()
+                .map(std::fs::File::create)
+                .transpose()
+                .map_err(|e| format!("could not save output: {e}"))?,
+            output_limit: extra.output_limit.unwrap_or(64 << 20),
             background: extra.long || extra.tool || extra.test.is_some() || goes_over_network(args),
             timeout: extra.timeout,
             ..Default::default()
@@ -457,9 +466,41 @@ pub fn run_env(
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
-    let out = execute(dir, &Extra::default(), args)?;
+    // Blob callers already return a Vec, but need more headroom than command diagnostics.
+    // Keep a finite per-read bound rather than allowing arbitrary process output in memory.
+    let out = execute(
+        dir,
+        &Extra {
+            output_limit: Some(512 << 20),
+            ..Default::default()
+        },
+        args,
+    )?;
     if out.code == Some(0) {
         Ok(out.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+
+/// Save a command's stdout without capturing a local export in memory. Remote exports
+/// retain the existing persistent-shell transport and its binary-output behavior.
+pub fn run_to_file(dir: &Path, args: &[&str], file: &Path) -> Result<(), String> {
+    if remote::is_remote(dir) {
+        return run_bytes(Some(dir), args).and_then(|bytes| {
+            std::fs::write(file, bytes).map_err(|e| format!("could not save it: {e}"))
+        });
+    }
+    let out = execute(
+        Some(dir),
+        &Extra {
+            stdout_file: Some(file.to_owned()),
+            ..Default::default()
+        },
+        args,
+    )?;
+    if out.code == Some(0) {
+        Ok(())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
     }
@@ -959,6 +1000,32 @@ mod tests {
     use std::process::Stdio;
 
     use super::*;
+
+    #[test]
+    fn large_binary_reads_and_file_exports_exceed_the_diagnostic_capture_bound()
+    -> Result<(), String> {
+        let dir =
+            std::env::temp_dir().join(format!("gitcraft-large-output-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        run(Some(&dir), &["init", "-q"])?;
+        let blob = dir.join("large.bin");
+        let mut file = std::fs::File::create(&blob).map_err(|e| e.to_string())?;
+        let chunk = vec![0; 1 << 20];
+        for _ in 0..65 {
+            file.write_all(&chunk).map_err(|e| e.to_string())?;
+        }
+        drop(file);
+        let hash = run(Some(&dir), &["hash-object", "-w", "large.bin"])?;
+        let args = ["cat-file", "blob", hash.trim()];
+        let captured = run_bytes(Some(&dir), &args)?.len();
+        let export = dir.join("export.bin");
+        run_to_file(&dir, &args, &export)?;
+        let saved = std::fs::metadata(&export).map_err(|e| e.to_string())?.len();
+        let _ = std::fs::remove_dir_all(dir);
+        assert_eq!(captured, 65 << 20);
+        assert_eq!(saved, captured as u64);
+        Ok(())
+    }
 
     /// Network operations go to shells of their own on another machine; reads don't.
     #[test]

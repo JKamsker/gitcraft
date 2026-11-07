@@ -12,7 +12,7 @@ pub(crate) const QUEUE_CAPACITY: usize = 512;
 pub(crate) const BUSY: &str = "Background queue is full; try again when current work finishes";
 
 #[derive(Clone, Default)]
-pub(crate) struct Cancellation(Arc<AtomicBool>);
+pub(crate) struct Cancellation(Arc<AtomicBool>, Option<Arc<Cancellation>>);
 
 impl Cancellation {
     pub(crate) fn cancel(&self) {
@@ -20,6 +20,10 @@ impl Cancellation {
     }
     pub(crate) fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::Acquire)
+            || self.1.as_ref().is_some_and(|parent| parent.is_cancelled())
+    }
+    pub(crate) fn child(&self) -> Self {
+        Self(Arc::default(), Some(Arc::new(self.clone())))
     }
 }
 
@@ -49,6 +53,7 @@ pub(crate) enum Priority {
 type Work = Box<dyn FnOnce() + Send>;
 struct Job {
     work: Work,
+    on_cancel: Option<Work>,
     cancel: Cancellation,
     priority: Priority,
     /// A whole mutation operation holds its key, including between subprocesses.
@@ -75,6 +80,7 @@ struct Shared {
 pub(crate) struct Pool {
     shared: Arc<Shared>,
     capacity: usize,
+    workers: Mutex<Vec<std::thread::JoinHandle<()>>>,
 }
 
 impl Pool {
@@ -97,22 +103,30 @@ impl Pool {
             ready: Condvar::new(),
             background_limit,
         });
+        let mut handles = Vec::new();
         for i in 0..workers {
             let state = Arc::clone(&shared);
-            if let Err(e) = std::thread::Builder::new()
+            match std::thread::Builder::new()
                 .name(format!("gitcraft-job-{i}"))
                 .spawn(move || worker(state))
             {
-                let mut locked = shared
-                    .state
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                locked.stopped = true;
-                shared.ready.notify_all();
-                return Err(e);
+                Ok(handle) => handles.push(handle),
+                Err(e) => {
+                    let mut locked = shared
+                        .state
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    locked.stopped = true;
+                    shared.ready.notify_all();
+                    return Err(e);
+                }
             }
         }
-        Ok(Self { shared, capacity })
+        Ok(Self {
+            shared,
+            capacity,
+            workers: Mutex::new(handles),
+        })
     }
 
     pub(crate) fn submit(
@@ -120,6 +134,17 @@ impl Pool {
         cancel: Cancellation,
         priority: Priority,
         key: Option<PathBuf>,
+        work: Work,
+    ) -> Result<(), &'static str> {
+        self.submit_cancellable(cancel, priority, key, None, work)
+    }
+
+    pub(crate) fn submit_cancellable(
+        &self,
+        cancel: Cancellation,
+        priority: Priority,
+        key: Option<PathBuf>,
+        on_cancel: Option<Work>,
         work: Work,
     ) -> Result<(), &'static str> {
         let mut state = self
@@ -131,12 +156,13 @@ impl Pool {
             return Err("Background work has shut down");
         }
         // Drop cancelled queued closures promptly, releasing their captures and capacity.
-        state.queue.retain(|job| !job.cancel.is_cancelled());
+        purge(&mut state);
         if state.queue.len() >= self.capacity {
             return Err(BUSY);
         }
         state.queue.push_back(Job {
             work,
+            on_cancel,
             cancel,
             priority,
             key,
@@ -160,6 +186,18 @@ impl Pool {
         self.shared.ready.notify_all();
     }
 
+    fn join(&self) {
+        let workers = std::mem::take(
+            &mut *self
+                .workers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        for worker in workers {
+            let _ = worker.join();
+        }
+    }
+
     pub(crate) fn counts(&self) -> (usize, usize) {
         let state = self
             .shared
@@ -167,6 +205,30 @@ impl Pool {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         (state.active, state.queue.len())
+    }
+}
+
+fn purge(state: &mut State) {
+    state.queue.retain_mut(|job| {
+        if !job.cancel.is_cancelled() {
+            return true;
+        }
+        if let Some(done) = job.on_cancel.take() {
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(done));
+        }
+        false
+    });
+}
+
+pub(crate) fn purge_cancelled() {
+    if let Some(Ok(pool)) = POOL.get() {
+        let mut state = pool
+            .shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        purge(&mut state);
+        pool.shared.ready.notify_all();
     }
 }
 
@@ -181,9 +243,9 @@ fn worker(shared: Arc<Shared>) {
                 if state.stopped {
                     return;
                 }
-                state.queue.retain(|job| !job.cancel.is_cancelled());
-                // Interactive reads first, FIFO within a priority. A later writer cannot
-                // pass an earlier writer of the same key, even across priorities.
+                purge(&mut state);
+                // Oldest runnable work first so reads cannot starve mutations. The
+                // background limit still reserves worker capacity for interactive reads.
                 let mut seen = HashSet::new();
                 let mut candidates = Vec::new();
                 for (i, job) in state.queue.iter().enumerate() {
@@ -198,11 +260,7 @@ fn worker(shared: Arc<Shared>) {
                         candidates.push(i);
                     }
                 }
-                let selected = candidates
-                    .iter()
-                    .copied()
-                    .find(|&i| state.queue[i].priority == Priority::Interactive)
-                    .or_else(|| candidates.first().copied());
+                let selected = candidates.first().copied();
                 if let Some(i) = selected
                     && let Some(job) = state.queue.remove(i)
                 {
@@ -252,6 +310,7 @@ fn worker(shared: Arc<Shared>) {
 impl Drop for Pool {
     fn drop(&mut self) {
         self.shutdown();
+        self.join();
     }
 }
 
@@ -266,8 +325,9 @@ pub(crate) fn read<T: Send + 'static>(
         .as_ref()
         .map_err(Clone::clone)?;
     let (tx, rx) = std::sync::mpsc::channel();
+    let cancel = cancellation().child();
     pool.submit(
-        cancellation(),
+        cancel.clone(),
         Priority::Interactive,
         None,
         Box::new(move || {
@@ -277,13 +337,33 @@ pub(crate) fn read<T: Send + 'static>(
         }),
     )
     .map_err(str::to_owned)?;
-    Ok(Read(rx))
+    Ok(Read {
+        reply: Some(rx),
+        cancel,
+    })
 }
 
-pub(crate) struct Read<T>(std::sync::mpsc::Receiver<Result<T, String>>);
+pub(crate) struct Read<T> {
+    reply: Option<std::sync::mpsc::Receiver<Result<T, String>>>,
+    cancel: Cancellation,
+}
 impl<T> Read<T> {
-    pub(crate) fn join(self) -> Result<T, String> {
-        self.0.recv().map_err(|_| "cancelled".to_owned())?
+    pub(crate) fn join(mut self) -> Result<T, String> {
+        self.reply
+            .take()
+            .ok_or("reader already joined")?
+            .recv()
+            .map_err(|_| "cancelled".to_owned())?
+    }
+}
+impl<T> Drop for Read<T> {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+        // A failed reload cannot release its loading state while sibling readers still
+        // own process slots. Cancellation also removes queued readers without running them.
+        if let Some(reply) = self.reply.take() {
+            let _ = reply.recv();
+        }
     }
 }
 
@@ -315,6 +395,12 @@ pub(crate) fn shutdown() {
     }
     if let Some(Ok(pool)) = POOL.get() {
         pool.shutdown();
+    }
+    if let Some(Ok(pool)) = POOL.get() {
+        pool.join();
+    }
+    if let Some(Ok(pool)) = READ_POOL.get() {
+        pool.join();
     }
 }
 
@@ -371,10 +457,9 @@ mod tests {
     }
 
     #[test]
-    fn interactive_reads_pass_background_work_but_repository_writes_stay_fifo() -> Result<(), String>
-    {
+    fn reads_and_writes_both_make_progress_and_repository_writes_stay_fifo() -> Result<(), String> {
         let pool = Pool::new(1).map_err(|e| e.to_string())?;
-        let (gate_tx, gate) = mpsc::channel();
+        let (gate_tx, gate) = mpsc::channel::<()>();
         let (started, rx) = mpsc::channel();
         submit(&pool, Priority::Background, None, move || {
             let _ = started.send(());
@@ -403,7 +488,7 @@ mod tests {
                     .map_err(|e| e.to_string())?,
             );
         }
-        assert_eq!(result, ["read", "write 1", "write 2", "other repo"]);
+        assert_eq!(result, ["write 1", "write 2", "read", "other repo"]);
         pool.shutdown();
         Ok(())
     }
@@ -412,7 +497,7 @@ mod tests {
     fn cancelled_queued_jobs_release_capacity_and_panics_do_not_remove_workers()
     -> Result<(), String> {
         let pool = Pool::new(1).map_err(|e| e.to_string())?;
-        let (gate_tx, gate) = mpsc::channel();
+        let (gate_tx, gate) = mpsc::channel::<()>();
         let (started, rx) = mpsc::channel();
         submit(&pool, Priority::Background, None, move || {
             let _ = started.send(());
@@ -452,10 +537,71 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn cancelling_a_queued_mutation_completes_before_a_worker_becomes_available()
+    -> Result<(), String> {
+        let pool = Pool::new(1).map_err(|e| e.to_string())?;
+        let (gate_tx, gate) = mpsc::channel::<()>();
+        let (started, rx) = mpsc::channel();
+        submit(&pool, Priority::Background, Some("repo"), move || {
+            let _ = started.send(());
+            let _ = gate.recv();
+        })?;
+        rx.recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        let cancel = Cancellation::default();
+        let (done, result) = mpsc::channel();
+        let ran = done.clone();
+        pool.submit_cancellable(
+            cancel.clone(),
+            Priority::Background,
+            Some("repo".into()),
+            Some(Box::new(move || {
+                let _ = done.send("cancelled");
+            })),
+            Box::new(move || {
+                let _ = ran.send("ran");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        cancel.cancel();
+        submit(&pool, Priority::Interactive, None, || {})?;
+        assert_eq!(
+            result
+                .recv_timeout(Duration::from_secs(1))
+                .map_err(|e| e.to_string())?,
+            "cancelled"
+        );
+        drop(gate_tx);
+        Ok(())
+    }
+
+    #[test]
+    fn dropping_a_reader_waits_for_its_cancellation_without_cancelling_its_parent()
+    -> Result<(), String> {
+        let parent = Cancellation::default();
+        CURRENT.with(|slot| *slot.borrow_mut() = Some(parent.clone()));
+        let (started, rx) = mpsc::channel();
+        let reader = read(move || {
+            let cancel = cancellation();
+            let _ = started.send(());
+            while !cancel.is_cancelled() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        });
+        CURRENT.with(|slot| *slot.borrow_mut() = None);
+        let reader = reader?;
+        rx.recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        drop(reader);
+        assert!(!parent.is_cancelled());
+        Ok(())
+    }
+
+    #[test]
     fn writers_share_a_key_while_other_repositories_and_reserved_reads_can_run()
     -> Result<(), String> {
         let pool = Pool::with_limits(3, 16, 1).map_err(|e| e.to_string())?;
-        let (gate_tx, gate) = mpsc::channel();
+        let (gate_tx, gate) = mpsc::channel::<()>();
         let (tx, events) = mpsc::channel();
         let started = tx.clone();
         submit(&pool, Priority::Background, Some("repo"), move || {

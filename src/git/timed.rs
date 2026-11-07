@@ -79,7 +79,14 @@ fn run_here(
             drain_for: Duration::from_millis(500),
             ..Default::default()
         },
-    )?;
+    )
+    .map_err(|reason| {
+        if reason.contains("timed out") {
+            stopped(what, limit)
+        } else {
+            reason
+        }
+    })?;
     if let Some(reason) = out.stopped
         && !reason.contains("kept its output open")
     {

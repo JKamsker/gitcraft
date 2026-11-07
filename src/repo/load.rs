@@ -417,6 +417,9 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
+        if crate::remote::is_remote(&self.path) {
+            self.tx.repo = self.repo_key().to_owned();
+        }
         self.timeline_read(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
         let remote = crate::remote::is_remote(&self.path);

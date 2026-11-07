@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use super::{Msg, RepoTab, spawn};
+use super::{Msg, RepoTab};
 use crate::git;
 
 #[test]
@@ -12,6 +12,9 @@ fn workload() -> Result<(), String> {
         .map_err(|e| e.to_string())?
         .parse::<usize>()
         .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("benchmark count must be positive".into());
+    }
     let mode = std::env::var("GITCRAFT_BENCH_MODE").unwrap_or_else(|_| "commands".into());
     let dir = std::env::temp_dir().join(format!("gitcraft-process-bench-{}", std::process::id()));
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -67,11 +70,16 @@ fn workload() -> Result<(), String> {
     if mode == "commands" {
         for tab in &tabs {
             let path = dir.clone();
-            spawn(&tab.tx, &ctx, move || {
-                Msg::Loaded(Err(git::run_shell(&path, "sleep 0.1; printf ok")
-                    .map(|_| "benchmark completed".to_owned())
-                    .unwrap_or_else(|e| e)))
-            });
+            super::messages::spawn_or(
+                &tab.tx,
+                &ctx,
+                |e| Msg::Loaded(Err(e)),
+                move || {
+                    Msg::Loaded(Err(git::run_shell(&path, "sleep 0.1; printf ok")
+                        .map(|_| "benchmark completed".to_owned())
+                        .unwrap_or_else(|e| e)))
+                },
+            );
         }
     } else {
         for tab in &mut tabs {
