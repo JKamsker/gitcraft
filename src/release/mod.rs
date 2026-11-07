@@ -552,25 +552,9 @@ fn same_publication_repository(url: &str, hosting: &Hosting) -> bool {
         scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
     });
     if web_transport {
-        let Some(web) = crate::forge::web_url(url) else {
-            return false;
-        };
-        let authority = |web: &str| {
-            web.split_once("://").map(|(scheme, rest)| {
-                format!("{scheme}://{}", rest.split('/').next().unwrap_or_default())
-            })
-        };
-        let (Some(actual), Some(expected)) = (authority(&web), authority(&hosting.web)) else {
-            return false;
-        };
-        if !actual.eq_ignore_ascii_case(&expected) {
-            return false;
-        }
+        return hosting.matches_http_repository(url);
     }
-    match hosting.forge {
-        Forge::GitLab => path == hosting.path,
-        Forge::GitHub | Forge::Forgejo | Forge::Gitea => path.eq_ignore_ascii_case(&hosting.path),
-    }
+    hosting.same_repository_path(&path)
 }
 
 /// Writes the new version (and the notes in the changelog) and commits those files only.
