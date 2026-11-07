@@ -64,6 +64,7 @@ impl RepoTab {
         self.tour = None;
         self.cancel_draft_reads();
         self.content_recovery.dismiss();
+        self.saved_views.cancel();
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {
@@ -79,6 +80,7 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.saved_views.cancel();
         self.work_epoch = self.work_epoch.wrapping_add(1);
         self.discard_decrypted();
         // Changes seen on disk so far are read by this reload (or the one queued after the
@@ -322,6 +324,10 @@ impl RepoTab {
     }
 
     pub(super) fn load_more(&mut self, ctx: &egui::Context) {
+        if self.saved_views.active() {
+            self.load_graph_view_page();
+            return;
+        }
         if self.loading_more || !self.has_more || self.history.len() >= MAX_HISTORY {
             return;
         }
@@ -506,6 +512,7 @@ impl RepoTab {
         let previous = self.selected_hash();
         self.rebuild_rows();
         self.restore_selection(previous, ctx);
+        self.saved_views.dirty = true;
         self.take_prepared_message();
         self.refresh_work_diff(ctx);
         if let Some(hash) = self.pending_goto.clone() {

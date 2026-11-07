@@ -124,6 +124,21 @@ disabled. Snapshots and recovery run on the repository's machine, including SSH 
 
 **Graph**
 
+- The view chooser above the graph offers **My unpushed work**, **My recent changes +
+  dependencies** (with a day count), **Descendants of selected commit**, and **Only merges
+  into…** (choose main or another local branch). Name a view and click **Save view** to
+  remember its relation and parameters for this repository. These views compose with branch
+  visibility and search; **All history** leaves the view. Unpushed compares the exact current
+  author email against pinned local remote-tracking tips, without contacting a server.
+  Long omitted runs become dashed connectors: click to expand, or **Collapse spans** to hide
+  context again. Working changes, stashes, short gaps and the selected commit remain context.
+  **Refresh view** pins a new snapshot; **Load older context** explicitly reads one page at
+  the pinned tips. Selection and matches still refer to the original commits.
+  Queries run in the background, stop on replacement/cancel, and never download missing
+  objects or run source hooks/filters/signing. Counts distinguish loaded matches from selected
+  history; shallow boundaries and a 30,000-commit query budget stay visible. Missing history, unsupported
+  Git `--no-lazy-fetch`, and query errors leave loaded context visible with an explanation.
+
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.
 - _Activity_ in the toolbar (or _Activity calendar_ / _Contributor statistics_ in Ctrl+P)
   opens a day/month calendar and author statistics. Click a day, drag across days, choose a

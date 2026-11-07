@@ -228,7 +228,14 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     frame(&ctx, &mut tab, size, vec![], 0.0);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
     let x = header_x(&shapes, "DESCRIPTION") + 30.0;
-    let first_point = egui::pos2(x, 26.0 + ROW_PITCH / 2.0);
+    let first_y = texts(&shapes)
+        .into_iter()
+        .find(|s| s.galley.job.text == tab.commits[0].summary)
+        .ok_or("First commit description was not painted")?
+        .visual_bounding_rect()
+        .center()
+        .y;
+    let first_point = egui::pos2(x, first_y);
     let second_point = first_point + vec2(0.0, ROW_PITCH);
     frame(
         &ctx,
@@ -375,13 +382,18 @@ fn lane_names_distinguish_refs_tags_detached_and_reused_columns() {
 }
 
 #[test]
-fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
+fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() -> Result<(), String> {
     let (ctx, mut tab) = fixture(3);
     Arc::make_mut(&mut tab.commits[0]).refs = vec!["feature".to_owned()];
     tab.rebuild_graph_labels();
     let size = vec2(900.0, 220.0);
-    let point = egui::pos2(25.0, 26.0 + ROW_PITCH / 2.0);
-    frame(&ctx, &mut tab, size, vec![], 0.0);
+    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.0);
+    let point = texts(&shapes)
+        .into_iter()
+        .find(|s| s.galley.job.text == "feature")
+        .ok_or("The feature branch pill was not painted")?
+        .visual_bounding_rect()
+        .center();
     frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 0.1);
     let mut actions = Vec::new();
     for (n, pressed) in [true, false, true, false].into_iter().enumerate() {
@@ -420,4 +432,5 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
         Some(Some("feature".to_owned()))
     );
     assert!(egui::Popup::is_any_open(&ctx));
+    Ok(())
 }
