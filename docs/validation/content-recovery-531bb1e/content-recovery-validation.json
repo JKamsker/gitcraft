@@ -1,0 +1,142 @@
+{
+  "feature": "#32 Lost and found by content",
+  "candidate": "531bb1ed528cb0c1ae68812d77e4cd309975fedd",
+  "branch": "codex/content-recovery",
+  "remote_branch": "531bb1ed528cb0c1ae68812d77e4cd309975fedd",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "tree": "2dee5bce5e98d3b269ab8e433f3041fc34c619f2",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "status": "locally validated; independent final review pending",
+  "application_changed_files": {
+    "Cargo.toml": "7435825294b10e46fe544d0239a795a57187912194e1ab2e2f90e72488460463",
+    "README.md": "78ac7eb1738fed40ddb980de2c8529caf8f54c95958c80a7ec5b68e0628e4890",
+    "src/git/command.rs": "84cd99208043623d46ef47eba0fa5dbd13f63667a335fe7d92c01b90cdf3afa3",
+    "src/git/mod.rs": "858978850feb79947a66d3f6c2a2b466f64ae8042ab14824f6af40730f0d9b14",
+    "src/git/recovery/batch.rs": "ec6198f5dd133fcf4170f024a93ddcc03cc0ede4898286eabb649e430b2cea00",
+    "src/git/recovery/file.rs": "6564e15c9374d498b367540dfc22f0fd7a61a9a3f67ebf5592c0795d48ff04f9",
+    "src/git/recovery/mod.rs": "6e991160dbf698f99b17c062bfefbad21ead0b8dd50908c437092e5aa70cbf80",
+    "src/git/recovery/recover.rs": "d0da24957b3f9f064c8e2438b42ee169f24b36e24e25f9fedd7b9920813a6f3d",
+    "src/git/recovery/tests.rs": "c55d18be956a89b2a8748b96357112d863e4d8cbd19996643c8c319edde8cd6e",
+    "src/manual.rs": "44b70236c7c9df723ee96f3a9da2cc5e0b72c8730ecaec2532340fec2c5a47cc",
+    "src/repo/actions.rs": "754dbb688f17f02ba4b310858cde86f1f156dafda9f1c6e35dcc7933c03ee7e0",
+    "src/repo/apply.rs": "4c2662b4114b11613cb7dab75f5e063f0f9e674c4469a34af9e8c54c00e323ed",
+    "src/repo/content_recovery/mod.rs": "c9e7e843a9250f8229382b86b91fa38203904f495000505209fef047577188cb",
+    "src/repo/content_recovery/tests.rs": "1b1a83bd2973100494fc471c76597a486ec15bc53b88b04ab733d238cb0c9437",
+    "src/repo/content_recovery/view.rs": "7bf45dd37fee68ee729f84ce412f57e36599883541637a1e337a55ee201f8117",
+    "src/repo/dialogs/mod.rs": "e36766afbf43ab0a63e899783f224eabf2c476e0a420efbf69370c5139948861",
+    "src/repo/load.rs": "f0c6228f21d96fe5eaa3f1e6b39a1f63a0d0d2da1e27d2b2dba788176c69dd4d",
+    "src/repo/messages.rs": "5d64e35e459137d0cfa429ec4ccdc6f98a00458596a582d57c8eb4513b01718e",
+    "src/repo/mod.rs": "f0987957a1fb969b2847d20e9bdd739c9cca7fc9081162b0f89990527b729e83",
+    "src/repo/worktree_tab/mod.rs": "b1de0b26afc4725ea761d473789f332779d5ad98a3d36d4e828d5dbdaaa7c21a"
+  },
+  "private_target": "/workspace/work/content-recovery/target",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "gates": {
+    "fmt": "PASS",
+    "strict_clippy_all_targets": "PASS",
+    "full_tests": "811 passed;0failed;3ignored;0filtered;814total",
+    "new_feature_tests": "22/22 PASS in exact-candidate full log"
+  },
+  "commands": {
+    "fmt": "cargo fmt -- --check",
+    "clippy": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo clippy --all-targets -- -D warnings",
+    "full": "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test"
+  },
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/content-recovery-fmt-531bb1e.log",
+      "sha256": "dde0b1f55f0b6263c70b9dc48c14e3f9a196822100b4b2f5dfa96c7b1e6b7199"
+    },
+    "clippy": {
+      "path": "/workspace/work/content-recovery-clippy-531bb1e.log",
+      "sha256": "4ad4bedefcfd865a43cc9b9890aca91c88800bfd9b7d7895f2ba9b61a60bf995"
+    },
+    "test": {
+      "path": "/workspace/work/content-recovery-test-531bb1e.log",
+      "sha256": "9e250861628f0ff061f19f46f4befc69ef455d3dd84c92fb06607afa3c37a8fc"
+    }
+  },
+  "prior_focused_logs": {
+    "content-recovery-parser-8aa310f.log": {
+      "path": "/workspace/work/content-recovery-parser-8aa310f.log",
+      "sha256": "d4ea7162e4b2e5b1530f94e9ca5452c32b0bfbe0fe681aab37180e43915e95b8"
+    },
+    "content-recovery-targeted-2c663e2.log": {
+      "path": "/workspace/work/content-recovery-targeted-2c663e2.log",
+      "sha256": "029f7bc8c3dd2af0d560f62777816409c1e9d9f95a3767b9372be27be740a625"
+    },
+    "content-recovery-ui-2c663e2.log": {
+      "path": "/workspace/work/content-recovery-ui-2c663e2.log",
+      "sha256": "6627654263f5a2027b300c5e3772a6d41603698ca1f305234083e49db864d797"
+    }
+  },
+  "new_tests": [
+    "git::recovery::batch::tests::raw_frames_keep_newlines_and_nuls_and_reject_range_type_and_identity_confusion",
+    "git::recovery::file::tests::destinations_refuse_metadata_aliases_devices_and_traversal",
+    "git::recovery::file::tests::remote_new_file_script_is_quoted_exclusive_and_keeps_existing_and_linked_files",
+    "git::recovery::file::root_replacement_tests::local_creation_rejects_root_and_ancestor_replacements_after_the_final_git_check",
+    "git::recovery::tests::commit_and_excerpt_parsers_refuse_invalid_identity_and_keep_unicode_ranges",
+    "git::recovery::file::root_replacement_tests::typed_remote_publication_rejects_root_symlink_and_same_name_directory_substitution",
+    "git::recovery::tests::binary_large_unicode_literal_and_cancelled_scans_have_explicit_limits",
+    "git::recovery::tests::content_search_finds_reflog_commits_and_staged_only_blobs_without_any_writes",
+    "git::recovery::tests::dropped_stashes_retain_working_index_and_untracked_content_provenance",
+    "git::recovery::tests::branch_destinations_refuse_symbolic_collisions_and_never_parse_names_as_shell_or_commands",
+    "git::recovery::tests::dropped_stash_recovery_only_updates_its_list_and_refuses_a_moved_destination",
+    "git::recovery::tests::partial_promisor_search_does_not_download_or_call_network_helpers",
+    "git::recovery::tests::filters_hooks_fsmonitor_signing_and_diff_helpers_never_execute_for_search_or_recovery",
+    "git::recovery::tests::new_file_recovery_refuses_links_special_destinations_and_missing_tracked_paths",
+    "git::recovery::tests::preview_rejects_forged_provenance_and_pruned_blob_identity",
+    "git::recovery::tests::pruning_an_unattached_blob_after_preview_refuses_recovery_without_creating_a_file",
+    "git::recovery::tests::unborn_sha256_staged_blobs_and_commit_recovery_keep_hash_format_and_index",
+    "repo::content_recovery::tests::escape_closes_and_invalidates_a_live_content_read_without_closing_the_tab",
+    "repo::content_recovery::tests::pending_read_preserves_the_initiating_profile_scope_without_any_remote_execution",
+    "repo::content_recovery::tests::replacements_wait_for_the_actual_owned_read_to_return_and_only_start_the_latest",
+    "git::recovery::tests::prepared_branch_and_file_recovery_are_create_only_and_preserve_head_and_index",
+    "repo::content_recovery::tests::pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file"
+  ],
+  "ignored": [
+    "test forge::gitea::live::live_forgejo ... ignored, needs a Forgejo: see ci/forge-server.sh",
+    "test forge::gitea::live::live_gitea ... ignored, needs a Gitea: see ci/forge-server.sh",
+    "test remote::vault::tests::the_system_store_keeps_and_forgets ... ignored, uses the system's credential store"
+  ],
+  "scope": [
+    "Literal remembered-text search through reflog/history commits, unreachable commits, dropped stash working/index/untracked trees and dangling staged-only blobs.",
+    "Raw cat-file batch check/read verifies exact ID/type/size framing; bounded bytes, object/tree/commit counts, hits and UI snippets; binary/oversized/missing/incomplete results are reported.",
+    "Timeline/provenance, verified raw-content preview and separate prepare/confirm flow for create-only branch/file and CAS stash-list recovery.",
+    "No standalone reflog/lost-commit browser; PR54 remains excluded. No dependency on Working Drafts."
+  ],
+  "safety_proofs": [
+    "Read-only scan compares refs/reflogs/index/object-store counts in real repository regression; no ref/index/worktree writes during search.",
+    "Explicit --no-lazy-fetch and no-replace/optional-write settings; source hooks/fsmonitor/signing/filters/diff tools disabled. Promisor and configured-helper tests include positive controls.",
+    "Initiating Profile context is captured on queued jobs and retained by shared Practice-first/fallible Git transport. Recovery remote calls remain directly owned until actual remote::exec returns; queue ownership does not depend on a timer.",
+    "One reader plus newest pending request; close/Escape/replacement/profile/park/drop invalidates generation. Recorded delayed ownership tests and actual pointer UI recovery roundtrip pass.",
+    "Source provenance and raw blob hash are rechecked on inspect/prepare/perform. Pruned sources, moved stash refs, symbolic branch destinations, existing/ignored/tracked/linked paths and raced new filenames refuse safely.",
+    "RootPin binds filesystem identity through publication: local canonical root holds a directory handle, Unix dev/ino, Windows volume/file-index and no-delete sharing. Initial root opens without following links and compares actual identity. Remote typed scripts compare captured pwd-P and GNU stat dev/ino/ctime-nanoseconds before scratch/publication; unavailable identity disables file recovery.",
+    "Final file creation is exclusive, never updates the real index, and cannot overwrite an existing inode. Remote publication is atomic ln-T from a private Git-metadata scratch file; unsupported cross-filesystem layout refuses.",
+    "Known successful update-ref results are acknowledged despite late cancellation; uncertain interruption explicitly advises inspecting refs before retry."
+  ],
+  "root_review_correction": {
+    "prior_candidate": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
+    "reviewer": "review_portable_setup",
+    "confirmed": "Initial root symlink/substitution could redirect file publication after final Git verification.",
+    "independent_reproducer_notes_commit": "37cdfae99736db9ae9f017c60abac62615eaf559",
+    "fix_candidate": "3815b8f9962ca173d71f2c144d827008e31c3bdd",
+    "current_candidate_includes_fix": true,
+    "regressions": [
+      "local_creation_rejects_root_and_ancestor_replacements_after_the_final_git_check",
+      "typed_remote_publication_rejects_root_symlink_and_same_name_directory_substitution"
+    ]
+  },
+  "limits": [
+    "Linux native gates passed. Real SSH/WSL and native Windows filesystem behavior were not exercised; typed remote scripts were executed locally and Windows handle query uses existing windows-sys APIs with a documented narrow unsafe call.",
+    "Git must support --no-lazy-fetch; unsupported Git fails closed. Binary/non-UTF-8 blobs and blobs above2MiB are skipped; raw Git blobs (including LFS pointers) are searched without filters or downloads.",
+    "Budgets:500commits,10000objects,15000file entries,64MiBblob content,300hits,50provenances/blob,120s job and30s request execution limit. Remote pool/connect wait stays owned until actual return and is not claimed to have a total timeout.",
+    "Unattached blobs have unknown original path/time and recover as new regular files. Existing/tracked/ignored targets refuse; no overwrite/automatic checkout/stash apply is offered.",
+    "Remote file recovery requires usable GNU stat/ln, a stable captured root identity and metadata/worktree on the same filesystem. Directory ctime changes can require a fresh search; unsupported identity keeps search/branch/stash available.",
+    "Local failed disk writes may leave an explicitly diagnosed incomplete new file; all preexisting files remain preserved.",
+    "Dropped-stash recognition uses standard Git stash parent topology and WIP/On/index/untracked message forms.",
+    "No CI used, dispatched, rerun, polled or awaited; user deferred CI until all implementation, final history, local gates and independent reviews are complete."
+  ],
+  "review_pending": true
+}
