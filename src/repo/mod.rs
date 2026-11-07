@@ -33,6 +33,7 @@ mod drag_drop;
 mod external_tools;
 mod error_help;
 mod diff_split;
+pub(crate) mod fence_view;
 mod file_text;
 mod file_view;
 mod forge_link;
@@ -210,6 +211,8 @@ pub struct RepoTab {
     issue_work: issue_work::IssueWork,
     /// Who owns which files (CODEOWNERS).
     owners: owners::Owners,
+    /// The agent fence: its list, the worktrees checked against it, its editor.
+    fence: fence_view::FenceState,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -467,6 +470,7 @@ impl RepoTab {
             collisions: None,
             issue_work: Default::default(),
             owners: owners::Owners::default(),
+            fence: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

@@ -136,6 +136,7 @@ impl RepoTab {
         self.lfs_storage_ui(&ctx, &mut acts);
         self.issue_picker(&ctx, &mut acts);
         self.owners_lint_window(&ctx, &mut acts);
+        self.fence_window(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }

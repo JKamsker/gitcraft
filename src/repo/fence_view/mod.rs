@@ -1,0 +1,330 @@
+//! The agent fence in the tab: its list read with the repository, every linked worktree
+//! checked against it in the background (a worktree touching it turns red in the sidebar),
+//! the window that edits it and writes it into the agents' configs, and the confirmation a
+//! merge of a red worktree's branch needs.
+
+mod editor;
+#[cfg(test)]
+mod tests;
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+use super::{Action, Dialog, RepoTab};
+use crate::fence::{self, Violation};
+use crate::git::Worktree;
+
+pub(crate) use editor::FenceEditor;
+
+/// Added to the label of a merge confirmed past the fence: it reads in the undo list as what it
+/// was, and the gate lets it through.
+const PAST: &str = " (past the agent fence)";
+
+/// What the tab knows of the fence.
+#[derive(Default)]
+pub(crate) struct FenceState {
+    /// The list, as read last.
+    pub(crate) list: Vec<String>,
+    /// Which configurations besides Claude Code's it is written into.
+    pub(crate) targets: fence::Targets,
+    /// The list was read at least once.
+    pub(crate) loaded: bool,
+    /// Each linked worktree checked (by its folder): the fenced paths it touched, or why it
+    /// couldn't be checked (which counts as touched: a guardrail errs on the safe side).
+    pub(crate) found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
+    /// Writing the agents' configs into a worktree failed: where, and why.
+    pub(crate) write_errors: Vec<String>,
+    checking: bool,
+    /// Checked again once this check is in (the repository was read again meanwhile).
+    again: bool,
+    /// Steps a background check of their branch found clean: let through once.
+    cleared: Option<Vec<Vec<String>>>,
+    pub(crate) editor: Option<FenceEditor>,
+}
+
+impl FenceState {
+    /// The fenced paths the worktree at `path` touched (none when not checked or clean).
+    pub(crate) fn violations(&self, path: &std::path::Path) -> &[Violation] {
+        match self.found.get(path) {
+            Some(Ok(v)) => v,
+            _ => &[],
+        }
+    }
+
+    /// Why the worktree at `path` couldn't be checked, if it couldn't.
+    pub(crate) fn error(&self, path: &std::path::Path) -> Option<&str> {
+        match self.found.get(path) {
+            Some(Err(e)) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Whether the worktree at `path` is red: it touched the fence, or couldn't be checked.
+    pub(crate) fn red(&self, path: &std::path::Path) -> bool {
+        !self.violations(path).is_empty() || self.error(path).is_some()
+    }
+}
+
+/// The files gitcraft writes into a worktree itself, left out of its check.
+fn own_files(targets: fence::Targets) -> Vec<&'static str> {
+    let mut own = vec![fence::CLAUDE];
+    if targets.cursor {
+        own.push(fence::CURSOR);
+    }
+    if targets.agents_md {
+        own.push(fence::AGENTS);
+    }
+    own
+}
+
+/// The worktrees checked: the linked ones there are, not the main one.
+fn checked(worktrees: &[Worktree]) -> Vec<Worktree> {
+    worktrees
+        .iter()
+        .filter(|w| !w.main && !w.bare && w.prunable.is_none() && !w.head.is_empty())
+        .cloned()
+        .collect()
+}
+
+/// What a check of the worktrees found.
+struct Checked {
+    list: Vec<String>,
+    targets: fence::Targets,
+    found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
+    write_errors: Vec<String>,
+}
+
+impl RepoTab {
+    /// Reads the list, writes it into the agents' configs of worktrees that lack it (one
+    /// added since it was saved), and checks the linked worktrees, in the background.
+    pub(crate) fn check_fence(&mut self, ctx: &egui::Context) {
+        if self.fence.checking {
+            self.fence.again = true;
+            return;
+        }
+        let worktrees = checked(&self.worktrees);
+        let roots: Vec<PathBuf> = self
+            .worktrees
+            .iter()
+            .filter(|w| !w.bare && w.prunable.is_none())
+            .map(|w| w.path.clone())
+            .collect();
+        let base = self
+            .worktrees
+            .iter()
+            .find(|w| w.main)
+            .map(|w| w.head.clone())
+            .unwrap_or_default();
+        self.fence.checking = true;
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || {
+                let list = fence::read(&repo)?;
+                let targets = fence::read_targets(&repo);
+                let patterns = fence::parse_list(&list);
+                let mut write_errors = Vec::new();
+                if !patterns.is_empty() {
+                    for root in &roots {
+                        if let Err(e) = fence::write_all(root, &patterns, targets) {
+                            write_errors.push(format!("{}: {e}", crate::remote::display(root)));
+                        }
+                    }
+                }
+                let own = own_files(targets);
+                let found = worktrees
+                    .iter()
+                    .map(|w| {
+                        (
+                            w.path.clone(),
+                            fence::check(&w.path, &base, &patterns, &own),
+                        )
+                    })
+                    .collect();
+                Ok::<_, String>(Checked {
+                    list,
+                    targets,
+                    found,
+                    write_errors,
+                })
+            },
+            |tab, result, ctx| {
+                tab.fence.checking = false;
+                match result {
+                    Ok(c) => {
+                        tab.fence.list = c.list;
+                        tab.fence.targets = c.targets;
+                        tab.fence.found = c.found;
+                        tab.fence.write_errors = c.write_errors;
+                        tab.fence.loaded = true;
+                    }
+                    Err(e) => tab.status = Some((e, true)),
+                }
+                if std::mem::take(&mut tab.fence.again) {
+                    tab.check_fence(ctx);
+                }
+            },
+        );
+    }
+
+    /// `action`, or nothing yet: a merge, fast-forward or rebase onto a branch is first
+    /// checked against the fence in the background (what its commits bring in, and what its
+    /// worktree, if it has one, touched); it then runs, or asks to be confirmed.
+    pub(crate) fn fence_gate(&mut self, action: Action, ctx: &egui::Context) -> Option<Action> {
+        let Action::UndoableOps {
+            label,
+            ops,
+            refresh,
+            undo,
+        } = action
+        else {
+            return Some(action);
+        };
+        let pass = Action::UndoableOps {
+            label: label.clone(),
+            ops: ops.clone(),
+            refresh,
+            undo: undo.clone(),
+        };
+        if label.ends_with(PAST) || self.fence.cleared.as_ref() == Some(&ops) {
+            self.fence.cleared = None;
+            return Some(pass);
+        }
+        let Some(tip) = brought_in(&ops).map(str::to_owned) else {
+            return Some(pass);
+        };
+        if self.fence.loaded && fence::parse_list(&self.fence.list).is_empty() {
+            return Some(pass);
+        }
+        // What its worktree touched, if one has the branch checked out.
+        let short = tip
+            .strip_prefix("refs/heads/")
+            .or_else(|| {
+                tip.strip_prefix("refs/remotes/")
+                    .and_then(|r| r.split_once('/').map(|(_, b)| b))
+            })
+            .unwrap_or(&tip)
+            .to_owned();
+        let worktree = self
+            .worktrees
+            .iter()
+            .find(|w| w.branch.as_deref() == Some(short.as_str()))
+            .map(|w| {
+                let found = match self.fence.found.get(&w.path) {
+                    Some(Ok(v)) => Ok(v.clone()),
+                    Some(Err(e)) => Err(e.clone()),
+                    None => Ok(Vec::new()),
+                };
+                (w.name(), found)
+            });
+        self.status = Some(("Checking against the agent fence…".to_owned(), false));
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || {
+                let patterns = fence::parse_list(&fence::read(&repo)?);
+                if patterns.is_empty() {
+                    return Ok(Vec::new());
+                }
+                fence::check_ref(&repo, &tip, "HEAD", &patterns)
+            },
+            move |tab, commits, ctx| {
+                tab.status = None;
+                let mut found: Vec<Violation> = Vec::new();
+                let mut errors: Vec<String> = Vec::new();
+                match commits {
+                    Ok(v) => found.extend(v),
+                    Err(e) => errors.push(e),
+                }
+                if let Some((_, wt)) = &worktree {
+                    match wt {
+                        Ok(v) => found.extend(
+                            v.iter()
+                                .filter(|x| !found.contains(x))
+                                .cloned()
+                                .collect::<Vec<_>>(),
+                        ),
+                        Err(e) => errors.push(e.clone()),
+                    }
+                }
+                if found.is_empty() && errors.is_empty() {
+                    tab.fence.cleared = Some(ops.clone());
+                    tab.apply(
+                        Action::UndoableOps {
+                            label,
+                            ops,
+                            refresh,
+                            undo,
+                        },
+                        ctx,
+                    );
+                    return;
+                }
+                let body = confirm_body(
+                    &short,
+                    worktree.as_ref().map(|w| w.0.as_str()),
+                    &found,
+                    &errors,
+                );
+                tab.dialog = Some(
+                    Dialog::confirm(&format!("{label}{PAST}"), body, "Merge anyway", ops, None)
+                        .undo(undo),
+                );
+            },
+        );
+        None
+    }
+}
+
+/// The ref a `merge` or `rebase` step brings in, if the first step is one.
+fn brought_in(ops: &[Vec<String>]) -> Option<&str> {
+    let first = ops.first()?;
+    if !matches!(first.first().map(String::as_str), Some("merge" | "rebase")) {
+        return None;
+    }
+    let last = first.last()?;
+    last.starts_with("refs/").then_some(last.as_str())
+}
+
+/// Most fenced paths a hover or a confirmation lists.
+const LISTED: usize = 8;
+
+/// The fenced paths, one per line, `how` each was touched, cut to [`LISTED`].
+pub(crate) fn list_violations(found: &[Violation]) -> String {
+    let mut out: Vec<String> = found
+        .iter()
+        .take(LISTED)
+        .map(|v| format!("  {} ({}; fence: {})", v.path, v.how.label(), v.pattern))
+        .collect();
+    if found.len() > LISTED {
+        out.push(format!("  and {} more", found.len() - LISTED));
+    }
+    out.join("\n")
+}
+
+fn confirm_body(
+    branch: &str,
+    worktree: Option<&str>,
+    found: &[Violation],
+    errors: &[String],
+) -> String {
+    let mut body = match worktree {
+        Some(wt) => format!("{branch} (checked out in the worktree {wt})"),
+        None => branch.to_owned(),
+    };
+    if !found.is_empty() {
+        body.push_str(&format!(
+            " touched paths agents must stay out of:\n{}",
+            list_violations(found)
+        ));
+    }
+    if !errors.is_empty() {
+        body.push_str(&format!(
+            "{}couldn't be checked against the agent fence:\n  {}",
+            if found.is_empty() { " " } else { "\nIt also " },
+            errors.join("\n  ")
+        ));
+    }
+    body.push_str("\n\nGo ahead all the same?");
+    body
+}

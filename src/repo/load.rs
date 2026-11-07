@@ -419,6 +419,7 @@ impl RepoTab {
             here.changes = Some(changes);
         }
         self.count_worktrees(ctx);
+        self.check_fence(ctx);
         self.take_visibility(loaded.log_from, ctx);
         self.take_order(loaded.order, ctx);
         // Stash numbers shift when one is pushed or dropped; follow the commit.

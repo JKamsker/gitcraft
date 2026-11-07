@@ -24,6 +24,9 @@ impl RepoTab {
             self.wait_for_running(waiter);
             return;
         }
+        let Some(action) = self.fence_gate(action, ctx) else {
+            return;
+        };
         match action {
             Action::Select(row) => {
                 self.leave_pages();
@@ -96,6 +99,7 @@ impl RepoTab {
             Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
             Action::SelectStaleBranches => self.dialog = Some(self.cleanup_dialog(ctx)),
             Action::OpenCollisions => self.open_collisions(),
+            Action::OpenFence => self.open_fence(ctx),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),
