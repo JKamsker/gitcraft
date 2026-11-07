@@ -122,3 +122,48 @@ pub(super) fn packs(
         })
         .collect()
 }
+
+/// Bounded optional file contents, on the repository machine.
+pub(crate) fn read(
+    path: &Path,
+    cap: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<Vec<u8>>, String> {
+    if let Some(out) = remote_read(
+        path,
+        |p| {
+            format!(
+                "if [ -f {p} ]; then printf '1'; head -c {} < {p}; elif [ -e {p} ]; then echo 'not a regular file' >&2; exit 1; else printf '0'; fi",
+                cap + 1
+            )
+        },
+        cap + 2,
+        active,
+    )? {
+        return match out.first() {
+            Some(b'0') => Ok(None),
+            Some(b'1') if out.len() - 1 <= cap => Ok(Some(out[1..].to_vec())),
+            _ => Err("Object-store metadata exceeds the inspection limit".into()),
+        };
+    }
+    if !active() {
+        return Err("Object inspection cancelled".into());
+    }
+    use std::io::Read;
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    if !file.metadata().map_err(|e| e.to_string())?.is_file() {
+        return Err("Object-store metadata is not a regular file".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(cap as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > cap {
+        return Err("Object-store metadata exceeds the inspection limit".into());
+    }
+    Ok(Some(bytes))
+}

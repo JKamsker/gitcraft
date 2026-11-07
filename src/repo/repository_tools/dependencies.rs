@@ -4,7 +4,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     ui.heading("Publish submodule dependencies before their parent");
     ui.label("Check fetches heads/tags into temporary app-owned refs on each submodule. It checks the named fetch endpoint, including gitlinks in outgoing history. Nested dependencies publish first. These pushes are not atomic; failures stop their parent.");
     let Some(result) = &mut state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let p = match result {

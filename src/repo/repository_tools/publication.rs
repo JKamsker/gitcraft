@@ -4,7 +4,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     ui.heading("Publish to several hosts");
     ui.label("These pushes are not atomic. A successful host stays published if another host fails. Each destination receives the exact commit shown; retry sends only failed destinations.");
     let Some(result) = &mut state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let m = match result {

@@ -1,3 +1,5 @@
+mod sharing;
+use crate::git::repository_tools::sharing as borrowing;
 mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
 mod submodule_conflict;
@@ -24,10 +26,13 @@ enum Tool {
     ForceRoute,
     SubmoduleConflict,
     Dependencies,
+    Sharing,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Sharing,
+    MakeIndependent(Box<borrowing::Plan>),
     AllRefs(String),
     Object(String),
     Reftable,
@@ -55,6 +60,7 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Sharing(borrowing::Sharing),
     Refs(all_refs::Browser),
     Object(object::Inspection),
     Reftable(reftable::Storage),
@@ -80,6 +86,15 @@ pub(crate) struct State {
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
         let act = match act {
+            Act::MakeIndependent(plan) => {
+                self.repository_tool_mutation(
+                    "Make clone independent",
+                    false,
+                    ctx,
+                    move |runner| borrowing::independent(runner, &plan),
+                );
+                return;
+            }
             Act::CheckDependencies(plan) => {
                 self.dependency_job(*plan, false, ctx);
                 return;
@@ -187,6 +202,8 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Sharing => (String::new(), Tool::Sharing),
+            Act::MakeIndependent(..) => return,
             Act::AllRefs(q) => (q, Tool::Refs),
             Act::Object(q) => (q, Tool::Object),
             Act::Reftable => (String::new(), Tool::Reftable),
@@ -232,6 +249,7 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Sharing => borrowing::inspect(&path).map(Data::Sharing),
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
                 Tool::Replacements => replacements::read(&path).map(Data::Replacements),
@@ -317,6 +335,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Sharing {
+        sharing::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Dependencies {
         dependencies::show(ui, state, acts);
         return;
@@ -363,7 +385,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
     });
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let browser = match result {
@@ -428,7 +450,7 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
         }
     });
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let data = match result {
@@ -466,7 +488,7 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
 fn reftable_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Ref storage and guided migration");
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let storage = match result {
@@ -516,7 +538,7 @@ fn reftable_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
 fn replacements_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Replace refs and temporary history joins");
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let data = match result {

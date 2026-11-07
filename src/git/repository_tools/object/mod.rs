@@ -1,5 +1,5 @@
 //! Read-only object representations. Git runs on the repository machine, without lazy fetch.
-mod files;
+pub(super) mod files;
 #[cfg(test)]
 mod tests;
 
@@ -329,8 +329,25 @@ pub(crate) fn inspect(
         Some(o) => entries(repo, o, active)?,
         None => Vec::new(),
     };
-    let representations = representations(repo, &objects, &oid, active)?;
-    let mut notes = Vec::new();
+    let topology = super::sharing::topology::read(repo, &objects, active)?;
+    let mut representations = Vec::new();
+    for store in topology.stores.iter().filter(|s| s.available) {
+        representations.extend(self::representations(repo, &store.path, &oid, active)?);
+    }
+    let mut notes = topology.warnings;
+    notes.extend(
+        topology
+            .stores
+            .iter()
+            .filter(|s| !s.available || s.error.is_some())
+            .map(|s| {
+                format!(
+                    "Object store {}: {}",
+                    remote::display(&s.path),
+                    s.error.as_deref().unwrap_or("missing donor")
+                )
+            }),
+    );
     let missing = object.is_none().then(|| format!("{oid} is missing from the available object stores. No download was attempted; a promisor configuration alone does not prove that this particular object is promised."));
     if object.is_some() && representations.is_empty() {
         notes.push("Git can read this object, but no representation was found in the primary store. It may be borrowed from an alternate; inspect shared and borrowed objects.".into());

@@ -21,7 +21,7 @@ fn lines(ui: &mut egui::Ui, title: &str, values: &mut Vec<String>) {
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Remote URLs, refspecs and mirror policy");
     let Some(result) = &mut state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let e = match result {

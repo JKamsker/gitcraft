@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Shared and borrowed objects".into(),
+                "Inspect shared Git directories and donors; make a clone independent".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Sharing),
+            ),
+            (
                 "Publish submodule dependencies before parent…".into(),
                 "submodules publish remote".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Dependencies),

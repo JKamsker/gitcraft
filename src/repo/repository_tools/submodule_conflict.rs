@@ -3,7 +3,7 @@ use crate::repo::Action;
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Submodule conflict graph");
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let c = match result {

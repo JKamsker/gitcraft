@@ -39,7 +39,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     ui.heading("Separate pull and push routes");
     ui.label("Each count compares this local branch to the last fetched ref for that route. Missing or excluded tracking refs show unknown. Changing a push branch affects gitcraft's ordinary branch pushes; Git itself still uses its native push.default/refspec rules.");
     let Some(result) = &mut state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let data = match result {
@@ -114,7 +114,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
 pub(super) fn force(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Force push to the push route");
     let Some(result) = &state.result else {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
         return;
     };
     let p = match result {
