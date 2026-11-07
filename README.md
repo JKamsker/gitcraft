@@ -647,7 +647,7 @@ Windows holds every ancestor without delete sharing and exclusively owns the act
 alternate file while clearing its contents; its held-file recovery cannot overwrite
 replacement metadata. SSH, WSL and other platforms retain read-only inspection and explain why this action
 is unavailable. Private `objects/gitcraft-independent-stage-*` directories are kept
-as recovery evidence; successfully installed packs share their file data with that stage.
+as recovery evidence; Linux installs share pack data with the stage; Windows retains protected copies.
 
 SSH/WSL independence requires the `gitcraft-object-storage-helper` executable supplied
 by this package in PATH on the repository machine. It supports the versioned

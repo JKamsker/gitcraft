@@ -96,6 +96,7 @@ pub(super) struct Ownership {
     expected: Vec<u8>,
     locked: AtomicBool,
     backup: Mutex<Option<(String, Arc<File>)>>,
+    installed: Mutex<Vec<Arc<File>>>,
 }
 impl Ownership {
     pub fn capture(
@@ -149,6 +150,7 @@ impl Ownership {
             expected: expected.into(),
             locked: AtomicBool::new(false),
             backup: Mutex::new(None),
+            installed: Mutex::new(Vec::new()),
         };
         result.current(true)?;
         Ok(result)
@@ -277,22 +279,52 @@ impl Ownership {
     }
     pub fn install(&self, stage: &Stage, hash: &str) -> Result<(), String> {
         self.current(true)?;
+        let mut installed = self
+            .installed
+            .lock()
+            .map_err(|_| err("installed pack ownership lock failed"))?;
         for suffix in ["pack", "idx"] {
             let name = format!("pack-{hash}.{suffix}");
-            let path = stage.pack.join(&name);
-            let source = locked_read(&path)?;
-            match std::fs::hard_link(&path, self.pack.join(&name)) {
-                Ok(()) => (),
+            let source = locked_read(&stage.pack.join(&name))?;
+            if source.metadata().map_err(err)?.len() > 128 * 1024 * 1024 {
+                return Err(err("staged pack/index exceeds 128 MiB"));
+            }
+            let destination = self.pack.join(&name);
+            let retained = match std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .share_mode(SHARE_READ)
+                .custom_flags(NOFOLLOW)
+                .open(&destination)
+            {
+                Ok(mut file) => {
+                    let mut offset = 0;
+                    let mut buffer = [0u8; 64 * 1024];
+                    loop {
+                        let count = source.seek_read(&mut buffer, offset).map_err(err)?;
+                        if count == 0 {
+                            break;
+                        }
+                        file.write_all(&buffer[..count]).map_err(|error|format!("Owned pack copy failed; borrowing remains and the partial copy was retained: {error}"))?;
+                        offset += count as u64;
+                    }
+                    file.sync_all().map_err(err)?;
+                    file
+                }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let existing = open(&self.pack.join(&name), false, false)?;
+                    let existing = locked_read(&destination)?;
                     if read(&existing, 128 * 1024 * 1024)? != read(&source, 128 * 1024 * 1024)? {
                         return Err(err(
                             "an existing pack/index differs and was not overwritten",
                         ));
                     }
+                    existing
                 }
                 Err(error) => return Err(err(error)),
-            }
+            };
+            // Keep the actual installed files protected through proof/recovery as well.
+            installed.push(Arc::new(retained));
         }
         self.current(true)
     }
