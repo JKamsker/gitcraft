@@ -107,6 +107,45 @@ fn forge_of(tool: &str) -> Result<Forge, String> {
     }
 }
 
+/// GitLab API calls name the full project and host rather than trusting repository-local
+/// glab configuration. Recheck both before every request, including ordinary local tabs.
+pub(super) fn gitlab_api(
+    repo: &Path,
+    hosting: &super::Hosting,
+    method: &str,
+    endpoint: &str,
+    body: Option<&serde_json::Value>,
+    deadline: Instant,
+) -> Result<String, String> {
+    let (host, path) = remote_location(repo, Forge::GitLab)?;
+    let expected = super::gitlab::api_authority(hosting);
+    if !host.eq_ignore_ascii_case(&expected) || path != hosting.path {
+        return Err("The GitLab remote changed. Refresh the tab before continuing.".into());
+    }
+    if !endpoint.starts_with("projects/") && endpoint != "user" {
+        return Err("Invalid GitLab API endpoint".into());
+    }
+    let mut cmd = tool_command("glab");
+    crate::connections::configure_cli(&mut cmd, "glab", &host)?;
+    cmd.current_dir(std::env::temp_dir())
+        .env("GITLAB_HOST", &host)
+        .args(["api", "--hostname", &host, "--method", method, endpoint]);
+    let input = body.map(|body| body.to_string().into_bytes());
+    if input.is_some() {
+        cmd.args(["--input", "-"]);
+    }
+    let out = crate::bounded_process::run_with_input(
+        cmd,
+        input,
+        &|| Instant::now() < deadline,
+        Duration::from_secs(30).min(deadline.saturating_duration_since(Instant::now())),
+    )?;
+    if !out.status.success() {
+        return Err(failure("glab", &out));
+    }
+    String::from_utf8(out.stdout).map_err(|_| "GitLab returned non-UTF-8 JSON".into())
+}
+
 /// Whether `glab` with `args` takes `--repo`: every command but `api`.
 fn gitlab_takes_repo(args: &[&str]) -> bool {
     args.first().is_some_and(|sub| *sub != "api")

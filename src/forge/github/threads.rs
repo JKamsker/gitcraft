@@ -121,6 +121,9 @@ pub(crate) fn parse(json: &str) -> Result<(PrExtras, Option<String>), String> {
         .filter(|_| has_next)
         .map(str::to_owned);
     let extras = PrExtras {
+        review_features: Default::default(),
+        merge_blocker: None,
+        connection_binding: None,
         pr_id: at(pr, "/id").to_owned(),
         viewer: (!viewer.is_empty()).then(|| viewer.to_owned()),
         permission: at(repository, "/viewerPermission").to_owned(),

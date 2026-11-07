@@ -127,6 +127,17 @@ impl RepoTab {
             return;
         };
         let number = view.number;
+        if details
+            .extras
+            .connection_binding
+            .is_some_and(|b| b != crate::pr_threads::connection_binding())
+        {
+            self.pr_drafts.entry(number).or_default().error = Some((
+                Place::Review,
+                "Profile connections changed. Reload the pull request before sending.".into(),
+            ));
+            return;
+        }
         let draft = self.pr_drafts.entry(number).or_default();
         // One thing at a time: what's shown may be about to change with the answer.
         if draft.posting {

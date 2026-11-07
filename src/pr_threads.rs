@@ -33,9 +33,33 @@ pub struct Thread {
     pub more_comments: bool,
 }
 
+/// Native review operations exposed by a forge; unsupported actions stay off the page.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewFeatures {
+    pub pending: bool,
+    pub request_changes: bool,
+    pub approve: bool,
+    pub apply_suggestions: bool,
+}
+impl Default for ReviewFeatures {
+    fn default() -> Self {
+        Self {
+            pending: true,
+            request_changes: true,
+            approve: true,
+            apply_suggestions: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PrExtras {
     pub pr_id: String,
+    pub review_features: ReviewFeatures,
+    /// Native forge blocker; unknown data remains a blocker instead of permission.
+    pub merge_blocker: Option<String>,
+    /// Immutable public Profile context that read the page (no token values).
+    pub connection_binding: Option<u64>,
     pub viewer: Option<String>,
     pub permission: String,
     pub merge_allowed: bool,
@@ -91,4 +115,12 @@ mod tests {
             assert_eq!(extras.can_write(), may, "{permission}");
         }
     }
+}
+
+/// Bind new provider actions to the exact Profile settings which read their page.
+pub(crate) fn connection_binding() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    crate::connections::current().hash(&mut hash);
+    hash.finish()
 }

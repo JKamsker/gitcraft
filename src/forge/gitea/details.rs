@@ -140,6 +140,9 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
     };
     let head_repo = at(pr, "/head/repo/full_name");
     let extras = PrExtras {
+        review_features: Default::default(),
+        merge_blocker: None,
+        connection_binding: None,
         pr_id: pr
             .get("id")
             .and_then(Value::as_u64)

@@ -46,6 +46,12 @@ pub(in crate::repo) fn review_box(
             .font(theme::semibold(10.5))
             .color(t.text_faint),
     );
+    if !extras.review_features.pending {
+        ui.label("Line comments are published when sent; this forge has no pending review here.");
+    }
+    if !extras.review_features.request_changes {
+        ui.label("Use comments to explain requested changes; this forge has no separate request-changes verdict here.");
+    }
     pending_list(ui, extras, draft.posting, acts);
     ui.add_enabled(
         !draft.posting,
@@ -80,6 +86,11 @@ fn verdict_buttons(
         (Verdict::Approve, "Approve"),
         (Verdict::RequestChanges, "Request changes"),
     ] {
+        if (verdict == Verdict::RequestChanges && !extras.review_features.request_changes)
+            || (verdict == Verdict::Approve && !extras.review_features.approve)
+        {
+            continue;
+        }
         // Whatever is pending can still go out, but a verdict comes too late.
         if !open && verdict != Verdict::Comment {
             continue;

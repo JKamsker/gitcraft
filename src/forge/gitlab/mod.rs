@@ -1,10 +1,13 @@
-//! GitLab, through `glab`: the list of merge requests and opening one. Their page is the web's.
+//! GitLab merge requests, native discussions, approvals and SHA-guarded merges through glab.
+mod api;
+mod details;
+mod post;
 
 use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, NewPullRequest, Provider, PullRequest, cli};
+use super::{Hosting, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
@@ -56,6 +59,10 @@ impl Provider for GitLab {
         self.run(repo, &args).map(|out| out.trim().to_owned())
     }
 
+    fn pages(&self) -> Option<&dyn Pages> {
+        Some(self)
+    }
+
     /// The host's own avatar API, asked by email.
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);
@@ -68,7 +75,7 @@ impl Provider for GitLab {
 
 /// Where a self-hosted GitLab's API is: its host, with the port of an `https://host:8443/…`
 /// remote (its web pages and API are on that port too).
-fn api_authority(hosting: &Hosting) -> String {
+pub(super) fn api_authority(hosting: &Hosting) -> String {
     hosting
         .web
         .split_once("://")
@@ -138,5 +145,27 @@ mod tests {
             at("ssh://git@gitlab.example.com:2222/g/p.git"),
             "gitlab.example.com"
         );
+    }
+}
+
+impl Pages for GitLab {
+    fn details(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+    ) -> Result<crate::pull_request::PrDetails, String> {
+        details::read(&api::Api::new(repo, hosting)?, number)
+    }
+    fn target(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        details: &crate::pull_request::PrDetails,
+    ) -> Option<Box<dyn crate::pr_post::Target>> {
+        Some(Box::new(post::GitLabTarget::new(
+            api::Api::new(repo, hosting).ok()?,
+            details,
+        )?))
     }
 }

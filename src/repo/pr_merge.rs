@@ -61,18 +61,20 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
         );
         return;
     }
-    let blocker = pr_post::merge_blocker(
-        d.draft,
-        &d.mergeable,
-        &d.merge_state,
-        extras.can_write(),
-        extras.can_bypass_rules,
-    );
+    let blocker = extras.merge_blocker.as_deref().or_else(|| {
+        pr_post::merge_blocker(
+            d.draft,
+            &d.mergeable,
+            &d.merge_state,
+            extras.can_write(),
+            extras.can_bypass_rules,
+        )
+    });
     let method = method_of(draft, d);
     draft.merge_method = Some(method);
     ui.horizontal_wrapped(|ui| {
         for (option, allowed, label) in [
-            (MergeMethod::Merge, extras.merge_allowed, "Merge commit"),
+            (MergeMethod::Merge, extras.merge_allowed, "Merge"),
             (MergeMethod::Squash, extras.squash_allowed, "Squash"),
             (MergeMethod::Rebase, extras.rebase_allowed, "Rebase"),
         ] {
