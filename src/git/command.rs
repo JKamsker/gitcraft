@@ -716,7 +716,13 @@ pub(crate) fn setup_clone(
     if crate::remote::is_remote(parent) {
         return Err("Setup clones target local folders only".into());
     }
-    let mut cmd = repository_command(Some(parent), &[])?;
+    // Explicit current-machine folder clones never consult profile/global URL rewrites,
+    // SSH commands, credential helpers or filters. Network clones retain the ready profile.
+    let mut cmd = if local {
+        practice_command(parent)
+    } else {
+        repository_command(Some(parent), &[])?
+    };
     for name in [
         "GIT_DIR",
         "GIT_COMMON_DIR",
@@ -726,6 +732,9 @@ pub(crate) fn setup_clone(
         "GIT_ALTERNATE_OBJECT_DIRECTORIES",
         "GIT_CONFIG_PARAMETERS",
         "GIT_CONFIG",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_TEMPLATE_DIR",
     ] {
         cmd.env_remove(name);
     }

@@ -108,28 +108,7 @@ pub(crate) fn read(
         return Ok(tour);
     }
     let tree = run(
-        &[
-            "--no-lazy-fetch",
-            "ls-tree",
-            "-r",
-            "-z",
-            &tour.head,
-            "--",
-            "README*",
-            "readme*",
-            "CONTRIBUTING*",
-            ".github",
-            "docs/CONTRIBUTING*",
-            ".gitattributes",
-            ".gitmodules",
-            ".editorconfig",
-            ".husky",
-            "lefthook.yml",
-            "lefthook.yaml",
-            ".lefthook.yml",
-            "package.json",
-            ".pre-commit-config.yaml",
-        ],
+        &["--no-lazy-fetch", "ls-tree", "-r", "-z", &tour.head],
         None,
     )?;
     let mut documents = 0;
@@ -170,8 +149,20 @@ pub(crate) fn read(
                 ".editorconfig",
                 "package.json",
             ]
-            .contains(&path);
-        if !document || documents >= 20 {
+            .contains(&path)
+            || path.ends_with("/.gitattributes");
+        if !document {
+            continue;
+        }
+        if documents >= 20 {
+            if !tour
+                .documents_unavailable
+                .iter()
+                .any(|s| s == "Additional documents omitted by the 20-document reading limit")
+            {
+                tour.documents_unavailable
+                    .push("Additional documents omitted by the 20-document reading limit".into());
+            }
             continue;
         }
         documents += 1;
@@ -197,7 +188,7 @@ pub(crate) fn read(
         match read() {
             Ok(bytes) => {
                 let text = String::from_utf8_lossy(&bytes);
-                if path == ".gitattributes"
+                if (path == ".gitattributes" || path.ends_with("/.gitattributes"))
                     && text.lines().any(|l| {
                         !l.trim_start().starts_with('#')
                             && l.split_whitespace().any(|s| s == "filter=lfs")
@@ -372,7 +363,7 @@ fn inspect_objects(mut bytes: &[u8], expected: usize, out: &mut Workflow) -> Res
             !conventional.is_empty() && conventional.bytes().all(|b| b.is_ascii_lowercase()),
         );
         bytes = bytes
-            .get(size + 1..)
+            .get(size.checked_add(1).ok_or("Invalid commit size")?..)
             .ok_or("Missing commit record separator")?;
     }
     if !bytes.is_empty() {

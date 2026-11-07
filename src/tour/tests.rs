@@ -76,3 +76,69 @@ fn real_repository_tour_reads_documents_needs_and_one_cached_history_without_hoo
     let _ = std::fs::remove_dir_all(repo.parent().ok_or("root")?);
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher()
+-> Result<(), String> {
+    const CHILD: &str = "GITCRAFT_TOUR_RECORDING_REMOTE";
+    if let Some(path) = std::env::var_os(CHILD) {
+        let path = std::path::PathBuf::from(path);
+        let encoded = crate::remote::encode(
+            &crate::remote::Host::Ssh("tour-fixture.invalid".into()),
+            path.to_str().ok_or("UTF-8 path")?,
+        );
+        let report = read(&encoded, None, &|| true, &AtomicUsize::new(0), 20000)?;
+        assert!(
+            report
+                .documents
+                .iter()
+                .any(|d| d.path == "README.md" && d.text.contains("remote fixture"))
+        );
+        let setup = crate::portability::snapshot(&encoded, vec![1], Vec::new(), &|| true)?;
+        assert_eq!(
+            setup.author_email.as_deref(),
+            Some("practice@example.invalid")
+        );
+        assert_eq!(setup.previous_path, encoded.to_string_lossy());
+        let rejected = crate::portability::restore(&setup, &encoded, Some(&path), None, &|| true);
+        assert!(!rejected.complete);
+        assert!(rejected.messages.join(" ").contains("local absolute"));
+        return Ok(());
+    }
+    let repo = crate::practice::create(crate::practice::Scenario::Published)?;
+    let root = repo.parent().ok_or("root")?.to_owned();
+    std::fs::write(repo.join("README.md"), "Only the remote fixture's README.")
+        .map_err(|e| e.to_string())?;
+    git::practice_run(&repo, &["add", "README.md"])?;
+    git::practice_run(&repo, &["commit", "-m", "docs: remote fixture"])?;
+    let bin = root.join("recording-bin");
+    std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    let ssh = bin.join("ssh");
+    let marker = root.join("recording-launcher-used");
+    std::fs::write(
+        &ssh,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' recording >> {}\nexec /bin/sh\n",
+            crate::remote::sh_quote(&marker.to_string_lossy())
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let output=std::process::Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","tour::tests::encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher","--nocapture"]).env(CHILD,&repo).env("PATH",std::env::join_paths(paths).map_err(|e|e.to_string())?).output().map_err(|e|e.to_string())?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(marker.exists());
+    std::fs::remove_dir_all(root).map_err(|e| e.to_string())?;
+    Ok(())
+}

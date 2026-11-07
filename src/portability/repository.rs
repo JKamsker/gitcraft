@@ -59,7 +59,11 @@ pub(crate) fn snapshot(
         let symbolic = run(&["symbolic-ref", "--short", "HEAD"])?;
         out.branch = Some(symbolic.trim().into());
     }
-    for remote in run(&["remote"])?.lines().take(32) {
+    let remotes = run(&["remote"])?;
+    if remotes.lines().count() > 32 {
+        return Err("More than 32 remotes; narrow the repository setup first".into());
+    }
+    for remote in remotes.lines() {
         reference(remote)?;
         let fetch = run(&["remote", "get-url", "--all", remote])?;
         let push = run(&["remote", "get-url", "--push", "--all", remote])?;
@@ -79,7 +83,10 @@ pub(crate) fn snapshot(
             ));
         }
         let mut push_urls = Vec::new();
-        for value in push.lines().take(16) {
+        if push.lines().count() > 16 {
+            return Err("More than 16 push URLs; narrow the repository setup first".into());
+        }
+        for value in push.lines() {
             match sanitize_url(value) {
                 Ok((url, changed)) => {
                     if changed {

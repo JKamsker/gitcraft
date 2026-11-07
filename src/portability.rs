@@ -28,6 +28,9 @@ pub struct PublicAccountExpectation {
     pub provider: Provider,
     pub host: String,
     pub user_or_alias: String,
+    /// Tea aliases are local labels; pin their actual public owner as well.
+    #[serde(default)]
+    pub account_user: Option<String>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -82,6 +85,7 @@ impl PublicProfile {
                         provider,
                         host: account.host.clone(),
                         user_or_alias: account.user.clone(),
+                        account_user: None,
                     });
                 }
             }
@@ -90,6 +94,7 @@ impl PublicProfile {
                     provider: Provider::Tea,
                     host: p.connections.tea_host.clone(),
                     user_or_alias: p.connections.tea_login.clone(),
+                    account_user: None,
                 });
             }
         }
@@ -203,6 +208,21 @@ impl Setup {
             repositories: Vec::new(),
         }
     }
+    /// Resolve public alias ownership on the exporting machine. Never serialize login tokens.
+    pub(crate) fn resolve_public_accounts(&mut self) -> Result<(), String> {
+        for profile in &mut self.profiles {
+            for account in &mut profile.setup.accounts {
+                if account.provider == Provider::Tea && account.account_user.is_none() {
+                    let (host,user)=crate::forge::selected_tea_metadata(&account.user_or_alias).ok_or("Cannot export the selected tea account: local public ownership is unavailable")?;
+                    if !host.eq_ignore_ascii_case(&account.host) || user.is_empty() {
+                        return Err("The selected tea alias has a different host or no public owner; check local profile setup before export".into());
+                    }
+                    account.account_user = Some(user);
+                }
+            }
+        }
+        Ok(())
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() > FILE_LIMIT {
             return Err("Setup file exceeds 8 MiB".into());
@@ -275,6 +295,18 @@ impl Setup {
                 if a.user_or_alias.is_empty() {
                     return Err("Expected account is empty".into());
                 }
+                if let Some(user) = &a.account_user {
+                    text(user, 256)?;
+                    if user.is_empty() {
+                        return Err("Expected account owner is empty".into());
+                    }
+                }
+                if a.provider == Provider::Tea && a.account_user.is_none() {
+                    return Err(
+                        "A portable tea alias must include its expected public account owner"
+                            .into(),
+                    );
+                }
             }
         }
         for i in &self.identities {
@@ -307,8 +339,12 @@ impl Repository {
         {
             return Err("Repository metadata exceeds limits".into());
         }
+        let mut remote_names = std::collections::BTreeSet::new();
         for remote in &r.remotes {
             reference(&remote.name)?;
+            if !remote_names.insert(&remote.name) {
+                return Err("Duplicate remote name".into());
+            }
             if sanitize_url(&remote.fetch)?.0 != remote.fetch {
                 return Err("Remote URL contains credentials or nonportable decorations".into());
             }
@@ -359,6 +395,14 @@ fn text(s: &str, max: usize) -> Result<(), String> {
         Ok(())
     }
 }
+fn windows_reserved(s: &str) -> bool {
+    let stem = s.split('.').next().unwrap_or_default().to_ascii_lowercase();
+    ["con", "prn", "aux", "nul"].contains(&stem.as_str())
+        || ["com", "lpt"].iter().any(|prefix| {
+            stem.strip_prefix(prefix)
+                .is_some_and(|n| n.len() == 1 && matches!(n.as_bytes()[0], b'1'..=b'9'))
+        })
+}
 pub(crate) fn leaf(s: &str) -> Result<(), String> {
     text(s, 100)?;
     if s.is_empty()
@@ -369,7 +413,7 @@ pub(crate) fn leaf(s: &str) -> Result<(), String> {
         || !s
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-        || ["con", "prn", "aux", "nul", "com1", "lpt1"].contains(&s.to_ascii_lowercase().as_str())
+        || windows_reserved(s)
     {
         return Err("Choose a plain, unique folder name".into());
     }

@@ -5,8 +5,8 @@ use crate::{
 };
 #[derive(Clone, Default)]
 pub(super) struct Fresh {
-    ssh: String,
-    signing: String,
+    pub(super) ssh: String,
+    pub(super) signing: String,
     folders: Vec<String>,
 }
 pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh) -> bool {
@@ -93,10 +93,14 @@ pub(super) fn verify(
                 choices.gitlab = account;
             }
             Provider::Tea => {
-                let (host, _) = crate::forge::selected_tea_metadata(&account.user)
+                let (host, user) = crate::forge::selected_tea_metadata(&account.user)
                     .ok_or("The expected local tea login is unavailable")?;
                 if !host.eq_ignore_ascii_case(&a.host) {
                     return Err("The tea login belongs to a different HTTPS server".into());
+                }
+                let expected=a.account_user.as_ref().ok_or("The imported tea expectation has no public owner; export it again from the original machine")?;
+                if !user.eq_ignore_ascii_case(expected) {
+                    return Err("The selected tea alias belongs to a different account user".into());
                 }
                 connections::check_account("tea", &account)?;
                 choices.tea_login = account.user;

@@ -1,6 +1,8 @@
 //! Portable setup preview and background handoffs. Imported paths never choose destinations.
 mod files;
 mod pending;
+#[cfg(test)]
+mod tests;
 
 use super::{App, Tab, profiles::ProfileState};
 use crate::{
@@ -297,7 +299,7 @@ impl App {
                             ui.label(format!("{} — previous location: {}",r.name,r.previous_path));
                             ui.label(format!("Checkout: {} · {} linked worktrees · {} hidden branches",r.branch.as_deref().unwrap_or("detached"),r.worktrees.len(),r.hidden.len()));
                             for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(format!("Push: {url}"));}}
-                            for w in &r.worktrees{ui.label(format!("Worktree {}: {} ({})",w.name,w.branch.as_deref().unwrap_or("detached"),w.previous_path));}
+                            for w in &r.worktrees{ui.label(format!("Worktree {}: {} at {} ({})",w.name,w.branch.as_deref().unwrap_or("detached"),w.commit,w.previous_path));}
                             for notice in &r.notices {ui.label(notice);}
                             if self.setup.import {
                                 let matching=r.profile_ids.iter().filter_map(|id|self.setup.mappings.get(id)).copied().collect::<Vec<_>>();
@@ -316,6 +318,7 @@ impl App {
                                     if !r.worktrees.is_empty(){ui.label(format!("New worktree root: {}",plan.parent.join(format!("{}-worktrees",plan.name)).display()));}
                                     if !permitted {ui.label("Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.");for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()){if ui.button(format!("Activate {}",p.title())).clicked(){activate=Some(*id);}}}}
                                     if ui.add_enabled(plan.selected && permitted && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){"Retry remaining steps"}else{"Clone and restore selected setup"})).clicked(){restore=Some(index);}
+                                    if plan.receipt.is_some() && ui.button("Choose a new destination instead").clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
                                     if plan.complete && ui.button("Open restored repository").clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
                                 });
                                 for message in &plan.messages{ui.label(message);}
@@ -360,6 +363,7 @@ impl App {
                 .cloned()
                 .collect::<Vec<_>>();
             self.setup.launch(ctx, move |active| {
+                file.resolve_public_accounts()?;
                 let mut errors = Vec::new();
                 for c in candidates {
                     if !active() {

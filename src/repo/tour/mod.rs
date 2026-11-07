@@ -140,7 +140,7 @@ impl RepoTab {
             for unavailable in &report.documents_unavailable{ui.label(unavailable);}
             if report.documents.is_empty(){ui.label("No README or contribution document was available in the recorded HEAD tree.");}
             ui.separator();ui.strong("Observed history workflow");let w=&report.workflow;
-            ui.label(format!("{} commits inspected: {} merges, {} Conventional Commit-like subjects, {} signature headers, {} Signed-off-by trailers",w.inspected,w.merges,w.conventional,w.signature_headers,w.signoffs));
+            ui.label(format!("{} commits inspected: {} merges, {} Conventional Commit-like subjects, {} signature headers, {} messages with Signed-off-by lines",w.inspected,w.merges,w.conventional,w.signature_headers,w.signoffs));
             ui.label(if w.merges==0{"No merge commits in this sample. This alone cannot distinguish squash, rebase or linear development."}else{"Merge commits occur in the sample; this does not establish a merge policy."});
             if let Some(e)=&w.incomplete{ui.label(e);}
             ui.strong("Branch and tag names");ui.label(format!("{} branches/remotes; {} tags (up to 2,000 names)",report.branches.len(),report.tags.len()));
@@ -167,5 +167,67 @@ impl RepoTab {
         } else if refresh {
             self.open_tour(true, ui.ctx());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn pending(generation: u64) -> TourView {
+        TourView {
+            generation: Arc::new(AtomicU64::new(generation)),
+            report: None,
+            loading: true,
+            error: None,
+            name: String::new(),
+            email: String::new(),
+            show_help: false,
+        }
+    }
+    #[test]
+    fn closed_or_replaced_tours_reject_stale_answers() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/tour-test".into(), &ctx);
+        tab.tour = Some(pending(2));
+        tab.tour_arrived(1, Err("stale".into()));
+        assert!(tab.tour.as_ref().unwrap().loading);
+        assert!(tab.tour.as_ref().unwrap().error.is_none());
+        tab.tour = None;
+        tab.tour_arrived(2, Err("closed".into()));
+        assert!(tab.tour.is_none());
+    }
+    #[test]
+    fn tour_ui_checklist_and_close_button_are_connected() -> Result<(), String> {
+        use egui_kittest::kittest::Queryable as _;
+        let path = crate::practice::create(crate::practice::Scenario::Published)?;
+        let root = path.parent().ok_or("root")?.to_owned();
+        let report = crate::tour::read(&path, None, &|| true, &AtomicUsize::new(0), 20000)?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(path, &ctx);
+        let mut view = pending(1);
+        view.loading = false;
+        view.report = Some(report);
+        tab.tour = Some(view);
+        let mut h = egui_kittest::Harness::builder()
+            .with_size([1200.0, 1400.0])
+            .build_ui_state(
+                |ui, tab: &mut RepoTab| {
+                    let mut actions = Vec::new();
+                    tab.tour_view(ui, &mut actions);
+                },
+                tab,
+            );
+        let _ = h.get_by_label("A tour of this repository");
+        let _ = h.get_by_label("Setup checklist");
+        h.get_by_label("Review hook, EditorConfig and signing setup")
+            .click();
+        h.run_steps(3);
+        assert!(h.state().tour.as_ref().unwrap().show_help);
+        h.get_by_label("Close tour").click();
+        h.run_steps(3);
+        assert!(h.state().tour.is_none());
+        drop(h);
+        std::fs::remove_dir_all(root).map_err(|e| e.to_string())?;
+        Ok(())
     }
 }

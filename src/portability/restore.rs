@@ -3,7 +3,7 @@
 use super::{Repository, leaf};
 use crate::git;
 use std::{
-    collections::BTreeSet,
+    collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
@@ -14,7 +14,7 @@ pub(crate) struct Receipt {
     definition: Vec<u8>,
     config: Vec<u8>,
     main_done: bool,
-    worktrees: BTreeSet<String>,
+    worktrees: BTreeMap<String, Vec<u8>>,
     work_root: Option<PathBuf>,
 }
 #[derive(Clone, Debug)]
@@ -120,6 +120,9 @@ pub(crate) fn restore(
             return Err("Import targets must be local absolute folders on this machine".into());
         }
         let parent = parent.canonicalize().map_err(|e| e.to_string())?;
+        if parent.to_str().is_none() {
+            return Err("Choose a destination with a UTF-8 path".into());
+        }
         let definition = serde_json::to_vec(repository).map_err(|e| e.to_string())?;
         if let Some(r) = &receipt {
             r.verify(&definition)?;
@@ -136,8 +139,9 @@ pub(crate) fn restore(
                 }
                 path.canonicalize()
                     .map_err(|e| e.to_string())?
-                    .to_string_lossy()
-                    .into_owned()
+                    .to_str()
+                    .ok_or("Choose a local source with a UTF-8 path")?
+                    .to_owned()
             } else {
                 repository
                     .remotes
@@ -181,7 +185,7 @@ pub(crate) fn restore(
                 definition,
                 config,
                 main_done: false,
-                worktrees: BTreeSet::new(),
+                worktrees: BTreeMap::new(),
                 work_root: None,
             });
         }
@@ -304,85 +308,108 @@ pub(crate) fn restore(
                     return Err("Worktree destination root was replaced".into());
                 }
                 let path = root.join(&w.name);
-                if r.worktrees.contains(&w.name) {
-                    if !path.is_dir() {
+                let already_added = if let Some(gitfile) = r.worktrees.get(&w.name) {
+                    let metadata = std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+                    if !metadata.is_dir()
+                        || metadata.file_type().is_symlink()
+                        || read_file(&path.join(".git"), 8192)? != *gitfile
+                    {
                         return Err(format!(
-                            "Previously restored worktree {} is missing; finish manually",
+                            "Previously restored worktree {} was replaced; finish manually",
                             w.name
                         ));
                     }
-                    continue;
-                }
-                if std::fs::symlink_metadata(&path).is_ok() {
-                    return Err(format!(
-                        "Worktree {} already exists and was not overwritten",
-                        w.name
-                    ));
-                }
-                match &w.branch {
-                    Some(branch) => {
-                        let from = branch_ref(repo, remote, branch, active)?;
-                        if from.starts_with("refs/heads/") {
+                    true
+                } else {
+                    if std::fs::symlink_metadata(&path).is_ok() {
+                        return Err(format!(
+                            "Worktree {} already exists and was not overwritten",
+                            w.name
+                        ));
+                    }
+                    false
+                };
+                if !already_added {
+                    match &w.branch {
+                        Some(branch) => {
+                            let from = branch_ref(repo, remote, branch, active)?;
+                            if from.starts_with("refs/heads/") {
+                                git::setup_run(
+                                    repo,
+                                    &["worktree", "add", "--", &path.to_string_lossy(), branch],
+                                    active,
+                                )?;
+                            } else {
+                                git::setup_run(
+                                    repo,
+                                    &[
+                                        "worktree",
+                                        "add",
+                                        "-b",
+                                        branch,
+                                        "--",
+                                        &path.to_string_lossy(),
+                                        &from,
+                                    ],
+                                    active,
+                                )?;
+                            }
+                        }
+                        None => {
                             git::setup_run(
                                 repo,
-                                &["worktree", "add", "--", &path.to_string_lossy(), branch],
+                                &[
+                                    "rev-parse",
+                                    "--verify",
+                                    "--end-of-options",
+                                    &format!("{}^{{commit}}", w.commit),
+                                ],
                                 active,
-                            )?;
-                        } else {
+                            )
+                            .map_err(|_| {
+                                format!(
+                                    "Worktree {} commit is unavailable; no substitute was used",
+                                    w.name
+                                )
+                            })?;
                             git::setup_run(
                                 repo,
                                 &[
                                     "worktree",
                                     "add",
-                                    "-b",
-                                    branch,
+                                    "--detach",
                                     "--",
                                     &path.to_string_lossy(),
-                                    &from,
+                                    &w.commit,
                                 ],
                                 active,
                             )?;
                         }
                     }
-                    None => {
+                    let gitfile = read_file(&path.join(".git"), 8192)?;
+                    r.worktrees.insert(w.name.clone(), gitfile);
+                }
+                if w.was_locked {
+                    // The preceding add is retained even when cancellation interrupts locking.
+                    let list =
+                        git::setup_run(repo, &["worktree", "list", "--porcelain", "-z"], active)?;
+                    let mut here = false;
+                    let mut locked = false;
+                    for field in list.split(|b| *b == 0) {
+                        if let Some(p) = field.strip_prefix(b"worktree ") {
+                            here = p == path.as_os_str().to_string_lossy().as_bytes();
+                        } else if here && (field == b"locked" || field.starts_with(b"locked ")) {
+                            locked = true;
+                        }
+                    }
+                    if !locked {
                         git::setup_run(
                             repo,
-                            &[
-                                "rev-parse",
-                                "--verify",
-                                "--end-of-options",
-                                &format!("{}^{{commit}}", w.commit),
-                            ],
-                            active,
-                        )
-                        .map_err(|_| {
-                            format!(
-                                "Worktree {} commit is unavailable; no substitute was used",
-                                w.name
-                            )
-                        })?;
-                        git::setup_run(
-                            repo,
-                            &[
-                                "worktree",
-                                "add",
-                                "--detach",
-                                "--",
-                                &path.to_string_lossy(),
-                                &w.commit,
-                            ],
+                            &["worktree", "lock", "--", &path.to_string_lossy()],
                             active,
                         )?;
                     }
                 }
-                if w.was_locked {
-                    git::setup_run(
-                        repo,
-                        &["worktree", "lock", "--", &path.to_string_lossy()],
-                        active,
-                    )?;
-                }
-                r.worktrees.insert(w.name.clone());
             }
             Ok(())
         })();
