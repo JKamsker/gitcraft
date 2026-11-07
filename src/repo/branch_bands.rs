@@ -268,6 +268,12 @@ impl RepoTab {
                 );
             }
         });
+        if self.band_reader.busy() {
+            ui.spinner();
+            ui.small("Updating branch-model layout…").on_hover_text(
+                "The visible layout is a preview until the selected branch model finishes rebuilding.",
+            );
+        }
         if changed {
             self.branch_bands.store(ui.ctx(), self.repo_key());
             self.queue_branch_bands();
