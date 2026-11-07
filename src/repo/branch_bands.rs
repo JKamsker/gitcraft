@@ -173,6 +173,7 @@ impl RepoTab {
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
         ui.menu_button("Graph tools…", |ui| {
+            self.postcard_button(ui);
             if ui.button("Watch the repository grow…").clicked() {
                 self.open_growth();
                 ui.close();

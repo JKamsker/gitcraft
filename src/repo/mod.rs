@@ -87,6 +87,7 @@ mod partial_stash;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
@@ -408,6 +409,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    postcards: postcards::State,
     growth: Option<growth::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
@@ -664,6 +666,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            postcards: Default::default(),
             growth: None,
             atlas: None,
             history_activity: None,

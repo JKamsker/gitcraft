@@ -42,6 +42,7 @@ mod log_order;
 mod notebook_filter;
 mod notes;
 mod overview;
+pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
@@ -64,6 +65,8 @@ mod submodule;
 mod timed;
 mod trees;
 mod unity;
+#[cfg(test)]
+mod visualization_tests;
 #[cfg(test)]
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;

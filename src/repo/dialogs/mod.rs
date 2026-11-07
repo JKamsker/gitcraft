@@ -433,6 +433,7 @@ impl RepoTab {
         self.history_activity_window(ctx, acts);
         self.atlas_window(ctx);
         self.growth_window(ctx);
+        self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
             d.seed(self.stash_picks.picked.iter().cloned());
             d.keep_changed(&self.work);
