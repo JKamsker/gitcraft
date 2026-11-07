@@ -1,0 +1,27 @@
+
+running 22 tests
+test git::recovery::batch::tests::raw_frames_keep_newlines_and_nuls_and_reject_range_type_and_identity_confusion ... ok
+test git::recovery::file::root_replacement_tests::typed_remote_publication_rejects_root_symlink_and_same_name_directory_substitution ... ok
+test git::recovery::file::tests::destinations_refuse_metadata_aliases_devices_and_traversal ... ok
+test git::recovery::file::root_replacement_tests::local_creation_rejects_root_and_ancestor_replacements_after_the_final_git_check ... ok
+test git::recovery::file::tests::remote_new_file_script_is_quoted_exclusive_and_keeps_existing_and_linked_files ... ok
+test git::recovery::tests::binary_large_unicode_literal_and_cancelled_scans_have_explicit_limits ... ok
+test git::recovery::tests::commit_and_excerpt_parsers_refuse_invalid_identity_and_keep_unicode_ranges ... ok
+test git::recovery::tests::content_search_finds_reflog_commits_and_staged_only_blobs_without_any_writes ... ok
+test git::recovery::tests::branch_destinations_refuse_symbolic_collisions_and_never_parse_names_as_shell_or_commands ... ok
+test git::recovery::tests::dropped_stashes_retain_working_index_and_untracked_content_provenance ... ok
+test git::recovery::tests::dropped_stash_recovery_only_updates_its_list_and_refuses_a_moved_destination ... ok
+test git::recovery::tests::filters_hooks_fsmonitor_signing_and_diff_helpers_never_execute_for_search_or_recovery ... ok
+test git::recovery::tests::partial_promisor_search_does_not_download_or_call_network_helpers ... ok
+test git::recovery::tests::new_file_recovery_refuses_links_special_destinations_and_missing_tracked_paths ... ok
+test git::recovery::tests::preview_rejects_forged_provenance_and_pruned_blob_identity ... ok
+test git::recovery::tests::pruning_an_unattached_blob_after_preview_refuses_recovery_without_creating_a_file ... ok
+test git::recovery::tests::prepared_branch_and_file_recovery_are_create_only_and_preserve_head_and_index ... ok
+test repo::content_recovery::tests::escape_closes_and_invalidates_a_live_content_read_without_closing_the_tab ... ok
+test repo::content_recovery::tests::pending_read_preserves_the_initiating_profile_scope_without_any_remote_execution ... ok
+test git::recovery::tests::unborn_sha256_staged_blobs_and_commit_recovery_keep_hash_format_and_index ... ok
+test repo::content_recovery::tests::replacements_wait_for_the_actual_owned_read_to_return_and_only_start_the_latest ... ok
+test repo::content_recovery::tests::pointer_ui_roundtrip_searches_inspects_prepares_and_recovers_a_new_file ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 792 filtered out; finished in 10.08s
+

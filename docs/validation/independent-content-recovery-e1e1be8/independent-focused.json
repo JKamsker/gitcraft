@@ -1,0 +1,11 @@
+{
+  "application_candidate": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+  "command": [
+    "/workspace/work/content-recovery/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "recovery::",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "log_sha256": "7498063c1f5efb034420e259fb6e5cf7b37b0c6e420d56aff6beb3ad51245c8c",
+  "scope": "Independent Linux focused execution from bound frozen existing author binary; no freshcompile/nativeWindows/full independent suite/live accounts or real remote/CI."
+}

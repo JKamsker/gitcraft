@@ -1,0 +1,9 @@
+Independent Lost and found by content review — PASS
+
+Exact application `e1e1be8842d83a01a902b6b6ff1be779ba693f84`, tree `9000ea7214151426627b1409705e3115e1f89da6`, relative `ff901aad4346ee409509b60f9c6e7b12689fde44`. This covers literal content recovery; PR54's standalone reflog/lost-commit browser is excluded.
+
+The original initial-root replacement finding is resolved. Local RootPin holds actual directory identity; Unix verifies a NOFOLLOW reopened root before handle-relative traversal and exclusive creation. Typed remote publication checks captured physical path and stat token. Windows uses volume/file-index identity and explicitly retains every canonical physical ancestor, worktree root and destination parent without delete sharing through CREATE_NEW. The narrow Windows API query uses the correct windows-sys signature with live owned storage. No new actionable findings remain.
+
+Independent read-only reuse of the bound frozen author binary passed all22focused cases (0failed;792filtered;10.08s), including local/typed-remote root replacement, raw framing, no-helper/lazy-fetch positive controls, provenance, no-overwrite, stash CAS, stale reader ownership and actual pointer search→inspect→prepare→confirm recovery. All20application source hashes and6log hashes match;337source/Cargo/build/assets files match exact candidate. Verified author evidence records fmt, strict all-target Clippy and full811passed/3ignored/0filtered with814registered and all22Linuxfeature tests executed.
+
+No fresh compilation, independent full-suite rerun, native Windows execution, live SSH/WSL/providers/credentials, real remote-host tests or CI use is claimed. The Windows-only ancestor test remains for deferred native gates. Remote file recovery requires GNU stat/ln and stable root identity; unsupported identity fails closed. This scoped PASS does not replace independent review of the exact final combined candidate.

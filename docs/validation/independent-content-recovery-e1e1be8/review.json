@@ -1,0 +1,34 @@
+{
+  "verdict": "PASS",
+  "application_candidate": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+  "application_tree": "9000ea7214151426627b1409705e3115e1f89da6",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "prior_failed_application": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
+  "scope": "Independent ordinary software correctness/adversarial review of eligible #32 literal content recovery, excluding PR54 standalone reflog/lost-commit UI. Exact scoped source approval; not final combined integration approval.",
+  "findings": [],
+  "resolved_findings": {
+    "CONTENT-1": "RootPin retains actual local root directory identity/allocation; Unix NOFOLLOW reopened root must match captured dev/ino before handle-relative traversal/exclusive creation. Remote publication verifies captured physical cwd and GNU stat dev/ino/ctime-ns before scratch/link publication. Independent original root/ancestor/symlink/same-name replacement regressions pass. Windows compares captured volume/file-index through a live handle and now opens/type-checks/reparse-refuses/retains every canonical physical ancestor from drive/UNC root through worktree, then destination parents, all without delete sharing through CREATE_NEW."
+  },
+  "static_review": [
+    "Bounded fsck/reflog discovery, strict cat-file type/ID/size frames and literal UTF-8 content search preserve distinct capped provenance/timeline; limitations reported.",
+    "Inspect/prepare/perform revalidate repository/source tree/path/blob/hash; raw bytes used for previews and output; no filters/textconv/lazy fetch/hooks/signing execute.",
+    "Create-only branch refs and new files; tracked/ignored/existing/linked/metadata destinations refuse; stash membership and expected-old-ref CAS preserve prior stash order and do not apply index/worktree data.",
+    "Latest-only read dispatch retains actual owned remote call to completion; generation/lifetime guards discard stale replies. Profile/Practice routing captured. Pointer UI actually searches, inspects, prepares and confirms; known committed ref outcomes acknowledged despite late cancellation.",
+    "Windows GetFileInformationByHandle narrow unsafe call matches existing windows-sys ABI/types with live owned handle/output storage; zero unusable identity fails closed. Physical ancestor guard removes dependence on descendant rename inference."
+  ],
+  "validation": {
+    "author_source_log_binding": "20application source hashes and6current/prior log hashes match;337src/Cargo/build/assets files match exact e1e1 source; evidence delta docs only.",
+    "author_full": "811passed;0failed;3ignored;0filtered;814registered;all22Linuxfeature cases executed. fmt/strict all-target Clippy logs verified.",
+    "independent_focused": "22passed;0failed;792filtered;10.08s;existing frozen bound binary read-only reuse.",
+    "binary_sha256": "9ef629751e7c824127116133864a63cc9c3ffa8df3ef900e18b83075dec70f61",
+    "manifest_sha256": "fe4d2bd10a372a169c1148476c3b0a97086829176866c5b5adab751d4f34f2b1",
+    "fresh_compile": false,
+    "ci": "No use/dispatch/rerun/poll/wait"
+  },
+  "limits": [
+    "No native Windows filesystem execution/compilation, live SSH/WSL/provider accounts or actual remote-host testing; typed scripts use owned local shell fixtures. Windows-only physical ancestor test is correctly registered in source and explicitly unexecuted here.",
+    "Remote file creation needs GNU stat/ln and stable root token; directory ctime changes can require fresh search. Unsupported identity disables file creation.",
+    "Independent run reuses author binary; source/depfile/hash/name/log consistency was checked, without cryptographic retroactive compile proof. Full suite remains author evidence, not independently rerun.",
+    "Final combined candidate still requires separate integration checks and independent whole-combination review plus deferred native platform gates."
+  ]
+}
