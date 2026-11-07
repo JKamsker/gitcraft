@@ -1,0 +1,37 @@
+{
+  "scope": "Command-level reproducer of exact b05 setup_clone network argv/environment, not app runtime. Owned temporary fixture, synthetic global URL rewrite and recording-only SSH executable; no network or real account/keys.",
+  "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "command": [
+    "git",
+    "-C",
+    "/tmp/gitcraft-portable-review-36x5r2y0/parent",
+    "--no-lazy-fetch",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "init.templateDir=",
+    "-c",
+    "protocol.ext.allow=never",
+    "-c",
+    "protocol.file.allow=never",
+    "clone",
+    "--no-checkout",
+    "--template=",
+    "--origin",
+    "origin",
+    "--",
+    "https://expected.fixture.invalid/team/project.git",
+    "/tmp/gitcraft-portable-review-36x5r2y0/parent/restored"
+  ],
+  "exit_code": 128,
+  "expected_url": "https://expected.fixture.invalid/team/project.git",
+  "recorded_transport_argv": [
+    "-o",
+    "SendEnv=GIT_PROTOCOL",
+    "git@redirect.fixture.invalid",
+    "git-upload-pack '/team/project.git'"
+  ],
+  "unexpected_host_recorded": true,
+  "stderr": "Cloning into '/tmp/gitcraft-portable-review-36x5r2y0/parent/restored'...\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.\n",
+  "temp_fixture_deleted_after_capture": true
+}
