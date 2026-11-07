@@ -55,6 +55,7 @@ impl RepoTab {
         }
         self.graph_motion_begin(&ops);
         self.celebration_begin(label, &ops, ctx);
+        let observe_celebration_head = self.celebration_needs_head();
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);
@@ -113,13 +114,24 @@ impl RepoTab {
                 }
                 result => result,
             };
-            Msg::OpDone {
+            // Pin the successful action's target before another queued action
+            // can start. This read stays on the owned mutation worker.
+            let observed = (result.is_ok() && observe_celebration_head).then(|| git::head(&path));
+            let done = Msg::OpDone {
                 label,
                 result,
                 refresh,
                 kind,
                 quiet,
                 stopped,
+            };
+            if let Some(head) = observed {
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.celebration_observed_head(head);
+                    tab.handle(done, ctx);
+                }))
+            } else {
+                done
             }
         });
     }
