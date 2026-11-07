@@ -136,6 +136,7 @@ impl RepoTab {
                     let _ = open::that_detached(url);
                 }
             }
+            Action::ForgeLink(request) => self.forge_link(request, ctx),
             Action::OpenPath(rel) => {
                 if let Err(e) = crate::remote::open_here(crate::remote::join(
                     &self.path,

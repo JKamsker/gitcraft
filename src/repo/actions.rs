@@ -101,6 +101,8 @@ pub(crate) enum Action {
         draft: bool,
     },
     OpenUrl(String),
+    /// Copy a link to a commit, branch, file or lines on the forge, or open it there.
+    ForgeLink(super::forge_link::LinkRequest),
     /// Open a path (relative to the repository) with the system's default app.
     OpenPath(PathBuf),
     OpenInEditor(PathBuf),

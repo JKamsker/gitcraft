@@ -199,6 +199,9 @@ impl RepoTab {
         {
             acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
         }
+        if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+            menu.items(ui, "branch", &target, acts);
+        }
         ui.separator();
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();

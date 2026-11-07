@@ -94,6 +94,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a file for its history, its blame or the whole file as it is at the commit.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
+            "Copy link to … and Open … on GitHub (GitLab, Forgejo, Gitea) in the menu of a commit, a branch or a file, and of a commit's diff lines (right-click a line, or select text for a range) or a file's lines at a commit (click one, Shift+click for a range, then right-click). Links to a commit, file or lines use the commit's hash; a branch's follows the branch. They go to the remote the checked-out (or right-clicked) branch tracks, else origin, else the one you pick; the status line warns when the commit or branch isn't on that remote yet.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Sync (toolbar, or the command palette) pulls the current branch the way Pull is set to, then pushes it; if the pull fails (conflicts, or it can't fast-forward), nothing is pushed.",
             "A push the remote refuses because it has commits you don't have opens a banner: how many, and whether your branch was rewritten here (amended, rebased, undone) or both moved on, or is only behind. Pull, then push joins them; Force push (with lease)… names the commits it removes from the remote first, and pushes nothing if the remote (or your branch) moved since it was checked.",
@@ -166,6 +167,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",
+            ),
+            (
+                "Click / Shift+click",
+                "Pick lines of a file to link to (View file, or File in a commit's diff)",
             ),
             ("F7 / Shift+F7", "Next / previous change in a diff"),
             ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),

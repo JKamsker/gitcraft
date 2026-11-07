@@ -215,7 +215,12 @@ impl RepoTab {
             RowExtra::Buttons(buttons),
         );
         if f.code != 'D' {
-            widgets::file_menu(&r.row, &f.path, None, true, Some(&key), acts);
+            // Linked as it is in the last commit: a new or renamed file isn't there by this name.
+            let links = || {
+                self.link_menu(None)
+                    .filter(|_| !matches!(f.code, 'A' | '?') && f.old_path.is_none())
+            };
+            widgets::file_menu(&r.row, &f.path, None, true, Some(&key), &links, acts);
         }
         match r.button {
             Some(i) => RowClick::Button(i),

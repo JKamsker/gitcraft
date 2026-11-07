@@ -68,7 +68,9 @@ impl RepoTab {
                         selected(&f),
                         RowExtra::Stats(f.added, f.removed),
                     );
-                    widgets::file_menu(&r.row, &f.path, rev, false, Some(&key(&f.path)), acts);
+                    // A file the commit deleted isn't in it, and has nothing to link to.
+                    let links = || self.link_menu(None).filter(|_| f.status != 'D');
+                    widgets::file_menu(&r.row, &f.path, rev, false, Some(&key(&f.path)), &links, acts);
                     if r.row.clicked() {
                         acts.push(Action::OpenDiff(key(&f.path)));
                     }

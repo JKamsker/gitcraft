@@ -5,9 +5,11 @@ use egui::{Sense, Stroke, Ui};
 
 use super::images::image_view;
 use super::lfs::lfs_view;
+use super::link::LineLinks;
 use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
+use crate::forge::links::Target;
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -66,14 +68,25 @@ impl RepoTab {
             self.find.bar(ui, what.name());
         }
         if as_file {
-            let source = || find::Source::DiffFile(path.clone());
-            file_text::show(
-                ui,
-                ("diff_file", &path),
-                view.file.as_ref(),
-                &mut self.find,
-                source,
-            );
+            let before = matches!(&view.file, Some(Ok(f)) if f.before);
+            let rev = sides(&view.key).map(|(new, old)| if before { old } else { new });
+            let menu = || self.link_menu(None);
+            let mut link = |ui: &mut Ui, lines| {
+                if let (Some(rev), Some(menu)) = (&rev, menu()) {
+                    let target = Target::File {
+                        rev: rev.clone(),
+                        path: path.clone(),
+                        lines: Some(lines),
+                    };
+                    menu.items(ui, &lines.label(), &target, acts);
+                }
+            };
+            // Lines are picked only when there's something to link them to.
+            let links = (rev.is_some() && self.link_menu(None).is_some())
+                .then_some(&mut link as file_text::LineMenu<'_>);
+            // Lines picked in one commit's file aren't picked in another's.
+            let id = ("diff_file", &path, sides(&view.key));
+            file_text::show(ui, id, view.file.as_ref(), &mut self.find, || find::Source::DiffFile(path.clone()), links);
             return;
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
@@ -92,8 +105,16 @@ impl RepoTab {
         let split = data.shows_split(split);
         let reveal = find::search_diff(&mut self.find, ui.ctx(), &path, data, split);
         let shift = ui.input(|i| i.modifiers.shift);
+        let menu = || self.link_menu(None);
+        let links = sides(&view.key).map(|(new, old)| LineLinks {
+            path: path.clone(),
+            new,
+            old,
+            menu: &menu,
+        });
         let mut rows = Rows::new(ui, view, data, review.as_ref(), partial, split)
             .with_find(&self.find, reveal);
+        rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
         self.find.saw(seen);
@@ -169,7 +190,18 @@ impl RepoTab {
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, Some(&view.key), acts);
+                    // Linked as it is in the last commit: a new or renamed file isn't there by
+                    // this name. Compared with the working tree, the file shown is in no commit.
+                    let links = || {
+                        self.link_menu(None).filter(|_| match &view.key {
+                            DiffKey::Work(f) => {
+                                !matches!(f.code, 'A' | '?') && f.old_path.is_none()
+                            }
+                            DiffKey::Range { to: None, .. } => false,
+                            DiffKey::Commit { .. } | DiffKey::Range { .. } => true,
+                        })
+                    };
+                    widgets::file_menu(&title, path, rev, ignorable, Some(&view.key), &links, acts);
                     widgets::chip(ui, origin, t.text_dim);
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)
@@ -323,6 +355,18 @@ impl DiffView {
                 self.anchor = Some(i);
             }
         }
+    }
+}
+
+/// The revisions of a commit's diff (or a comparison of two) its lines can link to: the file
+/// after the change, and before it. `None` for changes not committed, which no forge has.
+fn sides(key: &DiffKey) -> Option<(String, String)> {
+    match key {
+        DiffKey::Commit { hash, .. } => Some((hash.clone(), format!("{hash}^"))),
+        DiffKey::Range {
+            from, to: Some(to), ..
+        } => Some((to.clone(), from.clone())),
+        DiffKey::Range { to: None, .. } | DiffKey::Work(_) => None,
     }
 }
 

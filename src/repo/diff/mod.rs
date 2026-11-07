@@ -6,6 +6,7 @@
 mod images;
 mod jump;
 mod lfs;
+pub(in crate::repo) mod link;
 mod map;
 mod paint;
 mod parse;

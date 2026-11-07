@@ -328,6 +328,18 @@ so your config, credentials and hooks apply as usual.
   file's menu).
 - _View all files_ under a commit's files lists every file of the commit, not only those it
   changed; click one to read it as it was in that commit.
+- Links to the forge: _Copy link to …_ and _Open … on GitHub_ (GitLab, Forgejo, Gitea;
+  self-hosted ones too, under a sub-path, or on another port for an HTTPS remote) in the menu of
+  a commit, a branch (its pill or its row in the sidebar), a file, and the lines of a commit's
+  diff (right-click a line, or the text selected for a range) or of a file at a commit (click a
+  line, Shift+click to make a range, then right-click; also with _File_ in a commit's diff). A
+  link to a commit, a file or lines names the commit by its hash, so it keeps showing the same
+  thing when the branch moves on; a branch's link follows the branch. Links go to the remote
+  the checked-out branch tracks (from a branch's own menu or pill, that branch's), else
+  `origin`; with neither, the menu lists the remotes to choose from. The link is made in the
+  background and copied (or opened); when the commit or branch isn't on that remote yet (as of
+  the last fetch), the status line says so: the page won't be found until it's pushed. Stashes
+  and uncommitted changes have no links.
 
 **Toolbar, terminal, app**
 
@@ -557,6 +569,7 @@ was made this way, on a demo repository.
 | `src/forge/gitea/`       | Forgejo and Gitea through their REST API: list, the page of one, comments, reviews, merges; finding the login |
 | `src/forge/http.rs`      | the REST client for forges without a command-line tool                             |
 | `src/forge/cli.rs`       | running `gh` / `glab`                                                              |
+| `src/forge/links/` | links to commits, branches, files and lines for each forge; the remote they go to |
 | `ci/forge-server.sh`     | a throwaway Forgejo or Gitea for the live tests (`src/forge/gitea/live.rs`)        |
 | `src/pull_request/mod.rs` | one pull request in full, whatever the forge: details, checks, comments, changes, safe markdown |
 | `src/pr_post/mod.rs` | what goes out: the `Target` trait each forge implements, and what they share (suggestions, merge rules) |
@@ -601,6 +614,7 @@ was made this way, on a demo repository.
 | `src/repo/find/`         | find in the diff, file or blame shown: the bar, matching, marks, keys              |
 | `src/custom_commands/`   | custom commands: what they are, the script each runs (its variables quoted), a repository's `.gitcraft/commands.json` and its trust |
 | `src/repo/custom_commands/` | custom commands in a tab: menu and palette entries, the repository's file, running one (toast or terminal) |
+| `src/repo/forge_link/` | the _Copy link to …_ / _Open … on GitHub_ menu entries, and the link made in the background |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
 | `src/git/preview.rs`     | what a destructive operation would change, read before it runs                     |
 | `src/repo/widgets.rs`    | shared painted widgets (panel headers, file rows, avatars, tabs)                   |

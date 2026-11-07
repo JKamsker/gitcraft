@@ -23,6 +23,7 @@ mod drag_drop;
 mod external_tools;
 mod file_text;
 mod file_view;
+mod forge_link;
 mod fold;
 mod find;
 pub(crate) mod graph_view;

@@ -11,6 +11,7 @@ use super::file_text::{self, FileText};
 use super::find::Source;
 use super::widgets;
 use super::{Action, RepoTab};
+use crate::forge::links::{Lines, Target};
 use crate::git::FileCommit;
 use crate::icons;
 use crate::theme::{self, Tokens};
@@ -122,16 +123,25 @@ impl RepoTab {
         match view.tab {
             FileTab::History => self.file_history(ui, acts),
             FileTab::Blame => self.blame_lines(ui, acts),
-            FileTab::File => file_text::show(
-                ui,
-                ("file_view", &view.path, &view.rev),
-                view.text.as_ref(),
-                &mut self.find,
-                || Source::File {
-                    path: view.path.clone(),
-                    rev: view.rev.clone(),
-                },
-            ),
+            FileTab::File => {
+                // Lines link to the commit the file is at; on disk, they may be in none.
+                let rev = view.rev.clone();
+                let mut link = |ui: &mut Ui, lines: Lines| {
+                    if let (Some(rev), Some(menu)) = (&rev, self.link_menu(None)) {
+                        let target = Target::File {
+                            rev: rev.clone(),
+                            path: view.path.clone(),
+                            lines: Some(lines),
+                        };
+                        menu.items(ui, &lines.label(), &target, acts);
+                    }
+                };
+                // Lines are picked only when there's something to link them to.
+                let links = (view.rev.is_some() && self.link_menu(None).is_some())
+                    .then_some(&mut link as file_text::LineMenu<'_>);
+                let id = ("file_view", &view.path, &view.rev);
+                file_text::show(ui, id, view.text.as_ref(), &mut self.find, || Source::File { path: view.path.clone(), rev: view.rev.clone() }, links);
+            }
         }
     }
 }

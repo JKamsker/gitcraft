@@ -3,21 +3,24 @@
 use egui::Response;
 
 use super::file_row::split_dir;
+use crate::forge::links::Target;
 use crate::repo::external_tools::{ToolItem, tool_item};
 use crate::repo::file_view::FileTab;
 use crate::repo::{Action, DiffKey};
+use crate::repo::forge_link::LinkMenu;
 
 /// Right-click menu for a file of the working tree or a commit: open it, its folder, copy path.
 /// Right-click menu of a file. `rev`: the commit it is shown in (it is viewed as it is there,
 /// history and blame start there);
-/// `ignorable`: a working-tree file that can be added to `.gitignore`; `diff`: the diff the
-/// row stands for, which an external diff or merge tool can open.
+/// `ignorable`: whether the file can be ignored; `diff`: the external tool target.
+/// `links`: forge destinations, read when the menu opens.
 pub fn file_menu(
     resp: &Response,
     path: &str,
     rev: Option<&str>,
     ignorable: bool,
     diff: Option<&DiffKey>,
+    links: &dyn Fn() -> Option<LinkMenu>,
     acts: &mut Vec<Action>,
 ) {
     egui::Popup::context_menu(resp)
@@ -87,6 +90,14 @@ pub fn file_menu(
                 scope,
                 acts,
             );
+            if let Some(menu) = links() {
+                let target = Target::File {
+                    rev: rev.unwrap_or("HEAD").to_owned(),
+                    path: path.to_owned(),
+                    lines: None,
+                };
+                menu.items(ui, "file", &target, acts);
+            }
         });
 }
 

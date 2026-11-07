@@ -4,6 +4,7 @@ use egui::{Response, Ui};
 
 use super::badge::{BadgeKind, badges};
 use super::compare_items;
+use crate::forge::links::Target;
 use crate::git;
 use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
 use crate::repo::conflict_check::Op;
@@ -120,6 +121,7 @@ impl RepoTab {
             acts.push(Action::ApplyPatch);
         }
         ui.separator();
+        self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
         copy_items(ui, &hash, &summary, branch_name.as_deref());
         let scope = self.commit_scope(&hash, branch_name.as_deref());
         crate::repo::custom_commands::menu_items(
@@ -128,6 +130,35 @@ impl RepoTab {
             scope,
             acts,
         );
+    }
+
+    /// Copy a link to the commit, or to its branch, or open them on the forge; links go to
+    /// the remote of the right-clicked branch (`pill`), else of the checked-out one.
+    fn link_items(
+        &self,
+        ui: &mut Ui,
+        hash: &str,
+        pill: Option<&str>,
+        branch: Option<&str>,
+        acts: &mut Vec<Action>,
+    ) {
+        let mut any = false;
+        if let Some(menu) = self.link_menu(pill) {
+            let target = Target::Commit {
+                rev: hash.to_owned(),
+            };
+            menu.items(ui, "commit", &target, acts);
+            any = true;
+        }
+        if let Some(name) = branch
+            && let Some((menu, target)) = self.branch_link_menu(name)
+        {
+            menu.items(ui, &format!("branch {name}"), &target, acts);
+            any = true;
+        }
+        if any {
+            ui.separator();
+        }
     }
 
     /// Actions on the right-clicked `branch`: check it out, or bring it into the checked-out
