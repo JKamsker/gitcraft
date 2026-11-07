@@ -1,5 +1,5 @@
 {
-  "review_state": "WIP static review; no approval yet",
+  "review_state": "FAIL: two actionable correctness findings; exact application not approved",
   "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
   "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
   "author_manifest_sha256": "c8d102c216a3a64b7d34d332679c15d0a337fc1f5657f7880132c7c92a5517a0",
@@ -63,9 +63,50 @@
     "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
     "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
   ],
-  "scope": "Independent source review and evidence consistency. No fresh Cargo build or independent runtime test yet. No CI use.",
-  "open_questions": [
-    "Network setup_clone deliberately keeps ready profile/global config; inspect whether ambient URL rewrites can change portable remote routing.",
-    "Continue static review of Windows path comparisons, restore retries, and explicit profile matching."
-  ]
+  "scope": "Independent ordinary software correctness/adversarial review of all Tour/Portability application changes b05 relative ff901aa. Static source review plus existing-binary focused Linux runtime tests and recording-only command fixtures. Not a combined-final-candidate review.",
+  "independent_validation": {
+    "focused_existing_binary": "20 passed;0 failed;792 filtered;2.28s",
+    "native_windows": "not run; static path mismatch plus synthetic path/parser and owned Linux repeated-lock fixture",
+    "network_rewrite": "exact setup_clone network command/environment shape, synthetic global config and recording-only SSH; changed expected HTTPS host to redirected SSH host",
+    "fresh_compile": false,
+    "full_suite": "author evidence only:809 passed;3 ignored;0 failed;0 filtered;812 registered; all source/log hashes verified",
+    "ci": "No use/dispatch/rerun/poll/wait"
+  },
+  "findings": [
+    {
+      "id": "PORTABLE-1",
+      "priority": "P2",
+      "title": "Keep portable network clone routing independent from ambient URL rewrites",
+      "file": "src/git/command.rs",
+      "lines": [
+        721,
+        724
+      ],
+      "trigger": "User imports a public HTTPS/SSH repository and clones with a ready profile while user-global/profile-included or destination-parent config has url.<other host>.insteadOf for that source.",
+      "behavior": "Network setup_clone uses repository_command and retains complete global/profile and parent config. The environment cleanup resets GIT_CONFIG_COUNT but does not remove url.*.insteadOf. Git silently routes the imported URL to another host or repository, contrary to preview and requested isolation; selected-host account helpers may no longer apply.",
+      "evidence": "network-rewrite-reproducer.json: expected https://expected.fixture.invalid/team/project.git invokes recording fake SSH for git@redirect.fixture.invalid. No real network or credentials used.",
+      "recommendation": "Build network clone from isolated base configuration and add only the captured ready profile authentication/SSH settings needed for the selected transport/host, or reject effective URL changes before transport. Add actual network-command recording regression with synthetic global and parent URL rewrites."
+    },
+    {
+      "id": "PORTABLE-2",
+      "priority": "P2",
+      "title": "Compare worktree lock paths using filesystem identity on Windows",
+      "file": "src/portability/restore.rs",
+      "lines": [
+        398,
+        401
+      ],
+      "trigger": "Windows import restores a locked linked worktree, then a later worktree step fails. User retries retained partial outcome.",
+      "behavior": "Rust parent.canonicalize yields Windows native/verbatim paths, while Git worktree porcelain emits slash paths. Raw byte equality misses the existing locked entry, then worktree lock runs again and Git errors already locked. Retry stops before later unfinished worktrees.",
+      "evidence": "windows-lock-review.json: existing project src/git/worktree.rs:242 models C:/... porcelain; synthetic Windows canonical versus Git spellings fail b05 comparison; independent owned Linux Git confirms second lock exits128 already locked. Native Windows runtime not claimed.",
+      "recommendation": "Resolve porcelain path to Path and compare canonical filesystem identity/normalized Windows forms rather than raw display bytes. Cover locked worktree before a later failure and successful unchanged receipt retry; retain native Windows final gate."
+    }
+  ],
+  "artifacts": {
+    "independent-focused.log": "7ca6ada71b412239f8799089add8e79e9a2eb820d38efc65d0467a6fb6926647",
+    "binary-binding.json": "ecc7570ca9f009ed1115bef6d39e50f9fb81e02ef45b1f438db23d2fb69d98af",
+    "independent-focused.json": "fd210274ee96cddc721cd992918bf363e964f5082e635cece613ce98dd9b5e56",
+    "windows-lock-review.json": "2634ced86cf4f7d481d7adf9941f03decf486774af440555bc264975ccd99b28",
+    "network-rewrite-reproducer.json": "9baaad7ab28300c13c4bbe17265432361e09d67ec277d2fa701b39a0bf5611bc"
+  }
 }
