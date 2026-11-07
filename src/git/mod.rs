@@ -26,6 +26,7 @@ pub mod errors;
 pub mod external_tool;
 mod files;
 mod fold;
+pub(crate) mod growth;
 mod hooks;
 mod interaction;
 mod lfs;

@@ -55,6 +55,7 @@ mod gerrit;
 mod ghost;
 mod graph_order;
 pub(crate) mod graph_view;
+mod growth;
 mod guide;
 pub(crate) mod highlight;
 mod history_activity;
@@ -407,6 +408,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    growth: Option<growth::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
@@ -662,6 +664,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            growth: None,
             atlas: None,
             history_activity: None,
             history_minimap: Default::default(),
