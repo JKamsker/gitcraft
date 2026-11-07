@@ -105,7 +105,7 @@ pub(super) fn boundary(
     let a = before.text().unwrap_or_default();
     let b = after.text().unwrap_or_default();
     if a.split_inclusive('\n').count() > 20_000 || b.split_inclusive('\n').count() > 20_000 {
-        return Err("More than20,000 lines in a version; use the normal patch view".into());
+        return Err("More than 20,000 lines in a version; use the normal patch view".into());
     }
     let body = if before.bytes == after.bytes {
         String::new()

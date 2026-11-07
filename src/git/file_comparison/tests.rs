@@ -191,6 +191,46 @@ fn encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_loc
 }
 
 #[test]
+fn blobless_matrix_does_not_fetch_and_missing_blob_comparisons_fail_explicitly()
+-> Result<(), String> {
+    let source = Repo::new()?;
+    source.write("folder/config", "configuration bytes\n")?;
+    source.commit()?;
+    source.git(&["config", "uploadpack.allowFilter", "true"])?;
+    let partial = Repo(source.0.join("partial"));
+    let out = Command::new("git")
+        .args(["clone", "--no-checkout", "--no-local", "--filter=blob:none"])
+        .arg(&source.0)
+        .arg(&partial.0)
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let missing = partial.git(&["rev-list", "--objects", "--all", "--missing=print"])?;
+    assert!(missing.lines().any(|s| s.starts_with('?')));
+    let matrix = matrix(
+        &partial.0,
+        &["HEAD".into(), "refs/heads/main".into()],
+        "folder/",
+        &|| true,
+    )?;
+    assert_eq!(matrix.paths, [b"folder/config".to_vec()]);
+    let entry = matrix.columns[0]
+        .files
+        .get(b"folder/config".as_slice())
+        .ok_or("missing matrix entry")?;
+    assert!(blob(&partial.0, Some(entry), &|| true).is_err());
+    assert_eq!(
+        partial.git(&["rev-list", "--objects", "--all", "--missing=print"])?,
+        missing
+    );
+    Ok(())
+}
+
+#[test]
 fn migration_reads_renames_copies_scores_and_immutable_blob_sides() -> Result<(), String> {
     let r = Repo::new()?;
     r.write(

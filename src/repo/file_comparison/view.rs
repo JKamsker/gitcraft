@@ -71,7 +71,7 @@ impl RepoTab {
                         acts.push(Action::ComparisonNormalPatch);
                     }
                 });
-                ui.label("HEAD → staged → working copy. Boundary buttons apply raw line patches under an index lock; changed snapshots are refused. Binary/unsupported/converting files stay read-only here.");
+                ui.label("HEAD → staged → working copy. Stage or unstage lines at either boundary; refresh if the file changes. Binary files and files requiring Git conversions stay read-only here.");
             }
             Page::Matrix => {
                 ui.horizontal_wrapped(|ui| {
@@ -92,7 +92,7 @@ impl RepoTab {
                     }
                 });
                 egui::CollapsingHeader::new(format!(
-                    "Choose branches ({} selected, maximum8)",
+                    "Choose branches ({} selected, maximum 8)",
                     state.selected.len()
                 ))
                 .default_open(state.selected.len() < 2)
@@ -423,7 +423,7 @@ fn lens(
             ui.colored_label(t.text_dim, reason);
         }
     }
-    ui.label(RichText::new("Long lines are abbreviated at2,000 characters; boundary actions use the complete raw line. Use the normal patch to inspect it.").small().color(t.text_dim));
+    ui.label(RichText::new("Long lines are abbreviated at 2,000 characters; boundary actions use the complete raw line. Use the normal patch to inspect it.").small().color(t.text_dim));
     let width = (ui.available_width() / 3. - 55.).max(180.);
     ui.horizontal(|ui| {
         ui.add_sized([width, 24.], egui::Label::new("HEAD"));

@@ -178,6 +178,9 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         .moves
         .is_empty()
     );
+    // Publish the new working change through the App's normal status load so
+    // opening the lens focuses the same file the user sees in Changes.
+    apply(&mut harness, Action::Reload)?;
     let active = harness.state().active;
     let action = match harness.state().tabs.get(active) {
         Some(Tab::Repo(tab)) => tab

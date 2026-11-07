@@ -303,6 +303,9 @@ pub(crate) fn matrix(
     if !(2..=8).contains(&branches.len()) {
         return Err("Choose between two and eight branches".into());
     }
+    if folder.starts_with('/') {
+        return Err("Choose a repository-relative folder".into());
+    }
     let folder = folder.trim_end_matches('/');
     let mut columns = Vec::new();
     let mut paths = BTreeSet::new();
