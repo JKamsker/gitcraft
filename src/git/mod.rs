@@ -11,6 +11,8 @@ mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
+mod credential_scope;
+pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
 mod commit_msg;
 mod commits;
 mod conflict;

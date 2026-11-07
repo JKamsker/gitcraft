@@ -113,16 +113,21 @@ pub(super) fn credentials(
     ui.add_space(4.0);
     ui.label(
         RichText::new(
-            "Used for this tab until you close it. If git has a credential helper (such as Git \
+            "Used only for this endpoint and account until you close the tab. If git has a credential helper (such as Git \
              Credential Manager), it saves them once they work.",
         )
         .color(t.text_faint)
         .small(),
     );
     ui.add_space(8.0);
-    let valid = !username.trim().is_empty() && !password.is_empty();
+    let scope = crate::git::CredentialScope::for_url(url, username.trim()).ok();
+    let valid = scope.is_some() && !password.is_empty() && !password.chars().any(char::is_control);
+    if scope.is_none() {
+        ui.label("An exact HTTP(S) endpoint is required before entering a transient sign-in. Run the operation again to resolve its destination.");
+    }
     buttons(ui, "Sign in", valid, enter, || {
         Action::SignIn(crate::git::Credentials {
+            scope: scope.clone(),
             username: username.trim().to_owned(),
             password: password.clone(),
         })
