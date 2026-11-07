@@ -12,6 +12,8 @@ pub(super) struct CodeMoves {
     pub data: DiffData,
     pub locations: Vec<[Location; 2]>,
     pub notes: Vec<String>,
+    /// Prepared once in the analysis worker; paints only borrow these immutable rows.
+    opened: Vec<Option<moved_view::Opened>>,
 }
 pub(super) struct Location {
     pub key: DiffKey,
@@ -157,7 +159,7 @@ pub(super) fn read(
     if !live() {
         return Err("Moved-code analysis cancelled or exceeded 40 seconds".into());
     }
-    assemble(label, patches, notes, source, &pins)
+    assemble(label, patches, notes, source, &pins, &live)
 }
 type ChangedPaths = (Vec<(String, char)>, Vec<String>);
 fn paths(bytes: &[u8]) -> Result<ChangedPaths, String> {
@@ -192,6 +194,7 @@ fn assemble(
     notes: Vec<String>,
     source: u8,
     pins: &[String],
+    active: &dyn Fn() -> bool,
 ) -> Result<CodeMoves, String> {
     let mut lines = Vec::new();
     let mut owners = Vec::new();
@@ -264,7 +267,18 @@ fn assemble(
     let mut data = DiffData::default();
     data.lines = lines;
     data.moves = moved::Moves { blocks, of_line };
+    let mut opened = Vec::with_capacity(data.moves.blocks.len());
+    for i in 0..data.moves.blocks.len() {
+        if !active() {
+            return Err("Moved-code comparison cancelled".into());
+        }
+        opened.push(moved_view::Opened::new(&data, i));
+    }
+    if !active() {
+        return Err("Moved-code comparison cancelled".into());
+    }
     Ok(CodeMoves {
+        opened,
         label,
         data,
         locations,
@@ -342,10 +356,10 @@ pub(super) fn view(
             }
         }
     });
-    if let Some(opened) = moved_view::Opened::new(&data.data, i) {
+    if let Some(opened) = data.opened.get(i).and_then(Option::as_ref) {
         let mut tint = *t;
         tint.accent = block_color(t, i);
-        moved_view::content(ui, &tint, &data.data, &opened);
+        moved_view::content(ui, &tint, &data.data, opened);
     }
 }
 fn block_color(t: &crate::theme::Tokens, i: usize) -> egui::Color32 {
@@ -378,6 +392,7 @@ mod tests {
             vec![],
             2,
             &["a".repeat(40), "b".repeat(40)],
+            &|| true,
         )?;
         assert_eq!(data.locations.len(), 1);
         let b = &data.data.moves.blocks[0];
@@ -395,13 +410,95 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn near_limit_edited_move_is_prepared_once_and_repaints_do_no_comparison() -> Result<(), String>
+    {
+        let prefix = "long source token ".repeat(100);
+        let old = (0..1000)
+            .map(|i| format!("-{prefix} original_line_{i}\n"))
+            .collect::<String>();
+        let new = (0..1000)
+            .map(|i| {
+                format!(
+                    "+{prefix} original_line_{}\n",
+                    if i == 500 { 1001 } else { i }
+                )
+            })
+            .collect::<String>();
+        let mut a = patch("a.rs", &old);
+        let mut b = patch("b.rs", &new);
+        a.text = a.text.replace("@@ -1,5 +1,5 @@", "@@ -1,1000 +0,0 @@");
+        b.text = b.text.replace("@@ -1,5 +1,5 @@", "@@ -0,0 +1,1000 @@");
+        let start = std::time::Instant::now();
+        let data = assemble("near limit".into(), vec![a, b], vec![], 0, &[], &|| true)?;
+        eprintln!(
+            "near-limit cross-file rows prepared in {:?}",
+            start.elapsed()
+        );
+        assert!(!data.locations.is_empty());
+        assert!(data.opened.iter().flatten().any(|o| o.edited_lines() > 0));
+        let temp = crate::git::file_comparison::tests::Repo::new()?;
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = RepoTab::new_deferred(temp.0.clone(), &ctx);
+        tab.open_file_comparison(Page::CodeMoves, &ctx);
+        let state = tab.file_comparison.as_mut().ok_or("state")?;
+        state.code_move = Some(0);
+        let count = moved_view::PREPARATIONS.with(|n| n.get());
+        for frame in 0..5 {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Point,
+                        phase: egui::TouchPhase::Move,
+                        delta: egui::vec2(0., frame as f32 * 10.),
+                        modifiers: egui::Modifiers::default(),
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    egui::CentralPanel::default().show(ui, |ui| {
+                        view(
+                            ui,
+                            state,
+                            &data,
+                            &crate::theme::Tokens::get(ui.ctx()),
+                            &mut Vec::new(),
+                        )
+                    });
+                },
+            );
+            out.shapes.clear();
+            out.textures_delta.clear();
+        }
+        assert_eq!(moved_view::PREPARATIONS.with(|n| n.get()), count);
+        // Accepted immutable rows live with their request; a stale worker cannot replace them.
+        let current = state.begin(true);
+        state.accept(current, Ok(Data::CodeMoves(Box::new(data))));
+        let epoch = state.data_request;
+        state.begin(true);
+        state.accept(epoch, Err("stale selected comparison".into()));
+        assert!(state.data.is_none() && state.code_move.is_none());
+        assert!(
+            assemble(
+                "cancel".into(),
+                vec![patch("a", &old), patch("b", &new)],
+                vec![],
+                0,
+                &[],
+                &|| false
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+    #[test]
     fn same_file_moves_are_left_to_the_existing_diff() -> Result<(), String> {
         let a = patch(
             "one.rs",
             "-fn important_validation_function() {}\n context\n+fn important_validation_function() {}\n",
         );
         assert!(
-            assemble("".into(), vec![a], vec![], 0, &[])?
+            assemble("".into(), vec![a], vec![], 0, &[], &|| true)?
                 .locations
                 .is_empty()
         );

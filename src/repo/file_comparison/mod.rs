@@ -312,6 +312,10 @@ impl RepoTab {
         else {
             return;
         };
+        // Every selection transition revokes the old pair, including 2→1 and 1→0.
+        // Displayed matrix cells retain their independent data_request ownership.
+        state.begin(false);
+        state.loading = false;
         let cell = (path, column);
         if let Some(i) = state.cells.iter().position(|c| *c == cell) {
             state.cells.remove(i);

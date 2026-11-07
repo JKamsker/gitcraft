@@ -224,6 +224,7 @@ fn actual_lens_boundary_buttons_stage_and_unstage_the_displayed_snapshot() -> Re
 fn actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches() -> Result<(), String> {
     let r = Repo::new()?;
     r.write("config", "old\n")?;
+    r.write("other", "other\n")?;
     r.commit()?;
     r.git(&["branch", "release-a"])?;
     r.write("config", "new\n")?;
@@ -251,6 +252,66 @@ fn actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches() -> R
     assert!(h.query_by_label_contains("-old").is_some());
     assert!(h.query_by_label_contains("+new").is_some());
     assert!(h.query_by_label_contains("Stage lens row").is_none());
+    let epoch = h
+        .state()
+        .0
+        .file_comparison
+        .as_ref()
+        .ok_or("state")?
+        .data_request;
+    let old_request = h.state().0.file_comparison.as_ref().ok_or("state")?.request;
+    h.query_by_label_contains("config | refs/heads/release-b |")
+        .ok_or("deselect")?
+        .click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("Content edits only").is_none());
+    {
+        let state = h.state_mut().0.file_comparison.as_mut().ok_or("state")?;
+        assert_eq!(state.cells.len(), 1);
+        assert_eq!(state.data_request, epoch);
+        assert!(!state.loading && state.pair.is_none());
+        state.accept_pair(old_request, Err("late pair".into()));
+        assert!(state.pair.is_none());
+    }
+    h.query_by_label_contains("config | refs/heads/release-a |")
+        .ok_or("clear final")?
+        .click();
+    h.run_steps(2);
+    assert!(
+        h.state()
+            .0
+            .file_comparison
+            .as_ref()
+            .is_some_and(|s| s.cells.is_empty() && !s.loading && s.pair.is_none())
+    );
+    for label in [
+        "config | refs/heads/release-a |",
+        "config | refs/heads/release-b |",
+    ] {
+        h.query_by_label_contains(label).ok_or("pair cell")?.click();
+        h.run_steps(2);
+    }
+    settle(&mut h)?;
+    let old = h.state().0.file_comparison.as_ref().ok_or("state")?.request;
+    h.query_by_label_contains("other | refs/heads/release-a |")
+        .ok_or("new first")?
+        .click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("Content edits only").is_none());
+    let state = h.state_mut().0.file_comparison.as_mut().ok_or("state")?;
+    assert_eq!(state.cells.len(), 1);
+    assert!(!state.loading && state.pair.is_none());
+    state.accept_pair(old, Err("late prior selection".into()));
+    assert!(state.pair.is_none());
+    // Deliver a deterministically outstanding pair after clearing a selection.
+    let stale = state.begin(false);
+    let ctx = h.ctx.clone();
+    h.state_mut()
+        .0
+        .comparison_cell(epoch, b"other".to_vec(), 0, &ctx);
+    let state = h.state_mut().0.file_comparison.as_mut().ok_or("state")?;
+    state.accept_pair(stale, Err("late pending pair".into()));
+    assert!(state.pair.is_none() && !state.loading && state.cells.is_empty());
     Ok(())
 }
 #[test]
@@ -537,5 +598,64 @@ fn actual_cross_file_move_opens_both_places_and_navigates_after_the_patch_arrive
         data.lines[view.jump_line.ok_or("line target")?].new,
         Some(1)
     );
+    Ok(())
+}
+
+#[test]
+fn line_history_header_wrap_toggles_without_reloading_or_losing_logical_selection()
+-> Result<(), String> {
+    let r = Repo::new()?;
+    r.write("long.txt", format!("{} old\n", "source prose ".repeat(60)))?;
+    r.commit()?;
+    r.write("long.txt", format!("{} new\n", "source prose ".repeat(60)))?;
+    let hash = r.commit()?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(r.0.clone(), &ctx);
+    let key = DiffKey::Commit {
+        hash,
+        path: "long.txt".into(),
+    };
+    let data = crate::repo::diff::load_lines(
+        &r.0,
+        &key,
+        Some(&[(1, 1)]),
+        crate::git::DiffOptions::default(),
+        true,
+    )?;
+    let mut view = crate::repo::DiffView::new(key);
+    view.next_request();
+    view.lines = Some(vec![(1, 1)]);
+    let target = data
+        .lines
+        .iter()
+        .position(|l| l.new == Some(1))
+        .ok_or("logical line")?;
+    view.chosen.insert(target);
+    view.data = Some(Ok(data));
+    tab.diff = Some(view);
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1300., 950.))
+        .build_ui_state(
+            |ui, tab: &mut RepoTab| {
+                crate::theme::install_fonts(ui.ctx());
+                let mut acts = Vec::new();
+                tab.diff_view(ui, &mut acts);
+                for action in acts {
+                    tab.apply(action, ui.ctx());
+                }
+            },
+            tab,
+        );
+    let before = crate::settings::Settings::get(&h.ctx).diff_wrap;
+    h.get_by_label("Wrap").click();
+    h.run_steps(2);
+    assert_ne!(crate::settings::Settings::get(&h.ctx).diff_wrap, before);
+    let view = h.state().diff.as_ref().ok_or("diff")?;
+    assert_eq!(view.lines, Some(vec![(1, 1)]));
+    assert_eq!(view.chosen, [target].into());
+    assert!(view.data.as_ref().is_some_and(Result::is_ok));
+    h.get_by_label("Wrap").click();
+    h.run_steps(2);
+    assert_eq!(crate::settings::Settings::get(&h.ctx).diff_wrap, before);
     Ok(())
 }

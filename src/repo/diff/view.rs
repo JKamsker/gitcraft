@@ -496,6 +496,7 @@ impl RepoTab {
                         {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
+                            wrap_control(ui, acts);
                             if view.lines.is_none() {
                                 view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                                 ui.add_space(4.0);
@@ -731,13 +732,7 @@ fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
     format!("{noun} {}", parts.join(", "))
 }
 
-/// Whitespace, whole file, side by side and unified toggles, laid out right to left.
-fn view_options(
-    ui: &mut Ui,
-    t: &Tokens,
-    (split, ignore_ws, whole_file): (bool, bool, bool),
-    acts: &mut Vec<Action>,
-) {
+fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {
     let wrap = crate::settings::Settings::get(ui.ctx()).diff_wrap;
     if ui
         .selectable_label(wrap, "Wrap")
@@ -746,6 +741,15 @@ fn view_options(
     {
         acts.push(Action::DiffWrap(!wrap));
     }
+}
+
+/// Whitespace, whole file, side by side and unified toggles, laid out right to left.
+fn view_options(
+    ui: &mut Ui,
+    t: &Tokens,
+    (split, ignore_ws, whole_file): (bool, bool, bool),
+    acts: &mut Vec<Action>,
+) {
     let ws = icons::small_button(
         ui,
         "pilcrow",

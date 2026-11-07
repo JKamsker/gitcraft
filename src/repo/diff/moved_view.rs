@@ -36,9 +36,13 @@ pub(in crate::repo) struct Opened {
     reindented: bool,
 }
 
+#[cfg(test)]
+thread_local! { pub(in crate::repo) static PREPARATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 impl Opened {
     /// Block `b` of `data` compared, if it is there.
     pub(in crate::repo) fn new(data: &DiffData, b: usize) -> Option<Self> {
+        #[cfg(test)]
+        PREPARATIONS.with(|n| n.set(n.get() + 1));
         let block = data.moves.blocks.get(b)?;
         let lines = &data.lines;
         let compared = moved::compare(lines, block);
