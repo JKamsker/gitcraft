@@ -3,6 +3,7 @@
 
 mod absorb;
 pub(crate) mod activity;
+pub(crate) mod atlas;
 mod attributes;
 pub mod backend;
 mod backlinks;

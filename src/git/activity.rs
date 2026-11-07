@@ -2,7 +2,7 @@
 //! after walking commits: Git's --since would prune out-of-order author dates.
 mod date;
 mod mailmap;
-mod process;
+pub(in crate::git) mod process;
 #[cfg(test)]
 mod tests;
 

@@ -7,6 +7,7 @@ pub(crate) mod agent;
 mod agents;
 mod ai;
 mod apply;
+mod atlas;
 mod authorship_view;
 mod bakeoff;
 mod bisect;
@@ -406,6 +407,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
     branch_bands: branch_bands::Preferences,
@@ -660,6 +662,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            atlas: None,
             history_activity: None,
             history_minimap: Default::default(),
             branch_bands,

@@ -173,6 +173,10 @@ impl RepoTab {
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
         ui.menu_button("Graph tools…", |ui| {
+            if ui.button("Churn and contributor atlas…").clicked() {
+                self.open_atlas();
+                ui.close();
+            }
             if ui.button("Activity calendar…").clicked() {
                 self.open_activity(super::history_activity::Page::Calendar, ui.ctx());
                 ui.close();

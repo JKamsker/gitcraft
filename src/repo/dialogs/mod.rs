@@ -431,6 +431,7 @@ enum Outcome {
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.history_activity_window(ctx, acts);
+        self.atlas_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
             d.seed(self.stash_picks.picked.iter().cloned());
             d.keep_changed(&self.work);
