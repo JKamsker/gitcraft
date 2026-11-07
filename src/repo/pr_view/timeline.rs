@@ -164,9 +164,13 @@ fn entry_header(
             );
         }
         ui.label(
-            RichText::new(git::relative_time(entry.at, git::now()))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(if entry.at > 0 {
+                git::relative_time(entry.at, git::now())
+            } else {
+                "Time unavailable".into()
+            })
+            .color(t.text_faint)
+            .small(),
         );
         if pr::is_web_url(&entry.url)
             && icons::small_button(ui, "external-link", "Open in the browser").clicked()

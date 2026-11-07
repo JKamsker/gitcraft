@@ -12,9 +12,10 @@ use serde_json::{Value, json};
 pub(super) struct GitLabTarget {
     api: Api,
     details: PrDetails,
+    context: crate::connections::Context,
 }
 impl GitLabTarget {
-    pub fn new(api: Api, details: &PrDetails) -> Option<Self> {
+    pub fn new(mut api: Api, details: &PrDetails) -> Option<Self> {
         let (host, path) = crate::pull_request::repo_of_url(&details.url)?;
         if host != api.hosting.host
             || path != api.hosting.path
@@ -23,7 +24,18 @@ impl GitLabTarget {
         {
             return None;
         }
+        let context = api.context.clone();
+        if !api.context.choices.gitlab.selected() {
+            // A click authorizes the viewer shown on the page, never a later CLI default.
+            api.context.choices.gitlab = crate::connections::Account {
+                host: super::api_authority(&api.hosting),
+                user: details.extras.viewer.clone()?,
+                config_dir: String::new(),
+            };
+            api.context.choices.gitlab.validate().ok()?;
+        }
         Some(Self {
+            context,
             api,
             details: details.clone(),
         })
@@ -32,7 +44,7 @@ impl GitLabTarget {
         self.api.mr(self.details.number)
     }
     fn guard(&self) -> Result<Value, String> {
-        if self.api.context != crate::connections::current() {
+        if self.context != crate::connections::current() {
             return Err("Profile connections changed. Reload the merge request.".into());
         }
         let me = self.api.get("user")?;
@@ -40,7 +52,14 @@ impl GitLabTarget {
             return Err("The GitLab account changed. Reload before sending.".into());
         }
         let mr = self.api.get(&self.endpoint())?;
-        if at(&mr, "/state") != "opened"
+        if mr
+            .get("id")
+            .and_then(Value::as_u64)
+            .map(|id| id.to_string())
+            .as_deref()
+            != Some(self.details.extras.pr_id.as_str())
+            || mr.get("iid").and_then(Value::as_u64) != Some(self.details.number)
+            || at(&mr, "/state") != "opened"
             || at(&mr, "/sha") != self.details.head_oid
             || at(&mr, "/diff_refs/head_sha") != self.details.head_oid
             || at(&mr, "/diff_refs/base_sha") != self.details.base_oid

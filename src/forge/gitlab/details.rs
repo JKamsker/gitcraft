@@ -302,10 +302,16 @@ pub(super) fn assemble(
             "CLEAN"
         }
         .into(),
-        review_decision: if approvals.as_ref().ok().and_then(approval_state) == Some(true) {
-            "APPROVED"
-        } else {
-            "REVIEW_REQUIRED"
+        review_decision: match approvals.as_ref().ok().and_then(approval_state) {
+            Some(true)
+                if approvals
+                    .as_ref()
+                    .is_ok_and(|a| !items(a, "/approved_by").is_empty()) =>
+            {
+                "APPROVED"
+            }
+            Some(false) => "REVIEW_REQUIRED",
+            _ => "",
         }
         .into(),
         labels: items(mr, "/labels")

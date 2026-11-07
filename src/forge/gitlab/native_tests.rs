@@ -202,8 +202,12 @@ if a[:2]==['config','get']:
 if a[0]!='api':raise Exception('non API tool call')
 host=a[a.index('--hostname')+1]
 assert host=='gitlab.com',host
-assert os.environ.get('GLAB_CONFIG_DIR')==str(root/'selected auth')
-assert os.environ.get('GITLAB_TOKEN')=='FIXTURE_SELECTED_TOKEN'
+if f['mode'].startswith('ambient'):
+ assert os.environ.get('GLAB_CONFIG_DIR') is None
+ assert os.environ.get('GITLAB_TOKEN') in [None,'FIXTURE_SELECTED_TOKEN']
+else:
+ assert os.environ.get('GLAB_CONFIG_DIR')==str(root/'selected auth')
+ assert os.environ.get('GITLAB_TOKEN')=='FIXTURE_SELECTED_TOKEN'
 method=a[a.index('--method')+1] if '--method' in a else 'GET'
 e=a[a.index('--method')+2] if '--method' in a else a[1]
 body=json.loads(sys.stdin.read()) if '--input' in a else None
@@ -229,6 +233,8 @@ else:
  if f['mode']=='changing':
   n=int((root/'read-count').read_text()) if (root/'read-count').exists() else 0
   (root/'read-count').write_text(str(n+1));result=dict(result);result['sha']=('%040x'%n)
+if f['mode']=='ambient-switch' and plain.endswith('/merge_requests/7'):
+ f['viewer']['username']='personal';(root/'fixtures.json').write_text(json.dumps(f))
 print(json.dumps(result))
 "#.replace("ROOT",&serde_json::to_string(&f.root.to_string_lossy()).map_err(|e|e.to_string())?);
             std::fs::write(&f.program, script).map_err(|e| e.to_string())?;
@@ -399,7 +405,7 @@ print(json.dumps(result))
     }
     #[test]
     fn stale_head_account_repository_and_profile_cannot_send_a_write() -> Result<(), String> {
-        for changed in ["head", "start", "base", "viewer", "remote", "profile"] {
+        for changed in ["head", "start", "base", "id", "viewer", "remote", "profile"] {
             let f = Fixture::new()?;
             f.run(|api| {
                 let d = details::read(api, 7)?;
@@ -408,6 +414,7 @@ print(json.dumps(result))
                 let mut fixture = f.fixture()?;
                 match changed {
                     "head" => fixture["mr"]["sha"] = json!("d".repeat(40)),
+                    "id" => fixture["mr"]["id"] = json!(999),
                     "viewer" => fixture["viewer"]["username"] = json!("personal"),
                     "start" => fixture["mr"]["diff_refs"]["start_sha"] = json!("d".repeat(40)),
                     "base" => fixture["mr"]["diff_refs"]["base_sha"] = json!("d".repeat(40)),
@@ -433,6 +440,39 @@ print(json.dumps(result))
                 "{changed}"
             );
         }
+        Ok(())
+    }
+    #[test]
+    fn default_cli_account_is_pinned_to_the_displayed_viewer_even_if_it_changes_mid_action()
+    -> Result<(), String> {
+        let mut f = Fixture::new()?;
+        f.profile.choices.gitlab = crate::connections::Account::on("gitlab.com");
+        let mut fixture = f.fixture()?;
+        fixture["mode"] = json!("ambient");
+        f.store(&fixture)?;
+        f.run(|api| {
+            let d = details::read(api, 7)?;
+            assert_eq!(d.review_decision, ""); // satisfied zero-approval rules are not a review.
+            let t = post::GitLabTarget::new(api::Api::new(&f.repo, &f.hosting())?, &d)
+                .ok_or("target")?;
+            t.comment("Authorized as the displayed work viewer")?;
+            let mut fixture = f.fixture()?;
+            fixture["mode"] = json!("ambient-switch");
+            f.store(&fixture)?;
+            assert!(t.comment("Must not publish as personal").is_err());
+            Ok(())
+        })?;
+        assert_eq!(
+            f.requests()?
+                .iter()
+                .filter(|r| r["method"] != "GET")
+                .count(),
+            1
+        );
+        let mut pending = Fixture::new()?;
+        pending.profile.error = Some("Imported profile setup is pending".into());
+        assert!(pending.run(|api| details::read(api, 7)).is_err());
+        assert!(pending.requests()?.is_empty());
         Ok(())
     }
     #[test]
