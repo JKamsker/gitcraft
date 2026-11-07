@@ -134,7 +134,9 @@ mod tests {
             tab.refs.local.push(Branch {
                 name: branch.into(),
                 target: "same-tip".into(),
-                ..Branch::default()
+                is_head: false,
+                upstream: String::new(),
+                track: String::new(),
             });
         }
         let mut acts = Vec::new();
