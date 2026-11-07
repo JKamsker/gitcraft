@@ -331,6 +331,8 @@ pub(crate) enum Action {
     Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Forget the effective HTTPS helper login, then reopen the tab sign-in dialog.
+    SwitchHttps(String),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
     /// at is known (read in the background for a repository on another machine).
     DeleteTag {

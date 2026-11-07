@@ -58,6 +58,8 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod connection;
+pub(crate) use connection::*;
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 

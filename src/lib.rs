@@ -63,3 +63,5 @@ mod tour;
 mod update;
 mod vscode_theme;
 mod weakened;
+
+mod connection_doctor;

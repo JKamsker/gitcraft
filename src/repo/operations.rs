@@ -150,6 +150,37 @@ impl RepoTab {
         self.run_ops(label, ops, refresh, OpKind::Normal(undo, before), ctx);
     }
 
+    /// An explicit helper rejection also clears tab-local credentials for that repository host.
+    pub(crate) fn forget_https_memory(&mut self, path: &std::path::Path, url: &str) {
+        let host = crate::connection_doctor::endpoint(url);
+        if self.path == path
+            || self.remotes.iter().any(|r| {
+                r.url.starts_with("https://") && crate::connection_doctor::endpoint(&r.url) == host
+            })
+        {
+            self.credentials = None;
+        }
+    }
+    pub(super) fn switch_https(&mut self, url: String, ctx: &egui::Context) {
+        if !crate::settings::network_page::valid_https(&url) {
+            return;
+        }
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Wait until {busy} finishes before switching sign-ins"),
+                true,
+            ));
+            return;
+        }
+        let path = self.path.clone();
+        let original = url.clone();
+        self.credentials = None;
+        self.then_or(ctx,true,Err,move || git::https_reject(&path,&url),move |tab,result,_|match result {
+            Ok(())=>{tab.status=Some(("Stored HTTPS sign-in rejected. Choose the correct account; profile-selected forge accounts can be changed in Settings → Profile.".into(),false));tab.dialog=Some(Dialog::credentials(&original,false));},
+            Err(e)=>tab.status=Some((format!("Could not forget the stored sign-in: {}",crate::diagnostics::crash::scrub(&e)),true)),
+        });
+    }
+
     /// Remembers the credentials and runs the operation that needed them again.
     pub(super) fn sign_in(&mut self, creds: git::Credentials, ctx: &egui::Context) {
         self.credentials = Some(creds);

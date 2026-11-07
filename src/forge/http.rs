@@ -310,6 +310,13 @@ pub(crate) fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentB
     }
 }
 
+/// The exact environment choice used by the REST client. Never display it without redaction.
+pub(crate) fn environment_proxy(web: &str) -> Option<String> {
+    proxy_for(web, |name| {
+        std::env::var(name).ok().filter(|v| !v.is_empty())
+    })
+}
+
 /// The proxy for `web` (`https://host[:port]`): the scheme's own variable, else `ALL_PROXY`, unless
 /// `NO_PROXY` names the host (`*`, a domain and its subdomains, an IPv4 range like `10.0.0.0/8`).
 fn proxy_for(web: &str, var: impl Fn(&str) -> Option<String>) -> Option<String> {

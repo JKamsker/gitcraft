@@ -9,6 +9,7 @@ mod diffs;
 mod external_tools;
 mod file_menus;
 mod layout;
+pub(crate) mod network_page;
 mod page;
 mod portable_page;
 mod preview;
@@ -456,6 +457,8 @@ impl Settings {
         let t = Tokens::get(ui.ctx());
         match page {
             Page::Profile => self.profile_ui(ui, f, view),
+            Page::Network => self.network_ui(ui, f, false),
+            Page::HttpsSignins => self.network_ui(ui, f, true),
             Page::General => {
                 section(ui, f, "Behaviour", None, |card| {
                     card.row("Worktrees", "open same tab switch", |ui| {
@@ -1139,6 +1142,8 @@ pub(crate) enum Page {
     Graph,
     Git,
     Signing,
+    Network,
+    HttpsSignins,
     Terminal,
     Identities,
     Ai,
@@ -1148,13 +1153,15 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 14] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
         Page::Graph,
         Page::Git,
         Page::Signing,
+        Page::Network,
+        Page::HttpsSignins,
         Page::Terminal,
         Page::Identities,
         Page::Ai,
@@ -1171,6 +1178,8 @@ impl Page {
             Page::Graph => "Commit graph",
             Page::Git => "Git",
             Page::Signing => "Commit signing",
+            Page::Network => "Network",
+            Page::HttpsSignins => "HTTPS sign-ins",
             Page::Terminal => "Terminal",
             Page::Identities => "Identities",
             Page::Ai => "AI",
@@ -1188,6 +1197,8 @@ impl Page {
             Page::Graph => "git-branch",
             Page::Git => "git-merge",
             Page::Signing => "key-round",
+            Page::Network => "network",
+            Page::HttpsSignins => "key-round",
             Page::Terminal => "square-terminal",
             Page::Identities => "user-round",
             Page::Ai => "sparkles",

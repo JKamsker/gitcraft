@@ -69,11 +69,27 @@ impl App {
             unpin: false,
             request: None,
         };
+        let mut repositories = self.recent.clone();
+        for tab in &self.tabs {
+            if let Tab::Repo(repo) = tab
+                && !repositories.contains(&repo.path)
+            {
+                repositories.push(repo.path.clone());
+            }
+        }
+        crate::settings::network_page::repositories(&ctx, repositories);
         let tweaks = self.settings.theme_tweaks;
         if self.settings.page(ui, &mut view) {
             self.settings.set(&ctx);
             if self.settings.theme_tweaks != tweaks {
                 self.apply_theme(&ctx);
+            }
+        }
+        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
+            for tab in &mut self.tabs {
+                if let Tab::Repo(repo) = tab {
+                    repo.forget_https_memory(&path, &url);
+                }
             }
         }
         let check_now = view.check_updates_now;

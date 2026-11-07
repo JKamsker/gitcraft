@@ -367,6 +367,7 @@ impl RepoTab {
             Action::CloseAbsorb => self.absorb = None,
             Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
+            Action::SwitchHttps(url) => self.switch_https(url, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {
                 pick: diff::Pick::Revert,
