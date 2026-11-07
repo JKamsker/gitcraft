@@ -112,6 +112,28 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
         .collect())
 }
 
+impl Pages for GitLab {
+    fn details(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+    ) -> Result<crate::pull_request::PrDetails, String> {
+        details::read(&api::Api::new(repo, hosting)?, number)
+    }
+    fn target(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        details: &crate::pull_request::PrDetails,
+    ) -> Option<Box<dyn crate::pr_post::Target>> {
+        Some(Box::new(post::GitLabTarget::new(
+            api::Api::new(repo, hosting).ok()?,
+            details,
+        )?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,27 +171,5 @@ mod tests {
             at("ssh://git@gitlab.example.com:2222/g/p.git"),
             "gitlab.example.com"
         );
-    }
-}
-
-impl Pages for GitLab {
-    fn details(
-        &self,
-        repo: &Path,
-        hosting: &Hosting,
-        number: u64,
-    ) -> Result<crate::pull_request::PrDetails, String> {
-        details::read(&api::Api::new(repo, hosting)?, number)
-    }
-    fn target(
-        &self,
-        repo: &Path,
-        hosting: &Hosting,
-        details: &crate::pull_request::PrDetails,
-    ) -> Option<Box<dyn crate::pr_post::Target>> {
-        Some(Box::new(post::GitLabTarget::new(
-            api::Api::new(repo, hosting).ok()?,
-            details,
-        )?))
     }
 }

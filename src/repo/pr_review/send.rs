@@ -202,7 +202,7 @@ impl RepoTab {
                 (e, true)
             }
         };
-        if !self.pr_view.as_ref().is_some_and(|v| v.number == number) {
+        if self.pr_view.as_ref().is_none_or(|v| v.number != number) {
             draft.native_post_request = None;
         }
         self.finished.push(outcome);
@@ -322,7 +322,8 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
 mod native_ownership_tests {
     use super::*;
     #[test]
-    fn old_native_write_completion_after_profile_reload_cannot_clear_a_new_draft() {
+    fn old_native_write_completion_after_profile_reload_cannot_clear_a_new_draft()
+    -> Result<(), String> {
         crate::connections::Context::default().run(|| {
             let ctx = egui::Context::default();
             let mut tab =
@@ -337,7 +338,7 @@ mod native_ownership_tests {
                 },
             );
             tab.reload_profile_connections(&ctx);
-            let draft = tab.pr_drafts.get_mut(&7).expect("draft");
+            let draft = tab.pr_drafts.get_mut(&7).ok_or("draft")?;
             assert!(!draft.posting);
             assert!(!draft.settling);
             assert!(draft.native_post_request.is_none());
@@ -346,14 +347,15 @@ mod native_ownership_tests {
             draft.native_post_request = Some(2);
             draft.posting = true;
             tab.pr_posted(7, Some(1), Posted::Comment, Ok(()), &ctx);
-            let draft = tab.pr_drafts.get(&7).expect("draft");
+            let draft = tab.pr_drafts.get(&7).ok_or("draft")?;
             assert_eq!(draft.comment, "New account draft");
             assert!(draft.posting);
             assert_eq!(draft.native_post_request, Some(2));
             tab.pr_posted(7, Some(2), Posted::Comment, Ok(()), &ctx);
-            let draft = tab.pr_drafts.get(&7).expect("draft");
+            let draft = tab.pr_drafts.get(&7).ok_or("draft")?;
             assert!(draft.comment.is_empty());
             assert!(!draft.posting);
-        });
+            Ok(())
+        })
     }
 }

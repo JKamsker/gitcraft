@@ -71,7 +71,7 @@ fn discussions_keep_removed_lines_replies_resolution_and_native_capabilities() -
     let t = &d.extras.threads[0];
     assert_eq!(t.side, DiffSide::Left);
     assert_eq!(t.line, Some(2));
-    assert_eq!(t.path, "old name.rs");
+    assert_eq!(t.path, "new name.rs");
     assert_eq!(t.comments.len(), 2);
     assert!(t.can_resolve);
     assert!(t.can_reply);
@@ -161,13 +161,35 @@ mod recording {
                 profile,
             };
             f.git(&["init", "-q"])?;
+            f.git(&["config", "user.name", "Fixture author"])?;
+            f.git(&["config", "user.email", "fixture@test.invalid"])?;
+            f.git(&["config", "commit.gpgSign", "false"])?;
+            std::fs::write(f.repo.join("old name.rs"), "context\nold\ntail\n")
+                .map_err(|e| e.to_string())?;
+            f.git(&["add", "."])?;
+            f.git(&["commit", "-qm", "base"])?;
+            let base = f.git_output(&["rev-parse", "HEAD"])?;
+            std::fs::rename(f.repo.join("old name.rs"), f.repo.join("new name.rs"))
+                .map_err(|e| e.to_string())?;
+            std::fs::write(f.repo.join("new name.rs"), "context\nnew\ntail\n")
+                .map_err(|e| e.to_string())?;
+            f.git(&["add", "-A"])?;
+            f.git(&["commit", "-qm", "change"])?;
+            let head = f.git_output(&["rev-parse", "HEAD"])?;
+
             f.git(&[
                 "remote",
                 "add",
                 "origin",
                 "https://gitlab.com/group/sub/repo.git",
             ])?;
-            let fixtures = json!({"mr":mr(),"project":project(),"viewer":{"username":"work"},"approvals":{"approvals_left":0,"user_can_approve":true},"discussions":[discussion()],"commits":[{"id":"a".repeat(40),"title":"A change","author_name":"Author"}],"diffs":[diff()],"mode":"normal"});
+            let mut fixtures = json!({"mr":mr(),"project":project(),"viewer":{"username":"work"},"approvals":{"approvals_left":0,"user_can_approve":true},"discussions":[discussion()],"commits":[{"id":"a".repeat(40),"title":"A change","author_name":"Author"}],"diffs":[diff()],"mode":"normal"});
+            fixtures["mr"]["sha"] = json!(head);
+            fixtures["mr"]["diff_refs"] = json!({"base_sha":base,"start_sha":base,"head_sha":head});
+            fixtures["discussions"][0]["notes"][0]["position"]["head_sha"] = json!(head);
+            fixtures["discussions"][0]["notes"][0]["position"]["base_sha"] = json!(base);
+            fixtures["discussions"][0]["notes"][0]["position"]["start_sha"] = json!(base);
+            fixtures["commits"][0]["id"] = json!(head);
             f.store(&fixtures)?;
             let script=r#"#!/usr/bin/python3
 import sys,json,os,pathlib
@@ -214,12 +236,21 @@ print(json.dumps(result))
             Ok(f)
         }
         fn git(&self, args: &[&str]) -> Result<(), String> {
+            self.git_output(args).map(|_| ())
+        }
+        fn git_output(&self, args: &[&str]) -> Result<String, String> {
             let mut c = Command::new("git");
-            c.arg("-C")
-                .arg(&self.repo)
-                .args(args)
-                .env("GIT_CONFIG_GLOBAL", "/dev/null")
-                .env("GIT_CONFIG_NOSYSTEM", "1");
+            c.args([
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "core.fsmonitor=false",
+                "-C",
+            ])
+            .arg(&self.repo)
+            .args(args)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1");
             for e in [
                 "GIT_DIR",
                 "GIT_WORK_TREE",
@@ -232,7 +263,7 @@ print(json.dumps(result))
             }
             let out = c.output().map_err(|e| e.to_string())?;
             if out.status.success() {
-                Ok(())
+                Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
             } else {
                 Err(String::from_utf8_lossy(&out.stderr).into_owned())
             }
@@ -283,9 +314,23 @@ print(json.dumps(result))
     fn recording_cli_reads_the_full_mr_and_native_action_payloads_without_network()
     -> Result<(), String> {
         let f = Fixture::new()?;
+        let head = f.git_output(&["rev-parse", "HEAD"])?;
+        let refs = f.git_output(&["show-ref"])?;
+        let index = std::fs::read(f.repo.join(".git/index")).map_err(|e| e.to_string())?;
         f.run(|api| {
             assert_eq!(GitLab.list(&f.repo, &f.hosting())?.len(), 1);
             let d = details::read(api, 7)?;
+            let files = crate::pull_request::files(
+                &f.repo,
+                &d,
+                &[crate::git::Remote {
+                    name: "origin".into(),
+                    url: "https://gitlab.com/group/sub/repo.git".into(),
+                }],
+                None,
+            )?;
+            assert_eq!(files.to, head);
+            assert!(files.files.iter().any(|file| file.path == "new name.rs"));
             assert_eq!(d.changed_files, 1);
             assert_eq!((d.additions, d.deletions), (1, 1));
             assert_eq!(d.checks[0].state, crate::pull_request::CheckState::Passed);
@@ -338,12 +383,17 @@ print(json.dumps(result))
             "quotes \" and $(only text)\nnext"
         );
         assert_eq!(writes[1]["body"]["position"]["new_line"], 2);
-        assert_eq!(writes[4]["body"]["sha"], "a".repeat(40));
+        assert_eq!(writes[4]["body"]["sha"], head);
         assert_eq!(
             writes[5]["body"],
-            json!({"sha":"a".repeat(40),"squash":true,"should_remove_source_branch":true})
+            json!({"sha":head,"squash":true,"should_remove_source_branch":true})
         );
         assert_eq!(writes[6]["body"]["title"], "Draft: New MR");
+        assert_eq!(f.git_output(&["show-ref"])?, refs);
+        assert_eq!(
+            std::fs::read(f.repo.join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
         Ok(())
     }
     #[test]

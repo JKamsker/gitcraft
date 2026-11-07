@@ -342,14 +342,13 @@ fn thread(d: &Value, mr: &Value, viewer: &str, can_resolve: bool, open: bool) ->
     } else {
         DiffSide::Left
     };
-    let path = at(
-        p,
-        if side == DiffSide::Right {
-            "/new_path"
-        } else {
-            "/old_path"
-        },
-    );
+    // The shared diff uses the post-rename path for both sides; the old coordinate
+    // still identifies a removed line in that same diff.
+    let path = if at(p, "/new_path").is_empty() {
+        at(p, "/old_path")
+    } else {
+        at(p, "/new_path")
+    };
     if path.is_empty() {
         return None;
     }
