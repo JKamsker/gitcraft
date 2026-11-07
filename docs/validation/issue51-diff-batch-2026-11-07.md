@@ -1,5 +1,7 @@
 # Issue #51: diff, staging and file-tool implementation batch
 
+Historical record: this candidate subsequently failed independent R1 review. See [the implementation corrections and new exact-source gates](issue51-fileviews-corrections-2026-11-08.md). These original passing tests did not cover or clear the later blockers.
+
 Source validated: `5df74dbb3792a34ee0b1d13c301c9aa552aa6c69`. Base: `a850de26b0a0778ea96fe34cd1498e6e78928492`. Work branch: `t3/diff-staging-views` on `JKamsker/gitcraft`. All implementation units and fixes were committed and pushed with matching remote SHAs. Author throughout: Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>.
 
 Status: **locally validated; awaiting parent independent adversarial review and combined gate**. This handoff covers the ten assigned ideas from #40, #44 and #50. Requirements were read from the original issue bodies in `/tmp/gitcraft-issue51-issues.json` and the final content audit. The parent-owned combined ledger and audit commit were not edited or cherry-picked.
