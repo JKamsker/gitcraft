@@ -27,3 +27,9 @@ The remaining 35 incomplete ideas are retained in the baseline audits for later 
 - Current bisect/remote cleanup scripts derive descendant signal targets from host-wide process listings. Do not execute those cleanup paths in real tests until owned-process containment is established and synthetic/recording checks pass.
 - Assemble final history from `dev`, run combined local checks, and obtain independent adversarial review on the immutable final application candidate before opening one consolidated PR.
 - Record test/review evidence against immutable SHAs; document unavailable platform/runtime gates without claiming they passed.
+
+## Review and second-wave checkpoint
+
+Visualization candidate `39d8c4ce` is preserved in WIP integration `fa89c966`; three independent reviews rejected it. Their SHA-bound reports and archived writer evidence are under `reviews/visualization-round1` and `validation/visualization-39d8c4ce`. Keyboard entry and suspension corrections subsequently passed scoped independent reviews. Candidate `6a1cf232` passed 79 relevant local regressions after correcting a test fixture that treated an already displayed activity view as a deferred tab. Other findings remain open; the batch is not accepted and no full-suite result is claimed.
+
+The machines/imports batch is active: seven remaining ideas (teleport drag, linked-machine facts, behaviour timeline, clone options and consent, contained bundle import, filter-repo cleanup, direct backlink diffs), plus the prerequisite owned-process supervision correction. Thus 65 incomplete ideas have implementation assignments and 28 await subsequent batches. Limits are concurrent: up to six coding subagents and ten total active subagents, with no lifetime limit. No CI or PR has been started.

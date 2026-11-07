@@ -9,8 +9,16 @@
         "903de82d539c1cc7c0ed08c48bc59f31b8522922",
         "33a74a5ed917a4ef27d9944f67ee5799dbc8de30"
       ],
-      "status": "parent fix and two safe actual-key-event tests pass; independent rereview pending"
+      "status": "scoped independent PASS at33a74a5e"
+    },
+    {
+      "finding": "Lifecycle B2: suspension",
+      "commits": [
+        "72a6a6a30fde9cce2b4a586f1597d42ff1e098f7",
+        "6a1cf232ff5eb68e9fef917cd5cbb79626ea824f"
+      ],
+      "status": "scoped independent PASS on72a6a6a3 application correction; followup fixes test fixture lifecycle;79 focused regression tests pass at6a1cf232"
     }
   ],
-  "unresolved": "All other blocking findings remain open. Lifecycle C1 is an API/test contract gap; normal Reader cancellation uses the owned token. No full-suite or CI claim."
+  "unresolved": "UI-R1-2 through5; atlas navigation, file/directory overlap, dense postcard graphs, expanded allocation budgets; UI-thread copying/export work; cancellation test contract. Overall FAIL, no full-suite/CI claim."
 }
