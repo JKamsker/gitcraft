@@ -1,0 +1,11 @@
+Guarded repair recovery
+Branch: refs/heads/main
+Original: f42504e1da1451535f0b8f91ba631c07bf1f4072
+Rewritten: 3a6d43a233d15e0c6503e93b4723fec534aedb6e
+Index path: /workspace/work/push-preflight-gate2-files-sha1/repository ' quoted \ path/.git/index
+Shared-index dependency: none
+
+Inspect HEAD, git status, git diff and git diff --cached before recovery.
+Saved before.index and before.shared-index (when present) are owned evidence, not permission to overwrite concurrent edits.
+Save concurrent work before deliberately restoring the original tree/ref.
+After saving work, git reset --merge f42504e1da1451535f0b8f91ba631c07bf1f4072 may help; do not remove locks owned by another operation.

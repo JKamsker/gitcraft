@@ -1,0 +1,36 @@
+{
+  "gate": "2",
+  "verdict": "FAIL_RUNTIME; no feature acceptance",
+  "source_commit": "c0a284f8afa319da5c3e7a32a117bff3a9597179",
+  "preserved_compiler_commit": "ccc7d2edfde0d9971e1cb8e298c89c8597871060",
+  "production_source": "490a9e7 / equivalent8b8b9b9",
+  "case": "files-sha1",
+  "counts": {
+    "outer_pass": 0,
+    "outer_fail": 1,
+    "child_pass": 0,
+    "child_fail": 1
+  },
+  "reason": "Git2.52.0 capability native currentHEAD symref verify + currentbranch update refused; no probe prepared/committed ACK. Exact underlying tool error withheld by production success helper; not yet diagnosed.",
+  "owned_evidence_directory": "/workspace/work/push-preflight-gate2-files-sha1/tmp/gitcraft-push-ref-transaction-923133-1794026488572483740",
+  "original_hook_command_stdin_proof": "PASS: hook-command.ok probe and exact owned capability input",
+  "probe_acknowledgements": {
+    "probe-prepared.ok": false,
+    "probe-committed.ok": false,
+    "probe-updates-prepared": false
+  },
+  "user_state_unchanged": true,
+  "remaining": "Stop successful/failure repair cases until production protocol supports actual native backend. Remote repair still OPEN. No additional runtime/CI executed.",
+  "hashes": {
+    "hook-command.stdin": "d7ccc914af8c9ac2205673378fd1edf58bfb8046a4a0077c4087ed809f0464c8",
+    "hook-command.ok": "25be323556dad377abb57fe7ec8c4b99a6527f488dda28d0c9b686528659c909",
+    "recovery.txt": "ab1c14ffe9bab71cd190a5ea685ed5e591ad757872f83791818ba0fa53dbaf1d",
+    "outer.log": "a650cceae1649c73bdd75880e2b759c5348aa07b04419e6e7565ffc2d862cb75",
+    "case.json": "ad501cdc2c351f31f433bba03b537235c96f50ca0836883812f9cfa99d3ecdcf",
+    "child.stdout": "c3567e1847818ca887172c0769b6694cd439757653cb5e5e71a8a8ba74b0e749",
+    "mode": "ba9c736f19e7f60b7f6764adb0b7908c0a2b394e09b6c09863528c7f2bc86095",
+    "before.index": "a277a4161aaf8b4731a94f10e5fa4387e3fb46b4e4e8e1673b55d08724d4f13d",
+    "child.stderr": "c605a6d98eff038944ecfbbe5485e2294ef4fe30c7a942717782d81591e9f5c0",
+    "reference-transaction": "ca4ab70222b20a4f5f045953f51385b494438c05c5030e93f23095f3bc462231"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "after": {
+    "head": "f42504e1da1451535f0b8f91ba631c07bf1f4072",
+    "index": {
+      "hex": "4449524300000002000000016aeeabf805997ff36aeeabf805997ff30000001b001640e5000081a4000003e8000003e80000000790be1f3056c4f471f977a28497b8d4b392c55a02000866696c652e74787400005452454500000019003120300a37a68520af137b3fdf786836871dc4bc0162963a7460b8cb292695b52883f5eb3c31559494893050",
+      "mode": 33152
+    },
+    "refs": "f42504e1da1451535f0b8f91ba631c07bf1f4072 refs/heads/main",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "before": {
+    "head": "f42504e1da1451535f0b8f91ba631c07bf1f4072",
+    "index": {
+      "hex": "4449524300000002000000016aeeabf805997ff36aeeabf805997ff30000001b001640e5000081a4000003e8000003e80000000790be1f3056c4f471f977a28497b8d4b392c55a02000866696c652e74787400005452454500000019003120300a37a68520af137b3fdf786836871dc4bc0162963a7460b8cb292695b52883f5eb3c31559494893050",
+      "mode": 33152
+    },
+    "refs": "f42504e1da1451535f0b8f91ba631c07bf1f4072 refs/heads/main",
+    "shared": null,
+    "shared_path": "",
+    "symref": "refs/heads/main",
+    "work": {
+      "hex": "6265666f72650a",
+      "mode": 33152
+    }
+  },
+  "case": "files-sha1",
+  "constructor_error": "This Git/backend did not prove private hook selection and an atomic current-HEAD/branch update. No user reference update was launched."
+}
