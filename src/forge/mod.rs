@@ -13,6 +13,7 @@ mod gitea;
 pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 mod github;
 mod gitlab;
+pub(crate) mod history;
 mod http;
 pub(crate) mod ssh_keys;
 

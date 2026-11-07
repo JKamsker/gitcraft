@@ -22,6 +22,7 @@ pub(crate) struct Attribution {
 pub(crate) struct Card {
     pub at: Seed,
     pub text: String,
+    pub file_oid: String,
     pub author: String,
     pub email: String,
     pub time: i64,
@@ -581,6 +582,7 @@ pub(crate) fn trace(
             result.cards.push(Card {
                 at: cursor.clone(),
                 text,
+                file_oid:file.oid.clone(),
                 author,
                 email,
                 time,

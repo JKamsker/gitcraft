@@ -130,7 +130,9 @@ pub(super) fn history_api(
     if !active() {
         return Err("History lookup cancelled".into());
     }
-    if !trusted_host(forge, tool, authority)? {
+    if !trusted_host(forge, tool, authority)
+        .map_err(|_| "Selected forge host/account could not be checked")?
+    {
         return Err("Sign in to the selected forge host before looking up history".into());
     }
     let mut command = tool_command(tool);
