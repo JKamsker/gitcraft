@@ -93,7 +93,7 @@ impl App {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct Review {
     text: String,
 }
