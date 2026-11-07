@@ -492,6 +492,7 @@ impl RepoTab {
         let Some(plan) = plan else {
             // One still being read answers a query that is gone (or can't be searched).
             self.search.running = false;
+            self.history_minimap.dirty = true;
             self.search.results.clear();
             self.search.matches.clear();
             self.search.searched.clear();
@@ -527,6 +528,7 @@ impl RepoTab {
             return;
         }
         self.search.running = false;
+        self.history_minimap.dirty = true;
         self.search.searched = query;
         match result {
             Ok(hashes) => {
@@ -559,11 +561,13 @@ impl RepoTab {
     }
 
     pub(super) fn toggle_search(&mut self) {
+        self.history_minimap.dirty = true;
         self.search.open = !self.search.open;
         self.search.focus = self.search.open;
         if !self.search.open {
             self.authorship.filter = false;
             self.search.running = false;
+            self.history_minimap.dirty = true;
             // Nor does a query typed just before closing start a search once it's closed.
             self.search.edited = None;
             self.search.matches.clear();

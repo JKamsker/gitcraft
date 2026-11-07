@@ -8,6 +8,7 @@ mod header;
 mod lanes;
 mod menu;
 pub(super) mod message_tooltip;
+pub(super) mod minimap;
 mod order;
 mod pills;
 mod readability;
@@ -122,6 +123,15 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let map_area = ui.available_rect_before_wrap();
+        let map_rect = egui::Rect::from_min_max(
+            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            map_area.right_bottom(),
+        );
+        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        if show_map {
+            ui.set_width((map_area.width() - 84.0).max(1.0));
+        }
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -208,6 +218,9 @@ impl RepoTab {
             }
         }
 
+        if let Some(offset) = self.history_minimap.offset.take() {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
@@ -300,6 +313,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if show_map && !ghost {
+            self.history_minimap(ui, map_rect, out.state.offset.y, out.inner_rect.height());
+        }
         if let Some(steps) = first_steps {
             self.first_steps_view(ui, steps, acts);
         }

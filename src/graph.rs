@@ -26,7 +26,7 @@ pub struct Row {
     pub outgoing: Box<[usize]>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Graph {
     pub rows: Vec<Row>,
     /// Widest the graph gets, in lanes.

@@ -164,6 +164,7 @@ impl RepoTab {
                 Ok(graph) => {
                     self.graph = graph;
                     self.rebuild_graph_labels();
+                    self.history_minimap.dirty = true;
                 }
                 Err(error) => self.status = Some((error, true)),
             }

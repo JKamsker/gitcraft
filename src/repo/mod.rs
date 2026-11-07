@@ -405,6 +405,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    history_minimap: graph_view::minimap::State,
     branch_bands: branch_bands::Preferences,
     band_reader: history_reader::Reader<crate::graph::Graph>,
     /// A network operation failed (taken by `App`, for the taskbar button).
@@ -657,6 +658,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            history_minimap: Default::default(),
             branch_bands,
             band_reader: Default::default(),
             network_failed: false,
