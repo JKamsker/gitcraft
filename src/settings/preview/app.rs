@@ -349,7 +349,11 @@ pub(super) fn corners(ui: &mut Ui, t: &Tokens, width: f32) {
     for (i, name) in ["main", "feature/x"].iter().enumerate() {
         let galley = p.layout_no_wrap((*name).to_owned(), theme::semibold(15.0), Color32::WHITE);
         let pill = Rect::from_min_size(pos2(x, y - 15.0), vec2(galley.size().x + 24.0, 30.0));
-        p.rect_filled(pill, t.radius * ZOOM, t.lane(i));
+        p.rect_filled(
+            pill,
+            t.radius * ZOOM,
+            theme::palette::white_text_fill(t.lane(i)),
+        );
         p.galley(
             pill.min + vec2(12.0, 15.0 - galley.size().y / 2.0),
             galley,

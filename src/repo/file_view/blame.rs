@@ -120,7 +120,7 @@ impl RepoTab {
                                 line.hash.get(..7).unwrap_or(&line.hash),
                                 theme::mono(11.0),
                                 if gutter_resp.hovered() {
-                                    t.accent
+                                    t.accent_fg
                                 } else {
                                     t.text_faint
                                 },

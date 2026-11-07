@@ -237,7 +237,7 @@ fn header(ui: &mut Ui, d: &PrDetails) {
     ui.add_space(6.0);
     ui.horizontal_wrapped(|ui| {
         let (state, color) = match (d.state.as_str(), d.draft) {
-            ("MERGED", _) => ("Merged", t.accent),
+            ("MERGED", _) => ("Merged", t.accent_fg),
             ("CLOSED", _) => ("Closed", t.danger),
             (_, true) => ("Draft", t.text_dim),
             _ => ("Open", t.success),
@@ -317,7 +317,7 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
         }
     }
     for label in &d.labels {
-        widgets::chip(ui, label, t.accent);
+        widgets::chip(ui, label, t.accent_fg);
     }
 }
 
