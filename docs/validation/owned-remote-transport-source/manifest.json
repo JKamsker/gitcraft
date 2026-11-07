@@ -81,6 +81,7 @@
     "src/remote/shell.rs": "efab00f399fec1e482019f403182711d31b00164271749eb12f0d3c0c7bd0c50",
     "src/remote/mod.rs": "8c29ce4ed021e52f04be300cefb851233f72dbc22cc846d25ea75229a33ce67a",
     "src/git/command/completion.rs": "927274521a75e4485d003c71306c826004f1bc1fef5ba8a4c6d6a39bc0e7c4c3",
-    "src/remote/ownership/fixtures.rs": "c70503297eff1691c6a206e315e84842bfc7852b3938de1a99c24b03c46b861c"
-  }
+    "src/remote/ownership/fixtures.rs": "c872e568651694eb2de454d24cd0e2faaedb09dacba8960821786b84772b409d"
+  },
+  "source_followup": "Close final unexecuted fixture function; no generic production code changed, no compiler/runtime executed."
 }

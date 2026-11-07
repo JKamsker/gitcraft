@@ -80,3 +80,4 @@ fn owned_fixture_timeout_keeps_unknown_and_late_owned_receipt() -> Result<(), St
     drop(shell);
     println!("Unknown retained through late receipt; fixture {}", root.display());
     Ok(())
+}
