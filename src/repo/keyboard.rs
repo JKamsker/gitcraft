@@ -57,6 +57,7 @@ fn same_file(a: &DiffKey, b: &DiffKey) -> bool {
 
 fn available(tab: &RepoTab, ctx: &egui::Context) -> bool {
     tab.dialog.is_none()
+        && tab.ssh_setup.is_none()
         && !tab.keys_blocked
         && !ctx.egui_wants_keyboard_input()
         && !egui::Popup::is_any_open(ctx)
@@ -415,6 +416,7 @@ impl RepoTab {
             || self.work_pending != 0
             || self.load_error.is_some()
             || self.dialog.is_some()
+            || self.ssh_setup.is_some()
         {
             return;
         }

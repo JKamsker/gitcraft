@@ -125,7 +125,11 @@ fn remote_plans_never_need_local_profile_key_or_token_values() -> Result<(), Str
             && decoded.contains("mktemp")
             && decoded.contains("--login 'fixture-login'")
     );
-    assert!(!decoded.contains("-- \"$key.pub\""));
+    let upload = decoded
+        .lines()
+        .find(|line| line.starts_with("if tea ssh-keys add "))
+        .ok_or("No fixed public upload command")?;
+    assert!(upload.contains("$public_file") && !upload.contains("$key.pub"));
     Ok(())
 }
 

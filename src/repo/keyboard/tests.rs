@@ -712,3 +712,58 @@ fn delayed_patch_completion_cannot_apply_after_an_actual_failed_full_reload() ->
     assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
     Ok(())
 }
+
+#[test]
+fn ssh_setup_owns_repository_keys_and_refuses_previously_queued_file_actions() -> Result<(), String>
+{
+    crate::connections::Context::default().run(|| {
+        let mut t = Test::new("ssh-setup-guards")?;
+        t.frame(vec![]);
+        t.pane(Key::Num3);
+        t.frame(vec![]);
+        let (scope, key) = t
+            .tab
+            .keyboard
+            .borrow()
+            .cursor
+            .clone()
+            .ok_or("No file cursor")?;
+        let request = Request {
+            path: t.path.clone(),
+            read: t.tab.work_read,
+            epoch: t.tab.work_epoch,
+            target: Target::File {
+                scope,
+                key,
+                open: false,
+            },
+        };
+        t.tab.open_ssh_setup(&t.ctx);
+        assert!(t.tab.ssh_setup.is_some());
+        t.tab.apply_keyboard(request, &t.ctx);
+        for key in [Key::Space, Key::S, Key::U, Key::D, Key::Enter] {
+            t.key(key);
+        }
+        assert!(t.tab.busy_op.is_none() && t.tab.dialog.is_none());
+        assert!(
+            t.git(&["diff", "--cached", "--name-only"])?
+                .trim()
+                .is_empty()
+        );
+        t.tab.ssh_setup = None;
+        t.ctx.memory_mut(|m| {
+            if let Some(id) = m.focused() {
+                m.surrender_focus(id);
+            }
+        });
+        t.pane(Key::Num3);
+        t.key(Key::Space);
+        t.wait()?;
+        assert!(
+            !t.git(&["diff", "--cached", "--name-only"])?
+                .trim()
+                .is_empty()
+        );
+        Ok(())
+    })
+}
