@@ -1,10 +1,6 @@
 //! Independence requires held filesystem ownership, rather than shell path checks.
 #[cfg(any(target_os = "linux", windows))]
 pub(super) mod local;
-#[cfg(all(test, any(target_os = "linux", windows)))]
-pub(super) use local::make_with_checkpoints;
-#[cfg(any(target_os = "linux", windows))]
-pub(super) use local::prepare;
 #[derive(Clone, Debug)]
 pub(crate) struct Snapshot {
     pub repo: std::path::PathBuf,
