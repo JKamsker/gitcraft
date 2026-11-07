@@ -340,6 +340,61 @@ fn solve_copy(program: &Path, repo: &Path, path: &str) -> Result<String, String>
     result
 }
 
+/// Tests forecast conflict text on a private copy through the shared process service.
+pub(crate) fn solve_text(
+    path: &str,
+    text: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    if !active() {
+        return Err("Forecast cancelled".into());
+    }
+    let name = path.rsplit(['/', '\\']).next().unwrap_or("file");
+    if name.is_empty() || matches!(name, "." | "..") || name.contains(':') {
+        return Err("Invalid conflict filename".into());
+    }
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "gitcraft-weather-solve-{}-{nanos}",
+        std::process::id()
+    ));
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(&dir).map_err(|e| e.to_string())?;
+    let result = (|| {
+        std::fs::write(dir.join(name), text).map_err(|e| e.to_string())?;
+        for program in
+            std::iter::once(PathBuf::from("mergiraf")).chain(own_dir().map(|d| d.join(EXE)))
+        {
+            if !active() {
+                return Err("Forecast cancelled".into());
+            }
+            let mut cmd = quiet(Command::new(&program));
+            cmd.current_dir(&dir)
+                .args(["solve", "--stdout", "--", name]);
+            match crate::processes::run(
+                cmd,
+                crate::processes::Options {
+                    background: true,
+                    timeout: Some(Duration::from_secs(3)),
+                    output_limit: 8 << 20,
+                    ..Default::default()
+                },
+            ) {
+                Ok(out) => return solved(&out.complete()?, path),
+                Err(_) => continue,
+            }
+        }
+        Err("Mergiraf isn't installed".into())
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
 /// What Mergiraf printed: the file, solved as far as it could be.
 fn solved(out: &std::process::Output, path: &str) -> Result<String, String> {
     // 0: all solved; 2: some conflicts remain, still a file to show.

@@ -1359,3 +1359,111 @@ mod tests {
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
 }
+
+/// Bounded isolated object reads/replays on the shared process service. Task cancellation
+/// owns both local children and remote completion; no detached transport is introduced.
+pub(crate) fn forecast_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    draft_bytes(dir, args, env, Vec::new(), ok, active)
+}
+
+pub(crate) fn draft_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    input: Vec<u8>,
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    if !active() || crate::tasks::cancellation().is_cancelled() {
+        return Err("Read cancelled".into());
+    }
+    let extra = Extra {
+        env: env.to_vec(),
+        stdin: Some(input),
+        long: true,
+        timeout: Some(std::time::Duration::from_secs(15)),
+        output_limit: Some(64 << 20),
+        ..Default::default()
+    };
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ];
+    let (code, stdout, stderr) = if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        let out = remote::exec(&target.host, &request)?;
+        (out.code, out.stdout, out.stderr)
+    } else {
+        let mut command = local_command(Some(dir), &extra, args);
+        for key in REMOVE {
+            command.env_remove(key);
+        }
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        let out = crate::processes::run(
+            command,
+            crate::processes::Options {
+                input: extra.stdin,
+                background: true,
+                timeout: extra.timeout,
+                output_limit: 64 << 20,
+                stderr_limit: Some(64 << 10),
+                ..Default::default()
+            },
+        )?
+        .complete()?;
+        (out.status.code().unwrap_or(-1), out.stdout, out.stderr)
+    };
+    if !active() {
+        return Err("Read cancelled".into());
+    }
+    if stdout.len() > 64 << 20 || stderr.len() > 64 << 10 {
+        return Err("Read output exceeds limit".into());
+    }
+    if ok.contains(&code) {
+        Ok(stdout)
+    } else {
+        Err(format!(
+            "Git command failed ({code}): {}",
+            String::from_utf8_lossy(&stderr).trim()
+        ))
+    }
+}
+
+pub(crate) fn forecast_run(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    forecast_bytes(dir, args, env, ok, active).map(|b| String::from_utf8_lossy(&b).into_owned())
+}
+
+pub(crate) fn forecast_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Read cancelled".into());
+    }
+    request.timeout = Some(std::time::Duration::from_secs(15));
+    request.long = true;
+    remote::exec(host, &request)
+}
