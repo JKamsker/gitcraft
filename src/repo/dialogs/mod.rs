@@ -16,6 +16,15 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    PushLoading {
+        id: u64,
+        token: std::sync::Arc<()>,
+    },
+    PushPreflight {
+        plan: Box<crate::push_preflight::Plan>,
+        acknowledge: bool,
+    },
+    PushError(String),
     GerritReview {
         remote: String,
         head: String,
@@ -304,6 +313,18 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::PushLoading { .. } => {
+                    ui.label("Checking the exact outgoing history locally…");
+                    ui.add(crate::spinner::Spinner::new());
+                    ui.label("No remote is contacted and no credential helper is queried. Cancel stops this check.");
+                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
+                Dialog::PushPreflight { plan, acknowledge } => super::push_preflight::dialog(ui, plan, acknowledge),
+                Dialog::PushError(error) => {
+                    ui.heading("Push preflight could not finish");
+                    ui.label(error.as_str());
+                    if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
                 Dialog::GerritReview {
                     remote,
                     head,

@@ -7,6 +7,7 @@ mod commits;
 mod diff;
 mod files;
 mod lfs;
+mod push_hooks;
 mod refs;
 mod status;
 mod submodule;

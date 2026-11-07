@@ -238,6 +238,25 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
 
 - Undo, redo, Fetch, Pull and Push (with incoming / outgoing counts), new branch, stash, terminal,
   search, open the folder (Explorer / Finder, your editor), refresh (F5).
+- Push preflight: a deliberate checklist previews the pinned outgoing commit and exact target
+  before any push. It flags author mismatches against Profile → Push author policies (a host or
+  host/namespace), absent signatures when signing is expected, WIP/fixup subjects, likely secrets,
+  Git blobs over 5 MiB, and remote commits a force push would drop, including other authors.
+  Repairs amend outgoing authors, sign commits, prepare editable autosquash, remove affected
+  secret files/messages from outgoing history, move regular files to local Git LFS pointers, or
+  merge the inspected fetched target. Completed repairs enter Ctrl+Z/Ctrl+Y history; pushing is
+  a separate explicit action. Repairs require the branch checked out with a clean working tree.
+  Source/checkout/profile/config changes invalidate approval; branch pushes use the inspected
+  remote tip as a lease and normal mode permits only fast-forwards or a genuinely absent ref.
+  Fetch explicitly before updating an existing unfetched target. LFS uploads are included in
+  the confirmed push, existing pre-push hooks retain their original remote name, and follow-tags
+  and recursive submodule pushes are excluded from the single-ref preview.
+  Checks are local and cancellable, with a two-minute budget, 10,000-commit/50,000-object limits,
+  and per-command deadlines. They require Git's `--no-lazy-fetch` support and its POSIX tools
+  (`grep`, `cut`, `head`). Secret heuristics return locations, never matched values; external LFS
+  payloads are not downloaded or scanned and embedded signatures are not trust-verified. LFS
+  endpoints use inspected Git configuration and the current committed `.lfsconfig`; routing
+  edits must be committed or stashed first. Multi-ref/mirror/delete pushes need separate reviews.
 - Pull's arrow (or a right-click on it) sets what it does: fast-forward, merging when the branch
   has diverged; fast-forward only; or rebase. Also in Settings, and the menu has _Fetch all_.
 - Background fetch every few minutes (Settings; 0 turns it off).

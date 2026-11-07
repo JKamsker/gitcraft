@@ -505,11 +505,11 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     let dir = repo("sign-in-retry");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-    // A push git answers like one that needs signing in.
-    let push = ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]);
+    // A fetch git answers like one that needs signing in. Pushes now open preflight first.
+    let fetch = ops(&[&["fetch", "terminal prompts disabled", "refs/tags/v1"]]);
     let steps: Vec<Vec<String>> = ops(&[&["tag", "v1"]])
         .into_iter()
-        .chain(push.clone())
+        .chain(fetch.clone())
         .collect();
     tab.apply(
         Action::Ops {
@@ -531,8 +531,8 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(asked);
-    assert_eq!(kept, Some(push));
-    // The push ran again (and needs signing in again), not the tag.
+    assert_eq!(kept, Some(fetch));
+    // The fetch ran again (and needs signing in again), not the tag.
     assert!(status.contains("sign-in needed"), "{status}");
 }
 
@@ -558,8 +558,8 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     // An undo git answers like one that needs signing in.
     let entry = UndoEntry {
-        label: "Push".to_owned(),
-        undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
+        label: "Fetch".to_owned(),
+        undo: ops(&[&["fetch", "terminal prompts disabled", "refs/tags/v1"]]),
         redo: Vec::new(),
         heads: None,
     };

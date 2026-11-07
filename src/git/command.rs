@@ -257,6 +257,286 @@ pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<Str
     run_inner(dir, args, ok, None, false)
 }
 
+/// Automatic local checks use this bounded, cancellable command path. Remote work
+/// is detached immediately on cancellation and stopped by the remote session's own deadline.
+pub(crate) fn forecast_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    use std::time::Duration;
+    const LIMIT: Duration = Duration::from_secs(15);
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ];
+    if !active() {
+        return Err("Forecast cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let extra = Extra {
+            pre: Vec::new(),
+            env: env.to_vec(),
+        };
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        forecast_remote(&target.host, request, active)?
+    } else {
+        let mut command = repository_command(Some(dir), args);
+        command.args(args);
+        for name in REMOVE {
+            command.env_remove(name);
+        }
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let out = crate::bounded_process::run(command, active, LIMIT)?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if ok.contains(&out.code) {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Forecast git command failed ({}): {}",
+            out.code,
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+pub(crate) fn forecast_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    const LIMIT: Duration = Duration::from_secs(15);
+    if !active() {
+        return Err("Forecast cancelled".into());
+    }
+    request.timeout = Some(LIMIT);
+    request.long = true;
+    let host = host.clone();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(remote::exec(&host, &request));
+    });
+    let deadline = Instant::now() + LIMIT;
+    loop {
+        if !active() {
+            return Err("Forecast cancelled".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("Forecast command timed out".into());
+        }
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(out) => return out,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(_) => return Err("Forecast command stopped".into()),
+        }
+    }
+}
+
+pub(crate) fn forecast_run(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    forecast_bytes(dir, args, env, ok, active).map(|out| String::from_utf8_lossy(&out).into_owned())
+}
+
+/// A confirmed push uses an opaque address on argv. Git expands this exact, longest
+/// insteadOf match once to the reviewed address, kept only in the child's environment.
+/// This also pins url.* rewrites without exposing an embedded password in process arguments.
+pub(crate) struct PushTarget<'a> {
+    pub address: &'a str,
+    pub alias: &'a str,
+    pub original_remote: &'a str,
+    pub lfs_config: &'a [(String, String)],
+    pub lfs_objects: &'a [String],
+    pub receive_pack: &'a str,
+}
+
+pub(crate) fn push_preflight_with(
+    dir: &Path,
+    args: &[String],
+    target: PushTarget<'_>,
+    creds: Option<&Credentials>,
+) -> Result<String, String> {
+    let PushTarget {
+        address,
+        alias: opaque,
+        original_remote,
+        lfs_config,
+        lfs_objects,
+        receive_pack,
+    } = target;
+    let (source, destination) = args
+        .last()
+        .and_then(|s| s.split_once(':'))
+        .ok_or("Missing inspected refspec")?;
+    let remote_tip = args.iter().find_map(|a| {
+        a.strip_prefix("--force-with-lease=")
+            .and_then(|v| v.rsplit_once(':'))
+            .map(|v| v.1)
+    });
+    let hooks = super::push_hooks::Hooks::new(
+        dir,
+        original_remote,
+        super::push_hooks::Upload {
+            alias: opaque,
+            objects: lfs_objects,
+            source,
+            destination,
+            remote_tip,
+        },
+    )?;
+    let placeholder = format!("gitcraft-preflight-address://{opaque}");
+    let mut values = vec![
+        (format!("url.{address}.insteadOf"), placeholder.clone()),
+        (format!("remote.{opaque}.url"), placeholder.clone()),
+        (format!("remote.{original_remote}.url"), placeholder.clone()),
+        (format!("remote.{original_remote}.pushurl"), placeholder),
+        ("core.hooksPath".into(), hooks.path()),
+    ];
+    for (source, value) in lfs_config {
+        if value.is_empty() {
+            continue;
+        }
+        let target = source
+            .strip_prefix(&format!("remote.{original_remote}."))
+            .map(|key| format!("remote.{opaque}.{key}"))
+            .unwrap_or_else(|| source.clone());
+        values.push((target.clone(), value.clone()));
+        if target != *source {
+            values.push((source.clone(), value.clone()));
+        }
+    }
+    if !receive_pack.is_empty() {
+        values.push((format!("remote.{opaque}.receivepack"), receive_pack.into()));
+    }
+    const VARS: [(&str, &str); 12] = [
+        ("GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"),
+        ("GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"),
+        ("GIT_CONFIG_KEY_2", "GIT_CONFIG_VALUE_2"),
+        ("GIT_CONFIG_KEY_3", "GIT_CONFIG_VALUE_3"),
+        ("GIT_CONFIG_KEY_4", "GIT_CONFIG_VALUE_4"),
+        ("GIT_CONFIG_KEY_5", "GIT_CONFIG_VALUE_5"),
+        ("GIT_CONFIG_KEY_6", "GIT_CONFIG_VALUE_6"),
+        ("GIT_CONFIG_KEY_7", "GIT_CONFIG_VALUE_7"),
+        ("GIT_CONFIG_KEY_8", "GIT_CONFIG_VALUE_8"),
+        ("GIT_CONFIG_KEY_9", "GIT_CONFIG_VALUE_9"),
+        ("GIT_CONFIG_KEY_10", "GIT_CONFIG_VALUE_10"),
+        ("GIT_CONFIG_KEY_11", "GIT_CONFIG_VALUE_11"),
+    ];
+    if values.len() > VARS.len() {
+        return Err("Too many pinned transport settings; no push was run.".into());
+    }
+    let mut extra = Extra {
+        pre: Vec::new(),
+        env: vec![("GIT_CONFIG_COUNT", values.len().to_string())],
+    };
+    for ((key, value), (key_var, value_var)) in values.into_iter().zip(VARS) {
+        extra.env.extend([(key_var, key), (value_var, value)]);
+    }
+    if let Some(c) = creds {
+        extra.pre.extend(["-c", ENV_HELPER]);
+        extra.env.extend([
+            ("GITCRAFT_GIT_USERNAME", c.username.clone()),
+            ("GITCRAFT_GIT_PASSWORD", c.password.clone()),
+        ]);
+    }
+    let mapping: Vec<_> = extra
+        .env
+        .iter()
+        .filter(|(name, _)| name.starts_with("GIT_CONFIG_"))
+        .cloned()
+        .collect();
+    if forecast_run(
+        dir,
+        &["ls-remote", "--get-url", opaque],
+        &mapping,
+        &[0],
+        &|| true,
+    )
+    .map_err(|_| "The reviewed address could not be pinned; no push was run.")?
+    .trim_end()
+        != address
+    {
+        return Err("The reviewed address could not be pinned; no push was run.".into());
+    }
+    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    let out = execute_preflight(dir, &extra, &words)?;
+    if out.code == Some(0) {
+        Ok("Push completed.".into())
+    } else if is_auth_error(&String::from_utf8_lossy(&out.stderr)) {
+        Err("Authentication failed for the reviewed push target.".into())
+    } else {
+        Err("The reviewed push was refused or failed. Fetch and reopen preflight before trying again; Git diagnostics were withheld because server output can contain credentials or secret values.".into())
+    }
+}
+
+fn execute_preflight(dir: &Path, extra: &Extra, words: &[&str]) -> Result<Ran, String> {
+    let remove = [
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG",
+        "GIT_ATTR_SOURCE",
+    ];
+    if let Some(target) = remote::parse(dir) {
+        let mut request = remote_request(&target, extra, words);
+        request.unset.extend(remove.iter().map(|s| (*s).to_owned()));
+        let out = remote::exec(&target.host, &request)?;
+        Ok(Ran {
+            code: Some(out.code),
+            status: out.code.to_string(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        })
+    } else {
+        let mut cmd = repository_command(Some(dir), words);
+        for name in remove {
+            cmd.env_remove(name);
+        }
+        cmd.args(&extra.pre).args(words);
+        for (name, value) in &extra.env {
+            cmd.env(name, value);
+        }
+        let out = cmd
+            .output()
+            .map_err(|_| "Could not start the reviewed push")?;
+        Ok(Ran {
+            code: out.status.code(),
+            status: out.status.to_string(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        })
+    }
+}
+
 /// A username and password (or token) for an HTTPS remote, typed into gitcraft.
 #[derive(Clone)]
 pub struct Credentials {

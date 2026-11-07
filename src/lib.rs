@@ -2,6 +2,7 @@
 
 pub mod app;
 mod avatars;
+mod bounded_process;
 mod ci;
 mod desktop_entry;
 mod folder_browser;
@@ -18,6 +19,7 @@ mod pr_post;
 mod pr_threads;
 mod practice;
 mod pull_request;
+mod push_preflight;
 mod remote;
 mod repo;
 mod safe_read;

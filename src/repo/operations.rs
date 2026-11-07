@@ -36,6 +36,28 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
+        if crate::push_preflight::has_push(&ops) {
+            // The tag was explicitly requested locally too. Finish that undoable step,
+            // then inspect its actual tag object before sending anything to the server.
+            if ops.len() == 2
+                && ops[0].first().is_some_and(|s| s == "tag")
+                && crate::push_preflight::has_push(&ops[1..])
+            {
+                self.push_after_local = Some((label.to_owned(), vec![ops[1].clone()]));
+                self.run_ops_ex(label, vec![ops[0].clone()], refresh, kind, quiet, ctx);
+                return;
+            }
+            // Opening a preview is not executing an undo/redo. Keep the journal
+            // entry available if the preview is cancelled, then take it on approval.
+            match &kind {
+                OpKind::Undo(entry) => self.undo_stack.push(entry.clone()),
+                OpKind::Redo(entry) => self.redo_stack.push(entry.clone()),
+                OpKind::Normal(..) => {}
+            }
+            self.push_kind = Some(kind);
+            self.begin_push_preflight(ops, ctx);
+            return;
+        }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);
@@ -132,7 +154,7 @@ impl RepoTab {
 
     /// Takes the undo or redo of `kind` off its stack again, to run it: it went back there when
     /// it needed signing in, so that cancelling the sign-in keeps it (see `op_done`).
-    fn take_back(&mut self, kind: &OpKind) {
+    pub(super) fn take_back(&mut self, kind: &OpKind) {
         let (stack, entry) = match kind {
             OpKind::Undo(entry) => (&mut self.undo_stack, entry),
             OpKind::Redo(entry) => (&mut self.redo_stack, entry),
@@ -245,6 +267,19 @@ impl RepoTab {
             Refresh::All => self.reload(ctx),
         }
         self.follow_checkout_move(result.is_ok(), ctx);
+        if self
+            .push_after_local
+            .as_ref()
+            .is_some_and(|(pending, _)| pending == &label)
+        {
+            let pending = self.push_after_local.take();
+            if result.is_ok()
+                && let Some((_, ops)) = pending
+            {
+                self.push_kind = Some(OpKind::plain());
+                self.begin_push_preflight(ops, ctx);
+            }
+        }
     }
 
     fn record_undo(&mut self, label: &str, kind: OpKind) {
@@ -355,6 +390,24 @@ pub(super) fn run_steps_counted(
             continue;
         }
         result = (|| {
+            if let [mark, id] = op.as_slice()
+                && mark == crate::push_preflight::APPROVED
+            {
+                return crate::push_preflight::execute(
+                    path,
+                    crate::push_preflight::registered(id)?.as_ref(),
+                    creds,
+                );
+            }
+            if let [mark, id, fix] = op.as_slice()
+                && mark == crate::push_preflight::FIX
+            {
+                return crate::push_preflight::fix(
+                    path,
+                    crate::push_preflight::registered(id)?.as_ref(),
+                    fix,
+                );
+            }
             let prepared;
             let op = if let [mark, message] = op.as_slice()
                 && mark == crate::gerrit::AMEND
@@ -736,5 +789,67 @@ mod tests {
         assert_eq!(head_now, mine);
         assert!(matches!(undone, Some(Ok(_))));
         assert_eq!(main_after, Ok(was));
+    }
+}
+
+#[cfg(test)]
+mod preflight_undo_tests {
+    use super::*;
+    use crate::push_preflight::{self, tests::Fixture};
+
+    #[test]
+    fn completed_preflight_repairs_enter_the_existing_undo_and_redo_journal() -> Result<(), String>
+    {
+        for repair in ["author", "secrets", "lfs", "remote"] {
+            let f = Fixture::new()?;
+            if repair == "remote" {
+                f.advance_receiver()?;
+                f.git(&["fetch", "-q", "origin"])?;
+            }
+            let text = match repair {
+                "secrets" => "password=fixture_only_12345678\n".to_owned(),
+                "lfs" => "x".repeat(6 * 1024 * 1024),
+                _ => "new\n".to_owned(),
+            };
+            let before = f.commit("payload.txt", &text, "Outgoing")?;
+            let before_tree = f.git(&["rev-parse", "HEAD^{tree}"])?;
+            let mut profile = f.profile();
+            if repair == "author" {
+                profile.author_email = "personal@example.org".into();
+            }
+            let plan = f.plan(profile)?;
+            let mut step = push_preflight::register(plan);
+            step[0] = push_preflight::FIX.into();
+            step.push(repair.into());
+            let (result, kind) = run_steps(
+                &f.repo,
+                &[step],
+                OpKind::Normal(Undo::HeadMove { mode: "--merge" }, before.clone()),
+                None,
+            );
+            assert!(result.is_ok(), "{repair}: {result:?}");
+            let after = f.git(&["rev-parse", "HEAD"])?;
+            assert_ne!(before, after);
+            let ctx = egui::Context::default();
+            let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
+            tab.record_undo("Preflight repair", kind);
+            let entry = tab
+                .undo_stack
+                .pop()
+                .ok_or("Repair did not enter undo journal")?;
+            let (result, kind) = run_steps(&f.repo, &entry.undo.clone(), OpKind::Undo(entry), None);
+            assert!(result.is_ok(), "undo {repair}: {result:?}");
+            tab.record_undo("Undo repair", kind);
+            assert_eq!(f.git(&["rev-parse", "HEAD"])?, before);
+            assert_eq!(f.git(&["rev-parse", "HEAD^{tree}"])?, before_tree);
+            let entry = tab
+                .redo_stack
+                .pop()
+                .ok_or("Repair did not enter redo journal")?;
+            let (result, _) = run_steps(&f.repo, &entry.redo.clone(), OpKind::Redo(entry), None);
+            assert!(result.is_ok(), "redo {repair}: {result:?}");
+            assert_eq!(f.git(&["rev-parse", "HEAD"])?, after);
+        }
+        Ok(())
     }
 }

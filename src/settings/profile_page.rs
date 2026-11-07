@@ -219,6 +219,52 @@ impl Settings {
             },
         );
 
+        section(
+            ui,
+            f,
+            "Push author policies",
+            Some(
+                "Expected authors for outgoing commits. Use a host (github.com) or host/namespace (github.com/personal) to keep work and personal identities apart. This checks history; it does not change sign-ins or credentials.",
+            ),
+            |card| {
+                let profile = self.profile_mut();
+                let mut remove = None;
+                for (i, policy) in profile.author_hosts.iter_mut().enumerate() {
+                    card.row(
+                        "Host or namespace",
+                        "preflight author email identity",
+                        |ui| {
+                            ui.push_id(i, |ui| {
+                                ui.add(
+                                    layout::field(&mut policy.host)
+                                        .hint_text("github.com/personal"),
+                                );
+                                ui.add(
+                                    layout::field(&mut policy.name)
+                                        .hint_text("Expected author name"),
+                                );
+                                ui.add(
+                                    layout::field(&mut policy.email)
+                                        .hint_text("Expected author email"),
+                                );
+                                if ui.button("Remove policy").clicked() {
+                                    remove = Some(i);
+                                }
+                            });
+                        },
+                    );
+                }
+                if let Some(i) = remove {
+                    profile.author_hosts.remove(i);
+                }
+                card.row("", "push preflight identity", |ui| {
+                    if ui.button("Add host author policy").clicked() {
+                        profile.author_hosts.push(Default::default());
+                    }
+                });
+            },
+        );
+
         section(ui, f, "Profile's commit signing", None, |card| {
             let profile = self.profile_mut();
             card.row("Signing", "gpg sign key profile own global", |ui| {

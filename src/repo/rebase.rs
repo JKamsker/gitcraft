@@ -202,6 +202,16 @@ impl RebaseEditor {
 
     /// The rebase, its todo list copied from `todo_file` (quoted for `sh`).
     fn rebase_args(&self, todo_file: &str) -> Vec<String> {
+        if self.onto.is_empty() {
+            return vec![
+                "-c".into(),
+                format!("sequence.editor=cp {todo_file}"),
+                "rebase".into(),
+                "-i".into(),
+                "--root".into(),
+                "--autostash".into(),
+            ];
+        }
         vec![
             "-c".to_owned(),
             format!("sequence.editor=cp {todo_file}"),

@@ -29,6 +29,16 @@ pub struct UserProfile {
     /// Sign as `signing` says rather than as the global git config does.
     pub own_signing: bool,
     pub signing: Signing,
+    /// Expected outgoing author per host, optionally narrowed to a forge namespace.
+    pub author_hosts: Vec<HostAuthor>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HostAuthor {
+    pub host: String,
+    pub name: String,
+    pub email: String,
 }
 
 impl Default for UserProfile {
@@ -40,11 +50,35 @@ impl Default for UserProfile {
             author_email: String::new(),
             own_signing: false,
             signing: Signing::default(),
+            author_hosts: Vec::new(),
         }
     }
 }
 
 impl UserProfile {
+    pub(crate) fn expected_author(&self, url: &str) -> (&str, &str) {
+        let policy = crate::push_preflight::location(url).and_then(|(host, path)| {
+            self.author_hosts
+                .iter()
+                .filter(|p| {
+                    let key = p.host.trim().to_ascii_lowercase();
+                    if let Some((h, namespace)) = key.split_once('/') {
+                        h == host
+                            && path
+                                .to_ascii_lowercase()
+                                .strip_prefix(namespace)
+                                .is_some_and(|tail| tail.is_empty() || tail.starts_with('/'))
+                    } else {
+                        key == host
+                    }
+                })
+                .max_by_key(|p| p.host.len())
+        });
+        policy.map_or(
+            (self.author_name.as_str(), self.author_email.as_str()),
+            |p| (p.name.as_str(), p.email.as_str()),
+        )
+    }
     /// Whether it sets anything in git's config.
     pub fn sets_git(&self) -> bool {
         !self.author_name.trim().is_empty()

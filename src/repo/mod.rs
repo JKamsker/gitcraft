@@ -31,6 +31,7 @@ mod pr_review;
 mod pr_view;
 mod practice;
 pub(crate) mod pull;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
 mod rewrite;
@@ -175,6 +176,8 @@ pub struct RepoTab {
     credentials: Option<git::Credentials>,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    push_after_local: Option<(String, Vec<Vec<String>>)>,
+    push_kind: Option<OpKind>,
     /// The forge has been asked for avatars.
     avatars_hinted: bool,
     diff_ignore_ws: bool,
@@ -336,6 +339,8 @@ impl RepoTab {
             reword: None,
             credentials: None,
             last_op: None,
+            push_after_local: None,
+            push_kind: None,
             avatars_hinted: false,
             diff_ignore_ws: false,
             diff_as_file: false,

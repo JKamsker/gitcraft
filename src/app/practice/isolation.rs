@@ -8,6 +8,7 @@ use crate::app::{App, Tab};
 use crate::git;
 use crate::practice::Scenario;
 use crate::repo::{Action, Refresh, Undo};
+use egui_kittest::kittest::Queryable as _;
 
 type H<'a> = egui_kittest::Harness<'a, App>;
 
@@ -100,9 +101,27 @@ fn exercise_app(root: &Path) -> Result<(), String> {
     );
     apply(&mut harness, operation(&["revert", "--no-edit", &before]))?;
     apply(&mut harness, Action::Push)?;
+    let until = Instant::now() + Duration::from_secs(20);
+    loop {
+        harness.step();
+        if let Some(acknowledge) = harness.query_by_label(
+            "I reviewed the exact target and findings, including heuristic limitations",
+        ) {
+            acknowledge.click();
+            break;
+        }
+        if Instant::now() >= until {
+            return Err("The practice push checklist did not arrive".into());
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    harness.step();
+    harness.get_by_label("Push inspected commit").click();
+    harness.step();
+    wait(&mut harness)?;
     assert!(
         session.check(&path)?,
-        "The App's plain push must reach the local practice origin"
+        "The App's approved push must reach the local practice origin"
     );
 
     // Opening a linked practice worktree must not return to inherited caller routing.
