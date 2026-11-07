@@ -291,7 +291,9 @@ impl RepoTab {
             Action::ApplyPatch => self.apply_patch(ctx),
             Action::OpenObjectStorage => self.open_object_storage(None, ctx),
             Action::InspectObject(query) => self.open_object_storage(Some(query), ctx),
-            Action::MakeObjectStorageIndependent(snapshot) => self.make_object_storage_independent(snapshot, ctx),
+            Action::MakeObjectStorageIndependent(snapshot) => {
+                self.make_object_storage_independent(snapshot, ctx)
+            }
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleImport => self.open_bundle_import(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),

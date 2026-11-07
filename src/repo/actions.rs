@@ -423,8 +423,16 @@ impl RepoTab {
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );
         items.extend([
-            ("How an object is stored…".into(), "objects packs delta file version".into(), Action::OpenObjectStorage),
-            ("Shared and borrowed objects…".into(), "alternates donors independent".into(), Action::OpenObjectStorage),
+            (
+                "How an object is stored…".into(),
+                "objects packs delta file version".into(),
+                Action::OpenObjectStorage,
+            ),
+            (
+                "Shared and borrowed objects…".into(),
+                "alternates donors independent".into(),
+                Action::OpenObjectStorage,
+            ),
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             (
                 "Earlier versions of working changes…".into(),
