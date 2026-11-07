@@ -4,7 +4,10 @@ use crate::{connections, remote};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 const PROTOCOL: &str = "gitcraft-owned-objects/1";
 const LIMIT: usize = 4 * 1024 * 1024;
@@ -61,7 +64,9 @@ fn request(
     active: &dyn Fn() -> bool,
 ) -> Result<Payload, String> {
     if !active() {
-        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+        return Err(
+            "Object independence was cancelled before dispatch; no helper request was sent.".into(),
+        );
     }
     let target = remote::parse(repo).ok_or("Owned helper requires an SSH/WSL repository")?;
     request_target(&target, ticket, active)
@@ -72,7 +77,9 @@ fn request_target(
     active: &dyn Fn() -> bool,
 ) -> Result<Payload, String> {
     if !active() {
-        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+        return Err(
+            "Object independence was cancelled before dispatch; no helper request was sent.".into(),
+        );
     }
     let payload = serde_json::to_vec(&Request {
         protocol: PROTOCOL.into(),
@@ -141,7 +148,9 @@ pub(super) fn prepare(repo: &Path, active: &dyn Fn() -> bool) -> Result<RemotePl
 }
 fn claim(plan: &RemotePlan, active: &dyn Fn() -> bool) -> Result<(), String> {
     if !active() {
-        return Err("Object independence was cancelled before dispatch; no helper request was sent.".into());
+        return Err(
+            "Object independence was cancelled before dispatch; no helper request was sent.".into(),
+        );
     }
     if plan.profile != connections::current() {
         return Err("Profile changed; prepare remote independence again.".into());
@@ -188,7 +197,8 @@ mod protocol_tests {
         }
     }
     #[test]
-    fn recording_prepared_attempt_is_single_use_across_clones_and_cancel_does_not_claim() -> Result<(), String> {
+    fn recording_prepared_attempt_is_single_use_across_clones_and_cancel_does_not_claim()
+    -> Result<(), String> {
         connections::Context::default().run(|| {
             let plan = plan();
             let copy = plan.clone();
@@ -209,9 +219,13 @@ mod protocol_tests {
         });
     }
     #[test]
-    fn recording_only_exact_complete_protocol_and_transaction_prove_success() -> Result<(), String> {
+    fn recording_only_exact_complete_protocol_and_transaction_prove_success() -> Result<(), String>
+    {
         let good = serde_json::json!({"protocol":PROTOCOL,"result":{"Ok":{"kind":"Completed","data":{"transaction":"abc123","message":"verified"}}}});
-        assert_eq!(completed(parse_reply(output(good.clone()))?, "abc123", "backup")?, "verified");
+        assert_eq!(
+            completed(parse_reply(output(good.clone()))?, "abc123", "backup")?,
+            "verified"
+        );
         assert!(completed(parse_reply(output(good.clone()))?, "different", "backup").is_err());
         let mut wrong = good.clone();
         wrong["protocol"] = "gitcraft-owned-objects/999".into();
@@ -221,10 +235,31 @@ mod protocol_tests {
         assert!(parse_reply(output(extra)).is_err());
         let bytes = good.to_string().into_bytes();
         for cut in 0..bytes.len() {
-            assert!(parse_reply(remote::Output { code:0,stdout:bytes[..cut].into(),stderr:Vec::new() }).is_err());
+            assert!(
+                parse_reply(remote::Output {
+                    code: 0,
+                    stdout: bytes[..cut].into(),
+                    stderr: Vec::new()
+                })
+                .is_err()
+            );
         }
-        assert!(parse_reply(remote::Output {code:0,stdout:vec![b' '; LIMIT+1],stderr:Vec::new()}).is_err());
-        assert!(parse_reply(remote::Output {code:127,stdout:Vec::new(),stderr:b"helper: not found".to_vec()}).is_err_and(|e|e.contains("Install the matching")));
+        assert!(
+            parse_reply(remote::Output {
+                code: 0,
+                stdout: vec![b' '; LIMIT + 1],
+                stderr: Vec::new()
+            })
+            .is_err()
+        );
+        assert!(
+            parse_reply(remote::Output {
+                code: 127,
+                stdout: Vec::new(),
+                stderr: b"helper: not found".to_vec()
+            })
+            .is_err_and(|e| e.contains("Install the matching"))
+        );
         Ok(())
     }
 }

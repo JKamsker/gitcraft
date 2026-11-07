@@ -32,10 +32,8 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
     let offset = std::mem::offset_of!(FILE_RENAME_INFO, FileName);
     // A NUL is included for API compatibility, but is not counted in FileNameLength.
     let bytes = (offset + (wide.len() + 1) * 2).max(std::mem::size_of::<FILE_RENAME_INFO>());
-    let mut storage = vec![
-        FILE_RENAME_INFO::default();
-        bytes.div_ceil(std::mem::size_of::<FILE_RENAME_INFO>())
-    ];
+    let mut storage =
+        vec![FILE_RENAME_INFO::default(); bytes.div_ceil(std::mem::size_of::<FILE_RENAME_INFO>())];
     let size = u32::try_from(bytes)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Rename metadata too large"))?;
     // SAFETY: defaulted FILE_RENAME_INFO storage has the required native alignment
@@ -55,7 +53,9 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
             std::ptr::addr_of_mut!((*info).FileName).cast::<u16>(),
             wide.len(),
         );
-        if SetFileInformationByHandle(source.as_raw_handle(), FileRenameInfo, info.cast(), size) == 0 {
+        if SetFileInformationByHandle(source.as_raw_handle(), FileRenameInfo, info.cast(), size)
+            == 0
+        {
             Err(io::Error::last_os_error())
         } else {
             Ok(())

@@ -332,10 +332,14 @@ impl Ownership {
         file.write_all(&self.expected).map_err(err)?;
         file.sync_all().map_err(err)?;
         rename::no_replace(&file, &self.info_file, "alternates").map_err(|error| {
-            err(format!("create-only restore refused: {error}; retained {private}"))
+            err(format!(
+                "create-only restore refused: {error}; retained {private}"
+            ))
         })?;
         if !same_file(&destination, &file)? || read(&file, 64 * 1024)? != self.expected {
-            return Err(err("restored alternate identity/content could not be proven"));
+            return Err(err(
+                "restored alternate identity/content could not be proven",
+            ));
         }
         Ok(())
     }

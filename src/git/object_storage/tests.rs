@@ -851,7 +851,10 @@ mod native_windows_ownership {
                 name.starts_with("alternates.gitcraft-backup-") && !name.ends_with(".restore")
             })
             .ok_or("no retained backup")?;
-        assert_eq!(std::fs::read(backup.path()).map_err(|e| e.to_string())?, before);
+        assert_eq!(
+            std::fs::read(backup.path()).map_err(|e| e.to_string())?,
+            before
+        );
         drop(plan);
         Ok(())
     }
@@ -924,7 +927,8 @@ mod native_windows_ownership {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor() -> Result<(), String> {
+fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor()
+-> Result<(), String> {
     crate::connections::Context::default().run(|| {
         for change in ["refs", "alternate identity", "missing donor"] {
             let f = Fixture::new()?;
@@ -935,7 +939,10 @@ fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor
             let before = std::fs::read(&alt).map_err(|e| e.to_string())?;
             match change {
                 "refs" => {
-                    Fixture::git(&borrower, &["update-ref", "refs/heads/after-prepare", "HEAD"])?;
+                    Fixture::git(
+                        &borrower,
+                        &["update-ref", "refs/heads/after-prepare", "HEAD"],
+                    )?;
                 }
                 "alternate identity" => {
                     std::fs::rename(&alt, alt.with_file_name("owned-original-alternates"))
@@ -948,12 +955,21 @@ fn fixed_helper_server_rejects_changed_refs_alternate_identity_and_missing_donor
                 }
             }
             let result = helper::fixture_server_execute(&borrower, ticket);
-            assert!(result.is_err(), "Changed {change} cannot execute a prepared helper ticket");
+            assert!(
+                result.is_err(),
+                "Changed {change} cannot execute a prepared helper ticket"
+            );
             assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, before);
-            assert!(!std::fs::read_dir(&objects).map_err(|e| e.to_string())?
-                .filter_map(Result::ok)
-                .any(|entry| entry.file_name().to_string_lossy().starts_with("gitcraft-independent-stage-")),
-                "Changed {change} must refuse before creating an independence stage");
+            assert!(
+                !std::fs::read_dir(&objects)
+                    .map_err(|e| e.to_string())?
+                    .filter_map(Result::ok)
+                    .any(|entry| entry
+                        .file_name()
+                        .to_string_lossy()
+                        .starts_with("gitcraft-independent-stage-")),
+                "Changed {change} must refuse before creating an independence stage"
+            );
         }
         Ok(())
     })
