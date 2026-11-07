@@ -1,3 +1,5 @@
+mod routes;
+use crate::git::repository_tools::routes as routing;
 mod publication;
 mod remotes;
 // Reachable repository internals dialogs; stale background answers never replace a new view.
@@ -14,6 +16,8 @@ enum Tool {
     Replacements,
     Remote,
     Publication,
+    Routes,
+    ForceRoute,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
@@ -33,6 +37,11 @@ pub(crate) enum Act {
     SaveGroup(Box<publishing::Manager>),
     PreparePublication(Box<publishing::Manager>),
     PublishGroup(Box<publishing::Manager>, bool),
+    Routes(String),
+    SaveRoutes(Box<routing::Browser>, String),
+    PushBranch(String, String),
+    ForceBranch(String, String),
+    ForceConfirmed(Box<routing::Force>),
 }
 enum Data {
     Refs(all_refs::Browser),
@@ -41,6 +50,8 @@ enum Data {
     Replacements(replacements::Histories),
     Remote(remote_config::Editor),
     Publication(publishing::Manager),
+    Routes(routing::Browser),
+    Force(routing::Force),
 }
 pub(crate) struct State {
     id: u64,
@@ -56,6 +67,33 @@ pub(crate) struct State {
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
         let act = match act {
+            Act::ForceConfirmed(plan) => {
+                self.repository_tool_mutation(
+                    "Force push to confirmed push route",
+                    true,
+                    ctx,
+                    move |runner| routing::force(runner, &plan),
+                );
+                return;
+            }
+            Act::SaveRoutes(browser, name) => {
+                self.repository_tool_mutation(
+                    "Save pull and push routes",
+                    false,
+                    ctx,
+                    move |runner| routing::save(runner, &browser, &name),
+                );
+                return;
+            }
+            Act::PushBranch(name, oid) => {
+                self.repository_tool_mutation(
+                    "Push branch via its push route",
+                    true,
+                    ctx,
+                    move |runner| routing::push_branch(runner, &name, &oid),
+                );
+                return;
+            }
             Act::SaveGroup(manager) => {
                 self.repository_tool_mutation(
                     "Save publication group",
@@ -125,6 +163,10 @@ impl RepoTab {
             Act::Replacements => (String::new(), Tool::Replacements),
             Act::Remote(name) => (name, Tool::Remote),
             Act::Publication(name) => (name, Tool::Publication),
+            Act::Routes(name) => (name, Tool::Routes),
+            Act::ForceBranch(name, oid) => (format!("{name}\0{oid}"), Tool::ForceRoute),
+            Act::ForceConfirmed(..) => return,
+            Act::SaveRoutes(..) | Act::PushBranch(..) => return,
             Act::SaveGroup(..) | Act::PreparePublication(..) | Act::PublishGroup(..) => return,
             Act::SaveRemote(..) | Act::RemotePreview(..) => return,
             Act::Migrate(..)
@@ -161,6 +203,11 @@ impl RepoTab {
                 Tool::Replacements => replacements::read(&path).map(Data::Replacements),
                 Tool::Remote => remote_config::inspect(&path, &query).map(Data::Remote),
                 Tool::Publication => publishing::read(&path, &query).map(Data::Publication),
+                Tool::Routes => routing::read(&path, &query).map(Data::Routes),
+                Tool::ForceRoute => {
+                    let (name, oid) = query.split_once('\0').ok_or("Missing branch snapshot")?;
+                    routing::prepare_force(&path, name, oid).map(Data::Force)
+                }
             },
             move |tab, result, _| {
                 if tab.path != expected_path || crate::git::profile_config() != profile {
@@ -232,6 +279,14 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::ForceRoute {
+        routes::force(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Routes {
+        routes::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Publication {
         publication::show(ui, state, acts);
         return;

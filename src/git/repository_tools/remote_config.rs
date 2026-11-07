@@ -24,12 +24,16 @@ pub(crate) struct Editor {
     pub preview: Option<Preview>,
 }
 pub(crate) fn values(repo: &Path, key: &str) -> Result<Vec<String>, String> {
+    let normalized = key
+        .rsplit_once('.')
+        .map(|(prefix, field)| format!("{prefix}.{}", field.to_ascii_lowercase()))
+        .unwrap_or_else(|| key.to_ascii_lowercase());
     let all = text(repo, &["config", "--null", "--list", "--includes"])?;
     Ok(all
         .split('\0')
         .filter_map(|s| {
             let (k, v) = s.split_once('\n')?;
-            (k == key).then(|| v.to_owned())
+            (k == normalized).then(|| v.to_owned())
         })
         .collect())
 }

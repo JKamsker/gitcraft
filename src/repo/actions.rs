@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Pull and push routes…".into(),
+                "triangular upstream ahead behind".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Routes(String::new())),
+            ),
+            (
                 "Publish to several hosts…".into(),
                 "publication group retry mirrors".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Publication(String::new())),

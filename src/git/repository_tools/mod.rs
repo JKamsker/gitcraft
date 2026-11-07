@@ -61,3 +61,4 @@ pub(crate) mod publication;
 pub(crate) mod reftable;
 pub(crate) mod remote_config;
 pub(crate) mod replacements;
+pub(crate) mod routes;
