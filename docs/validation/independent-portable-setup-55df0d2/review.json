@@ -1,0 +1,33 @@
+{
+  "verdict": "PASS",
+  "application_candidate": "55df0d2e5fe8a4e46f47127f645030c00e96d4cc",
+  "application_tree": "3a4a060041ef998d68773be5252e6bc3c934fd17",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "prior_failed_application": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "scope": "Independent ordinary software correctness/adversarial scoped review of Tour and Portable setup, exact corrected source; not approval of final combined integration candidate.",
+  "findings": [],
+  "resolved_findings": {
+    "PORTABLE-1": "Actual clone now uses owned private working directory/HOME, no parent/global/profile-included configuration; exact source/protocol is validated and redirects disabled. Only captured selected profile credential/SSH helpers are constructed, with original auth-folder environment restored only inside the fixed helper. Anonymous HTTPS has no ambient helper/netrc; SSH needs fresh selected existing key and fixed literal endpoint. Recording-only real Git remote-helper test proves source/auth routing under hostile global/profile/parent/environment settings.",
+    "PORTABLE-2": "Worktree lock lookup canonicalizes actual filesystem directory identity. Existing lock is recognized across platform path spellings; locked-first/later-failure partial restore retries remaining steps without relocking. Native Windows test is registered; execution here is Linux alias identity only."
+  },
+  "additional_corrective_review": [
+    "SSH addresses derive fresh imported key requirement even if old profile used ambient agent; decode/export cannot omit it.",
+    "Editable public restoration URLs are revalidated; edits clear literal-host confirmation. Actual pointer UI demonstrates pending guard, key/signing setup, activation, literal endpoint confirmation, and local clone.",
+    "Selected GitHub/GitLab/Tea same-host helper precedence matches existing profile behavior; Tea alias/host/actual-owner semantics remain preserved.",
+    "Original bounded tour/document/history and profile/public serialization/create-only/retry paths reviewed; no additional actionable finding."
+  ],
+  "validation": {
+    "source_and_logs": "36source/9logs match author hashes;343src/Cargo/build/assets files match application; evidence delta docs only.",
+    "author_full": "814passed;0failed;3ignored;0filtered;817registered;all25feature tests actually pass. Author fmt/strict all-target Clippy logs match.",
+    "independent_focused": "25passed;0failed;792filtered;existing bound binary only;2.88s.",
+    "binary_sha256": "e39934cbb2a95b44d8b986458f6d3abdda93dbacda4d24a9290ec160ad7065b8",
+    "manifest_sha256": "b5b0fc323a2469dec68eeb4066c2f949e0e3269554e0541c8b2051b30f12e227",
+    "fresh_compile": false,
+    "ci": "No use/dispatch/rerun/poll/wait"
+  },
+  "limits": [
+    "No native Windows/runtime SSH/WSL/provider account tests. Recording-only local transport/auth fixtures; no real keys/accounts/network.",
+    "This Linux focused execution reuses the frozen author binary. Source/depfile/log/name/hash consistency was checked; no cryptographic retroactive compilation proof or independent full-suite claim.",
+    "Final combined source still needs separate integration checks/review and deferred native Windows CI."
+  ]
+}
