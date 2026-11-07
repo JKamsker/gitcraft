@@ -412,6 +412,7 @@ esac"#,
             r#"[ -z "${GITEA_SERVER_TOKEN:-}" ] || exit 93
 case "$1" in
  login) printf 'fixture-login https://forge.example fixture-user\n';;
+ api) printf '{"login":"fixture-user"}\n';;
  ssh-keys) for argument in "$@"; do last=$argument; done; cat "$last" > "$FIXTURE_ROOT/tea-public-payload";;
  *) exit 94;;
 esac"#,

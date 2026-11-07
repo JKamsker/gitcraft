@@ -15,7 +15,7 @@ pub(crate) struct SshKeyAccount {
     target: Target,
 }
 enum Target {
-    Github { host: String, command: Command },
+    Github { host: String, command: Box<Command> },
     Gitea(Box<Api>),
 }
 impl SshKeyAccount {
@@ -49,7 +49,7 @@ impl SshKeyAccount {
                     "--input",
                     "-",
                 ]);
-                execute(command, Some(&body), active)?;
+                execute(*command, Some(&body), active)?;
             }
             Target::Gitea(api) => {
                 api.send("POST", "user/keys", Some(&body))
@@ -94,7 +94,7 @@ pub(crate) fn prepare(
                 owner,
                 target: Target::Github {
                     host: hosting.host.clone(),
-                    command,
+                    command: Box::new(command),
                 },
             })
         }
@@ -313,5 +313,90 @@ esac
             assert!(!error.contains("fixture-private"));
             Ok(())
         })
+    }
+    #[test]
+    fn forgejo_and_gitea_registration_posts_only_public_key_to_user_keys() -> Result<(), String> {
+        use std::io::{BufRead, Read, Write};
+        use std::net::TcpListener;
+        for provider in ["Forgejo", "Gitea"] {
+            let fixture = Fixture::new()?;
+            let public = fixture.public()?;
+            let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
+            listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+            let address = listener.local_addr().map_err(|e| e.to_string())?;
+            let server = std::thread::spawn(move || -> Result<(String, String, Value), String> {
+                let deadline = std::time::Instant::now() + Duration::from_secs(4);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            if std::time::Instant::now() >= deadline {
+                                return Err("Owned loopback fixture timed out".into());
+                            }
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(e) => return Err(e.to_string()),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .map_err(|e| e.to_string())?;
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .map_err(|e| e.to_string())?;
+                let mut reader =
+                    std::io::BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
+                let mut line = String::new();
+                reader.read_line(&mut line).map_err(|e| e.to_string())?;
+                let request = line.trim().to_owned();
+                let mut length = 0;
+                let mut auth = String::new();
+                loop {
+                    line.clear();
+                    reader.read_line(&mut line).map_err(|e| e.to_string())?;
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if line.is_empty() {
+                        return Err("Incomplete fixture headers".into());
+                    }
+                    let (key, value) = line.split_once(':').ok_or("Invalid fixture header")?;
+                    if key.eq_ignore_ascii_case("content-length") {
+                        length = value.trim().parse::<usize>().map_err(|e| e.to_string())?;
+                    }
+                    if key.eq_ignore_ascii_case("authorization") {
+                        auth = value.trim().into();
+                    }
+                }
+                if length > 16384 {
+                    return Err("Oversized fixture body".into());
+                }
+                let mut bytes = vec![0; length];
+                reader.read_exact(&mut bytes).map_err(|e| e.to_string())?;
+                stream.write_all(b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}").map_err(|e|e.to_string())?;
+                Ok((
+                    request,
+                    auth,
+                    serde_json::from_slice(&bytes).map_err(|e| e.to_string())?,
+                ))
+            });
+            let account = SshKeyAccount {
+                owner: provider.into(),
+                target: Target::Gitea(Box::new(Api::fixture(
+                    &format!("http://{address}"),
+                    super::super::http::Login::Token("fixture-only-token".into()),
+                ))),
+            };
+            account.upload("fixture-title", &public, &|| true)?;
+            let (request, auth, payload) =
+                server.join().map_err(|_| "Loopback fixture stopped")??;
+            assert_eq!(request, "POST /api/v1/user/keys HTTP/1.1");
+            assert_eq!(auth, "token fixture-only-token");
+            assert_eq!(payload["title"], "fixture-title");
+            assert!(payload["key"].as_str().is_some_and(
+                |key| key.starts_with("ssh-ed25519 ") && !key.contains("discarded-private")
+            ));
+        }
+        Ok(())
     }
 }
