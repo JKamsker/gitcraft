@@ -638,6 +638,16 @@ so your config, credentials and hooks apply as usual.
 - Unified or side by side (a new file takes the whole width, with no empty old side), syntax
   colours, the changed part of each line marked, whitespace changes optional, images shown
   before / after. Esc closes.
+- Pictures compare four ways: _2-up_ side by side, _Swipe_ (drag the line, or the slider),
+  _Onion skin_ (the new one over the old, as see-through as the slider says) and _Difference_
+  (the pixels that changed, bright over a faint old picture). Zoom (the wheel, at the pointer)
+  and pan (drag) stay the same across the modes and both sides of 2-up, the two pictures laid
+  out on one canvas so that pixels line up; _Fit_, _100%_ and a double-click reset them. A
+  checkerboard shows through transparent parts, and the header says how the dimensions and
+  size changed and how many pixels did. Pictures past 4096 pixels are shown scaled (both by the
+  same factor); a picture that doesn't decode (an `.ico`) shows before / after as before.
+  Below, the picture's history is a strip of thumbnails, newest first; click one to see that
+  commit's change.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

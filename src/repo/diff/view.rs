@@ -4,6 +4,7 @@
 use egui::{Sense, Stroke, Ui};
 
 use super::binary::{binary_view, textconv_note};
+use super::image_compare::compare_view;
 use super::images::image_view;
 use super::lfs::lfs_view;
 use super::link::LineLinks;
@@ -140,7 +141,7 @@ impl RepoTab {
             }
             return;
         }
-        let Some(data) = ready_data(ui, view, ignore_ws, &t) else {
+        let Some(data) = ready_data(ui, view, ignore_ws, &t, acts) else {
             return;
         };
 
@@ -645,6 +646,7 @@ fn ready_data<'a>(
     view: &'a DiffView,
     ignore_ws: bool,
     t: &Tokens,
+    acts: &mut Vec<Action>,
 ) -> Option<&'a DiffData> {
     let data = match &view.data {
         None => {
@@ -663,6 +665,10 @@ fn ready_data<'a>(
     };
     if let Some(lfs) = &data.lfs {
         lfs_view(ui, lfs);
+        return None;
+    }
+    if let Some(cmp) = &data.compare {
+        compare_view(ui, cmp, acts);
         return None;
     }
     if let Some(images) = &data.image {

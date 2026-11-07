@@ -7,6 +7,7 @@ mod algorithm;
 #[cfg(test)]
 mod algorithm_tests;
 mod binary;
+mod image_compare;
 mod images;
 mod interdiff;
 mod jump;
@@ -86,6 +87,9 @@ pub struct DiffData {
     /// Side-by-side rows: (left line, right line).
     pub split: Vec<(Option<usize>, Option<usize>)>,
     pub image: Option<ImagePair>,
+    /// The two versions of the picture decoded, to compare in every mode; `None` when they
+    /// don't decode (they show as `image` then).
+    pub compare: Option<image_compare::Compare>,
     /// The file is kept in Git LFS: the objects before and after, shown instead of the lines.
     pub lfs: Option<LfsPair>,
     /// A binary file (not an image, not in LFS): both versions, shown instead of git's
@@ -270,6 +274,9 @@ fn prepare(
         .then(|| binary::textconv_for(repo, &path))
         .flatten();
     let partial = partial && textconv.is_none();
+    let compare = image
+        .as_ref()
+        .and_then(|pair| image_compare::compare(repo, key, &path, pair));
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
     let mut uncut = std::collections::HashMap::new();
@@ -295,6 +302,7 @@ fn prepare(
         changed,
         split,
         image,
+        compare,
         lfs,
         binary,
         textconv,
