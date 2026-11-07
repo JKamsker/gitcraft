@@ -1,0 +1,8 @@
+{
+  "candidate": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "exit_code": 0,
+  "test_passed": true,
+  "trace": "SEEDED regular physical checkout with indexed120000 and core.symlinks=false\nCHECKED UI boundary result retains120000 and regular physical checkout\nCHECKED UI boundary result retains120000 and regular physical checkout\n",
+  "log_sha256": "8d26c274fc06666e10782252cea5eca4534c9e71202a453a4216c25959bcd5b6",
+  "scope": "Exact frozen UI unstage+stage boundary test; reviewer fixture initializes private file a as indexed120000 with core.symlinks=false physical regular bytes; readback guards assert mode120000 and physical regular checkout after both UI actions. Original assertions verify exact staged/working bytes. No production source edits."
+}

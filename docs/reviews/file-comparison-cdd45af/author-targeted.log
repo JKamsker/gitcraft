@@ -1,0 +1,40 @@
+   Compiling gitcraft v0.3.4 (/workspace/work/file-comparison-views)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.89s
+     Running unittests src/lib.rs (target/debug/deps/gitcraft-31822f5b138c0fe8)
+
+running 26 tests
+test git::file_comparison::tests::blobless_matrix_does_not_fetch_and_missing_blob_comparisons_fail_explicitly ... ok
+test git::file_comparison::tests::matrix_distinguishes_equal_blobs_missing_modes_and_pins_ambiguous_branch_refs ... ok
+test git::file_comparison::tests::migration_reads_renames_copies_scores_and_immutable_blob_sides ... ok
+test git::file_comparison::tests::link_targets_and_binary_versions_are_read_without_following_links ... ok
+test git::file_comparison::tests::missing_promised_attributes_fail_closed_without_starting_a_transport ... ok
+test git::file_comparison::tests::patch_paths_cannot_escape_the_snapshot_or_inject_an_additional_file ... ok
+test git::file_comparison::tests::raw_non_utf8_paths_stay_distinct_and_literal_folders_do_not_expand_globs ... ok
+test git::file_comparison::tests::size_and_cancellation_limits_fail_explicitly ... ok
+test git::file_comparison::tests::guarded_patch_keeps_working_bytes_and_other_index_entries_and_preserves_an_existing_lock ... ok
+test git::file_comparison::tests::unborn_additions_deletions_and_empty_reorganizations_are_explicit ... ok
+test git::file_comparison::tests::encoded_remote_readers_and_locked_staging_preserve_raw_files_and_existing_locks ... ok
+test repo::file_comparison::tests::actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches ... ok
+test repo::file_comparison::tests::actual_migration_ribbon_opens_content_edits_apart_from_the_rename ... ok
+test repo::file_comparison::tests::aligned_insertions_and_deletions_do_not_shift_unrelated_index_lines ... ok
+test git::file_comparison::tests::snapshot_checks_refuse_changed_head_index_flags_working_bytes_and_filters ... ok
+test repo::file_comparison::tests::closed_refreshed_or_reopened_views_cannot_apply_old_line_actions ... ok
+test repo::file_comparison::tests::actual_lens_boundary_buttons_stage_and_unstage_the_displayed_snapshot ... ok
+test repo::file_comparison::tests::emulated_symlinks_keep_the_index_type_like_git_add_and_guard_config_changes ... ok
+test repo::file_comparison::tests::opening_snapshot_views_drops_diff_reading_modes_and_selections ... ok
+test repo::file_comparison::tests::malformed_line_ids_and_submodule_boundaries_are_read_only ... ok
+test repo::file_comparison::tests::intent_to_add_and_empty_file_creation_deletion_keep_commit_semantics ... ok
+test repo::file_comparison::tests::mode_only_boundaries_and_staged_rename_content_keep_paths_and_working_bytes ... ok
+test repo::file_comparison::tests::quoted_git_names_and_crlf_no_newline_patches_do_not_run_programs_or_change_other_files ... ok
+test repo::file_comparison::tests::partial_deletions_and_reversed_deleted_file_creation_are_safe ... ok
+test repo::file_comparison::tests::partly_staged_new_files_can_stage_and_unstage_selected_lines_without_touching_working_copy ... ok
+test repo::file_comparison::tests::three_way_alignment_marks_working_edits_undoing_staged_changes_and_preserves_lf ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 792 filtered out; finished in 7.62s
+
+     Running unittests src/main.rs (target/debug/deps/gitcraft-7e93e9ffb9045fe8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
