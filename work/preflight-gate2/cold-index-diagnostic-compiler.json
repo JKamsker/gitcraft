@@ -1,0 +1,8 @@
+{
+  "source_commit": "fe3f30230980220022c59c1fcc2fa96b69b44c5d",
+  "binary": "/workspace/work/push-preflight-cold-index-diagnostic-bin",
+  "binary_sha256": "c5b6529b8041a148b75d21706345e07c95627256827c74bc7657955ffb416341",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "bounded_runner_sha256": "42b340340b9dd7d289f44f57bb51b8738c8a82b2984885a0254951f9b119024a",
+  "runtime": "NOT EXECUTED"
+}

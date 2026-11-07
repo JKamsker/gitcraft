@@ -1,0 +1,22 @@
+warning: constant `MAX_OUTPUT` is never used
+  --> work/preflight-gate2/../../src/bounded_process.rs:10:7
+   |
+10 | const MAX_OUTPUT: u64 = 16 * 1024 * 1024;
+   |       ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `run` is never used
+  --> work/preflight-gate2/../../src/bounded_process.rs:12:15
+   |
+12 | pub(crate) fn run(
+   |               ^^^
+
+warning: function `run_with_input` is never used
+  --> work/preflight-gate2/../../src/bounded_process.rs:21:15
+   |
+21 | pub(crate) fn run_with_input(
+   |               ^^^^^^^^^^^^^^
+
+warning: 3 warnings emitted
+
