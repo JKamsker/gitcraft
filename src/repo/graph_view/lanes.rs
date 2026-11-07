@@ -62,7 +62,7 @@ impl RepoTab {
             }
         }
         for &lane in graph_row.outgoing.iter() {
-            let color = if is_wip || stash.is_some() {
+            let color = if is_wip || stash.is_some() || self.parked_at(row.i).is_some() {
                 t.text_faint
             } else {
                 t.lane(lane)
@@ -77,6 +77,8 @@ impl RepoTab {
 
         if stash.is_some() {
             stash_box(ui, &gp, &t, node, row.gx + row.cols.graph);
+        } else if let Some(parked) = self.parked_at(row.i) {
+            self.parked_marker(ui, &gp, parked, node);
         } else if is_wip {
             gp.circle_filled(node, 6.0, t.dock);
             gp.add(egui::Shape::dashed_line(

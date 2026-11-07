@@ -26,7 +26,20 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
 - _Resolve all with agent_ on the banner of a merge, rebase, cherry-pick or revert in progress
   (or _Agent → Resolve in background_ in the conflict editor, for that file) hands the conflicted files
   to Claude Code, or to Codex when Settings → AI picks it, running headless. You go on working
-  meanwhile; nothing in your checkout changes until you apply the result.
+  meanwhile; nothing of the merge changes until you apply the result.
+- _Resolve all with agent_ also puts the merge aside while the agent works, like a stash: the
+  worktree's files, its index as it is (each conflict's sides and what you staged) and the
+  merge itself (`MERGE_HEAD`, its message) are kept, and the worktree goes back to its branch,
+  clean. Check out other branches, commit, anything, in the same worktree. The graph shows the
+  merge put aside above the commit it was on, with the agent's robot: a turning ring and how far
+  along it is while it works, a dot and _resolved · bring it back_ once it is done (with a
+  notification). _Bring it back_ (the card, or the row's menu) checks out its branch and puts
+  the merge back exactly as it was, then opens the review of what the agent did. It needs a
+  clean worktree and the branch where it was; until then it waits, and it survives closing
+  gitcraft (the agent's work too, once it is done). Files git doesn't track stay where they
+  are. A rebase, or a cherry-pick of several commits, isn't put aside: it is resolved in place.
+  The merge's files are kept as a commit under `refs/gitcraft/parked/`, the rest under
+  `.git/gitcraft/parked/` and `.git/gitcraft/resolver/`.
 - The agent works in a private copy of the checkout: a scratch worktree in the temporary
   folder, not listed among the worktrees and removed when the run ends (or, after a crash, the
   next time gitcraft makes one). The operation is replayed there so it sees all of it, and each

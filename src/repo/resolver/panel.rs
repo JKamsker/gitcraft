@@ -83,8 +83,10 @@ impl RepoTab {
             .add_enabled(local, egui::Button::new("Resolve all with agent"))
             .on_hover_text(format!(
                 "{} resolves the {n} conflicted file{} in the background, in a private copy of \
-                 this checkout: you go on working and watch its progress. Nothing here changes \
-                 until you apply its result. (The agent is picked in Settings → AI.)",
+                 this checkout. The merge is put aside meanwhile, like a stash (conflicts and \
+                 staged files kept as they are): check out and work on anything. When the \
+                 agent is done, bring it back from the graph and review what it did. (The \
+                 agent is picked in Settings → AI.)",
                 engine.label(),
                 if n == 1 { "" } else { "s" },
             ))
@@ -229,6 +231,16 @@ fn header(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
                 sub.push(format!("${cost:.2}"));
             }
             ui.label(RichText::new(sub.join(" · ")).color(t.text_dim).small());
+            if let Some(parked) = &run.parked {
+                ui.label(
+                    RichText::new(format!(
+                        "The {} is put aside: work on anything meanwhile",
+                        parked.what()
+                    ))
+                    .color(t.accent)
+                    .small(),
+                );
+            }
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
             if icons::small_button(ui, "chevron-down", "Fold: it goes on in the background")
@@ -464,6 +476,11 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
         {
             acts.push(Action::Resolver(ResolverAct::Review(0)));
         }
+        // The merge put aside: brought back first, then the files are applied to it.
+        if let Some(parked) = &run.parked {
+            bring_back_button(ui, parked, acts);
+            return;
+        }
         let n = run.picked.len();
         let label = match n {
             0 => "Nothing to apply".to_owned(),
@@ -490,6 +507,26 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
             acts.push(Action::Resolver(ResolverAct::Dismiss));
         }
     });
+}
+
+/// _Bring it back_: the merge put aside, back in the worktree as it was, to apply the agent's
+/// work to.
+pub(super) fn bring_back_button(
+    ui: &mut Ui,
+    parked: &crate::resolver::park::Parked,
+    acts: &mut Vec<Action>,
+) {
+    if widgets::primary_button(ui, "Bring it back", true, 0.0)
+        .on_hover_text(format!(
+            "Checks out {} and puts the {} back as it was, conflicts and staged files \
+             included; then the agent's work is there to review and apply",
+            parked.branch.as_deref().unwrap_or("its commit"),
+            parked.what()
+        ))
+        .clicked()
+    {
+        acts.push(Action::Resolver(ResolverAct::BringBack(parked.id.clone())));
+    }
 }
 
 fn applied(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
@@ -523,6 +560,11 @@ fn failed(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
     ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
     ui.add_space(6.0);
     ui.horizontal(|ui| {
+        // Its merge put aside: brought back before anything else (it is never dropped).
+        if let Some(parked) = &run.parked {
+            bring_back_button(ui, parked, acts);
+            return;
+        }
         if ui.button("Try again").clicked() {
             acts.push(Action::Resolver(ResolverAct::Dismiss));
             acts.push(Action::Resolver(ResolverAct::Start(Some(

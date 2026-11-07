@@ -59,10 +59,22 @@ impl RepoTab {
             self.drop_extras();
             return;
         }
+        // A merge put aside: its agent's card, nothing to read of a commit.
+        if self.parked_at(row).is_some() {
+            self.detail = None;
+            self.detail_hash = None;
+            self.drop_extras();
+            self.resolver_show();
+            return;
+        }
         self.load_detail(hash, ctx);
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
+        // A row of no commit (the changes row, a merge put aside): nothing for git to read.
+        if hash.starts_with('\u{0}') {
+            return;
+        }
         self.detail = None;
         self.reword = None;
         self.detail_error = None;

@@ -62,6 +62,11 @@ fn top_bar(ui: &mut Ui, t: &Tokens, run: &Run, review: &ReviewState, acts: &mut 
                     if icons::small_button(ui, "x", "Back (the agent's card)").clicked() {
                         acts.push(Action::Resolver(ResolverAct::CloseReview));
                     }
+                    // Read while the merge is put aside; applied once it is back.
+                    if let Some(parked) = &run.parked {
+                        super::panel::bring_back_button(ui, parked, acts);
+                        return;
+                    }
                     let n = run.picked.len();
                     let label = match n {
                         0 => "Nothing to apply".to_owned(),

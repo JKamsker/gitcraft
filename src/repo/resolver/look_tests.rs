@@ -145,6 +145,7 @@ fn run(phase: Phase, now: Instant) -> Run {
         last_words: None,
         cost_usd: (!working).then_some(0.42),
         review: None,
+        parked: None,
     }
 }
 
@@ -268,18 +269,33 @@ fn the_card_in_each_state() -> Result<(), String> {
     for dark in [true, false] {
         let mut h = harness(repo.path().to_owned(), dark);
         settle(&mut h);
-        for (name, phase, folded, review) in [
-            ("working", Phase::Working, false, None),
-            ("ready", Phase::Ready, false, None),
-            ("folded", Phase::Working, true, None),
-            ("review", Phase::Ready, false, Some(false)),
-            ("review-diff", Phase::Ready, false, Some(true)),
+        let head = repo.git(&["rev-parse", "HEAD"])?.trim().to_owned();
+        for (name, phase, folded, review, put_aside) in [
+            ("working", Phase::Working, false, None, false),
+            ("ready", Phase::Ready, false, None, false),
+            ("folded", Phase::Working, true, None, false),
+            ("review", Phase::Ready, false, Some(false), false),
+            ("review-diff", Phase::Ready, false, Some(true), false),
+            ("parked-working", Phase::Working, true, None, true),
+            ("parked-ready", Phase::Ready, false, None, true),
         ] {
             if let Some(tab) = h.state_mut().as_mut() {
                 let mut run = run(phase, Instant::now());
                 run.review = review.map(under_review);
+                let parked = put_aside.then(|| crate::resolver::park::Parked {
+                    id: "look".into(),
+                    operation: "merge".into(),
+                    branch: Some("main".into()),
+                    head: head.clone(),
+                    theirs_name: Some("dev".into()),
+                    at: crate::git::now() - 200,
+                    ..Default::default()
+                });
+                run.parked = parked.clone();
+                tab.resolver.parked = parked.into_iter().collect();
                 tab.resolver.run = Some(run);
                 tab.resolver.folded = folded;
+                tab.rebuild_rows();
             }
             for _ in 0..4 {
                 h.step();
@@ -292,6 +308,8 @@ fn the_card_in_each_state() -> Result<(), String> {
             if let Some(tab) = h.state_mut().as_mut() {
                 // Nothing is cleaned up for a run that made nothing.
                 tab.resolver.run = None;
+                tab.resolver.parked.clear();
+                tab.rebuild_rows();
             }
         }
     }

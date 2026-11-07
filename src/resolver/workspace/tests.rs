@@ -92,7 +92,7 @@ fn only_files_resolved_and_untouched_by_the_user_are_applied() -> Result<(), Str
     // The agent resolves a.txt, leaves b.txt half done.
     std::fs::write(ws.dir().join("a.txt"), "one\nmain and side\nthree\n")
         .map_err(|e| e.to_string())?;
-    let results = ws.check(repo.path(), &[]);
+    let results = ws.check(Some(repo.path()), &[]);
     assert_eq!(
         results,
         vec![
@@ -109,7 +109,7 @@ fn only_files_resolved_and_untouched_by_the_user_are_applied() -> Result<(), Str
     std::fs::write(ws.dir().join("b.txt"), "b both\n").map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("b.txt"), "b by hand\n").map_err(|e| e.to_string())?;
     assert_eq!(
-        ws.check(repo.path(), &[])[1].1,
+        ws.check(Some(repo.path()), &[])[1].1,
         FileResult::ChangedMeanwhile
     );
     // a.txt was applied before: it too now differs from what the agent started from.
@@ -126,7 +126,7 @@ fn a_file_the_agent_deleted_is_deleted_and_paths_stay_inside() -> Result<(), Str
     assert!(Workspace::prepare(repo.path(), &[]).is_err());
     let ws = Workspace::prepare(repo.path(), &files())?;
     std::fs::remove_file(ws.dir().join("b.txt")).map_err(|e| e.to_string())?;
-    assert_eq!(ws.check(repo.path(), &[])[1].1, FileResult::Deleted);
+    assert_eq!(ws.check(Some(repo.path()), &[])[1].1, FileResult::Deleted);
     let applied = ws.apply(repo.path(), &["b.txt".to_owned()], &[]);
     assert_eq!(applied.written, vec!["b.txt".to_owned()]);
     assert!(!repo.path().join("b.txt").exists());
@@ -147,10 +147,13 @@ fn a_file_without_markers_is_only_applied_once_the_agent_decided() -> Result<(),
     let files = vec!["gone.txt".to_owned()];
     let ws = Workspace::prepare(repo.path(), &files)?;
     assert_eq!(ws.files[0].conflicts, 0);
-    assert_eq!(ws.check(repo.path(), &[])[0].1, FileResult::Untouched);
+    assert_eq!(ws.check(Some(repo.path()), &[])[0].1, FileResult::Untouched);
     assert!(ws.apply(repo.path(), &files, &[]).written.is_empty());
     // Reported done as it is (keep side's edit): now it applies.
-    assert_eq!(ws.check(repo.path(), &files)[0].1, FileResult::Resolved);
+    assert_eq!(
+        ws.check(Some(repo.path()), &files)[0].1,
+        FileResult::Resolved
+    );
     ws.remove()
 }
 
@@ -164,7 +167,7 @@ fn a_link_the_agent_made_is_never_applied() -> Result<(), String> {
     std::fs::write(&secret, "token\n").map_err(|e| e.to_string())?;
     std::fs::remove_file(ws.dir().join("a.txt")).map_err(|e| e.to_string())?;
     std::os::unix::fs::symlink(&secret, ws.dir().join("a.txt")).map_err(|e| e.to_string())?;
-    assert_eq!(ws.check(repo.path(), &[])[0].1, FileResult::NotPlain);
+    assert_eq!(ws.check(Some(repo.path()), &[])[0].1, FileResult::NotPlain);
     assert!(ws.apply(repo.path(), &files(), &[]).written.is_empty());
     let _ = std::fs::remove_file(&secret);
     ws.remove()

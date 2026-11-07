@@ -3,9 +3,13 @@
 //! plan, each step and what it is doing on a card of its own ([`panel`]). Once it is done the
 //! user applies what it resolved: those files are written here and marked resolved.
 
+mod graph;
 mod panel;
+mod parking;
 mod review;
 mod review_view;
+
+pub(in crate::repo) use graph::parked_rows;
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -14,6 +18,7 @@ use std::time::{Duration, Instant};
 
 use crate::repo::{OpKind, Refresh, RepoTab};
 use crate::resolver::agent::{self, Activity, Engine};
+use crate::resolver::park::{self, Parked};
 use crate::resolver::process::Running;
 use crate::resolver::report::{Progress, Report};
 use crate::resolver::workspace::{Applied, FileResult, Workspace};
@@ -37,6 +42,8 @@ pub(crate) enum ResolverAct {
     /// Shows the file reviewed by conflict, or as a line diff.
     ReviewAsDiff(bool),
     CloseReview,
+    /// Brings the merge put aside as this back into the worktree.
+    BringBack(String),
 }
 
 /// The agent's work under review, in the big area.
@@ -89,6 +96,9 @@ struct Run {
     cost_usd: Option<f64>,
     /// Its files under review, while they are.
     review: Option<ReviewState>,
+    /// The merge it resolves, put aside while it does (`None`: resolved in place, or brought
+    /// back).
+    parked: Option<Parked>,
 }
 
 /// The tab's run, if one.
@@ -96,6 +106,9 @@ struct Run {
 pub(crate) struct ResolverState {
     run: Option<Run>,
     folded: bool,
+    /// The merges put aside from this worktree (see `parking`).
+    pub(in crate::repo) parked: Vec<Parked>,
+    reading_parked: bool,
 }
 
 impl ResolverState {
@@ -156,13 +169,21 @@ struct Prepared {
     mcp_file: PathBuf,
     command: crate::ai::run::CommandLine,
     prompt: String,
+    /// The merge, put aside (when asked to and it could be).
+    parked: Option<Parked>,
+    /// Why it wasn't put aside, when it was asked to be.
+    not_parked: Option<String>,
 }
 
+/// Makes the agent's worktree and command for resolving `files`; then, when `put_aside`, puts
+/// the merge aside (see `park`), the worktree free meanwhile. A merge that can't be (a rebase)
+/// is resolved in place, and says why.
 fn prepare(
     repo: &std::path::Path,
     files: &[String],
     engine: Engine,
     id: &str,
+    put_aside: bool,
 ) -> Result<Prepared, String> {
     let exe = std::env::current_exe().map_err(|e| format!("gitcraft can't find itself: {e}"))?;
     let workspace = Workspace::prepare(repo, files)?;
@@ -175,11 +196,26 @@ fn prepare(
         return Err(format!("couldn't write the agent's MCP settings: {e}"));
     }
     let prompt = agent::prompt(&workspace, engine);
+    // The tests' stand-in for the agent, when one is set.
+    #[cfg(test)]
+    let command = flow_tests::STAND_IN
+        .lock()
+        .ok()
+        .and_then(|s| s.clone())
+        .unwrap_or(command);
+    // Last: once the agent's copy of it is made, the merge is put aside.
+    let (parked, not_parked) = match put_aside.then(|| park::park(repo, id, files)) {
+        Some(Ok(parked)) => (Some(parked), None),
+        Some(Err(why)) => (None, Some(why)),
+        None => (None, None),
+    };
     Ok(Prepared {
         workspace,
         mcp_file,
         command,
         prompt,
+        parked,
+        not_parked,
     })
 }
 
@@ -236,7 +272,15 @@ impl RepoTab {
                     }
                 }
             }
+            // A merge put aside is brought back first: there is nothing to apply it to.
+            ResolverAct::Apply
+                if self
+                    .resolver
+                    .run
+                    .as_ref()
+                    .is_some_and(|r| r.parked.is_some()) => {}
             ResolverAct::Apply => self.apply_resolved(ctx),
+            ResolverAct::BringBack(id) => self.bring_back(&id, ctx),
             ResolverAct::Pick(path, on) => {
                 if let Some(run) = &mut self.resolver.run {
                     if on {
@@ -247,12 +291,13 @@ impl RepoTab {
                 }
             }
             ResolverAct::Dismiss => {
-                // While files are written, the run stays to mark them resolved.
+                // While files are written, the run stays to mark them resolved; a merge put
+                // aside is never forgotten with it: it is brought back first.
                 if self
                     .resolver
                     .run
                     .as_ref()
-                    .is_some_and(|r| r.phase == Phase::Applying)
+                    .is_some_and(|r| r.phase == Phase::Applying || r.parked.is_some())
                 {
                     return;
                 }
@@ -344,6 +389,9 @@ impl RepoTab {
             self.resolver.folded = false;
             return;
         }
+        // All of them: the merge is put aside meanwhile, the worktree free (one file is resolved
+        // in place, from its conflict editor).
+        let put_aside = files.is_none();
         let files = files.unwrap_or_else(|| {
             self.work
                 .conflicted
@@ -377,12 +425,13 @@ impl RepoTab {
             last_words: None,
             cost_usd: None,
             review: None,
+            parked: None,
         });
         let repo = self.path.clone();
         let for_id = id.clone();
         self.then(
             ctx,
-            move || prepare(&repo, &files, engine, &for_id),
+            move || prepare(&repo, &files, engine, &for_id, put_aside),
             move |tab, prepared, ctx| tab.resolver_prepared(&id, prepared, ctx),
         );
     }
@@ -393,8 +442,24 @@ impl RepoTab {
         prepared: Result<Prepared, String>,
         ctx: &egui::Context,
     ) {
+        // The merge put aside: the worktree changed under the tab, and the graph has its row.
+        let parked = prepared.as_ref().ok().and_then(|p| p.parked.clone());
+        let not_parked = prepared.as_ref().ok().and_then(|p| p.not_parked.clone());
+        if let Some(parked) = &parked {
+            self.resolver.parked.push(parked.clone());
+            self.status = Some((
+                format!(
+                    "The {} is put aside while the agent resolves it: the worktree is free",
+                    parked.what()
+                ),
+                false,
+            ));
+            self.reload(ctx);
+        } else if let Some(why) = not_parked {
+            self.status = Some((format!("Resolving in place: {why}"), false));
+        }
         let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == id) else {
-            // Dismissed meanwhile: what was made goes.
+            // Dismissed meanwhile: what was made goes (a merge put aside stays, in the graph).
             if let Ok(p) = prepared {
                 std::thread::spawn(move || {
                     let _ = std::fs::remove_file(&p.mcp_file);
@@ -403,6 +468,7 @@ impl RepoTab {
             }
             return;
         };
+        run.parked = parked;
         let p = match prepared {
             Ok(p) if run.stopping => {
                 // Stopped while it was being made: the agent isn't started.
@@ -482,6 +548,12 @@ impl RepoTab {
         if failed {
             run.error = Some(failure(run.engine, exit.code, &exit.stderr));
         }
+        // Its merge put aside: its work is kept with it, to bring back when the user is ready.
+        if run.parked.is_some() {
+            run.agent = None;
+            self.keep_parked_work(ctx);
+            return;
+        }
         let Some(ws) = run.workspace.clone() else {
             run.phase = Phase::Failed;
             return;
@@ -491,7 +563,7 @@ impl RepoTab {
         let done = done_files(&run.progress);
         self.then(
             ctx,
-            move || ws.check(&repo, &done),
+            move || ws.check(Some(&repo), &done),
             move |tab, results, _| {
                 let Some(run) = tab.resolver.run.as_mut().filter(|r| r.id == id) else {
                     return;
@@ -600,3 +672,6 @@ impl RepoTab {
 
 #[cfg(test)]
 mod look_tests;
+
+#[cfg(test)]
+mod flow_tests;

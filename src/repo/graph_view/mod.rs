@@ -34,6 +34,7 @@ use badge::{Badge, BadgeKind, badges};
 /// For the settings' previews, which draw a graph of their own like this one.
 pub(crate) use lanes::edge;
 use row::Lanes;
+pub(in crate::repo) use row::pill;
 
 // The reset modes, for the reflog view's entries too.
 pub(super) use menu::{Rewrite, reset_items};
@@ -406,13 +407,20 @@ impl RepoTab {
                 .show(|ui| super::sidebar::stash_menu(ui, acts, stash, idle));
             return;
         }
+        if let Some(parked) = self.parked_at(i) {
+            egui::Popup::context_menu(resp)
+                .style(crate::theme::menu_style)
+                .show(|ui| self.parked_menu(ui, parked, acts));
+            return;
+        }
         self.commit_menu(resp, i, idle, acts);
     }
 
     /// Compares two rows of the graph, the older one first; the changes row stands for the
     /// working tree. `None` for the same row twice.
     fn compare_rows(&self, a: usize, b: usize) -> Option<Action> {
-        if a == b {
+        // A merge put aside isn't a commit to compare (its files are the agent's business).
+        if a == b || self.parked_at(a).is_some() || self.parked_at(b).is_some() {
             return None;
         }
         // Rows go newest first.

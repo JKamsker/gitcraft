@@ -63,6 +63,7 @@ impl RepoTab {
             if row.col < shown_lanes
                 && self.commits[i].hash != WIP_HASH
                 && self.stash_at(i).is_none()
+                && self.parked_at(i).is_none()
             {
                 first.entry(row.origin).or_insert(i);
             }

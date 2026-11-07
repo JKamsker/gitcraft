@@ -6,7 +6,9 @@
 //! The user's checkout is not touched until the agent's work is applied, file by file, and only
 //! where the file is still as it was when the agent started.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
 
 use crate::git::{self, Scratch};
 
@@ -23,10 +25,13 @@ pub struct Conflicted {
     original: Option<Vec<u8>>,
     /// How many conflicts it had then.
     pub conflicts: usize,
+    /// The agent left a link (or anything but a file) in its place: kept as such.
+    agent_not_plain: bool,
 }
 
 /// The two sides of the operation, as the agent is told them.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Sides {
     /// What it is: "merge", "cherry-pick", "revert", "rebase" (empty when gitcraft can't tell).
     pub operation: String,
@@ -38,11 +43,35 @@ pub struct Sides {
     pub theirs_name: Option<String>,
 }
 
-/// The agent's scratch worktree and what it was given.
+/// The agent's scratch worktree and what it was given; or, once it is done, its work kept
+/// (see [`Workspace::keep`]).
 pub struct Workspace {
-    scratch: Scratch,
+    /// Where the agent's version of each file is.
+    dir: PathBuf,
+    scratch: Option<Scratch>,
+    /// The folder its work is kept in, when it is.
+    kept: Option<PathBuf>,
     pub files: Vec<Conflicted>,
     pub sides: Sides,
+}
+
+/// A file of a kept workspace, as `workspace.json` lists it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct KeptFile {
+    path: String,
+    conflicts: usize,
+    /// It was in the checkout (under `original/`).
+    original: bool,
+    /// "file" (under `resolved/`), "deleted" or "not_plain".
+    agent: String,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct KeptWorkspace {
+    files: Vec<KeptFile>,
+    sides: Sides,
 }
 
 /// How a file stands after the agent's work.
@@ -243,6 +272,7 @@ impl Workspace {
                 path: path.to_owned(),
                 original,
                 conflicts,
+                agent_not_plain: false,
             });
         }
         let (sides, replay) = sides(repo);
@@ -264,32 +294,40 @@ impl Workspace {
             write(&scratch.path, &file.path, file.original.as_deref())?;
         }
         Ok(Workspace {
-            scratch,
+            dir: scratch.path.clone(),
+            scratch: Some(scratch),
+            kept: None,
             files: given,
             sides,
         })
     }
 
-    /// The folder the agent works in.
+    /// The folder the agent works in (or its work is kept in).
     pub fn dir(&self) -> &Path {
-        &self.scratch.path
+        &self.dir
     }
 
-    /// How each file stands: the agent's version against the checkout at `repo` now. `done`:
-    /// the files (or steps named after them) the agent reported done.
-    pub fn check(&self, repo: &Path, done: &[String]) -> Vec<(String, FileResult)> {
+    /// How each file stands: the agent's version, against the checkout at `repo` now when one
+    /// is given (`None`: while the operation is put aside, the checkout has none of it).
+    /// `done`: the files (or steps named after them) the agent reported done.
+    pub fn check(&self, repo: Option<&Path>, done: &[String]) -> Vec<(String, FileResult)> {
         self.files
             .iter()
             .map(|file| (file.path.clone(), self.check_one(repo, file, done)))
             .collect()
     }
 
-    fn check_one(&self, repo: &Path, file: &Conflicted, done: &[String]) -> FileResult {
-        let Ok(now) = read(repo, &file.path) else {
+    fn check_one(&self, repo: Option<&Path>, file: &Conflicted, done: &[String]) -> FileResult {
+        if let Some(repo) = repo {
+            let Ok(now) = read(repo, &file.path) else {
+                return FileResult::NotPlain;
+            };
+            if now != file.original {
+                return FileResult::ChangedMeanwhile;
+            }
+        }
+        if file.agent_not_plain {
             return FileResult::NotPlain;
-        };
-        if now != file.original {
-            return FileResult::ChangedMeanwhile;
         }
         let Ok(theirs) = read(self.dir(), &file.path) else {
             return FileResult::NotPlain;
@@ -310,7 +348,7 @@ impl Workspace {
     /// meanwhile, or that isn't resolved, is left as it is.
     pub fn apply(&self, repo: &Path, paths: &[String], done: &[String]) -> Applied {
         let mut applied = Applied::default();
-        for (path, result) in self.check(repo, done) {
+        for (path, result) in self.check(Some(repo), done) {
             if !result.applies() || !paths.contains(&path) {
                 continue;
             }
@@ -335,16 +373,107 @@ impl Workspace {
         Ok((file.original.as_deref(), read(self.dir(), path)?))
     }
 
-    /// Removes the scratch worktree now, saying why if it couldn't be.
+    /// Keeps the agent's work in the folder `to` (of the repository's git folder: it outlasts
+    /// gitcraft, unlike the scratch worktree): each file as it was given (`original/`) and as
+    /// the agent left it (`resolved/`), and what is known of them (`workspace.json`). The
+    /// workspace of what is kept.
+    pub fn keep(&self, to: &Path) -> Result<Workspace, String> {
+        let (originals, resolved) = (to.join("original"), to.join("resolved"));
+        std::fs::create_dir_all(&resolved)
+            .map_err(|e| format!("couldn't make {}: {e}", resolved.display()))?;
+        let mut listed = Vec::new();
+        let mut files = Vec::new();
+        for file in &self.files {
+            if let Some(bytes) = &file.original {
+                write(&originals, &file.path, Some(bytes))?;
+            }
+            let agent = match read(self.dir(), &file.path) {
+                _ if file.agent_not_plain => "not_plain",
+                Ok(Some(bytes)) => {
+                    write(&resolved, &file.path, Some(&bytes))?;
+                    "file"
+                }
+                Ok(None) => "deleted",
+                Err(_) => "not_plain",
+            };
+            listed.push(KeptFile {
+                path: file.path.clone(),
+                conflicts: file.conflicts,
+                original: file.original.is_some(),
+                agent: agent.to_owned(),
+            });
+            files.push(Conflicted {
+                agent_not_plain: agent == "not_plain",
+                ..file.clone()
+            });
+        }
+        let kept = KeptWorkspace {
+            files: listed,
+            sides: self.sides.clone(),
+        };
+        let text = serde_json::to_string_pretty(&kept).map_err(|e| e.to_string())?;
+        std::fs::write(to.join("workspace.json"), text)
+            .map_err(|e| format!("couldn't keep the agent's work: {e}"))?;
+        Ok(Workspace {
+            dir: resolved,
+            scratch: None,
+            kept: Some(to.to_path_buf()),
+            files,
+            sides: self.sides.clone(),
+        })
+    }
+
+    /// The agent's work kept in `from` by [`Workspace::keep`].
+    pub fn load(from: &Path) -> Result<Workspace, String> {
+        let text = std::fs::read_to_string(from.join("workspace.json"))
+            .map_err(|e| format!("the agent's work isn't there: {e}"))?;
+        let kept: KeptWorkspace = serde_json::from_str(&text)
+            .map_err(|e| format!("the agent's work can't be read: {e}"))?;
+        let mut files = Vec::with_capacity(kept.files.len());
+        for f in kept.files {
+            let path = checked(&f.path)?.to_owned();
+            let original = if f.original {
+                read(&from.join("original"), &path)?
+            } else {
+                None
+            };
+            files.push(Conflicted {
+                path,
+                original,
+                conflicts: f.conflicts,
+                agent_not_plain: f.agent == "not_plain",
+            });
+        }
+        Ok(Workspace {
+            dir: from.join("resolved"),
+            scratch: None,
+            kept: Some(from.to_path_buf()),
+            files,
+            sides: kept.sides,
+        })
+    }
+
+    /// Removes the scratch worktree (or the work kept) now, saying why if it couldn't be.
     pub fn remove(self) -> Result<(), String> {
-        self.scratch.remove()
+        match (self.scratch, self.kept) {
+            (Some(scratch), _) => scratch.remove(),
+            (None, Some(kept)) => match std::fs::remove_dir_all(&kept) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                    Err(format!("couldn't remove {}: {e}", kept.display()))
+                }
+                _ => Ok(()),
+            },
+            (None, None) => Ok(()),
+        }
     }
 
     /// Removes it, trying again for a while: on Windows a program that just ended may still
     /// hold its folder for a moment.
-    pub fn remove_patiently(self) -> Result<(), String> {
-        self.scratch
-            .remove_retrying(5, std::time::Duration::from_millis(400))
+    pub fn remove_patiently(mut self) -> Result<(), String> {
+        match self.scratch.take() {
+            Some(scratch) => scratch.remove_retrying(5, std::time::Duration::from_millis(400)),
+            None => self.remove(),
+        }
     }
 }
 

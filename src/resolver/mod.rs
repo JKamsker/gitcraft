@@ -9,6 +9,7 @@
 //! - [`report`]: the agent's reports and the progress kept of them.
 
 pub(crate) mod agent;
+pub(crate) mod park;
 pub(crate) mod process;
 pub mod report;
 pub(crate) mod workspace;
