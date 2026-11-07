@@ -113,8 +113,16 @@ pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
     let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
     // Ask git once for the private worktree directory. In particular, a linked worktree's
     // operation markers do not live in the shared git directory.
-    let directory = run(Some(repo), &["rev-parse", "--absolute-git-dir"])?;
-    let directory = Path::new(directory.strip_suffix('\n').unwrap_or(&directory));
+    let directory = super::backend::dispatch(
+        repo,
+        super::backend::Read::GitDir,
+        super::backend::git_dir,
+        || {
+            run(Some(repo), &["rev-parse", "--absolute-git-dir"]).map(|directory| {
+                std::path::PathBuf::from(directory.strip_suffix('\n').unwrap_or(&directory))
+            })
+        },
+    )?;
     for dir in ["rebase-merge", "rebase-apply"] {
         let state = directory.join(dir);
         if crate::remote::try_is_dir(&state).map_err(asked)? {

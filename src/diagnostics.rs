@@ -82,6 +82,23 @@ pub fn report(
             ),
         );
     }
+    let operations = crate::git::backend::metrics();
+    let native: u64 = operations.iter().map(|m| m.native_calls).sum();
+    let fallback: u64 = operations.iter().map(|m| m.fallback_calls).sum();
+    let cli: u64 = operations.iter().map(|m| m.subprocesses).sum();
+    line(
+        "Git read backend",
+        &format!("{native} native reads, {fallback} read fallbacks, {cli} CLI invocations"),
+    );
+    for operation in operations.iter().filter(|m| m.fallback_calls > 0) {
+        let reasons = operation
+            .fallback_reasons
+            .iter()
+            .map(|(reason, count)| format!("{reason}: {count}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        line(&format!("Git {} fallback", operation.operation), &reasons);
+    }
     for t in tools {
         // glab can only tell by asking its server: offline reads as a failed check.
         let (yes, no) = if t.tool == "glab" {

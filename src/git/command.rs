@@ -145,6 +145,7 @@ const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    let _timer = super::backend::CliTimer::new(args);
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
@@ -370,6 +371,7 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
     let Some(target) = remote::parse(dir) else {
         return Some(run(Some(dir), args));
     };
+    let _timer = super::backend::CliTimer::new(args);
     let mut req = remote_request(&target, &Extra::default(), args);
     req.timeout = Some(std::time::Duration::from_secs(30));
     let out = match remote::exec_if_connected(&target.host, &req)? {
@@ -405,6 +407,7 @@ pub struct Captured {
 pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Captured, String> {
     let out = match (remote::parse(dir), input) {
         (Some(target), _) => {
+            let _timer = super::backend::CliTimer::new(args);
             let mut request = remote_request(&target, &Extra::default(), args);
             request.stdin = input.map(<[u8]>::to_vec);
             let out = remote::exec(&target.host, &request)?;
@@ -969,6 +972,7 @@ pub fn run_recorded(
 /// What git's credential helpers keep for `url` (`https://host`), asking nobody: no terminal
 /// prompt, no askpass program, no sign-in window.
 pub fn stored_credentials(url: &str) -> Option<Credentials> {
+    let _timer = super::backend::CliTimer::new(&["credential"]);
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = git_cmd();
