@@ -88,7 +88,7 @@ fn read_config(file: &Path, ssh_dir: &Path, hosts: &mut Vec<String>, depth: u32)
 
 /// The files `pattern` names: itself, or with `*` and `?` in its parts, the files matching it
 /// (as `glob` matches them: not a hidden file for a `*`), sorted.
-fn expand(pattern: &Path) -> Vec<PathBuf> {
+pub(super) fn expand(pattern: &Path) -> Vec<PathBuf> {
     let mut found = vec![PathBuf::new()];
     for part in pattern.components() {
         let name = part.as_os_str().to_string_lossy();
@@ -150,7 +150,7 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
 
 /// The words of a config line's value, as ssh splits them: at blanks, but not inside double or
 /// single quotes (which are taken off).
-fn config_words(value: &str) -> Vec<String> {
+pub(super) fn config_words(value: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut word = String::new();
     let mut quote = None;

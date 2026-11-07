@@ -52,6 +52,15 @@ pub struct Refs {
 
 /// Reads branch, tag and remote tips together with local tracking and push destinations.
 pub fn refs(repo: &Path) -> Result<Refs, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Refs,
+        super::backend::refs,
+        || refs_cli(repo),
+    )
+}
+
+pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
     // Names are the full ones less `refs/heads/`… and not `%(refname:short)`, which makes a
     // branch `heads/x` when a tag is called `x` too (checking that out detaches HEAD).
     let format = format!(
@@ -120,7 +129,7 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
 
 /// The remote the remote-tracking branch `rest` (`my/fork/main`) is of: the longest of
 /// `remotes` it is under, else its first part (a remote since removed from the config).
-fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
+pub(super) fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
     remotes
         .iter()
         .copied()
@@ -134,9 +143,13 @@ fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
 
 /// HEAD's commit hash, or empty before the first commit.
 pub fn head(repo: &Path) -> String {
-    run(Some(repo), &["rev-parse", "--verify", "-q", "HEAD"])
-        .map(|s| s.trim().to_owned())
-        .unwrap_or_default()
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Head,
+        super::backend::head,
+        || run(Some(repo), &["rev-parse", "--verify", "-q", "HEAD"]).map(|s| s.trim().to_owned()),
+    )
+    .unwrap_or_default()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,6 +218,15 @@ pub struct Remote {
 }
 
 pub fn remotes(repo: &Path) -> Result<Vec<Remote>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Remotes,
+        super::backend::remotes,
+        || remotes_cli(repo),
+    )
+}
+
+pub(super) fn remotes_cli(repo: &Path) -> Result<Vec<Remote>, String> {
     let out = run(Some(repo), &["remote", "-v"])?;
     Ok(parse_remotes(&out))
 }

@@ -66,6 +66,12 @@ pub(super) struct Shell {
 }
 
 impl Shell {
+    /// Observe this owned SSH client's exit without probing or sending a command.
+    #[cfg(test)]
+    pub(super) fn exited(&mut self) -> std::io::Result<bool> {
+        self.child.try_wait().map(|status| status.is_some())
+    }
+
     /// Starts `cmd` (a shell on the machine `label` names), waits for it to be ready.
     pub(super) fn start(mut cmd: Command, label: &str) -> Result<Self, String> {
         cmd.stdin(Stdio::piped())

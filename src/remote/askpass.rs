@@ -283,9 +283,28 @@ pub fn take_notices() -> Vec<String> {
         .unwrap_or_default()
 }
 
+static SECURITY_EPOCH: AtomicU64 = AtomicU64::new(0);
+static HOST_EPOCHS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+
+/// Invalidating a saved/rejected credential must not retain an authenticated transport.
+pub(super) fn security_epoch(host: &str) -> [u64; 2] {
+    let host_epoch = HOST_EPOCHS
+        .get()
+        .and_then(|epochs| lock(epochs).get(host).copied())
+        .unwrap_or(0);
+    [SECURITY_EPOCH.load(Ordering::Relaxed), host_epoch]
+}
+
+fn invalidate_host(host: &str) {
+    let mut epochs = lock(HOST_EPOCHS.get_or_init(Mutex::default));
+    let epoch = epochs.entry(host.to_owned()).or_default();
+    *epoch = epoch.wrapping_add(1);
+}
+
 /// Forgets every sign-in kept, here and in the system's store: blocking, so not on the
 /// window's thread. The window is told how many there were.
 pub fn forget_saved() {
+    SECURITY_EPOCH.fetch_add(1, Ordering::Relaxed);
     let Some(server) = server() else { return };
     lock(&server.state).known.clear();
     let count = super::vault::forget_all();
@@ -458,6 +477,7 @@ fn known(server: &Server, session: u64, host: &str, prompt: &str) -> Known {
     let once = (session, prompt.to_owned());
     if state.answered_from_known.remove(&once) {
         state.known.remove(&key);
+        invalidate_host(host);
         return Known::Wrong;
     }
     match state.known.get(&key).cloned() {
@@ -473,9 +493,13 @@ fn known(server: &Server, session: u64, host: &str, prompt: &str) -> Known {
 /// again means it was wrong (see [`known`]).
 fn remember(server: &Server, session: u64, host: &str, prompt: &str, secret: &str) {
     let mut state = lock(&server.state);
-    state
+    if state
         .known
-        .insert((host.to_owned(), prompt.to_owned()), secret.to_owned());
+        .insert((host.to_owned(), prompt.to_owned()), secret.to_owned())
+        .is_some_and(|old| old != secret)
+    {
+        invalidate_host(host);
+    }
     state
         .answered_from_known
         .insert((session, prompt.to_owned()));

@@ -175,6 +175,7 @@ pub fn stream(
             stopped: true,
         });
     }
+    let _timer = super::backend::CliTimer::new(args);
     let result = match remote::parse(dir) {
         Some(target) => stream_there(&target, args, stopper, line),
         None => stream_here(dir, args, stopper, line),

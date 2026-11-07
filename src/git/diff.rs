@@ -17,7 +17,7 @@ pub struct ChangedFile {
 }
 
 /// `--name-status -z`: `STATUS\0path\0` or, for renames/copies, `R100\0old\0new\0`.
-pub(super) fn parse_name_status(out: &str) -> Vec<ChangedFile> {
+pub(crate) fn parse_name_status(out: &str) -> Vec<ChangedFile> {
     let mut files = Vec::new();
     let mut it = out.split('\0').filter(|s| !s.is_empty());
     while let Some(status) = it.next() {

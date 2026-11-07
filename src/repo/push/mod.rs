@@ -119,6 +119,10 @@ pub(crate) struct PushFlow {
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
+        if let Some(dialog) = self.review_dialog() {
+            self.dialog = Some(dialog);
+            return;
+        }
         self.push_labelled("Push", None, ctx);
     }
 
@@ -218,6 +222,10 @@ impl RepoTab {
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
     /// at the pull when that fails (on conflicts, which are left to resolve).
     pub(super) fn sync(&mut self, ctx: &egui::Context) {
+        if let Some(dialog) = self.review_dialog() {
+            self.dialog = Some(dialog);
+            return;
+        }
         if self.busy_op.is_some() {
             return;
         }

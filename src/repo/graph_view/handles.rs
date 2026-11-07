@@ -14,6 +14,11 @@ use crate::theme::Tokens;
 /// the squeezed graph width, and the graph would stay that narrow once the view widens.
 fn save_drag(next: &mut Settings, bar: Bar, prefs: &Cols, widths: &Cols) {
     next.last_resized = Some(bar);
+    if bar == Bar::Refs {
+        next.auto_refs_width = false;
+        next.refs_width = widths.refs;
+    }
+    let keep_auto_refs = next.fit_visible_refs();
     for (col, setting) in [
         (Bar::Refs, &mut next.refs_width),
         (Bar::Graph, &mut next.graph_width),
@@ -22,7 +27,9 @@ fn save_drag(next: &mut Settings, bar: Bar, prefs: &Cols, widths: &Cols) {
         (Bar::When, &mut next.when_width),
         (Bar::Date, &mut next.date_width),
     ] {
-        if col == Bar::Graph && bar != Bar::Graph {
+        if (col == Bar::Graph && bar != Bar::Graph)
+            || (col == Bar::Refs && bar != Bar::Refs && keep_auto_refs)
+        {
             continue;
         }
         if widths.width(col) != prefs.width(col) {
@@ -148,5 +155,33 @@ mod tests {
         let widths = Bar::Graph.drag(&prefs, None, 10.0, 700.0);
         save_drag(&mut next, Bar::Graph, &prefs, &widths);
         assert_eq!(next.graph_width, 110.0);
+    }
+    #[test]
+    fn resizing_auto_refs_fixes_the_width_without_an_initial_jump() {
+        let prefs = Cols {
+            refs: crate::repo::columns::MIN_REFS_W,
+            graph: 60.0,
+            hash: 0.0,
+            author: 150.0,
+            when: 100.0,
+            date: 0.0,
+            push: 0.0,
+        };
+        let mut settings = Settings::default();
+        let width = Bar::Refs.drag(&prefs, None, 10.0, 900.0);
+        save_drag(&mut settings, Bar::Refs, &prefs, &width);
+        assert_eq!(settings.refs_width, prefs.refs + 10.0);
+        assert!(!settings.auto_refs_width);
+        let mut at_minimum = Settings::default();
+        let width = Bar::Refs.drag(&prefs, None, -100.0, 900.0);
+        save_drag(&mut at_minimum, Bar::Refs, &prefs, &width);
+        assert_eq!(at_minimum.refs_width, prefs.refs);
+
+        // Resizing another column must never persist a temporary auto-sized refs width.
+        let mut settings = Settings::default();
+        let width = Bar::Author.drag(&prefs, None, -100.0, 500.0);
+        save_drag(&mut settings, Bar::Author, &prefs, &width);
+        assert_eq!(settings.refs_width, Settings::default().refs_width);
+        assert!(settings.fit_visible_refs());
     }
 }

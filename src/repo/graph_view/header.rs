@@ -65,6 +65,16 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             ui.checkbox(&mut next.show_test_lane, "Tests")
                 .on_hover_text(crate::repo::TEST_LANE_TIP);
             ui.separator();
+            let mut fit = next.fit_visible_refs();
+            if ui
+                .checkbox(&mut fit, "Fit visible branch / tag pills")
+                .changed()
+            {
+                next.auto_refs_width = fit;
+                if fit {
+                    next.refs_width = settings::DEFAULT_REFS_WIDTH;
+                }
+            }
             let mut compact = next.compact_graph;
             if ui
                 .checkbox(&mut compact, "Compact graph column")

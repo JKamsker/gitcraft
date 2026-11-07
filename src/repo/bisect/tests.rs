@@ -236,11 +236,18 @@ fn opening_on_a_finished_bisect_keeps_the_selection() -> Result<(), String> {
     let (dir, hashes) = culprit_repo("finished", 8, 3)?;
     let ctx = egui::Context::default();
     let result = (|| {
+        // Use Git's own shell via the same builtin as the banner's run action. An
+        // external `sh` on PATH need not be Git for Windows' shell.
+        let run = git::bisect_run_args("! grep -q bug f");
+        let run: Vec<&str> = run.iter().map(String::as_str).collect();
         for args in [
             &["bisect", "start", &hashes[7], &hashes[0]][..],
-            &["bisect", "run", "sh", "-c", "! grep -q bug f"],
+            run.as_slice(),
         ] {
-            git::run(Some(&dir), args)?;
+            // A broken fixture must fail with its command instead of hanging the
+            // whole Windows shard before the tab's own bounded settle loop starts.
+            git::run_unattended_within(&dir, args, Duration::from_secs(60))
+                .map_err(|e| format!("finished bisect fixture {args:?}: {e}"))?;
         }
         let tab = open(&dir, &ctx)?;
         let outcome = tab.bisect.state().and_then(|b| b.outcome.clone());

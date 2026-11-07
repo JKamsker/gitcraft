@@ -11,6 +11,7 @@ use super::link::LineLinks;
 use super::notebook::notebook_bar;
 use super::remerge;
 use super::rows::Rows;
+use super::structural;
 use super::{DiffData, Kind, Pick, old_name, picked_in_file, unstage_args};
 use super::{rendered, rich};
 use crate::forge::links::Target;
@@ -48,12 +49,14 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial = matches!(&view.data, Some(Ok(d)) if d.partial) && idle;
+        let partial =
+            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
         // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
         // A stash's changes aren't a commit's to revert.
         let revert = self.stash_view.is_none();
-        let pickable =
-            matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert) && idle;
+        let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert)
+            && idle
+            && !view.structural.enabled;
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -183,6 +186,23 @@ impl RepoTab {
                 acts.push(Action::UnfoldDiff);
             }
             return;
+        }
+        if view.structural.enabled {
+            match &view.structural.result {
+                None => {
+                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
+                    return;
+                }
+                Some(Ok(data)) => {
+                    structural::show(ui, data);
+                    return;
+                }
+                Some(Err(reason)) => {
+                    ui.colored_label(t.warning, reason);
+                    ui.label("Showing the patch. Turn off Syntax to stage changes.");
+                    ui.separator();
+                }
+            }
         }
         let Some(data) = ready_data(ui, view, ignore_ws, &t, acts) else {
             return;
@@ -379,7 +399,7 @@ impl RepoTab {
                         path,
                         rev,
                         ignorable,
-                        Some(&view.key),
+                        (!view.structural.enabled).then_some(&view.key),
                         &links,
                         acts,
                         |ui, acts| {
@@ -404,20 +424,27 @@ impl RepoTab {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
-                        if let DiffKey::Work(file) = &view.key {
+                        if let DiffKey::Work(file) = &view.key
+                            && !view.structural.enabled
+                        {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
                         }
                         if let DiffKey::Commit { hash, path } = &view.key
                             && view.lines.is_none()
                             && self.stash_view.is_none()
+                            && !view.structural.enabled
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
                         }
                         ui.add_space(8.0);
+                        if !as_file && !rendered && !folded && !rich_ready && view.lines.is_none() {
+                            structural::toggle(ui, view.structural.enabled, acts);
+                            ui.add_space(4.0);
+                        }
                         // A folded diff shows no lines to arrange.
-                        if !as_file && !rendered && !folded {
+                        if !as_file && !rendered && !folded && view.structural.shows_patch() {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             if view.lines.is_none() {

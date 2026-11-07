@@ -120,6 +120,13 @@ impl RepoTab {
     /// Pushes `b`, checked out or not: to the branch it tracks, else publishes it on the
     /// default remote and tracks that. With where it goes: `origin/main`, or `origin`.
     pub(super) fn push_branch(&self, b: &Branch) -> Option<(String, Action)> {
+        if self.gerrit.is_some() {
+            let mut dialog = self.review_dialog_for(Some(&b.name))?;
+            if let super::Dialog::GerritReview { head, .. } = &mut dialog {
+                *head = b.target.clone();
+            }
+            return Some(("Gerrit review".to_owned(), Action::Dialog(dialog)));
+        }
         let tracked = if b.upstream_gone() {
             None
         } else {
@@ -265,6 +272,11 @@ impl RepoTab {
             commit.extend(["-m".to_owned(), body.to_owned()]);
         }
         let mut steps = Vec::new();
+        if self.amend && self.gerrit.is_some() {
+            commit.insert(0, crate::gerrit::AMEND.to_owned());
+            steps.push(self.same_branch());
+            steps.push(super::operations::expect_ref_at("HEAD", &self.refs.head));
+        }
         // Nothing staged: commit everything, like "Stage all and commit" (an amend with
         // nothing staged only rewrites the message).
         if self.work.staged.is_empty() && !self.amend {

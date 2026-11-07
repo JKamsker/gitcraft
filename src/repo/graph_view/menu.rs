@@ -129,6 +129,7 @@ impl RepoTab {
         }
         ui.separator();
         self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
+        self.gerrit_menu(ui, commit, acts);
         copy_items(ui, &hash, &summary, branch_name.as_deref());
         let scope = self.commit_scope(&hash, branch_name.as_deref());
         crate::repo::custom_commands::menu_items(

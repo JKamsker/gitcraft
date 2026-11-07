@@ -1,11 +1,13 @@
-//! Thin wrapper over the `git` command line. Every call shells out to the installed git, so
-//! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
+//! Typed Git operations: native local reads where parity is proven, with the installed
+//! Git as the compatibility backend (config, credentials, hooks and remote machines).
 
 mod absorb;
 mod attributes;
+pub mod backend;
 mod backlinks;
 mod bisect;
 mod branch_health;
+mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
@@ -69,6 +71,7 @@ pub use self::attributes::*;
 pub use self::backlinks::*;
 pub use self::bisect::*;
 pub use self::branch_health::*;
+pub use self::bundles::*;
 pub use self::command::*;
 pub use self::commit_msg::*;
 pub use self::commits::*;
