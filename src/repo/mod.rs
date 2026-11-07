@@ -5,6 +5,7 @@ mod actions;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
+mod bundles;
 mod ci_status;
 mod ci_view;
 pub(crate) mod columns;

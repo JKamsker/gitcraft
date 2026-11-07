@@ -29,6 +29,7 @@ const FEATURES: &[(&str, &[&str])] = &[
         &[
             "Open, create or clone a repository from the start page; recent ones are listed there.",
             "Clone options choose shallow history (depth), blobless file contents on demand, and sparse folders. The server must support partial clones. Sparse checkout… in the palette edits the folder tree later, with all changes committed or stashed first. Move ignored files outside the working tree too: Git can delete them during sparse changes. Root files and files immediately inside parent folders remain included. Custom non-cone patterns are replaced only when explicitly chosen. Partial clones show when history may download contents; missing files ask before downloading.",
+            "The palette exports Git bundles of selected refs or an incremental range (exclude a base commit), and inspects local bundle refs/prerequisites before a deliberate import. Choose new destination refs: existing refs are never overwritten and import does not check out work. File pickers use this machine's disk; SSH/WSL repositories receive temporary copies. Bundle limit: 128 MiB, 1000 header entries and two minutes per Git call. Incremental bundles need their base commits already present.",
             "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",

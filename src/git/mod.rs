@@ -2,6 +2,7 @@
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
 mod clone_options;
+mod bundles;
 mod command;
 mod commits;
 mod diff;
@@ -13,6 +14,7 @@ mod submodule;
 mod worktree;
 
 pub use self::clone_options::*;
+pub use self::bundles::*;
 pub use self::command::*;
 pub use self::commits::*;
 pub use self::diff::*;
