@@ -17,7 +17,7 @@ pub(crate) fn retry() {
     UNAVAILABLE.store(false, Ordering::Relaxed);
 }
 
-/// All test fixtures record dispatches; they never open an audio device.
+// All test fixtures record dispatches; they never open an audio device.
 #[cfg(test)]
 thread_local! { static RECORDED: std::cell::RefCell<Vec<Cue>> = const { std::cell::RefCell::new(Vec::new()) }; }
 

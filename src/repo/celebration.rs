@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn first_commit_is_opt_in_confirmed_once_and_sound_is_independent_of_motion() {
         let ctx = egui::Context::default();
-        ctx.style_mut(|style| style.animation_time = 0.0);
+        ctx.all_styles_mut(|style| style.animation_time = 0.0);
         let mut tab = RepoTab::new_deferred("/nonexistent/first-celebrate".into(), &ctx);
         let commit = vec![vec!["commit".into(), "-m".into(), "first".into()]];
         tab.celebration_begin("Commit", &commit, &ctx);

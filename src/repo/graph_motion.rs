@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn reduced_motion_finishes_scroll_without_repaints() {
         let ctx = egui::Context::default();
-        ctx.style_mut(|style| style.animation_time = 0.0);
+        ctx.all_styles_mut(|style| style.animation_time = 0.0);
         let mut state = State::default();
         assert_eq!(state.start_scroll(0.0, 500.0, &ctx), 500.0);
         assert!(state.scroll.is_none());
