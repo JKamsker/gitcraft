@@ -28,6 +28,7 @@ pub(crate) enum Action {
     /// Turn offline mode on or off.
     SetOffline(bool),
     Select(usize),
+    DvcPull,
     OpenFileComparison(super::file_comparison::Page),
     RefreshFileComparison,
     CloseFileComparison,
@@ -552,6 +553,11 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn additional_palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "DVC: Pull".into(),
+                "data download remote".into(),
+                Action::DvcPull,
+            ),
             (
                 "File migration map".into(),
                 "files".into(),

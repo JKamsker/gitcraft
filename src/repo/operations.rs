@@ -433,7 +433,7 @@ pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
 /// `remote` subcommands that ask it (`update`, `prune`, `show` without `-n`) and LFS's
 /// transfers. Not `remote add` / `rename` / `set-url` / `remove`, which only write the config,
 /// nor `submodule update`, which reaches one only when a commit is missing (and then says so).
-pub(super) fn reaches_a_remote(op: &[String]) -> bool {
+pub(crate) fn reaches_a_remote(op: &[String]) -> bool {
     let mut words = op.iter().map(String::as_str);
     // Past the options before the subcommand (`-c x=y`).
     let sub = loop {
@@ -447,7 +447,7 @@ pub(super) fn reaches_a_remote(op: &[String]) -> bool {
     };
     let rest: Vec<&str> = words.collect();
     match sub {
-        Some("fetch" | "pull" | "push" | "clone" | "ls-remote") => true,
+        Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | git::dvc::PULL_ALIAS) => true,
         Some("remote") => match rest.first().copied() {
             Some("update" | "prune") => true,
             Some("show") => !rest.contains(&"-n"),

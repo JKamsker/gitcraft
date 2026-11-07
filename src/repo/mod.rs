@@ -74,7 +74,7 @@ mod nav_history;
 mod navigate;
 mod navigation;
 mod offline;
-mod operations;
+pub(crate) mod operations;
 mod owners;
 mod package;
 mod palette;

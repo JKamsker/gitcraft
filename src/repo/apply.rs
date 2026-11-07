@@ -37,6 +37,10 @@ impl RepoTab {
             self.file_comparison = None;
         }
         match action {
+            Action::DvcPull => {
+                self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
+            }
+
             Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
             Action::RefreshFileComparison => self.load_file_comparison(ctx),
             Action::CloseFileComparison => self.file_comparison = None,

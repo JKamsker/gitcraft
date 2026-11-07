@@ -266,6 +266,7 @@ pub fn goes_over_network(args: &[&str]) -> bool {
                 | "lfs"
                 | SHELL_ALIAS
                 | USER_COMMAND_ALIAS
+                | super::dvc::PULL_ALIAS
         )
     )
 }
