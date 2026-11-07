@@ -2,6 +2,7 @@
 
 mod bisect;
 pub(super) mod branch;
+mod bundles;
 mod cleanup;
 mod confirm;
 mod custom;
@@ -54,6 +55,17 @@ pub enum Dialog {
         selected: std::collections::BTreeSet<String>,
         enabled: bool,
         convert: bool,
+    },
+    BundleLoading(u64),
+    BundleExport {
+        refs: Vec<crate::git::BundleRef>,
+        selected: std::collections::BTreeSet<String>,
+        base: String,
+    },
+    BundleIncoming {
+        label: String,
+        preview: Box<crate::git::BundlePreview>,
+        imports: Vec<(bool, crate::git::BundleImport)>,
     },
     CreateBranch {
         /// Commit the branch starts at.
@@ -467,6 +479,7 @@ impl RepoTab {
         let worktrees = &self.worktrees;
         let remote_names: Vec<&str> = self.remotes.iter().map(|r| r.name.as_str()).collect();
         let remote_branches = &self.refs.remotes;
+        let idle = self.busy_op.is_none();
         // What a new branch's undo checks out again.
         let previous = self
             .refs
@@ -518,6 +531,14 @@ impl RepoTab {
                     enabled,
                     convert,
                 } => super::sparse::dialog(ui, state, selected, enabled, convert),
+                Dialog::BundleLoading(_) => {
+                    ui.heading("Reading bundle information…");
+                    ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
+                Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
+                Dialog::BundleIncoming { label, preview, imports } => bundles::incoming(ui, label, preview, imports, idle),
                 Dialog::CreateBranch {
                     at,
                     at_label,

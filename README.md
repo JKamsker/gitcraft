@@ -262,6 +262,18 @@ so your config, credentials and hooks apply as usual.
   patch…_ (the latest commit's menu, the changes row's menu or the palette) turns one from
   `git format-patch` into commits (`git am`) and puts any other diff on the working tree
   (`git apply`). Ctrl+Z undoes either.
+- Git bundles: **Export Git bundle…** in the palette saves selected refs, with an optional
+  excluded base commit for an incremental range. Ref tips are pinned to the dialog's snapshot;
+  a moved ref asks you to reopen it. Output is a new local file; existing files are preserved.
+  **Inspect / import local Git bundle…** shows incoming refs, prerequisite commits and Git's
+  verification result before importing. Edit each new destination (branches, tags or
+  `refs/bundles/…`); collisions stop the whole ref transaction. Import does not check out or
+  merge incoming work. SSH and WSL repositories receive a temporary copy for verification and
+  import; file pickers and saved bundles always refer to this machine's disk. Supports v2/v3
+  bundles and matching SHA-1/SHA-256 repositories, up to 128 MiB and 1000 header entries, with
+  a two minute deadline per Git stream. Requires Git 2.36 or newer. Larger exchanges can use
+  Git in the terminal. In partial clones, inspection and import require Git's explicit
+  `--no-lazy-fetch` support; older Git refuses them instead of fetching from the remote.
 - Interactive rebase: the commits to rewrite, newest on top; pick, reword (edit the message in
   place), edit (stop there to change the commit; _Continue rebase_ amends it with what is staged
   and goes on), squash, fix up

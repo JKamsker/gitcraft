@@ -289,6 +289,16 @@ pub(crate) enum Action {
     DropMenu(drag_drop::DropMenu),
     /// Move or squash a commit of the checked-out branch onto another of it.
     CommitDrop(drag_drop::CommitDrop),
+    OpenBundleExport,
+    OpenBundleImport,
+    ExportBundle {
+        refs: Vec<git::BundleRef>,
+        base: String,
+    },
+    ImportBundle {
+        preview: Box<git::BundlePreview>,
+        imports: Vec<git::BundleImport>,
+    },
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
         edit: quick_edit::Edit,
@@ -561,6 +571,16 @@ impl RepoTab {
         );
         items.extend([
             (
+                "Export Git bundle…".into(),
+                "offline backup".into(),
+                Action::OpenBundleExport,
+            ),
+            (
+                "Inspect / import local Git bundle…".into(),
+                "offline exchange".into(),
+                Action::OpenBundleImport,
+            ),
+            (
                 "Stash only what is staged…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
@@ -570,7 +590,6 @@ impl RepoTab {
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
             ),
-            ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             (
                 "Distribute staged fixes…".into(),
                 "absorb".into(),
