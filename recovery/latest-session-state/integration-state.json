@@ -2,12 +2,12 @@
   "branch": "codex/remaining-features",
   "worktree": "/workspace/work/integration",
   "base": "74027116e8f20334716a6b1208717bb33c9c6280",
-  "head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
   "remote": "origin",
-  "remote_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "remote_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
   "pushed": true,
   "remote_branch_url": "https://github.com/JKamsker/gitcraft/tree/codex/remaining-features",
-  "status": "19 eligible ideas integrated. Fresh private Linux fmt/strict all-target Clippy/full891passed3ignored0filtered PASS; exact894 test-name union verified. CI deferred by explicit user policy. Final all-scope implementation/history assembly/review pending.",
+  "status": "22 eligible ideas integrated. Exact private Linux fmt/strictClippy/full945passed3ignored0filtered PASS; exact948 test-name union. CI deferred; final all-scope assembly/review pending.",
   "merged_features": [
     {
       "feature": "gerrit",
@@ -138,6 +138,32 @@
       "strategy": "merge --no-ff; additive conflict; transient validation artifacts omitted",
       "individual_review": "PASS",
       "review_report": "/workspace/work/review-portable-setup/docs/validation/independent-portable-setup-55df0d2/review.md"
+    },
+    {
+      "feature": "ssh_key_helper",
+      "named_features": [
+        "#43 SSH key helper"
+      ],
+      "reviewed_sha": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+      "integration_merge_sha": "d2bc96292209598b24244b9814ef591baf0b2044",
+      "integration_followup_sha": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+      "strategy": "application merge; additive conflicts and declared lifecycle adapters",
+      "individual_review": "PASS",
+      "review_report": "/workspace/work/review-ssh-key-helper/SSH_HELPER_REREVIEW.md"
+    },
+    {
+      "feature": "content_recovery",
+      "reviewed_sha": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+      "integration_merge_sha": "9ba5f13585814447cf2ffee2646323afc9935c06",
+      "integration_followup_sha": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+      "individual_review": "PASS"
+    },
+    {
+      "feature": "saved_graph_views",
+      "reviewed_sha": "80b2e50f069d8215b0801c7d674a03331da8d819",
+      "integration_merge_sha": "ab68bdedd387236c03f26f839572860d405a2f7f",
+      "individual_review": "PASS",
+      "review_report": "/workspace/work/review-saved-views-80b2e50.json"
     }
   ],
   "merge_conflicts": [
@@ -231,6 +257,34 @@
         "src/repo/apply.rs"
       ],
       "resolution": "Retained all file-comparison and Tour action arms additively."
+    },
+    {
+      "merge": "ssh_key_helper",
+      "files": [
+        "src/repo/actions.rs",
+        "src/repo/apply.rs"
+      ],
+      "resolution": "Retained all Draft actions and SSH setup action additively; current Profile pending/import account helpers unchanged."
+    },
+    {
+      "merge": "content_recovery",
+      "files": [
+        "src/repo/actions.rs",
+        "src/repo/apply.rs",
+        "src/repo/dialogs/mod.rs",
+        "src/repo/load.rs",
+        "src/repo/messages.rs",
+        "src/repo/worktree_tab/mod.rs"
+      ],
+      "resolution": "Additive action/poll/dialog wiring; central dismissal retires both owned readers, typed Content steps preserve provenance until consumed. Transient validation logs omitted."
+    },
+    {
+      "merge": "saved_graph_views",
+      "files": [
+        "src/repo/load.rs",
+        "src/repo/messages.rs"
+      ],
+      "resolution": "Both Profile cancellations and both background polling paths retained additively; no edits to unique Saved Views implementation."
     }
   ],
   "integration_only_changes": [
@@ -328,6 +382,41 @@
         "src/repo/load.rs"
       ],
       "change": "Tour and comparison mutually drop old reader states; profileconnection reload drops Tour and Activity snapshots. Existing realPractice UI test exercises dispatch transitions and weak-generation cancellation. No added test names or transport API adaptation."
+    },
+    {
+      "sha": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+      "files": [
+        "src/repo/ssh_setup/mod.rs",
+        "src/repo/ssh_setup/tests.rs",
+        "src/repo/load.rs",
+        "src/repo/diff/encrypted/tests.rs",
+        "src/repo/drafts.rs"
+      ],
+      "change": [
+        "SSH opening dismisses/cancels existing Draft modal reader and discards SOPS plaintext; profile connection reload drops SSH helper and SOPS private state.",
+        "Existing SSH/SOPS/Drafts lifecycle test bodies extend modal/profile cancellation checks without new test names; all remaining unique SSH files match reviewed head."
+      ]
+    },
+    {
+      "sha": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+      "files": [
+        "src/repo/drafts.rs",
+        "src/repo/content_recovery/mod.rs",
+        "src/repo/dialogs/mod.rs"
+      ],
+      "change": [
+        "Content opening closes SSH and SOPS; actual modal/profile/tab dismissal cancels Content plus Draft readers. Typed Content continuation preserves captured Results/Preview; existing pointer regression reproduced original failure then verifies full flow. Engine/RootPin unchanged."
+      ]
+    },
+    {
+      "sha": "ab68bdedd387236c03f26f839572860d405a2f7f",
+      "files": [
+        "src/repo/load.rs",
+        "src/repo/messages.rs"
+      ],
+      "change": [
+        "Profile reload retains Content dismissal plus Saved Views cancellation; message polling advances both independent owned readers. Existing pinned no-fetch query/projection source unchanged."
+      ]
     }
   ],
   "preservation_checks": {
@@ -344,12 +433,16 @@
       "src/git/command/bounded.rs: propagate fallible shared builder",
       "src/git/bundles.rs and tests: independently static-reviewed Windows native argument conversion/config+fixtures",
       "src/connections/tests.rs, src/git/activity/tests.rs, src/repo/diff/structural/tests.rs: Windows-valid fixtures retain Unix edge cases",
-      "src/git/command.rs and src/app/practice/isolation.rs: reviewed file raw readers and hostile selected-profile actual App staging extension"
+      "src/git/command.rs and src/app/practice/isolation.rs: reviewed file raw readers and hostile selected-profile actual App staging extension",
+      "SSH opening dismisses/cancels existing Draft modal reader and discards SOPS plaintext; profile connection reload drops SSH helper and SOPS private state.",
+      "Existing SSH/SOPS/Drafts lifecycle test bodies extend modal/profile cancellation checks without new test names; all remaining unique SSH files match reviewed head.",
+      "Content opening closes SSH and SOPS; actual modal/profile/tab dismissal cancels Content plus Draft readers. Typed Content continuation preserves captured Results/Preview; existing pointer regression reproduced original failure then verifies full flow. Engine/RootPin unchanged.",
+      "Profile reload retains Content dismissal plus Saved Views cancellation; message polling advances both independent owned readers. Existing pinned no-fetch query/projection source unchanged."
     ],
     "keyboard_and_history_unshared_unique_files_byte_identical_to_reviewed_heads": true,
     "all_eleven_reviewed_commits_ancestors_of_head": true,
     "profile_unshared_unique_files_byte_identical_to_reviewed_head": 13,
-    "new_sops_drafts_unique_files_byte_identical_to_reviewed_heads": true,
+    "new_sops_drafts_unique_files_byte_identical_to_reviewed_heads": "Except declared integration lifecycle regression extensions; production private-data/reader helpers retained",
     "workflow_exact_original_dev_master_only": true,
     "tour_portability_unique_files_byte_identical_except_declared_tour_lifecycle": true
   },
@@ -359,15 +452,15 @@
     "jobs": 2,
     "difft": "Real0.72.0 via /workspace/work/difft-bin onPATH",
     "fmt": "PASS",
-    "clippy": "PASS --all-targets -- -D warnings",
+    "clippy": "PASS",
     "tests": {
-      "passed": 891,
+      "passed": 945,
       "failed": 0,
       "ignored": 3,
       "filtered_out": 0,
-      "registered": 894
+      "registered": 948
     },
-    "expected_tests_manifest": "/workspace/work/integration-d182105-expected-tests.json",
+    "expected_tests_manifest": "/workspace/work/integration-ab68bde-expected-tests.json",
     "feature_new_tests": {
       "gerrit": 8,
       "clone": 8,
@@ -409,29 +502,24 @@
     ],
     "logs": {
       "fmt": {
-        "path": "/workspace/work/integration-d182105-fmt.log",
+        "path": "/workspace/work/integration-ab68bde-fmt.log",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "bytes": 0
       },
-      "targeted": {
-        "path": "/workspace/work/integration-d182105-targeted.log",
-        "sha256": "589942b5cf4d6c440a3ef4d8a56f259829388bbba8ce6858eee4a7c34904a15b",
-        "bytes": 601
-      },
       "clippy": {
-        "path": "/workspace/work/integration-d182105-clippy.log",
-        "sha256": "79296ab72856052d8e8db20ab6c9437f3ccf3e538e0db397f2d2796565cc1c14",
+        "path": "/workspace/work/integration-ab68bde-clippy.log",
+        "sha256": "32c5e4df878fe92d08beb44492af6fe28e1a75762a365f7d672927196cc28d97",
         "bytes": 132
       },
       "test": {
-        "path": "/workspace/work/integration-d182105-test.log",
-        "sha256": "8508f24b635b7e6450811041e4892df4123463f995902b53b8b23cb58365a195",
-        "bytes": 75158
+        "path": "/workspace/work/integration-ab68bde-test.log",
+        "sha256": "f0584ff7483a7f76a389bd925fcfeb13583040ef4f46effb741f030bb8cd0b06",
+        "bytes": 83305
       },
       "test-list": {
-        "path": "/workspace/work/integration-d182105-test-list.log",
-        "sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
-        "bytes": 69329
+        "path": "/workspace/work/integration-ab68bde-test-list.log",
+        "sha256": "be36fe2043b7f63ddf6b1fec746c9a0ea2c4ed389b4a720deb4913bf204ea004",
+        "bytes": 74978
       }
     },
     "integration_cross_feature_regressions": {
@@ -475,16 +563,16 @@
     "additional_integration_tests": [
       "bounded_process::tests::configured_stream_caps_are_independent_and_keep_boundary_bytes"
     ],
-    "prior_gates_state": "/workspace/work/integration-state-b5df680-pre-tour-portability.json",
-    "source_commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
-    "test_list": "/workspace/work/integration-d182105-test-list.log",
-    "test_list_sha256": "48eabdb174384b80145f66e91afd7f03f6375d1c32f7ff0ab911c21dbf4fc3d4",
+    "prior_gates_state": "/workspace/work/integration-state-23dd87f-pre-saved_graph_views.json",
+    "source_commit": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "test_list": "/workspace/work/integration-ab68bde-test-list.log",
+    "test_list_sha256": "be36fe2043b7f63ddf6b1fec746c9a0ea2c4ed389b4a720deb4913bf204ea004",
     "independent_supporting_unit_review": "/workspace/work/review-process-test-containment-aab2a25-final.json",
-    "cargo_incremental": "0"
+    "cargo_incremental": 0
   },
   "not_merged": [
-    "Push Preflight protocol43c1691 static FAIL3ownership/capability blockers; local correction and remote owned completion follow-up pending",
-    "Content recovery8f992 backend WIP; standalone file tools and SSH helper assigned; other eligible queued ideas remain in scope"
+    "Push Preflight protocol ownership/capability correction remains under independent review",
+    "Object storage owned-helper protocol static review queued; other eligible named ideas remain tracked in root queue"
   ],
   "publication": {
     "giant_pr_created": false,
@@ -493,8 +581,8 @@
     "instructions": "Return integration write ownership to parent after this handoff. No CI use until final assembled all-scope candidate is locally validated and independently reviewed.",
     "final_branch_history": "Rebuild from dev with one correctly authored commit per feature, preserving existing source/recovery branches. Rebuilt exact candidate must pass tests and independent adversarial review before ONE PR."
   },
-  "previous_head": "b5df68070a6df9d91cd29ca5d6270db80c9040c9",
-  "previous_round_state": "/workspace/work/integration-state-b5df680-pre-tour-portability.json",
+  "previous_head": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+  "previous_round_state": "/workspace/work/integration-state-23dd87f-pre-saved_graph_views.json",
   "next_batch_cross_feature_requirements": [
     "Preserve practice context recognition and sandbox routing before active-profile/global application, including credential helpers, raw reads, piped history and terminals.",
     "When profile connections merge, rerun actualApp hostile caller/global/profile practice integration regression plus normal-tab profile control; add explicit cross-feature account-model coverage as needed.",
@@ -502,13 +590,13 @@
     "Keepnewboundedbinarybundlelocalroute onsharedrepository_command; extendedPractice hostileApp test mustcontinuepassing afterprofile/account/workerscope merges.",
     "Preserve fallible repository_command and Practice-first error/SSH/credential bypass; rerun combined hostile selected-connection App fixture after further transport/account changes."
   ],
-  "tree": "60b4ae6146a22083c657d1745bcc3e5d4b67ba2e",
-  "source_diff_sha256": "44e0348a6b6cd2324094cf98c7ea14730ae7ded5b8f73876905445c1b54ed789",
+  "tree": "e5f6b5b28e574c2ab6506aebbeb6acbb3a344e5c",
+  "source_diff_sha256": "d95266eb8f1bb6448a9f34f20c20c59762e80f69549e07b9e0088ee85d1b3423",
   "held_keyboard_candidate_evidence": "/workspace/work/integration-candidate-04b737d.json",
   "application_validation_binding": {
-    "application_commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
-    "source_tree": "fd8c51103c41a6cf7700f690b05eea59501ee587",
-    "manifest": "/workspace/work/integration-d182105-gates.json",
+    "application_commit": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "source_tree": "10530b961ddfce74a6cbbc507377761fbd24d620",
+    "manifest": "/workspace/work/integration-ab68bde-gates.json",
     "fresh_private_package_clean": true,
     "actual_compile_worktree": "/workspace/work/integration",
     "cargo_tests_repeated": true,
@@ -516,22 +604,22 @@
     "scope": "Exact combined local Linux gates; no CI or final whole-scope approval"
   },
   "workflow_validation": {
-    "commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+    "commit": "ab68bdedd387236c03f26f839572860d405a2f7f",
     "branch_filter": [
       "master"
     ],
-    "validation": "Byte-identical original dev7402711 master-only workflow; unchanged through application merge and lifecycle followup.",
+    "validation": "Byte-identical original dev master-only workflows and CI-deferral/author AGENTS policy retained.",
     "ci_used_during_this_unit": false,
     "actions_result": "NOT REQUESTED/POLLED/AWAITED; explicit user policy defers CI until all side work, final assembly, local gates and independent reviews complete.",
     "prior_historical_ci_records": "Archived in prior integration-state; not current validation/acceptance."
   },
   "unit_preservation": {
-    "commit": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
-    "status": "Reviewed application merge and narrow lifecycle unit separately committed/pushed; correct author and remoteSHA verified before exact private gates",
+    "commit": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "status": "Correct-author application merge and any narrow adaptation committed/pushed before private gates",
     "author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
     "author_name": "Jonas Kamsker",
     "author_email": "11245306+JKamsker@users.noreply.github.com",
-    "combined_gate_manifest": "/workspace/work/integration-d182105-gates.json",
+    "combined_gate_manifest": "/workspace/work/integration-ab68bde-gates.json",
     "giant_pr_created": false
   },
   "supporting_units": [

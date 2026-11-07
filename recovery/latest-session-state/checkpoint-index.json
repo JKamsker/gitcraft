@@ -1,17 +1,17 @@
 {
-  "note": "20-feature2db60b3exactgreenpreserved;ContentandSavedViewsscopereviewPASSqueued;StandaloneACLfindingfixinprogress. CIdeferred; onefinalPRnotcreated. Allsourceunitsontaskbranches.",
+  "note": "22-feature ab68bde exact local green; lifecycle delta review pending. Standalone 9bb corrective review active. Shared owned transport is the critical path for Preflight and Object mutation. CI deferred; one final PR not created.",
   "files": {
     "implementation-queue.json": {
-      "sha256": "7f961ea5f27ec0ace64484c8f81a1de313a61138d0407b4d5fcbb636a6457eb1",
-      "bytes": 126040
+      "sha256": "1e3b810f7ed9c2c696975126b506416f481f3d0219b97db214ae1130ee34bb1c",
+      "bytes": 126298
     },
     "root-operating-notes.json": {
-      "sha256": "144d73c16b97d7ea6c659c3fa050460e14ac4617df6bb28e19d01f7e23504895",
-      "bytes": 7772
+      "sha256": "ee94e5e2ab6791640e0aad3dc3b089a0a0a18a6100cb0c36a3d32a831d9abfb3",
+      "bytes": 7905
     },
     "integration-state.json": {
-      "sha256": "2c2c292397544043f71934a879f00f900aed50fe040946e23e8bf88fb7682ffe",
-      "bytes": 27858
+      "sha256": "32377e7158c2f13233cd1c1c4b5e685ac6815acba2290b30027af55df196b7b9",
+      "bytes": 32056
     },
     "completed-application-cache-cleanup.json": {
       "sha256": "b3ad645a34a9a623cfbd9bdb064e0f02e992f3937d543380f5be647e42e148cc",
@@ -100,6 +100,74 @@
     "integration-2db60b3-expected-tests.json": {
       "sha256": "c126deeeb176726a430a361c17114e268ca10ddde0b62819e8a2ba36d95e838e",
       "bytes": 74465
+    },
+    "integration-ab68bde-gates.json": {
+      "sha256": "4d5a360135e7163f72224c075d0529008deb8d68f9eb76347fbdd1d5129dd4a3",
+      "bytes": 3658
+    },
+    "integration-ab68bde-expected-tests.json": {
+      "sha256": "2242c36f0875d2820e154b29ccea8723baa65165d34b0ee1981de6471ba537af",
+      "bytes": 77131
+    },
+    "integration-23dd87f-pointer.log": {
+      "sha256": "1923dd9c1b5ba3d486711585ee01c8018fd50b69a99240ccfd2e03043e5ca103",
+      "bytes": 636
+    },
+    "standalone-9bb73a3.json": {
+      "sha256": "f4fdc7c923778376897450dd639c17637f41e8d7a16caada073cbde2f019ba55",
+      "bytes": 50541
+    },
+    "integration-ab68bde-fmt.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "integration-23dd87f-expected-tests.json": {
+      "sha256": "af95ac0f1ba922abacebfbfd3fc1740f7f967ca48ffeb6d01da8a8dcac904436",
+      "bytes": 76942
+    },
+    "integration-2db60b3-gates.json": {
+      "sha256": "4e3abfc2c9d5d9aefea99ff227d1df2f9184bdb134d875094ad2529c63486025",
+      "bytes": 4487
+    },
+    "final-history-plan.json": {
+      "sha256": "1537a8dd6acfd5801e90cb0a4deed7a9b4b5cc44de69faa904c6e416272ab234",
+      "bytes": 1392
+    },
+    "integration-23dd87f-test.log": {
+      "sha256": "c4feb4bee43efdf6c919fd38776d6ca3b5bc3b6a96ae6136ae15a7f823d3d70c",
+      "bytes": 81945
+    },
+    "integration-ab68bde-clean.log": {
+      "sha256": "015ca06b106ab5065fab4276532372a9ecb68ab88459cb85a375518aedc47798",
+      "bytes": 36
+    },
+    "integration-ab68bde-clippy.log": {
+      "sha256": "32c5e4df878fe92d08beb44492af6fe28e1a75762a365f7d672927196cc28d97",
+      "bytes": 132
+    },
+    "integration-23dd87f-clippy.log": {
+      "sha256": "57c9e1615d825c718ca65d5651dc051df152124cab213d31026eb2052a09d739",
+      "bytes": 132
+    },
+    "integration-23dd87f-gates.json": {
+      "sha256": "8631245b593e843e9c614bbd36979f63dcf4ad57a364476133315ee7c6e73830",
+      "bytes": 4174
+    },
+    "integration-23dd87f-test-list.log": {
+      "sha256": "64e9c4e3225250d03395d46ecdf3674d14c2e1760d1d3ac293c9f106bec965a0",
+      "bytes": 73691
+    },
+    "integration-ab68bde-test.log": {
+      "sha256": "f0584ff7483a7f76a389bd925fcfeb13583040ef4f46effb741f030bb8cd0b06",
+      "bytes": 83305
+    },
+    "integration-ab68bde-test-list.log": {
+      "sha256": "be36fe2043b7f63ddf6b1fec746c9a0ea2c4ed389b4a720deb4913bf204ea004",
+      "bytes": 74978
+    },
+    "integration-23dd87f-fmt.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
     }
   }
 }

@@ -70,9 +70,9 @@
       "branch": "codex/push-preflight",
       "worktree": "/workspace/work/push-preflight",
       "base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93",
-      "commit": "1c6d1611ead6f39b0ab60947a08af504cfa4aa19",
+      "commit": "e5d1c100f6f20918f3f7c3564d28234cc64a3133",
       "reviewer": "baseline_validation",
-      "validation": "Local full926pass3ignored929registered; local production Gate2 independent21/21 PASS. Remote automaticrepair and final whole-feature review pending.",
+      "validation": "Local production 21/21 and full 926 passed / 3 ignored on accepted local cut. Remote e5d1c10 independent static PASS; pure recordings and bounded owned fixtures next. Minimal shared transport extraction is critical for Object helper.",
       "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto",
       "latest_preserved_head": "43c169159af81b3e85c13b8e6a19e1d040ddc4d3",
       "review_report": "/workspace/work/review-push-repair-protocol/review-evidence/push-repair-protocol-43c1691.json",
@@ -103,15 +103,17 @@
           "Needs Git object reader and content search, remote background command support."
         ]
       },
-      "status": "reviewed_ready_to_integrate",
+      "status": "integrated",
       "agent": "audit_32_38",
       "branch": "codex/content-recovery",
       "worktree": "/workspace/work/content-recovery",
       "latest_preserved_head": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
-      "validation": "Local full811pass3ignored814registered; exact independent22/22PASS; queued after SSH integration.",
+      "validation": "Independent feature PASS; combined Content milestone 933 passed / 3 ignored, 936 names. Typed modal continuation fix preserves state; real pointer flow passes.",
       "reviewer": "review_portable_setup",
       "commit": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
-      "review_commit": "45e980e49d940b983cf72fa287666aa910258f93"
+      "review_commit": "45e980e49d940b983cf72fa287666aa910258f93",
+      "integration_merge": "9ba5f13",
+      "integration_followup": "23dd87fb5ff98af98846a517f983d8afb0d567a4"
     },
     {
       "issue": 32,
@@ -550,15 +552,16 @@
           "Open #73 search operators and #84 graph order/first-parent are distinct and should compose."
         ]
       },
-      "status": "reviewed_ready_to_integrate",
+      "status": "integrated",
       "agent": "audit_32_38",
       "branch": "codex/history-investigations",
       "worktree": "/workspace/work/history-investigations",
       "commit": "80b2e50f069d8215b0801c7d674a03331da8d819",
-      "validation": "Individualfull878pass3ignore881names; independent12/12PASS and360apphasheschecked; integrationafterContentauthorized.",
+      "validation": "Independent 12/12 PASS; combined 22-feature milestone 945 passed / 3 ignored, exact 948 names.",
       "reviewer": "audit_45_50",
       "review_commit": "df98bbdf10b1eb8b5595af95572c382c596e77a4",
-      "review_report": "/workspace/work/review-saved-views-80b2e50.json"
+      "review_report": "/workspace/work/review-saved-views-80b2e50.json",
+      "integration_merge": "ab68bdedd387236c03f26f839572860d405a2f7f"
     },
     {
       "issue": 36,
@@ -1281,13 +1284,13 @@
         ],
         "effort": "M"
       },
-      "status": "fixing_review_finding",
+      "status": "independent_review",
       "agent": "audit_39_44",
       "branch": "codex/standalone-file-tools",
       "worktree": "/workspace/work/standalone-file-tools",
       "latest_preserved_head": "15fb8de83c051575d6671b563f2e2419ed336769",
-      "validation": "Individual842pass3ignore; independent25/25PASS; reviewFAILP2 concurrentACLdrift STANDALONE-1. Authoractivatedforfix; nativeWindowshelperprotocolSTATICPASS only.",
-      "commit": "7fb68f226a1056970d5f722751a1bd2f0b937cbf",
+      "validation": "Corrected metadata guards; local fmt/strict Clippy/full 845 passed / 3 ignored; all 28 new feature cases ran. Re-review active; native Windows/macOS unexecuted.",
+      "commit": "9bb73a3256573a68f665f09cc390def05ba2f139",
       "reviewer": "review_portable_setup",
       "review_commit": "afd7fab1b04014e256255a2b72ad8639484edb09"
     },
@@ -2097,8 +2100,8 @@
       "agent": "implement_object_storage",
       "branch": "codex/object-storage",
       "worktree": "/workspace/work/object-storage",
-      "commit": "320fab90947667e6c4048dae7e72bd977496533a",
-      "validation": "Linux correctedrootownershipa3b4d7d full886pass3ignored889registered; Windows320 modulecross-typecheckPASS; remoteownedhelperimplementationongoing. Newfixedcandidateindependentreviewpending; originalcandidateFAIL/incomplete, blockedharnessmustnotrerun."
+      "commit": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+      "validation": "Read-only and local mutation implemented; Linux prior full gates passed. Latest source fmt/strict Clippy and Windows module cross-typecheck PASS. Helper runtime awaits corrected shared owned transport and independent static review. No native runtime claim."
     },
     {
       "issue": 49,
@@ -2195,8 +2198,8 @@
       "agent": "implement_object_storage",
       "branch": "codex/object-storage",
       "worktree": "/workspace/work/object-storage",
-      "commit": "320fab90947667e6c4048dae7e72bd977496533a",
-      "validation": "Linux correctedrootownershipa3b4d7d full886pass3ignored889registered; Windows320 modulecross-typecheckPASS; remoteownedhelperimplementationongoing. Newfixedcandidateindependentreviewpending; originalcandidateFAIL/incomplete, blockedharnessmustnotrerun."
+      "commit": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+      "validation": "Read-only and local mutation implemented; Linux prior full gates passed. Latest source fmt/strict Clippy and Windows module cross-typecheck PASS. Helper runtime awaits corrected shared owned transport and independent static review. No native runtime claim."
     },
     {
       "issue": 49,
@@ -2322,7 +2325,7 @@
     "single_final_pr": true,
     "integration_branch": "codex/remaining-features",
     "integration_worktree": "/workspace/work/integration",
-    "integration_agent": "implement_gerrit",
+    "integration_agent": "root",
     "interim_prs_to_close": [
       153,
       154,
@@ -2335,22 +2338,21 @@
       154,
       155
     ],
-    "integration_remote_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+    "integration_remote_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
     "initial_combined_validation": "fmt/clippy/fulltest PASS686+3ignored689total",
-    "combined_validation": "LOCALfmt/strictClippy/full911pass3ignore914registered on2db60b3; noCI."
+    "combined_validation": "LOCAL fmt, strict all-target Clippy, 945 passed / 3 ignored / 0 filtered; exact 948 names. CI deferred."
   },
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Filesystem recovered; all current completed source/review units committed and pushed. Initial immutableZIP retained; live recoverymetadata updated separately.",
-  "verified_remote_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "verified_remote_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
   "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS.",
   "final_commit_author_reference": "028242cd4bc3c82ced848ea0fa73639981cd71d7",
   "status_counts": {
-    "integrated": 20,
+    "integrated": 22,
     "implementing_remote_repair": 1,
-    "reviewed_ready_to_integrate": 2,
     "queued": 41,
     "implementing": 4,
     "assigned": 3,
-    "fixing_review_finding": 1
+    "independent_review": 1
   }
 }

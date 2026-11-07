@@ -1,0 +1,79 @@
+{
+  "head": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "tree": "e5f6b5b28e574c2ab6506aebbeb6acbb3a344e5c",
+  "source_tree": "10530b961ddfce74a6cbbc507377761fbd24d620",
+  "starting_head": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+  "worktree": "/workspace/work/integration",
+  "branch": "codex/remaining-features",
+  "remote_verified": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "source_diff_sha256": "d95266eb8f1bb6448a9f34f20c20c59762e80f69549e07b9e0088ee85d1b3423",
+  "merge": {
+    "reviewed_application": "80b2e50f069d8215b0801c7d674a03331da8d819",
+    "merge_commit": "ab68bdedd387236c03f26f839572860d405a2f7f",
+    "review_report": "/workspace/work/review-saved-views-80b2e50.json"
+  },
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "full_default": "945 passed;0 failed;3 ignored;0 filtered;948 registered",
+    "test_list_union": "Exact union; no losses/collisions; 12 feature tests actually pass"
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean_at_merge": true,
+  "clean_log": "/workspace/work/integration-ab68bde-clean.log",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_env": "unset",
+  "safety_exclusions": 0,
+  "logs": {
+    "fmt": {
+      "path": "/workspace/work/integration-ab68bde-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-ab68bde-clippy.log",
+      "sha256": "32c5e4df878fe92d08beb44492af6fe28e1a75762a365f7d672927196cc28d97",
+      "bytes": 132
+    },
+    "test": {
+      "path": "/workspace/work/integration-ab68bde-test.log",
+      "sha256": "f0584ff7483a7f76a389bd925fcfeb13583040ef4f46effb741f030bb8cd0b06",
+      "bytes": 83305
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-ab68bde-test-list.log",
+      "sha256": "be36fe2043b7f63ddf6b1fec746c9a0ea2c4ed389b4a720deb4913bf204ea004",
+      "bytes": 74978
+    }
+  },
+  "expected_tests_manifest": "/workspace/work/integration-ab68bde-expected-tests.json",
+  "expected_tests_sha256": "2242c36f0875d2820e154b29ccea8723baa65165d34b0ee1981de6471ba537af",
+  "workflow": {
+    "identical_original_dev": true,
+    "protected_files_sha256": {
+      ".github/workflows/ci.yml": "70d2a21e1aa735e32bb7ad3fc40fae09355b6866409eec15fdb6adadf5907145",
+      ".github/workflows/release.yml": "d1c0682bd1448d356730c58fe44e20a338ba1fb7bb4c02294902c33a3a94ef8f",
+      "AGENTS.md": "dd41e050679ab2cd33683e28e2c2db6e43bdd611042a6faa56708f12010dec3f"
+    },
+    "ci_used": false
+  },
+  "merge_conflicts": [
+    "src/repo/load.rs",
+    "src/repo/messages.rs"
+  ],
+  "integration_adaptations": [
+    "Profile reload retains Content dismissal plus Saved Views cancellation; message polling advances both independent owned readers. Existing pinned no-fetch query/projection source unchanged."
+  ],
+  "application_only_merge": "Reviewed application head only; no evidence-only heads or validation logs merged; product docs retained.",
+  "limits": [
+    "Local Linux only; native Windows and live external accounts/transports not exercised",
+    "CI deferred by explicit user policy; final combined independent review remains pending"
+  ],
+  "binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "77570ac410be281f89dca00a3b2abbbb4d537c9d242f25a68816dc8f71d0dffd",
+    "source_binding": "Fresh integration-only package clean and actual compile from this private worktree; all source gates on immutable pushed head"
+  }
+}

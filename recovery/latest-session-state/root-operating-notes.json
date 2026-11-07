@@ -6,20 +6,20 @@
   "user_steering": "ONE final giant PR; rebuild clean branch from dev with one commit per feature, all authored exactly Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> matching028242cd4bc3. Preserve published branches/history; each new unit still commit+push before next/riskytest.",
   "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
   "agents": {
-    "audit_32_38": "Content e1 exactreviewPASS frozen; SavedViews80b full878+3 frozenawaitreview; LineDossier implementation thenSymbol/Coupling",
-    "audit_39_44": "Standalone7fb reviewFAILconcurrentACLdrift; authoractivatedfix; WindowshelperSTATICPASS",
-    "audit_45_50": "SavedViews80 independent12PASS notesdf98; returnedGitLabWIPdb55 thenAzure/Bitbucket",
-    "implement_gerrit": "SOLEintegrationwriter:SSH2dbgreenpublished20features911+3; nowContente1 thenSavedViews80, thenObjecthelperSTATICreview",
-    "implement_object_storage": "Linux rootpina3b local886+3; Windows320 crosscheckPASS; ownedremotehelperimplementation; fixedreviewpending; neverretryblockedoldharness",
-    "review_weather": "Preflight local926+3 incl21productioncases; remote explicitcompletion/dispatch/uncertainrecovery staticunit underway; reviewbeforefixture",
-    "review_portable_setup": "CompletedStandalone reviewFAILnotesafd7; idle forfixedrereview"
+    "audit_32_38": "Saved Views integrated; Line Dossier backend/UI and guarded ignore-file action underway using accepted Content 23dd.",
+    "audit_39_44": "Standalone 9bb final candidate frozen, full 845 passed / 3 ignored. Inactive while reviewer uses slot.",
+    "audit_45_50": "GitLab implementation and request ownership guard; Azure/Bitbucket assigned next.",
+    "implement_gerrit": "Independent Object f2b7968 static review; remote helper legacy stop dependency is open. Next graph bands/minimap/postcards reserved.",
+    "implement_object_storage": "Object f2b7968 frozen; helper runtime blocked on accepted owned transport. Independently reviewed Preflight e5d1c10 static PASS ba19e714.",
+    "review_weather": "Remote e5d1c10 static PASS; run defined recordings and owned fixtures, then extract minimal shared transport for Object integration.",
+    "review_portable_setup": "Standalone 9bb corrective re-review and integration-only lifecycle delta d182..ab68 static review."
   },
   "integration": {
     "worktree": "/workspace/work/integration",
     "branch": "codex/remaining-features",
-    "remote_green_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+    "remote_green_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
     "state": "/workspace/work/integration-state.json",
-    "checks": "LOCALfmt/strictClippy/full911pass3ignore914registered; focused3lifecyclePASS; exactunionverified; noCI",
+    "checks": "LOCAL fmt/strict Clippy/full 945 passed, 3 ignored, 0 filtered, exact 948 names.",
     "features": [
       "Gerrit",
       "Clone",
@@ -40,16 +40,18 @@
       "Working tree drafts",
       "Repositorytour",
       "Portablepublicsetup",
-      "SSHkeyhelper"
+      "SSHkeyhelper",
+      "Content recovery",
+      "Saved graph views"
     ],
     "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
     "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview.",
     "platform_gates": "NativeWindows finalvalidation stillrequired. Do not poll/rerun/dispatchCI until ALL implementation+finalhistory+localchecks+independentwhole-review complete.",
-    "pending_candidate": "Content e1 thenSavedViews80 mergesauthorized",
-    "sole_writer": "implement_gerrit",
+    "pending_candidate": null,
+    "sole_writer": "root; implement_gerrit handed back after Saved Views",
     "pending_features": [
-      "Content e1 independentPASS",
-      "SavedViews80 independentPASS"
+      "Standalone 9bb corrected; independent re-review active",
+      "Shared owned remote transport; static PASS, recordings/owned fixtures pending"
     ]
   },
   "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
@@ -65,13 +67,13 @@
     "/workspace/work/prs.json (99originalopenPRs,allinflightfeaturesexcludedwhole-namedbullet)"
   ],
   "scope_rule": "Namedidea with anyopenPR excludedwholeevenifomissions. Registry #38excludedbecausePR75sharedkeymap. ContrasteligiblePR66explicitlyexcludesit.",
-  "new_feature_base": "d18210503b376c77e76c6e4825e24b182b1f7eeb (19features localgreen)",
+  "new_feature_base": "ab68bdedd387236c03f26f839572860d405a2f7f (22 features locally green)",
   "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
   "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
-  "communications": "Userdelaystatus:20/72integrated;911defaultlocalpasses/3baselineignored; ContentandSavedViewsindependentlyPASS next.41queued; noguaranteedcompletionETA. CIoff.",
+  "communications": "Latest user status: 22 integrated, 945 local tests passing; one final PR, CI deferred, source units pushed. 41 features remain queued.",
   "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
   "recovery_status": "Current source units and review evidence committed/pushed; no app test quarantine on accepted containment branches. Historical recovery/checkpoint_worktrees.py must NOT be rerun (would restore obsolete quarantine/identity); normal agents preserve their own units with correct shared repo-local author.",
-  "verified_remote_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "verified_remote_head": "ab68bdedd387236c03f26f839572860d405a2f7f",
   "backup": {
     "url": "https://raw.githubusercontent.com/JKamsker/gitcraft/f6896061a3bc6c3a049f5cdd592ff21860ccb50b/recovery/gitcraft-recovery-20261107.zip",
     "sha256": "0816c7c383acb5c130d3d019efacd573d6c70a8872f9cd91b67b076ccb887bf7",

@@ -1,0 +1,89 @@
+{
+  "head": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+  "tree": "c60dc1bb1b16cad1179fab4d09378bec3b9b7f8f",
+  "source_tree": "e5e0f6efa15242dbce23da1a0edb85d4a61ccc7c",
+  "starting_head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "worktree": "/workspace/work/integration",
+  "branch": "codex/remaining-features",
+  "remote_verified": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+  "source_diff_sha256": "92afceae965dfb523fad198b64cbf47041e044b6dfa36a1db7173e3d36557760",
+  "merge": {
+    "reviewed_application": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
+    "merge_commit": "9ba5f13585814447cf2ffee2646323afc9935c06",
+    "followup": "23dd87fb5ff98af98846a517f983d8afb0d567a4",
+    "review_report": "45e980e49d940b983cf72fa287666aa910258f93:docs/validation/independent-content-recovery-e1e1be8/review.md"
+  },
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "full_default": "933 passed;0 failed;3 ignored;0 filtered;936 registered",
+    "test_list_union": "Exact union; no losses/collisions; 22 feature tests actually pass"
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean_at_merge": true,
+  "clean_log": "/workspace/work/integration-9ba5f13-clean.log",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_env": "unset",
+  "safety_exclusions": 0,
+  "logs": {
+    "pointer": {
+      "path": "/workspace/work/integration-23dd87f-pointer.log",
+      "sha256": "1923dd9c1b5ba3d486711585ee01c8018fd50b69a99240ccfd2e03043e5ca103",
+      "bytes": 636
+    },
+    "fmt": {
+      "path": "/workspace/work/integration-23dd87f-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-23dd87f-clippy.log",
+      "sha256": "57c9e1615d825c718ca65d5651dc051df152124cab213d31026eb2052a09d739",
+      "bytes": 132
+    },
+    "test": {
+      "path": "/workspace/work/integration-23dd87f-test.log",
+      "sha256": "c4feb4bee43efdf6c919fd38776d6ca3b5bc3b6a96ae6136ae15a7f823d3d70c",
+      "bytes": 81945
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-23dd87f-test-list.log",
+      "sha256": "64e9c4e3225250d03395d46ecdf3674d14c2e1760d1d3ac293c9f106bec965a0",
+      "bytes": 73691
+    }
+  },
+  "expected_tests_manifest": "/workspace/work/integration-23dd87f-expected-tests.json",
+  "expected_tests_sha256": "af95ac0f1ba922abacebfbfd3fc1740f7f967ca48ffeb6d01da8a8dcac904436",
+  "workflow": {
+    "identical_original_dev": true,
+    "protected_files_sha256": {
+      ".github/workflows/ci.yml": "70d2a21e1aa735e32bb7ad3fc40fae09355b6866409eec15fdb6adadf5907145",
+      ".github/workflows/release.yml": "d1c0682bd1448d356730c58fe44e20a338ba1fb7bb4c02294902c33a3a94ef8f",
+      "AGENTS.md": "dd41e050679ab2cd33683e28e2c2db6e43bdd611042a6faa56708f12010dec3f"
+    },
+    "ci_used": false
+  },
+  "merge_conflicts": [
+    "src/repo/actions.rs",
+    "src/repo/apply.rs",
+    "src/repo/dialogs/mod.rs",
+    "src/repo/load.rs",
+    "src/repo/messages.rs",
+    "src/repo/worktree_tab/mod.rs"
+  ],
+  "integration_adaptations": [
+    "Content opening closes SSH and SOPS; actual modal/profile/tab dismissal cancels Content plus Draft readers. Typed Content continuation preserves captured Results/Preview; existing pointer regression reproduced original failure then verifies full flow. Engine/RootPin unchanged."
+  ],
+  "application_only_merge": "Reviewed application head only; no evidence-only heads or validation logs merged; product docs retained.",
+  "limits": [
+    "Local Linux only; native Windows and live external accounts/transports not exercised",
+    "CI deferred by explicit user policy; final combined independent review remains pending"
+  ],
+  "binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "cad4657102a33ddf59afed536ad307d9b16ea5e92cd253e2f3285e1e483e96f2",
+    "source_binding": "Fresh integration-only package clean and actual compile from this private worktree; all source gates on immutable pushed head"
+  }
+}

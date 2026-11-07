@@ -1,0 +1,96 @@
+{
+  "head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "tree": "503e943a17dc91a89200b83711dfed00c1fe08f8",
+  "source_tree": "7d01a433008256fabffa97fb27b4ff25ad649f80",
+  "starting_head": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "worktree": "/workspace/work/integration",
+  "branch": "codex/remaining-features",
+  "remote_verified": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "source_diff_sha256": "8edffe1277bc5016e97f021cb3814c0f24035221a72382ab90c2402561701792",
+  "merge": {
+    "reviewed_application": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+    "merge_commit": "d2bc96292209598b24244b9814ef591baf0b2044",
+    "followup": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+    "review_report": "/workspace/work/review-ssh-key-helper/SSH_HELPER_REREVIEW.md"
+  },
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "gates": {
+    "fmt": "PASS",
+    "strict_all_target_clippy": "PASS",
+    "full_default": "911 passed;0 failed;3 ignored;0 filtered;914 registered",
+    "test_list_union": "Exact union; no losses/collisions; 20 feature tests actually pass"
+  },
+  "private_target": "/workspace/work/integration/target",
+  "fresh_package_clean_at_merge": true,
+  "clean_log": "/workspace/work/integration-2db60b3-clean.log",
+  "cargo_incremental": "0",
+  "cargo_build_jobs": "2",
+  "optional_ssh_wsl_env": "unset",
+  "safety_exclusions": 0,
+  "logs": {
+    "sops-lifecycle": {
+      "path": "/workspace/work/integration-2db60b3-sops-lifecycle.log",
+      "sha256": "9d9c829d839fd759c2ec50ba84f4cf404c0307870265097b663c01e78854c825",
+      "bytes": 640
+    },
+    "ssh-lifecycle": {
+      "path": "/workspace/work/integration-2db60b3-ssh-lifecycle.log",
+      "sha256": "91110fd01172579a3b203894ae0c0d539fdc8aa517c3491c298dae94231acd44",
+      "bytes": 558
+    },
+    "drafts-lifecycle": {
+      "path": "/workspace/work/integration-2db60b3-drafts-lifecycle.log",
+      "sha256": "875cf875fa8fad5898e61267a63f34dccfb3b6060168f5ee58c54979d5a3c612",
+      "bytes": 565
+    },
+    "fmt": {
+      "path": "/workspace/work/integration-2db60b3-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clippy": {
+      "path": "/workspace/work/integration-2db60b3-clippy.log",
+      "sha256": "fa3bd3a13659a0067e7b153be0294d020a531edf018a72cd8496f4a2726f0d83",
+      "bytes": 132
+    },
+    "test": {
+      "path": "/workspace/work/integration-2db60b3-test.log",
+      "sha256": "00207ae16065015d9d867d658c21024bd89b40f0aa47e1f79151984e433bcd7d",
+      "bytes": 79426
+    },
+    "test-list": {
+      "path": "/workspace/work/integration-2db60b3-test-list.log",
+      "sha256": "5d1d26e2a22610d668a469764ff4b61947a51c5bc0cb9fefb1b4941a102c705e",
+      "bytes": 71304
+    }
+  },
+  "expected_tests_manifest": "/workspace/work/integration-2db60b3-expected-tests.json",
+  "expected_tests_sha256": "c126deeeb176726a430a361c17114e268ca10ddde0b62819e8a2ba36d95e838e",
+  "workflow": {
+    "identical_original_dev": true,
+    "protected_files_sha256": {
+      ".github/workflows/ci.yml": "70d2a21e1aa735e32bb7ad3fc40fae09355b6866409eec15fdb6adadf5907145",
+      ".github/workflows/release.yml": "d1c0682bd1448d356730c58fe44e20a338ba1fb7bb4c02294902c33a3a94ef8f",
+      "AGENTS.md": "dd41e050679ab2cd33683e28e2c2db6e43bdd611042a6faa56708f12010dec3f"
+    },
+    "ci_used": false
+  },
+  "merge_conflicts": [
+    "src/repo/actions.rs",
+    "src/repo/apply.rs"
+  ],
+  "integration_adaptations": [
+    "SSH opening dismisses/cancels existing Draft modal reader and discards SOPS plaintext; profile connection reload drops SSH helper and SOPS private state.",
+    "Existing SSH/SOPS/Drafts lifecycle test bodies extend modal/profile cancellation checks without new test names; all remaining unique SSH files match reviewed head."
+  ],
+  "application_only_merge": "Reviewed application head only; no evidence-only heads or validation logs merged; product docs retained.",
+  "limits": [
+    "Local Linux only; native Windows and live external accounts/transports not exercised",
+    "CI deferred by explicit user policy; final combined independent review remains pending"
+  ],
+  "binary": {
+    "path": "/workspace/work/integration/target/debug/deps/gitcraft-98b7c97eceab1e2d",
+    "sha256": "8e7ff95aa2b77ab49c41ff49e8976852218d70a9409852eb9aa8bbf2bf115309",
+    "source_binding": "Fresh integration-only package clean and actual compile from this private worktree; all source gates on immutable pushed head"
+  }
+}
