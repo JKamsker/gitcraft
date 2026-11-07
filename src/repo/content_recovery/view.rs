@@ -186,7 +186,7 @@ impl State {
             egui::ScrollArea::vertical()
                 .id_salt("content-matches")
                 .max_height(420.0)
-                .show_rows(ui, 65.0, report.hits.len(), |ui, rows| {
+                .show_rows(ui, 80.0, report.hits.len(), |ui, rows| {
                     for i in rows {
                         let hit = &report.hits[i];
                         let source = hit.provenance.first();
@@ -202,16 +202,22 @@ impl State {
                         if ui
                             .add_enabled(
                                 enabled,
-                                egui::Button::new(title.chars().take(130).collect::<String>()),
+                                egui::Button::new(title.chars().take(130).collect::<String>())
+                                    .truncate(),
                             )
                             .on_hover_text(&title)
                             .clicked()
                         {
                             outcome = Outcome::Done(Action::ContentInspect(i, source.map(|_| 0)));
                         }
-                        ui.label(
-                            egui::RichText::new(hit.excerpt.chars().take(140).collect::<String>())
-                                .monospace(),
+                        let snippet: String = hit
+                            .excerpt
+                            .chars()
+                            .take(140)
+                            .map(|c| if c.is_control() { ' ' } else { c })
+                            .collect();
+                        ui.add(
+                            egui::Label::new(egui::RichText::new(snippet).monospace()).truncate(),
                         );
                         ui.label(
                             egui::RichText::new(format!(
