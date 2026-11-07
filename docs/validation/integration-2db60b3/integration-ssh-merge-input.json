@@ -1,0 +1,24 @@
+{
+  "base": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "incoming": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+  "branch": "codex/remaining-features",
+  "protected_files": {
+    ".github/workflows/ci.yml": "70d2a21e1aa735e32bb7ad3fc40fae09355b6866409eec15fdb6adadf5907145",
+    ".github/workflows/release.yml": "d1c0682bd1448d356730c58fe44e20a338ba1fb7bb4c02294902c33a3a94ef8f",
+    "AGENTS.md": "dd41e050679ab2cd33683e28e2c2db6e43bdd611042a6faa56708f12010dec3f"
+  },
+  "merge_sha": "d2bc96292209598b24244b9814ef591baf0b2044",
+  "head": "2db60b38b9e79f35c6158d81ca20be41c4427852",
+  "status": "PUSHED; private integration gates running",
+  "conflicts": [
+    "src/repo/actions.rs",
+    "src/repo/apply.rs"
+  ],
+  "resolution": "Retained all Draft actions and SSH setup action additively",
+  "lifecycle_adaptations": [
+    "Opening SSH setup dismisses Draft dialog/cancels reader and drops SOPS plaintext",
+    "Profile connection reload drops SSH helper and SOPS private state",
+    "Existing SOPS/SSH/Drafts lifecycle regressions extended without adding test names"
+  ],
+  "expected_tests_manifest": "/workspace/work/integration-2db60b3-expected-tests.json"
+}

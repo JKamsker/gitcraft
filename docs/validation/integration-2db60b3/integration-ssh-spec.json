@@ -1,0 +1,13 @@
+{
+ "head":"2db60b38b9e79f35c6158d81ca20be41c4427852",
+ "starting_head":"d18210503b376c77e76c6e4825e24b182b1f7eeb",
+ "key":"ssh_key_helper","features_count":20,
+ "merge":{"reviewed_application":"bcb0e78ba1fca0622126a2e72885554ee3fc9e0e","merge_commit":"d2bc96292209598b24244b9814ef591baf0b2044","followup":"2db60b38b9e79f35c6158d81ca20be41c4427852","review_report":"/workspace/work/review-ssh-key-helper/SSH_HELPER_REREVIEW.md"},
+ "feature_record":{"feature":"ssh_key_helper","named_features":["#43 SSH key helper"],"reviewed_sha":"bcb0e78ba1fca0622126a2e72885554ee3fc9e0e","integration_merge_sha":"d2bc96292209598b24244b9814ef591baf0b2044","integration_followup_sha":"2db60b38b9e79f35c6158d81ca20be41c4427852","strategy":"application merge; additive conflicts and declared lifecycle adapters","individual_review":"PASS","review_report":"/workspace/work/review-ssh-key-helper/SSH_HELPER_REREVIEW.md"},
+ "conflicts":["src/repo/actions.rs","src/repo/apply.rs"],
+ "resolution":"Retained all Draft actions and SSH setup action additively; current Profile pending/import account helpers unchanged.",
+ "adapted_files":["src/repo/ssh_setup/mod.rs","src/repo/ssh_setup/tests.rs","src/repo/load.rs","src/repo/diff/encrypted/tests.rs","src/repo/drafts.rs"],
+ "adaptations":["SSH opening dismisses/cancels existing Draft modal reader and discards SOPS plaintext; profile connection reload drops SSH helper and SOPS private state.","Existing SSH/SOPS/Drafts lifecycle test bodies extend modal/profile cancellation checks without new test names; all remaining unique SSH files match reviewed head."],
+ "clean_log":"/workspace/work/integration-2db60b3-clean.log",
+ "log_stages":["sops-lifecycle","ssh-lifecycle","drafts-lifecycle","fmt","clippy","test","test-list"]
+}
