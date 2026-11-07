@@ -207,6 +207,7 @@ impl RepoTab {
         let opts = git::DiffOptions {
             ignore_ws: self.diff_ignore_ws,
             whole_file: Settings::get(ctx).diff_whole_file,
+            no_textconv: false,
         };
         let dark = Tokens::get(ctx).dark();
         spawn(&self.tx, ctx, move || {

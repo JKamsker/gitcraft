@@ -124,6 +124,8 @@ pub struct DiffOptions {
     pub ignore_ws: bool,
     /// The whole file as context, not just the lines around the changes.
     pub whole_file: bool,
+    /// `--no-textconv`: the file's own bytes, not what a textconv driver makes of them.
+    pub no_textconv: bool,
 }
 
 impl DiffOptions {
@@ -133,6 +135,9 @@ impl DiffOptions {
         args.extend(PATCH_ARGS);
         if self.ignore_ws {
             args.push("-w");
+        }
+        if self.no_textconv {
+            args.push("--no-textconv");
         }
         if self.whole_file {
             // More context than any file has lines: git shows each file as one hunk.

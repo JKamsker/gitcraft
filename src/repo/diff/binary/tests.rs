@@ -24,6 +24,10 @@ fn repo(name: &str) -> Result<PathBuf, String> {
     ] {
         git::run(Some(&dir), args)?;
     }
+    // No diff driver for the kinds the tests diff, whatever the system's attributes say (Git
+    // for Windows maps `*.docx` and `*.pdf` to its `astextplain`).
+    let attributes = "*.docx !diff\n*.pdf !diff\n*.zip !diff\n*.bin !diff\n*.png !diff\n";
+    std::fs::write(dir.join(".git/info/attributes"), attributes).map_err(|e| e.to_string())?;
     Ok(dir)
 }
 
@@ -173,6 +177,33 @@ fn a_new_pdf_and_raw_bytes() -> Result<(), String> {
     );
     assert!(blob.text.is_none() && blob.members.is_none());
     assert!(!data.partial);
+    Ok(())
+}
+
+/// A textconv driver that fails doesn't fail the diff: the file is shown as the binary it is.
+#[test]
+fn a_failing_textconv_falls_back_to_the_bytes() -> Result<(), String> {
+    let dir = repo("textconv-fails")?;
+    std::fs::write(dir.join(".gitattributes"), "*.docx diff=broken\n")
+        .map_err(|e| e.to_string())?;
+    // The driver comes from the repository's attributes, not the tests' blanket `!diff`.
+    std::fs::write(dir.join(".git/info/attributes"), "").map_err(|e| e.to_string())?;
+    git::run(Some(&dir), &["config", "diff.broken.textconv", "false"])?;
+    let name = "Spec.docx";
+    commit(&dir, name, &make_docx(&["Intro", "Old plan"]), "one")?;
+    let hash = commit(&dir, name, &make_docx(&["Intro", "New plan"]), "two")?;
+    let data = load(&dir, &commit_key(&hash, name), DiffOptions::default(), true)?;
+    let Some(binary) = data.binary else {
+        return Err("the docx isn't shown as a binary".into());
+    };
+    let text = binary.text.unwrap_or_default();
+    if data.textconv.is_some()
+        || !text
+            .iter()
+            .any(|(e, t)| *e == Edit::Add && t.contains("New plan"))
+    {
+        return Err(format!("textconv {:?}", data.textconv));
+    }
     Ok(())
 }
 
