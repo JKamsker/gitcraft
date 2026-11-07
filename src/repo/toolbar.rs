@@ -15,6 +15,26 @@ use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
+/// "Undo Commit (Ctrl+Z)", or "Undo Claude Code's Commit (Ctrl+Z)" for an agent's step.
+fn step_tip(what: &str, entry: &super::UndoEntry, keys: &str) -> String {
+    match &entry.agent {
+        Some(agent) => format!("{what} {agent}'s {} ({keys})", entry.label),
+        None => format!("{what} {} ({keys})", entry.label),
+    }
+}
+
+/// A robot in the corner of the undo button `undo`: the step it undoes is an agent's (its
+/// tooltip names which).
+fn agent_badge(ui: &Ui, undo: &egui::Response) {
+    let t = Tokens::get(ui.ctx());
+    let size = 11.0;
+    let at = undo.rect.right_bottom() - egui::vec2(size * 0.75, size * 0.75);
+    let rect = egui::Rect::from_center_size(at, egui::Vec2::splat(size + 3.0));
+    ui.painter()
+        .circle_filled(rect.center(), (size + 3.0) / 2.0, t.chrome);
+    icons::paint(ui, rect.shrink(1.5), "bot", size, t.accent);
+}
+
 impl RepoTab {
     pub(super) fn toolbar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         ui.horizontal(|ui| {
@@ -45,19 +65,22 @@ impl RepoTab {
     /// Undo and redo, with what they'd undo or redo as tooltips.
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let undo_tip = match self.undo_stack.last() {
-            Some(e) => format!("Undo {} ({})", e.label, keymap::written("Cmd+Z")),
+            Some(e) => step_tip("Undo", e, &keymap::written("Cmd+Z")),
             None => "Nothing to undo".to_owned(),
         };
-        if icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
+        let undo = icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
             .named(&undo_tip)
-            .on_hover_text(undo_tip)
-            .on_disabled_hover_text("Nothing to undo")
-            .clicked()
-        {
+            .on_hover_text(&undo_tip)
+            .on_disabled_hover_text("Nothing to undo");
+        if undo.clicked() {
             acts.push(Action::Undo);
         }
+        // What Ctrl+Z takes back next is an agent's.
+        if self.undo_stack.last().is_some_and(|e| e.agent.is_some()) {
+            agent_badge(ui, &undo);
+        }
         let redo_tip = match self.redo_stack.last() {
-            Some(e) => format!("Redo {} ({})", e.label, keymap::written("Cmd+Y")),
+            Some(e) => step_tip("Redo", e, &keymap::written("Cmd+Y")),
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())

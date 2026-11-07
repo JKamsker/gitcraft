@@ -24,6 +24,13 @@ so your config, credentials and hooks apply as usual.
   its own open tabs, recent repositories, theme, git author and commit signing (Settings →
   Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
+- One window: `gitcraft <folder>` or _Open in gitcraft_ while gitcraft is running opens that
+  folder in a tab of the running window (or switches to its tab) and brings it to the front; a
+  bare `gitcraft` just brings it to the front. Where the system doesn't let a window come to
+  the front by itself (Windows, Wayland), its taskbar button flashes instead. Two windows no
+  longer save their tabs over each other's. The handoff goes over 127.0.0.1 with a random
+  token kept in a file of the data folder only you can read. Every build shares that folder, so
+  `cargo run` while an installed gitcraft runs goes to that window: close it first.
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - What you typed survives a crash or a restart: the commit message, unsent pull-request
   comments, reviews and replies, and an interactive-rebase list being set up are saved per
@@ -454,6 +461,50 @@ so your config, credentials and hooks apply as usual.
   **Backlinks** (later commits that mention its hash: reverts, cherry-picks and trailers such
   as `Fixes:` apart from plain mentions; click one to open it).
 
+**Coding agents (MCP)**
+
+- `gitcraft mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over
+  stdio, for Claude Code, Codex and other agents. Add it once:
+
+  ```sh
+  claude mcp add --scope user gitcraft -- gitcraft mcp
+  codex mcp add gitcraft -- gitcraft mcp
+  ```
+
+  (or, in Codex's `~/.codex/config.toml`, `[mcp_servers.gitcraft]` with `command = "gitcraft"`
+  and `args = ["mcp"]`). Settings → Agents shows the same commands with this copy's own path when
+  `gitcraft` isn't on the PATH. The agent starts it in the repository it works in; `--repo
+  <path>` names another one (also one in WSL or over SSH, as gitcraft names it:
+  `ssh://host/path`).
+- Reading tools work on their own, with no window open: `log` (the graph: commits with their
+  branches and tags, paged, or one file's history), `show_commit`, `status`, `diff` (working
+  tree, index or a commit, paged by bytes), `blame` (a range of lines), `branches` (with
+  remotes, tags, stashes and worktrees), `conflicts`, `ci_status` (runs, jobs and the failed log
+  through `gh` / `glab`) and `pull_requests`. Paths must stay inside the repository, revisions
+  can't be taken for options, and a remote's URL never carries a token out.
+- Changing tools run in the gitcraft window that has the repository open: `stage`, `unstage`,
+  `commit`, `create_branch`, `rename_branch`, `checkout`, `stash`, `cherry_pick`, `revert`,
+  `reset` (soft, mixed) and `move_commit`. Each is a step of that tab's undo list, marked with a
+  robot on the undo button and named in its tooltip, so Ctrl+Z also takes back what the agent
+  did. With no window for the repository, they fail and say to open it.
+- What can't be undone, or is easy to regret, waits on an _Approve / Deny_ card in the window
+  that names the agent, says what will happen and shows the git commands: `push` (forced or
+  not), `delete_branch`, a `hard` reset, `drop_commit`, and staging a conflicted file (which ends
+  the conflict). The call waits for the answer; after two minutes it is denied automatically.
+- An approval can take up to two minutes, longer than some agents wait for a tool by default:
+  give the server more time there (Codex: `tool_timeout_sec = 180` under
+  `[mcp_servers.gitcraft]`). A call the agent cancels, or an agent that quits, takes its card
+  away, and what hadn't started doesn't run.
+- `gitcraft mcp` has no window of its own to ask ssh's questions in: for a repository over SSH
+  it signs in with keys (an agent or a key without a passphrase) only. An agent running inside
+  WSL starts the Linux gitcraft, which can't reach a window on Windows: start it from Windows
+  with `--repo \\wsl.localhost\<distro>\path` instead.
+- Settings → Agents turns agents' changes off; the reading tools still work. `gitcraft mcp`
+  reaches the window the way a second start of gitcraft does (see one window, above): over
+  127.0.0.1, with the running window's random token from a file only you can read, believed only
+  while that window holds its lock. An agent's change is a request of its own kind there, and
+  its connection stays open until the window answers.
+
 **Toolbar, terminal, app**
 
 - Undo, redo, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
@@ -513,7 +564,7 @@ so your config, credentials and hooks apply as usual.
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
   date, editor command, external diff and merge tools, default shell and terminal font size, saved identities, custom commands,
-  SSH sign-ins, the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  SSH sign-ins, agents, the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
@@ -727,6 +778,8 @@ was made this way, on a demo repository.
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |
 | `src/repo/mod.rs`        | one repository tab: state, background git work, undo / redo, toolbar               |
+| `src/mcp/`               | `gitcraft mcp`: the MCP server (`rmcp`), its tools, and the token-checked channel to the window |
+| `src/repo/agent/`        | agents' requests in a tab: planned as undoable steps, queued, the approval card's state |
 | `src/repo/sidebar.rs`    | branches, remotes, worktrees, stashes, pull requests, tags                         |
 | `src/repo/pr_view.rs` | a pull request in the big area, its changed files on the right |
 | `src/repo/pr_review.rs` | comments and reviews being written, and the threads on lines of a diff |

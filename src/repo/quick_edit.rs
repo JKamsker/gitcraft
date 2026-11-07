@@ -45,7 +45,7 @@ impl Edit {
 
     /// What the rebase replays the commits onto: below the commit, or below its parent too when
     /// it moves down past it.
-    fn base(self, hash: &str) -> String {
+    pub(super) fn base(self, hash: &str) -> String {
         match self {
             Edit::MoveDown => format!("{hash}~2"),
             _ => format!("{hash}^"),
@@ -109,7 +109,11 @@ fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'static str> {
 
 /// The rebase that does `edit` to `hash`, from the commits after `edit.base(hash)` (oldest first,
 /// as git lists them).
-fn plan(edit: Edit, hash: &str, commits: Vec<RebaseCommit>) -> Result<RebaseEditor, String> {
+pub(super) fn plan(
+    edit: Edit,
+    hash: &str,
+    commits: Vec<RebaseCommit>,
+) -> Result<RebaseEditor, String> {
     if commits.iter().any(|c| c.merge) {
         return Err("merges came after the commit, which this would flatten".to_owned());
     }

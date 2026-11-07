@@ -26,6 +26,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "What you type is kept, per repository, if gitcraft crashes or is closed: the commit message, unsent pull-request comments, reviews and replies, and an interactive rebase being set up come back when the repository is opened again. Each goes once committed, sent or started, or when you empty or cancel it. After a crash, gitcraft says so when it starts again. Nothing typed into a password or sign-in prompt is kept.",
             "The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
             "A greyed-out menu entry says why under it.",
+            "One window: started again while it runs (gitcraft <folder>, Open in gitcraft, the menu entry), gitcraft opens that folder in a tab of the window already open, or switches to its tab, and brings the window to the front (where the system won't allow that, its taskbar button flashes). Started without a folder, it just comes to the front.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
             "Right-click a tab and choose Teleport to… (or Ctrl+P, Teleport to another machine…) to carry its work to this machine, a WSL distribution or an SSH host: the branch, the staged and unstaged changes and the untracked files arrive in a new worktree there, and a tab opens on it. It goes in a clone of the same project found there, another repository there, a clone made first or a new repository made from what is sent; nothing here is changed. No push or forge is needed.",
         ],
@@ -128,6 +129,16 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Reflog (left pane, a branch's menu, or Ctrl+P): where HEAD and each branch have been, what moved them (commit, checkout, reset, rebase…) and from which commit to which, also for what was done in the terminal or before gitcraft was opened. Select an entry to see its commit; Create branch here (or a double-click) gets it back, or cherry-pick it, check it out or copy its hash.",
             "Find lost commits scans for the commits no branch, tag or stash has any more, even once their reflog has expired, newest first, with the same buttons; a dropped stash is applied back with Apply stash. It reads every object, so on a big repository it takes a while; Cancel stops it.",
             "Before a reset, deleting a branch (here or on a remote), dropping a commit or discarding a file, the dialog says what it will do: the commits leaving the branch (for a delete, those the checked-out branch hasn't), each marked still on another branch or only here; the files whose uncommitted changes are lost; whether the commits it rewrites were pushed, so that a force push will be needed; the git commands it runs (folded); and whether Ctrl+Z restores it.",
+        ],
+    ),
+    (
+        "Coding agents",
+        &[
+            "Add gitcraft to an agent as an MCP server: claude mcp add --scope user gitcraft -- gitcraft mcp (Claude Code), or codex mcp add gitcraft -- gitcraft mcp (Codex). Settings → Agents has both, ready to copy.",
+            "Agents read the graph, status, diffs, blame, branches, conflicts, CI builds and pull requests, with or without a window open.",
+            "What an agent changes (stage, commit, branches, checkout, stash, cherry-pick, revert, reset, moving a commit) runs in the repository's tab, as a step of its undo list: the robot on the undo button says the next Ctrl+Z takes back the agent's step.",
+            "A push, deleting a branch, a hard reset, dropping a commit or staging a conflicted file waits on an Approve / Deny card naming the agent and the git commands; no answer in two minutes denies it.",
+            "Settings → Agents turns agents' changes off; reading still works.",
         ],
     ),
     (

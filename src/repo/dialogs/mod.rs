@@ -1,7 +1,7 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
 mod bisect;
-mod branch;
+pub(super) mod branch;
 mod cleanup;
 mod confirm;
 mod fold;

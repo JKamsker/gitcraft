@@ -189,9 +189,31 @@ impl BlameLine {
 
 /// `git blame` of `path`, as of `rev` (the working tree when `None`).
 pub fn blame(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<BlameLine>, String> {
+    blame_with(repo, rev, path, &[])
+}
+
+/// [`blame`] of lines `first` to `last` only, without the text conversions the repository's
+/// attributes name: for what an agent asks (no program the repository configures runs for it).
+pub fn blame_plain(
+    repo: &Path,
+    rev: Option<&str>,
+    path: &str,
+    (first, last): (u64, u64),
+) -> Result<Vec<BlameLine>, String> {
+    let range = format!("{first},{last}");
+    blame_with(repo, rev, path, &["--no-textconv", "-L", &range])
+}
+
+fn blame_with<'a>(
+    repo: &Path,
+    rev: Option<&'a str>,
+    path: &'a str,
+    extra: &[&'a str],
+) -> Result<Vec<BlameLine>, String> {
     // Names and summaries in UTF-8, whatever `i18n.logOutputEncoding` says (`blame` has no
     // `--encoding`).
     let mut args = vec!["-c", "i18n.logOutputEncoding=UTF-8", "blame", "--porcelain"];
+    args.extend(extra);
     if let Some(rev) = rev {
         // `blame` takes no `--end-of-options`.
         args.push(not_an_option(rev)?);
@@ -201,7 +223,7 @@ pub fn blame(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<BlameLine
         // `blame.ignoreRevsFile` set for all repositories (`.git-blame-ignore-revs`) names a
         // file this one may not have, and git then blames nothing at all.
         Err(e) if e.contains("could not open object name list") => {
-            args.insert(4, "--no-ignore-revs-file");
+            args.insert(4 + extra.len(), "--no-ignore-revs-file");
             Ok(parse_blame(&run(Some(repo), &args)?))
         }
         out => Ok(parse_blame(&out?)),

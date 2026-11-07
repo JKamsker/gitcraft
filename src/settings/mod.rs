@@ -3,6 +3,7 @@
 mod ai_page;
 mod custom_commands;
 mod external_tools;
+mod agents;
 mod layout;
 mod page;
 mod portable_page;
@@ -120,6 +121,9 @@ pub struct Settings {
     pub custom_commands: Vec<crate::custom_commands::CustomCommand>,
     /// The repositories' command files the user trusted, as they were then.
     pub trusted_command_files: Vec<crate::custom_commands::TrustedFile>,
+    /// Agents connected over `gitcraft mcp` may change repositories (through the window, as
+    /// steps of the undo list); otherwise they only read.
+    pub agent_writes: bool,
 }
 
 impl Default for Settings {
@@ -169,6 +173,7 @@ impl Default for Settings {
             ai: Default::default(),
             custom_commands: Vec::new(),
             trusted_command_files: Vec::new(),
+            agent_writes: true,
         }
     }
 }
@@ -862,6 +867,7 @@ impl Settings {
                 );
             }
             Page::CustomCommands => custom_commands::page(self, ui, f),
+            Page::Agents => self.agents_ui(ui, f),
             Page::Shortcuts => {
                 for (group, keys) in crate::manual::shortcut_groups() {
                     section(ui, f, group, None, |card| {
@@ -964,6 +970,7 @@ pub(crate) enum Page {
     Identities,
     Ai,
     CustomCommands,
+    Agents,
     Shortcuts,
 }
 
@@ -979,6 +986,7 @@ impl Page {
         Page::Identities,
         Page::Ai,
         Page::CustomCommands,
+        Page::Agents,
         Page::Shortcuts,
     ];
 
@@ -994,6 +1002,7 @@ impl Page {
             Page::Identities => "Identities",
             Page::Ai => "AI",
             Page::CustomCommands => "Custom commands",
+            Page::Agents => "Agents",
             Page::Shortcuts => "Keyboard shortcuts",
         }
     }
@@ -1010,6 +1019,7 @@ impl Page {
             Page::Identities => "user-round",
             Page::Ai => "sparkles",
             Page::CustomCommands => "command",
+            Page::Agents => "bot",
             Page::Shortcuts => "keyboard",
         }
     }

@@ -1,8 +1,10 @@
 //! Window shell: git check, browser-like tabs, the start page and cloning.
 
+mod agent_card;
 mod askpass_dialog;
 mod clone;
 mod draft_saving;
+mod handoff;
 mod home;
 mod palette;
 mod panels;
@@ -149,6 +151,8 @@ impl App {
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
         crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
+        // So do later starts' requests (see `crate::instance`).
+        crate::instance::set_repaint(cc.egui_ctx.clone());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -525,6 +529,7 @@ impl eframe::App for App {
             }
         }
 
+        self.take_handoffs(&ctx);
         if let Err(err) = self.git_version.clone() {
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(t.dock))
@@ -536,6 +541,7 @@ impl eframe::App for App {
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
+        self.agent_requests(&ctx);
 
         // Background repos still need their results drained. Those restored on start are read
         // once the one shown is: they would otherwise all compete with it.
@@ -590,6 +596,7 @@ impl eframe::App for App {
         self.remote_dialog(&ctx);
         self.teleport_dialog(&ctx);
         self.askpass_dialog(&ctx);
+        self.agent_card(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         // After the tabs are drawn, so what was typed in this frame is in.
@@ -625,6 +632,11 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         self.close_drafts();
     }
+
+    fn on_exit(&mut self) {
+        // Saved: what later starts ask is no longer taken here.
+        crate::instance::closing();
+    }
 }
 
 /// Where the tab that was active at `active` is once the tabs not `kept` (their folder is gone)
@@ -643,7 +655,7 @@ fn repo_scope(path: &Path) -> egui::Id {
 }
 
 /// The top of the repository `path` is in, in the form tabs are told apart by.
-fn repo_root(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn repo_root(path: &Path) -> Result<PathBuf, String> {
     let root = git::toplevel(path)?;
     // Already in its one form; resolving it here would mean nothing.
     if crate::remote::is_remote(&root) {
@@ -683,8 +695,46 @@ pub fn persistence_path() -> Option<PathBuf> {
     crate::portable::persistence_path()
 }
 
-/// Once the window closed: starts the version an update put in place, if it did.
+pub use crate::instance::Start;
+
+/// Settles, before any window is made, whether this start opens the window or hands `open_arg`
+/// to the gitcraft already running (see `crate::instance`).
+pub fn single_instance(open_arg: Option<&Path>) -> Start {
+    crate::instance::start(open_arg)
+}
+
+/// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
+/// from a terminal.
+pub fn report_failed_start(message: &str) {
+    eprintln!("gitcraft: {message}");
+    // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
+    // menu would end with nothing shown: a desktop notification says it instead.
+    if cfg!(all(unix, not(target_os = "macos"))) && !on_path("zenity") {
+        let _ = notify_rust::Notification::new()
+            .appname("gitcraft")
+            .summary("gitcraft")
+            .body(&panels::notification_body(message))
+            .show();
+        return;
+    }
+    let _ = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("gitcraft")
+        .set_description(message)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
+
+/// Whether a program called `name` is on the PATH.
+fn on_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|path| std::env::split_paths(&path).any(|dir| dir.join(name).is_file()))
+}
+
+/// Once the window closed: lets the next start be the running instance, then starts the
+/// version an update put in place, if it did.
 pub fn after_exit() {
+    crate::instance::shut_down();
     update::relaunch();
 }
 

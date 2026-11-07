@@ -12,6 +12,21 @@ fn main() -> eframe::Result {
     if let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
+    // `gitcraft mcp`: the MCP server for coding agents, on stdin and stdout; no window.
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|a| a == "mcp") {
+        std::process::exit(gitcraft::mcp::main(&args[1..]));
+    }
+    // gitcraft is running already: what this start was given goes to its window.
+    let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
+    match app::single_instance(open_arg.as_deref()) {
+        app::Start::Window => {}
+        app::Start::HandedOver => return Ok(()),
+        app::Start::Failed(message) => {
+            app::report_failed_start(&message);
+            std::process::exit(1);
+        }
+    }
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -38,10 +53,7 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| {
-            let open_arg = std::env::args_os().nth(1).map(std::path::PathBuf::from);
-            Ok(Box::new(app::App::new(cc, open_arg)))
-        }),
+        Box::new(|cc| Ok(Box::new(app::App::new(cc, open_arg)))),
     );
     app::after_exit();
     result

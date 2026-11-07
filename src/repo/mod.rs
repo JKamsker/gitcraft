@@ -3,6 +3,7 @@
 
 mod actions;
 mod ai;
+pub(crate) mod agent;
 mod apply;
 mod branch_cleanup;
 mod branch_health;
@@ -262,6 +263,8 @@ pub struct RepoTab {
     /// A fold of staged changes into an older commit running, or stopped on a conflict.
     fold: fold::FoldState,
     redo_stack: Vec<UndoEntry>,
+    /// What agents asked for over `gitcraft mcp`, waiting, on its card or running.
+    agents: agent::Agents,
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
@@ -434,6 +437,7 @@ impl RepoTab {
             undo_stack: Vec::new(),
             fold: fold::FoldState::default(),
             redo_stack: Vec::new(),
+            agents: Default::default(),
             busy_op: None,
             op_started: None,
             update_submodules: false,
