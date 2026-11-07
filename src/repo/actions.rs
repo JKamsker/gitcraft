@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "How an object is stored…".into(),
+                "objects pack delta file version".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Object("HEAD".into())),
+            ),
+            (
                 "All refs and namespace history…".into(),
                 "refs internals".into(),
                 Action::RepositoryTools(super::repository_tools::Act::AllRefs(String::new())),
