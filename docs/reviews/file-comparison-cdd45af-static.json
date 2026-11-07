@@ -1,0 +1,35 @@
+{
+  "review": "Independent adversarial ordinary correctness re-review: file comparison views",
+  "verdict": "STATIC_REVIEW_PASS_PENDING_RUNTIME_AND_AUTHOR_GATES",
+  "candidate": "cdd45af340b433b125f29e2347705cf2335053c3",
+  "base": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "containment_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "scope": "All five Git comparison modules, raw pair alignment and patch generation, action/request ownership and UI views, captured connection contexts, Practice routing, new regressions, changes from reviewed initial146a2e3. Existing containment changes retain their prior separate assessment.",
+  "findings": [],
+  "prior_findings": {
+    "COMPARISON-1": "Static repair present: central comparison_output prefixes every command with --no-lazy-fetch, and attribute_state first checks governing working/index .gitattributes sources explicitly, including promised blob availability. Merely trusting Git's silent missing-attribute fallback is avoided.",
+    "COMPARISON-2": "Static repair present: effective four conversion attributes plus core.autocrlf are fingerprinted; local verification and the exclusive remote index transaction recheck them before and after alternate-index apply. core.filemode and core.symlinks are captured/rechecked too.",
+    "core.symlinks=false": "Static repair present: physical regular target-text bytes remain in work_raw while semantic working version retains indexed120000. Configuration drift is part of local/remote stale verification. New author regression compares actual Git add result."
+  },
+  "assessment": [
+    "HEAD/index/work snapshots are raw, bounded and immutable. Full serialized index stamp detects flags/extensions that ls-files does not expose. Local and remote transactions preserve existing index.lock, operate on an alternate index, recheck before installation and leave working bytes alone.",
+    "Paths go through literal Git pathspecs or quoted patch/script arguments. Read-only migration/matrix preserve raw non-UTF8 keys; the working lens refuses unrepresentable/unsafe paths and does not traverse parent symlinks. Binary/non-UTF8 content, submodules, unreadable paths and conversions cannot trigger lens staging.",
+    "UI line actions bind to data_request and frozen snapshot, reject loading/closed/refreshed/reopened states, and revalidate actual repository state before writing. Profile reload drops state; nested comparison jobs capture initiating connection context via connections::spawn.",
+    "Local repository Git calls use Practice-aware repository_command before profile selection, including alternate index writes. Raw diff alignment uses owned scratch files with GIT environment cleared, empty global config and external diff/textconv disabled.",
+    "Matrix resolves each selected branch once to a commit and uses immutable tree/blob OIDs; file presence, modes and shared blob markers remain distinct. Migration pins commits/ranges or verifies staged HEAD/index snapshots and presents rename/copy metadata separately from raw content edits.",
+    "Existing new tests meaningfully cover missing root/nested promised attributes with trace and object availability checks; remote after-apply attribute drift; native symlink emulation; actual UI actions; stale index flags/HEAD/work; Practice with hostile profile and environment. No source edits were made by reviewer."
+  ],
+  "runtime": {
+    "executed_by_reviewer": false,
+    "reason": "Waiting for explicit root Cargo slot.",
+    "planned_new_candidate_checks": [
+      "Run the full file_comparison test selection on clean private target, compiled from exact cdd45af source.",
+      "Run hostile Practice integration and profile request/lifetime checks on the same candidate.",
+      "Add focused reviewer-only regressions if needed for locked remote config drift and emulated-symlink unstage semantics, without changing canonical feature sources.",
+      "Verify frozen author format/strict Clippy/full-suite logs and source binding separately."
+    ],
+    "platform_boundary": "No blocked old-head runtime action was repeated. Stop and report if any platform security block occurs; do not bypass."
+  },
+  "acceptance": "No static correctness blocker found. Prior production failures appear repaired statically; final scoped PASS requires new-candidate runtime evidence and exact author gates. Windows CI remains a separate required platform gate.",
+  "notes_branch": "codex/review-portability-and-file-views"
+}
