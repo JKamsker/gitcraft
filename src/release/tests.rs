@@ -485,7 +485,9 @@ fn ssh_publication_identity_preserves_custom_web_ports_and_proxy_prefixes() {
 #[test]
 fn review12_matching_http_single_label_publication_preflight() {
     let (dir, bare) = project("single-label-preflight");
-    let read = draft(&dir, "HEAD", Some("origin".into())).unwrap();
+    let read = draft(&dir, "HEAD", Some("origin".into()));
+    assert!(read.is_ok(), "{read:?}");
+    let Ok(read) = read else { return };
     let mut plan = plan_of(&read, "notes");
     plan.publish = true;
     let hosting = Hosting {
