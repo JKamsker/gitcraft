@@ -6,6 +6,7 @@ use super::files_header;
 use crate::ci::Status;
 use crate::git::{CommitDetail, Stash};
 use crate::icons;
+use crate::repo::remerge::Mode;
 use crate::repo::{
     Action, DiffKey, Refresh, RepoTab, Reword, branch_tree, ci_status, sidebar, widgets,
 };
@@ -32,6 +33,7 @@ impl RepoTab {
             stash_banner(ui, acts, stash, idle);
         }
         self.want_all_files(ui.ctx());
+        self.want_remerge_shown(ui.ctx());
         if let Some(err) = &self.detail_error {
             ui.add_space(10.0);
             ui.horizontal(|ui| {
@@ -100,11 +102,20 @@ impl RepoTab {
                         }
                     });
 
-                let note = (detail.parents.len() > 1).then_some("vs. first parent");
-                files_header(ui, &detail.files, note);
-                self.all_files_toggle(ui, acts);
+                let remerge = self.remerge_mode(detail);
+                let resolved = matches!(remerge, Mode::Checking | Mode::On);
+                if !resolved {
+                    let note = (detail.parents.len() > 1).then_some("vs. first parent");
+                    files_header(ui, &detail.files, note);
+                }
+                self.remerge_toggle(ui, acts, &remerge);
+                if !resolved {
+                    self.all_files_toggle(ui, acts);
+                }
                 ui.spacing_mut().item_spacing.y = 0.0;
-                if self.all_files.on {
+                if resolved {
+                    self.remerge_files(ui, acts, detail);
+                } else if self.all_files.on {
                     self.all_files_list(ui, acts, detail);
                 } else {
                     self.file_list(

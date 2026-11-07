@@ -48,6 +48,7 @@ mod push;
 mod quick_edit;
 mod rebase;
 mod reflog;
+mod remerge;
 mod rewrite;
 #[cfg(test)]
 mod samples;
@@ -206,6 +207,8 @@ pub struct RepoTab {
     diff_rendered: bool,
     /// Whether the commit pane lists every file of the commit, and those read.
     all_files: detail::AllFiles,
+    /// What merges resolved: the commit pane's view of one, the graph's badges.
+    remerges: remerge::Remerges,
     conflict: Option<conflict::ConflictEditor>,
     /// How many times a conflict editor was opened in the tab: the one open is the latest, and
     /// what is read in the background for an earlier one is not taken for it.
@@ -380,6 +383,7 @@ impl RepoTab {
             diff_as_file: false,
             diff_rendered: false,
             all_files: Default::default(),
+            remerges: Default::default(),
             conflict: None,
             conflict_generation: 0,
             conflict_checks: Default::default(),

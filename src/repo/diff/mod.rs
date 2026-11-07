@@ -11,6 +11,7 @@ mod map;
 mod paint;
 mod parse;
 mod patch;
+mod remerge;
 pub(super) mod rendered;
 mod rows;
 mod select;
@@ -156,8 +157,20 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
             git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
             path.clone(),
         ),
+        DiffKey::Remerge {
+            hash,
+            path,
+            old_path,
+            ..
+        } => (
+            git::remerge_file_diff(repo, hash, path, old_path.as_deref(), opts)?,
+            path.clone(),
+        ),
     };
-    let lines = parse(&text);
+    let mut lines = parse(&text);
+    if let DiffKey::Remerge { conflicts, .. } = key {
+        lines = remerge::label(conflicts, lines, opts.ignore_ws);
+    }
     let header = patch_header(&text);
     let partial = can_pick(key, opts, &header, &lines);
     let new_file = is_new_file(&text);
@@ -170,7 +183,6 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     };
     let mut spans = highlight_sides(&path, &lines, dark);
     let (mut changed, split) = pair_lines(&lines);
-    let mut lines = lines;
     let mut uncut = std::collections::HashMap::new();
     for (i, (line, spans)) in lines.iter_mut().zip(spans.iter_mut()).enumerate() {
         if let Some(whole) = cap_line(&mut line.text, spans.as_mut()) {

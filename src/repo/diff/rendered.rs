@@ -134,6 +134,7 @@ fn sides(key: &DiffKey) -> (SideAt, SideAt) {
             }
         }
         DiffKey::Range { from, to, path } => (at(Some(from), path), at(to.as_deref(), path)),
+        DiffKey::Remerge { hash, path, .. } => (None, at(Some(hash), path)),
     }
 }
 

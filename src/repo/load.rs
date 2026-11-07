@@ -57,6 +57,8 @@ impl RepoTab {
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
         self.deferred = false;
+        // What merges couldn't be redone for (a machine not reached…) is tried again.
+        self.remerges.forget_failures();
         if self.loading {
             // What changed may have been read before it changed: read again once this is in.
             self.reload_again = true;

@@ -16,6 +16,8 @@ impl RepoTab {
                 acts.push(Action::Reload);
                 acts.push(Action::Select(1));
                 acts.push(Action::Select(0));
+                // What a merge resolved: read in the background, never from the window's thread.
+                acts.push(Action::ShowRemerge(true));
                 acts.push(Action::LoadMore);
                 acts.push(Action::ToggleSearch);
                 acts.push(Action::ToggleSearch);

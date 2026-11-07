@@ -6,10 +6,10 @@ use egui::{Sense, Stroke, Ui};
 use super::images::image_view;
 use super::lfs::lfs_view;
 use super::link::LineLinks;
-use super::rendered;
 use super::rows::Rows;
 use super::{DiffData, Kind, Pick, unstage_args};
 use crate::forge::links::Target;
+use super::{remerge, rendered};
 use crate::git::{Area, StatusFile};
 use crate::icons;
 use crate::pull_request::DiffSide;
@@ -36,7 +36,7 @@ impl RepoTab {
         );
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
-        let markdown = rendered::is_markdown(&path).then_some(self.diff_rendered);
+        let markdown = view.key.renders().then_some(self.diff_rendered);
         let clear = self.diff_header(
             ui,
             view,
@@ -153,6 +153,7 @@ impl RepoTab {
                 },
             ),
             DiffKey::Range { from, to, path } => (path.clone(), self.range_label(from, to)),
+            DiffKey::Remerge { hash, path, .. } => (path.clone(), remerge::origin(hash)),
         }
     }
 
@@ -185,7 +186,9 @@ impl RepoTab {
                             .sense(Sense::click()),
                     );
                     let (rev, ignorable) = match &view.key {
-                        DiffKey::Commit { hash, .. } => (Some(hash.as_str()), false),
+                        DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } => {
+                            (Some(hash.as_str()), false)
+                        }
                         DiffKey::Range { to: Some(to), .. } => (Some(to.as_str()), false),
                         DiffKey::Range { to: None, .. } => (None, false),
                         DiffKey::Work(_) => (None, true),
