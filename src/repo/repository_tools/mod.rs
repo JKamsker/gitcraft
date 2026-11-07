@@ -1,12 +1,13 @@
 //! Reachable repository internals dialogs; stale background answers never replace a new view.
 use super::{Action, Dialog, RepoTab};
-use crate::git::repository_tools::{all_refs, guard, object, reftable};
+use crate::git::repository_tools::{all_refs, guard, object, reftable, replacements};
 use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tool {
     Refs,
     Object,
     Reftable,
+    Replacements,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
@@ -15,11 +16,16 @@ pub(crate) enum Act {
     Object(String),
     Reftable,
     Migrate(Box<reftable::Storage>, String),
+    Replacements,
+    Graft(Box<replacements::Histories>, String, String),
+    RemoveReplacement(Box<replacements::Histories>, String, String),
+    ConvertGrafts(Box<replacements::Histories>),
 }
 enum Data {
     Refs(all_refs::Browser),
     Object(object::Inspection),
     Reftable(reftable::Storage),
+    Replacements(replacements::Histories),
 }
 pub(crate) struct State {
     id: u64,
@@ -29,6 +35,8 @@ pub(crate) struct State {
     tool: Tool,
     acknowledged: bool,
     compatible: bool,
+    parent: String,
+    effective: bool,
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
@@ -39,13 +47,41 @@ impl RepoTab {
                 });
                 return;
             }
+            Act::Graft(history, commit, parent) => {
+                self.repository_tool_mutation(
+                    "Join imported histories temporarily",
+                    false,
+                    ctx,
+                    move |runner| replacements::graft(runner, &history, &commit, &parent),
+                );
+                return;
+            }
+            Act::RemoveReplacement(history, original, effective) => {
+                self.repository_tool_mutation("Remove replace ref", false, ctx, move |runner| {
+                    replacements::remove(runner, &history, &original, &effective)
+                });
+                return;
+            }
+            Act::ConvertGrafts(history) => {
+                self.repository_tool_mutation(
+                    "Convert legacy grafts to removable replace refs",
+                    false,
+                    ctx,
+                    move |runner| replacements::convert(runner, &history),
+                );
+                return;
+            }
             act => act,
         };
         let (query, tool) = match act {
             Act::AllRefs(q) => (q, Tool::Refs),
             Act::Object(q) => (q, Tool::Object),
             Act::Reftable => (String::new(), Tool::Reftable),
-            Act::Migrate(..) => return,
+            Act::Replacements => (String::new(), Tool::Replacements),
+            Act::Migrate(..)
+            | Act::Graft(..)
+            | Act::RemoveReplacement(..)
+            | Act::ConvertGrafts(..) => return,
         };
         let id = REQUESTS.fetch_add(1, Ordering::Relaxed);
         self.dialog = Some(Dialog::RepositoryTools(Box::new(State {
@@ -56,6 +92,8 @@ impl RepoTab {
             tool,
             acknowledged: false,
             compatible: false,
+            parent: String::new(),
+            effective: true,
         })));
         let path = self.path.clone();
         let expected_path = path.clone();
@@ -71,6 +109,7 @@ impl RepoTab {
                 .map(Data::Object),
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
+                Tool::Replacements => replacements::read(&path).map(Data::Replacements),
             },
             move |tab, result, _| {
                 if tab.path != expected_path || crate::git::profile_config() != profile {
@@ -142,6 +181,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Replacements {
+        replacements_view(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Reftable {
         reftable_view(ui, state, acts);
         return;
@@ -306,6 +349,104 @@ fn reftable_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
         acts.push(Action::RepositoryTools(Act::Migrate(
             Box::new(storage.clone()),
             target.into(),
+        )));
+    }
+}
+
+fn replacements_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
+    ui.heading("Replace refs and temporary history joins");
+    let Some(result) = &state.result else {
+        ui.spinner();
+        return;
+    };
+    let data = match result {
+        Ok(Data::Replacements(v)) => v,
+        Ok(_) => return,
+        Err(e) => {
+            ui.label(e);
+            return;
+        }
+    };
+    ui.label("Replace refs affect these commits and their descendants. Joins below are local and temporary; removing the replace ref restores the original history.");
+    ui.checkbox(
+        &mut state.acknowledged,
+        "I reviewed these local history changes",
+    );
+    for r in &data.replacements {
+        ui.horizontal(|ui| {
+            if ui
+                .link(format!("Affected commit {} → {}", r.original, r.effective))
+                .clicked()
+            {
+                acts.push(Action::RepositoryTools(Act::Object(r.effective.clone())));
+            }
+            if ui
+                .add_enabled(state.acknowledged, egui::Button::new("Remove link"))
+                .clicked()
+            {
+                acts.push(Action::RepositoryTools(Act::RemoveReplacement(
+                    Box::new(data.clone()),
+                    r.original.clone(),
+                    r.effective.clone(),
+                )));
+            }
+        });
+        ui.label(format!("Effective parents: {}", r.parents));
+    }
+    if !data.legacy.is_empty() {
+        ui.label("Legacy info/grafts file (converted links remain visible/removable here):");
+        ui.monospace(&data.legacy);
+        if ui
+            .add_enabled(
+                state.acknowledged,
+                egui::Button::new("Convert legacy grafts to replace refs"),
+            )
+            .clicked()
+        {
+            acts.push(Action::RepositoryTools(Act::ConvertGrafts(Box::new(
+                data.clone(),
+            ))));
+        }
+    }
+    ui.horizontal(|ui| {
+        ui.selectable_value(&mut state.effective, true, "Effective history");
+        ui.selectable_value(
+            &mut state.effective,
+            false,
+            "Original history (--no-replace-objects)",
+        );
+    });
+    egui::ScrollArea::both()
+        .id_salt("replacement_history")
+        .max_height(280.0)
+        .show(ui, |ui| {
+            ui.monospace(if state.effective {
+                &data.effective
+            } else {
+                &data.original
+            });
+        });
+    ui.separator();
+    ui.label("Join imported histories: replace this commit's parents with a commit from the other history. Paste full commit IDs. Cyclic joins and existing replacements are refused.");
+    ui.horizontal(|ui| {
+        ui.label("Commit:");
+        ui.text_edit_singleline(&mut state.query);
+    });
+    ui.horizontal(|ui| {
+        ui.label("New parent:");
+        ui.text_edit_singleline(&mut state.parent);
+    });
+    if ui
+        .add_enabled(
+            state.acknowledged && !state.query.is_empty() && !state.parent.is_empty(),
+            egui::Button::new("Create temporary graft"),
+        )
+        .clicked()
+    {
+        acts.push(Action::RepositoryTools(Act::Graft(
+            Box::new(data.clone()),
+            state.query.trim().into(),
+            state.parent.trim().into(),
         )));
     }
 }

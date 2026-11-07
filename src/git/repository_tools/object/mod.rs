@@ -94,7 +94,7 @@ fn line(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String,
         .trim_end_matches(['\n', '\r'])
         .into())
 }
-pub(super) fn valid_oid(s: &str) -> bool {
+pub(crate) fn valid_oid(s: &str) -> bool {
     matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 fn resolve(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<String, String> {

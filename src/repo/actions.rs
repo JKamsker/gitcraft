@@ -666,6 +666,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Replace refs and temporary history joins…".into(),
+                "grafts original effective history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Replacements),
+            ),
+            (
                 "Ref storage and reftable migration…".into(),
                 "refs compatibility".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Reftable),
