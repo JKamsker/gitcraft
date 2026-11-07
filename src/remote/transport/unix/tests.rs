@@ -485,14 +485,25 @@ fn real_openssh_reuses_concurrently_and_recovers() -> Result<(), Box<dyn std::er
         socket.starts_with("/tmp/gc-"),
         "test config must allow managed multiplexing"
     );
+    let pool = super::super::super::pool::pool(&host, super::super::super::pool::Lane::Quick);
+    assert!(
+        !pool.looks().2.is_empty(),
+        "reconnect must start with pooled clients still open"
+    );
+    assert!(!pool.idle_shells_exited()?);
     let status = Command::new("ssh")
         .args(["-S", socket, "-O", "exit", "--", &dest])
         .status()?;
     assert!(status.success());
-    for _ in 0..100 {
-        if !Path::new(socket).exists() {
-            break;
-        }
+    // Unlinking the master socket precedes the pooled clients observing EOF. Wait
+    // for their owned processes too, so the next request cannot reach a dying shell.
+    // Commands sent before a disconnect remain deliberately non-retriable.
+    let until = Instant::now() + Duration::from_secs(5);
+    while Path::new(socket).exists() || !pool.idle_shells_exited()? {
+        assert!(
+            Instant::now() < until,
+            "the stopped master and its pooled clients must exit before reconnecting"
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
     // Leave a stale socket, as after a crashed master. OpenSSH auto removes/replaces it.
