@@ -257,12 +257,13 @@ fn a_hidden_merge_still_blocks_flattening_rewrites() {
     ];
     tab.rebuild_rows();
     assert!(!tab.index.contains_key("merge"));
-    assert!(tab.surgery_refusal("older").unwrap().contains("flatten"));
+    assert!(
+        tab.surgery_refusal("older")
+            .is_some_and(|why| why.contains("flatten"))
+    );
     let line = crate::repo::quick_edit::first_parents(&tab.history, &tab.history_index, "head");
     assert!(
-        crate::repo::fold::plan::refusal(&line, "older")
-            .unwrap()
-            .contains("flatten")
+        crate::repo::fold::plan::refusal(&line, "older").is_some_and(|why| why.contains("flatten"))
     );
 }
 
@@ -343,7 +344,7 @@ fn real_first_parent_git_log_can_compact_a_matching_merge() -> Result<(), String
     let merge = history
         .iter()
         .find(|c| c.summary == "checkpoint merge")
-        .unwrap();
+        .ok_or("checkpoint merge was not loaded")?;
     assert_eq!(merge.parents.len(), 2);
     assert!(!history.iter().any(|c| c.hash == merge.parents[1]));
     let (visible, graph, hidden, _) =

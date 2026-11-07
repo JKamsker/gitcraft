@@ -498,7 +498,8 @@ fn a_fast_forward_refuses_a_branch_being_rebased_elsewhere() {
 }
 
 #[test]
-fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_undoes() {
+fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_undoes()
+-> Result<(), String> {
     let dir = repo("filtered-ancestor");
     let older = commit(&dir, "older.txt", "older");
     git_ok(&dir, &["config", "user.name", "T3 Code"]);
@@ -531,7 +532,7 @@ fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_un
     );
     assert_eq!(subjects(&dir), ["head", "hidden checkpoint", "base"]);
     assert_eq!(
-        std::fs::read_to_string(dir.join("hidden.txt")).unwrap(),
+        std::fs::read_to_string(dir.join("hidden.txt")).map_err(|e| e.to_string())?,
         "hidden checkpoint\n"
     );
     run(&mut tab, &ctx, Action::Undo);
@@ -541,4 +542,5 @@ fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_un
         ["head", "hidden checkpoint", "older", "base"]
     );
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }

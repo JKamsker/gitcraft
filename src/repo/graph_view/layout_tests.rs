@@ -395,13 +395,13 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
                 texts
                     .into_iter()
                     .find(|(_, text, _)| text == label)
-                    .unwrap()
-                    .0
+                    .map(|(clip, _, _)| clip)
+                    .ok_or_else(|| format!("missing painted header: {label}"))
             };
             let viewport = h.ctx.content_rect().size();
             assert!((viewport.x - width as f32).abs() < 0.1);
-            let before_graph = find(&h, "GRAPH");
-            let before_desc = find(&h, "DESCRIPTION");
+            let before_graph = find(&h, "GRAPH")?;
+            let before_desc = find(&h, "DESCRIPTION")?;
             let press = egui::pos2(before_graph.left() - 6.0, before_graph.center().y);
             let button = |pos, pressed| egui::Event::PointerButton {
                 pos,
@@ -422,8 +422,8 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
             for _ in 0..4 {
                 h.step();
             }
-            let after_graph = find(&h, "GRAPH");
-            let after_desc = find(&h, "DESCRIPTION");
+            let after_graph = find(&h, "GRAPH")?;
+            let after_desc = find(&h, "DESCRIPTION")?;
             // Painted clip bounds round to physical pixels. One pixel of tolerance cannot
             // mask the review's 20-point exchange into the wrong column.
             let pixel = 1.0 / scale + 0.01;
@@ -464,8 +464,8 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
                 h.step();
             }
             assert_eq!(Settings::get(&h.ctx), saved);
-            assert!((find(&h, "GRAPH").width() - after_graph.width()).abs() < 0.1);
-            assert!((find(&h, "DESCRIPTION").width() - after_desc.width()).abs() < 0.1);
+            assert!((find(&h, "GRAPH")?.width() - after_graph.width()).abs() < 0.1);
+            assert!((find(&h, "DESCRIPTION")?.width() - after_desc.width()).abs() < 0.1);
             if let Ok(dir) = std::env::var("GITCRAFT_HISTORY_SHOTS") {
                 h.render()
                     .map_err(|e| e.to_string())?
