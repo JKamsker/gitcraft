@@ -227,3 +227,106 @@ fn sparse_normal_repo_non_cone_untracked_and_head_guards() -> Result<(), String>
     assert!(sparse_state(&repo)?.cone);
     Ok(())
 }
+
+#[test]
+fn sparse_changes_refuse_ignored_files_and_directories_without_mutation() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let repo = f.repo()?;
+    std::fs::write(repo.join(".gitignore"), "*.cache\nlocal-only/\n").map_err(|e| e.to_string())?;
+    run(Some(&repo), &["add", ".gitignore"])?;
+    run(Some(&repo), &["commit", "-qm", "ignore local data"])?;
+    let before = sparse_state(&repo)?;
+    // Cover a removed tracked folder, a wholly ignored directory, and retained/root
+    // paths: every transition fails closed rather than guessing which data Git removes.
+    for path in [
+        "docs/valuable.cache",
+        "docs/local-only/valuable.txt",
+        "valuable.cache",
+        "src/deep/valuable.cache",
+    ] {
+        let file = repo.join(path);
+        std::fs::create_dir_all(file.parent().ok_or("fixture path has no parent")?)
+            .map_err(|e| e.to_string())?;
+        std::fs::write(&file, "irreplaceable local data").map_err(|e| e.to_string())?;
+        assert!(
+            run(
+                Some(&repo),
+                &["status", "--porcelain=v1", "-z", "--untracked-files=normal"]
+            )?
+            .is_empty()
+        );
+        let error = set_sparse(&repo, &before, Some(&["src".into()]))
+            .err()
+            .ok_or("ignored local data was not refused")?;
+        assert!(error.contains("ignored files"), "{error}");
+        assert_eq!(
+            std::fs::read_to_string(&file).map_err(|e| e.to_string())?,
+            "irreplaceable local data"
+        );
+        assert!(repo.join("docs/file.txt").exists());
+        assert_eq!(sparse_state(&repo)?, before);
+        std::fs::remove_file(&file).map_err(|e| e.to_string())?;
+        if path.contains("local-only/") {
+            std::fs::remove_dir(file.parent().ok_or("fixture path has no parent")?)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    // Existing sparse repositories are guarded for narrowing, expansion and disable too.
+    set_sparse(&repo, &before, Some(&["docs".into()]))?;
+    let before = sparse_state(&repo)?;
+    std::fs::create_dir_all(repo.join("src/deep")).map_err(|e| e.to_string())?;
+    let file = repo.join("src/deep/valuable.cache");
+    std::fs::write(&file, "outside current selection").map_err(|e| e.to_string())?;
+    for folders in [Some(vec![]), Some(vec!["src".into()]), None] {
+        let error = set_sparse(&repo, &before, folders.as_deref())
+            .err()
+            .ok_or("ignored local data was not refused")?;
+        assert!(error.contains("ignored files"), "{error}");
+        assert_eq!(sparse_state(&repo)?, before);
+        assert_eq!(
+            std::fs::read_to_string(&file).map_err(|e| e.to_string())?,
+            "outside current selection"
+        );
+        assert!(repo.join("docs/file.txt").exists());
+    }
+    std::fs::remove_file(file).map_err(|e| e.to_string())?;
+    set_sparse(&repo, &before, None)?;
+    assert!(repo.join("src/deep/file.txt").exists());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn sparse_changes_preserve_ignored_symlinks_and_their_targets() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let repo = f.repo()?;
+    std::fs::write(repo.join(".gitignore"), "*.cache\n").map_err(|e| e.to_string())?;
+    run(Some(&repo), &["add", ".gitignore"])?;
+    run(Some(&repo), &["commit", "-qm", "ignore local links"])?;
+    let target = f.0.join("outside");
+    std::fs::write(&target, "external data").map_err(|e| e.to_string())?;
+    let before = sparse_state(&repo)?;
+    for (name, destination) in [
+        ("docs/valuable.cache", target.clone()),
+        ("docs/dangling.cache", f.0.join("absent")),
+    ] {
+        let link = repo.join(name);
+        std::os::unix::fs::symlink(&destination, &link).map_err(|e| e.to_string())?;
+        let error = set_sparse(&repo, &before, Some(&["src".into()]))
+            .err()
+            .ok_or("ignored local data was not refused")?;
+        assert!(error.contains("ignored files"), "{error}");
+        assert_eq!(
+            std::fs::read_link(&link).map_err(|e| e.to_string())?,
+            destination
+        );
+        assert_eq!(sparse_state(&repo)?, before);
+        assert!(repo.join("docs/file.txt").exists());
+        assert_eq!(
+            std::fs::read_to_string(&target).map_err(|e| e.to_string())?,
+            "external data"
+        );
+        std::fs::remove_file(link).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

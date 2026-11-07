@@ -17,7 +17,9 @@ so your config, credentials and hooks apply as usual.
   contents download initially. In an open
   repository, **Sparse checkout…** in the palette offers a folder tree, or a return to a full
   checkout. Root files and files immediately inside parent folders are always included. It
-  refuses uncommitted or untracked changes and asks before replacing custom non-cone patterns.
+  refuses uncommitted, untracked or ignored files and asks before replacing custom non-cone
+  patterns. Move ignored files outside the working tree first; Git can delete them during
+  sparse changes, even when an ordinary status looks clean.
   Partial clones show a download notice; opening a historical file or diff whose contents
   are missing asks before Git downloads them. The server must support partial clones.
   These options run on the repository's machine, including WSL and SSH.

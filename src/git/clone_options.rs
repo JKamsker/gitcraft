@@ -66,9 +66,14 @@ pub fn clone_with_options(
     run_with(from.as_deref(), &args, creds)?;
     if let Some(folders) = &options.folders {
         // The initial sparse clone has root files only; add the selected folders.
-        let args = sparse_args(Some(folders))?;
-        let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        run_with(Some(dest), &args, creds).map_err(|e| {
+        // Local checkout hooks/templates may already have created ignored user data.
+        let apply = || {
+            ensure_sparse_clean(dest)?;
+            let args = sparse_args(Some(folders))?;
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            run_with(Some(dest), &args, creds).map(|_| ())
+        };
+        apply().map_err(|e| {
             format!("Clone was created at {} but setting its folders failed: {e}. Open it and use Sparse checkout… to try again.", dest.display())
         })?;
     }
@@ -281,23 +286,43 @@ pub fn set_sparse(
             "HEAD or sparse-checkout changed since this dialog opened; reopen it".to_owned(),
         );
     }
-    if !run(
-        Some(repo),
-        &["status", "--porcelain=v1", "-z", "--untracked-files=normal"],
-    )?
-    .is_empty()
-    {
-        return Err(
-            "Commit, stash or move uncommitted and untracked files before changing sparse folders"
-                .to_owned(),
-        );
-    }
+    ensure_sparse_clean(repo)?;
     if super::status(repo)?.in_progress.is_some() {
         return Err("Finish the operation in progress before changing sparse folders".to_owned());
     }
     let args = sparse_args(folders)?;
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     run(Some(repo), &args).map(|_| ())
+}
+
+fn ensure_sparse_clean(repo: &Path) -> Result<(), String> {
+    // Git can remove ignored files along with a directory excluded by sparse-checkout.
+    // Include ignored directories too, without enumerating their potentially large contents.
+    // Refuse conservatively even for retained folders: disable/expand/non-cone transitions
+    // also have collision semantics, and ignored data has no recoverable Git snapshot.
+    let status = run(
+        Some(repo),
+        &[
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=normal",
+            "--ignored=matching",
+        ],
+    )?;
+    if status.split('\0').any(|entry| entry.starts_with("!! ")) {
+        return Err(
+            "Move or back up ignored files outside the working tree before changing sparse folders. Git can delete ignored files during sparse checkout."
+                .to_owned(),
+        );
+    }
+    if !status.is_empty() {
+        return Err(
+            "Commit, stash or move uncommitted and untracked files before changing sparse folders"
+                .to_owned(),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -136,7 +136,7 @@ pub(super) fn dialog(
     ui.set_width(480.0);
     ui.heading("Sparse checkout");
     ui.checkbox(enabled, "Check out selected folders only");
-    ui.label(egui::RichText::new("Root files and files immediately inside parent folders stay included. An empty selection includes root files only. Commit, stash or move all changes first.").small().color(t.text_dim));
+    ui.label(egui::RichText::new("Root files and files immediately inside parent folders stay included. An empty selection includes root files only. Commit, stash or move changes first. Move ignored files outside the working tree too: Git can delete them during sparse changes.").small().color(t.text_dim));
     if state.partial {
         ui.colored_label(t.warning, "Adding folders or turning this off downloads their missing file contents from the remote.");
     }
