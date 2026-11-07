@@ -93,8 +93,14 @@ pub(super) fn branch_ref(
     if names.lines().any(|n| n == local) {
         return Ok(local);
     }
-    for remote in remotes {
-        let upstream = format!("refs/remotes/{}/{branch}", remote.name);
+    // An explicitly chosen local source can have no exportable remote URLs. Its
+    // fresh clone still uses the default origin namespace for source branches.
+    for remote in remotes
+        .iter()
+        .map(|r| r.name.as_str())
+        .chain(remotes.is_empty().then_some("origin"))
+    {
+        let upstream = format!("refs/remotes/{remote}/{branch}");
         if names.lines().any(|n| n == upstream) {
             return Ok(upstream);
         }
