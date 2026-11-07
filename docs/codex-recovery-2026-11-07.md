@@ -32,4 +32,11 @@ On macOS arm64 with Rust 1.95.0, the complete locked test command passed **3,050
 
 The first native run exposed five failures that also reproduced on unchanged dev, plus an existing process assertion that passes serially. The final environment uses GNU sed 4.10 from a temporary directory, canonical `TMPDIR=/private/tmp`, and a small shell wrapper that preserves the validation PATH rather than loading machine-specific login profiles. Serial tests avoid overlap between existing process fixtures. One existing Git regex test now uses portable POSIX whitespace (`[[:space:]]`) instead of the nonportable `\s`; production search code is unchanged. The validation record preserves these diagnostics rather than treating the first run as a pass.
 
-Windows and live SSH/WSL runtime execution remain unverified locally. The seven existing ignored tests require live forge services or the system credential store. Documentation-only additions after the pinned application candidate retain its application gates; they are not a claim of new application test execution.
+Windows and live SSH/WSL runtime execution remain unverified locally. The seven existing ignored tests require live forge services or the system credential store. The initial documentation-only delivery retained that pinned application candidate. Subsequent application changes and their own gates are recorded below.
+
+
+## PR #164 Linux performance follow-up
+
+Linux CI on `0e65092` passed 3,043 library tests but failed the existing 3,000-branch palette performance check: 12.93 seconds exceeded its unchanged 10-second limit. Adaptive graph sizing adds a badge calculation, exposing repeated scans of the full local/remote lists and previously accumulated badges. `2140f7e8ff5eef87fe218a45ccaac32d19942768` replaces those repeated scans with per-calculation lookup indexes. Exact remote precedence, local names under remote prefixes, tag separation, branch folding and stable display order are retained. A mixed 3,000-branch local/remote regression checks those properties.
+
+The unchanged palette test took 5.77 seconds locally before and 0.92 seconds after the fix. All 77 palette and graph tests passed, as did the all-target test build, formatting and Clippy with the same documented macOS dead-code allowance. Independent review passed on `2140f7e`. The prior full native suite was not rerun for this focused change. Details and complete focused logs are in [the follow-up validation record](validation/pr164-palette-2026-11-07.json); updated Linux/Windows CI remains a separate gate.
