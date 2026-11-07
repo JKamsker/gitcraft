@@ -309,6 +309,11 @@ pub(crate) enum Action {
     /// the fold's.
     AbortFold,
     RunRebase,
+    ConfirmedRebase(u64),
+    AskRebase {
+        onto: String,
+        label: String,
+    },
     CloseRebase,
     /// Open the split editor on a commit of the checked-out branch.
     OpenSplit(String),
@@ -484,11 +489,9 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 }
 
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
-    Action::UndoableOps {
+    Action::AskRebase {
+        onto: onto.full(),
         label: format!("Rebase {current} onto {}", onto.name),
-        ops: ops(&[&["rebase", &onto.full()]]),
-        refresh: Refresh::All,
-        undo: Undo::HeadMove { mode: "--keep" },
     }
 }
 

@@ -41,7 +41,7 @@ impl Step {
         Step::Drop,
     ];
 
-    fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Step::Pick => "Pick",
             Step::Reword => "Reword",

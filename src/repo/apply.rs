@@ -348,7 +348,13 @@ impl RepoTab {
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
-            Action::RunRebase => self.run_rebase(ctx),
+            Action::RunRebase => self.ask_run_rebase(ctx),
+            Action::ConfirmedRebase(id) => {
+                if self.rebase.as_ref().is_some_and(|e| e.id == id) {
+                    self.run_rebase(ctx);
+                }
+            }
+            Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
             Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::AbortFold => self.abort_fold(ctx),

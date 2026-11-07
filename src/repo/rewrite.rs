@@ -195,6 +195,71 @@ impl RepoTab {
         }
     }
 
+    /// Explicit impact and pushed-history confirmation shared by menu and palette rebases.
+    pub(super) fn ask_plain_rebase(&mut self, onto: String, label: String, ctx: &egui::Context) {
+        if self.busy_op.is_some() {
+            return;
+        }
+        let branch = self.refs.current.as_deref().unwrap_or("HEAD");
+        let ask =
+            git::PreviewAsk::rebase(branch, &self.refs.head, &onto, self.upstream_ref(branch));
+        let steps = vec![
+            self.same_branch(),
+            expect_ref_at("HEAD", &self.refs.head),
+            vec!["rebase".into(), "--end-of-options".into(), onto],
+        ];
+        self.open_dialog(super::Dialog::confirm(&label,
+            "Replay the branch's unique commits onto the target. Conflicts stop for resolution. Dirty tracked changes prevent this rebase from starting.".into(),
+            "Rebase", steps, None).undo(Undo::HeadMove { mode: "--keep" })
+            .preview(ask, format!("Commits rewritten on {branch}")), ctx);
+    }
+
+    pub(super) fn ask_run_rebase(&mut self, ctx: &egui::Context) {
+        let Some(editor) = self.rebase.as_ref() else {
+            return;
+        };
+        if editor.problem().is_some() || editor.starting || self.busy_op.is_some() {
+            return;
+        }
+        if let Some(reason) = editor.moved(&self.refs.head) {
+            self.status = Some((reason, true));
+            return;
+        }
+        let branch = self.refs.current.as_deref().unwrap_or("HEAD");
+        let ask = git::PreviewAsk::rebase(
+            branch,
+            &editor.head,
+            &editor.onto,
+            self.upstream_ref(branch),
+        );
+        let mut described = vec![format!(
+            "git rebase -i --autostash {}{}{}",
+            if editor.update_refs {
+                "--update-refs "
+            } else {
+                ""
+            },
+            if editor.no_ff { "--no-ff " } else { "" },
+            if editor.onto.is_empty() {
+                "--root"
+            } else {
+                &editor.onto
+            }
+        )];
+        described.extend(
+            editor
+                .entries
+                .iter()
+                .map(|e| format!("todo: {} {} {}", e.step.label(), e.commit.hash, e.message)),
+        );
+        self.open_dialog(super::Dialog::confirm("Interactive rebase",
+            "Replay this todo list? Dropped commits leave the branch; kept commits may receive new IDs. Git autostashes and restores tracked uncommitted changes; restoring that stash can conflict.".into(),
+            "Start rebase", Vec::new(), None)
+            .instead(super::Action::ConfirmedRebase(editor.id), described)
+            .undo(Undo::HeadMove { mode: "--keep" })
+            .preview(ask, format!("Commits rewritten or dropped on {branch}")), ctx);
+    }
+
     /// Runs the rebase the editor describes.
     pub(super) fn run_rebase(&mut self, ctx: &egui::Context) {
         let Some(editor) = &mut self.rebase else {
