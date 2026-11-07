@@ -13,6 +13,14 @@ pub struct Held {
     _file: File,
 }
 
+impl Drop for Held {
+    fn drop(&mut self) {
+        // Release before closing: a concurrently spawned child can briefly share the open
+        // file description until exec, which otherwise keeps the lock alive after drop.
+        let _ = self._file.unlock();
+    }
+}
+
 /// What trying to take the lock found.
 #[derive(Debug)]
 pub enum Lock {
