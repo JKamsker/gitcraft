@@ -62,6 +62,15 @@ const PAGE: usize = 50;
 
 impl Api {
     /// The API of the forge whose web pages are at `web` (`https://host[:port]`).
+    #[cfg(test)]
+    pub(super) fn fixture(base: &str, login: Login) -> Self {
+        let mut api = Self::new("fixture", base, "127.0.0.1", Some(login));
+        api.agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(3))
+            .redirects(0)
+            .build();
+        api
+    }
     pub fn new(name: &'static str, web: &str, host: &str, login: Option<Login>) -> Api {
         Api {
             base: format!("{}/api/v1", web.trim_end_matches('/')),

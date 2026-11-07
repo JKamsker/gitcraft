@@ -166,7 +166,8 @@ pub(super) fn picker_entries<'a>(
 impl RepoTab {
     fn work(&mut self) -> Unfinished {
         Unfinished {
-            operation: self.busy_op.is_some(),
+            operation: self.busy_op.is_some()
+                || self.ssh_setup.as_ref().is_some_and(|s| s.running()),
             terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()

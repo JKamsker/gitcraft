@@ -324,6 +324,10 @@ impl RepoTab {
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
+                if ui.button("Set up SSH…").clicked() {
+                    acts.push(Action::OpenSshSetup);
+                    ui.close();
+                }
                 let browser = MenuItem::new("Open in browser")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);

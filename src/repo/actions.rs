@@ -63,6 +63,7 @@ pub(crate) enum Action {
     OpenDoctor(doctor::Section),
     CloseDoctor,
     OpenTour,
+    OpenSshSetup,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
     /// Agent tasks and the worktree setup recipe.

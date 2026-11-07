@@ -250,7 +250,7 @@ pub(crate) fn helper_command(tool: &str, account: &Account, executable: &Path) -
 }
 
 #[cfg(test)]
-thread_local! { static TEST_PROGRAMS: RefCell<std::collections::HashMap<String,PathBuf>> = RefCell::new(std::collections::HashMap::new()); }
+thread_local! { pub(crate) static TEST_PROGRAMS: RefCell<std::collections::HashMap<String,PathBuf>> = RefCell::new(std::collections::HashMap::new()); }
 
 struct Secret {
     value: String,

@@ -779,3 +779,12 @@ mod tests {
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
     }
 }
+
+pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
+    Api::new(
+        hosting.forge.provider().name(),
+        &hosting.web,
+        &hosting.host,
+        tea_login(&hosting.web),
+    )
+}

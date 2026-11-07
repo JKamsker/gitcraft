@@ -104,6 +104,7 @@ mod running;
 #[cfg(test)]
 mod samples;
 mod sidebar;
+mod ssh_setup;
 mod stack;
 mod state;
 mod surgery;
@@ -290,6 +291,7 @@ pub struct RepoTab {
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
     tour: Option<tour::TourView>,
+    ssh_setup: Option<ssh_setup::State>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -598,6 +600,7 @@ impl RepoTab {
             versions: Default::default(),
             doctor: None,
             tour: None,
+            ssh_setup: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
