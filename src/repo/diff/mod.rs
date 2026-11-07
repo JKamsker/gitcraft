@@ -38,6 +38,7 @@ pub(in crate::repo) mod structural;
 mod tests;
 mod view;
 mod weakened;
+mod wrap;
 
 #[cfg(test)]
 pub(super) use binary::{make_docx, make_pdf, make_zip};
@@ -522,3 +523,5 @@ pub(in crate::repo) fn literal_path(path: &str) -> String {
 pub(in crate::repo) fn comparison_pairs(lines: &[DiffLine]) -> Vec<(Option<usize>, Option<usize>)> {
     pair_lines(lines).1
 }
+
+pub(in crate::repo) use wrap::logical_offset as logical_wrap_offset;

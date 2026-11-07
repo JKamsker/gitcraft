@@ -290,12 +290,14 @@ impl RepoTab {
         rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
+        let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
 
         if let Some(view) = &mut self.diff {
             view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
+            view.wrap_offsets = wrap_offsets;
             view.jump = None;
             view.scroll_to = None;
             view.jump_line = None;
@@ -719,6 +721,14 @@ fn view_options(
     (split, ignore_ws, whole_file): (bool, bool, bool),
     acts: &mut Vec<Action>,
 ) {
+    let wrap = crate::settings::Settings::get(ui.ctx()).diff_wrap;
+    if ui
+        .selectable_label(wrap, "Wrap")
+        .on_hover_text("Wrap long patch lines in any text file")
+        .clicked()
+    {
+        acts.push(Action::DiffWrap(!wrap));
+    }
     let ws = icons::small_button(
         ui,
         "pilcrow",

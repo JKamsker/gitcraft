@@ -214,6 +214,7 @@ pub(crate) enum Action {
     DiffStructural(bool),
     DiffDecrypted(bool),
     DiffSvgSource(bool),
+    DiffWrap(bool),
     DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),

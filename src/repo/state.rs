@@ -167,6 +167,7 @@ pub(crate) struct DiffView {
     /// A folded file's lines (a lockfile…) were opened.
     pub(super) unfolded: bool,
     pub(super) svg_source: bool,
+    pub(super) wrap_offsets: Option<std::sync::Arc<Vec<f32>>>,
     /// Where the view was when the diff was asked for again another way (another algorithm):
     /// put back at the top once the new reading arrives.
     pub(super) keep_place: Option<diff::Place>,
@@ -213,6 +214,7 @@ impl DiffView {
             lines: None,
             unfolded: false,
             svg_source: false,
+            wrap_offsets: None,
             keep_place: None,
             restore: None,
             algorithm: None,

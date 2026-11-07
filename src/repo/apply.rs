@@ -301,6 +301,20 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffWrap(on) => {
+                let mut settings = Settings::get(ctx);
+                settings.diff_wrap = on;
+                settings.set(ctx);
+                if let Some(view) = &mut self.diff {
+                    view.text_sel = None;
+                    let logical = super::diff::logical_wrap_offset(
+                        view.wrap_offsets.as_deref().map(Vec::as_slice),
+                        view.scroll,
+                    );
+                    view.scroll_to = Some(logical);
+                    view.wrap_offsets = None;
+                }
+            }
             Action::DiffSvgSource(on) => {
                 if let Some(view) = &mut self.diff {
                     view.svg_source = on;

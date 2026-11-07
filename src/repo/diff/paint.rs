@@ -5,8 +5,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use egui::{
-    Align2, Color32, Pos2, Rect, Sense, Stroke, Ui, pos2, text::CCursor, text::LayoutJob,
-    text::TextFormat, vec2,
+    Align2, Color32, Pos2, Rect, Sense, Stroke, Ui, pos2, text::LayoutJob, text::TextFormat, vec2,
 };
 
 use super::select::Side;
@@ -35,6 +34,7 @@ pub(super) fn paint_line(
     text_sel: Option<Range<usize>>,
     // The find bar's matches in the line.
     found: Option<LineMarks<'_>>,
+    wrap: bool,
 ) -> Option<(Pos2, Arc<egui::Galley>)> {
     let line = data.lines.get(i)?;
     let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
@@ -62,7 +62,7 @@ pub(super) fn paint_line(
     if selected {
         p.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.22));
     }
-    let y = rect.center().y;
+    let y = rect.top() + LINE_H / 2.0;
     let numbers: &[(Option<u32>, f32)] = match side {
         Side::Unified => &[(line.old, NUM_W - 8.0), (line.new, NUM_W * 2.0 - 8.0)],
         Side::Old => &[(line.old, NUM_W - 8.0)],
@@ -143,7 +143,11 @@ pub(super) fn paint_line(
         }
         _ => vec![(fg, line.text.as_str())],
     };
-    let job = line_job(&spans, changed, font, strong);
+    let mut job = line_job(&spans, changed, font, strong);
+    if wrap && side.shows(line.kind) {
+        job.wrap.max_width = (rect.width() - gutter - 24.0).max(1.0);
+        job.wrap.break_anywhere = true;
+    }
     let galley = ui.fonts_mut(|f| f.layout_job(job));
     let x = rect.left() + gutter + 24.0;
     // Scrolled text goes under the marker column, not over the numbers.
@@ -152,24 +156,39 @@ pub(super) fn paint_line(
     } else {
         p
     };
-    let origin = pos2(x - scroll_x, y - galley.size().y / 2.0);
-    if let Some(chars) = text_sel {
-        let at = |c: usize| origin.x + galley.pos_from_cursor(CCursor::new(c)).min.x;
-        let left = at(chars.start);
-        // Selected through the end: a little past the text, for the line break.
-        let right = if chars.end == usize::MAX {
-            origin.x + galley.size().x + 6.0
+    let origin = pos2(
+        x - scroll_x,
+        if wrap {
+            rect.top() + 2.0
         } else {
-            at(chars.end)
-        };
-        p.rect_filled(
-            Rect::from_min_max(pos2(left, rect.top()), pos2(right, rect.bottom())),
-            0.0,
-            t.accent.gamma_multiply(0.35),
-        );
+            y - galley.size().y / 2.0
+        },
+    );
+    if let Some(chars) = text_sel {
+        for rect in super::wrap::rectangles(&galley, chars) {
+            p.rect_filled(
+                rect.translate(origin.to_vec2()),
+                0.0,
+                t.accent.gamma_multiply(0.35),
+            );
+        }
     }
     if let Some(found) = found {
-        paint_marks(&p, origin, &galley, rect.y_range(), found, t);
+        if wrap {
+            for (k, range) in found.ranges.iter().enumerate() {
+                for rect in super::wrap::rectangles(&galley, range.clone()) {
+                    let rect = rect.translate(origin.to_vec2());
+                    p.rect_filled(
+                        rect,
+                        2.0,
+                        t.warning
+                            .gamma_multiply(if found.current == Some(k) { 0.6 } else { 0.28 }),
+                    );
+                }
+            }
+        } else {
+            paint_marks(&p, origin, &galley, rect.y_range(), found, t);
+        }
     }
     p.galley(origin, galley.clone(), fg);
     Some((origin, galley))

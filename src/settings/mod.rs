@@ -88,6 +88,7 @@ pub struct Settings {
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
+    pub diff_wrap: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
@@ -200,6 +201,7 @@ impl Default for Settings {
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
+            diff_wrap: false,
             diff_whole_file: false,
             diff_beside_graph: false,
             diff_algorithms: Default::default(),

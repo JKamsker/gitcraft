@@ -3,7 +3,7 @@
 
 use egui::{FontId, Galley, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 
-use super::jump::{change_at, offset_of};
+use super::jump::change_at;
 use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
 use super::paint::{filler, hunk_button, paint_line, text_button};
@@ -26,6 +26,8 @@ pub(super) struct Rows<'a> {
     review: Option<&'a DiffReview>,
     partial: bool,
     split: bool,
+    wrap: bool,
+    pub(super) geometry: Option<std::sync::Arc<super::wrap::Geometry>>,
     /// Which hunk actions the headers offer.
     hunk_picks: &'static [Pick],
     /// Only a selection made in the layout shown: one made side by side isn't on screen
@@ -81,6 +83,8 @@ impl<'a> Rows<'a> {
             review,
             partial,
             split,
+            wrap: crate::settings::Settings::get(ui.ctx()).diff_wrap,
+            geometry: None,
             hunk_picks,
             text_sel: view.text_sel.filter(|s| s.made_in(split)),
             press,
@@ -137,7 +141,14 @@ impl<'a> Rows<'a> {
         let area = ui.available_rect_before_wrap();
         let strip = Rect::from_min_max(pos2(area.right() - MAP_W, area.top()), area.max);
         let body = Rect::from_min_max(area.min, pos2(strip.left() - 1.0, area.bottom()));
-        let total_h = count as f32 * LINE_H;
+        let geometry = self
+            .wrap
+            .then(|| super::wrap::geometry(ui, data, split, body.width() - 16.0, &self.font));
+        self.geometry = geometry.clone();
+        let total_h = geometry
+            .as_ref()
+            .map_or(count as f32 * LINE_H, |g| g.total());
+        let offset = |row: usize| geometry.as_ref().map_or(row as f32 * LINE_H, |g| g.at(row));
         let map = ui
             .interact(
                 strip,
@@ -151,9 +162,13 @@ impl<'a> Rows<'a> {
             ui.id().with(("diff_text", path)),
             Sense::click_and_drag(),
         );
-        let mut scroll = egui::ScrollArea::both()
-            .id_salt(("diff_scroll", path, split))
-            .auto_shrink(false);
+        let mut scroll = if self.wrap {
+            egui::ScrollArea::vertical()
+        } else {
+            egui::ScrollArea::both()
+        }
+        .id_salt(("diff_scroll", path, split))
+        .auto_shrink(false);
         if let Some(i) = self.view.jump.filter(|&i| i < changes.len()) {
             self.jumped = Some(i);
         } else if (map.clicked() || map.dragged())
@@ -164,7 +179,15 @@ impl<'a> Rows<'a> {
             let slack = 3.0 / strip.height() * count as f32;
             self.jumped = map
                 .clicked()
-                .then(|| change_at(changes, frac * count as f32, slack))
+                .then(|| {
+                    change_at(
+                        changes,
+                        geometry
+                            .as_ref()
+                            .map_or(frac * count as f32, |g| g.row(frac * total_h) as f32),
+                        slack,
+                    )
+                })
                 .flatten();
             if self.jumped.is_none() {
                 let at = frac * total_h;
@@ -172,45 +195,86 @@ impl<'a> Rows<'a> {
             }
         }
         if let Some(change) = self.jumped.and_then(|i| changes.get(i)) {
-            scroll = scroll.vertical_scroll_offset(offset_of(change.start));
-        } else if let Some(offset) = self.view.scroll_to {
+            scroll = scroll.vertical_scroll_offset(offset(change.start.saturating_sub(3)));
+        } else if let Some(logical) = self.view.scroll_to {
             // Back where it was, read another way.
-            scroll = scroll.vertical_scroll_offset(offset);
+            scroll = scroll.vertical_scroll_offset(offset((logical / LINE_H).floor() as usize));
         }
         if let (Some(find), Some(hit)) = (self.find, self.reveal) {
             let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
-            scroll = find.scroll_to(scroll, &hit, text, char_w);
+            if let Some(g) = &geometry {
+                let width = if split {
+                    body.width() / 2.0 - NUM_W - 40.0
+                } else {
+                    body.width() - NUM_W * 2.0 - 40.0
+                };
+                let galley = super::wrap::galley(ui, text, &self.font, width);
+                let y = g.at(hit.row)
+                    + galley
+                        .pos_from_cursor(egui::text::CCursor::new(hit.start))
+                        .top();
+                scroll = scroll.vertical_scroll_offset((y - LINE_H * 3.0).max(0.0));
+            } else {
+                scroll = find.scroll_to(scroll, &hit, text, char_w);
+            }
         } else if let Some(row) = self.view.jump_line.and_then(|i| row_of(data, split, i)) {
-            scroll = scroll.vertical_scroll_offset(offset_of(row));
+            scroll = scroll.vertical_scroll_offset(offset(row.saturating_sub(3)));
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
-            scroll.show_rows(ui, LINE_H, count, |ui, range| {
-                if split {
-                    // Each half is half of what's visible, however long the lines: scrolling
-                    // sideways moves the text in both, the line numbers stay.
+            if let Some(g) = &geometry {
+                scroll.show_viewport(ui, |ui, viewport| {
+                    ui.set_min_height(total_h);
+                    let start = g.row(viewport.top()).saturating_sub(1);
+                    let end = (g.row(viewport.bottom()) + 2).min(count);
+                    ui.add_space(g.at(start));
                     let view = ui.clip_rect();
-                    let half = (view.width() / 2.0).floor();
-                    let overflow = (NUM_W + 24.0 + longest * char_w + 16.0 - half).max(0.0);
-                    for row in range {
-                        self.split_row(ui, row, view, half, overflow, acts);
+                    let width = ui.available_width();
+                    for row in start..end {
+                        let h = g.height(row);
+                        if split {
+                            self.split_row(ui, row, view, (width / 2.0).floor(), 0.0, h, acts);
+                        } else {
+                            let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
+                            self.line(ui, rect, row, Side::Unified, 0.0, acts);
+                        }
                     }
-                } else {
-                    let width =
-                        (NUM_W * 2.0 + 24.0 + longest * char_w + 24.0).max(ui.available_width());
-                    for i in range {
-                        let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                        self.line(ui, rect, i, Side::Unified, 0.0, acts);
+                })
+            } else {
+                scroll.show_rows(ui, LINE_H, count, |ui, range| {
+                    if split {
+                        let view = ui.clip_rect();
+                        let half = (view.width() / 2.0).floor();
+                        let overflow = (NUM_W + 24.0 + longest * char_w + 16.0 - half).max(0.0);
+                        for row in range {
+                            self.split_row(ui, row, view, half, overflow, LINE_H, acts);
+                        }
+                    } else {
+                        let width = (NUM_W * 2.0 + 24.0 + longest * char_w + 24.0)
+                            .max(ui.available_width());
+                        for i in range {
+                            let (rect, _) =
+                                ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+                            self.line(ui, rect, i, Side::Unified, 0.0, acts);
+                        }
                     }
-                }
-            })
+                })
+            }
         });
         let shown = out.inner;
         self.offset = shown.state.offset.y;
         let view_w = shown.inner_rect.width();
         self.seen = Seen {
             x: shown.state.offset.x,
-            y: shown.state.offset.y,
-            height: shown.inner_rect.height(),
+            y: super::wrap::logical_offset(
+                geometry.as_ref().map(|g| g.offsets.as_slice()),
+                shown.state.offset.y,
+            ),
+            height: geometry.as_ref().map_or(shown.inner_rect.height(), |g| {
+                (g.row(shown.state.offset.y + shown.inner_rect.height())
+                    .saturating_sub(g.row(shown.state.offset.y))
+                    + 1) as f32
+                    * LINE_H
+            }),
             // The text's width beside the numbers: in each half side by side.
             text_w: if split {
                 (view_w / 2.0).floor() - NUM_W - 24.0
@@ -225,6 +289,7 @@ impl<'a> Rows<'a> {
             runs,
             split,
             (shown.state.offset.y, shown.inner_rect.height(), total_h),
+            geometry.as_ref().map(|g| g.offsets.as_slice()),
             &self.t,
         );
 
@@ -292,16 +357,17 @@ impl<'a> Rows<'a> {
         view: Rect,
         half: f32,
         overflow: f32,
+        height: f32,
         acts: &mut Vec<Action>,
     ) {
         let Some(&(l, r)) = self.data.split.get(row) else {
             return;
         };
-        let (rect, _) = ui.allocate_exact_size(vec2(half * 2.0 + overflow, LINE_H), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(vec2(half * 2.0 + overflow, height), Sense::hover());
         let scroll_x = (view.left() - rect.left()).clamp(0.0, overflow);
         let left =
-            Rect::from_min_size(pos2(rect.left() + scroll_x, rect.top()), vec2(half, LINE_H));
-        let right = Rect::from_min_size(pos2(left.right(), rect.top()), vec2(half, LINE_H));
+            Rect::from_min_size(pos2(rect.left() + scroll_x, rect.top()), vec2(half, height));
+        let right = Rect::from_min_size(pos2(left.right(), rect.top()), vec2(half, height));
         // Hunk headers and notes span both halves.
         if l == r
             && let Some(i) = l
@@ -357,6 +423,7 @@ impl<'a> Rows<'a> {
             .filter(|_| kind.is_some_and(|k| side.shows(k)));
         let placed = paint_line(
             ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars, found,
+            self.wrap,
         );
         if let Some(who) = data.authors.get(i).copied().flatten() {
             crate::repo::authorship_view::stripe(ui.painter(), &self.t, rect, who, 4.0);
