@@ -203,6 +203,19 @@ pub(crate) fn save(runner: &Runner<'_>, browser: &Browser, name: &str) -> Result
             std::slice::from_ref(value),
         )?;
     }
+    let after = read(runner.repo, name)?;
+    let actual = after
+        .branches
+        .iter()
+        .find(|v| v.name == name)
+        .ok_or("Branch disappeared after saving")?;
+    if actual.pull.remote != b.pull_remote
+        || actual.pull.branch != b.pull_branch
+        || actual.push.remote != b.push_remote
+        || actual.push.branch != b.push_branch
+    {
+        return Err("Effective routes differ after saving. A higher priority include, worktree or profile value may still apply; reopen routes before pushing.".into());
+    }
     Ok(format!(
         "{name}: pull from {}/{}; push to {}/{}",
         b.pull_remote, b.pull_branch, b.push_remote, b.push_branch
@@ -395,6 +408,7 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
     if urls.len() != 1 {
         return Err("Force push requires exactly one push URL. Use the remote editor to choose it explicitly.".into());
     }
+    super::remote_config::validate_url(urls[0])?;
     let destination = format!("refs/heads/{}", b.push.branch);
     let advertised = text(repo, &["ls-remote", "--refs", "--", urls[0], &destination])?;
     let remote_commit = advertised
@@ -421,6 +435,7 @@ pub(crate) fn force(runner: &Runner<'_>, plan: &Force) -> Result<String, String>
     runner.run(&[
         "push",
         "--porcelain",
+        "--recurse-submodules=check",
         &format!(
             "--force-with-lease={}:{}",
             plan.destination, plan.remote_commit

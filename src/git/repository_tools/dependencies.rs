@@ -165,6 +165,7 @@ pub(crate) fn read(repo: &Path) -> Result<Plan, String> {
     if urls.len() != 1 {
         return Err("Dependency publication requires one explicit parent push URL; use a dedicated remote for this route".into());
     }
+    super::remote_config::validate_url(urls[0])?;
     let dependencies = tree_links(repo, &route.oid)?
         .into_iter()
         .map(|(p, required)| add(repo, p, required, &route.push.remote))
@@ -294,6 +295,8 @@ fn inspect_node(runner: &Runner<'_>, node: &mut Dependency) -> Result<(), String
         return Err("Choose a submodule remote with exactly one push URL".into());
     }
     node.push_url = urls[0].into();
+    super::remote_config::validate_url(&node.fetch_url)?;
+    super::remote_config::validate_url(&node.push_url)?;
     node.published = reachable(runner, node)?;
     let refs = text(
         &node.repo,

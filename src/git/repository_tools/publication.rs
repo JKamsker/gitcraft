@@ -1,7 +1,7 @@
 //! Named publication groups use independent ordinary pushes on every supported Git version.
 use super::{
     guard::{Runner, Snapshot, text},
-    remote_config::{set_values, values},
+    remote_config::{boolean, set_values, validate_url},
 };
 use std::{collections::BTreeMap, path::Path};
 #[derive(Clone, Debug)]
@@ -95,10 +95,7 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
         .to_owned();
     let mut destinations = Vec::new();
     for remote in &manager.selected {
-        if values(repo, &format!("remote.{remote}.mirror"))?
-            .last()
-            .is_some_and(|s| matches!(s.as_str(), "true" | "yes" | "1" | "on"))
-        {
+        if boolean(repo, &format!("remote.{remote}.mirror"), false)? {
             return Err(format!(
                 "{remote} is a mirror; publication groups only send the selected branch. Change its mirror policy first."
             ));
@@ -109,9 +106,7 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
         )?
         .lines()
         {
-            if url.starts_with('-') || url.contains("::") {
-                return Err("Unsupported option-like URL or external transport helper".into());
-            }
+            validate_url(url)?;
             destinations.push(Destination {
                 remote: remote.clone(),
                 url: url.into(),
@@ -193,6 +188,9 @@ mod tests {
         let mut m = read(r.path(), "mirrors")?;
         m.selected = vec!["a".into(), "b".into()];
         save_group(&runner, &m)?;
+        r.git(&["config", "remote.a.mirror", "TRUE"])?;
+        assert!(prepare(r.path(), read(r.path(), "mirrors")?).is_err());
+        r.git(&["config", "--unset", "remote.a.mirror"])?;
         let m = prepare(r.path(), read(r.path(), "mirrors")?)?;
         let mut m = publish(&runner, m, false)?;
         let p = m.plan.as_ref().ok_or("no plan")?;
