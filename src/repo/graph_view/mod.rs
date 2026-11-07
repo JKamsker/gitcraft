@@ -7,6 +7,9 @@ mod header;
 mod lanes;
 mod menu;
 mod pills;
+mod readability;
+#[cfg(test)]
+mod readability_tests;
 mod row;
 mod search;
 
@@ -15,7 +18,6 @@ use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
-use crate::git;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 use badge::{BadgeKind, badges};
@@ -80,15 +82,13 @@ impl RepoTab {
 
         let settings = Settings::get(ui.ctx());
         let lanes = lane_layout(&settings, self.graph.width);
-        let prefs = preferred_cols(&settings, lanes);
-        let cols = prefs.squeezed(ui.available_width(), settings.last_resized);
+        let mut prefs = preferred_cols(&settings, lanes);
+        let mut cols = prefs.squeezed(ui.available_width(), settings.last_resized);
 
         // Column headers.
         let (header, header_resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-        header::column_headers(ui, &t, header, &cols);
-        self.column_handles(ui, header, &prefs, &cols, &settings);
-        header::header_menu(&header_resp, &settings);
+        // Paint the header after the viewport has supplied this frame's ref width.
 
         let mut scroll = egui::ScrollArea::vertical()
             .id_salt("graph_scroll")
@@ -107,9 +107,23 @@ impl RepoTab {
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let now = git::now();
         let total = self.commits.len() + usize::from(self.has_more);
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
+            // show_rows includes one overscan row. Only intersecting rows affect widths and
+            // labels, so a pill just outside the viewport does not hide the lane's name.
+            let top = ui.max_rect().top();
+            let clip = ui.clip_rect();
+            let mut visible = range.clone().filter(|i| {
+                let y = top + (i - range.start) as f32 * ROW_PITCH;
+                y < clip.bottom() && y + ROW_PITCH > clip.top()
+            });
+            let first = visible.clone().next().unwrap_or(range.start);
+            let end = visible.next_back().map_or(first, |i| i + 1);
+            let readable = self.readable_viewport(ui, first..end, lanes.shown);
+            if settings.fit_visible_refs() {
+                prefs.refs = readable.refs_width;
+            }
+            cols = prefs.squeezed(ui.available_width(), settings.last_resized);
             // Near the end: fetch the next page of history.
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
                 acts.push(Action::LoadMore);
@@ -119,7 +133,7 @@ impl RepoTab {
                     loading_row(ui, &t);
                     continue;
                 }
-                let resp = self.commit_row(ui, i, cols, lanes, now, acts);
+                let resp = self.commit_row(ui, i, cols, lanes, &readable, acts);
                 if resp.clicked() {
                     // Ctrl+click: compare the selected commit with this one.
                     let compare = ui
@@ -132,6 +146,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        header::column_headers(ui, &t, header, &cols);
+        self.column_handles(ui, header, &prefs, &cols, &settings);
+        header::header_menu(&header_resp, &settings);
     }
 
     /// Up and down select the row above or below the selected one.
@@ -311,6 +328,7 @@ pub(super) fn compare_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git;
 
     #[test]
     fn a_compact_graph_column_fits_its_lanes_closer_together() {

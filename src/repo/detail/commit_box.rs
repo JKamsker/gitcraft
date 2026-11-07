@@ -120,7 +120,7 @@ impl RepoTab {
         let shortcut = (summary.has_focus() || body.has_focus())
             && ui.input(|i| i.modifiers.command && i.key_pressed(Key::Enter));
         let resp = widgets::primary_button(ui, &label, can, ui.available_width());
-        if (resp.clicked() || (shortcut && can)) && can {
+        if (resp.clicked() || shortcut) && can {
             acts.push(Action::Commit);
         }
         resp.on_hover_text("Ctrl+Enter");

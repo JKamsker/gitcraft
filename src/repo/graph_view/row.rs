@@ -62,7 +62,7 @@ impl RepoTab {
         i: usize,
         cols: Cols,
         lanes: Lanes,
-        now: i64,
+        viewport: &super::readability::Viewport,
         acts: &mut Vec<Action>,
     ) -> Response {
         let t = Tokens::get(ui.ctx());
@@ -100,13 +100,26 @@ impl RepoTab {
         };
 
         let resp = self.refs_cell(ui, &painter, &row, resp, acts);
+        if let Some(label) = viewport.labels.get(&i) {
+            faint_lane_label(ui, &painter, &t, &row, label);
+        }
         self.graph_cell(ui, &painter, &row, lanes.shown);
         if is_wip {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
             description(ui, &painter, &t, &row, is_match, ci.is_some());
-            trailing_columns(ui, &painter, &t, &row, now);
+            let description_rect = Rect::from_min_max(
+                pos2((gx + cols.graph).min(rect.right()), rect.top()),
+                pos2(
+                    (rect.right() - cols.trailing()).max(gx + cols.graph),
+                    rect.bottom(),
+                ),
+            );
+            if ui.rect_contains_pointer(description_rect.intersect(rect)) {
+                resp.clone().on_hover_text(full_message(commit));
+            }
+            trailing_columns(ui, &painter, &t, &row, viewport.now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
@@ -208,16 +221,17 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
     };
     let text_clip = painter.with_clip_rect(Rect::from_min_max(
         pos2(x, rect.top()),
-        pos2(text_right, rect.bottom()),
+        pos2(text_right.max(x), rect.bottom()),
     ));
-    let summary = text_clip.text(
-        pos2(x + 2.0, mid),
-        Align2::LEFT_CENTER,
-        &row.commit.summary,
-        font.clone(),
-        t.text,
+    let mut job = egui::text::LayoutJob::single_section(
+        row.commit.summary.clone(),
+        egui::TextFormat::simple(font, t.text),
     );
-    let room = text_right - summary.right() - 12.0;
+    job.wrap = egui::text::TextWrapping::truncate_at_width((text_right - x - 2.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let summary_right = x + 2.0 + galley.size().x;
+    text_clip.galley(pos2(x + 2.0, mid - galley.size().y / 2.0), galley, t.text);
+    let room = text_right - summary_right - 12.0;
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
@@ -226,7 +240,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
         job.wrap = egui::text::TextWrapping::truncate_at_width(room);
         let galley = ui.fonts_mut(|f| f.layout_job(job));
         text_clip.galley(
-            pos2(summary.right() + 10.0, mid - galley.size().y / 2.0),
+            pos2(summary_right + 10.0, mid - galley.size().y / 2.0),
             galley,
             t.text,
         );
@@ -300,4 +314,39 @@ fn pill(painter: &Painter, left_center: Pos2, text: &str, color: Color32) -> f32
         color,
     );
     w
+}
+
+/// Tooltips retain the original paragraphs even when the row only has room for an ellipsis.
+fn full_message(commit: &Commit) -> String {
+    if commit.body.is_empty() {
+        commit.summary.clone()
+    } else {
+        format!("{}\n\n{}", commit.summary, commit.body)
+    }
+}
+
+fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {
+    let x = row.rect.left() + 8.0;
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(FontId::proportional(11.0), t.text_faint),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width((row.cols.refs - 24.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let right = x + galley.size().x;
+    let clip = Rect::from_min_max(row.rect.min, pos2(row.gx - 4.0, row.rect.bottom()));
+    painter.with_clip_rect(clip).galley(
+        pos2(x, row.mid() - galley.size().y / 2.0),
+        galley,
+        t.text_faint,
+    );
+    if let Some(node_x) = row.node_x {
+        painter.line_segment(
+            [
+                pos2(right + 6.0, row.mid()),
+                pos2(node_x.min(row.gx + row.cols.graph), row.mid()),
+            ],
+            Stroke::new(1.0, t.text_faint.gamma_multiply(0.35)),
+        );
+    }
 }
