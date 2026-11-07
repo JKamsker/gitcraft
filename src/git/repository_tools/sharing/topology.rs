@@ -101,15 +101,20 @@ pub(crate) fn read(
 ) -> Result<Topology, String> {
     let worktrees = line(repo, &["worktree", "list", "--porcelain"], active)?;
     let config = text(repo, &["config", "--null", "--list", "--includes"])?;
-    let promisor = config
+    let keys: BTreeSet<_> = config
         .split('\0')
-        .filter_map(|row| row.split_once('\n'))
-        .any(|(key, value)| {
-            let key = key.to_ascii_lowercase();
-            (key == "extensions.partialclone"
-                || key.starts_with("remote.") && key.ends_with(".promisor"))
-                && !matches!(value, "false" | "0" | "")
-        });
+        .map(|row| row.split_once('\n').map_or(row, |(key, _)| key))
+        .filter(|key| !key.is_empty())
+        .collect();
+    let mut promisor = keys
+        .iter()
+        .any(|key| key.eq_ignore_ascii_case("extensions.partialclone"));
+    for key in keys.iter().filter(|key| {
+        key.to_ascii_lowercase().starts_with("remote.")
+            && key.to_ascii_lowercase().ends_with(".promisor")
+    }) {
+        promisor |= super::super::remote_config::boolean(repo, key, false)?;
+    }
     let alternates = files::read(&remote::join(primary, "info/alternates"), 64 * 1024, active)?;
     let mut topology = Topology {
         stores: Vec::new(),

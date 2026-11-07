@@ -112,6 +112,13 @@ fn missing_donor_and_stale_alternate_are_diagnosed_without_detaching() -> Result
             clone.to_str().ok_or("clone path")?,
         ],
     )?;
+    run(&clone, &["config", "remote.origin.promisor", "FALSE"])?;
+    assert!(!inspect(&clone)?.topology.promisor);
+    run(&clone, &["config", "remote.origin.promisor", "TRUE"])?;
+    let partial = inspect(&clone)?;
+    assert!(partial.topology.promisor);
+    assert!(partial.plan.is_none());
+    run(&clone, &["config", "--unset", "remote.origin.promisor"])?;
     let model = inspect(&clone)?;
     let alt = clone.join(".git/objects/info/alternates");
     let old = std::fs::read(&alt).map_err(|e| e.to_string())?;
