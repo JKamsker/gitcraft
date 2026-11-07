@@ -269,6 +269,52 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     let mut hook = match hook_result {
         Ok(hook) => hook,
         Err(error) => {
+            if case == "files-sha1-diagnostic" {
+                // Repeat only the owned bare capability transaction, using the existing
+                // production bounded transport while retaining normally withheld stderr.
+                for entry in fs::read_dir(std::env::temp_dir()).map_err(|e| e.to_string())? {
+                    let directory = entry.map_err(|e| e.to_string())?.path();
+                    let probe = directory.join("capability.git");
+                    if !probe.is_dir() {
+                        continue;
+                    }
+                    let old = run(&probe, &["rev-parse", "HEAD"], b"", None)?;
+                    let objects = run(
+                        &probe,
+                        &[
+                            "cat-file",
+                            "--batch-all-objects",
+                            "--batch-check=%(objectname) %(objecttype)",
+                        ],
+                        b"",
+                        None,
+                    )?;
+                    let new = objects
+                        .lines()
+                        .filter_map(|line| line.strip_suffix(" commit"))
+                        .find(|oid| *oid != old)
+                        .ok_or("missing owned candidate commit")?;
+                    let hooks = format!("core.hooksPath={}", directory.display());
+                    let input = transaction("refs/heads/gitcraft-capability", &old, new);
+                    let output = git::local_repair_input(
+                        &f.repo,
+                        &[
+                            "-C",
+                            &probe.to_string_lossy(),
+                            "-c",
+                            &hooks,
+                            "update-ref",
+                            "--stdin",
+                        ],
+                        input.as_bytes(),
+                        &[],
+                    )?;
+                    write(root.join("diagnostic-input"), &input)?;
+                    write(root.join("diagnostic.stdout"), &output.stdout)?;
+                    write(root.join("diagnostic.stderr"), &output.stderr)?;
+                    write(root.join("diagnostic-status"), output.status.to_string())?;
+                }
+            }
             write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"constructor_error":error,"before":before,"after":snapshot(&f.repo)?})).unwrap())?;
             return Err(format!(
                 "supported {refs}/{objects} capability refused: {error}"
