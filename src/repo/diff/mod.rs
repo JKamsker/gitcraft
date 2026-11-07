@@ -152,13 +152,28 @@ impl Pick {
 
 /// Reads and prepares the diff for `key`.
 pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result<DiffData, String> {
-    let (text, path) = match key {
-        DiffKey::Commit { hash, path } => (git::file_diff(repo, hash, path, opts)?, path.clone()),
-        DiffKey::Work(file) => (git::work_diff(repo, file, opts)?, file.path.clone()),
-        DiffKey::Range { from, to, path } => (
-            git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
-            path.clone(),
-        ),
+    let patch = |opts: DiffOptions| -> Result<(String, String), String> {
+        Ok(match key {
+            DiffKey::Commit { hash, path } => {
+                (git::file_diff(repo, hash, path, opts)?, path.clone())
+            }
+            DiffKey::Work(file) => (git::work_diff(repo, file, opts)?, file.path.clone()),
+            DiffKey::Range { from, to, path } => (
+                git::range_file_diff(repo, from, to.as_deref(), path, opts)?,
+                path.clone(),
+            ),
+        })
+    };
+    // A textconv driver that fails (Git for Windows maps `*.docx` and `*.pdf` to its own
+    // `astextplain`, which refuses some files) fails the whole diff: the file's own bytes
+    // are diffed instead, so it is shown as a binary rather than not at all.
+    let (text, path) = match patch(opts) {
+        Err(e) if !opts.no_textconv => patch(DiffOptions {
+            no_textconv: true,
+            ..opts
+        })
+        .map_err(|_| e)?,
+        done => done?,
     };
     let lines = parse(&text);
     let header = patch_header(&text);
