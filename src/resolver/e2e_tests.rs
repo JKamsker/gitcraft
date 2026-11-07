@@ -102,7 +102,13 @@ fn a_real_agent_resolves_a_merge_and_reports_each_step() -> Result<(), String> {
         );
     }
     let started = Instant::now();
-    let running = Running::start(engine, &command, ws.dir(), agent::prompt(&ws), || {})?;
+    let running = Running::start(
+        engine,
+        &command,
+        ws.dir(),
+        agent::prompt(&ws, engine),
+        || {},
+    )?;
     let mut shown = 0;
     let exit = loop {
         let (exit, new) = running.with_feed(|f| {
@@ -134,7 +140,7 @@ fn a_real_agent_resolves_a_merge_and_reports_each_step() -> Result<(), String> {
     for (at, r) in reports.iter().cloned() {
         progress.apply(r, at);
     }
-    let result = ws.check(repo.path());
+    let result = ws.check(repo.path(), &[]);
     let text = std::fs::read_to_string(ws.dir().join("src/main.rs")).unwrap_or_default();
     println!("resolved:\n{text}");
     let ended = running.with_feed(|f| {

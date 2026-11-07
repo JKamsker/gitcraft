@@ -39,11 +39,15 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
 - When it is done, the card lists each file: resolved, deleted (as one side did), still
   conflicted, or changed by you meanwhile (left as you made it). _Apply_ writes the files you
   tick and marks them resolved; _Discard_ forgets the agent's work.
-- It may read the files and git (`git diff`, `log`, `show`, `blame`) and gitcraft's own reading
-  tools, and edit its copy's files; it can't stage, commit, continue the operation or run
-  anything else. It reports its plan and steps with the `resolve_plan`, `resolve_step` and
-  `resolve_finish` tools of `gitcraft mcp`, which only an agent gitcraft started this way is
-  offered. For repositories on this machine only, for now.
+- Claude Code runs `--restricted`: it reads and edits files in its copy only, reads git through
+  gitcraft's own tools, and has no shell; no settings file is read, so hooks or permissions a
+  branch being merged brings (`.claude/settings.json`) don't apply. Codex runs in its
+  `workspace-write` sandbox. `gitcraft mcp` offers an agent started this way its reading tools
+  and the `resolve_plan`, `resolve_step` and `resolve_finish` reports, and none that change
+  the repository. Nothing it does is applied unless it is a plain file (never a link) that you
+  didn't change meanwhile; a file without conflict markers (one side deleted it, or it is
+  binary) is only offered once the agent changed it or said it is done with it. For
+  repositories on this machine only, for now.
 
 ## Warnings before you act
 

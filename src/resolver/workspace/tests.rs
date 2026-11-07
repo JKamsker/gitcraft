@@ -92,7 +92,7 @@ fn only_files_resolved_and_untouched_by_the_user_are_applied() -> Result<(), Str
     // The agent resolves a.txt, leaves b.txt half done.
     std::fs::write(ws.dir().join("a.txt"), "one\nmain and side\nthree\n")
         .map_err(|e| e.to_string())?;
-    let results = ws.check(repo.path());
+    let results = ws.check(repo.path(), &[]);
     assert_eq!(
         results,
         vec![
@@ -100,16 +100,20 @@ fn only_files_resolved_and_untouched_by_the_user_are_applied() -> Result<(), Str
             ("b.txt".to_owned(), FileResult::StillConflicted),
         ]
     );
-    let written = ws.apply(repo.path(), &files())?;
-    assert_eq!(written, vec!["a.txt".to_owned()]);
+    let applied = ws.apply(repo.path(), &files(), &[]);
+    assert_eq!(applied.written, vec!["a.txt".to_owned()]);
+    assert!(applied.failed.is_empty());
     let a = std::fs::read_to_string(repo.path().join("a.txt")).map_err(|e| e.to_string())?;
     assert_eq!(a, "one\nmain and side\nthree\n");
     // Now the user edits b.txt themselves while the agent finishes it: theirs stays.
     std::fs::write(ws.dir().join("b.txt"), "b both\n").map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("b.txt"), "b by hand\n").map_err(|e| e.to_string())?;
-    assert_eq!(ws.check(repo.path())[1].1, FileResult::ChangedMeanwhile);
+    assert_eq!(
+        ws.check(repo.path(), &[])[1].1,
+        FileResult::ChangedMeanwhile
+    );
     // a.txt was applied before: it too now differs from what the agent started from.
-    assert!(ws.apply(repo.path(), &files())?.is_empty());
+    assert!(ws.apply(repo.path(), &files(), &[]).written.is_empty());
     let b = std::fs::read_to_string(repo.path().join("b.txt")).map_err(|e| e.to_string())?;
     assert_eq!(b, "b by hand\n");
     ws.remove()
@@ -122,11 +126,46 @@ fn a_file_the_agent_deleted_is_deleted_and_paths_stay_inside() -> Result<(), Str
     assert!(Workspace::prepare(repo.path(), &[]).is_err());
     let ws = Workspace::prepare(repo.path(), &files())?;
     std::fs::remove_file(ws.dir().join("b.txt")).map_err(|e| e.to_string())?;
-    assert_eq!(ws.check(repo.path())[1].1, FileResult::Deleted);
-    assert_eq!(
-        ws.apply(repo.path(), &["b.txt".to_owned()])?,
-        vec!["b.txt".to_owned()]
-    );
+    assert_eq!(ws.check(repo.path(), &[])[1].1, FileResult::Deleted);
+    let applied = ws.apply(repo.path(), &["b.txt".to_owned()], &[]);
+    assert_eq!(applied.written, vec!["b.txt".to_owned()]);
     assert!(!repo.path().join("b.txt").exists());
+    ws.remove()
+}
+
+/// A file with no markers (one side deleted it, or it is binary) is the agent's only once it
+/// changed it or said it is done with it: an agent that stopped early decides nothing.
+#[test]
+fn a_file_without_markers_is_only_applied_once_the_agent_decided() -> Result<(), String> {
+    let repo = Repo::new("resolve-nomarkers")?;
+    repo.commit("base", &[("gone.txt", Some("base\n"))])?;
+    repo.git(&["checkout", "-q", "-b", "side"])?;
+    repo.commit("side edits", &[("gone.txt", Some("side\n"))])?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit("main deletes", &[("gone.txt", None)])?;
+    assert!(repo.git(&["merge", "-q", "side"]).is_err());
+    let files = vec!["gone.txt".to_owned()];
+    let ws = Workspace::prepare(repo.path(), &files)?;
+    assert_eq!(ws.files[0].conflicts, 0);
+    assert_eq!(ws.check(repo.path(), &[])[0].1, FileResult::Untouched);
+    assert!(ws.apply(repo.path(), &files, &[]).written.is_empty());
+    // Reported done as it is (keep side's edit): now it applies.
+    assert_eq!(ws.check(repo.path(), &files)[0].1, FileResult::Resolved);
+    ws.remove()
+}
+
+/// The agent can't have a secret elsewhere applied (and so committed) by linking to it.
+#[cfg(unix)]
+#[test]
+fn a_link_the_agent_made_is_never_applied() -> Result<(), String> {
+    let repo = conflicted("resolve-link")?;
+    let ws = Workspace::prepare(repo.path(), &files())?;
+    let secret = repo.path().join("../resolve-link-secret");
+    std::fs::write(&secret, "token\n").map_err(|e| e.to_string())?;
+    std::fs::remove_file(ws.dir().join("a.txt")).map_err(|e| e.to_string())?;
+    std::os::unix::fs::symlink(&secret, ws.dir().join("a.txt")).map_err(|e| e.to_string())?;
+    assert_eq!(ws.check(repo.path(), &[])[0].1, FileResult::NotPlain);
+    assert!(ws.apply(repo.path(), &files(), &[]).written.is_empty());
+    let _ = std::fs::remove_file(&secret);
     ws.remove()
 }

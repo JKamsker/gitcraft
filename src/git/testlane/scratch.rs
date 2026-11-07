@@ -78,6 +78,26 @@ impl Scratch {
         self.removed = true;
         remove_worktree(&self.repo, &self.path)
     }
+
+    /// Removes it now, trying `attempts` times `pause` apart while it can't be (a program that
+    /// worked in it may hold its folder a moment longer).
+    pub fn remove_retrying(
+        mut self,
+        attempts: u32,
+        pause: std::time::Duration,
+    ) -> Result<(), String> {
+        self.removed = true;
+        let mut tried = 1;
+        loop {
+            match remove_worktree(&self.repo, &self.path) {
+                Err(_) if tried < attempts => {
+                    tried += 1;
+                    std::thread::sleep(pause);
+                }
+                done => return done,
+            }
+        }
+    }
 }
 
 impl Drop for Scratch {

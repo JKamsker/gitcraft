@@ -94,6 +94,26 @@ fn time_left_comes_from_the_estimate_then_from_the_steps_done() {
 }
 
 #[test]
+fn steps_reported_over_at_once_dont_bring_the_estimate_down() {
+    let t0 = Instant::now();
+    let mut p = Progress::default();
+    p.apply(
+        Report::Plan {
+            steps: vec![planned("a", "A"), planned("b", "B"), planned("c", "C")],
+            estimate_minutes: Some(10),
+        },
+        t0,
+    );
+    // Done without ever running: no time to learn from, so the estimate still counts.
+    p.apply(step("a", StepStatus::Done), t0 + Duration::from_secs(60));
+    p.apply(step("b", StepStatus::Skipped), t0 + Duration::from_secs(60));
+    assert_eq!(
+        p.remaining(t0 + Duration::from_secs(60)),
+        Some(Duration::from_secs(540))
+    );
+}
+
+#[test]
 fn a_new_plan_keeps_how_known_steps_stand_and_unplanned_steps_are_added() {
     let t0 = Instant::now();
     let mut p = Progress::default();

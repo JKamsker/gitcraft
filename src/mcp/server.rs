@@ -62,6 +62,17 @@ const INSTRUCTIONS: &str = "gitcraft is the user's git client. Its tools read th
 /// The largest answer a tool gives, in bytes.
 const MAX_ANSWER: usize = 512 * 1024;
 
+/// Whether a tool of `kind` is offered: the reports only to an agent of a resolving run
+/// (`run`), and to that one nothing that changes the repository. It works in a worktree of
+/// its own that no tab has open, and is there only to resolve its files.
+fn offered(kind: Kind, run: bool) -> bool {
+    match kind {
+        Kind::Read => true,
+        Kind::Report => run,
+        Kind::Write | Kind::Approve => !run,
+    }
+}
+
 /// The tool as MCP lists it.
 fn listed(def: &ToolDef) -> Tool {
     let schema = match (def.schema)() {
@@ -146,7 +157,7 @@ impl ServerHandler for Gitcraft {
         Ok(ListToolsResult::with_all_items(
             tools::all()
                 .into_iter()
-                .filter(|t| run || t.kind != Kind::Report)
+                .filter(|t| offered(t.kind, run))
                 .map(listed)
                 .collect(),
         ))
@@ -157,7 +168,8 @@ impl ServerHandler for Gitcraft {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let Some(def) = tools::find(&request.name) else {
+        let Some(def) = tools::find(&request.name).filter(|t| offered(t.kind, self.run.is_some()))
+        else {
             return Err(ErrorData::invalid_params(
                 format!("Unknown tool: {}", request.name),
                 None,
@@ -205,6 +217,14 @@ impl ServerHandler for Gitcraft {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_agent_of_a_run_is_offered_reading_and_reporting_only() {
+        assert!(offered(Kind::Read, true) && offered(Kind::Read, false));
+        assert!(offered(Kind::Report, true) && !offered(Kind::Report, false));
+        assert!(!offered(Kind::Write, true) && offered(Kind::Write, false));
+        assert!(!offered(Kind::Approve, true) && offered(Kind::Approve, false));
+    }
 
     #[test]
     fn agents_are_named_as_people_know_them() {

@@ -18,7 +18,7 @@ fn claude_runs_headless_with_only_gitcraft_and_safe_tools() -> Result<(), String
     };
     let joined = words.join(" ");
     assert!(
-        joined.starts_with("claude -p --output-format stream-json"),
+        joined.starts_with("claude -p --restricted --output-format stream-json"),
         "{joined}"
     );
     assert!(
@@ -29,20 +29,11 @@ fn claude_runs_headless_with_only_gitcraft_and_safe_tools() -> Result<(), String
         joined.ends_with(&format!("--allowedTools {CLAUDE_TOOLS}")),
         "{joined}"
     );
-    // On Windows `cmd` keeps the tool list one word.
+    // On Windows `cmd` keeps the tool list one word (quoted, for its commas).
     assert!(line.cmd().contains(&format!("\"{CLAUDE_TOOLS}\"")));
-    // Nothing that commits, stages or pushes is let through.
-    for refused in [
-        "git add",
-        "git commit",
-        "git push",
-        "git merge:",
-        "git checkout",
-        "Bash,",
-        "Bash(*",
-    ] {
-        assert!(!CLAUDE_TOOLS.contains(refused), "{refused}");
-    }
+    // No shell at all, and nothing a branch's settings bring.
+    assert!(!CLAUDE_TOOLS.contains("Bash"), "{CLAUDE_TOOLS}");
+    assert!(words.contains(&"--restricted".to_owned()));
     let config = claude_mcp_config(Path::new("/bin/gitcraft"), Path::new(DIR), "r1");
     assert_eq!(config["mcpServers"]["gitcraft"]["command"], "/bin/gitcraft");
     assert_eq!(
@@ -155,7 +146,9 @@ fn the_prompt_names_the_files_the_sides_and_the_tools() -> Result<(), String> {
     repo.commit("main", &[("a.txt", Some("main\n"))])?;
     assert!(repo.git(&["merge", "-q", "side"]).is_err());
     let ws = Workspace::prepare(repo.path(), &["a.txt".to_owned()])?;
-    let text = prompt(&ws);
+    let text = prompt(&ws, Engine::Claude);
+    assert!(text.contains("there is no shell here"), "{text}");
+    assert!(prompt(&ws, Engine::Codex).contains("git log -5 MERGE_HEAD"));
     assert!(text.contains("a merge of side ("), "{text}");
     assert!(text.contains("into main ("), "{text}");
     assert!(text.contains("- a.txt (1 conflict)"), "{text}");

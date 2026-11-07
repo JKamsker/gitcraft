@@ -14,7 +14,7 @@ use crate::repo::{OpKind, Refresh, RepoTab};
 use crate::resolver::agent::{self, Activity, Engine};
 use crate::resolver::process::Running;
 use crate::resolver::report::{Progress, Report};
-use crate::resolver::workspace::{FileResult, Workspace};
+use crate::resolver::workspace::{Applied, FileResult, Workspace};
 
 /// What the card and the buttons that start a run ask for.
 #[derive(Clone, Debug)]
@@ -91,26 +91,38 @@ impl ResolverState {
 /// How often the card's clock moves.
 const CLOCK: Duration = Duration::from_secs(1);
 
-/// Removes what a run leaves, in the background (removing a worktree runs git).
+/// Removes what a run leaves, in the background (removing a worktree runs git): the agent is
+/// stopped first, and only once it is gone is its folder removed (on Windows a running
+/// program holds it).
 fn clean_up(run: &mut Run) {
-    if let Some(agent) = run.agent.take() {
-        agent.stop();
-    }
+    let agent = run.agent.take();
     let workspace = run.workspace.take();
     let mcp_file = run.mcp_file.take();
     std::thread::spawn(move || {
+        if let Some(agent) = agent {
+            agent.stop_now();
+        }
         if let Some(file) = mcp_file {
             let _ = std::fs::remove_file(file);
         }
+        // Held elsewhere (being applied, or checked), it is removed when that ends: dropping
+        // the last of it removes it too.
         if let Some(ws) = workspace.and_then(|ws| Arc::try_unwrap(ws).ok()) {
-            let _ = ws.remove();
+            let _ = ws.remove_patiently();
         }
     });
 }
 
 impl Drop for ResolverState {
+    /// The tab is closed, or gitcraft is: the agent is stopped before this returns, as a
+    /// thread left to do it may never run when the program ends. The rest is removed in the
+    /// background (or, if gitcraft ends first, swept the next time it makes a scratch
+    /// worktree).
     fn drop(&mut self) {
         if let Some(run) = &mut self.run {
+            if let Some(agent) = run.agent.take() {
+                agent.stop_now();
+            }
             clean_up(run);
         }
     }
@@ -133,17 +145,31 @@ fn prepare(
     let exe = std::env::current_exe().map_err(|e| format!("gitcraft can't find itself: {e}"))?;
     let workspace = Workspace::prepare(repo, files)?;
     let mcp_file = std::env::temp_dir().join(format!("gitcraft-resolve-{id}.json"));
-    let config = agent::claude_mcp_config(&exe, workspace.dir(), id);
-    std::fs::write(&mcp_file, config.to_string())
-        .map_err(|e| format!("couldn't write the agent's MCP settings: {e}"))?;
+    // The worktree goes with `workspace` on failure (dropping it removes it); the file here.
     let command = agent::command(engine, &exe, workspace.dir(), id, &mcp_file)?;
-    let prompt = agent::prompt(&workspace);
+    let config = agent::claude_mcp_config(&exe, workspace.dir(), id);
+    if let Err(e) = std::fs::write(&mcp_file, config.to_string()) {
+        let _ = std::fs::remove_file(&mcp_file);
+        return Err(format!("couldn't write the agent's MCP settings: {e}"));
+    }
+    let prompt = agent::prompt(&workspace, engine);
     Ok(Prepared {
         workspace,
         mcp_file,
         command,
         prompt,
     })
+}
+
+/// The files the agent said it is done with: its steps reported done, by their file or id.
+fn done_files(progress: &Progress) -> Vec<String> {
+    progress
+        .steps
+        .iter()
+        .filter(|s| s.status == crate::resolver::report::StepStatus::Done)
+        .flat_map(|s| [Some(s.id.clone()), s.file.clone()])
+        .flatten()
+        .collect()
 }
 
 /// Why an agent that ended with `code` and said `stderr` gave nothing, as the user reads it.
@@ -199,6 +225,15 @@ impl RepoTab {
                 }
             }
             ResolverAct::Dismiss => {
+                // While files are written, the run stays to mark them resolved.
+                if self
+                    .resolver
+                    .run
+                    .as_ref()
+                    .is_some_and(|r| r.phase == Phase::Applying)
+                {
+                    return;
+                }
                 if let Some(mut run) = self.resolver.run.take() {
                     clean_up(&mut run);
                 }
@@ -285,6 +320,16 @@ impl RepoTab {
             return;
         };
         let p = match prepared {
+            Ok(p) if run.stopping => {
+                // Stopped while it was being made: the agent isn't started.
+                run.workspace = Some(Arc::new(p.workspace));
+                run.mcp_file = Some(p.mcp_file);
+                run.phase = Phase::Failed;
+                run.error = Some("Stopped before the agent started".to_owned());
+                run.ended = Some(Instant::now());
+                clean_up(run);
+                return;
+            }
             Ok(p) => p,
             Err(e) => {
                 run.phase = Phase::Failed;
@@ -359,9 +404,10 @@ impl RepoTab {
         };
         run.phase = Phase::Checking;
         let (repo, id) = (self.path.clone(), run.id.clone());
+        let done = done_files(&run.progress);
         self.then(
             ctx,
-            move || ws.check(&repo),
+            move || ws.check(&repo, &done),
             move |tab, results, _| {
                 let Some(run) = tab.resolver.run.as_mut().filter(|r| r.id == id) else {
                     return;
@@ -404,38 +450,45 @@ impl RepoTab {
         }
         run.phase = Phase::Applying;
         let (repo, id) = (self.path.clone(), run.id.clone());
+        let done = done_files(&run.progress);
         self.then(
             ctx,
-            move || ws.apply(&repo, &picked),
-            move |tab, written, ctx| tab.resolved_applied(&id, written, ctx),
+            move || ws.apply(&repo, &picked, &done),
+            move |tab, applied, ctx| tab.resolved_applied(&id, applied, ctx),
         );
     }
 
-    fn resolved_applied(
-        &mut self,
-        id: &str,
-        written: Result<Vec<String>, String>,
-        ctx: &egui::Context,
-    ) {
+    /// The files are written: those that were are marked resolved, whatever became of the
+    /// others.
+    fn resolved_applied(&mut self, id: &str, applied: Applied, ctx: &egui::Context) {
+        let busy = self.busy_op.clone();
         let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == id) else {
             return;
         };
-        let written = match written {
-            Ok(w) => w,
-            Err(e) => {
-                run.phase = Phase::Ready;
-                self.status = Some((format!("The agent's files weren't all applied: {e}"), true));
-                return;
-            }
-        };
+        let Applied { written, failed } = applied;
         run.applied = written.len();
         run.phase = Phase::Applied;
+        let mut said = Vec::new();
+        if !failed.is_empty() {
+            let each: Vec<String> = failed.iter().map(|(p, e)| format!("{p}: {e}")).collect();
+            said.push(format!("Not applied: {}", each.join("; ")));
+        }
+        if let Some(busy) = busy.as_ref().filter(|_| !written.is_empty()) {
+            said.push(format!(
+                "Written, but not marked resolved while {busy} runs: mark them resolved under \
+                 CONFLICTED"
+            ));
+        }
+        run.error = (!said.is_empty()).then(|| said.join(". "));
         clean_up(run);
         if written.is_empty() {
-            self.status = Some((
-                "Nothing was applied: the files changed here since the agent started".to_owned(),
-                true,
-            ));
+            if failed.is_empty() {
+                self.status = Some((
+                    "Nothing was applied: the files changed here since the agent started"
+                        .to_owned(),
+                    true,
+                ));
+            }
             return;
         }
         // The conflict editor shows the file as it was: it is closed over the new one.

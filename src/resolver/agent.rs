@@ -35,11 +35,11 @@ impl Engine {
 }
 
 /// The tools Claude Code may use without asking (nobody is there to ask): reading and editing
-/// files in its folder, reading git, and gitcraft's own. Committing, staging, pushing or
-/// running anything else is refused.
-const CLAUDE_TOOLS: &str = "Read,Edit,MultiEdit,Write,Glob,Grep,LS,TodoWrite,\
-Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*),Bash(git blame:*),\
-Bash(git ls-files:*),Bash(git merge-base:*),Bash(git rev-parse:*),mcp__gitcraft";
+/// files, and gitcraft's own (which read git: the server offers an agent of a run nothing that
+/// changes the repository). It runs `--restricted`: no shell nor any tool that runs code, file
+/// tools confined to its folder, and no settings file read, so no hook nor permission that a
+/// branch being merged brings (`.claude/settings.json`) applies.
+const CLAUDE_TOOLS: &str = "Read,Edit,MultiEdit,Write,Glob,Grep,LS,TodoWrite,mcp__gitcraft";
 
 /// How `gitcraft mcp` is started for the agent: `exe`, on `dir`, for the run `run`.
 pub fn mcp_args(dir: &Path, run: &str) -> Vec<String> {
@@ -84,12 +84,23 @@ pub fn command(
     run: &str,
     mcp_file: &Path,
 ) -> Result<CommandLine, String> {
+    // `cmd` reads `%NAME%` in a command line as a variable, quoted or not.
+    let percent = [exe, dir, mcp_file]
+        .into_iter()
+        .find(|p| p.to_string_lossy().contains('%'));
+    if let Some(path) = percent.filter(|_| cfg!(windows)) {
+        return Err(format!(
+            "{} has a % in it, which can't be passed on Windows",
+            path.display()
+        ));
+    }
     let words = |w: &[&str]| w.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     let line = match engine {
         Engine::Claude => {
             let mut w = words(&[
                 "claude",
                 "-p",
+                "--restricted",
                 "--output-format",
                 "stream-json",
                 "--verbose",
@@ -129,8 +140,23 @@ pub fn command(
     Ok(CommandLine::Words(line))
 }
 
-/// What the agent is asked to do.
-pub fn prompt(ws: &Workspace) -> String {
+/// How the agent reads git: Claude Code has no shell (see [`CLAUDE_TOOLS`]).
+fn git_reading(engine: Engine) -> &'static str {
+    match engine {
+        Engine::Claude => {
+            "Read git through gitcraft's tools: `conflicts` (each conflict with its sides), \
+             `diff`, `log`, `show_commit`, `blame`, `status`; there is no shell here."
+        }
+        Engine::Codex => {
+            "You are already in that folder: run each git command on its own, as it is \
+             (`git log -5 MERGE_HEAD`). gitcraft's tools (`conflicts`, `diff`, `log`, \
+             `show_commit`, `blame`) read the repository too."
+        }
+    }
+}
+
+/// What `engine` is asked to do.
+pub fn prompt(ws: &Workspace, engine: Engine) -> String {
     let s = &ws.sides;
     let short = |h: &str| h.get(..10).unwrap_or(h).to_owned();
     let theirs = match (&s.theirs, &s.theirs_name) {
@@ -155,7 +181,7 @@ pub fn prompt(ws: &Workspace) -> String {
     format!(
         "You are resolving git conflicts for the user, in the background, in gitcraft (their git \
 client). The folder you are in is a private copy of their checkout made for this: {operation} of \
-{theirs} into {ours} ({ours_hash}) is in progress here, as it is in theirs. You are already in that folder: run each git command on its own, as it is (`git log -5 MERGE_HEAD`), without `cd`, `&&` or pipes, which aren't allowed here. gitcraft's own tools (log, diff, blame, conflicts) read the repository too.
+{theirs} into {ours} ({ours_hash}) is in progress here, as it is in theirs. {git}
 
 Conflicted files:
 {files}
@@ -163,8 +189,8 @@ What to do:
 1. First call the gitcraft tool `resolve_plan` with one step per file (id: the path, title: \
 what you will do in it, file: the path) and, if it helps, a last step to check the result; give \
 `estimate_minutes`, your honest guess of how long all of it takes.
-2. For each file: call `resolve_step` with status `running`, read both sides (`git diff`, \
-`git log`, `git show` of each side, the code around it), then edit the file so that it keeps \
+2. For each file: call `resolve_step` with status `running`, read both sides (the conflicts, \
+the history of each side, the code around it), then edit the file so that it keeps \
 what each side meant to do, and has no conflict marker (<<<<<<<, =======, >>>>>>>) left. Then \
 call `resolve_step` with `done` and a one-line note of how you resolved it, or `failed` with \
 why, if you can't resolve it with confidence (leave its markers then).
@@ -177,6 +203,7 @@ check.
 
 Keep notes and the summary short and plain: the user reads them in a small progress panel.",
         ours = s.ours_name,
+        git = git_reading(engine),
         ours_hash = short(&s.ours),
         op_word = if s.operation.is_empty() {
             "operation"
@@ -267,7 +294,11 @@ pub fn activities(engine: Engine, line: &str, dir: &str) -> Vec<Activity> {
         .map(|a| match a {
             Activity::Tool(t) => Activity::Tool(super::report::clean(&t, MAX_ACTIVITY)),
             Activity::Said(t) => Activity::Said(super::report::clean(&t, MAX_ACTIVITY)),
-            ended => ended,
+            Activity::Ended { ok, text, cost_usd } => Activity::Ended {
+                ok,
+                text: super::report::clean(&text, super::report::MAX_TEXT),
+                cost_usd,
+            },
         })
         .filter(|a| !matches!(a, Activity::Tool(t) | Activity::Said(t) if t.is_empty()))
         .collect()

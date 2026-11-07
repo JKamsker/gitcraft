@@ -54,8 +54,20 @@ pub enum FileResult {
     Deleted,
     /// Conflict markers are still in it.
     StillConflicted,
+    /// It had no markers to resolve (one side deleted or renamed it, or it is binary), and the
+    /// agent neither changed it nor said it was done with it: the user decides.
+    Untouched,
     /// The user changed it in their checkout since: it isn't applied over their work.
     ChangedMeanwhile,
+    /// It, or a folder on its way, isn't a plain file or folder (a link): never applied.
+    NotPlain,
+}
+
+/// What applying wrote, and what it couldn't.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Applied {
+    pub written: Vec<String>,
+    pub failed: Vec<(String, String)>,
 }
 
 impl FileResult {
@@ -144,17 +156,44 @@ fn sides(repo: &Path) -> (Sides, Option<Vec<String>>) {
     (sides, Some(replay))
 }
 
-/// Reads `path` of the checkout at `top`: `None` when there is no such file.
-fn read(top: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
-    match std::fs::read(top.join(path)) {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("couldn't read {path}: {e}")),
+/// Whether `path` of the checkout at `top` is reached without a link: none of its folders, nor
+/// it, is one (an agent could link a file of the checkout to a secret elsewhere, to have it
+/// applied and committed). `Ok(false)` when it, or a folder on its way, isn't there.
+fn plain(top: &Path, path: &str) -> Result<bool, String> {
+    let mut at = top.to_path_buf();
+    for part in path.split(['/', '\\']) {
+        at.push(part);
+        match std::fs::symlink_metadata(&at) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                return Err(format!("{path} goes through a link"));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(format!("couldn't look at {path}: {e}")),
+        }
     }
+    Ok(true)
 }
 
-/// Writes `bytes` to `path` of the checkout at `top` (removes it for `None`).
+/// Reads `path` of the checkout at `top`: `None` when there is no such file. One reached
+/// through a link, or that isn't a file, is an error.
+fn read(top: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
+    if !plain(top, path)? {
+        return Ok(None);
+    }
+    let file = top.join(path);
+    if !file.is_file() {
+        return Err(format!("{path} isn't a file"));
+    }
+    std::fs::read(&file)
+        .map(Some)
+        .map_err(|e| format!("couldn't read {path}: {e}"))
+}
+
+/// Writes `bytes` to `path` of the checkout at `top` (removes it for `None`), never through a
+/// link.
 fn write(top: &Path, path: &str, bytes: Option<&[u8]>) -> Result<(), String> {
+    plain(top, path)?;
     let file = top.join(path);
     match bytes {
         Some(bytes) => {
@@ -233,43 +272,65 @@ impl Workspace {
         &self.scratch.path
     }
 
-    /// How each file stands: the agent's version against the checkout at `repo` now.
-    pub fn check(&self, repo: &Path) -> Vec<(String, FileResult)> {
+    /// How each file stands: the agent's version against the checkout at `repo` now. `done`:
+    /// the files (or steps named after them) the agent reported done.
+    pub fn check(&self, repo: &Path, done: &[String]) -> Vec<(String, FileResult)> {
         self.files
             .iter()
-            .map(|file| {
-                let result = match (read(repo, &file.path), read(self.dir(), &file.path)) {
-                    (Ok(now), _) if now != file.original => FileResult::ChangedMeanwhile,
-                    (Err(_), _) => FileResult::ChangedMeanwhile,
-                    (Ok(_), Ok(None)) => FileResult::Deleted,
-                    (Ok(_), Ok(Some(text))) if !has_markers(&text) => FileResult::Resolved,
-                    (Ok(_), _) => FileResult::StillConflicted,
-                };
-                (file.path.clone(), result)
-            })
+            .map(|file| (file.path.clone(), self.check_one(repo, file, done)))
             .collect()
     }
 
-    /// Writes the agent's version of each of `paths` that is ready into the checkout at `repo`:
-    /// the paths written, for marking them resolved. One the user changed meanwhile, or that
-    /// still has conflicts, is left as it is.
-    pub fn apply(&self, repo: &Path, paths: &[String]) -> Result<Vec<String>, String> {
-        let ready: Vec<String> = self
-            .check(repo)
-            .into_iter()
-            .filter(|(path, result)| result.applies() && paths.contains(path))
-            .map(|(path, _)| path)
-            .collect();
-        for path in &ready {
-            let theirs = read(self.dir(), path)?;
-            write(repo, path, theirs.as_deref())?;
+    fn check_one(&self, repo: &Path, file: &Conflicted, done: &[String]) -> FileResult {
+        let Ok(now) = read(repo, &file.path) else {
+            return FileResult::NotPlain;
+        };
+        if now != file.original {
+            return FileResult::ChangedMeanwhile;
         }
-        Ok(ready)
+        let Ok(theirs) = read(self.dir(), &file.path) else {
+            return FileResult::NotPlain;
+        };
+        // A file with markers is resolved once they are gone; one without is only when the
+        // agent changed it or said it is done with it.
+        let decided = theirs != file.original || done.contains(&file.path);
+        match theirs {
+            Some(text) if file.conflicts > 0 && has_markers(&text) => FileResult::StillConflicted,
+            _ if file.conflicts == 0 && !decided => FileResult::Untouched,
+            Some(_) => FileResult::Resolved,
+            None => FileResult::Deleted,
+        }
+    }
+
+    /// Writes the agent's version of each of `paths` that is ready into the checkout at `repo`,
+    /// each on its own: one that fails doesn't stop the others. One the user changed
+    /// meanwhile, or that isn't resolved, is left as it is.
+    pub fn apply(&self, repo: &Path, paths: &[String], done: &[String]) -> Applied {
+        let mut applied = Applied::default();
+        for (path, result) in self.check(repo, done) {
+            if !result.applies() || !paths.contains(&path) {
+                continue;
+            }
+            let copied =
+                read(self.dir(), &path).and_then(|theirs| write(repo, &path, theirs.as_deref()));
+            match copied {
+                Ok(()) => applied.written.push(path),
+                Err(e) => applied.failed.push((path, e)),
+            }
+        }
+        applied
     }
 
     /// Removes the scratch worktree now, saying why if it couldn't be.
     pub fn remove(self) -> Result<(), String> {
         self.scratch.remove()
+    }
+
+    /// Removes it, trying again for a while: on Windows a program that just ended may still
+    /// hold its folder for a moment.
+    pub fn remove_patiently(self) -> Result<(), String> {
+        self.scratch
+            .remove_retrying(5, std::time::Duration::from_millis(400))
     }
 }
 

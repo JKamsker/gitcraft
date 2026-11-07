@@ -394,6 +394,8 @@ fn result_line(t: &Tokens, result: &FileResult) -> (&'static str, Color32, &'sta
             t.warning,
             "you changed it meanwhile: kept yours",
         ),
+        FileResult::Untouched => ("circle-alert", t.warning, "not decided: yours to choose"),
+        FileResult::NotPlain => ("x", t.danger, "a link, not a file: not applied"),
     }
 }
 
@@ -457,7 +459,7 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
             ui.add(crate::spinner::Spinner::new().size(14.0));
         }
         if ui
-            .button("Discard")
+            .add_enabled(run.phase == Phase::Ready, egui::Button::new("Discard"))
             .on_hover_text("Forget the agent's work; your checkout stays as it is")
             .clicked()
         {
@@ -468,13 +470,15 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
 
 fn applied(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
     ui.add_space(8.0);
-    let files = if run.applied == 1 { "1 file" } else { "files" };
-    let text = if run.applied == 1 {
-        format!("Applied {files} and marked it resolved.")
-    } else {
-        format!("Applied {} {files} and marked them resolved.", run.applied)
+    let text = match run.applied {
+        0 => "Nothing was applied.".to_owned(),
+        1 => "Applied 1 file and marked it resolved.".to_owned(),
+        n => format!("Applied {n} files and marked them resolved."),
     };
     ui.label(RichText::new(text).color(t.text));
+    if let Some(e) = &run.error {
+        ui.add(egui::Label::new(RichText::new(e).color(t.warning).small()).wrap());
+    }
     ui.label(
         RichText::new("Check the result in the staged changes before you commit.")
             .color(t.text_dim)

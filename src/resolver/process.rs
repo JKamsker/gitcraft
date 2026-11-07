@@ -18,6 +18,17 @@ const MAX_ACTIVITIES: usize = 300;
 const MAX_STDERR: usize = 8 * 1024;
 /// How often it is checked on.
 const TICK: Duration = Duration::from_millis(200);
+/// How long its output may stay open after it ended.
+const LINGER: Duration = Duration::from_secs(3);
+
+/// Sends on its channel when dropped: a reader's way of saying it is done.
+struct Closed(std::sync::mpsc::Sender<()>);
+
+impl Drop for Closed {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
+}
 
 /// How the process ended.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,7 +87,10 @@ impl Running {
         let dir_text = dir.display().to_string();
         let stdout = child.stdout.take().map(|out| {
             let (feed, changed) = (Arc::clone(&feed), Arc::clone(&changed));
+            let (done, read_all) = std::sync::mpsc::channel::<()>();
             std::thread::spawn(move || {
+                // Told once the pipe closes, however the loop ends.
+                let _done = Closed(done);
                 for line in BufReader::new(out).lines() {
                     let Ok(line) = line else { break };
                     let found = agent::activities(engine, &line, &dir_text);
@@ -94,9 +108,11 @@ impl Running {
                     }
                     changed();
                 }
-            })
+            });
+            read_all
         });
         let stderr = child.stderr.take().map(|mut err| {
+            let (tx, rx) = std::sync::mpsc::channel::<String>();
             std::thread::spawn(move || {
                 let mut kept = Vec::new();
                 let mut buf = [0u8; 4096];
@@ -110,8 +126,9 @@ impl Running {
                     }
                 }
                 let from = kept.len().saturating_sub(MAX_STDERR);
-                String::from_utf8_lossy(&kept[from..]).into_owned()
-            })
+                let _ = tx.send(String::from_utf8_lossy(&kept[from..]).into_owned());
+            });
+            rx
         });
         let child = Arc::new(Mutex::new(Some(child)));
         let (watched, fed) = (Arc::clone(&child), Arc::clone(&feed));
@@ -129,11 +146,18 @@ impl Running {
                 }
                 std::thread::sleep(TICK);
             };
-            // What it printed last (its result) is read before it counts as ended.
-            if let Some(reader) = stdout {
-                let _ = reader.join();
+            // What it printed last (its result) is read before it counts as ended; but
+            // something it left running may hold its output open, so not for ever.
+            let until = std::time::Instant::now() + LINGER;
+            if let Some(read_all) = stdout {
+                let _ = read_all.recv_timeout(LINGER);
             }
-            let stderr = stderr.and_then(|r| r.join().ok()).unwrap_or_default();
+            let stderr = stderr
+                .and_then(|rx| {
+                    rx.recv_timeout(until.saturating_duration_since(std::time::Instant::now()))
+                        .ok()
+                })
+                .unwrap_or_default();
             lock(&fed).exit = Some(Exit {
                 code,
                 stopped,
@@ -148,6 +172,15 @@ impl Running {
     pub fn stop(&self) {
         if let Some(mut child) = lock(&self.child).take() {
             std::thread::spawn(move || stop_here(&mut child));
+        }
+    }
+
+    /// Stops it, and what it started, before returning: for when nothing may be left behind
+    /// (gitcraft is closing, or its folder is removed next).
+    pub fn stop_now(&self) {
+        let taken = lock(&self.child).take();
+        if let Some(mut child) = taken {
+            stop_here(&mut child);
         }
     }
 

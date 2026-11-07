@@ -255,11 +255,14 @@ impl Progress {
         if self.finished.is_some() {
             return None;
         }
+        // Only steps seen running count: one reported over at once, or skipped, took no time
+        // that tells anything.
         let took: Vec<Duration> = self
             .steps
             .iter()
-            .filter(|s| s.status.is_over())
+            .filter(|s| matches!(s.status, StepStatus::Done | StepStatus::Failed))
             .filter_map(|s| Some(s.ended?.saturating_duration_since(s.started?)))
+            .filter(|d| !d.is_zero())
             .collect();
         let left = self.steps.iter().filter(|s| !s.status.is_over()).count();
         if !took.is_empty() && left > 0 {
