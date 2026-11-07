@@ -23,6 +23,7 @@ impl RepoTab {
         }
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
         self.shortcuts(&ctx, &mut acts);
+        self.drag_frame_start(&ctx);
 
         egui::Panel::top("repo_toolbar")
             .frame(
@@ -65,6 +66,7 @@ impl RepoTab {
                 }
             });
 
+        self.drag_overlay(&ctx, &mut acts);
         self.dialogs(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
@@ -123,7 +125,9 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.close_drop_menu() {
+                // The drop menu was in front of everything else.
+            } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);

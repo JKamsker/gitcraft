@@ -116,8 +116,12 @@ impl RepoTab {
         let full = remote_ref(&b.name);
         let shown = self.branch_shown(&full, false);
         let r = remote_row(ui, &full, row, has_pr, !shown);
+        let r = self.branch_drag_drop(ui, r, &b.name, true, &b.target, acts);
         acts.extend(visibility::eye(ui, &r, &full, shown));
-        let r = r.on_hover_text(format!("{}\nDouble-click to check out", b.name));
+        let r = r.on_hover_text(format!(
+            "{}\nDouble-click to check out, or drag onto a branch or a commit",
+            b.name
+        ));
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         } else if r.clicked() {

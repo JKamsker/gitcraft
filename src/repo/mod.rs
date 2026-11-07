@@ -17,6 +17,7 @@ mod diff;
 mod drafts;
 #[cfg(test)]
 mod drafts_tests;
+mod drag_drop;
 mod file_text;
 mod file_view;
 mod fold;
@@ -168,6 +169,8 @@ pub struct RepoTab {
     compare_requests: u64,
     file_view: Option<file_view::FileView>,
     rebase: Option<rebase::RebaseEditor>,
+    /// What a drop offers, while its menu is open.
+    drop_menu: Option<drag_drop::DropMenu>,
     /// The selected commit's message, being edited in the right pane.
     reword: Option<Reword>,
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
@@ -334,6 +337,7 @@ impl RepoTab {
             compare_requests: 0,
             file_view: None,
             rebase: None,
+            drop_menu: None,
             reword: None,
             push_flow: Default::default(),
             credentials: None,

@@ -5,8 +5,7 @@ use std::path::PathBuf;
 use super::pull::PullMode;
 use super::toolbar::reveal_label;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops,
-    pr_review, quick_edit, reflog,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop,
 };
 use crate::git::{self, InProgress};
 use crate::terminal::ShellSpec;
@@ -152,6 +151,10 @@ pub(crate) enum Action {
     },
     /// Apply a patch file, asking which.
     ApplyPatch,
+    /// Open the menu of what a drop offers.
+    DropMenu(drag_drop::DropMenu),
+    /// Move or squash a commit of the checked-out branch onto another of it.
+    CommitDrop(drag_drop::CommitDrop),
     /// Drop or move a commit of the checked-out branch.
     QuickEdit {
         edit: quick_edit::Edit,
@@ -293,6 +296,16 @@ pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
     Action::UndoableOps {
         label: format!("Rebase {current} onto {}", onto.name),
         ops: ops(&[&["rebase", &onto.full()]]),
+        refresh: Refresh::All,
+        undo: Undo::HeadMove { mode: "--keep" },
+    }
+}
+
+/// Cherry-picks the commit `hash` onto what is checked out.
+pub(crate) fn cherry_pick_action(hash: &str) -> Action {
+    Action::UndoableOps {
+        label: format!("Cherry-pick {}", super::short(hash)),
+        ops: ops(&[&["cherry-pick", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
     }

@@ -210,6 +210,8 @@ impl RepoTab {
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
+            Action::DropMenu(menu) => self.drop_menu = Some(menu),
+            Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
             Action::RunRebase => self.run_rebase(ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
             Action::RunFold(plan) => self.run_fold(*plan, ctx),

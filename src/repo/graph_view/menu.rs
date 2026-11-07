@@ -5,7 +5,7 @@ use egui::{Response, Ui};
 use super::badge::{BadgeKind, badges};
 use super::compare_items;
 use crate::git;
-use crate::repo::actions::{BranchRef, interactive_rebase_action};
+use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
 use crate::repo::conflict_check::Op;
 use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
@@ -339,12 +339,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
             .conflict_button(ui, cherry_pick, idle && !is_head, Op::CherryPick, hash)
     };
     if picked.clicked() {
-        acts.push(Action::UndoableOps {
-            label: format!("Cherry-pick {short}"),
-            ops: ops(&[&["cherry-pick", hash]]),
-            refresh: Refresh::All,
-            undo: Undo::HeadMove { mode: "--keep" },
-        });
+        acts.push(cherry_pick_action(hash));
     }
     if ui
         .add_enabled(idle, egui::Button::new("Revert commit"))

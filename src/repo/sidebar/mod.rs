@@ -73,6 +73,7 @@ impl RepoTab {
         let pane_h = ui.available_height();
         let gap = bottom_gap(pane_h, content_h);
         let output = scroll.show(ui, |ui| {
+            self.drag_auto_scroll(ui);
             ui.spacing_mut().item_spacing.y = 0.0;
             self.local_section(ui, acts, idle, &filter, &mut sections);
             self.remotes_section(ui, acts, idle, &filter, &mut sections);

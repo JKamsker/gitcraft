@@ -7,6 +7,7 @@ use egui::{
 
 use super::DIMMED;
 use super::badge::{Badge, BadgeKind, badges};
+use super::drag::PillHit;
 use super::menu::pill_menu_id;
 use super::row::Row;
 use crate::ci::CheckState;
@@ -17,7 +18,7 @@ use crate::theme::{self, Tokens};
 
 impl RepoTab {
     /// Branch and tag pills, left of the graph, joined to the commit's dot. Returns `resp`
-    /// with the column's tooltip.
+    /// with the column's tooltip, and the row's own pill.
     pub(super) fn refs_cell(
         &self,
         ui: &Ui,
@@ -25,7 +26,7 @@ impl RepoTab {
         row: &Row,
         resp: Response,
         acts: &mut Vec<Action>,
-    ) -> Response {
+    ) -> (Response, Option<PillHit>) {
         let t = Tokens::get(ui.ctx());
         let badges = badges(&row.commit.refs, &self.refs);
         let (Some(first), Some(node_x)) = (badges.first(), row.node_x) else {
@@ -34,7 +35,7 @@ impl RepoTab {
             if resp.secondary_clicked() {
                 ui.data_mut(|d| d.insert_temp(pill_menu_id(&row.commit.hash), None::<String>));
             }
-            return resp;
+            return (resp, None);
         };
         let (rect, mid, gx, cols) = (row.rect, row.mid(), row.gx, row.cols);
         let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
@@ -52,6 +53,7 @@ impl RepoTab {
             self.marks(first, &row.commit.hash),
         );
         self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
+        let hit = PillHit::of(first, pill, &row.commit.hash);
         let mut end = pill.right();
         let mut more_rect = None;
         if more > 0 {
@@ -65,21 +67,31 @@ impl RepoTab {
             [pos2(end, mid), pos2(node_x.min(gx + cols.graph), mid)],
             Stroke::new(1.5, row.color.gamma_multiply(0.8)),
         );
-        let stack_open = more_rect.is_some_and(|more| {
-            let at = pos2(rect.left() + 2.0, mid - 16.0);
-            self.ref_stack(ui, &badges, row.i, more, at, cols, row.color, acts)
-        });
+        // Not during a drag: the list would cover the rows below, which then take no drop.
+        let dragging = self.dragged(ui.ctx()).is_some();
+        let stack_open = !dragging
+            && more_rect.is_some_and(|more| {
+                let at = pos2(rect.left() + 2.0, mid - 16.0);
+                self.ref_stack(ui, &badges, row.i, more, at, cols, row.color, acts)
+            });
         let refs_cell = Rect::from_min_max(rect.min, pos2(gx, rect.bottom()));
-        if !stack_open && ui.rect_contains_pointer(refs_cell) {
+        // No tooltip in the way of a drag.
+        if !stack_open && !dragging && ui.rect_contains_pointer(refs_cell) {
             let lines: Vec<String> = badges.iter().map(Badge::describe).collect();
-            return resp.on_hover_text(format!(
-                "{}\nTip commit by {} · {}\nDouble-click a pill to check it out",
+            let drag = if first.kind == BadgeKind::Branch {
+                "Double-click a pill to check it out, or drag it onto a branch or a commit"
+            } else {
+                "Double-click a pill to check it out; drag the row to cherry-pick or move the commit"
+            };
+            let resp = resp.on_hover_text(format!(
+                "{}\nTip commit by {} · {}\n{drag}",
                 lines.join("\n"),
                 row.commit.author,
                 row.commit.date
             ));
+            return (resp, Some(hit));
         }
-        resp
+        (resp, Some(hit))
     }
 
     /// What a pill of `badge` on commit `hash` carries besides its name: whether the branch has

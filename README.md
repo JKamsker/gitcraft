@@ -116,6 +116,15 @@ so your config, credentials and hooks apply as usual.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_ (which asks first), _Move commit up_ / _down_, each a rebase without
   the editor and undone with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.
+- Drag and drop: drag a branch's pill (or its row in the left pane) onto another pill, a commit
+  or a branch in the left pane, and a small menu offers what makes sense there: _Merge x into
+  main_, _Rebase main onto x_, _Interactive rebase main onto x…_, or _Fast-forward_ when one
+  branch is only behind the other, which also works for a branch that isn't checked out. Drag a
+  commit onto the checked-out branch to cherry-pick it, and a commit of the checked-out branch
+  onto another commit of that branch to move it right above or below that one, or squash or fix
+  it up into it. The targets that take what is dragged light up, the graph scrolls near its
+  edges, Esc cancels, and each entry runs the same operation as the right-click menu, undone
+  with Ctrl+Z.
 
 **Branches, remotes, worktrees, stashes, tags** (left)
 
@@ -479,6 +488,7 @@ was made this way, on a demo repository.
 | `src/mergiraf.rs` | Mergiraf, run as the user's own command when it is installed |
 | `src/repo/rebase.rs`     | interactive rebase editor and its todo list                                        |
 | `src/repo/reflog/` | the reflog view and the scan for lost commits (`src/git/reflog/`: reading and parsing them) |
+| `src/repo/drag_drop/` | drag and drop: what a drop offers, the drop menu, moving and squashing commits |
 | `src/repo/file_view.rs`  | a file's history, blame and contents at a commit                                   |
 | `src/repo/file_text.rs`  | a whole file at a commit, coloured, for the file view and diffs                    |
 | `src/repo/dialogs.rs`    | branch, tag, stash, remote, worktree, pull request and confirm dialogs             |
