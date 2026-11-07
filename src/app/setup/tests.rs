@@ -13,6 +13,14 @@ fn wait(h: &mut egui_kittest::Harness<'_, App>) -> Result<(), String> {
     h.run_steps(3);
     Ok(())
 }
+// Previews can exceed the modal's viewport. Exercise the real pointer route after
+// scrolling the target into view rather than clicking an off-screen AccessKit rectangle.
+fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
+    h.get_by_label(label).scroll_to_me();
+    h.run_steps(3);
+    h.get_by_label(label).click();
+    h.run_steps(3);
+}
 #[test]
 fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup()
 -> Result<(), String> {
@@ -52,9 +60,7 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
     h.state_mut().setup.set_file(decoded);
     h.state_mut().setup.import = true;
     h.run_steps(3);
-    h.get_by_label("Add profiles, authors and public settings")
-        .click();
-    h.run_steps(3);
+    click(&mut h, "Add profiles, authors and public settings");
     assert_eq!(h.state().settings.active_profile, active);
     let id = *h
         .state()
@@ -74,9 +80,7 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
     let ctx = h.ctx.clone();
     assert!(!h.state_mut().switch_profile(id, &ctx));
     h.state_mut().setup.fresh.entry(id).or_default().signing = "new-local-signing-id".into();
-    h.get_by_label("Verify required setup and enable profile")
-        .click();
-    h.run_steps(3);
+    click(&mut h, "Verify required setup and enable profile");
     wait(&mut h)?;
     assert!(
         !h.state()
@@ -88,8 +92,7 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
             .pending_setup()
     );
     assert_eq!(h.state().settings.active_profile, active);
-    h.get_by_label("Activate Default").click();
-    h.run_steps(3);
+    click(&mut h, "Activate Default");
     assert_eq!(h.state().settings.active_profile, id);
     let parent = root.join("ui-restores");
     std::fs::create_dir(&parent).map_err(|e| e.to_string())?;
@@ -100,8 +103,7 @@ fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup
         plan.source = Some(repo.clone());
     }
     h.run_steps(3);
-    h.get_by_label("Clone and restore selected setup").click();
-    h.run_steps(3);
+    click(&mut h, "Clone and restore selected setup");
     wait(&mut h)?;
     assert!(
         h.state().setup.plans[0].complete,
