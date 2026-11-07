@@ -125,6 +125,7 @@ struct Layout {
     /// The branch column as drawn, and how wide it really is.
     refs: f32,
     refs_true: f32,
+    keep_branch_end: bool,
     graph: f32,
     lane_w: f32,
     /// Trailing columns, left to right: (header, width as drawn).
@@ -207,8 +208,8 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
             && l.refs > 0.0
         {
             let more = m.refs.len() - 1;
-            let more_w = if more > 0 { 28.0 } else { 0.0 };
-            let max_w = (l.refs_true - 10.0 - 5.0 - more_w - 14.0).max(40.0);
+            let more_w = if more > 0 { 22.0 } else { 0.0 };
+            let max_w = (l.refs_true - 10.0 - more_w).max(16.0);
             let clip = p.with_clip_rect(Rect::from_min_max(
                 pos2(l.left, r.top()),
                 pos2(l.gx() - 4.0, r.bottom()),
@@ -221,15 +222,18 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
             let pill = draw::pill(
                 &clip,
                 t,
-                pos2(l.left + 8.0, mid),
-                first,
+                pos2(l.left + 6.0, mid),
+                draw::PillLabel {
+                    text: first,
+                    keep_end: l.keep_branch_end,
+                },
                 fill,
                 *kind == RefKind::Head,
                 max_w,
             );
             let mut end = pill.right();
             if more > 0 {
-                let m = Rect::from_min_size(pos2(end + 3.0, mid - 10.0), vec2(25.0, 20.0));
+                let m = Rect::from_min_size(pos2(end + 3.0, mid - 10.0), vec2(more_w - 3.0, 20.0));
                 clip.rect_filled(m, t.radius, color.gamma_multiply(0.25));
                 clip.text(
                     m.center(),
@@ -397,13 +401,16 @@ pub(super) fn refs(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         LANE_W
     };
     let graph = graph_width(lane_w);
-    let refs_true = s.refs_width.max(210.0);
+    let refs_true = s.refs_width.max(crate::repo::columns::MIN_REFS_W);
     // Room is kept for the graph and the start of the descriptions.
-    let refs = refs_true.min(width - graph - 56.0).max(120.0);
+    let refs = refs_true
+        .min(width - graph - 56.0)
+        .max(crate::repo::columns::MIN_REFS_W);
     let l = Layout {
         left: rect.left(),
         refs,
         refs_true,
+        keep_branch_end: s.branch_names_keep_end,
         graph,
         lane_w,
         trailing: Vec::new(),
@@ -460,6 +467,7 @@ pub(super) fn columns(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         left: rect.left(),
         refs: 0.0,
         refs_true: 0.0,
+        keep_branch_end: s.branch_names_keep_end,
         graph,
         lane_w,
         trailing,
@@ -515,6 +523,7 @@ pub(super) fn lanes(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
             left: r.left(),
             refs: 0.0,
             refs_true: 0.0,
+            keep_branch_end: s.branch_names_keep_end,
             graph: graph_width(lane_w),
             lane_w,
             trailing: Vec::new(),
@@ -571,7 +580,10 @@ pub(super) fn lane_colors(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32, cur
             &p,
             t,
             pos2(px, y),
-            name,
+            draw::PillLabel {
+                text: name,
+                keep_end: s.branch_names_keep_end,
+            },
             t.lane(i),
             i == 0,
             rect.right() - px - 8.0,

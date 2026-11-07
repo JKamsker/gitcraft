@@ -6,7 +6,7 @@ use egui::{
 };
 
 use super::DIMMED;
-use super::badge::{Badge, BadgeKind, badges};
+use super::badge::{Badge, BadgeKind};
 use super::drag::PillHit;
 use super::menu::pill_menu_id;
 use super::row::Row;
@@ -29,7 +29,7 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) -> (Response, Option<PillHit>) {
         let t = Tokens::get(ui.ctx());
-        let badges = badges(&row.commit.refs, &self.refs);
+        let badges = self.graph_badges(row.commit);
         let (Some(first), Some(node_x)) = (badges.first(), row.node_x) else {
             // No pill was right-clicked: forget one right-clicked on this row before, which
             // may have moved off it since, or its menu would offer that branch here.
@@ -48,15 +48,15 @@ impl RepoTab {
             rp.set_opacity(1.0);
         }
         let more = badges.len() - 1;
-        let more_w = if more > 0 { 28.0 } else { 0.0 };
-        let max_w = cols.refs - 10.0 - 5.0 - more_w - 14.0;
+        let more_w = if more > 0 { 22.0 } else { 0.0 };
+        let max_w = cols.refs - 10.0 - more_w;
         let pill = ref_pill(
             ui,
             &rp,
-            pos2(rect.left() + 8.0, mid),
+            pos2(rect.left() + 6.0, mid),
             first,
             row.color,
-            max_w.max(40.0),
+            max_w.max(16.0),
             self.marks(first, &row.commit.hash),
         );
         ghost_pill_marks(&rp, &t, pill, moved, gone);
@@ -92,7 +92,9 @@ impl RepoTab {
                     .filter(|b| b.kind == BadgeKind::Branch && b.local)
                     .filter_map(|b| self.stack_line(&b.label)),
             );
-            let drag = if first.kind == BadgeKind::Branch {
+            let drag = if first.kind == BadgeKind::PullRequest {
+                "Pull request tip; double-click its entry in the left pane to open details"
+            } else if first.kind == BadgeKind::Branch {
                 "Double-click a pill to check it out, or drag it onto a branch or a commit"
             } else {
                 "Double-click a pill to check it out; drag the row to cherry-pick or move the commit"
@@ -202,7 +204,7 @@ impl RepoTab {
                 .first()
                 .map(|remote| Action::CheckoutRemote(format!("{remote}/{}", badge.label))),
             BadgeKind::Tag => Some(Action::Checkout(format!("refs/tags/{}", badge.label))),
-            BadgeKind::DetachedHead => None,
+            BadgeKind::DetachedHead | BadgeKind::PullRequest => None,
         }
     }
 
@@ -274,6 +276,7 @@ impl RepoTab {
     /// Clicks on one pill of a row's stack, which act like those on the row's own pill.
     fn stack_slot_clicks(&self, resp: Response, b: &Badge, i: usize, acts: &mut Vec<Action>) {
         let hint = match self.pill_checkout(b) {
+            _ if b.kind == BadgeKind::PullRequest => "pull request tip",
             _ if b.head => "checked out",
             Some(Action::Pull) => "double-click to pull",
             _ => "double-click to check out",
@@ -367,7 +370,7 @@ fn ref_pill(
     let fill = match badge.kind {
         BadgeKind::Branch if badge.local => lane,
         // Only on a remote: a darker shade of the lane.
-        BadgeKind::Branch => lane.lerp_to_gamma(Color32::BLACK, 0.35),
+        BadgeKind::Branch | BadgeKind::PullRequest => lane.lerp_to_gamma(Color32::BLACK, 0.35),
         BadgeKind::Tag => Color32::from_rgb(104, 104, 112),
         BadgeKind::DetachedHead => t.warning,
     };
@@ -377,16 +380,41 @@ fn ref_pill(
     } else {
         fill.lerp_to_gamma(Color32::BLACK, DIMMED)
     };
-    let (lead, trail) = pill_icons(badge, marks.pr);
+    let (mut lead, mut trail) = pill_icons(badge, marks.pr);
     let font = if badge.head {
         theme::semibold(11.0)
     } else {
         theme::medium(11.0)
     };
-    let dot_w = if marks.ci.is_some() { 12.0 } else { 0.0 };
+    // At the column's minimum, the branch name takes precedence over its decorations. Keep
+    // room for at least a short name such as `dev`; the tooltip still describes every mark.
+    let name_w = painter
+        .layout_no_wrap(badge.label.clone(), font.clone(), white)
+        .size()
+        .x;
+    let short_w = painter
+        .layout_no_wrap("dev".to_owned(), font.clone(), white)
+        .size()
+        .x;
+    let icon_room = (max_w - 16.0 - name_w.min(short_w)).max(0.0);
+    let mut ci = marks.ci;
+    let mut dot_w = if ci.is_some() { 12.0 } else { 0.0 };
+    while (lead.len() + trail.len()) as f32 * ICON + dot_w > icon_room {
+        if trail.pop().is_some() {
+            continue;
+        }
+        if ci.take().is_some() {
+            dot_w = 0.0;
+            continue;
+        }
+        if lead.pop().is_none() {
+            break;
+        }
+    }
     let icons_w = (lead.len() + trail.len()) as f32 * ICON + dot_w;
     let text_room = (max_w - 16.0 - icons_w).max(16.0);
-    let label = truncate(painter, &badge.label, &font, text_room);
+    let keep_end = crate::settings::Settings::branch_names_keep_end(ui.ctx());
+    let label = truncate(painter, &badge.label, &font, text_room, keep_end);
     let galley = painter.layout_no_wrap(label, font, white);
     let w = (galley.size().x + 16.0 + icons_w).min(max_w);
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 10.0), vec2(w, 20.0));
@@ -415,7 +443,7 @@ fn ref_pill(
         );
         x += ICON;
     }
-    if let Some(state) = marks.ci {
+    if let Some(state) = ci {
         // On a ring of the pill's colour, so it reads on any lane.
         let center = pos2((x + 7.0).min(r.right() - 7.0), r.center().y);
         painter.circle_filled(center, ci_status::DOT_R + 1.5, Color32::WHITE);
@@ -431,6 +459,7 @@ fn pill_icons(badge: &Badge, pr: bool) -> (Vec<&'static str>, Vec<&'static str>)
     match badge.kind {
         BadgeKind::Tag => lead.push("tag"),
         BadgeKind::DetachedHead => lead.push("check"),
+        BadgeKind::PullRequest => trail.push("git-pull-request"),
         BadgeKind::Branch => {
             if badge.head {
                 lead.push("check");
@@ -451,7 +480,7 @@ fn pill_icons(badge: &Badge, pr: bool) -> (Vec<&'static str>, Vec<&'static str>)
 }
 
 /// `text`, cut with an ellipsis to fit `width`.
-fn truncate(painter: &Painter, text: &str, font: &FontId, width: f32) -> String {
+fn truncate(painter: &Painter, text: &str, font: &FontId, width: f32, keep_end: bool) -> String {
     let fits = |s: &str| {
         painter
             .layout_no_wrap(s.to_owned(), font.clone(), Color32::WHITE)
@@ -459,22 +488,7 @@ fn truncate(painter: &Painter, text: &str, font: &FontId, width: f32) -> String 
             .x
             <= width
     };
-    if fits(text) {
-        return text.to_owned();
-    }
-    // The longest prefix that fits with the ellipsis, by bisection: a prefix is never wider
-    // than a longer one, and this runs for every cut pill every frame.
-    let cut = |n: usize| text.chars().take(n).collect::<String>() + "…";
-    let (mut lo, mut hi) = (0, text.chars().count().saturating_sub(1));
-    while lo < hi {
-        let mid = (lo + hi).div_ceil(2);
-        if fits(&cut(mid)) {
-            lo = mid;
-        } else {
-            hi = mid - 1;
-        }
-    }
-    if lo == 0 { "…".to_owned() } else { cut(lo) }
+    crate::settings::fit_branch_name(text, keep_end, fits)
 }
 
 #[cfg(test)]
@@ -497,6 +511,85 @@ mod tests {
             remotes: vec![remote.to_owned()],
             head: false,
         }
+    }
+
+    #[test]
+    fn minimum_column_keeps_dev_and_the_extra_refs_count_visible() {
+        let mut tab = tab(Refs {
+            current: Some("dev".to_owned()),
+            ..Refs::default()
+        });
+        tab.prs.push(crate::forge::PullRequest {
+            number: 1,
+            title: "Dev changes".to_owned(),
+            branch: "dev".to_owned(),
+            base: "main".to_owned(),
+            from_fork: false,
+            sha: "a".to_owned(),
+            author: String::new(),
+            url: String::new(),
+            draft: false,
+        });
+        tab.ci.by_sha.insert(
+            "a".to_owned(),
+            crate::ci::Status {
+                state: CheckState::Passed,
+                checks: Vec::new(),
+            },
+        );
+        let commit = crate::git::Commit {
+            hash: "a".to_owned(),
+            refs: ["HEAD -> dev", "refs/remotes/origin/dev", "tag: v1"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+            ..crate::git::Commit::default()
+        };
+        let ctx = egui::Context::default();
+        theme::install_fonts(&ctx);
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let row = Row {
+                i: 0,
+                commit: &commit,
+                rect: Rect::from_min_size(Pos2::ZERO, vec2(600.0, 32.0)),
+                cols: Cols {
+                    refs: crate::repo::columns::MIN_REFS_W,
+                    graph: 60.0,
+                    hash: 0.0,
+                    author: 0.0,
+                    when: 0.0,
+                    date: 0.0,
+                    push: 0.0,
+                },
+                gx: crate::repo::columns::MIN_REFS_W,
+                lane_w: 20.0,
+                node_x: Some(90.0),
+                color: Color32::BLUE,
+            };
+            let resp = ui.interact(row.rect, ui.id().with("narrow-refs"), Sense::click());
+            let (_, hit) = tab.refs_cell(ui, ui.painter(), &row, resp, &mut Vec::new());
+            assert!(hit.is_some_and(|hit| hit.rect.right() <= row.gx - 4.0));
+        });
+        let mut names = Vec::new();
+        for shape in &output.shapes {
+            if let egui::epaint::Shape::Text(text) = &shape.shape {
+                let label = text.galley.text();
+                if label == "dev" || label == "+1" {
+                    assert!(text.pos.x >= shape.clip_rect.left());
+                    assert!(text.pos.x + text.galley.size().x <= shape.clip_rect.right());
+                    names.push(label);
+                }
+            }
+        }
+        assert!(
+            names.contains(&"dev"),
+            "the short branch name must stay whole"
+        );
+        assert!(
+            names.contains(&"+1"),
+            "the extra refs count must stay reachable"
+        );
+        output.textures_delta.clear();
     }
 
     #[test]

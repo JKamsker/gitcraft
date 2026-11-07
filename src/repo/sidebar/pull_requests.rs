@@ -77,7 +77,10 @@ impl RepoTab {
         widgets::a11y(&r, egui::WidgetType::Button, || {
             labels::pull_request(pr.number, &pr.title, &pr.author, &pr.branch, pr.draft)
         });
-        let shown = self.pr_view.as_ref().is_some_and(|v| v.number == pr.number);
+        let shown = self.pr_view.as_ref().is_some_and(|v| v.number == pr.number)
+            || self.compare.as_ref().is_some_and(|c| {
+                c.target_label == pr.branch && c.target.as_deref() == Some(pr.sha.as_str())
+            });
         if shown {
             ui.painter().rect_filled(rect, 0.0, t.row_selected);
         } else if r.hovered() {
@@ -147,26 +150,29 @@ impl RepoTab {
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
         let r = r.on_hover_text(if has_view {
-            format!("{}\nClick to open", pr.url)
+            format!(
+                "{}\nClick to show its changes; double-click to open details",
+                pr.url
+            )
         } else {
-            format!("{}\nDouble-click to open in the browser", pr.url)
+            format!(
+                "{}\nClick to show its changes; double-click to open in the browser",
+                pr.url
+            )
         });
         let r = match badges {
             Some(why) => r.on_hover_text(why),
             None => r,
         };
-        if has_view {
-            // A double-click opens it as a click does: its first click already did.
-            if r.clicked() && !r.double_clicked() {
+        if r.double_clicked() {
+            if has_view {
                 acts.push(Action::OpenPr(pr.number));
+            } else {
+                acts.push(Action::OpenUrl(pr.url.clone()));
+                acts.extend(seen_on_open);
             }
-        } else if r.double_clicked() {
-            acts.push(Action::OpenUrl(pr.url.clone()));
-            acts.extend(seen_on_open);
-        } else if r.clicked()
-            && let Some(target) = self.pr_target(pr)
-        {
-            acts.push(Action::SelectHash(target));
+        } else if r.clicked() {
+            acts.push(Action::SelectPr(pr.number));
         }
         egui::Popup::context_menu(&r)
             .style(crate::theme::menu_style)
@@ -205,7 +211,10 @@ impl RepoTab {
     }
 
     /// The tip of `pr`'s branch, local or on a remote.
-    fn pr_target(&self, pr: &PullRequest) -> Option<String> {
+    pub(in crate::repo) fn pr_target(&self, pr: &PullRequest) -> Option<String> {
+        if !pr.sha.is_empty() {
+            return Some(pr.sha.clone());
+        }
         self.refs
             .local
             .iter()
@@ -528,6 +537,72 @@ mod tests {
             author: String::new(),
             url: String::new(),
             draft: false,
+        }
+    }
+
+    /// The second click of a double-click must open details without dispatching another
+    /// selection that could replace the page with a late comparison result.
+    #[test]
+    fn a_click_selects_the_whole_pr_and_a_double_click_opens_its_details() {
+        for forge in Forge::ALL {
+            let ctx = egui::Context::default();
+            crate::theme::install_fonts(&ctx);
+            let tab = RepoTab::new_deferred("/nonexistent/pr-click-test".into(), &ctx);
+            let pr = PullRequest {
+                number: 7,
+                title: "Two commits to review".to_owned(),
+                url: "https://example.org/team/app/pull/7".to_owned(),
+                ..pr("feature", "head")
+            };
+            let point = pos2(100.0, 18.0);
+            let frame = |time: f64, events: Vec<egui::Event>| {
+                let mut acts = Vec::new();
+                ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            vec2(360.0, 120.0),
+                        )),
+                        time: Some(time),
+                        events,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        egui::CentralPanel::default()
+                            .frame(egui::Frame::NONE)
+                            .show(ui, |ui| tab.pr_row(ui, &mut acts, forge, &pr, true));
+                    },
+                )
+                .drop_without_applying_deltas();
+                acts
+            };
+            let click = |pressed| egui::Event::PointerButton {
+                pos: point,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(1.0, vec![egui::Event::PointerMoved(point)]);
+            let first = frame(1.1, vec![click(true), click(false)]);
+            assert!(
+                matches!(first.as_slice(), [Action::SelectPr(7)]),
+                "{forge:?}"
+            );
+            let second = frame(1.2, vec![click(true), click(false)]);
+            if forge.has_pages() {
+                assert!(
+                    matches!(second.as_slice(), [Action::OpenPr(7)]),
+                    "{forge:?}"
+                );
+            } else {
+                assert!(
+                    matches!(second.as_slice(), [
+                    Action::OpenUrl(url),
+                    Action::Versions(crate::repo::versions::VersionsAct::PrSeen(7)),
+                ] if url == &pr.url),
+                    "{forge:?}"
+                );
+            }
         }
     }
 

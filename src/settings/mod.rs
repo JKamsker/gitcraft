@@ -2,6 +2,7 @@
 
 mod agents;
 mod ai_page;
+mod branch_names;
 mod custom_commands;
 mod diffs;
 mod external_tools;
@@ -20,6 +21,7 @@ use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
+pub(crate) use branch_names::fit as fit_branch_name;
 use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
@@ -47,6 +49,8 @@ pub struct Settings {
     pub shell: String,
     /// Width of the branch/tag column of the graph.
     pub refs_width: f32,
+    /// Shortened branch and tag pills keep their end rather than their beginning.
+    pub branch_names_keep_end: bool,
     /// Width of the graph column; 0 = fit the lanes of the repository.
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
@@ -172,6 +176,7 @@ impl Default for Settings {
             terminal_font: 12.5,
             shell: String::new(),
             refs_width: 280.0,
+            branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
             author_width: 150.0,
@@ -239,6 +244,14 @@ impl Settings {
     pub fn get(ctx: &egui::Context) -> Settings {
         ctx.data(|d| d.get_temp::<Settings>(id()))
             .unwrap_or_default()
+    }
+
+    /// Read just the pill shortening preference without cloning the settings for every pill.
+    pub(crate) fn branch_names_keep_end(ctx: &egui::Context) -> bool {
+        ctx.data_mut(|d| {
+            d.get_temp_mut_or_default::<Settings>(id())
+                .branch_names_keep_end
+        })
     }
 
     /// Gives the graph's columns their first widths back; which of them show stays.
@@ -690,11 +703,34 @@ impl Settings {
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         ui.add(layout::slider(
-                            egui::Slider::new(&mut self.refs_width, 210.0..=2000.0)
-                                .step_by(10.0)
-                                .suffix(" px"),
+                            egui::Slider::new(
+                                &mut self.refs_width,
+                                crate::repo::columns::MIN_REFS_W..=2000.0,
+                            )
+                            .step_by(10.0)
+                            .suffix(" px"),
                         ));
                     });
+                    card.preview(Preview::GraphRefs);
+                    card.row(
+                        "Shortened branch names",
+                        "refs tags pills abbreviation ellipsis suffix prefix",
+                        |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing.x = 18.0;
+                                ui.radio_value(
+                                    &mut self.branch_names_keep_end,
+                                    true,
+                                    "Keep end (…xyz)",
+                                );
+                                ui.radio_value(
+                                    &mut self.branch_names_keep_end,
+                                    false,
+                                    "Keep start (xyz…)",
+                                );
+                            });
+                        },
+                    );
                     card.preview(Preview::GraphColumns);
                     card.row_hint(
                         "Columns",

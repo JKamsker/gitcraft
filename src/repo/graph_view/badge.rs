@@ -21,6 +21,8 @@ pub(super) enum BadgeKind {
     Branch,
     Tag,
     DetachedHead,
+    /// A PR tip fetched as an object, with no corresponding branch ref here.
+    PullRequest,
 }
 
 impl Badge {
@@ -37,6 +39,7 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),
             BadgeKind::DetachedHead => "detached HEAD".to_owned(),
+            BadgeKind::PullRequest => format!("pull request branch {}", self.label),
             BadgeKind::Branch if self.head => format!("branch {}, checked out", self.label),
             BadgeKind::Branch if !self.local => format!("remote branch {}", self.git_ref()),
             BadgeKind::Branch => format!("branch {}", self.label),
@@ -48,6 +51,7 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => vec![format!("refs/tags/{}", self.label)],
             BadgeKind::DetachedHead => vec!["HEAD".to_owned()],
+            BadgeKind::PullRequest => Vec::new(),
             BadgeKind::Branch => {
                 let mut refs: Vec<String> = self
                     .remotes
@@ -66,6 +70,10 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),
             BadgeKind::DetachedHead => "HEAD (detached)".to_owned(),
+            BadgeKind::PullRequest => format!(
+                "{} — pull request branch (not fetched as a branch)",
+                self.label
+            ),
             BadgeKind::Branch => {
                 let mut places = Vec::new();
                 if self.local {
@@ -183,13 +191,47 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
             }
         }
     }
-    // Checked out first, then local branches, remote-only ones, tags.
-    out.sort_by_key(|b| match b.kind {
-        _ if b.head => 0,
-        BadgeKind::Branch if b.local => 1,
-        BadgeKind::Branch => 2,
-        BadgeKind::Tag => 3,
-        BadgeKind::DetachedHead => 4,
+    for badge in &mut out {
+        // A log's decorations needn't include HEAD (for example a filtered graph). The refs
+        // read alongside it still identify the checked-out local branch.
+        if badge.kind == BadgeKind::Branch && badge.local {
+            badge.head = match refs.current.as_deref() {
+                Some(current) => current == badge.label,
+                None => {
+                    badge.head
+                        || refs
+                            .local
+                            .iter()
+                            .any(|b| b.name == badge.label && b.is_head)
+                }
+            };
+        }
+        badge.remotes.sort();
+        badge.remotes.dedup();
+    }
+    // These pills all point at the same commit, so their commit distance to the default
+    // branch ties. Show the checked-out branch first, then the usual default/integration
+    // branches, before other local branches, remote-only branches and tags. Name ties are
+    // explicit: git's decoration order mustn't decide which branch hides under +N.
+    out.sort_by(|a, b| {
+        let rank = |badge: &Badge| match badge.kind {
+            _ if badge.head => 0,
+            BadgeKind::Branch => match badge.label.as_str() {
+                "main" => 1,
+                "master" => 2,
+                "dev" => 3,
+                "develop" => 4,
+                _ if badge.local => 5,
+                _ => 6,
+            },
+            BadgeKind::Tag => 7,
+            BadgeKind::DetachedHead => 8,
+            BadgeKind::PullRequest => 9,
+        };
+        rank(a)
+            .cmp(&rank(b))
+            .then_with(|| a.label.cmp(&b.label))
+            .then_with(|| a.remotes.cmp(&b.remotes))
     });
     out
 }
@@ -319,6 +361,63 @@ mod tests {
         assert_eq!(b[1].git_ref(), "x");
         assert_eq!(b[2].git_ref(), "gone/topic");
         assert_eq!(b[3].kind, BadgeKind::Tag);
+    }
+
+    #[test]
+    fn checked_out_branch_wins_even_without_a_head_decoration() {
+        let refs = Refs {
+            current: Some("topic".to_owned()),
+            local: vec![branch("main"), branch("topic")],
+            ..refs_with_origin()
+        };
+        let b = badges(&["main", "origin/main", "topic"].map(String::from), &refs);
+        assert_eq!(b[0].label, "topic");
+        assert!(b[0].head);
+        assert_eq!(b[1].label, "main");
+        // Live checkout metadata also takes precedence over decorations read earlier.
+        let b = badges(&["HEAD -> main", "topic"].map(String::from), &refs);
+        assert_eq!(b[0].label, "topic");
+        assert!(!b[1].head);
+    }
+
+    #[test]
+    fn default_branch_names_win_over_other_branches_at_the_same_commit() {
+        for (names, first) in [
+            (vec!["topic", "dev", "master", "main"], "main"),
+            (vec!["topic", "dev", "master"], "master"),
+            (vec!["topic", "dev", "develop"], "dev"),
+            (vec!["topic", "develop"], "develop"),
+        ] {
+            let decos: Vec<String> = names.into_iter().map(str::to_owned).collect();
+            assert_eq!(badges(&decos, &refs_with_origin())[0].label, first);
+        }
+        // A default branch on the remote still represents this commit ahead of a local
+        // feature branch; it needn't have been checked out locally.
+        let decos = ["topic", "origin/dev"].map(String::from);
+        let b = badges(&decos, &refs_with_origin());
+        assert_eq!(b[0].label, "dev");
+        assert!(!b[0].local);
+    }
+
+    #[test]
+    fn branch_ties_are_independent_of_git_decoration_order() {
+        let refs = Refs {
+            remotes: vec![("z".to_owned(), vec![]), ("a".to_owned(), vec![])],
+            ..Refs::default()
+        };
+        let names = ["beta", "a/topic", "alpha", "z/topic", "tag: release"];
+        let forward = badges(&names.map(String::from), &refs);
+        let backward = badges(
+            &names
+                .into_iter()
+                .rev()
+                .map(String::from)
+                .collect::<Vec<_>>(),
+            &refs,
+        );
+        let describe =
+            |badges: Vec<Badge>| badges.into_iter().map(|b| b.describe()).collect::<Vec<_>>();
+        assert_eq!(describe(forward), describe(backward));
     }
 
     #[test]

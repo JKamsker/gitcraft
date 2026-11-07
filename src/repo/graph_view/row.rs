@@ -4,7 +4,7 @@
 use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Stroke};
 use egui::{Ui, pos2, vec2};
 
-use super::badge::{Badge, badges};
+use super::badge::Badge;
 use super::{AVATAR_D, ROW_GAP, ROW_H, ROW_PITCH};
 use crate::a11y::labels;
 use crate::git::{self, Commit};
@@ -197,7 +197,8 @@ impl RepoTab {
         if let Some(stash) = self.stashes.iter().find(|s| s.hash == commit.hash) {
             return labels::join([labels::stash(&stash.name, &stash.message), when]);
         }
-        let refs: Vec<String> = badges(&commit.refs, &self.refs)
+        let refs: Vec<String> = self
+            .graph_badges(commit)
             .iter()
             .map(Badge::spoken)
             .collect();
