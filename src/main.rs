@@ -38,6 +38,10 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
+    if let Some(code) = app::checkpoint_cli() {
+        std::process::exit(code);
+    }
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

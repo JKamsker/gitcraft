@@ -338,7 +338,10 @@ impl<'a> Rows<'a> {
         let pickable = self.partial && matches!(kind, Some(Kind::Add | Kind::Del));
         let spot = self.comment_spot(i, side);
         let active = spot.is_some_and(|spot| self.is_target(spot));
-        let picked = self.view.chosen.contains(&i) || active;
+        // A line a pull-request comment is written on shows picked; one a note is written on
+        // doesn't, in a diff where picking a line is staging it.
+        let local = self.review.is_some_and(|r| r.local);
+        let picked = self.view.chosen.contains(&i) || (active && !local);
         // Hunk headers aren't copied, so they don't look selected either.
         let sel_chars = self
             .text_sel
@@ -355,9 +358,6 @@ impl<'a> Rows<'a> {
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {
             self.hit_test(rect, (i, side), origin, &galley, pickable);
         }
-        if let Some(spot) = spot {
-            self.comment_gutter(ui, rect, i, side, spot, acts);
-        }
         if pickable {
             let resp = ui
                 .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
@@ -368,6 +368,10 @@ impl<'a> Rows<'a> {
                 self.clicked = Some(i);
             }
             self.picks.push(resp);
+        }
+        // After the line's own click: its numbers take a note, the rest of it picks it.
+        if let Some(spot) = spot {
+            self.comment_gutter(ui, rect, i, side, spot, acts);
         }
         if kind == Some(Kind::Hunk) {
             let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
@@ -440,23 +444,45 @@ impl<'a> Rows<'a> {
             NUM_W
         };
         let area = Rect::from_min_size(rect.min, vec2(gutter, LINE_H));
-        let resp = ui
-            .interact(
-                area,
-                ui.id().with(("diff_gutter", i, column_of(side))),
-                Sense::click(),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Comment on this line");
+        // Where a click picks the line (to stage it), a note takes Alt+click: the plain click
+        // stays the line's.
+        let alt_only = review.local && self.partial;
+        let alt = ui.input(|i| i.modifiers.alt);
+        let sense = if alt_only && !alt {
+            Sense::hover()
+        } else {
+            Sense::click()
+        };
+        let tip = match (review.local, alt_only) {
+            (false, _) => "Comment on this line",
+            (true, false) => "Note for the agent on this line",
+            (true, true) => "Alt+click: note for the agent on this line",
+        };
+        let resp = ui.interact(
+            area,
+            ui.id().with(("diff_gutter", i, column_of(side))),
+            sense,
+        );
+        let resp = if sense == Sense::click() {
+            resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+        } else {
+            resp
+        }
+        .on_hover_text(tip);
         let count = review.marks.get(&(spot_side, number)).copied();
         let active = self.is_target((spot_side, number));
         paint_gutter_mark(ui, area, count, resp.hovered(), active);
         if resp.clicked() {
-            acts.push(Action::Pr(PrAct::OpenLine(LineTarget {
+            let target = LineTarget {
                 path: review.path.clone(),
                 line: number,
                 side: spot_side,
-            })));
+            };
+            acts.push(if review.local {
+                Action::Agent(crate::repo::agents::AgentAct::OpenNote(target))
+            } else {
+                Action::Pr(PrAct::OpenLine(target))
+            });
         }
     }
 

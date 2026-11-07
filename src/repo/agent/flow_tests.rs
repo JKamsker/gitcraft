@@ -175,7 +175,7 @@ fn a_card_nobody_answers_is_denied_by_itself() {
     let ctx = egui::Context::default();
     let dir = repo("timeout");
     let mut tab = tab(&dir, &ctx);
-    tab.agents.approval_wait = Duration::from_millis(50);
+    tab.agent_calls.approval_wait = Duration::from_millis(50);
     let rx = ask(&mut tab, &ctx, WriteOp::Push { force: true });
     let reply = answer(&mut tab, &ctx, &rx);
     let _ = std::fs::remove_dir_all(&dir);
@@ -184,7 +184,7 @@ fn a_card_nobody_answers_is_denied_by_itself() {
 
     let dir = repo("timeout-card");
     let mut tab = self::tab(&dir, &ctx);
-    tab.agents.approval_wait = Duration::from_millis(50);
+    tab.agent_calls.approval_wait = Duration::from_millis(50);
     let rx = ask(&mut tab, &ctx, delete_old());
     let reply = answer(&mut tab, &ctx, &rx);
     let kept = git::resolve(&dir, "refs/heads/old").is_ok();
@@ -212,7 +212,7 @@ fn requests_wait_their_turn_behind_the_card() {
         },
     );
     // Planned, but not run while the card is open.
-    settle(&mut tab, &ctx, |t| !t.agents.queue.is_empty());
+    settle(&mut tab, &ctx, |t| !t.agent_calls.queue.is_empty());
     let waited = git::resolve(&dir, "refs/heads/next").is_err();
     tab.agent_decide(false, &ctx);
     let first = answer(&mut tab, &ctx, &first);

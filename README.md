@@ -934,6 +934,58 @@ so your config, credentials and hooks apply as usual.
   listed apart, with how sparse-checkout is set up, and are never cleared; with pattern-mode
   sparse-checkout every skip-worktree file counts as its own.
 
+**Coding agents**
+
+- _Start agent task…_ (the + of AGENTS on the left, or the palette) makes a branch and a
+  worktree beside the repository, opens it and starts a terminal there running the agent you
+  pick: Claude Code, Codex, Gemini CLI, Cursor Agent, Aider or a command of your own, the task
+  given as its first message when the agent takes one. If the agent isn't installed there, the
+  terminal says so. AGENTS lists the tasks with their uncommitted changes; click one to
+  open its worktree and review what the agent did with the normal diff.
+- _Worktree setup…_ (palette): a recipe per repository that runs in every worktree gitcraft
+  makes (the Add worktree dialog, a pull request's _Open in worktree_, agent tasks), in a
+  terminal with its output: it copies or links ignored files from the main worktree
+  (`.env.local`, `node_modules`), sets variables per worktree
+  (`PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))`, a `CARGO_TARGET_DIR` of its own; the main
+  worktree is number 0, the others keep the number they were given) and runs a setup command
+  (`npm ci`). A step that fails says so; the setup command and the agent are then not run. It runs with `sh` on the repository's machine (Git's own `sh` on Windows),
+  WSL and SSH included; the script it makes can be read in the editor, and tried on a worktree
+  before saving. Kept in `.git/gitcraft/`, never committed.
+- Agent turns as review steps: _Agent turns: save each turn in this worktree_ (palette), or
+  _Save each turn to review on its own_ when starting a task, installs Claude Code's
+  `UserPromptSubmit` / `Stop` hooks (`.claude/settings.local.json`) and Codex's `notify`
+  (`.codex/config.toml`, read for trusted projects), both kept out of git through
+  `info/exclude`. After each turn they run `gitcraft checkpoint`, which saves the worktree as
+  it is (uncommitted and untracked files, its own index untouched) under
+  `refs/gitcraft/agent/<session>/<n>`, a turn that changed nothing skipped. _Uncommitted
+  changes_ then shows AGENT TURNS, each named by its prompt: click one to see what that turn
+  changed; its menu compares it with the files as they are now. The latest session shows,
+  earlier ones fold away (named by their first prompt); a session's menu deletes its turns.
+  Hooks take effect the next time the agent starts in the worktree. On a WSL or SSH machine, where gitcraft isn't,
+  the hooks run a `sh` script gitcraft writes into the repository's git folder. The turns are
+  not history: the graph leaves them out.
+- Hand it to the agent: click a line's number in a diff (Alt+click in a diff of uncommitted
+  changes, where a click picks the line to stage it) to write a note for the agent on it. Notes
+  are kept per worktree until they are sent, never published, and collect in NOTES FOR THE
+  AGENT under the big area; _Send to agent_ types them into the worktree's agent terminal (a
+  terminal named after the agent, or the one picked beside the button) as one message, pasted
+  for you to send with Enter, and clears them. The same _Send to agent_ is on a conflict (each
+  conflict's three sides), on a failing CI run's log (its end) and on a pull request's thread
+  (with its file and line). Nothing is typed into a program that hasn't asked for pastes.
+- _Bake-off: compare attempts…_ (palette, or _Compare them_ under AGENTS): pick 2–4 worktrees or
+  branches that tried the same task (the agent tasks come picked when there are 2–4 of them).
+  A grid compares them with the commit they all start from (their merge base; one that started
+  from a newer commit is named):
+  the files each touched, its size, the dependencies it adds (Cargo, npm, Go, Python, Ruby,
+  Composer manifests) and whether it builds (a command you type, kept for the repository, run
+  in a terminal in each worktree). A worktree's uncommitted work is compared too, read through
+  an index of gitcraft's own. Click a file to see it side by side across the attempts that
+  changed it; take it whole from one (click again to take it back), or tick hunks of several
+  (a binary file only goes whole), and _Assemble_ makes a new branch from the base with what
+  you picked, without checking anything out; the commit message lists where each file came
+  from, and _Show in graph_ goes to it. Hunks of two attempts that change the same lines are
+  flagged, and Assemble refuses them.
+
 **Toolbar, terminal, app**
 
 - Undo, redo, the timeline, Fetch, Pull, Push (with incoming / outgoing counts) and Sync, new branch, stash, terminal,
@@ -1278,6 +1330,12 @@ was made this way, on a demo repository.
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
+| `src/agent/` | coding agents: the worktree setup recipe, the agent tasks, the terminal script that runs them |
+| `src/repo/agents/` | the AGENTS section and the agent task and setup recipe dialogs |
+| `src/agent/checkpoint.rs` | agent turns: `gitcraft checkpoint`, the turns of a worktree; `hooks.rs` installs the agents' hooks, `checkpoint.sh` is the script for other machines |
+| `src/agent/handoff.rs` | hand-off: the messages typed into an agent's terminal (notes, conflicts, CI logs, threads), the notes tray |
+| `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
+| `src/repo/bakeoff/` | the bake-off page and its attempt picker |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
 | `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |

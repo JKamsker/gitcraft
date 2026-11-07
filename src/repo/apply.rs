@@ -60,6 +60,7 @@ impl RepoTab {
                 if self.pr_requests != requests {
                     self.ci_view = None;
                     self.doctor = None;
+                    self.bakeoff.view = None;
                 }
             }
             Action::OpenPrWorktree {
@@ -75,6 +76,7 @@ impl RepoTab {
             Action::Pr(act) => self.pr_act(act, ctx),
             Action::Versions(act) => self.versions_act(act, ctx),
             Action::OpenCi { sha, run } => {
+                self.bakeoff.view = None;
                 self.open_ci(sha, run, ctx);
                 // Over the doctor, which then closes: the toolbar's wrench says what shows.
                 if self.ci_view.is_some() {
@@ -89,6 +91,8 @@ impl RepoTab {
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),
+            Action::Agent(act) => self.agent_act(act, ctx),
+            Action::Bake(act) => self.bake_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

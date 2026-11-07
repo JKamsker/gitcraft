@@ -76,6 +76,20 @@ impl ConflictEditor {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             acts.push(Action::CloseDiff);
                         }
+                        if ui
+                            .button("Send to agent")
+                            .on_hover_text(
+                                "Types the conflicts, each with its three sides, into the agent's \
+                                 terminal. The agent then edits the file itself: close this editor \
+                                 then, and don't save over its work",
+                            )
+                            .clicked()
+                        {
+                            acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                                self.for_agent(),
+                                "the conflicts",
+                            )));
+                        }
                         if widgets::primary_button(
                             ui,
                             "Save and mark resolved",

@@ -470,6 +470,30 @@ fn run_here_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Ran, S
     })
 }
 
+/// [`run`] with variables of its own on top of what every call gets (`GIT_INDEX_FILE` for a
+/// temporary index), on whichever machine the repository is.
+pub fn run_env(
+    dir: Option<&Path>,
+    args: &[&str],
+    env: &[(&'static str, &str)],
+) -> Result<String, String> {
+    let extra = Extra {
+        pre: Vec::new(),
+        env: env.iter().map(|(n, v)| (*n, (*v).to_owned())).collect(),
+    };
+    let out = execute(dir, &extra, args)?;
+    if out.code == Some(0) {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
+        Err(if stderr.is_empty() {
+            format!("git {} failed ({})", args.join(" "), out.status)
+        } else {
+            stderr
+        })
+    }
+}
+
 /// Runs git and returns stdout as raw bytes (file contents: images…).
 pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = execute(dir, &Extra::default(), args)?;

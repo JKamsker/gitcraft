@@ -150,14 +150,14 @@ fn shown_command(args: &[String]) -> Option<String> {
 impl RepoTab {
     /// Takes a request from an agent: it waits its turn, and is planned once the tab is free.
     pub(crate) fn agent_request(&mut self, incoming: Incoming, ctx: &egui::Context) {
-        self.agents.queue.push_back(Job::new(incoming));
+        self.agent_calls.queue.push_back(Job::new(incoming));
         self.agent_step(ctx);
     }
 
     /// Plans `job` in the background. `approved`: the card the user approved for it, which the
     /// plan made now must still show for it to run without asking again.
     fn agent_plan(&mut self, job: Job, approved: Option<Ask>, ctx: &egui::Context) {
-        self.agents.planning = true;
+        self.agent_calls.planning = true;
         let path = self.path.clone();
         self.then(
             ctx,
@@ -177,7 +177,7 @@ impl RepoTab {
         approved: Option<Ask>,
         ctx: &egui::Context,
     ) {
-        self.agents.planning = false;
+        self.agent_calls.planning = false;
         if job.abandoned() {
             return self.agent_step(ctx);
         }
@@ -201,7 +201,7 @@ impl RepoTab {
             // from now (an approved request isn't dropped for the time its card was open).
             let mut job = job;
             job.came = Instant::now();
-            self.agents.queue.push_front(job);
+            self.agent_calls.queue.push_front(job);
             return;
         }
         match plan.ask.take() {
@@ -211,10 +211,10 @@ impl RepoTab {
             }
             Some(ask) => {
                 plan.ask = Some(ask);
-                self.agents.card = Some(Waiting {
+                self.agent_calls.card = Some(Waiting {
                     ready: Ready { job, plan },
                     shown: Instant::now(),
-                    until: Instant::now() + self.agents.approval_wait,
+                    until: Instant::now() + self.agent_calls.approval_wait,
                 });
                 ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
                     egui::UserAttentionType::Informational,
@@ -228,7 +228,7 @@ impl RepoTab {
     /// Moves the requests along: a card that waited too long is denied, the next request is
     /// planned once the tab is free. Called on every poll.
     pub(super) fn agent_step(&mut self, ctx: &egui::Context) {
-        let agents = &mut self.agents;
+        let agents = &mut self.agent_calls;
         // The agent stopped waiting: its card goes away, its queued requests are dropped.
         if agents
             .card
@@ -278,7 +278,7 @@ impl RepoTab {
         if agents.planning || agents.running.is_some() || self.busy_op.is_some() || self.loading {
             return;
         }
-        if let Some(job) = self.agents.queue.pop_front() {
+        if let Some(job) = self.agent_calls.queue.pop_front() {
             self.agent_plan(job, None, ctx);
         }
     }
@@ -294,7 +294,7 @@ impl RepoTab {
             ctx,
         );
         if self.busy_op.as_deref() == Some(plan.label.as_str()) {
-            self.agents.running = Some(Running {
+            self.agent_calls.running = Some(Running {
                 label: plan.label,
                 agent: job.agent,
                 reply: job.reply,
@@ -307,7 +307,7 @@ impl RepoTab {
     /// The card waiting for the user, if there is one. What the agent wrote into it (a branch
     /// name, a commit's summary) is shown without characters that reorder or hide text.
     pub(crate) fn agent_card(&self) -> Option<CardView> {
-        let waiting = self.agents.card.as_ref()?;
+        let waiting = self.agent_calls.card.as_ref()?;
         let plan = &waiting.ready.plan;
         let ask = plan.ask.as_ref()?;
         Some(CardView {
@@ -332,7 +332,7 @@ impl RepoTab {
     /// The user's answer to the card. Approved, the request is planned again, and runs if it
     /// still does what the card said; if the repository changed meanwhile, its new card shows.
     pub(crate) fn agent_decide(&mut self, approve: bool, ctx: &egui::Context) {
-        let Some(waiting) = self.agents.card.take() else {
+        let Some(waiting) = self.agent_calls.card.take() else {
             return;
         };
         let Ready { job, plan } = waiting.ready;
@@ -354,7 +354,7 @@ impl RepoTab {
         result: &Result<String, String>,
         undoable: bool,
     ) {
-        let Some(running) = self.agents.running.take_if(|r| r.label == label) else {
+        let Some(running) = self.agent_calls.running.take_if(|r| r.label == label) else {
             return;
         };
         let reply = match result {
@@ -376,7 +376,7 @@ impl RepoTab {
     /// An agent's operation needs the user to sign in first: the window asks them for it, and the
     /// agent is told to try again after.
     pub(super) fn agent_needs_sign_in(&mut self, label: &str) {
-        if let Some(running) = self.agents.running.take_if(|r| r.label == label) {
+        if let Some(running) = self.agent_calls.running.take_if(|r| r.label == label) {
             let _ = running.reply.send(Reply::new(
                 Outcome::Failed,
                 format!(

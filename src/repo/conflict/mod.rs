@@ -86,6 +86,25 @@ pub struct ConflictEditor {
     pub memo: decisions::Memo,
 }
 
+impl ConflictEditor {
+    /// The file's conflicts as a message for a coding agent: each one's three sides.
+    pub(crate) fn for_agent(&self) -> String {
+        let conflicts: Vec<crate::agent::handoff::Sides> = self
+            .segments
+            .iter()
+            .filter_map(|s| match s {
+                Segment::Conflict { ours, base, theirs } => {
+                    Some((ours.as_str(), base.as_deref(), theirs.as_str()))
+                }
+                Segment::Common(_) => None,
+            })
+            .collect();
+        // The sides as the editor names them (during a rebase, "ours" is upstream's).
+        let (ours, theirs) = self.side_names();
+        crate::agent::handoff::conflict_message(&self.path, &ours, &theirs, &conflicts)
+    }
+}
+
 /// Whether `line` (without its line ending) is git's `kind` conflict marker: exactly seven
 /// `kind` characters, then nothing or a space and a label. Longer runs (`========` under a
 /// Markdown heading, the inner markers of a nested conflict) are content.
@@ -509,6 +528,24 @@ mod tests {
     use super::*;
 
     const FILE: &str = "a\n<<<<<<< HEAD\nours 1\n=======\ntheirs 1\n>>>>>>> feature\nb\n<<<<<<< HEAD\nx\n||||||| base\nbase\n=======\ny\n>>>>>>> feature\nc\n";
+
+    #[test]
+    fn an_agent_is_told_every_conflict_with_its_three_sides() {
+        let msg = editor(FILE).for_agent();
+        assert!(msg.contains("has 2 merge conflicts"), "{msg}");
+        assert!(
+            msg.contains("ours (Ours (HEAD)):\n```\nours 1\n```"),
+            "{msg}"
+        );
+        assert!(
+            msg.contains("base (what both started from):\n```\nbase\n```"),
+            "{msg}"
+        );
+        assert!(
+            msg.contains("theirs (Theirs (feature)):\n```\ny\n```"),
+            "{msg}"
+        );
+    }
 
     #[test]
     fn parses_conflicts_and_labels() {

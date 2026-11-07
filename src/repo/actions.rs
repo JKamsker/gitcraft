@@ -60,6 +60,10 @@ pub(crate) enum Action {
     CloseDoctor,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
+    /// Agent tasks and the worktree setup recipe.
+    Agent(super::agents::AgentAct),
+    /// The bake-off of attempts.
+    Bake(super::bakeoff::BakeAct),
     CloseDiff,
     Ops {
         label: String,
@@ -595,6 +599,26 @@ impl RepoTab {
                 "Repository doctor".into(),
                 "doctor".into(),
                 Action::OpenDoctor(doctor::Section::ALL[0]),
+            ),
+            (
+                "Start agent task…".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::OpenStart),
+            ),
+            (
+                "Bake-off: compare attempts…".into(),
+                "agent".into(),
+                Action::Bake(super::bakeoff::BakeAct::OpenPicker),
+            ),
+            (
+                "Agent turns: save each turn in this worktree".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::InstallHooks),
+            ),
+            (
+                "Worktree setup…".into(),
+                "agent".into(),
+                Action::Agent(super::agents::AgentAct::OpenRecipe),
             ),
             (
                 reveal_label().into(),

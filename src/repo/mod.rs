@@ -5,11 +5,13 @@ mod actions;
 mod ai;
 pub(crate) mod agent;
 mod activity;
+mod agents;
 mod apply;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
 mod bisect;
+mod bakeoff;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -353,7 +355,7 @@ pub struct RepoTab {
     /// Why the timeline isn't kept on disk, or what it couldn't do.
     timeline_error: Option<String>,
     fold: fold::FoldState,
-    agents: agent::Agents,
+    agent_calls: agent::Agents,
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
@@ -437,6 +439,10 @@ pub struct RepoTab {
     parked_status: Vec<(PathBuf, &'static str)>,
     /// The app has a dialog of its own open (palette, settings): leave the keys to it.
     pub keys_blocked: bool,
+    /// Agent tasks, the worktree setup recipe and their dialogs.
+    agents: agents::AgentsState,
+    /// The bake-off of attempts shown in the big area, and its picker.
+    bakeoff: bakeoff::BakeoffState,
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
     pub finished: Vec<(String, bool)>,
@@ -581,7 +587,7 @@ impl RepoTab {
             timeline_view: None,
             timeline_error: None,
             fold: Default::default(),
-            agents: Default::default(),
+            agent_calls: Default::default(),
             busy_op: None,
             op_started: None,
             running: None,
@@ -624,6 +630,8 @@ impl RepoTab {
             parked: Vec::new(),
             parked_status: Vec::new(),
             keys_blocked: false,
+            agents: Default::default(),
+            bakeoff: Default::default(),
             finished: Vec::new(),
             custom: Default::default(),
         }

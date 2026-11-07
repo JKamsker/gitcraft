@@ -83,6 +83,7 @@ impl RepoTab {
             self.remotes_section(ui, acts, idle, &filter, &mut sections);
             ui.add_space(gap);
             self.worktree_section(ui, acts, idle, &mut sections);
+            self.agent_section(ui, acts, idle, &mut sections);
             self.submodule_section(ui, acts, idle, &mut sections);
             self.stash_section(ui, acts, idle, &mut sections);
             self.recovery_section(ui, acts, &mut sections);

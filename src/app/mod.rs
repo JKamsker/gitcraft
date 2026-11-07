@@ -778,6 +778,12 @@ pub(crate) fn repo_root(path: &Path) -> Result<PathBuf, String> {
 
 pub use draft_saving::keep_no_drafts;
 
+/// When this process was started as `gitcraft checkpoint` by a coding agent's hook: saves the
+/// turn and returns the exit code to end with, before any window is made. `None` otherwise.
+pub fn checkpoint_cli() -> Option<i32> {
+    crate::agent::checkpoint::cli()
+}
+
 /// When this process was started by ssh as its askpass program: asks the running app ssh's
 /// question and returns the exit code to end with, before any window is made. `None` for an
 /// ordinary start.

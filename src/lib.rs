@@ -3,6 +3,7 @@
 mod a11y;
 mod ai;
 mod across;
+mod agent;
 pub mod app;
 mod avatars;
 mod ci;

@@ -17,6 +17,7 @@ impl RepoTab {
         // Shown: its first read can't wait any more.
         self.start_deferred(&ctx);
         self.poll(&ctx);
+        self.agents_frame(&ctx);
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()
@@ -53,6 +54,7 @@ impl RepoTab {
                 .show(ui, |ui| self.progress_bar(ui));
         }
         self.side_panels(ui, &mut acts);
+        self.tray_panel(ui, &mut acts);
         if self.activity.open {
             egui::Panel::bottom("repo_activity")
                 .resizable(true)
@@ -129,6 +131,8 @@ impl RepoTab {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
                     self.ci_view_ui(ui, &mut acts);
+                } else if self.bakeoff.view.is_some() {
+                    self.bakeoff_view(ui, &mut acts);
                 } else if self.versions.view.is_some() {
                     self.versions_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() && self.docked(Panel::Pr) {
@@ -162,6 +166,8 @@ impl RepoTab {
         self.rehearse_window(&ctx, &mut acts);
         self.interaction_window(&ctx, &mut acts);
         self.stack_dialogs(&ctx, &mut acts);
+        self.agent_dialogs(&ctx, &mut acts);
+        self.bakeoff_dialog(&ctx, &mut acts);
         for action in acts {
             self.apply(action, &ctx);
         }
@@ -212,7 +218,7 @@ impl RepoTab {
     /// None of them while a dialog, a text field or the terminal has the keyboard.
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
-            self.dialog.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
+            self.dialog.is_none() && self.agents.dialog.is_none() && self.bakeoff.picker.is_none() && !self.stacks.modal_open() && !self.issue_picker_open() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
@@ -239,6 +245,8 @@ impl RepoTab {
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
             if esc && self.close_drop_menu() {
+            } else if esc && diff_keys && self.note_open(ctx) {
+                acts.push(Action::Agent(super::agents::AgentAct::Tray(super::agents::TrayAct::Close)));
             } else if esc && diff_keys && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.conflict.is_none() && self.rebase.is_some() {
@@ -257,6 +265,8 @@ impl RepoTab {
                 }
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
+            } else if esc && self.bakeoff.view.is_some() {
+                acts.push(Action::Bake(super::bakeoff::BakeAct::Close));
             } else if esc && self.ci_view.is_some() && self.main_keys(ctx, Panel::Ci) {
                 acts.push(Action::CloseCi);
             } else if esc && self.versions.view.is_some() {

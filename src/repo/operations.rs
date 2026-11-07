@@ -59,6 +59,7 @@ impl RepoTab {
         let cancellable = self.can_cancel();
         self.timeline_op_started(quiet, refresh);
         self.note_checkout_move(&ops, ctx);
+        self.note_worktree_add(label, &ops);
         if !quiet {
             self.status = None;
             // A fix made stays, for its undo, while what it fixed runs again.
@@ -264,7 +265,7 @@ impl RepoTab {
             let ok = result.is_ok();
             let mut undo = if ok { undo_entry(&label, &kind) } else { None };
             if let Some(undo) = &mut undo {
-                undo.agent = self.agents.running.as_ref().filter(|r| r.label == label).map(|r| r.agent.clone());
+                undo.agent = self.agent_calls.running.as_ref().filter(|r| r.label == label).map(|r| r.agent.clone());
             }
             self.agent_op_done(&label, &result, undo.is_some());
             self.timeline_op_ended(&label, &kind, undo, ok, refresh, ctx);
@@ -290,6 +291,7 @@ impl RepoTab {
         self.push_op_ended(&label, &result, ctx);
         self.after_op(result.is_ok(), quiet, ctx);
         self.link_status();
+        self.after_worktree_add(&label, result.is_ok(), ctx);
     }
 }
 

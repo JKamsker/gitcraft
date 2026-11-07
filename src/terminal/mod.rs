@@ -184,6 +184,24 @@ impl Terminal {
         })
     }
 
+    /// Types `text` into the program running as one pasted message, without pressing Enter: a
+    /// coding agent's prompt takes it as one message, and the user sends it. Refused when the
+    /// program hasn't asked for pastes (bracketed paste, which agent CLIs and modern shells
+    /// turn on), where each line would be taken as typed, and run.
+    pub fn paste_message(&mut self, text: &str) -> Result<(), String> {
+        if self.has_exited() {
+            return Err("its program has ended".to_owned());
+        }
+        if !lock(&self.parser).screen().bracketed_paste() {
+            return Err(
+                "the program running there doesn't take a pasted message: start the agent there first"
+                    .to_owned(),
+            );
+        }
+        self.send(&keys::paste_bytes(text, true));
+        Ok(())
+    }
+
     pub fn has_exited(&mut self) -> bool {
         if !self.exited.load(Ordering::Relaxed)
             && let Ok(Some(_)) = self.child.try_wait()

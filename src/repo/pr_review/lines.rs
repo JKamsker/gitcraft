@@ -90,6 +90,8 @@ pub(in crate::repo) struct DiffReview {
     pub marks: HashMap<(DiffSide, u64), usize>,
     pub target: Option<LineTarget>,
     pub path: String,
+    /// Notes for the coding agent, kept here, not comments on a pull request.
+    pub local: bool,
 }
 
 #[cfg(test)]

@@ -145,8 +145,16 @@ impl RepoTab {
         };
 
         // A file of the pull request shown: its lines take comments.
-        let review = self.diff_review(&view.key);
-        if review.as_ref().is_some_and(|r| r.target.is_some())
+        // Any other diff: its lines take notes for the coding agent.
+        let review = self
+            .diff_review(&view.key)
+            .or_else(|| Some(self.note_review(&path, &origin)));
+        if review
+            .as_ref()
+            .is_some_and(|r| r.target.is_some() && r.local)
+        {
+            crate::repo::agents::note_panel(ui, &t, &mut self.agents, data, &origin, acts);
+        } else if review.as_ref().is_some_and(|r| r.target.is_some())
             && let Some(pr) = &mut self.pr_view
         {
             let draft = self.pr_drafts.entry(pr.number).or_default();
