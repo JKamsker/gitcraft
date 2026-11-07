@@ -17,6 +17,7 @@ pub(super) use text::{blocks, only_web_links};
 
 pub(crate) struct PrView {
     pub number: u64,
+    pub(super) freshness: super::review_workflow::Freshness,
     pub(super) relocated: super::review_workflow::Relocations,
     request: u64,
     loading: bool,
@@ -86,6 +87,7 @@ impl RepoTab {
         self.versions.view = None;
         self.pr_view = Some(PrView {
             number,
+            freshness: Default::default(),
             relocated: Default::default(),
             request: 0,
             loading: true,
@@ -226,6 +228,7 @@ impl RepoTab {
         if let Some(details) = details {
             self.check_pr_since(&details, ctx);
         }
+        self.load_review_freshness(ctx);
         let Some(view) = self.pr_view.as_mut() else {
             return;
         };

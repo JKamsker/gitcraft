@@ -57,6 +57,9 @@ impl RepoTab {
                 acts,
             );
         }
+        if let Some(Ok(files)) = &view.files {
+            crate::repo::review_workflow::freshness_ui(ui, &mut view.freshness, files, acts);
+        }
         match &view.details {
             None => {
                 ui.add_space(40.0);
