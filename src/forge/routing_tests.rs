@@ -65,7 +65,7 @@ fn capture(
         let (key, target) = if h.forge == Forge::GitHub {
             ("GH_REPO", format!("{}/{}", h.host, h.path))
         } else {
-            ("GITLAB_HOST", h.host.clone())
+            ("GITLAB_HOST", gitlab::api_authority(h))
         };
         assert!(
             call.env
