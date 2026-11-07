@@ -613,6 +613,11 @@ pub fn askpass_helper() -> Option<i32> {
         .or_else(crate::git::object_storage::helper::run_cli)
 }
 
+/// Versioned, headless owned-object helper entry point supplied by this package.
+pub fn object_storage_helper() -> i32 {
+    crate::git::object_storage::helper::entrypoint()
+}
+
 /// How many commands for a repository on another machine were asked from the window's thread
 /// (and refused: it never waits for a network). For tests and `examples/ui_shot.rs`.
 pub fn refused_on_ui_thread() -> usize {

@@ -649,8 +649,9 @@ replacement metadata. SSH, WSL and other platforms retain read-only inspection a
 is unavailable. Private `objects/gitcraft-independent-stage-*` directories are kept
 as recovery evidence; successfully installed packs share their file data with that stage.
 
-SSH/WSL independence requires a matching GitCraft executable in PATH on the repository
-machine, supporting the `gitcraft-owned-objects/1` headless helper protocol. The app
+SSH/WSL independence requires the `gitcraft-object-storage-helper` executable supplied
+by this package in PATH on the repository machine. It supports the versioned
+`gitcraft-owned-objects/1` headless helper protocol. The app
 never installs a helper automatically. The Linux helper binds preparation to actual
 ancestor/store/file device, inode and filesystem birth-time identities plus refs and
 borrowing metadata, then retains handles throughout copying, installation and recovery.
@@ -658,3 +659,18 @@ Filesystems without birth-time identity support refuse the action. Requests/repl
 are capped at 4 MiB and the existing remote deadline applies. Only an exact transaction
 completion reply proves success; an interrupted connection reports the known recovery
 backup path and never retries automatically.
+
+For a source installation on the repository machine, build the helper from the same
+GitCraft checkout and put it on that account's PATH:
+
+```sh
+cargo build --release --bin gitcraft-object-storage-helper
+install -Dm755 target/release/gitcraft-object-storage-helper "$HOME/.local/bin/gitcraft-object-storage-helper"
+gitcraft-object-storage-helper --capabilities
+```
+
+Linux deb/rpm packages include that executable. `--capabilities` reports the protocol
+and package version without opening a repository or window. The helper runs under the
+same remote account, accepts one bounded JSON request on stdin, writes one complete
+versioned JSON reply, and exits. WSL uses the Linux helper inside the selected distro.
+No server, service, deployment automation or account sign-in is needed.

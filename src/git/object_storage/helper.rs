@@ -79,10 +79,10 @@ fn request_target(
     }
     // All shell text is constant; the path and snapshot travel only as bounded JSON stdin.
     let mut req = super::super::command::object_storage_request(
-        &target,
+        target,
         &[
             "-c",
-            "alias.gitcraft-owned-objects=!gitcraft --gitcraft-object-storage-helper",
+            "alias.gitcraft-owned-objects=!gitcraft-object-storage-helper",
             "gitcraft-owned-objects",
         ],
         payload,
@@ -92,7 +92,7 @@ fn request_target(
     let out = super::super::command::comparison_remote(&target.host, req, active)?;
     if out.code != 0 {
         return Err(format!(
-            "Install a matching GitCraft executable in PATH on the repository machine to enable owned object independence ({PROTOCOL}). No helper is installed automatically. Read-only inspection remains available. {}",
+            "Install the matching gitcraft-object-storage-helper executable in PATH on the repository machine to enable owned object independence ({PROTOCOL}). No helper is installed automatically. Read-only inspection remains available. {}",
             String::from_utf8_lossy(&out.stderr).trim()
         ));
     }
@@ -199,6 +199,21 @@ fn process(request: Request) -> Result<Payload, String> {
 #[cfg(not(target_os = "linux"))]
 fn process(_request: Request) -> Result<Payload, String> {
     Err("The remote owned-helper capability requires a Linux filesystem with stable birth-time identities. Read-only inspection remains available.".into())
+}
+pub(crate) fn entrypoint() -> i32 {
+    if std::env::args().nth(1).as_deref() == Some("--capabilities") {
+        let capabilities = serde_json::json!({"protocol":PROTOCOL,"package_version":env!("CARGO_PKG_VERSION"),"linux_owned_identity":cfg!(target_os="linux"),"requires_filesystem_birth_time":true,"max_protocol_bytes":LIMIT});
+        return if writeln!(std::io::stdout(), "{capabilities}").is_ok() {
+            0
+        } else {
+            1
+        };
+    }
+    if std::env::args().nth(1).is_some() {
+        eprintln!("Use --capabilities or provide one bounded ownership protocol request on stdin.");
+        return 2;
+    }
+    serve()
 }
 pub(crate) fn run_cli() -> Option<i32> {
     if std::env::args().nth(1).as_deref() != Some("--gitcraft-object-storage-helper") {

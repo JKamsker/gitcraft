@@ -891,7 +891,7 @@ fn fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion() -> Result<(
         "#!/bin/sh\n{HELPER}=1 {} --exact {NAME} --nocapture --quiet | sed -n '/^{{\"protocol\":/p'\n",
         remote::sh_quote(&exe.to_string_lossy())
     );
-    let path = bin.join("gitcraft");
+    let path = bin.join("gitcraft-object-storage-helper");
     std::fs::write(&path, script).map_err(|e| e.to_string())?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| e.to_string())?;
