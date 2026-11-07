@@ -209,6 +209,13 @@ fn push_now(repo: &Path, branch: &str, has_upstream: bool) -> Result<(), String>
             .map(|s| s.trim().to_owned())
             .filter(|s| !s.is_empty())
     };
+    if let Some(destination) = config(&format!("branch.{branch}.gitcraftPushBranch"))
+        && destination != branch
+    {
+        return Err(format!(
+            "{branch} uses a separate push branch ({destination}): open the repository to push it"
+        ));
+    }
     let local = format!("refs/heads/{branch}");
     // Read every time, whatever the look said: the push goes by what is set now.
     let tracked = config(&format!("branch.{branch}.remote"));

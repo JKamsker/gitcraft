@@ -127,46 +127,13 @@ impl RepoTab {
             }
             return Some(("Gerrit review".to_owned(), Action::Dialog(dialog)));
         }
-        let tracked = if b.upstream_gone() {
-            None
-        } else {
-            self.split_upstream(&b.upstream)
-        };
-        // Full refs: a tag of the same name must not be what is pushed.
-        let (to, args) = match tracked {
-            Some((remote, name)) => (
-                b.upstream.clone(),
-                vec![
-                    "push".to_owned(),
-                    remote,
-                    format!("refs/heads/{}:refs/heads/{name}", b.name),
-                ],
-            ),
-            None => {
-                let remote = self.default_remote()?;
-                (
-                    remote.clone(),
-                    vec![
-                        // `simple`: with push.default=upstream, a source alone goes to the
-                        // branch it tracks (`main` for one made from origin/main).
-                        "-c".to_owned(),
-                        "push.default=simple".to_owned(),
-                        "push".to_owned(),
-                        "-u".to_owned(),
-                        remote,
-                        // No `:dst`, which would bypass `remote.<name>.push` (Gerrit's
-                        // refs/for/*); the full source alone is not mistaken for a tag.
-                        format!("refs/heads/{}", b.name),
-                    ],
-                )
-            }
-        };
-        let action = Action::Ops {
-            label: format!("Push {}", b.name),
-            ops: vec![args],
-            refresh: Refresh::All,
-        };
-        Some((to, action))
+        Some((
+            "its configured push route".into(),
+            Action::RepositoryTools(super::repository_tools::Act::PushBranch(
+                b.name.clone(),
+                b.target.clone(),
+            )),
+        ))
     }
 
     /// Makes `b` track nothing, undoably.

@@ -316,6 +316,14 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
             remote.url.clone(),
         )))));
     }
+    if ui
+        .add_enabled(idle, egui::Button::new("URLs, refspecs and mirror policy…"))
+        .clicked()
+    {
+        acts.push(Action::RepositoryTools(
+            crate::repo::repository_tools::Act::Remote(remote.name.clone()),
+        ));
+    }
     if ui.button("Copy URL").clicked() {
         ui.ctx().copy_text(remote.url.clone());
     }

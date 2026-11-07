@@ -123,6 +123,10 @@ impl RepoTab {
             self.dialog = Some(dialog);
             return;
         }
+        if !self.submodules.is_empty() {
+            self.repository_tools_act(super::repository_tools::Act::Dependencies, ctx);
+            return;
+        }
         self.push_labelled("Push", None, ctx);
     }
 

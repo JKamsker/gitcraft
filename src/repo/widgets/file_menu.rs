@@ -65,6 +65,13 @@ pub fn file_menu_with(
                     tab: FileTab::File,
                 });
             }
+            if let Some(rev) = rev
+                && ui.button("Inspect stored object…").clicked()
+            {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::Object(format!("{rev}:{path}")),
+                ));
+            }
             if ui.button("File history").clicked() {
                 acts.push(Action::FileView {
                     path: path.to_owned(),

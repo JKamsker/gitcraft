@@ -38,6 +38,7 @@ pub(crate) enum Action {
     ContentInspect(usize, Option<usize>),
     ContentPrepare(crate::git::recovery::Target),
     ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
+    RepositoryTools(super::repository_tools::Act),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.
@@ -694,6 +695,51 @@ impl RepoTab {
                 "Select stale or merged branches…".into(),
                 "branch".into(),
                 Action::SelectStaleBranches,
+            ),
+            (
+                "Shared and borrowed objects".into(),
+                "Inspect shared Git directories and donors; make a clone independent".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Sharing),
+            ),
+            (
+                "Publish submodule dependencies before parent…".into(),
+                "submodules publish remote".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Dependencies),
+            ),
+            (
+                "Pull and push routes…".into(),
+                "triangular upstream ahead behind".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Routes(String::new())),
+            ),
+            (
+                "Publish to several hosts…".into(),
+                "publication group retry mirrors".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Publication(String::new())),
+            ),
+            (
+                "Remote URLs, refspecs and mirror policy…".into(),
+                "fetch push mapping prune".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Remote(String::new())),
+            ),
+            (
+                "Replace refs and temporary history joins…".into(),
+                "grafts original effective history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Replacements),
+            ),
+            (
+                "Ref storage and reftable migration…".into(),
+                "refs compatibility".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Reftable),
+            ),
+            (
+                "How an object is stored…".into(),
+                "objects pack delta file version".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Object("HEAD".into())),
+            ),
+            (
+                "All refs and namespace history…".into(),
+                "refs internals".into(),
+                Action::RepositoryTools(super::repository_tools::Act::AllRefs(String::new())),
             ),
             (
                 "Repository doctor".into(),

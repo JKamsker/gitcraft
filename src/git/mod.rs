@@ -53,6 +53,7 @@ mod reflog;
 mod refs;
 mod rehearse;
 mod remerge;
+pub(crate) mod repository_tools;
 mod revert;
 mod reviewed;
 mod rewrites;

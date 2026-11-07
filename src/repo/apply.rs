@@ -43,6 +43,7 @@ impl RepoTab {
             Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
             Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
+            Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
