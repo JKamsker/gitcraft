@@ -56,7 +56,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Search operators narrow a search and combine with each other and with text: author: and committer: (name or email), path: (a file or folder, letter case as in the repository; *.md works), after: and before: (by commit date: 2024-05-01, 2024-05, 2024, today, yesterday, or a time ago such as 12h, 3d, 2w, 6m for months, 1y), message:, contents: (git log -S), regex: (git log -G), merges: and -merges:. Quote values with spaces: author:\"Jane Doe\". Names and messages ignore the case of A–Z; changes match the case typed unless a name or message is matched too. A hash in the text still finds its commit.",
             "Typing an operator lists suggestions: authors and committers from history (as .mailmap names them), files and folders of the checked-out commit, dates. ↑ / ↓ highlight one, Tab or Enter puts it in, Esc closes the list. A search written wrong says why under the field.",
             "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
-            "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            "Interactive rebase: reorder, reword, edit, squash, fix up or drop commits, then start it. Drag a row by its handle to move it; Edit stops the rebase after that commit: stage what should change, and Continue rebase amends it and goes on.",
             "Drag a branch's pill (or its row on the left) onto another branch or a commit: a menu offers merging, rebasing, an interactive rebase or a fast-forward, those that make sense there. The targets that take it light up; Esc cancels.",
             "Drag a commit onto the checked-out branch to cherry-pick it, or onto another commit of the checked-out branch to move it above or below that one, or squash or fix it up into it. Ctrl+Z undoes a drop like the menu's entries.",
         ],
@@ -166,6 +166,18 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Merge, rebase, fast-forward, cherry-pick, move or squash",
             ),
             ("Esc", "Close the find bar, diff, comparison or search"),
+        ],
+    ),
+    (
+        "Interactive rebase",
+        &[
+            (
+                "P / R / E / S / F / D",
+                "Pick, reword, edit, squash, fix up or drop the selected row",
+            ),
+            ("↑ / ↓", "Select the row above / below"),
+            ("Alt+↑ / Alt+↓", "Move the selected commit up / down"),
+            ("Esc", "Close the editor without rebasing"),
         ],
     ),
     (

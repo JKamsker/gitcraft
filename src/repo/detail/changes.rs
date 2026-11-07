@@ -71,7 +71,9 @@ impl RepoTab {
                         }
                     });
                 });
-                let hint = if self.work.conflicted.is_empty() {
+                let hint = if self.work.conflicted.is_empty() && state == InProgress::Rebase {
+                    "No conflicts: Continue rebase goes on. At a commit it stopped at to edit, what is staged goes into that commit first."
+                } else if self.work.conflicted.is_empty() {
                     "All conflicts resolved: commit to finish."
                 } else {
                     "Fix the conflicted files, mark them resolved, then commit."

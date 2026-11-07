@@ -151,8 +151,10 @@ impl RepoTab {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
-            } else if esc && self.rebase.is_some() {
-                acts.push(Action::CloseRebase);
+            } else if esc && let Some(rebase) = &self.rebase {
+                if !rebase.typing {
+                    acts.push(Action::CloseRebase);
+                }
             } else if esc && self.file_view.is_some() {
                 acts.push(Action::CloseFileView);
             } else if esc && self.ci_view.is_some() {

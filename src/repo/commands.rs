@@ -7,7 +7,7 @@ use super::messages::spawn_or;
 use super::operations::expect_ref;
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
 use crate::forge::{self, NewPullRequest};
-use crate::git::{self, Branch};
+use crate::git::{self, Branch, InProgress};
 
 impl RepoTab {
     /// The checked-out branch, or HEAD's commit when detached (empty without commits).
@@ -222,13 +222,21 @@ impl RepoTab {
         }
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
-            let steps = ops(&[&[state.command(), "--continue"]]);
-            // A fold stopped on a conflict: done, it is undone as the whole fold.
+            let label = format!("Continue {}", state.label().to_lowercase());
+            let mut steps = ops(&[&[state.command(), "--continue"]]);
+            // Stopped at a commit to edit, with the changes not staged: they go into it, as a
+            // commit stages everything when nothing is (git would refuse, talking of conflicts).
+            if state == InProgress::Rebase
+                && self.work.staged.is_empty()
+                && !self.work.unstaged.is_empty()
+            {
+                steps.insert(0, vec!["add".to_owned(), "-A".to_owned()]);
+            }
+            // A fold stopped on a conflict is undone as the whole fold.
             if let Some((label, kind)) = self.fold_continue(state) {
                 self.run_ops(&label, steps, Refresh::All, kind, ctx);
                 return;
             }
-            let label = format!("Continue {}", state.label().to_lowercase());
             self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
             return;
         }
