@@ -83,8 +83,12 @@ impl RepoTab {
             now: crate::git::now(),
             // Stable buckets avoid tiny width changes between similar ref names. Long names
             // keep their ellipsis rather than consuming the description's flexible width.
-            refs_width: ((width / 32.0).ceil() * 32.0)
-                .clamp(MIN_REFS_W, crate::settings::DEFAULT_REFS_WIDTH),
+            refs_width: if width <= MIN_REFS_W {
+                MIN_REFS_W
+            } else {
+                ((width / 32.0).ceil() * 32.0)
+                    .clamp(MIN_REFS_W, crate::settings::DEFAULT_REFS_WIDTH)
+            },
             labels,
         }
     }
