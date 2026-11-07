@@ -12,6 +12,7 @@ mod branch_health;
 mod branch_order;
 mod bisect;
 mod bakeoff;
+mod authorship_view;
 mod branch_tree;
 mod branch_visibility;
 mod ci_status;
@@ -237,6 +238,8 @@ pub struct RepoTab {
     drift: Option<drift_view::DriftView>,
     /// Where the pull requests come from (forks), and how their branches are set up here.
     forks: forks::Forks,
+    /// What the commits record of who wrote them.
+    authorship: authorship_view::Lens,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -522,6 +525,7 @@ impl RepoTab {
             fence: Default::default(),
             drift: None,
             forks: forks::Forks::default(),
+            authorship: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

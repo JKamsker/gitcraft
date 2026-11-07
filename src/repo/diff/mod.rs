@@ -116,6 +116,8 @@ pub struct DiffData {
     /// out the first time they are needed, not every frame.
     /// The _weakens checks_ evidence of each hunk that has some, by its header's line.
     pub(super) weakened: std::collections::HashMap<usize, String>,
+    /// Who wrote each added line, as its commit records (a commit's diff only).
+    pub(super) authors: Vec<Option<crate::authorship::Who>>,
     map: [std::sync::OnceLock<(map::ChangeRuns, Vec<std::ops::Range<usize>>)>; 2],
 }
 
@@ -293,6 +295,7 @@ fn prepare(
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let authors = line_authors(repo, key, &path, &lines);
     let line_counts = count_lines(&lines);
     let weakened = weakened::by_hunk_line(&text, &lines);
     DiffData {
@@ -313,8 +316,32 @@ fn prepare(
         longest,
         uncut,
         weakened,
+        authors,
         map: Default::default(),
     }
+}
+
+/// Who wrote each added line of a commit's diff, as the commit records it (git-ai notes, Agent
+/// Trace, its author or trailers); nothing for other diffs or a commit that records nothing.
+fn line_authors(
+    repo: &Path,
+    key: &DiffKey,
+    path: &str,
+    lines: &[DiffLine],
+) -> Vec<Option<crate::authorship::Who>> {
+    let DiffKey::Commit { hash, .. } = key else {
+        return Vec::new();
+    };
+    let Some(a) = crate::authorship::load::one(repo, hash).ok().flatten() else {
+        return Vec::new();
+    };
+    lines
+        .iter()
+        .map(|l| match (l.kind, l.new) {
+            (Kind::Add, Some(n)) => Some(a.line(path, n)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Whether the patch is of a symbolic link (mode 120000 before its first hunk, no file mode).

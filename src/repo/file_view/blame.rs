@@ -103,27 +103,41 @@ impl RepoTab {
         ui.spacing_mut().item_spacing.y = 0.0;
         let found = &*find;
         let out = scroll.show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
-            for i in range {
-                let Some(line) = data.lines.get(i) else {
-                    continue;
-                };
-                let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                let clip = rect.intersect(ui.clip_rect());
-                let p = ui.painter().with_clip_rect(clip);
+                for i in range {
+                    let Some(line) = data.lines.get(i) else {
+                        continue;
+                    };
+                    let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+                    let clip = rect.intersect(ui.clip_rect());
+                    let p = ui.painter().with_clip_rect(clip);
                 let first = i == 0 || data.lines.get(i - 1).map(|l| &l.hash) != Some(&line.hash);
-                // Each change starts with a thin rule, so blocks read as one.
-                if first && i > 0 {
-                    p.hline(rect.x_range(), rect.top(), Stroke::new(1.0, t.separator));
-                }
+                    // Each change starts with a thin rule, so blocks read as one.
+                    if first && i > 0 {
+                        p.hline(rect.x_range(), rect.top(), Stroke::new(1.0, t.separator));
+                    }
                 if view.marked_line == Some(i + 1) { p.rect_filled(rect, 0.0, t.row_selected); }
-                let gutter = Rect::from_min_size(rect.min, vec2(GUTTER_W, LINE_H));
-                p.rect_filled(gutter, 0.0, t.card);
-                p.rect_filled(
-                    Rect::from_min_size(rect.min, vec2(3.0, LINE_H)),
-                    0.0,
-                    age_color(&t, line, data.span),
-                );
-                let mid = rect.center().y;
+                    let gutter = Rect::from_min_size(rect.min, vec2(GUTTER_W, LINE_H));
+                    p.rect_filled(gutter, 0.0, t.card);
+                    // Who wrote it, as its commit records: at the gutter's right edge.
+                    if let Some(a) = self.authorship.map.get(&line.hash) {
+                        let edge = Rect::from_min_size(
+                            pos2(gutter.right() - 4.0, rect.top()),
+                            vec2(3.0, LINE_H),
+                        );
+                        crate::repo::authorship_view::stripe(
+                            &p,
+                            &t,
+                            edge,
+                            a.line(&line.file, line.orig),
+                            0.0,
+                        );
+                    }
+                    p.rect_filled(
+                        Rect::from_min_size(rect.min, vec2(3.0, LINE_H)),
+                        0.0,
+                        age_color(&t, line, data.span),
+                    );
+                    let mid = rect.center().y;
                 // One Tab stop per block of lines of a commit, not one per line.
                 let stop = first && !line.uncommitted();
                 let sense = crate::a11y::list_row_sense(stop);
@@ -134,31 +148,31 @@ impl RepoTab {
                         format!("line {}, go to commit {short}", i + 1)
                     });
                 }
-                if first {
-                    let small = FontId::proportional(11.5);
-                    if line.uncommitted() {
-                        p.text(
-                            pos2(gutter.left() + 10.0, mid),
-                            Align2::LEFT_CENTER,
-                            "Not committed yet",
-                            small,
-                            t.warning,
-                        );
-                    } else {
-                        let hash = p.text(
-                            pos2(gutter.left() + 10.0, mid),
-                            Align2::LEFT_CENTER,
-                            line.hash.get(..7).unwrap_or(&line.hash),
-                            theme::mono(11.0),
-                            if gutter_resp.hovered() {
-                                t.accent
-                            } else {
-                                t.text_faint
-                            },
-                        );
-                        let when = p.text(
-                            pos2(gutter.right() - 8.0, mid),
-                            Align2::RIGHT_CENTER,
+                    if first {
+                        let small = FontId::proportional(11.5);
+                        if line.uncommitted() {
+                            p.text(
+                                pos2(gutter.left() + 10.0, mid),
+                                Align2::LEFT_CENTER,
+                                "Not committed yet",
+                                small,
+                                t.warning,
+                            );
+                        } else {
+                            let hash = p.text(
+                                pos2(gutter.left() + 10.0, mid),
+                                Align2::LEFT_CENTER,
+                                line.hash.get(..7).unwrap_or(&line.hash),
+                                theme::mono(11.0),
+                                if gutter_resp.hovered() {
+                                    t.accent
+                                } else {
+                                    t.text_faint
+                                },
+                            );
+                            let when = p.text(
+                                pos2(gutter.right() - 8.0, mid),
+                                Align2::RIGHT_CENTER,
                             git::relative_time(line.time, now),
                             small.clone(),
                             t.text_faint,

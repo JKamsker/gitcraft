@@ -118,6 +118,8 @@ impl RepoTab {
             Action::OpenCollisions => self.open_collisions(),
             Action::OpenFence => self.open_fence(ctx),
             Action::OpenDrift(path) => self.open_drift(&path, ctx),
+            Action::AgentFilter(on) => self.toggle_agent_filter(on, ctx),
+            Action::BranchAuthorship(name) => self.branch_authorship(&name, ctx),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),

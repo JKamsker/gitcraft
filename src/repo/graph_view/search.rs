@@ -31,6 +31,7 @@ impl RepoTab {
                     search_icon(ui, &t);
                     self.search_field(ui, acts);
                     self.search_where(ui, acts);
+                    crate::repo::authorship_view::filter_toggle(ui, self.authorship.filter, acts);
                     ui.label(
                         egui::RichText::new(self.search_summary())
                             .color(t.text_dim)
@@ -71,7 +72,7 @@ impl RepoTab {
             } else {
                 "Search messages, authors, hashes, or author:, path:…"
             })
-            .desired_width(ui.available_width() - 290.0)
+            .desired_width(ui.available_width() - 400.0)
             .margin(egui::Margin::symmetric(8, 4))
             // While the list is open, Tab picks a suggestion and Esc closes the list, instead
             // of egui taking the focus off the field for them.
@@ -87,6 +88,7 @@ impl RepoTab {
             edit.request_focus();
         }
         if edit.changed() {
+            self.authorship.filter = false;
             self.search.edited = Some(std::time::Instant::now());
             self.search.suggest.dismissed = None;
         }
@@ -239,7 +241,7 @@ impl RepoTab {
     }
 
     /// Messages or Code: where free text is looked for.
-    fn search_where(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+    fn search_where(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let code = self.search.code;
         for (label, on, tip) in [
             (
@@ -259,6 +261,7 @@ impl RepoTab {
                 .on_hover_text(tip)
                 .clicked()
             {
+                self.authorship.filter = false;
                 acts.push(Action::SearchCode(on));
             }
         }

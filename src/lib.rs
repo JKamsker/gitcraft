@@ -5,6 +5,7 @@ mod ai;
 mod across;
 mod agent;
 pub mod app;
+mod authorship;
 mod avatars;
 mod ci;
 mod custom_commands;

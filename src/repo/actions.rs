@@ -356,6 +356,10 @@ pub(crate) enum Action {
     TestLane(super::test_lane::LaneAct),
     /// Something done on a pull request from a fork.
     Fork(super::forks::ForkAct),
+    /// Show only the agent-written commits in the search bar's results, or stop.
+    AgentFilter(bool),
+    /// Work out how much of a local branch agents wrote.
+    BranchAuthorship(String),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not

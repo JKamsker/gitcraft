@@ -237,6 +237,16 @@ impl RepoTab {
             menu.items(ui, "branch", &target, acts);
         }
         self.pin_item(ui, &b.name);
+        if ui
+            .button("How much agents wrote")
+            .on_hover_text(
+                "Of the lines this branch added since it left the main branch: how many agents \
+                 wrote (as the commits record it), and how many of those people edited since",
+            )
+            .clicked()
+        {
+            acts.push(Action::BranchAuthorship(b.name.clone()));
+        }
         ui.separator();
         self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
         ui.separator();

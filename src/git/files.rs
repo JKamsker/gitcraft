@@ -182,6 +182,9 @@ pub struct BlameLine {
     pub time: i64,
     pub summary: String,
     pub text: String,
+    /// The line's number in that commit, and the file's name there.
+    pub orig: u32,
+    pub file: String,
 }
 
 impl BlameLine {
@@ -253,10 +256,16 @@ fn parse_blame(out: &str) -> Vec<BlameLine> {
             let hash = line.split(' ').next().unwrap_or_default();
             // SHA-1, or SHA-256 in a repository made with `--object-format=sha256`.
             if matches!(hash.len(), 40 | 64) && hash.bytes().all(|b| b.is_ascii_hexdigit()) {
-                current = Some(known.get(hash).cloned().unwrap_or_else(|| BlameLine {
+                let mut c = known.get(hash).cloned().unwrap_or_else(|| BlameLine {
                     hash: hash.to_owned(),
                     ..BlameLine::default()
-                }));
+                });
+                c.orig = line
+                    .split(' ')
+                    .nth(1)
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(0);
+                current = Some(c);
             }
             continue;
         };
@@ -266,6 +275,7 @@ fn parse_blame(out: &str) -> Vec<BlameLine> {
             "author-mail" => c.email = value.trim_matches(['<', '>']).to_owned(),
             "author-time" => c.time = value.parse().unwrap_or(0),
             "summary" => c.summary = value.to_owned(),
+            "filename" => c.file = value.to_owned(),
             _ => {}
         }
     }
