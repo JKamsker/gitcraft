@@ -513,19 +513,15 @@ mod tests {
             let result = apply(&r.0, &lens, &patch, false, &mut |at| {
                 if at == Phase::Prepared {
                     if config {
-                        if !record(
+                        record(
                             r.git(&["config", "core.sharedRepository", "0600"]),
                             &mut operation_hook_error,
-                        ) {
-                            return;
-                        }
+                        );
                     } else {
-                        if !record(
+                        record(
                             std::fs::set_permissions(&idx, std::fs::Permissions::from_mode(0o600)),
                             &mut operation_hook_error,
-                        ) {
-                            return;
-                        }
+                        );
                     }
                 }
             });
@@ -561,6 +557,20 @@ mod tests {
                 & 0o777,
             0o600
         );
+        Ok(())
+    }
+    #[test]
+    fn split_index_keeps_unrelated_entries_and_reverses_through_the_new_publisher()
+    -> Result<(), String> {
+        let (r, _, patch) = fixture()?;
+        r.git(&["update-index", "--split-index"])?;
+        let lens = r.lens("a")?;
+        apply(&r.0, &lens, &patch, false, &mut |_| {})?;
+        assert_eq!(r.git(&["show", ":a"])?, "after");
+        assert_eq!(r.git(&["show", ":unrelated"])?, "unchanged");
+        apply(&r.0, &r.lens("a")?, &patch, true, &mut |_| {})?;
+        assert_eq!(r.git(&["show", ":a"])?, "before");
+        assert_eq!(bytes(&r.0.join("a"))?, b"after\n");
         Ok(())
     }
     #[test]
@@ -629,12 +639,10 @@ mod tests {
             false,
             &mut |at| {
                 if at == Phase::Prepared {
-                    if !record(
+                    record(
                         exacl::setfacl(&[&idx], &changed, None),
                         &mut operation_hook_error,
-                    ) {
-                        return;
-                    }
+                    );
                 }
             },
         );
