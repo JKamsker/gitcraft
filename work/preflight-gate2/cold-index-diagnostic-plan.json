@@ -6,5 +6,6 @@
   "runner": "#[path] imports exact src/bounded_process.rs; no new controller/PID/signal logic",
   "scope": "Read-only comparison in actualownedfailedfixture; then independent filesystem copy of onlythatownedrepo for clean and same-lengthchanged contentcontrols. Originalindex/work asserted unchanged. No referenceupdate,checkout,hooks,drivers,livehosts,userrepos/credentials/CI. EachpinnedGit child privateenvclear/5sec/1MiBstreams.",
   "purpose": "Establish whether coldprivateindex diff-files --quiet gives statfalsepositive and whether --patch --exit-code comparescontent correctly",
-  "bounded_runner_sha256": "42b340340b9dd7d289f44f57bb51b8738c8a82b2984885a0254951f9b119024a"
+  "bounded_runner_sha256": "42b340340b9dd7d289f44f57bb51b8738c8a82b2984885a0254951f9b119024a",
+  "iteration": "v2: compare diff-files with porcelain diff, both quiet andpatch, optionalLocks0 on freshcoldindex; originalindex/workunchanged and independentcopiedsamelenbytechange"
 }
