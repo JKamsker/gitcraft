@@ -265,8 +265,27 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    fn frame(ctx: &Context, time: f64, events: Vec<Event>) -> (Vec<Command>, Vec<Command>) {
+    fn frame(ctx: &Context, time: f64, mut events: Vec<Event>) -> (Vec<Command>, Vec<Command>) {
         let mut result = (Vec::new(), Vec::new());
+        let releases: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Key {
+                    key,
+                    physical_key,
+                    modifiers,
+                    ..
+                } => Some(Event::Key {
+                    key: *key,
+                    physical_key: *physical_key,
+                    modifiers: *modifiers,
+                    pressed: false,
+                    repeat: false,
+                }),
+                _ => None,
+            })
+            .collect();
+        events.extend(releases);
         let input = egui::RawInput {
             time: Some(time),
             events,

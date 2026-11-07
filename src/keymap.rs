@@ -184,18 +184,6 @@ pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
         .map(|b| b.command)
 }
 
-/// The command of a key press: by the character the key types, else, for the tab keys, by
-/// where the digit is on the keyboard (on AZERTY the digits are typed with Shift, and the key
-/// under 4 reads as `'` without it).
-#[cfg(test)]
-fn find_pressed(key: Key, physical: Option<Key>, modifiers: Modifiers) -> Option<Command> {
-    find(key, modifiers).or_else(|| {
-        physical
-            .and_then(|p| find(p, modifiers))
-            .filter(|c| matches!(c, Command::GoToTab(_) | Command::LastTab))
-    })
-}
-
 /// The key of `command`, as the manual, the tooltips and the menus write it ("Ctrl+Shift+F", or
 /// "Cmd+Shift+F" on macOS). Empty for a command with no key.
 pub(crate) fn label(ctx: &egui::Context, command: Command) -> String {
