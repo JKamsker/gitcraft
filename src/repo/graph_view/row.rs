@@ -387,6 +387,32 @@ fn pill(
     w
 }
 
+fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {
+    let x = row.rect.left() + 8.0;
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(FontId::proportional(11.0), t.text_faint),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width((row.cols.refs - 24.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let right = x + galley.size().x;
+    let clip = Rect::from_min_max(row.rect.min, pos2(row.gx - 4.0, row.rect.bottom()));
+    painter.with_clip_rect(clip).galley(
+        pos2(x, row.mid() - galley.size().y / 2.0),
+        galley,
+        t.text_faint,
+    );
+    if let Some(node_x) = row.node_x {
+        painter.line_segment(
+            [
+                pos2(right + 6.0, row.mid()),
+                pos2(node_x.min(row.gx + row.cols.graph), row.mid()),
+            ],
+            Stroke::new(1.0, t.text_faint.gamma_multiply(0.35)),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,31 +497,5 @@ mod tests {
                 }
             }
         }
-    }
-}
-
-fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {
-    let x = row.rect.left() + 8.0;
-    let mut job = egui::text::LayoutJob::single_section(
-        label.to_owned(),
-        egui::TextFormat::simple(FontId::proportional(11.0), t.text_faint),
-    );
-    job.wrap = egui::text::TextWrapping::truncate_at_width((row.cols.refs - 24.0).max(0.0));
-    let galley = ui.fonts_mut(|f| f.layout_job(job));
-    let right = x + galley.size().x;
-    let clip = Rect::from_min_max(row.rect.min, pos2(row.gx - 4.0, row.rect.bottom()));
-    painter.with_clip_rect(clip).galley(
-        pos2(x, row.mid() - galley.size().y / 2.0),
-        galley,
-        t.text_faint,
-    );
-    if let Some(node_x) = row.node_x {
-        painter.line_segment(
-            [
-                pos2(right + 6.0, row.mid()),
-                pos2(node_x.min(row.gx + row.cols.graph), row.mid()),
-            ],
-            Stroke::new(1.0, t.text_faint.gamma_multiply(0.35)),
-        );
     }
 }
