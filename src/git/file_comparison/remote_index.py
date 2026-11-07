@@ -45,15 +45,39 @@ def set_acl(fd, text):
     try:
         if lib.acl_set_fd_np(fd,acl,0x100) != 0: raise RuntimeError('Cannot preserve native index ACL')
     finally: lib.acl_free(acl)
+def xattrs(fd):
+    if sys.platform != 'darwin':
+        return [(os.fsencode(name),os.getxattr(fd,name)) for name in sorted(os.listxattr(fd))]
+    # CPython on macOS does not expose os.listxattr/getxattr. Use the shipped
+    # descriptor-based APIs directly, with size queries before every allocation.
+    lib=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True)
+    lib.flistxattr.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int];lib.flistxattr.restype=ctypes.c_ssize_t
+    lib.fgetxattr.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_uint,ctypes.c_int];lib.fgetxattr.restype=ctypes.c_ssize_t
+    size=lib.flistxattr(fd,None,0,0)
+    if size<0 or size>1024*1024: raise RuntimeError('Cannot bound native index attributes')
+    names=ctypes.create_string_buffer(max(1,size));count=lib.flistxattr(fd,names,size,0)
+    if count<0 or count>size: raise RuntimeError('Index attributes changed during listing')
+    result=[];total=0
+    for name in sorted(n for n in names.raw[:count].split(b'\0') if n):
+        size=lib.fgetxattr(fd,name,None,0,0,0);total+=len(name)+max(0,size)
+        if size<0 or total>1024*1024: raise RuntimeError('Native index attributes exceed 1 MiB')
+        value=ctypes.create_string_buffer(max(1,size));count=lib.fgetxattr(fd,name,value,size,0,0)
+        if count<0 or count>size: raise RuntimeError('Index attributes changed during reading')
+        result.append((name,value.raw[:count]))
+    return result
+
+def set_xattr(fd,name,value):
+    if sys.platform != 'darwin': return os.setxattr(fd,name,value)
+    lib=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True)
+    lib.fsetxattr.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_uint,ctypes.c_int]
+    data=ctypes.create_string_buffer(value)
+    if lib.fsetxattr(fd,name,data,len(value),0,0)!=0: raise RuntimeError('Cannot preserve native index attributes')
+
 def access(fd):
     if not sys.platform.startswith(('linux','darwin')):
         raise RuntimeError('Full remote index policy requires Linux/WSL or macOS')
-    names = sorted(os.listxattr(fd)); values = []; total = 0
-    if len(names) > 1024: raise RuntimeError('Index access metadata exceeds limit')
-    for name in names:
-        value = os.getxattr(fd,name); total += len(os.fsencode(name)) + len(value)
-        if total > 1024*1024: raise RuntimeError('Index access metadata exceeds 1 MiB')
-        values.append((name,value))
+    values=xattrs(fd)
+    if len(values)>1024 or sum(len(name)+len(value) for name,value in values)>1024*1024: raise RuntimeError('Index access metadata exceeds 1 MiB')
     return (values,native_acl(fd))
 def readfd(fd, limit):
     result = bytearray()
@@ -154,7 +178,7 @@ def main():
                 key,_,policy = original
                 now=os.fstat(fd)
                 if (now.st_uid,now.st_gid)!=(key[3],key[4]): os.fchown(fd,key[3],key[4])
-                for attr,value in policy[0]: os.setxattr(fd,attr,value)
+                for attr,value in policy[0]: set_xattr(fd,attr,value)
                 set_acl(fd,policy[1]); os.fchmod(fd,mode)
                 if access(fd) != policy: raise RuntimeError('Configured mode conflicts with full captured access policy')
             os.fsync(fd)

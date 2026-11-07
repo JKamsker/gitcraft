@@ -194,7 +194,7 @@ fn remote_apply(
         &|| true,
     )?;
     if out.code == 0 {
-        Ok(String::new())
+        Ok(String::from_utf8_lossy(&out.stdout).trim().into())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().into())
     }
@@ -243,6 +243,9 @@ pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<Stri
             active,
         )?;
         if out.code != 0 {
+            if String::from_utf8_lossy(&out.stderr).contains("File comparison requires md5sum") {
+                return Err("File comparison requires md5sum (Linux/WSL) or md5 (macOS) on the repository machine".into());
+            }
             return Err("Could not fingerprint the Git index safely (16 MiB limit)".into());
         }
         let stamp = String::from_utf8(out.stdout).map_err(|_| "Invalid index fingerprint")?;
