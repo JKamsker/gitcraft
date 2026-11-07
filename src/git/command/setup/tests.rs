@@ -343,3 +343,58 @@ fn network_setup_clone_pins_https_and_explicit_profile_authentication_under_host
     );
     Ok(())
 }
+
+#[test]
+fn secondary_fetch_is_pinned_to_previewed_url_and_an_owned_git_directory() -> Result<(), String> {
+    let workspace = Workspace::new()?;
+    let exe = workspace.0.join("fixed gitcraft helper");
+    let source = "https://secondary.fixture.invalid/team/repository.git";
+    let context = connections::Context::default();
+    let prepared = context.run(|| fetch_command(&workspace.0, source, "upstream", &exe))?;
+    let args = prepared
+        .command
+        .get_args()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    let operation = args
+        .iter()
+        .position(|a| a == "fetch")
+        .ok_or("Missing fetch operation")?;
+    assert_eq!(
+        &args[operation..],
+        [
+            "fetch",
+            "--no-tags",
+            "--no-write-fetch-head",
+            "--",
+            source,
+            "+refs/heads/*:refs/remotes/upstream/*",
+            "+refs/tags/*:refs/gitcraft-setup/upstream/tags/*"
+        ]
+    );
+    assert_eq!(args[operation - 2], "--git-dir");
+    assert_eq!(
+        args[operation - 1],
+        workspace.0.join(".git").to_string_lossy()
+    );
+    let folder = args
+        .iter()
+        .position(|a| a == "-C")
+        .ok_or("Missing isolated working folder")?;
+    assert_eq!(args[folder + 1], prepared.workspace.0.to_string_lossy());
+    for (source, remote) in [
+        ("ext::UNTRUSTED", "upstream"),
+        (source, "../../outside"),
+        (
+            "https://token:SECRET@secondary.fixture.invalid/repo",
+            "upstream",
+        ),
+    ] {
+        assert!(
+            context
+                .run(|| fetch_command(&workspace.0, source, remote, &exe))
+                .is_err()
+        );
+    }
+    Ok(())
+}

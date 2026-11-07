@@ -72,14 +72,13 @@ fn mkdir(path: &Path) -> Result<(), String> {
         .create(path)
         .map_err(|e| format!("Choose a new unused destination: {e}"))
 }
-fn branch_ref(
+pub(super) fn branch_ref(
     repo: &Path,
-    remote: &str,
+    remotes: &[super::Remote],
     branch: &str,
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     let local = format!("refs/heads/{branch}");
-    let upstream = format!("refs/remotes/{remote}/{branch}");
     let bytes = git::setup_run(
         repo,
         &[
@@ -94,8 +93,11 @@ fn branch_ref(
     if names.lines().any(|n| n == local) {
         return Ok(local);
     }
-    if names.lines().any(|n| n == upstream) {
-        return Ok(upstream);
+    for remote in remotes {
+        let upstream = format!("refs/remotes/{}/{branch}", remote.name);
+        if names.lines().any(|n| n == upstream) {
+            return Ok(upstream);
+        }
     }
     Err(format!(
         "Branch {branch} is missing; no substitute was checked out"
@@ -213,10 +215,6 @@ pub(crate) fn restore(
         }
         let r = receipt.as_mut().ok_or("Missing import receipt")?;
         let repo = &r.root;
-        let remote = repository
-            .remotes
-            .first()
-            .map_or("origin", |r| r.name.as_str());
         let steps = (|| -> Result<(), String> {
             if !r.main_done {
                 let existing = git::setup_run(repo, &["remote"], active)?;
@@ -250,6 +248,14 @@ pub(crate) fn restore(
                         )?;
                     }
                 }
+                // A local source is selected explicitly instead of contacting imported URLs.
+                // Network imports fetch secondary heads too, so linked worktrees do not
+                // silently disappear when their branches belong to another remote.
+                if local_source.is_none() {
+                    for entry in repository.remotes.iter().skip(1) {
+                        git::setup_fetch(repo, &entry.fetch, &entry.name, active)?;
+                    }
+                }
                 for (key, value) in [
                     ("user.name", &repository.author_name),
                     ("user.email", &repository.author_email),
@@ -267,7 +273,7 @@ pub(crate) fn restore(
                 }
                 match (&repository.branch, &repository.commit) {
                     (Some(branch), Some(_)) => {
-                        let from = branch_ref(repo, remote, branch, active)?;
+                        let from = branch_ref(repo, &repository.remotes, branch, active)?;
                         if from.starts_with("refs/heads/") {
                             git::setup_run(
                                 repo,
@@ -361,7 +367,7 @@ pub(crate) fn restore(
                 if !already_added {
                     match &w.branch {
                         Some(branch) => {
-                            let from = branch_ref(repo, remote, branch, active)?;
+                            let from = branch_ref(repo, &repository.remotes, branch, active)?;
                             if from.starts_with("refs/heads/") {
                                 git::setup_run(
                                     repo,

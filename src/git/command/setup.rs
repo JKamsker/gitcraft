@@ -101,17 +101,7 @@ struct CloneCommand {
     workspace: Workspace,
 }
 
-fn clone_command(
-    parent: &Path,
-    source: &str,
-    destination: &Path,
-    remote: &str,
-    local: bool,
-    executable: &Path,
-) -> Result<CloneCommand, String> {
-    if crate::remote::is_remote(parent) || !parent.is_absolute() || !destination.is_absolute() {
-        return Err("Setup clones require local absolute folders".into());
-    }
+fn transport_command(source: &str, local: bool, executable: &Path) -> Result<CloneCommand, String> {
     let choices = if local {
         Choices::default()
     } else {
@@ -223,23 +213,41 @@ fn clone_command(
             .env(format!("GIT_CONFIG_KEY_{index}"), key)
             .env(format!("GIT_CONFIG_VALUE_{index}"), value);
     }
-    command
+    command.args([
+        "--no-lazy-fetch",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "init.templateDir=",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        if local {
+            "protocol.file.allow=always"
+        } else {
+            "protocol.file.allow=never"
+        },
+    ]);
+    Ok(CloneCommand { command, workspace })
+}
+
+fn clone_command(
+    parent: &Path,
+    source: &str,
+    destination: &Path,
+    remote: &str,
+    local: bool,
+    executable: &Path,
+) -> Result<CloneCommand, String> {
+    if crate::remote::is_remote(parent) || !parent.is_absolute() || !destination.is_absolute() {
+        return Err("Setup clones require local absolute folders".into());
+    }
+    let mut prepared = transport_command(source, local, executable)?;
+    prepared
+        .command
         .args([
-            "--no-lazy-fetch",
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "init.templateDir=",
-            "-c",
-            "core.fsmonitor=false",
-            "-c",
-            "protocol.ext.allow=never",
-            "-c",
-            if local {
-                "protocol.file.allow=always"
-            } else {
-                "protocol.file.allow=never"
-            },
             "clone",
             "--no-checkout",
             "--template=",
@@ -249,7 +257,53 @@ fn clone_command(
             source,
         ])
         .arg(destination);
-    Ok(CloneCommand { command, workspace })
+    Ok(prepared)
+}
+
+fn fetch_command(
+    repo: &Path,
+    source: &str,
+    remote: &str,
+    executable: &Path,
+) -> Result<CloneCommand, String> {
+    if crate::remote::is_remote(repo) || !repo.is_absolute() {
+        return Err("Setup fetches require a newly imported local repository".into());
+    }
+    crate::portability::reference(remote)?;
+    let mut prepared = transport_command(source, false, executable)?;
+    prepared
+        .command
+        .arg("--git-dir")
+        .arg(repo.join(".git"))
+        .arg("fetch")
+        .args(["--no-tags", "--no-write-fetch-head", "--", source])
+        .arg(format!("+refs/heads/*:refs/remotes/{remote}/*"))
+        .arg(format!("+refs/tags/*:refs/gitcraft-setup/{remote}/tags/*"));
+    Ok(prepared)
+}
+
+/// Secondary remotes get the same pinned URL and explicit account context as the clone.
+/// Never use the newly written remote name to resolve a URL or an ambient credential.
+pub(crate) fn setup_fetch(
+    repo: &Path,
+    source: &str,
+    remote: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    let executable = std::env::current_exe()
+        .map_err(|_| "Could not locate the selected profile authentication helper")?;
+    let CloneCommand {
+        command,
+        workspace: _workspace,
+    } = fetch_command(repo, source, remote, &executable)?;
+    let out = setup_process(command, active, Duration::from_secs(1800))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Secondary remote {remote} could not be fetched with this profile's explicit authentication; completed setup steps were retained"
+        ))
+    }
 }
 
 pub(crate) fn setup_clone(

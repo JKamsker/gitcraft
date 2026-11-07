@@ -534,3 +534,45 @@ fn portable_preferences_round_trip_workflow_and_layout_without_executables() -> 
     assert!(restored.shell.is_empty());
     Ok(())
 }
+
+#[test]
+fn linked_worktree_branch_can_resolve_from_a_secondary_remote() -> Result<(), String> {
+    let fixture = Fixture::new()?;
+    let mut repository = fixture.definition()?;
+    repository.remotes = vec![
+        Remote {
+            name: "origin".into(),
+            fetch: "https://primary.fixture.invalid/repo".into(),
+            push: Vec::new(),
+        },
+        Remote {
+            name: "upstream".into(),
+            fetch: "https://secondary.fixture.invalid/repo".into(),
+            push: Vec::new(),
+        },
+    ];
+    let commit = repository.commit.as_deref().ok_or("No fixture commit")?;
+    crate::git::practice_run(
+        &fixture.repo,
+        &["update-ref", "refs/remotes/upstream/secondary-only", commit],
+    )?;
+    assert_eq!(
+        restore::branch_ref(
+            &fixture.repo,
+            &repository.remotes,
+            "secondary-only",
+            &|| true
+        )?,
+        "refs/remotes/upstream/secondary-only"
+    );
+    assert!(
+        restore::branch_ref(
+            &fixture.repo,
+            &repository.remotes[..1],
+            "secondary-only",
+            &|| true
+        )
+        .is_err()
+    );
+    Ok(())
+}

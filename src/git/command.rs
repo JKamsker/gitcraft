@@ -61,7 +61,7 @@ use crate::remote::{self, Target};
 mod connection;
 mod setup;
 pub(crate) use connection::*;
-pub(crate) use setup::{setup_clone, setup_run};
+pub(crate) use setup::{setup_clone, setup_fetch, setup_run};
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 

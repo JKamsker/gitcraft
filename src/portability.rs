@@ -479,7 +479,7 @@ pub(crate) fn leaf(s: &str) -> Result<(), String> {
     }
     Ok(())
 }
-fn reference(s: &str) -> Result<(), String> {
+pub(crate) fn reference(s: &str) -> Result<(), String> {
     text(s, 256)?;
     if s.is_empty()
         || s.starts_with(['-', '.', '/'])
