@@ -16,6 +16,7 @@ mod error_card;
 mod fence;
 mod drift;
 mod finder_actions;
+mod diagnostics;
 mod folder_browser;
 mod forge;
 mod git;

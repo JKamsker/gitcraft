@@ -11,6 +11,7 @@ mod cli;
 pub(crate) use cli::tool_location;
 mod forks;
 pub use forks::ForkInfo;
+pub(crate) use cli::{ToolReport, tool_report};
 mod gitea;
 mod github;
 mod gitlab;

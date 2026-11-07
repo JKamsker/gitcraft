@@ -35,6 +35,7 @@ pub(crate) enum AppCommand {
     ForgetSignIns,
     Settings,
     Manual,
+    CopyDiagnostics,
     MyWork,
     Theme(ThemeId),
     /// The settings' themes.
@@ -101,6 +102,7 @@ impl App {
             );
         }
         list.push(Item::app("Where's my work? (unpushed commits, stashes, changes everywhere)", "app", AppCommand::MyWork));
+        list.push(Item::app("Help: Copy diagnostics", "app", AppCommand::CopyDiagnostics));
         list.extend([
             Item::app("Open repository…", "app", AppCommand::Open),
             Item::app("Create repository…", "app", AppCommand::Create),
@@ -208,6 +210,7 @@ impl App {
             }
             AppCommand::Settings => self.open_settings(),
             AppCommand::Manual => self.manual_open = true,
+            AppCommand::CopyDiagnostics => self.copy_diagnostics(ctx),
             AppCommand::MyWork => self.open_my_work(ctx),
             AppCommand::Theme(id) => self.set_theme(ctx, id),
             AppCommand::Themes => {

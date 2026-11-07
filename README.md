@@ -1102,6 +1102,15 @@ so your config, credentials and hooks apply as usual.
   `output` `"toast"` when left out; a field the format doesn't know makes the file unusable (the
   review says why). A toast shows only the last 8 lines of what a command printed.
 - Manual (F1, or the book in the title bar): what each part does and every keyboard shortcut.
+- _Copy diagnostics_ (at the top of the manual, or _Help: Copy diagnostics_ in the palette):
+  what a bug report needs, as Markdown on the clipboard. gitcraft's version and channel, the
+  system, the graphics adapter and backend wgpu draws with, the versions of git, `gh`, `glab`
+  and `tea` and whether each has a login (`gh auth token`'s exit code, offline too; `glab auth
+  status`, which asks its server; `tea`'s logins counted; never a token or an account), and the
+  settings of the doctor's allowlist in effect in the repository shown, with their scope and
+  file name. Never your name, email or signing key; a setting whose value is a path only says it
+  is set, and any user's folder (`/home/x`, `C:\Users\x`, `/mnt/c/Users/x`) is written `~`.
+  The tools are asked side by side; check the text before posting it.
 - Avatars: on a GitHub repository, the authors' GitHub accounts (through `gh` when installed, else
   GitHub's API); on Forgejo and Gitea, the accounts the host ties the commits to; on GitLab, the
   host's avatar API; elsewhere Gravatar (a hash of the email).
@@ -1349,6 +1358,7 @@ was made this way, on a demo repository.
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
 | `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |
+| `src/diagnostics.rs`     | Help → Copy diagnostics: what a bug report needs, nothing personal                 |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/keymap.rs`          | the keys of the main actions and tabs, read by handlers, manual, tooltips, menus   |
 | `src/menu_item.rs`       | a menu entry with its key on the right and why it is greyed out under it           |

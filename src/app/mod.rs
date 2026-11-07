@@ -6,6 +6,7 @@ mod clone;
 mod draft_saving;
 mod handoff;
 mod dropped;
+mod diagnostics;
 mod home;
 mod home_filter;
 mod home_recent;
@@ -162,6 +163,10 @@ pub struct App {
     /// What the profile set for git when the repository tabs last read who commits are by.
     profile_git_seen: String,
     manual_open: bool,
+    /// The graphics adapter wgpu draws with, for diagnostics.
+    adapter: Option<String>,
+    /// Diagnostics being collected for the clipboard.
+    diagnostics: Option<diagnostics::Collecting>,
     palette: Option<Palette>,
     palette_recent: palette::recent::Recent,
     toasts: Vec<Toast>,
@@ -242,6 +247,8 @@ impl App {
             profile_states: saved.profile_states,
             profile_git_seen: String::new(),
             manual_open: false,
+            adapter: diagnostics::adapter(cc),
+            diagnostics: None,
             palette: None,
             palette_recent: saved.palette_recent,
             toasts: Vec::new(),
@@ -713,6 +720,7 @@ impl eframe::App for App {
         self.keep_drafts(&ctx, focused);
         self.repo_scan_dialog(&ctx);
         self.my_work_ui(&ctx);
+        self.poll_diagnostics(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         crate::a11y::end_frame(&ctx);

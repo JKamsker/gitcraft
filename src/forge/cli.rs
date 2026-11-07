@@ -524,3 +524,75 @@ mod tests {
         }
     }
 }
+
+/// What diagnostics say about a forge's tool: its version, and whether it has a login (never
+/// any token or account).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ToolReport {
+    pub tool: &'static str,
+    /// The first line of `tool --version`; `None` when it isn't installed or didn't answer.
+    pub version: Option<String>,
+    /// Whether it has a login: `None` when that couldn't be told.
+    pub signed_in: Option<bool>,
+}
+
+/// How long a tool may take to answer diagnostics.
+const REPORT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// [`ToolReport`] for `gh` (`auth token` exits 0 when a login is stored, without asking the
+/// server; the token itself is never read), `glab` (`auth status`, which asks the server) or
+/// `tea` (its configured logins counted).
+pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
+    let version = answer(tool, &["--version"], true).and_then(|(ok, out)| {
+        ok.then(|| out.lines().next().unwrap_or_default().trim().to_owned())
+            .filter(|v| !v.is_empty())
+    });
+    let signed_in = match tool {
+        _ if version.is_none() => None,
+        "tea" => Some(!super::gitea::tea_servers().is_empty()),
+        "gh" => answer(tool, &["auth", "token"], false).map(|(ok, _)| ok),
+        _ => answer(tool, &["auth", "status"], false).map(|(ok, _)| ok),
+    };
+    ToolReport {
+        tool,
+        version,
+        signed_in,
+    }
+}
+
+/// Runs `tool` with `args` and no input, waiting at most [`REPORT_TIMEOUT`]: whether it
+/// succeeded, and its standard output when `keep` (else it goes nowhere). `None` when it
+/// couldn't be run or took too long. The output is read as it comes, so a long one can't stall
+/// the tool.
+fn answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
+    let mut cmd = tool_command(tool);
+    cmd.args(args)
+        .current_dir(std::env::temp_dir())
+        .stdin(Stdio::null())
+        .stdout(if keep { Stdio::piped() } else { Stdio::null() })
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn().ok()?;
+    let reader = child.stdout.take().map(|mut out| {
+        std::thread::spawn(move || {
+            let mut text = String::new();
+            let _ = std::io::Read::read_to_string(&mut out, &mut text);
+            text
+        })
+    });
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < REPORT_TIMEOUT => {
+                std::thread::sleep(Duration::from_millis(30));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let text = reader.and_then(|r| r.join().ok()).unwrap_or_default();
+    Some((status.success(), text))
+}
