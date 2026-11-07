@@ -19,6 +19,9 @@ mod reflog;
 mod preview;
 mod notes;
 mod log_order;
+mod lfs_locks;
+#[cfg(test)]
+pub(crate) mod lfs_test_server;
 mod refs;
 pub mod simulate;
 pub mod search_query;
@@ -47,6 +50,7 @@ pub use self::reflog::*;
 pub use self::preview::*;
 pub use self::notes::*;
 pub use self::log_order::*;
+pub use self::lfs_locks::*;
 pub use self::refs::*;
 pub use self::signature::*;
 pub use self::stash::*;

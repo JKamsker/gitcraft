@@ -36,6 +36,7 @@ impl RepoTab {
                     self.in_progress_banner(ui, acts, state);
                 }
                 self.stash_picks_bar(ui, acts);
+                self.lock_banners(ui, acts);
                 if !self.work.conflicted.is_empty() {
                     self.conflicted_list(ui, acts);
                 }
@@ -246,13 +247,14 @@ impl RepoTab {
             stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
         super::super::weakened_marks::hover(ui, &r, flags);
+        self.lock_badge(ui, &r.row, &f.path, (!buttons.is_empty(), selected));
         if f.code != 'D' {
             // Linked as it is in the last commit: a new or renamed file isn't there by this name.
             let links = || {
                 self.link_menu(None)
                     .filter(|_| !matches!(f.code, 'A' | '?') && f.old_path.is_none())
             };
-            widgets::file_menu_with(&r.row, &f.path, None, true, Some(&key), &links, acts, stash);
+            widgets::file_menu_with(&r.row, &f.path, None, true, Some(&key), &links, acts, |ui, acts| { self.lock_menu_items(ui, &f.path, None, acts); stash(ui, acts); });
         } else {
             // A deleted file has nothing to open, but can be stashed.
             egui::Popup::context_menu(&r.row)

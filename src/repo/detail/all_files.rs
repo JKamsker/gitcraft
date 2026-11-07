@@ -116,8 +116,15 @@ impl RepoTab {
                     };
                     let code = change.map_or(' ', |f| f.status);
                     let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
+                    // Over the stats of a changed file, the padlock would hide them.
+                    if change.is_none() {
+                        self.lock_badge(ui, &r.row, path, (false, shown(path)));
+                    }
+                    let locks = |ui: &mut Ui, acts: &mut Vec<Action>| {
+                        self.lock_menu_items(ui, path, Some(&detail.hash), acts);
+                    };
                     let links = || self.link_menu(None);
-                    widgets::file_menu(&r.row, path, Some(&detail.hash), false, None, &links, acts);
+                    widgets::file_menu_with(&r.row, path, Some(&detail.hash), false, None, &links, acts, locks);
                     if r.row.clicked() {
                         acts.push(Action::FileView {
                             path: path.clone(),

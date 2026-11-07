@@ -35,6 +35,18 @@ pub fn file_menu_with(
     acts: &mut Vec<Action>,
     more: impl FnOnce(&mut Ui, &mut Vec<Action>),
 ) {
+    file_menu_with(resp, path, rev, ignorable, |_, _| {}, acts);
+}
+
+/// [`file_menu`] with `extra` items of the caller's (Git LFS locks…) before Copy path.
+pub fn file_menu_with(
+    resp: &Response,
+    path: &str,
+    rev: Option<&str>,
+    ignorable: bool,
+    extra: impl FnOnce(&mut egui::Ui, &mut Vec<Action>),
+    acts: &mut Vec<Action>,
+) {
     egui::Popup::context_menu(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
@@ -87,6 +99,7 @@ pub fn file_menu_with(
                     }
                 });
             }
+            extra(ui, acts);
             ui.separator();
             if ui.button("Copy path").clicked() {
                 ui.ctx().copy_text(path.to_owned());

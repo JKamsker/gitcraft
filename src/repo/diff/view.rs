@@ -204,7 +204,7 @@ impl RepoTab {
                             DiffKey::Commit { .. } | DiffKey::Range { .. } => true,
                         })
                     };
-                    widgets::file_menu(&title, path, rev, ignorable, Some(&view.key), &links, acts);
+                    widgets::file_menu_with(&title, path, rev, ignorable, Some(&view.key), &links, acts, |ui, acts| self.lock_menu_items(ui, path, rev, acts));
                     widgets::chip(ui, origin, t.text_dim);
                     let before = if rendered {
                         matches!(&view.rendered, Some(Ok(md)) if md.before)

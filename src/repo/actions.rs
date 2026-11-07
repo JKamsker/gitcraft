@@ -151,6 +151,8 @@ pub(crate) enum Action {
     /// The commit pane of a merge shows what it resolved, or the files it changed.
     ShowRemerge(bool),
     SaveConflict,
+    /// Something done with the Git LFS file locks.
+    LfsLocks(super::lfs_locks::LockAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.
@@ -491,6 +493,11 @@ impl RepoTab {
                     },
                 ));
             }
+            items.push((
+                "LFS: Locks…".into(),
+                "remote".into(),
+                Action::LfsLocks(super::lfs_locks::LockAct::OpenPanel),
+            ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push((
