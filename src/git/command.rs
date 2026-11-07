@@ -4,7 +4,7 @@
 
 pub(super) mod bounded;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`

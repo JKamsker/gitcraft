@@ -62,11 +62,17 @@ fn exercise_app(root: &Path) -> Result<(), String> {
     let hostile_context = crate::connections::Context {
         git_config: Some(root.join("hostile.gitconfig")),
         choices: crate::connections::Choices {
-            ssh_key: root.join("missing-selected-key").to_string_lossy().into_owned(),
+            ssh_key: root
+                .join("missing-selected-key")
+                .to_string_lossy()
+                .into_owned(),
             github: crate::connections::Account {
                 host: "fixture.invalid".into(),
                 user: "selected-hostile-account".into(),
-                config_dir: root.join("missing-account-config").to_string_lossy().into_owned(),
+                config_dir: root
+                    .join("missing-account-config")
+                    .to_string_lossy()
+                    .into_owned(),
             },
             ..Default::default()
         },
@@ -74,8 +80,10 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         ..Default::default()
     };
     crate::connections::set(hostile_context.clone());
-    assert!(git::run(Some(&root.join("caller")), &["rev-parse", "HEAD"])
-        .is_err_and(|error| error.contains("Fixture profile")));
+    assert!(
+        git::run(Some(&root.join("caller")), &["rev-parse", "HEAD"])
+            .is_err_and(|error| error.contains("Fixture profile"))
+    );
     let ctx = harness.ctx.clone();
     harness
         .state_mut()
