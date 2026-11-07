@@ -60,6 +60,7 @@ impl RepoTab {
         self.file_comparison = None;
         self.cancel_draft_reads();
         self.saved_views.cancel();
+        self.dossier.close();
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {
@@ -76,6 +77,7 @@ impl RepoTab {
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
         self.saved_views.cancel();
+        self.dossier.close();
         self.work_epoch = self.work_epoch.wrapping_add(1);
         self.discard_decrypted();
         // Changes seen on disk so far are read by this reload (or the one queued after the

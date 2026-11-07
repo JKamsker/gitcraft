@@ -48,8 +48,20 @@ impl RepoTab {
                 | Action::OpenPr(_)
                 | Action::OpenCi { .. }
                 | Action::FileView { .. }
+                | Action::OpenLineDossier(_)
         ) {
             self.file_comparison = None;
+        }
+        if matches!(
+            &action,
+            Action::OpenFileComparison(_)
+                | Action::OpenDiff(_)
+                | Action::OpenActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.dossier.close();
         }
         match action {
             Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
@@ -284,6 +296,8 @@ impl RepoTab {
             Action::ViewAllFiles(on) => self.all_files.on = on,
             Action::FileView { path, rev, tab } => self.open_file_view(path, rev, tab, ctx),
             Action::CloseFileView => self.file_view = None,
+            Action::OpenLineDossier(seed) => self.open_line_dossier(seed, ctx),
+            Action::CloseLineDossier => self.dossier.close(),
             Action::InteractiveRebase { onto, label } => self.interactive_rebase(onto, label, ctx),
             Action::Reword { hash, message } => self.reword_commit(hash, message, ctx),
             Action::EditMessage(hash) => self.edit_message(hash, ctx),

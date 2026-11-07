@@ -244,6 +244,7 @@ impl RepoTab {
         }
         self.sync_draft_reader();
         self.poll_saved_views(ctx);
+        self.poll_line_dossier(ctx);
         if !shown {
             return;
         }

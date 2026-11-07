@@ -25,6 +25,7 @@ pub(crate) mod highlight;
 mod keep_submodules;
 pub(crate) mod keyboard;
 mod layout;
+mod line_dossier;
 mod load;
 mod messages;
 mod navigate;
@@ -123,6 +124,7 @@ pub struct RepoTab {
     sparse_requests: u64,
     drafts: drafts::State,
     saved_views: saved_views::State,
+    dossier: line_dossier::State,
     history_requests: u64,
     history_download_allowed: bool,
     /// Commits as git listed them.
@@ -309,6 +311,7 @@ impl RepoTab {
             sparse_requests: 0,
             drafts: Default::default(),
             saved_views: Default::default(),
+            dossier: Default::default(),
             history_requests: 0,
             history_download_allowed: false,
             history: Vec::new(),

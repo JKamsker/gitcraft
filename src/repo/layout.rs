@@ -55,7 +55,9 @@ impl RepoTab {
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
                 let pane_rect = ui.max_rect().intersect(ui.clip_rect());
-                if self.file_comparison.is_some() {
+                if self.dossier.open {
+                    self.line_dossier_view(ui, &mut acts);
+                } else if self.file_comparison.is_some() {
                     self.file_comparison_view(ui, &mut acts);
                 } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
@@ -137,7 +139,9 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.file_comparison.is_some() {
+            if esc && self.dossier.open {
+                acts.push(Action::CloseLineDossier);
+            } else if esc && self.file_comparison.is_some() {
                 acts.push(Action::CloseFileComparison);
             } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
@@ -158,8 +162,10 @@ impl RepoTab {
             } else if esc && self.search.open {
                 acts.push(Action::ToggleSearch);
             }
-            let diff_shown =
-                self.diff.is_some() && self.conflict.is_none() && self.rebase.is_none();
+            let diff_shown = self.diff.is_some()
+                && self.conflict.is_none()
+                && self.rebase.is_none()
+                && !self.dossier.open;
             if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
                 acts.push(Action::DiffStep(delta));
             }

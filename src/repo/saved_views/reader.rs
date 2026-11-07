@@ -17,7 +17,7 @@ struct Running<T> {
     answer: Option<Result<T, String>>,
     completion: ForecastCompletion,
 }
-pub(super) struct Reader<T> {
+pub(in crate::repo) struct Reader<T> {
     generation: Arc<AtomicU64>,
     pending: Option<Pending<T>>,
     running: Option<Running<T>>,

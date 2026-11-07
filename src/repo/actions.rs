@@ -175,6 +175,8 @@ pub(crate) enum Action {
         tab: file_view::FileTab,
     },
     CloseFileView,
+    OpenLineDossier(Option<git::investigations::dossier::Seed>),
+    CloseLineDossier,
     /// Open the interactive rebase editor for the commits after `onto`.
     /// Gives a commit of the checked-out branch a new message: amending the latest, rebasing
     /// for an older one.
@@ -392,6 +394,11 @@ impl RepoTab {
                 "Activity calendar".into(),
                 "history".into(),
                 Action::OpenActivity(super::activity::Page::Calendar),
+            ),
+            (
+                "Line dossier: explain history…".into(),
+                "history".into(),
+                Action::OpenLineDossier(None),
             ),
             (
                 "Contributor statistics".into(),

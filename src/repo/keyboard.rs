@@ -57,6 +57,7 @@ fn same_file(a: &DiffKey, b: &DiffKey) -> bool {
 
 fn available(tab: &RepoTab, ctx: &egui::Context) -> bool {
     tab.dialog.is_none()
+        && !tab.dossier.open
         && !tab.keys_blocked
         && !ctx.egui_wants_keyboard_input()
         && !egui::Popup::is_any_open(ctx)
