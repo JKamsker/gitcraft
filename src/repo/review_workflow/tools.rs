@@ -8,6 +8,7 @@ pub(crate) struct Tools {
     pub contracts: super::contracts::State,
     pub radar: super::radar::State,
     pub reproducer: super::reproducer::State,
+    pub choreography: super::choreography::State,
 }
 #[derive(Clone)]
 pub(crate) enum ToolsAct {
@@ -17,6 +18,7 @@ pub(crate) enum ToolsAct {
     Contract(super::contracts::Act),
     Radar(super::radar::Act),
     Reproducer(super::reproducer::Act),
+    Choreography(super::choreography::Act),
 }
 impl RepoTab {
     pub(in crate::repo) fn review_tools_act(&mut self, act: ToolsAct, ctx: &egui::Context) {
@@ -25,6 +27,7 @@ impl RepoTab {
                 self.review_tools.open = true;
                 self.echo_act(echo::Act::Load, ctx);
             }
+            ToolsAct::Choreography(act) => self.choreography_act(act, ctx),
             ToolsAct::Reproducer(act) => self.reproducer_act(act, ctx),
             ToolsAct::Radar(act) => self.radar_act(act, ctx),
             ToolsAct::Contract(act) => self.contract_act(act, ctx),
@@ -45,6 +48,17 @@ impl RepoTab {
                 egui::ScrollArea::both().show(ui, |ui| {
                     egui::CollapsingHeader::new("Personal reviewer echo")
                         .show(ui, |ui| echo::show(ui, &mut self.review_tools.echo, acts));
+                    egui::CollapsingHeader::new("Release choreography across repositories").show(
+                        ui,
+                        |ui| {
+                            super::choreography::show(
+                                ui,
+                                &mut self.review_tools.choreography,
+                                &self.path,
+                                acts,
+                            )
+                        },
+                    );
                     egui::CollapsingHeader::new("AI objections with a reproducer").show(ui, |ui| {
                         super::reproducer::show(ui, &mut self.review_tools.reproducer, acts)
                     });

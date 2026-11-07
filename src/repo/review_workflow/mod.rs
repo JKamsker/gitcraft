@@ -16,6 +16,7 @@ pub(super) use storyboard::{StoryAct, Storyboard, show as storyboard_ui};
 mod echo;
 mod tools;
 pub(super) use tools::{Tools, ToolsAct};
+mod choreography;
 mod contracts;
 mod intents;
 mod radar;
