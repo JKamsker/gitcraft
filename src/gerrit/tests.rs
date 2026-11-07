@@ -59,7 +59,8 @@ fn gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_pro
         Some(Server {
             remote: "origin".into(),
             web: "https://review.example".into(),
-            project: "project".into()
+            project: "project".into(),
+            web_warning: None
         })
     );
     let google = detect_with(
@@ -93,7 +94,10 @@ fn gerrit_projects_and_explicit_web_overrides_are_detected_without_a_network_pro
     );
     assert_eq!(proxy.map(|server| server.project), Some("project".into()));
     config.insert("gitcraft.gerriturl".into(), "javascript:alert(1)".into());
-    assert!(detect_with(&remote("ssh://review.example/project"), &config).is_none());
+    let invalid = detect_with(&remote("ssh://review.example/project"), &config)
+        .expect("invalid web setting must keep review routing");
+    assert_eq!(invalid.web, "https://review.example");
+    assert!(invalid.web_warning.is_some());
     assert!(detect_with(&remote("/tmp/project"), &config).is_none());
 }
 
@@ -188,4 +192,40 @@ fn divergence_and_merge_commits_need_a_linear_rebase_first() {
     );
     assert!(check_stack(&path, &base, &git::head(&path)).is_err());
     let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn restored_identity_joins_existing_trailers_and_preserves_continuations() {
+    let original = format!("Original\n\nChange-Id: {ID}");
+    for edited in [
+        "New\n\nCo-authored-by: A <a@b>",
+        "New\n\nReviewed-by: A\n continued",
+    ] {
+        let result = amended_message(&original, edited).unwrap();
+        assert_eq!(result, format!("{edited}\nChange-Id: {ID}"));
+        assert_eq!(change_id(&result), Ok(ID));
+    }
+    let prose = "New\n\nThis: looks like a trailer\nbut is prose";
+    assert_eq!(
+        amended_message(&original, prose),
+        Ok(format!("{prose}\n\nChange-Id: {ID}"))
+    );
+}
+
+#[test]
+fn preflight_propagates_cancellation_before_validation_and_between_reads() {
+    for stop in [0, 1] {
+        let mut calls = 0;
+        let result = check_stack_with("base", "head", |_| {
+            let call = calls;
+            calls += 1;
+            if call == stop {
+                Err(git::CANCELLED.to_owned())
+            } else {
+                Ok(String::new())
+            }
+        });
+        assert_eq!(result, Err(git::CANCELLED.to_owned()));
+        assert_eq!(calls, stop + 1);
+    }
 }

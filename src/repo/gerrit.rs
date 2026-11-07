@@ -4,6 +4,10 @@ use super::{Action, Dialog, RepoTab};
 
 impl RepoTab {
     pub(super) fn review_dialog(&self) -> Option<Dialog> {
+        self.review_dialog_for(self.refs.current.as_deref())
+    }
+
+    pub(super) fn review_dialog_for(&self, branch: Option<&str>) -> Option<Dialog> {
         let server = self.gerrit.as_ref()?;
         if self.refs.head.is_empty() {
             return None;
@@ -19,11 +23,8 @@ impl RepoTab {
                 crate::gerrit::valid_branch(name).then(|| (name.to_owned(), b.target.clone()))
             })
             .collect();
-        let upstream = self
-            .refs
-            .current
-            .as_ref()
-            .and_then(|name| self.refs.local.iter().find(|b| &b.name == name))
+        let upstream = branch
+            .and_then(|name| self.refs.local.iter().find(|b| b.name == name))
             .and_then(|b| self.split_upstream(&b.upstream))
             .filter(|(remote, _)| remote == &server.remote)
             .map(|(_, name)| name.to_owned());
@@ -44,6 +45,7 @@ impl RepoTab {
             target,
             topic: String::new(),
             skip_hooks: false,
+            web_warning: server.web_warning.clone(),
         })
     }
 
@@ -189,6 +191,7 @@ mod flow_tests {
             remote: "review".into(),
             web: "https://review.example.org".into(),
             project: "app".into(),
+            web_warning: None,
         });
         tab.remotes = vec![Remote {
             name: "review".into(),
@@ -211,8 +214,20 @@ mod flow_tests {
                 vec![branch("review/main", ""), branch("review/stable", "")],
             ),
         ];
+        tab.refs.local.push(branch("another", "review/main"));
+        let (
+            _,
+            Action::Dialog(Dialog::GerritReview {
+                target: pushed_target,
+                ..
+            }),
+        ) = tab.push_branch(&tab.refs.local[1]).expect("review action")
+        else {
+            panic!("expected review dialog")
+        };
+        assert_eq!(pushed_target, "main");
         let dialog = tab.review_dialog();
-        assert!(dialog.is_some());
+        assert!(matches!(&dialog, Some(Dialog::GerritReview { .. })));
         let Some(Dialog::GerritReview {
             remote,
             target,
@@ -326,6 +341,40 @@ mod integration_tests {
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), amended);
         assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        std::fs::remove_file(&hook).map_err(|e| e.to_string())?;
+        tab.reword_commit(
+            amended.clone(),
+            "Reworded\n\nCo-authored-by: Co Author <co@example.invalid>".to_owned(),
+            &ctx,
+        );
+        settle(&mut tab, &ctx);
+        let reworded = git::head(&path);
+        assert_ne!(reworded, amended);
+        let message = git::head_message(&path)?;
+        assert_eq!(crate::gerrit::change_id(&message)?, ID);
+        let trailers = run(&[
+            "show",
+            "-s",
+            "--format=%(trailers:key=Co-authored-by)",
+            "HEAD",
+        ])?;
+        assert!(trailers.contains("Co Author"), "{message}");
+        tab.reword_commit(
+            reworded.clone(),
+            format!("Changed identity\n\nChange-Id: I1123456789abcdef0123456789abcdef01234567"),
+            &ctx,
+        );
+        settle(&mut tab, &ctx);
+        assert_eq!(git::head(&path), reworded);
+        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        run(&["checkout", "-qb", "external"])?;
+        tab.amend = true;
+        tab.commit_summary = "Must not move external".to_owned();
+        tab.commit(&ctx);
+        settle(&mut tab, &ctx);
+        assert_eq!(git::head(&path), reworded);
+        assert_eq!(git::resolve(&path, "main")?, reworded);
+        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
         drop(tab);
         let _ = std::fs::remove_dir_all(path);
         Ok(())
@@ -339,6 +388,8 @@ mod integration_tests {
             remote: "origin".into(),
             web: "https://gerrit.example.invalid".into(),
             project: "project".into(),
+            web_warning: None,
+            web_warning: None,
         });
         tab.refs.head = "a".repeat(40);
         tab.sync(&ctx);

@@ -13,6 +13,7 @@ pub(super) fn review(
     target: &mut String,
     topic: &mut String,
     skip_hooks: bool,
+    web_warning: Option<&str>,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
     title(
@@ -24,6 +25,9 @@ pub(super) fn review(
         ),
         &t,
     );
+    if let Some(warning) = web_warning {
+        ui.label(egui::RichText::new(warning).color(t.warning));
+    }
     ui.label("Target branch");
     egui::ComboBox::from_id_salt("gerrit-target")
         .width(ui.available_width())

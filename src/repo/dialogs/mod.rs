@@ -44,6 +44,7 @@ pub enum Dialog {
         target: String,
         topic: String,
         skip_hooks: bool,
+        web_warning: Option<String>,
     },
     BundleLoading(u64),
     BundleExport {
@@ -488,7 +489,8 @@ impl RepoTab {
                     target,
                     topic,
                     skip_hooks,
-                } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks),
+                    web_warning,
+                } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks, web_warning.as_deref()),
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");

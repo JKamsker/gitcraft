@@ -10,6 +10,7 @@ pub(crate) struct Server {
     pub remote: String,
     pub web: String,
     pub project: String,
+    pub web_warning: Option<String>,
 }
 
 impl Server {
@@ -46,9 +47,11 @@ fn detect_with(remotes: &[Remote], config: &HashMap<String, String>) -> Option<S
     }
     // A reverse proxy can serve Gerrit under a path. The override is an explicit web URL,
     // not the SSH port (often 29418), and never contains user info or a query.
-    let web = config.get("gitcraft.gerriturl").map_or(Some(web), |url| {
-        valid_web(url).then(|| url.trim_end_matches('/').to_owned())
-    })?;
+    let (web, web_warning) = match config.get("gitcraft.gerriturl") {
+        Some(url) if valid_web(url) => (url.trim_end_matches('/').to_owned(), None),
+        Some(_) => (web, Some("Invalid gitcraft.gerritUrl: use an HTTP(S) URL without credentials, query or fragment. Using the remote's web address; Gerrit review submission remains enabled.".to_owned())),
+        None => (web, None),
+    };
     let mut project = project.as_str();
     if remote.url.starts_with("http://") || remote.url.starts_with("https://") {
         let prefix = web
@@ -66,6 +69,7 @@ fn detect_with(remotes: &[Remote], config: &HashMap<String, String>) -> Option<S
         remote: remote.name.clone(),
         web,
         project: project.to_owned(),
+        web_warning,
     })
 }
 
@@ -189,7 +193,23 @@ pub(crate) fn amended_message(original: &str, edited: &str) -> Result<String, St
         Ok(new) if new == id => Ok(edited.to_owned()),
         Ok(_) => Err("Keep the original Change-Id when amending a Gerrit change".to_owned()),
         Err(_) if !edited.lines().any(|l| l.starts_with("Change-Id:")) => {
-            Ok(format!("{}\n\nChange-Id: {id}", edited.trim_end()))
+            let edited = edited.trim_end();
+            let footer = edited.rsplit_once("\n\n").map(|(_, footer)| footer);
+            let mut trailer = false;
+            let has_trailers = footer.is_some_and(|footer| {
+                footer.lines().all(|line| {
+                    if line.starts_with([' ', '\t']) {
+                        return trailer;
+                    }
+                    trailer = line.split_once(':').is_some_and(|(key, _)| {
+                        !key.is_empty()
+                            && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                    });
+                    trailer
+                })
+            });
+            let separator = if has_trailers { "\n" } else { "\n\n" };
+            Ok(format!("{edited}{separator}Change-Id: {id}"))
         }
         Err(e) => Err(e),
     }
@@ -276,22 +296,28 @@ pub(crate) fn review_ops(
 
 /// Validate every commit being submitted, including ancestors outside the visible graph.
 /// A missing hook is reported with instructions, never downloaded or executed by gitcraft.
+#[cfg(test)]
 pub(crate) fn check_stack(repo: &Path, base: &str, head: &str) -> Result<(), String> {
-    git::run(Some(repo), &["merge-base", "--is-ancestor", base, head])
-        .map_err(|_| "The target branch is not an ancestor of this commit. Fetch and rebase onto the target before pushing for review.".to_owned())?;
+    check_stack_with(base, head, |args| git::run(Some(repo), args))
+}
+
+pub(crate) fn check_stack_with(
+    base: &str,
+    head: &str,
+    mut run: impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<(), String> {
+    run(&["merge-base", "--is-ancestor", base, head])
+        .map_err(|error| if error == git::CANCELLED { error } else { "The target branch is not an ancestor of this commit. Fetch and rebase onto the target before pushing for review.".to_owned() })?;
     let range = format!("{base}..{head}");
-    let out = git::run(
-        Some(repo),
-        &[
-            "log",
-            "--no-show-signature",
-            "--no-notes",
-            "--encoding=UTF-8",
-            "--format=%H%x00%P%x00%B%x00",
-            &range,
-            "--",
-        ],
-    )?;
+    let out = run(&[
+        "log",
+        "--no-show-signature",
+        "--no-notes",
+        "--encoding=UTF-8",
+        "--format=%H%x00%P%x00%B%x00",
+        &range,
+        "--",
+    ])?;
     let mut ids = HashSet::new();
     let mut count = 0;
     for fields in out.split('\0').collect::<Vec<_>>().as_chunks::<3>().0 {
