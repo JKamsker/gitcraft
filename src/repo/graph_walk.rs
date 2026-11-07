@@ -459,8 +459,14 @@ mod tests {
             kittest::{NodeT, Queryable},
         };
         tab.rebuild_graph_labels();
+        let mut initialized = false;
         let mut harness = Harness::builder().with_size([900.0, 600.0]).build_ui_state(
-            |ui, tab: &mut RepoTab| {
+            move |ui, tab: &mut RepoTab| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    return;
+                }
                 crate::settings::Settings {
                     graph_lane_walk: true,
                     ..Default::default()
