@@ -1,0 +1,1 @@
+Error: "The local repair did not establish complete owned acknowledgement. Preserve concurrent edits; inspect recovery.txt and saved index/dependency in /workspace/work/push-preflight-gate2-production-files-sha1/tmp/gitcraft-push-ref-transaction-1129399-1794027846695254128. No automatic rollback overwrote later work."

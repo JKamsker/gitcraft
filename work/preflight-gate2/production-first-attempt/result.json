@@ -1,0 +1,43 @@
+{
+  "verdict": "FAIL_PRODUCTION_GATE2; no feature PASS",
+  "compiled_source": "7347ecc33ed9c5e0fc6be1a6188b560bea121518",
+  "compiler_binding_commit": "fab3dfc748bbca05f874197a6fa0ada89ec44ad4",
+  "production_static_pass": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "actual_case": "files-sha1",
+  "counts": {
+    "pass": 0,
+    "fail": 1,
+    "remaining_not_run": 20
+  },
+  "native_scratch_proof": "PASS exact native stdin+prepared+committed ACK",
+  "original_prepared_relay": "ran with intended target+old/new,argvprepared and originalhooksPath",
+  "checkout": "not attempted; preparedACK absent",
+  "user_state_unchanged": true,
+  "recovery_retained": true,
+  "suspected_failure": "rawindex equality/statcold privateindex work comparison; affected-status not reached; specific stderr withheld; need owned read-only diagnostic",
+  "hashes": {
+    "check-before.index": "a9b989c371e6d29ba6d2919f27e0517ad9c0a67eb60fa53624de7e2875ce8801",
+    "updates-prepared": "679ec7b36469bf4abb2cdbb04811614c25e236bd555259bf28a1a054c811299f",
+    "original-args-aborted": "7c73de6bcd6f78379cac7ecea08492432c7057088cd95e16021fb8bbe5966783",
+    "recovery.txt": "3b2b016c8534005dea116db4d77b03a8fe988cdacbfa81e2a8092d43ac8c902e",
+    "outer.log": "76ca02a122e77458c40205785a951aa7173720705e18b7840afe31e8d006a3a2",
+    "updates-aborted": "679ec7b36469bf4abb2cdbb04811614c25e236bd555259bf28a1a054c811299f",
+    "probe-committed.ok": "25be323556dad377abb57fe7ec8c4b99a6527f488dda28d0c9b686528659c909",
+    "observed-checkout.ok": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observed-committed.ok": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original-config-prepared": "a67f011b37c663372be82daf68ef4184a6ead37f031e27580419200b1f5920f2",
+    "original-input-aborted": "679ec7b36469bf4abb2cdbb04811614c25e236bd555259bf28a1a054c811299f",
+    "global.gitconfig": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "case.json": "5d3f042547026156f05864b4ed22c9793a55094d9fab30261da4b14a4a594519",
+    "child.stdout": "8cd646e912be0abf493d77acd93716656ff1d2fc2c096d2f899f55c8ef5cc308",
+    "original-input-prepared": "679ec7b36469bf4abb2cdbb04811614c25e236bd555259bf28a1a054c811299f",
+    "before.index": "0884e5f41a5b340f3fe6b26e943db083111c02b6f1b7673b46df95beaf987484",
+    "original-args-prepared": "386cd37e88e71809c6198b993f41428a3a837e0de96ca2610f406bbd2db6a878",
+    "probe-updates-prepared": "4ddc1a4c2e26664bb8968c2527b12b06ee86d1a87a95e563a163df508b5ecf60",
+    "probe-prepared.ok": "25be323556dad377abb57fe7ec8c4b99a6527f488dda28d0c9b686528659c909",
+    "original-config-aborted": "a67f011b37c663372be82daf68ef4184a6ead37f031e27580419200b1f5920f2",
+    "child.stderr": "8b43e96db1b9000a02dc64445ca9a2907ce5990cb2ca03f08c56ce57cc711786",
+    "observed-prepared.ok": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reference-transaction": "7e1475686c64d32bf426d144b933f0fcf572d17b0f8af06ccbf832510e7c2914"
+  }
+}

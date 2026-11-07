@@ -1,0 +1,64 @@
+#!/bin/sh
+umask 077
+unset GIT_CONFIG_PARAMETERS
+exec env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0='/workspace/work/push-preflight-gate2-production-files-sha1/original hooks '\'' \ path' sh -c 'case "$1" in prepared|committed|aborted) ;; *) exit 1 ;; esac
+directory=$(dirname "$0")
+command -v cmp >/dev/null && command -v cp >/dev/null || exit 1
+if [ "$(cat "$directory/mode")" = probe ]; then
+    cat >"$directory/probe-updates-$1" || exit 1
+    printf '\''probe\n'\'' >"$directory/probe-$1.ok" || exit 1
+    exit 0
+fi
+updates="$directory/updates-$1"
+cat >"$updates" || exit 1
+if [ "$1" = prepared ]; then
+    matched=0
+    while read -r before after reference extra; do
+        [ -z "$extra" ] || exit 1
+        [ "$reference" = '\''refs/heads/main'\'' ] || exit 1
+        [ "$before" = '\''f7f22123e8ccb84350f67ddaf25c7e2f79071c23'\'' ] && [ "$after" = '\''dce7cecb4c97210d10e3971b13d35c4deadf9037'\'' ] || exit 1
+        matched=$((matched+1))
+    done <"$updates"
+    [ "$matched" = 1 ] || exit 1
+    [ "$(git symbolic-ref -q HEAD)" = '\''refs/heads/main'\'' ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = '\''f7f22123e8ccb84350f67ddaf25c7e2f79071c23'\'' ] || exit 1
+    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@" || exit $?
+    [ "$(git symbolic-ref -q HEAD)" = '\''refs/heads/main'\'' ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = '\''f7f22123e8ccb84350f67ddaf25c7e2f79071c23'\'' ] || exit 1
+    cmp -s -- '\''/workspace/work/push-preflight-gate2-production-files-sha1/repository '\''\'\'''\'' quoted \ path/.git/index'\'' "$directory/before.index" || exit 1
+    
+    GIT_INDEX_FILE="$directory/check-before.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    if [ true = true ]; then
+        git --literal-pathspecs -c core.fsmonitor=false status --porcelain=v1 -z --untracked-files=all --ignored=matching -- '\''file.txt'\'' >"$directory/affected-status" || exit 1
+        [ ! -s "$directory/affected-status" ] || exit 1
+    fi
+    printf '\''%s'\'' '\''refs/heads/main
+f7f22123e8ccb84350f67ddaf25c7e2f79071c23
+dce7cecb4c97210d10e3971b13d35c4deadf9037
+'\'' >"$directory/prepared.ok" || exit 1
+    if [ true = true ]; then
+        printf '\''attempted\n'\'' >"$directory/checkout-attempted" || exit 1
+        git -c core.fsmonitor=false read-tree -u -m '\''f7f22123e8ccb84350f67ddaf25c7e2f79071c23'\'' '\''dce7cecb4c97210d10e3971b13d35c4deadf9037'\'' || exit 1
+    fi
+    [ "$(git symbolic-ref -q HEAD)" = '\''refs/heads/main'\'' ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = '\''f7f22123e8ccb84350f67ddaf25c7e2f79071c23'\'' ] || exit 1
+    git -c core.fsmonitor=false diff-index --cached --quiet --no-ext-diff --no-textconv '\''dce7cecb4c97210d10e3971b13d35c4deadf9037'\'' -- || exit 1
+    GIT_INDEX_FILE="$directory/check-after.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    printf '\''%s'\'' '\''refs/heads/main
+f7f22123e8ccb84350f67ddaf25c7e2f79071c23
+dce7cecb4c97210d10e3971b13d35c4deadf9037
+'\'' >"$directory/checkout.ok" || exit 1
+elif [ "$1" = committed ]; then
+    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@" || exit $?
+    [ "$(git symbolic-ref -q HEAD)" = '\''refs/heads/main'\'' ] || exit 1
+    [ "$(git rev-parse --verify HEAD)" = '\''dce7cecb4c97210d10e3971b13d35c4deadf9037'\'' ] || exit 1
+    git -c core.fsmonitor=false diff-index --cached --quiet --no-ext-diff --no-textconv '\''dce7cecb4c97210d10e3971b13d35c4deadf9037'\'' -- || exit 1
+    GIT_INDEX_FILE="$directory/check-committed.index" git -c core.fsmonitor=false -c core.trustctime=true -c core.ignoreStat=false diff-files --quiet --no-ext-diff --no-textconv --ignore-submodules=none -- || exit 1
+    printf '\''%s'\'' '\''refs/heads/main
+f7f22123e8ccb84350f67ddaf25c7e2f79071c23
+dce7cecb4c97210d10e3971b13d35c4deadf9037
+'\'' >"$directory/committed.ok" || exit 1
+else
+    git hook run --ignore-missing --to-stdin="$updates" reference-transaction -- "$@"
+fi
+' "$0" "$@"
