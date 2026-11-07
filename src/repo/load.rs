@@ -871,6 +871,7 @@ mod connection_identity_tests {
         let mut parked =
             a.run(|| RepoTab::new_deferred("/nonexistent/context-edit-worktree".into(), &ctx));
         let creds = git::Credentials {
+            scope: None,
             username: "alice".into(),
             password: "never-send-as-bob".into(),
         };

@@ -403,6 +403,7 @@ fn sign_ins_typed_in_the_tab_are_never_kept() {
     let ctx = egui::Context::default();
     let mut tab = restored_tab(dir.clone(), &ctx);
     tab.set_credentials(git::Credentials {
+        scope: None,
         username: "me".to_owned(),
         password: "hunter2-token".to_owned(),
     });
