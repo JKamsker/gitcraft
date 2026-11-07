@@ -28,6 +28,7 @@ pub(super) struct State {
 pub(crate) struct Request {
     path: PathBuf,
     read: u64,
+    epoch: u64,
     target: Target,
 }
 
@@ -343,6 +344,7 @@ impl RepoTab {
             acts.push(Action::Keyboard(Request {
                 path: self.path.clone(),
                 read: self.work_read,
+                epoch: self.work_epoch,
                 target: Target::File {
                     scope,
                     key: selected,
@@ -391,6 +393,7 @@ impl RepoTab {
                 acts.push(Action::Keyboard(Request {
                     path: self.path.clone(),
                     read: self.work_read,
+                    epoch: self.work_epoch,
                     target: Target::Hunk {
                         key: view.key.clone(),
                         request: view.request,
@@ -406,6 +409,7 @@ impl RepoTab {
     pub(super) fn apply_keyboard(&mut self, request: Request, ctx: &egui::Context) {
         if self.path != request.path
             || self.work_read != request.read
+            || self.work_epoch != request.epoch
             || self.busy_op.is_some()
             || self.loading
             || self.work_pending != 0

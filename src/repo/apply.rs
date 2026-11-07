@@ -1,14 +1,27 @@
 //! Carrying out the actions the views asked for.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::{
-    Action, Compare, DiffKey, DiffView, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff,
-    ops, spawn,
+    Action, Compare, DiffKey, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff, ops, spawn,
 };
 use crate::git;
 use crate::settings::Settings;
+
+/// Ownership retained while a partial patch is being written, possibly over SSH/WSL.
+/// A read epoch changes at reload start, before new data (or a read error) can arrive.
+pub(super) struct PreparedPick {
+    path: PathBuf,
+    read: u64,
+    epoch: u64,
+    key: DiffKey,
+    request: u64,
+    pick: diff::Pick,
+    label: String,
+    preparing: String,
+    started: Instant,
+}
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
@@ -369,24 +382,38 @@ impl RepoTab {
         lines: &std::collections::BTreeSet<usize>,
         ctx: &egui::Context,
     ) {
-        let Some(DiffView {
-            key: DiffKey::Work(file),
-            data: Some(Ok(data)),
-            ..
-        }) = &self.diff
-        else {
+        let Some((patch, prepared)) = self.prepare_picked(pick, lines) else {
             return;
         };
-        if self
-            .diff
-            .as_ref()
-            .is_some_and(|v| v.request != v.data_request)
+        let repo = prepared.path.clone();
+        self.here_or_later(
+            ctx,
+            move || git::save_patch_for(&repo, &patch),
+            move |tab, saved, ctx| tab.picked_prepared(prepared, saved, ctx),
+        );
+    }
+
+    /// Capture the displayed patch and its ownership before starting any asynchronous write.
+    pub(super) fn prepare_picked(
+        &mut self,
+        pick: diff::Pick,
+        lines: &std::collections::BTreeSet<usize>,
+    ) -> Option<(String, PreparedPick)> {
+        if self.busy_op.is_some()
+            || self.loading
+            || self.load_error.is_some()
+            || self.work_pending != 0
         {
-            return;
+            return None;
         }
-        let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
-            return;
+        let view = self.diff.as_ref()?;
+        let (DiffKey::Work(file), Some(Ok(data))) = (&view.key, &view.data) else {
+            return None;
         };
+        if view.request != view.data_request || !data.partial {
+            return None;
+        }
+        let patch = diff::partial_patch(&data.header, &data.lines, lines, pick)?;
         let n = lines.len();
         let label = format!(
             "{} {n} line{} of {}",
@@ -394,43 +421,56 @@ impl RepoTab {
             if n == 1 { "" } else { "s" },
             file.path
         );
-        // Written where git runs: on another machine, in the background.
-        if self.busy_op.is_some() {
+        let prepared = PreparedPick {
+            path: self.path.clone(),
+            read: self.work_read,
+            epoch: self.work_epoch,
+            key: view.key.clone(),
+            request: view.request,
+            pick,
+            preparing: format!("Preparing {label}"),
+            label,
+            started: Instant::now(),
+        };
+        self.busy_op = Some(prepared.preparing.clone());
+        self.op_started = Some(prepared.started);
+        Some((patch, prepared))
+    }
+
+    /// Complete the same preparation for mouse and keyboard actions. A pending or failed
+    /// full read keeps retained diff/status identities, so those alone are not sufficient.
+    pub(super) fn picked_prepared(
+        &mut self,
+        prepared: PreparedPick,
+        saved: Result<String, String>,
+        ctx: &egui::Context,
+    ) {
+        if self.busy_op.as_ref() != Some(&prepared.preparing)
+            || self.op_started != Some(prepared.started)
+        {
             return;
         }
-        let (owner, read, key, request) = (
-            self.path.clone(),
-            self.work_read,
-            self.diff.as_ref().map(|v| v.key.clone()),
-            self.diff.as_ref().map(|v| v.request),
-        );
-        let repo = owner.clone();
-        let preparing = format!("Preparing {label}");
-        let started = Instant::now();
-        self.busy_op = Some(preparing.clone());
-        self.op_started = Some(started);
-        self.here_or_later(
-            ctx,
-            move || git::save_patch_for(&repo, &patch),
-            move |tab, saved, ctx| {
-                if tab.busy_op.as_ref() != Some(&preparing) || tab.op_started != Some(started) {
-                    return;
-                }
-                tab.busy_op = None;
-                let current = tab
-                    .diff
-                    .as_ref()
-                    .is_some_and(|v| Some(&v.key) == key.as_ref() && Some(v.request) == request);
-                if tab.path != owner || tab.work_read != read || tab.work_pending != 0 || !current {
-                    tab.status = Some((
-                        "Changes reloaded; pick the hunk again before applying it.".to_owned(),
-                        true,
-                    ));
-                    return;
-                }
-                tab.apply_picked(pick, &label, saved, ctx);
-            },
-        );
+        self.busy_op = None;
+        let current = self.diff.as_ref().is_some_and(|view| {
+            view.key == prepared.key
+                && view.request == prepared.request
+                && view.data_request == view.request
+        });
+        if self.path != prepared.path
+            || self.work_read != prepared.read
+            || self.work_epoch != prepared.epoch
+            || self.work_pending != 0
+            || self.loading
+            || self.load_error.is_some()
+            || !current
+        {
+            self.status = Some((
+                "Changes reloaded; pick the hunk again before applying it.".to_owned(),
+                true,
+            ));
+            return;
+        }
+        self.apply_picked(prepared.pick, &prepared.label, saved, ctx);
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
