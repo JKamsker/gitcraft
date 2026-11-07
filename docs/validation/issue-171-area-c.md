@@ -99,3 +99,14 @@ Screenshots: **175 PNGs** in `/tmp/gitcraft-c-followup-evidence/`, including the
 - `/tmp/gitcraft-c-followup-evidence/followup-namespaces-420-1.png`: 20 realistic namespaces use a bounded list; creation controls remain inside the 420×400 viewport.
 
 Headless evidence reserves the parent's extra toolbar height but does not run its unmerged toolbar or incoming structural-diff selector. Native cross-platform displays, live hooks, external AI and forge posting remain unexercised. Existing safety/action dispatch paths are unchanged.
+
+
+## Normal-height composer sizing correction
+
+The independent full-app review caught a regression introduced by the short-height ScrollArea: its maximum height did not enlarge the containing bottom panel. A persisted/default ~90-point panel therefore hid the body and commit action even in a 1400×860 window.
+
+The panel now receives an explicit height from the measured composition content, capped at 65% of remaining detail height to reserve staging space. This overrides stale panel sizing while retaining the same ScrollArea and editor IDs through shrink/expand. Content height is measured again each frame, so wrapped tools, continuation hints and warnings can change the natural size.
+
+`responsive_followup_full_height_composer_needs_no_scrolling_after_resize` failed against `690fb784`: the commit action lay below the panel. With the fix it verifies the toolbar, both message fields and commit action are inside the panel without scrolling at 1400×860 and 100/125/150%. It deliberately seeds a persisted 90-point panel, shrinks and scrolls the short presentation, then expands and checks everything fits again; actual clicks queue Commit. All 17 responsive regressions pass, including the four independent-review regressions. Log: `/tmp/gitcraft-c-composer-size-after.log`.
+
+Screenshots are regenerated in `/tmp/gitcraft-c-composer-size-evidence/`. Full-height examples: `followup-full-composer-1400-860-1-false.png`, `followup-full-composer-1400-860-1-true.png`, and matching `1.25`/`1.5` variants. The first was opened and visually verified. Actual full-app screenshot and final lint results are recorded after preservation push.

@@ -739,6 +739,78 @@ mod followup_tests {
     }
 
     #[test]
+    fn responsive_followup_full_height_composer_needs_no_scrolling_after_resize()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for scale in [1.0, 1.25, 1.5] {
+            let mut h = harness(1400.0, 860.0, scale);
+            for _ in 0..8 {
+                h.step();
+            }
+            // A persisted small panel size must not cap the composition area forever.
+            let mut panel = egui::PanelState::load(&h.ctx, egui::Id::new("commit_box"))
+                .ok_or("composer panel")?;
+            panel.outer_rect.set_height(90.0);
+            h.ctx
+                .data_mut(|d| d.insert_persisted(egui::Id::new("commit_box"), panel));
+            for _ in 0..6 {
+                h.step();
+            }
+            for resized in [false, true] {
+                if resized {
+                    h.set_size(egui::vec2(800.0 / scale, 400.0 / scale));
+                    for _ in 0..6 {
+                        h.step();
+                    }
+                    if h.query_by_label("Show the detail panel").is_some() {
+                        h.get_by_label("Show the detail panel").click();
+                        for _ in 0..6 {
+                            h.step();
+                        }
+                    }
+                    h.get_by_label("Commit 1 file").scroll_to_me();
+                    for _ in 0..6 {
+                        h.step();
+                    }
+                    h.set_size(egui::vec2(1400.0 / scale, 860.0 / scale));
+                    for _ in 0..8 {
+                        h.step();
+                    }
+                }
+                let panel = egui::PanelState::load(&h.ctx, egui::Id::new("commit_box"))
+                    .ok_or("composer panel")?
+                    .outer_rect;
+                let commit = h.get_by_label("Commit 1 file").rect();
+                assert!(
+                    panel.shrink(2.0).contains_rect(commit),
+                    "commit clipped at {scale}, resized={resized}: {commit:?}, panel {panel:?}"
+                );
+                for field in h.query_all_by_role(egui::accesskit::Role::TextInput) {
+                    assert!(
+                        panel.shrink(2.0).contains_rect(field.rect()),
+                        "message field clipped at {scale}, resized={resized}: {:?}, panel {panel:?}",
+                        field.rect()
+                    );
+                }
+                let toolbar = h.get_by_label("Message options").rect();
+                assert!(
+                    panel.shrink(2.0).contains_rect(toolbar),
+                    "toolbar scrolled out at full height"
+                );
+                // Check real pointer reachability, not just an offscreen accessibility node.
+                h.get_by_label("Commit 1 file").click();
+                h.step();
+                assert!(h.state().1.iter().any(|a| matches!(a, Action::Commit)));
+                h.state_mut().1.clear();
+                crate::repo::detail::responsive_tests::evidence(
+                    &mut h,
+                    &format!("followup-full-composer-1400-860-{scale}-{resized}"),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn responsive_followup_short_reopen_scrolls_composer_actions_into_view() {
         for height in [400.0, 500.0, 650.0] {
             for scale in [1.0, 1.25, 1.5] {
