@@ -438,6 +438,15 @@ fn detect_remote(
     // A local path has no host, and `C:/…` only a drive's: neither is on any forge, whatever
     // folder names it goes through.
     let (host, path) = location(&remote.url).filter(|(host, _)| host.len() > 1)?;
+    // Gerrit has its own change-based review flow. An explicit Gerrit override
+    // must not fall through to GitHub/GitLab host guessing for this remote.
+    if config
+        .get("gitcraft.forge")
+        .or_else(|| config.get(&format!("gitcraft.{host}.forge")))
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("gerrit"))
+    {
+        return None;
+    }
     let forge = choose(&host, config)
         .or_else(|| tea_web(&host).map(|_| Forge::Gitea))
         // GitLab can also live under a path of another host (`https://example.org/gitlab/…`) or
@@ -900,6 +909,28 @@ mod tests {
             hosting.map(|h| (h.forge, h.web)),
             Some((Forge::Gitea, "http://gitea.lan:3000".to_owned()))
         );
+    }
+
+    #[test]
+    fn gerrit_override_excludes_only_its_remote_from_primary_forge_candidates() {
+        let remotes = [
+            Remote {
+                name: "origin".into(),
+                url: "https://github.com/team/review.git".into(),
+            },
+            Remote {
+                name: "fork".into(),
+                url: "https://gitlab.com/team/review.git".into(),
+            },
+        ];
+        let config = parse_config("gitcraft.github.com.forge Gerrit\n");
+        assert!(detect_remote(&remotes[0], &config, &[]).is_none());
+        assert_eq!(
+            detect_with(&remotes, &config, &[]).map(|h| h.forge),
+            Some(Forge::GitLab)
+        );
+        let all_gerrit = parse_config("gitcraft.forge gerrit\n");
+        assert!(detect_with(&remotes, &all_gerrit, &[]).is_none());
     }
 
     #[test]
