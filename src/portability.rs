@@ -284,66 +284,74 @@ impl Setup {
         }
         let mut names = std::collections::BTreeSet::new();
         for r in &self.repositories {
-            leaf(&r.name)?;
             if !names.insert(&r.name) {
                 return Err("Duplicate repository destination name".into());
             }
-            text(&r.previous_path, 4096)?;
             if r.profile_ids.iter().any(|id| !ids.contains(id)) {
                 return Err("Repository references an unknown profile".into());
             }
-            if r.remotes.len() > 32
-                || r.worktrees.len() > 64
-                || r.hidden.len() > 2000
-                || r.notices.len() > 64
-            {
-                return Err("Repository metadata exceeds limits".into());
-            }
-            for remote in &r.remotes {
-                reference(&remote.name)?;
-                if sanitize_url(&remote.fetch)?.0 != remote.fetch {
-                    return Err("Remote URL contains credentials or nonportable decorations".into());
-                }
-                if remote.push.len() > 16 {
-                    return Err("Too many push URLs".into());
-                }
-                for u in &remote.push {
-                    if sanitize_url(u)?.0 != *u {
-                        return Err("Push URL contains credentials".into());
-                    }
-                }
-            }
-            for s in [&r.author_name, &r.author_email].into_iter().flatten() {
-                text(s, 512)?;
-            }
-            for s in &r.hidden {
-                full_ref(s)?;
-            }
-            if let Some(b) = &r.branch {
-                reference(b)?;
-            }
-            if let Some(c) = &r.commit {
-                oid(c)?;
-            }
-            let mut worktrees = std::collections::BTreeSet::new();
-            for w in &r.worktrees {
-                leaf(&w.name)?;
-                if !worktrees.insert(&w.name) {
-                    return Err("Duplicate worktree name".into());
-                }
-                text(&w.previous_path, 4096)?;
-                if let Some(b) = &w.branch {
-                    reference(b)?;
-                }
-                oid(&w.commit)?;
-            }
-            for n in &r.notices {
-                text(n, 1024)?;
-            }
+            r.validate()?;
         }
         Ok(())
     }
 }
+impl Repository {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        let r = self;
+        leaf(&r.name)?;
+        text(&r.previous_path, 4096)?;
+        if r.remotes.len() > 32
+            || r.worktrees.len() > 64
+            || r.hidden.len() > 2000
+            || r.notices.len() > 64
+        {
+            return Err("Repository metadata exceeds limits".into());
+        }
+        for remote in &r.remotes {
+            reference(&remote.name)?;
+            if sanitize_url(&remote.fetch)?.0 != remote.fetch {
+                return Err("Remote URL contains credentials or nonportable decorations".into());
+            }
+            if remote.push.len() > 16 {
+                return Err("Too many push URLs".into());
+            }
+            for u in &remote.push {
+                if sanitize_url(u)?.0 != *u {
+                    return Err("Push URL contains credentials".into());
+                }
+            }
+        }
+        for s in [&r.author_name, &r.author_email].into_iter().flatten() {
+            text(s, 512)?;
+        }
+        for s in &r.hidden {
+            full_ref(s)?;
+        }
+        if let Some(b) = &r.branch {
+            reference(b)?;
+        }
+        if let Some(c) = &r.commit {
+            oid(c)?;
+        }
+        let mut worktrees = std::collections::BTreeSet::new();
+        for w in &r.worktrees {
+            leaf(&w.name)?;
+            if !worktrees.insert(&w.name) {
+                return Err("Duplicate worktree name".into());
+            }
+            text(&w.previous_path, 4096)?;
+            if let Some(b) = &w.branch {
+                reference(b)?;
+            }
+            oid(&w.commit)?;
+        }
+        for n in &r.notices {
+            text(n, 1024)?;
+        }
+        Ok(())
+    }
+}
+
 fn text(s: &str, max: usize) -> Result<(), String> {
     if s.len() > max || s.chars().any(char::is_control) {
         Err("Text contains control characters or exceeds its limit".into())

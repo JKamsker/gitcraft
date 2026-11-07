@@ -677,6 +677,122 @@ pub(crate) fn onboarding_config(
     activity_mailmap_config(dir, key, false, active)
 }
 
+/// Only allowlisted local author fields are included in setup exports.
+pub(crate) fn onboarding_local_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    let bytes = activity_bytes_with_codes(
+        dir,
+        &["config", "--local", "--null", "--get", key],
+        None,
+        active,
+        std::time::Duration::from_secs(20),
+        &[0, 1],
+    )?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let bytes = bytes
+        .strip_suffix(&[0])
+        .ok_or("Invalid local identity response")?;
+    String::from_utf8(bytes.to_vec())
+        .map(Some)
+        .map_err(|_| "Local identity is not UTF-8".into())
+}
+/// Initial network clone uses the initiating ready profile's local authentication setup.
+pub(crate) fn setup_clone(
+    parent: &Path,
+    source: &str,
+    destination: &Path,
+    remote: &str,
+    local: bool,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    if crate::remote::is_remote(parent) {
+        return Err("Setup clones target local folders only".into());
+    }
+    let mut cmd = repository_command(Some(parent), &[])?;
+    for name in [
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG",
+    ] {
+        cmd.env_remove(name);
+    }
+    cmd.env("GIT_CONFIG_COUNT", "0")
+        .args([
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "init.templateDir=",
+            "-c",
+            "protocol.ext.allow=never",
+            "-c",
+            if local {
+                "protocol.file.allow=always"
+            } else {
+                "protocol.file.allow=never"
+            },
+            "clone",
+            "--no-checkout",
+            "--template=",
+            "--origin",
+            remote,
+            "--",
+            source,
+        ])
+        .arg(destination);
+    let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(1800))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err("The selected source could not be cloned; check this machine's authentication and use a new destination for retry".into())
+    }
+}
+/// Checkout/worktree/config steps never read profile/system command configuration or
+/// inherited Git routing. Only newly created, receipt-verified clones reach this helper.
+pub(crate) fn setup_run(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    if crate::remote::is_remote(repo) {
+        return Err("Setup restoration targets local folders only".into());
+    }
+    let mut cmd = practice_command(repo);
+    cmd.args([
+        "--no-lazy-fetch",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        "protocol.file.allow=never",
+    ])
+    .args(args);
+    let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(120))?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Setup step failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
