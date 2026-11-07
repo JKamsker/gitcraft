@@ -151,19 +151,41 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
     Ok(frames)
 }
 impl Growth {
-    /// Rebuild only when the cursor moves. The 16 MiB stream bound caps total replay work.
-    pub fn files_at(&self, cursor: usize) -> BTreeSet<Vec<u8>> {
-        let mut files = self.baseline.clone();
+    /// Reconstruct with borrowed paths; source streams already bound their total
+    /// size. Cancellation is checked inside replay, before expanded rows allocate.
+    pub fn files_at_borrowed(
+        &self,
+        cursor: usize,
+        active: &dyn Fn() -> bool,
+    ) -> Result<BTreeSet<&[u8]>, String> {
+        let mut files = BTreeSet::new();
+        for path in &self.baseline {
+            if !active() {
+                return Err("Frame cancelled".into());
+            }
+            files.insert(path.as_slice());
+        }
         for frame in self.frames.iter().take(cursor.saturating_add(1)).skip(1) {
             for (path, present) in &frame.changes {
+                if !active() {
+                    return Err("Frame cancelled".into());
+                }
                 if *present {
-                    files.insert(path.clone());
+                    files.insert(path.as_slice());
                 } else {
-                    files.remove(path);
+                    files.remove(path.as_slice());
                 }
             }
         }
-        files
+        Ok(files)
+    }
+    #[cfg(test)]
+    pub fn files_at(&self, cursor: usize) -> BTreeSet<Vec<u8>> {
+        self.files_at_borrowed(cursor, &|| true)
+            .expect("active fixture")
+            .into_iter()
+            .map(<[u8]>::to_vec)
+            .collect()
     }
 }
 #[cfg(test)]
