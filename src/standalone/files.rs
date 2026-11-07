@@ -19,11 +19,19 @@ pub(super) struct Stamp {
     ino: u64,
     #[cfg(unix)]
     mode: u32,
+    #[cfg(unix)]
+    uid: u32,
+    #[cfg(unix)]
+    gid: u32,
+    #[cfg(windows)]
+    attributes: u32,
 }
 impl Stamp {
     pub fn new(metadata: &Metadata) -> Self {
         #[cfg(unix)]
         use std::os::unix::fs::MetadataExt;
+        #[cfg(windows)]
+        use std::os::windows::fs::MetadataExt;
         Self {
             len: metadata.len(),
             modified: metadata.modified().ok(),
@@ -35,6 +43,12 @@ impl Stamp {
             ino: metadata.ino(),
             #[cfg(unix)]
             mode: metadata.mode(),
+            #[cfg(unix)]
+            uid: metadata.uid(),
+            #[cfg(unix)]
+            gid: metadata.gid(),
+            #[cfg(windows)]
+            attributes: metadata.file_attributes(),
         }
     }
 }

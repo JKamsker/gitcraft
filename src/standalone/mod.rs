@@ -7,6 +7,8 @@ mod permissions;
 pub(crate) mod registration;
 mod save;
 mod ui;
+#[cfg(any(windows, test))]
+mod windows_metadata;
 
 pub use cli::{Invocation, USAGE, parse};
 

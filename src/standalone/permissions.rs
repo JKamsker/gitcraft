@@ -11,8 +11,8 @@ pub(super) fn candidate(
 ) -> Result<File, String> {
     #[cfg(windows)]
     if let Some(original) = original {
-        // Deny write/delete while native CopyFile copies the stable source's ACL,
-        // attributes and streams. No unreviewed FFI or lossy permission reconstruction.
+        // Deny write/delete while the managed OS helper verifies bounded native
+        // metadata and copies exact access rules. File paths remain environment data.
         let pinned = Snapshot::from_file(
             &parent.path.join(name),
             parent
@@ -26,9 +26,27 @@ pub(super) fn candidate(
         {
             return Err("MERGED changed before metadata preparation".into());
         }
-        std::fs::copy(parent.path.join(name), dir.path.join("replacement")).map_err(|e| {
-            format!("Could not preserve the output's native security metadata: {e}")
-        })?;
+        {
+            use std::os::windows::fs::MetadataExt;
+            let attrs = pinned
+                .handle
+                .as_ref()
+                .ok_or("No pinned source")?
+                .as_file()
+                .metadata()
+                .map_err(|e| e.to_string())?
+                .file_attributes();
+            if attrs & !(0x20 | 0x80) != 0 {
+                return Err(
+                    "Unsupported native output attributes; the original was not changed".into(),
+                );
+            }
+        }
+        drop(
+            dir.create(OsStr::new("replacement"), &[])
+                .map_err(|e| e.to_string())?,
+        );
+        super::windows_metadata::prepare(&parent.path.join(name), &dir.path.join("replacement"))?;
         return dir
             .rewrite_owned(OsStr::new("replacement"), bytes, original)
             .map_err(|e| e.to_string());
@@ -79,13 +97,15 @@ pub(super) fn candidate(
 }
 #[cfg(unix)]
 fn unix_mode(to: &File, from: &File) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-    let mode = from
-        .metadata()
-        .map_err(|e| e.to_string())?
-        .permissions()
-        .mode()
-        & 0o777;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let metadata = from.metadata().map_err(|e| e.to_string())?;
+    rustix::fs::fchown(
+        to,
+        Some(rustix::process::Uid::from_raw(metadata.uid())),
+        Some(rustix::process::Gid::from_raw(metadata.gid())),
+    )
+    .map_err(|e| format!("Could not preserve output ownership: {e}"))?;
+    let mode = metadata.permissions().mode() & 0o777;
     to.set_permissions(std::fs::Permissions::from_mode(mode))
         .map_err(|e| e.to_string())
 }
@@ -160,7 +180,7 @@ mod tests {
     #[test]
     fn edited_results_keep_bounded_user_metadata_and_executable_mode_without_privileged_bits()
     -> Result<(), String> {
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let temp = crate::git::file_comparison::Scratch::new()?;
         let path = temp.0.join("result");
         std::fs::write(&path, b"old").map_err(|e| e.to_string())?;
@@ -174,9 +194,15 @@ mod tests {
         .map_err(|e| e.to_string())?;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o4755))
             .map_err(|e| e.to_string())?;
+        let ownership = source.metadata().map_err(|e| e.to_string())?;
         let output = crate::standalone::save::Output::capture(&path, &[])?;
         let saved = output.save(b"new", &[])?;
         let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+        let installed = file.metadata().map_err(|e| e.to_string())?;
+        assert_eq!(
+            (installed.uid(), installed.gid()),
+            (ownership.uid(), ownership.gid())
+        );
         let mut value = [0u8; 32];
         let count = rustix::fs::fgetxattr(&file, "user.gitcraft-fixture", &mut value[..])
             .map_err(|e| e.to_string())?;

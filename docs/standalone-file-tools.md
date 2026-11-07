@@ -51,9 +51,11 @@ the original. Links/devices are refused as merge outputs; input links are read-o
 
 Permission handling uses safe platform APIs. Linux preserves bounded user/access-control
 extended attributes, with a 1 MiB metadata limit; edited content does not regain privileged
-mode bits, capabilities or stale integrity signatures. Windows copies the stable source's
-native security metadata/streams before replacing the default stream, and requires other
-writers to release it during that preparation. macOS uses native file cloning to preserve
+mode bits, capabilities or stale integrity signatures; ownership/group are preserved or
+saving is refused. Windows uses a constant, profile-free managed OS helper to copy and
+verify the exact owner/group/access descriptor, and requires other writers to release the
+source during preparation. Named streams and unsupported native attributes are refused
+before moving the original. macOS uses native file cloning to preserve
 ACLs and refuses unsupported filesystems. The retained original keeps its original
 metadata. Permission/metadata failures leave it preserved and do not report success.
 
