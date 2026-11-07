@@ -13,6 +13,13 @@ impl ForecastCompletion {
     pub fn pending(&self) -> bool {
         self.0.load(Ordering::Acquire) != 0
     }
+    /// Track a synchronous owned worker before queue/connection waits as well as its
+    /// actual transport call. Nested forecast workers inherit the same scope.
+    pub(crate) fn track<T>(&self, job: impl FnOnce() -> T) -> T {
+        self.0.fetch_add(1, Ordering::AcqRel);
+        let _ticket = Ticket(self.clone());
+        self.run(job)
+    }
     pub fn run<T>(&self, job: impl FnOnce() -> T) -> T {
         struct Restore(Option<ForecastCompletion>);
         impl Drop for Restore {
