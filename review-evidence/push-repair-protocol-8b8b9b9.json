@@ -1,0 +1,65 @@
+{
+  "review": "Independent static guarded repair protocol re-review",
+  "verdict": "PASS_STATIC_ONLY",
+  "candidate": "8b8b9b97fca698daf4a6bc26a279fe3a171cda2b",
+  "tree": "ee0dbc2fb28addc944565a220c5cea66068116ff",
+  "parent_review_candidate": "12cee4d405fffe3a3dd4a4f260f521c5eecf87d5",
+  "scope": "One-file correction plus prior static ownership/capability/relay/recovery scope. Static gate only; no compiler claim, recording test, real Git protocol, process experiment, CI, merge or feature acceptance.",
+  "findings": [],
+  "REPAIR-PROTOCOL-4": {
+    "status": "STRUCTURALLY RESOLVED; recording and real split-index checks pending",
+    "evidence": [
+      "snapshot_pair first copies the main index to an owned before.index. The dependency resolver receives only that immutable saved path.",
+      "Production resolver calls Git --shared-index-path in the original repository/Practice/profile context with GIT_INDEX_FILE explicitly selecting before.index. The guarded local helper removes ambient index routing before applying this explicit value.",
+      "The returned dependency must be absolute and is exactly the file copied to before.shared-index, recorded in recovery.txt and checked by the prepared wrapper. No earlier live --shared-index-path observation remains.",
+      "Missing/unreadable/oversized dependency or failed resolver refuses before any user-ref dispatch. Uncertain launched resolver completion conservatively retains its directory.",
+      "New unexecuted recording fixture supplies a previously observed old dependency plus newer saved main index and verifies selection/copy of the newer dependency; unresolvable saved dependency refuses."
+    ]
+  },
+  "prior_scope_binding": {
+    "delta_from_12cee4d": "Only src/push_preflight/fix/transaction.rs; snapshot helper/call site and one recording fixture changed. All other previously reviewed source remains unchanged.",
+    "REPAIR-PROTOCOL-1": "Prior structural resolution retained: conservative Git>=2.50 plus same backend/object format scratch proof, hook/stdin proof and required user prepared/checkout/committed acknowledgements.",
+    "REPAIR-PROTOCOL-2": "Prior structural resolution retained only through interim local-only restriction: remote repair refuses before dispatch; local launched uncertainty retains evidence. Remote outcome ownership remains an open feature requirement.",
+    "REPAIR-PROTOCOL-3": "Prior structural resolution retained: native HEAD symref/branch transaction and post-original-hook HEAD/raw-index/stat-cold-work checks, repeated after checkout/commit, without rollback over edits.",
+    "transaction_rs_sha256": "335220e52c7cd2ad987b9b297288a2072d61a19b16fce0b656fa75eb4672bddd"
+  },
+  "gate_1_recording_first": {
+    "decision": "Root may authorize these recording-only checks after preserving exact source, approved private-target compiler result and test plan. Passing this static review does not run or claim these checks.",
+    "tests": [
+      "rotated_split_index_dependency_is_resolved_from_the_saved_index",
+      "synthetic_capability_versions_refuse_before_user_dispatch",
+      "missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+      "synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+      "recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes"
+    ],
+    "constraints": [
+      "Run only named tests, using owned temp directories and supplied recording Git. Remote-constructor calls must refuse before process dispatch. No real Git ref transactions, live hosts, user repository/keys, host PID lookup or signal logic.",
+      "Confirm unsupported version/missing acknowledgement prevents dispatch; split-index rotation captures a coherent pair or refuses; prepared veto/HEAD switch/detach/index/work mutation prevents checkout and preserves external bytes; uncertainty keeps directories.",
+      "Record exact source/binary/log hashes and test counts, commit/push/verify remote SHA before the next gate. Root assesses recording results before releasing real fixtures. Compiler-only fixes must remain preserved and be rebound to the reviewed production source."
+    ]
+  },
+  "gate_2_owned_temporary_repository_conditions": {
+    "decision": "After Gate 1 passes and root accepts its evidence, root may authorize the following bounded, owned temporary-repository fixtures without another broad planning loop. Any production protocol/source change requires static re-review before execution.",
+    "containment": [
+      "Use exclusively newly created owned local temp repositories and private HOME/XDG/Git config with no inherited user repositories, hooks, aliases, credentials, remotes, promisor configuration or live SSH/WSL. Use an explicit recorded Git executable/version/hash; successful repair requires supported Git>=2.50.",
+      "Use existing approved bounded owned-child execution only. No new watchdog, host-wide process/PID selector, signal controller, manual lock deletion of other processes, or remote mutation. Create lock fixtures only inside the owned temp repository with exclusive creation and retained ownership.",
+      "Preserve fixture source/plan with correct-author commit+push+remote verification before execution. Keep each bounded call below normal runner deadlines and report progress; retain logs and uncertain evidence."
+    ],
+    "required_cases": [
+      "Actual scratch capability proof on files/sha1 and each additionally supported backend/format claimed. Validate hook selection, exact stdin/argv and current HEAD symref plus branch transaction. Backend refusal is safe-refusal evidence, not successful repair evidence.",
+      "Successful actual production repair: expected branch/HEAD/index/worktree state and mandatory prepared/checkout/committed acknowledgements; original hook receives original args/stdin/config. Exercise special-character paths through quoted boundaries.",
+      "Owned held-target-ref-lock fixture: production repair refuses with exact index/worktree bytes and modes and refs unchanged; no automatic rollback or unrelated lock cleanup.",
+      "Original prepared veto, attempted HEAD switch/detach, index replacement and tracked working-byte changes: refusal before checkout when possible; exact external edits preserved. Native HEAD-lock enforcement must be established with real Git, not inferred from fake recordings.",
+      "Actual split-index pair: rotate live index/dependency at snapshot boundary, resolve from saved before.index using production GIT_INDEX_FILE path, and verify saved dependency/recovery metadata correspond to that saved index. Missing dependency must refuse before user update.",
+      "Checkout/later committed-hook failure and bounded timeout: retain actionable before.index, correct dependency, old/new IDs and phase/update evidence. Inspect actual refs and concurrent edits; do not restore automatically or claim an uncommitted transaction when Git already committed.",
+      "Unsupported Git/capability/backend and missing-hook acknowledgement refuse before user-ref mutation. Existing old-Git may prove refusal; do not claim success without a supported executable."
+    ],
+    "acceptance": "Record actual before/after ref, HEAD, raw index/dependency and working-file snapshots, child result and retained evidence. Commit/push/verify results before broader feature gates. Failures return to source review; no silent skips or whole-feature PASS."
+  },
+  "open_feature_limits": [
+    "Remote automatic repair remains INTERIM fail-closed and open. A counter/marker is not per-request completion/outcome ownership and does not complete remote mutation support.",
+    "No actual backend/Windows success or held-lock/timeout behavior has yet been demonstrated by this static review.",
+    "Normal Git filter/normalization semantics and explicit UTF8/index-size/sparse restrictions remain; arbitrary external worktree writers are not globally locked.",
+    "Default-port/auth retry/deletion journal/full-feature/combined tests and final independent whole-combination review remain separate. CI is deferred by user instruction."
+  ]
+}
