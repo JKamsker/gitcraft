@@ -240,12 +240,40 @@ fn solve_copy(program: &Path, repo: &Path, path: &str) -> Result<String, String>
 }
 
 /// Checks forecast conflict contents on a private copy; never reads or edits the working tree.
-pub(crate) fn solve_text(path: &str, text: &str) -> Result<String, String> {
-    let found = current().found.ok_or("Mergiraf isn't installed")?;
-    solve_contents(&found.program, path, text)
+pub(crate) fn solve_text(
+    path: &str,
+    text: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    // Do not use current(): its manual-tool discovery may be probing a stuck binary while
+    // holding STATE. Every automatic probe and solve has its own cancellable deadline.
+    let candidates =
+        std::iter::once(PathBuf::from("mergiraf")).chain(own_dir().map(|d| d.join(EXE)));
+    for program in candidates {
+        let mut probe = quiet(Command::new(&program));
+        probe.arg("--version");
+        if crate::bounded_process::run(probe, active, Duration::from_secs(2))
+            .is_ok_and(|o| o.status.success())
+        {
+            return solve_contents_with(&program, path, text, Some(active));
+        }
+        if !active() {
+            return Err("Forecast cancelled".into());
+        }
+    }
+    Err("Mergiraf isn't installed or did not answer its version probe".into())
 }
 
 fn solve_contents(program: &Path, path: &str, text: &str) -> Result<String, String> {
+    solve_contents_with(program, path, text, None)
+}
+
+fn solve_contents_with(
+    program: &Path,
+    path: &str,
+    text: &str,
+    active: Option<&dyn Fn() -> bool>,
+) -> Result<String, String> {
     let name = path.rsplit(['/', '\\']).next().unwrap_or("file");
     if name.is_empty() || matches!(name, "." | "..") || name.contains(':') {
         return Err(format!("Cannot copy {path} for Mergiraf"));
@@ -266,11 +294,18 @@ fn solve_contents(program: &Path, path: &str, text: &str) -> Result<String, Stri
     let result = std::fs::write(dir.join(name), text)
         .map_err(|e| format!("Could not copy {path}: {e}"))
         .and_then(|()| {
-            quiet(Command::new(program))
+            let mut command = quiet(Command::new(program));
+            command
                 .current_dir(&dir)
-                .args(["solve", "--stdout", "--", name])
-                .output()
-                .map_err(|e| format!("Could not run mergiraf: {e}"))
+                .args(["solve", "--stdout", "--", name]);
+            match active {
+                Some(active) => {
+                    crate::bounded_process::run(command, active, Duration::from_secs(3))
+                }
+                None => command
+                    .output()
+                    .map_err(|e| format!("Could not run mergiraf: {e}")),
+            }
         })
         .and_then(|out| solved(&out, path));
     let _ = std::fs::remove_dir_all(&dir);
@@ -332,6 +367,49 @@ mod tests {
             assert!(solve_contents(&program, "../..", text).is_err());
             assert!(solve_contents(&program, "C:outside", text).is_err());
             assert!(!dir.join("both.rs").exists());
+            Ok(())
+        })();
+        let _ = std::fs::remove_dir_all(&dir);
+        result
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stalled_forecast_solver_is_cancelled_and_has_a_deadline() -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("gitcraft-stalled-solver-{nanos}"));
+        std::fs::create_dir(&dir).map_err(|e| e.to_string())?;
+        let program = dir.join("solver");
+        let marker = dir.join("started");
+        let result = (|| -> Result<(), String> {
+            std::fs::write(
+                &program,
+                format!(
+                    "#!/bin/sh\ntouch {}\nsleep 30\n",
+                    crate::remote::sh_quote(&marker.to_string_lossy())
+                ),
+            )
+            .map_err(|e| e.to_string())?;
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+            let began = Instant::now();
+            let active = || began.elapsed() < Duration::from_millis(200);
+            assert!(
+                solve_contents_with(&program, "file.rs", "conflict", Some(&active))
+                    .is_err_and(|e| e.contains("cancelled"))
+            );
+            assert!(marker.exists());
+            assert!(began.elapsed() < Duration::from_secs(2));
+            let began = Instant::now();
+            assert!(
+                solve_contents_with(&program, "file.rs", "conflict", Some(&|| true))
+                    .is_err_and(|e| e.contains("timed out"))
+            );
+            assert!(began.elapsed() < Duration::from_secs(5));
             Ok(())
         })();
         let _ = std::fs::remove_dir_all(&dir);

@@ -7,8 +7,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use super::weather_git::ForecastGit;
 use super::{Entry, Step};
-use crate::git;
 use crate::repo::messages::spawn_or;
 use crate::repo::{Msg, RepoTab};
 use crate::theme::Tokens;
@@ -26,14 +26,13 @@ pub(super) enum Forecast {
     Dropped,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(super) struct Weather {
     plan: Plan,
     mergiraf: Option<bool>,
     generation: Arc<AtomicU64>,
     edited: Option<Instant>,
     running: bool,
-    discard_cache: bool,
     cache: Cache,
     pub(super) rows: Vec<Forecast>,
 }
@@ -44,7 +43,7 @@ impl Weather {
         self.edited = Some(Instant::now());
         self.rows.clear();
         self.cache.clear();
-        self.discard_cache = true;
+        self.running = false;
         ctx.request_repaint_after(DEBOUNCE);
     }
 
@@ -58,16 +57,17 @@ impl Weather {
             self.generation.fetch_add(1, Ordering::Relaxed);
             self.edited = Some(Instant::now());
             self.rows.clear();
+            self.running = false;
             ctx.request_repaint_after(DEBOUNCE);
         }
     }
 
     fn arrived(&mut self, generation: u64, rows: Vec<Forecast>, cache: Cache) {
-        self.running = false;
-        if !self.discard_cache {
-            self.cache = cache;
-        }
+        // A cancelled worker may finish after its replacement: it owns neither the guard
+        // nor that replacement's rows/cache.
         if self.generation.load(Ordering::Relaxed) == generation {
+            self.running = false;
+            self.cache = cache;
             self.rows = rows;
         }
     }
@@ -95,12 +95,11 @@ impl RepoTab {
         }
         weather.edited = None;
         weather.running = true;
-        weather.discard_cache = false;
         let (id, onto) = (editor.id, editor.onto.clone());
         let plan = weather.plan.clone();
         let generation = weather.generation.load(Ordering::Relaxed);
         let alive = Arc::downgrade(&weather.generation);
-        let mut cache = std::mem::take(&mut weather.cache);
+        let mut cache = weather.cache.clone();
         let repo = self.path.clone();
         spawn_or(
             &self.tx,
@@ -146,22 +145,29 @@ fn replay(
     plan: &[(String, Step)],
     cache: &mut Cache,
     mergiraf: bool,
-    active: impl Fn() -> bool,
+    requested: impl Fn() -> bool,
 ) -> Vec<Forecast> {
+    if !requested() {
+        return Vec::new();
+    }
+    let began = Instant::now();
+    let active = || requested() && began.elapsed() < Duration::from_secs(90);
     let mut rows = Vec::with_capacity(plan.len());
-    let setup = || -> Result<(String, Vec<String>), String> {
-        let tree = git::run(
-            Some(repo),
+    let setup = || -> Result<(String, ForecastGit), String> {
+        let context = ForecastGit::new(repo, &active)?;
+        let tree = context.run(
             &[
                 "rev-parse",
                 "--verify",
                 "--end-of-options",
                 &format!("{onto}^{{tree}}"),
             ],
+            &[0],
+            &active,
         )?;
-        Ok((tree.trim().to_owned(), text_merge_options(repo)?))
+        Ok((tree.trim().to_owned(), context))
     };
-    let (mut tree, options) = match setup() {
+    let (mut tree, context) = match setup() {
         Ok(value) => value,
         Err(e) => return plan.iter().map(|_| Forecast::Unknown(e.clone())).collect(),
     };
@@ -181,7 +187,7 @@ fn replay(
         let key = (tree.clone(), commit.clone());
         let applied = match cache.get(&key) {
             Some(value) => Ok(value.clone()),
-            None => apply(repo, &tree, commit, &options, mergiraf).inspect(|value| {
+            None => apply(&context, &tree, commit, mergiraf, &active).inspect(|value| {
                 // Bound a long editing session without affecting correctness.
                 if cache.len() >= 2048 {
                     cache.clear();
@@ -202,7 +208,7 @@ fn replay(
             }
             Err(e) => {
                 let reason = format!(
-                    "Forecast unavailable (requires Git with merge-tree --write-tree and --merge-base): {e}"
+                    "Forecast unavailable (requires Git with --attr-source and merge-tree --write-tree --merge-base): {e}"
                 );
                 blocked = Some(reason.clone());
                 rows.push(Forecast::Unknown(reason));
@@ -212,49 +218,37 @@ fn replay(
     rows
 }
 
-/// Override every configured external driver with Git's text merge. Repository attributes
-/// may select one even when merge.default is set. Forecasting must not run arbitrary scripts.
-fn text_merge_options(repo: &Path) -> Result<Vec<String>, String> {
-    let mut options = vec![
-        "-c".into(),
-        "merge.default=text".into(),
-        "-c".into(),
-        "merge.conflictStyle=diff3".into(),
-        "-c".into(),
-        "merge.renormalize=false".into(),
-    ];
-    let keys = git::run_ok_codes(
-        Some(repo),
-        &[
-            "config",
-            "--null",
-            "--name-only",
-            "--get-regexp",
-            r"^merge\..*\.driver$",
-        ],
-        &[0, 1],
-    )?;
-    for key in keys.split('\0').filter(|k| !k.is_empty()) {
-        options.extend([
-            "-c".into(),
-            format!("{key}=git merge-file -L current -L base -L incoming -- %A %O %B"),
-        ]);
-    }
-    Ok(options)
-}
-
 fn apply(
-    repo: &Path,
+    context: &ForecastGit,
     tree: &str,
     commit: &str,
-    options: &[String],
     mergiraf: bool,
+    active: &dyn Fn() -> bool,
 ) -> Result<Applied, String> {
-    // Resolve before any command without --end-of-options; only full object IDs follow.
-    let commit = git::resolve(repo, commit)?;
-    let parent = git::resolve(repo, &format!("{commit}^"))?;
-    let temporary = git::run(
-        Some(repo),
+    // Resolve before commands without --end-of-options; only object IDs follow.
+    let commit = context.run(
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{commit}^{{commit}}"),
+        ],
+        &[0],
+        active,
+    )?;
+    let commit = commit.trim();
+    let parent = context.run(
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{commit}^"),
+        ],
+        &[0],
+        active,
+    )?;
+    let parent = parent.trim();
+    let temporary = context.run(
         &[
             "-c",
             "user.name=gitcraft forecast",
@@ -266,62 +260,84 @@ fn apply(
             "-m",
             "gitcraft rebase forecast",
         ],
+        &[0],
+        active,
     )?;
+    // Global option: unsupported Git fails explicitly rather than silently ignoring an env
+    // variable. All attribute lookups use the simulated parent, even in a dirty checkout.
+    let attributes = format!("--attr-source={tree}");
     let base = format!("--merge-base={parent}");
-    let args: Vec<&str> = options
-        .iter()
-        .map(String::as_str)
-        .chain([
+    let output = context.run(
+        &[
+            "-c",
+            "merge.default=text",
+            "-c",
+            "merge.conflictStyle=diff3",
+            "-c",
+            "merge.renormalize=false",
+            &attributes,
             "merge-tree",
             "--write-tree",
             "--name-only",
             "-z",
             &base,
             temporary.trim(),
-            &commit,
-        ])
-        .collect();
-    let output = git::run_ok_codes(Some(repo), &args, &[0, 1])?;
+            commit,
+        ],
+        &[0, 1],
+        active,
+    )?;
     let (result_tree, files) = parse_merge(&output)?;
     let forecast = if files.is_empty() {
         if result_tree == tree
-            && !git::run(
-                Some(repo),
-                &[
-                    "diff-tree",
-                    "--no-ext-diff",
-                    "--no-textconv",
-                    "--name-only",
-                    "-r",
-                    &parent,
-                    &commit,
-                ],
-            )?
-            .is_empty()
+            && !context
+                .run(
+                    &[
+                        "diff-tree",
+                        "--no-ext-diff",
+                        "--no-textconv",
+                        "--name-only",
+                        "-r",
+                        parent,
+                        commit,
+                    ],
+                    &[0],
+                    active,
+                )?
+                .is_empty()
         {
             Forecast::Empty
         } else {
             Forecast::Clean
         }
     } else {
-        Forecast::Conflict(files.into_iter().map(|path| {
+        let mut conflicts = Vec::new();
+        for path in files {
             let checked = if !mergiraf {
                 Err("Disabled in Settings".to_owned())
-            } else { git::file_at(repo, Some(&result_tree), &path)
-                .and_then(|bytes| String::from_utf8(bytes).map_err(|_| "Binary conflict".to_owned()))
-                .and_then(|text| {
-                    if !text.lines().any(|line| line.starts_with("<<<<<<< ")) {
-                        return Err("Structural or binary conflict; Mergiraf cannot check this forecast".to_owned());
-                    }
-                    crate::mergiraf::solve_text(&path, &text)
-                }) };
+            } else {
+                context.bytes(&["show", "--end-of-options", &format!("{result_tree}:{path}")], &[0], active)
+                    .and_then(|bytes| String::from_utf8(bytes).map_err(|_| "Binary conflict".to_owned()))
+                    .and_then(|text| {
+                        if !text.lines().any(|line| line.starts_with("<<<<<<< ")) {
+                            return Err("Structural or binary conflict; Mergiraf cannot check this forecast".to_owned());
+                        }
+                        crate::mergiraf::solve_text(&path, &text, active)
+                    })
+            };
+            if !active() {
+                return Err("Forecast cancelled or timed out".into());
+            }
             let result = match checked {
-                Ok(text) if !text.lines().any(|line| line.starts_with("<<<<<<< ")) => "Mergiraf solves the text conflict (not applied)".to_owned(),
+                Ok(text) if !text.lines().any(|line| line.starts_with("<<<<<<< ")) => {
+                    "Mergiraf solves the text conflict (not applied)".to_owned()
+                }
                 Ok(_) => "Mergiraf leaves conflicts".to_owned(),
                 Err(e) => format!("Mergiraf: {e}"),
             };
-            (path, result)
-        }).collect())
+            conflicts.push((path, result));
+        }
+        Forecast::Conflict(conflicts)
     };
     Ok(Applied {
         tree: result_tree,
@@ -349,8 +365,8 @@ pub(super) fn badge(ui: &mut egui::Ui, forecast: Option<&Forecast>, dropped: boo
         ("minus", t.text_faint, "Dropped: not replayed".to_owned())
     } else {
         match forecast {
-            Some(Forecast::Clean) => ("sun", t.accent, "Applies cleanly here (Git text merge). Hooks and custom merge drivers are not run.".to_owned()),
-            Some(Forecast::Conflict(files)) => ("cloud-lightning", t.danger, format!("Conflicts here (Git text merge):\n{}", files.iter().map(|(path, result)| format!("{path}\n  {result}")).collect::<Vec<_>>().join("\n"))),
+            Some(Forecast::Clean) => ("sun", t.accent, "Applies cleanly with Git defaults and simulated-tree attributes. Source merge settings, hooks, custom drivers and global/info attributes are excluded.".to_owned()),
+            Some(Forecast::Conflict(files)) => ("cloud-lightning", t.danger, format!("Conflicts here (simulated-tree attributes):\n{}", files.iter().map(|(path, result)| format!("{path}\n  {result}")).collect::<Vec<_>>().join("\n"))),
             Some(Forecast::Empty) => ("cloud", t.text_dim, "Becomes empty here. Git may stop for you to skip or keep this commit.".to_owned()),
             Some(Forecast::Unknown(reason)) => ("cloud", t.text_dim, reason.clone()),
             _ => ("cloud", t.text_faint, "Checking rebase weather…".to_owned()),
@@ -363,6 +379,7 @@ pub(super) fn badge(ui: &mut egui::Ui, forecast: Option<&Forecast>, dropped: boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git;
     use std::path::PathBuf;
 
     struct Repository(PathBuf);
@@ -437,6 +454,68 @@ mod tests {
         let forecast = replay(&repo.0, &base, &dropped, &mut cache, true, || true);
         assert_eq!(forecast[0], Forecast::Dropped);
         assert!(matches!(forecast[1], Forecast::Conflict(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn attributes_come_from_each_simulated_parent_and_ignore_checkout_and_info()
+    -> Result<(), String> {
+        let repo = Repository::new("attributes")?;
+        let base = repo.git(&["rev-parse", "HEAD"])?;
+        let a = repo.commit("file.txt", "one\n", "one")?;
+        std::fs::write(repo.0.join(".gitattributes"), "*.txt merge=union\n")
+            .map_err(|e| e.to_string())?;
+        repo.git(&["add", ".gitattributes"])?;
+        let b = repo.commit("file.txt", "two\n", "two and union")?;
+        let plan = [(b.clone(), Step::Pick), (a, Step::Pick)];
+        let mut cache = Cache::new();
+        let first = replay(&repo.0, &base, &plan, &mut cache, false, || true);
+        assert!(matches!(first[0], Forecast::Conflict(_)), "{first:?}");
+        assert!(matches!(first[1], Forecast::Unknown(_)));
+
+        // Same immutable input, different dirty checkout/global/info attributes. Neither
+        // a cold computation nor a cache hit may acquire the checkout's union semantics.
+        std::fs::write(repo.0.join(".gitattributes"), "*.txt -merge\n")
+            .map_err(|e| e.to_string())?;
+        std::fs::write(repo.0.join(".git/info/attributes"), "*.txt merge=union\n")
+            .map_err(|e| e.to_string())?;
+        let global = repo.0.join("global-attributes");
+        std::fs::write(&global, "*.txt merge=union\n").map_err(|e| e.to_string())?;
+        repo.git(&["config", "core.attributesFile", &global.to_string_lossy()])?;
+        assert_eq!(
+            replay(&repo.0, &base, &plan, &mut cache, false, || true),
+            first
+        );
+        assert_eq!(
+            replay(&repo.0, &base, &plan, &mut Cache::new(), false, || true),
+            first
+        );
+        assert_eq!(
+            std::fs::read_to_string(repo.0.join(".gitattributes")).map_err(|e| e.to_string())?,
+            "*.txt -merge\n"
+        );
+
+        // Introducing union earlier in the todo changes the simulated parent tree. That
+        // subsequent merge really should use union, despite a dirty binary checkout.
+        std::fs::write(repo.0.join(".gitattributes"), "*.txt merge=union\n")
+            .map_err(|e| e.to_string())?;
+        repo.git(&["add", ".gitattributes"])?;
+        // This commit must add attributes relative to a parent with none.
+        repo.git(&["checkout", "-q", "--detach", &base])?;
+        let union = repo.commit(".gitattributes", "*.txt merge=union\n", "union")?;
+        std::fs::write(repo.0.join(".gitattributes"), "*.txt -merge\n")
+            .map_err(|e| e.to_string())?;
+        assert_eq!(
+            replay(
+                &repo.0,
+                &base,
+                &[(union, Step::Pick), (b, Step::Pick)],
+                &mut Cache::new(),
+                false,
+                || true
+            ),
+            [Forecast::Clean, Forecast::Clean]
+        );
         Ok(())
     }
 
@@ -622,7 +701,7 @@ mod tests {
         );
         weather.running = true;
         weather.arrived(generation, vec![Forecast::Clean], Cache::new());
-        assert!(!weather.running);
+        assert!(weather.running);
         assert!(weather.rows.is_empty());
         weather.refresh(&ctx);
         let mut cache = Cache::new();
@@ -635,5 +714,15 @@ mod tests {
         );
         weather.arrived(generation, vec![Forecast::Clean], cache);
         assert!(weather.cache.is_empty());
+    }
+
+    #[test]
+    fn closing_the_editor_cancels_weather_even_while_a_todo_snapshot_exists() {
+        let editor = super::super::RebaseEditor::new("base".into(), "base".into(), Vec::new());
+        let lifetime = Arc::downgrade(&editor.weather.generation);
+        let snapshot = editor.clone();
+        drop(editor);
+        assert!(lifetime.upgrade().is_none());
+        assert_eq!(snapshot.onto, "base");
     }
 }

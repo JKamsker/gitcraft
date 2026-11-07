@@ -105,10 +105,12 @@ so your config, credentials and hooks apply as usual.
   place), squash, fix up or drop each one, move them up and down, then _Start rebase_. Ctrl+Z
   undoes it. Rebase weather updates after each reorder or action change: a sun applies cleanly,
   a storm has conflicts (hover for file names and Mergiraf's check), and a cloud is waiting, becomes
-  empty or cannot be predicted. Later commits remain unknown after a conflict. Forecasts use Git's text
-  merge without running custom merge drivers or hooks, and leave refs, the index and working
-  files alone. They require `merge-tree --write-tree --merge-base` support; older Git shows why
-  weather is unavailable. Mergiraf checks copies only and does not apply its answers.
+  empty or cannot be predicted. Later commits remain unknown after a conflict. Forecasts use Git defaults and
+  attributes from each simulated parent tree; global/info attributes, custom merge drivers
+  and hooks are excluded. They leave refs, the index and working files alone, and require
+  `--attr-source` and `merge-tree --write-tree --merge-base` support; older Git shows why weather
+  is unavailable. Edits cancel stale checks, and automatic Git and Mergiraf commands have
+  deadlines. Mergiraf checks copies only and does not apply its answers.
 - Quick edits from a commit's menu, for commits of the checked-out branch: _Edit commit
   message_, _Drop commit_, _Move commit up_ / _down_, each a rebase without the editor and undone
   with Ctrl+Z. What can't be done (a merge, merges after the commit) is greyed out with why.

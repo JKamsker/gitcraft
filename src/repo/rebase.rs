@@ -3,6 +3,7 @@
 //! and hands it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
 
 mod weather;
+mod weather_git;
 
 use std::path::{Path, PathBuf};
 
@@ -61,7 +62,6 @@ pub(crate) struct Entry {
     pub message: String,
 }
 
-#[derive(Clone)]
 pub(crate) struct RebaseEditor {
     /// What the commits are replayed onto (a commit or a branch).
     pub onto: String,
@@ -78,6 +78,22 @@ pub(crate) struct RebaseEditor {
     /// started again, nor changed, meanwhile.
     pub starting: bool,
     weather: weather::Weather,
+}
+
+impl Clone for RebaseEditor {
+    fn clone(&self) -> Self {
+        // A todo snapshot prepared in the background must not keep the UI editor's
+        // forecast cancellation token alive after that editor has closed.
+        Self {
+            onto: self.onto.clone(),
+            onto_label: self.onto_label.clone(),
+            entries: self.entries.clone(),
+            head: self.head.clone(),
+            id: self.id,
+            starting: self.starting,
+            weather: weather::Weather::default(),
+        }
+    }
 }
 
 impl RebaseEditor {
