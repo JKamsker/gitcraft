@@ -17,6 +17,7 @@ mod select;
 #[cfg(test)]
 mod tests;
 mod view;
+mod weakened;
 
 use std::path::Path;
 
@@ -85,6 +86,8 @@ pub struct DiffData {
     pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
     /// out the first time they are needed, not every frame.
+    /// The _weakens checks_ evidence of each hunk that has some, by its header's line.
+    pub(super) weakened: std::collections::HashMap<usize, String>,
     map: [std::sync::OnceLock<(map::ChangeRuns, Vec<std::ops::Range<usize>>)>; 2],
 }
 
@@ -182,6 +185,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         .map(|l| l.text.chars().count())
         .max()
         .unwrap_or(0);
+    let weakened = weakened::by_hunk_line(&text, &lines);
     Ok(DiffData {
         lines,
         spans,
@@ -194,6 +198,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         new_file,
         longest,
         uncut,
+        weakened,
         map: Default::default(),
     })
 }

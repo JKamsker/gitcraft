@@ -194,6 +194,14 @@ impl RepoTab {
                 },
             );
         });
+        if let Some(first) = files.first() {
+            let area = super::super::weakened_marks::area_of(first.area);
+            let scope = crate::weakened::Scope::Work(area);
+            let found = self
+                .weakened
+                .get(ui.ctx(), &self.path, scope, self.work_read);
+            super::super::weakened_marks::error_note(ui, found.as_ref());
+        }
     }
 
     /// One working-tree file with hover buttons (hidden while an operation runs).
@@ -209,6 +217,13 @@ impl RepoTab {
         let picked = &self.stash_picks.picked;
         let selected = self.open_key() == Some(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
+        let area = super::super::weakened_marks::area_of(f.area);
+        let scope = crate::weakened::Scope::Work(area);
+        let found = self
+            .weakened
+            .get(ui.ctx(), &self.path, scope, self.work_read);
+        let plain = RowExtra::Buttons(buttons);
+        let (extra, flags) = super::super::weakened_marks::extra(found.as_ref(), &f.path, &plain);
         let r = widgets::file_row(
             ui,
             f.code,
@@ -216,7 +231,7 @@ impl RepoTab {
             f.old_path.as_deref(),
             indent,
             selected,
-            RowExtra::Buttons(buttons),
+            extra,
         );
         if picked.contains(&f.path) {
             mark_picked(ui, r.row.rect);
@@ -228,6 +243,7 @@ impl RepoTab {
             ui.separator();
             stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
+        super::super::weakened_marks::hover(ui, &r, flags);
         if f.code != 'D' {
             // Linked as it is in the last commit: a new or renamed file isn't there by this name.
             let links = || {

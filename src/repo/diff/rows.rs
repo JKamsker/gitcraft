@@ -334,8 +334,14 @@ impl<'a> Rows<'a> {
                 self.clicked = Some(i);
             }
         }
-        if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
-            self.hunk_buttons(ui, rect, i, acts);
+        if kind == Some(Kind::Hunk) {
+            let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
+            if !self.hunk_picks.is_empty() {
+                right = self.hunk_buttons(ui, rect, i, acts) - 4.0;
+            }
+            if let Some(tip) = data.weakened.get(&i) {
+                super::weakened::badge(ui, right, rect.center().y, tip, i);
+            }
         }
     }
 
@@ -421,7 +427,8 @@ impl<'a> Rows<'a> {
 
     /// The hunk actions in the header at line `i`, at the visible right end, however wide the
     /// line is.
-    fn hunk_buttons(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) {
+    /// The hunk's buttons right-aligned in `rect`; returns where the leftmost one starts.
+    fn hunk_buttons(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) -> f32 {
         let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
         for &pick in self.hunk_picks.iter().rev() {
             let (resp, left) = hunk_button(ui, right, rect.center().y, pick, i);
@@ -433,6 +440,7 @@ impl<'a> Rows<'a> {
             }
             right = left - 4.0;
         }
+        right + 4.0
     }
 }
 

@@ -34,3 +34,4 @@ mod terminal;
 mod theme;
 mod update;
 mod vscode_theme;
+mod weakened;

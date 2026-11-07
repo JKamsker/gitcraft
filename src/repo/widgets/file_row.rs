@@ -8,17 +8,22 @@ use crate::icons;
 use crate::theme::{self, Tokens};
 
 /// What a file row shows on its right edge.
+#[derive(Clone, Copy)]
 pub enum RowExtra<'a> {
     /// `+added −removed` (`None` for binary files).
     Stats(Option<u32>, Option<u32>),
     /// Icon buttons shown while the row is hovered: `(icon, tooltip)`.
     Buttons(&'a [(&'a str, &'a str)]),
+    /// [`RowExtra::Stats`] or [`RowExtra::Buttons`] with a warning badge left of them.
+    Badged(&'a RowExtra<'a>, &'a str),
 }
 
 pub struct FileRowResponse {
     pub row: Response,
     /// Index of the clicked hover button.
     pub button: Option<usize>,
+    /// Where the badge of [`RowExtra::Badged`] is, for its own hover text.
+    pub badge: Option<Rect>,
 }
 
 /// One file: status letter, file name, its folder dimmed, and `extra` on the right.
@@ -66,9 +71,14 @@ pub fn file_row(
     // Right edge first, so the name is clipped before it.
     let mut right = rect.right() - 8.0;
     let mut button = None;
+    let mut badge = None;
+    let (extra, label) = match &extra {
+        RowExtra::Badged(inner, label) => (*inner, Some(*label)),
+        other => (other, None),
+    };
     match extra {
         RowExtra::Stats(added, removed) => {
-            right = stats(&painter, &t, right, y, added, removed);
+            right = stats(&painter, &t, right, y, *added, *removed);
         }
         RowExtra::Buttons(buttons) => {
             // Also while the keyboard is on the row or one of them, so Tab reaches them.
@@ -76,8 +86,19 @@ pub fn file_row(
                 || (0..buttons.len()).any(|i| ui.memory(|m| m.has_focus(button_id(&row, i))));
             if hovered || selected || keyboard {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
+            } else if label.is_some() {
+                // The badge stays where it is when the buttons come up on hover.
+                right -= BUTTON_W * buttons.len() as f32;
             }
         }
+        RowExtra::Badged(..) => {}
+    }
+    if let Some(label) = label {
+        // Room left for the name; with too little, the badge shrinks to its icon.
+        let room = right - (rect.left() + 32.0 + shift);
+        let at = warning_badge(ui, &painter, &t, (right, y), label, room < 180.0);
+        right = at.left() - 6.0;
+        badge = Some(at);
     }
 
     let (dir, name) = split_dir(path);
@@ -117,7 +138,46 @@ pub fn file_row(
         None if !dir.is_empty() => row.on_hover_text(path),
         None => row,
     };
-    FileRowResponse { row, button }
+    FileRowResponse { row, button, badge }
+}
+
+/// Width a hover button takes, with its gap.
+const BUTTON_W: f32 = 22.0;
+
+/// A small warning pill with `label` (only its icon when `compact`), right-aligned at
+/// `right`; returns where it is.
+fn warning_badge(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    (right, y): (f32, f32),
+    label: &str,
+    compact: bool,
+) -> Rect {
+    let color = badge_text(t);
+    if compact {
+        let rect = Rect::from_center_size(pos2(right - 9.0, y), vec2(18.0, 18.0));
+        painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+        icons::paint(ui, rect, "circle-alert", 12.0, color);
+        return rect;
+    }
+    let galley = painter.layout_no_wrap(label.to_owned(), theme::medium(10.0), color);
+    let size = galley.size() + vec2(10.0, 3.0);
+    let rect = Rect::from_min_size(pos2(right - size.x, y - size.y / 2.0), size);
+    painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+    painter.galley(rect.min + vec2(5.0, 1.5), galley, color);
+    rect
+}
+
+/// The warning colour, darkened on light themes so small text on its tint stays readable.
+pub fn badge_text(t: &Tokens) -> egui::Color32 {
+    if t.dark() {
+        t.warning
+    } else {
+        let [r, g, b, _] = t.warning.to_array();
+        let dim = |c: u8| (f32::from(c) * 0.72) as u8;
+        egui::Color32::from_rgb(dim(r), dim(g), dim(b))
+    }
 }
 
 /// `+added −removed` (or `bin`) right-aligned at `right`; returns where the name must end.
