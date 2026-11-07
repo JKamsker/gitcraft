@@ -25,7 +25,7 @@ impl RepoTab {
                     if ui.selectable_label(active.is_some_and(|p|p.kind==kind),name).clicked(){choose=Some(Some(Preset{name:name.into(),kind,days:30}));}
                 }
                 let anchor=self.selected.and_then(|i|self.commits.get(i)).filter(|c|git::investigations::oid(&c.hash)).map(|c|c.hash.clone());
-                if ui.add_enabled(anchor.is_some(),egui::Button::new("Descendants of selected commit")).clicked(){if let Some(anchor)=anchor{choose=Some(Some(Preset{name:format!("Descendants of {}",super::super::short(&anchor)),kind:Kind::Descendants{anchor},days:30}));}}
+                if ui.add_enabled(anchor.is_some(),egui::Button::new("Descendants of selected commit")).clicked() && let Some(anchor)=anchor {choose=Some(Some(Preset{name:format!("Descendants of {}",super::super::short(&anchor)),kind:Kind::Descendants{anchor},days:30}));}
                 ui.menu_button("Only merges into…",|ui|{for b in &self.refs.local{if ui.button(&b.name).clicked(){choose=Some(Some(Preset{name:format!("Only merges into {}",b.name),kind:Kind::MergesInto{branch:b.name.clone()},days:30}));ui.close();}}});
                 if !self.saved_views.prefs.saved.is_empty(){ui.separator();for p in &self.saved_views.prefs.saved{if ui.selectable_label(active==Some(p),&p.name).clicked(){choose=Some(Some(p.clone()));}}}
             });
@@ -42,19 +42,17 @@ impl RepoTab {
         if let Some(preset) = choose {
             self.set_graph_view(preset, &ctx);
         }
-        if save {
-            if let Some(mut preset) = self.saved_views.prefs.active.clone() {
-                preset.name = self.saved_views.name.trim().to_owned();
-                if preset.valid() {
-                    self.saved_views
-                        .prefs
-                        .saved
-                        .retain(|p| p.name != preset.name);
-                    self.saved_views.prefs.saved.push(preset.clone());
-                    self.saved_views.prefs.active = Some(preset);
-                    self.saved_views.name.clear();
-                    self.save_graph_preferences(&ctx);
-                }
+        if save && let Some(mut preset) = self.saved_views.prefs.active.clone() {
+            preset.name = self.saved_views.name.trim().to_owned();
+            if preset.valid() {
+                self.saved_views
+                    .prefs
+                    .saved
+                    .retain(|p| p.name != preset.name);
+                self.saved_views.prefs.saved.push(preset.clone());
+                self.saved_views.prefs.active = Some(preset);
+                self.saved_views.name.clear();
+                self.save_graph_preferences(&ctx);
             }
         }
         if remove {

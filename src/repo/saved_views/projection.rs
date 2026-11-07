@@ -63,12 +63,11 @@ impl Projection {
         let mut next_origin = 0;
         let mut gap = 0;
         for (i, row) in graph.rows.iter().enumerate() {
-            if let Some(index) = gaps.get(gap) {
-                if let Row::Gap { range, top, .. } = &mut rows[*index] {
-                    if range.start == i {
-                        **top = active;
-                    }
-                }
+            if let Some(index) = gaps.get(gap)
+                && let Row::Gap { range, top, .. } = &mut rows[*index]
+                && range.start == i
+            {
+                **top = active;
             }
             if row.incoming.is_empty() {
                 next_origin = next_origin.max(row.origin + 1);
@@ -88,19 +87,18 @@ impl Projection {
                     next_origin += 1;
                     Some(origin)
                 };
-                if col < LANES {
-                    if let Some(origin) = origin {
-                        active[col] = Some(origin);
-                    }
+                if col < LANES
+                    && let Some(origin) = origin
+                {
+                    active[col] = Some(origin);
                 }
             }
-            if let Some(index) = gaps.get(gap) {
-                if let Row::Gap { range, bottom, .. } = &mut rows[*index] {
-                    if range.end == i + 1 {
-                        **bottom = active;
-                        gap += 1;
-                    }
-                }
+            if let Some(index) = gaps.get(gap)
+                && let Row::Gap { range, bottom, .. } = &mut rows[*index]
+                && range.end == i + 1
+            {
+                **bottom = active;
+                gap += 1;
             }
         }
         Self { rows }
@@ -169,7 +167,7 @@ mod tests {
         assert_eq!(p.position(10), Some(10));
     }
     #[test]
-    fn connector_never_claims_reused_columns_are_one_continuous_lane() {
+    fn connector_never_claims_reused_columns_are_one_continuous_lane() -> Result<(), String> {
         let commits = vec![
             c(0, &[1]),
             c(1, &[2]),
@@ -190,15 +188,16 @@ mod tests {
             &BTreeSet::new(),
         );
         let Row::Gap { top, bottom, range } = &p.rows[1] else {
-            panic!("Missing gap")
+            return Err("Missing gap".into());
         };
         assert_eq!(range, &(1..5));
         assert!(top[0].is_some());
         assert!(bottom[0].is_some());
         assert_ne!(top[0], bottom[0]);
+        Ok(())
     }
     #[test]
-    fn connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible() {
+    fn connector_boundaries_keep_merge_lanes_distinct_and_stashes_visible() -> Result<(), String> {
         let commits = vec![
             c(0, &[3, 1]),
             c(1, &[2]),
@@ -217,7 +216,7 @@ mod tests {
             &BTreeSet::new(),
         );
         let Row::Gap { top, bottom, .. } = &p.rows[1] else {
-            panic!("Missing gap")
+            return Err("Missing gap".into());
         };
         assert_ne!(top[0], top[1]);
         assert_eq!(top[0], bottom[0]);
@@ -231,5 +230,6 @@ mod tests {
             &BTreeSet::from([commits[3].hash.clone()]),
         );
         assert!(p.rows.iter().any(|r| matches!(r, Row::Commit(3))));
+        Ok(())
     }
 }

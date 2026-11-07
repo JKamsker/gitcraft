@@ -72,41 +72,41 @@ impl<T: Send + 'static> Reader<T> {
                 self.running = None;
             }
         }
-        if self.running.is_none() {
-            if let Some(Pending { id, context, job }) = self.pending.take() {
-                let (tx, rx) = mpsc::channel();
-                let completion = ForecastCompletion::default();
-                let owner = completion.clone();
-                let generation = Arc::downgrade(&self.generation);
-                let repaint = ctx.clone();
-                self.running = Some(Running {
-                    id,
-                    rx,
-                    answer: None,
-                    completion,
-                });
-                crate::connections::spawn(move || {
-                    let active = || {
-                        generation
-                            .upgrade()
-                            .is_some_and(|g| g.load(Ordering::Acquire) == id)
-                    };
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        context.run(|| {
-                            owner.run(|| {
-                                if active() {
-                                    job(&active)
-                                } else {
-                                    Err("History read cancelled".into())
-                                }
-                            })
+        if self.running.is_none()
+            && let Some(Pending { id, context, job }) = self.pending.take()
+        {
+            let (tx, rx) = mpsc::channel();
+            let completion = ForecastCompletion::default();
+            let owner = completion.clone();
+            let generation = Arc::downgrade(&self.generation);
+            let repaint = ctx.clone();
+            self.running = Some(Running {
+                id,
+                rx,
+                answer: None,
+                completion,
+            });
+            crate::connections::spawn(move || {
+                let active = || {
+                    generation
+                        .upgrade()
+                        .is_some_and(|g| g.load(Ordering::Acquire) == id)
+                };
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    context.run(|| {
+                        owner.run(|| {
+                            if active() {
+                                job(&active)
+                            } else {
+                                Err("History read cancelled".into())
+                            }
                         })
-                    }))
-                    .unwrap_or_else(|_| Err("History worker panicked".into()));
-                    let _ = tx.send(result);
-                    repaint.request_repaint();
-                });
-            }
+                    })
+                }))
+                .unwrap_or_else(|_| Err("History worker panicked".into()));
+                let _ = tx.send(result);
+                repaint.request_repaint();
+            });
         }
         if self.busy() {
             ctx.request_repaint_after(std::time::Duration::from_millis(20));
