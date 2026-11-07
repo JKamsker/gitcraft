@@ -1,0 +1,57 @@
+{
+  "scope": "Independent source-only review of Windows correction; not full application acceptance",
+  "head": "51f95f3c7121082c7ff4afcdf65e1533e27da049",
+  "base": "f2b7968b45d90afc1bd2f7d2347482a2463f0742",
+  "tree": "7334dee6814f9e386b75c04af0f87fe8f9de6f96",
+  "source_clean_verified": true,
+  "source_author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "remote_verification": "Root verified exact pushed51f95f3 before assignment; no network polling required during resource hold",
+  "patch_sha256": "4fbd043a6bac14db134e4987053982e34775b939351446e5411045e2c57a8024",
+  "patch_bytes": 24639,
+  "changed_files_sha256": {
+    "Cargo.toml": "b6807132e5f5aa399d57f72bf0f302ea0406cc5cc1819fe102b41629cdd07fbd",
+    "README.md": "304642894bf8c3952c9843730038c32a4b7f694fc8543ef332ac04fe078f089d",
+    "src/git/object_storage/independent/held_windows.rs": "18569dd7eb1920239471769395eb04db31978a23e4dc4c7a3db2c640c2876ed3",
+    "src/git/object_storage/independent/windows_rename.rs": "63cd06f1e51cfc5d6ab1000c6e7adc11f18ff4f05500b07547ea99c7d0e6e67c",
+    "src/git/object_storage/tests.rs": "89a7e60b72311f73b9e3fd39ec810f19af61296f2b50deb51224ae141c3f1283"
+  },
+  "cached_api_document": {
+    "file": "/workspace/work/object-storage-windows-contract/file-rename-info.md",
+    "sha256": "14ab160d2f24a8e49ca364c2572944a45196a00673c66178922ef3925719647d",
+    "url": "https://learn.microsoft.com/windows/win32/api/winbase/ns-winbase-file_rename_info"
+  },
+  "locked_binding_source": {
+    "file": "/workspace/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/windows-sys-0.61.2/src/Windows/Win32/Storage/FileSystem/mod.rs",
+    "sha256": "b44686d7dcd877df4e539d2a5152a3ec212757efb111139cb0a108c8bad7624a",
+    "version": "windows-sys0.61.2"
+  },
+  "verdict": "STATIC WINDOWS CORRECTION PASS",
+  "blocking_findings": [],
+  "original_finding": "OBJECT-WINDOWS-3 closed at source/design level: original/backup inode content writes and hardlink-exclusion inference are removed",
+  "checks": [
+    "FILE_RENAME_INFO reprC/union/RootDirectory/FileNameLength/FileName match locked windows-sys definitions; native aligned Vec allocation covers header+bounded ASCII UTF16 filename; no unbounded size arithmetic or narrowing.",
+    "SetFileInformationByHandle receives live borrowed File handles and synchronously valid buffer; FileRenameInfo selects ReplaceIfExists=false, not extended flags; one-component allowlist excludes separators, NUL, ADS and traversal components.",
+    "Original alternate has actual retained READ+DELETE handle with READ sharing; parent info directory is an actual retained handle and ancestors stay held without DELETE sharing. Source is not reopened for rename.",
+    "No writes/truncate remain against original/backup inode; hard-linked other-clone bytes are preserved by design regardless of new aliases. same_file compares actual volume/file-index while source remains held.",
+    "Backup destination collision leaves existing backup and original intact; original identity/content proof remains before detach.",
+    "Recovery refuses newer alternates and never replaces; creates new private inode, writes/flushes captured bytes, no-replace renames its retained actual handle into held info and verifies identity/bytes.",
+    "Native fixtures create only owned temp donor/borrower repositories, exercise linked alternate preservation, successful detach, failure recovery, newer alternate refusal and backup collision; no new remote/controller/PID/signal logic."
+  ],
+  "nonblocking_limits": [
+    "Uncompiled at exact51f95f3: no claim of fmt/Clippy/cross-target or native execution pass.",
+    "Required later native owned tests must establish actual Windows filesystem rename/sharing/hardlink behavior, permission requirements and final Git proof; source inspection cannot substitute.",
+    "The FileNameLength contract does not require a trailing NUL; safety assessment relies on explicit bounded byte length, not on Rust padding initialization.",
+    "No approval for remote helper/full default runtime: OBJECT-PROTOCOL-1/2 remain open and unchanged.",
+    "No source changes to author/integration worktrees; no Cargo/build/app/native/helper/fixture/signals/CI executed."
+  ],
+  "allowed_execution": "Source/static and compile-only once root resource hold permits. This review alone authorizes no runtime; root must explicitly approve any isolated native fixture phase after compilation and independently reviewed transport integration.",
+  "application_recommendation": "hold_for_evidence; full helper remains blocked by two established transport findings",
+  "ratings": {
+    "impact_if_wrong": "high",
+    "regression_likelihood": "moderate",
+    "regression_protection": "partial",
+    "recoverability": "managed",
+    "confidence": "moderate"
+  },
+  "reviewer_validation": "Git/source reads and inert Python hash/binding checks only"
+}
