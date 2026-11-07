@@ -44,48 +44,89 @@ impl Default for State {
         }
     }
 }
-fn tree_rows(data: &Growth, cursor: usize) -> Result<Vec<TreeRow>, String> {
-    let files = data.files_at(cursor);
-    let mut all = files.clone();
-    let changes = data
-        .frames
-        .get(cursor)
-        .map(|f| {
-            f.changes
-                .iter()
-                .map(|(p, _)| p.clone())
-                .collect::<BTreeSet<_>>()
-        })
-        .unwrap_or_default();
-    for path in files.iter().chain(&changes) {
-        all.insert(path.clone());
-        if all.len() > 200_000 {
-            return Err("Replay tree exceeds the 200,000 folder/file entry budget".into());
+const TREE_BYTES: usize = 64 * 1024 * 1024;
+const TREE_WORK: usize = 256 * 1024 * 1024;
+fn tree_rows(
+    data: &Growth,
+    cursor: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<TreeRow>, String> {
+    tree_rows_budget(data, cursor, active, TREE_BYTES, TREE_WORK)
+}
+fn tree_rows_budget<'a>(
+    data: &'a Growth,
+    cursor: usize,
+    active: &dyn Fn() -> bool,
+    mut bytes: usize,
+    mut work: usize,
+) -> Result<Vec<TreeRow>, String> {
+    let files = data.files_at_borrowed(cursor, active)?;
+    let mut changes = BTreeSet::new();
+    if let Some(frame) = data.frames.get(cursor) {
+        for (path, _) in &frame.changes {
+            if !active() {
+                return Err("Frame cancelled".into());
+            }
+            changes.insert(path.as_slice());
         }
+    }
+    // Prefix slices borrow the source snapshot until materialization. The budget
+    // reserves each final path and conservative set/row overhead before insertion.
+    let mut all = BTreeSet::new();
+    let mut insert = |path: &'a [u8], directory: bool| -> Result<(), String> {
+        if !active() {
+            return Err("Frame cancelled".into());
+        }
+        let effort = path.len() + 1;
+        if effort > work {
+            return Err("Replay tree expanded work budget exceeded".into());
+        }
+        work -= effort;
+        if !all.contains(&(path, directory)) {
+            let cost = path.len() + 256;
+            if cost > bytes || all.len() >= 200_000 {
+                return Err("Replay tree expanded allocation/entry budget exceeded".into());
+            }
+            bytes -= cost;
+            all.insert((path, directory));
+        }
+        Ok(())
+    };
+    for path in files.iter().chain(&changes) {
+        insert(path, false)?;
         for (i, b) in path.iter().enumerate() {
+            if i % 256 == 0 && !active() {
+                return Err("Frame cancelled".into());
+            }
             if *b == b'/' {
-                all.insert(path[..i].to_vec());
-                if all.len() > 200_000 {
-                    return Err("Replay tree exceeds the 200,000 folder/file entry budget".into());
-                }
+                insert(&path[..i], true)?;
             }
         }
     }
-    Ok(all
-        .into_iter()
-        .map(|path| {
-            let changed = changes.contains(&path);
-            let removed = changed && !files.contains(&path);
-            let directory = !files.contains(&path) && !changes.contains(&path);
-            TreeRow {
-                path,
-                directory,
-                changed,
-                removed,
-            }
-        })
-        .collect())
+    let mut entries: Vec<_> = all.into_iter().collect();
+    // Component ordering keeps a folder's descendants before its next sibling.
+    entries.sort_by(|(a, ad), (b, bd)| {
+        a.split(|c| *c == b'/')
+            .cmp(b.split(|c| *c == b'/'))
+            .then_with(|| bd.cmp(ad))
+    });
+    let mut rows = Vec::with_capacity(entries.len());
+    for (path, directory) in entries {
+        if !active() {
+            return Err("Frame cancelled".into());
+        }
+        let changed = !directory && changes.contains(path);
+        let removed = changed && !files.contains(path);
+        rows.push(TreeRow {
+            path: path.to_vec(),
+            directory,
+            changed,
+            removed,
+        });
+    }
+    Ok(rows)
 }
+
 impl RepoTab {
     pub(super) fn open_growth(&mut self) {
         let mut view = State::default();
@@ -155,7 +196,7 @@ impl RepoTab {
             if view.playing {ctx.request_repaint_after(Duration::from_millis(30));}
             if view.requested!=Some(view.cursor) {
                 let at=view.cursor;let snapshot=data.clone();view.requested=Some(at);
-                view.frames.queue(move |active| {if !active(){return Err("Frame cancelled".into());} let rows=tree_rows(&snapshot,at)?;if !active(){return Err("Frame cancelled".into());}Ok((at,rows))});
+                view.frames.queue(move |active| {if !active(){return Err("Frame cancelled".into());} let rows=tree_rows(&snapshot,at,active)?;if !active(){return Err("Frame cancelled".into());}Ok((at,rows))});
             }
             if view.frames.busy() {ui.label(format!("Preparing frame {}…",view.cursor+1));}
             let frame=&data.frames[view.shown.min(data.frames.len()-1)];
@@ -191,6 +232,70 @@ mod tests {
     use super::*;
     use crate::git::growth::Frame;
     #[test]
+    fn tree_budget_refuses_small_prefix_amplification_and_observes_cancellation() {
+        let data = Growth {
+            baseline: [b"aaaa/bbbb/cccc/dddd/eeee".to_vec()].into_iter().collect(),
+            frames: Vec::new(),
+            more: false,
+            shallow: false,
+        };
+        assert!(
+            tree_rows_budget(&data, 0, &|| true, 1000, TREE_WORK)
+                .is_err_and(|e| e.contains("allocation/entry budget"))
+        );
+        assert!(
+            tree_rows_budget(&data, 0, &|| true, TREE_BYTES, 20)
+                .is_err_and(|e| e.contains("work budget"))
+        );
+        let calls = std::cell::Cell::new(0);
+        assert!(
+            tree_rows(&data, 0, &|| {
+                calls.set(calls.get() + 1);
+                calls.get() < 4
+            })
+            .is_err_and(|e| e.contains("cancelled"))
+        );
+    }
+    #[test]
+    fn component_order_keeps_subtrees_together_and_file_directory_replacement_is_explicit()
+    -> Result<(), String> {
+        let data = Growth {
+            baseline: [b"a-b".to_vec(), b"a/old".to_vec()].into_iter().collect(),
+            frames: vec![
+                Frame {
+                    hash: "base".into(),
+                    name: String::new(),
+                    date: String::new(),
+                    subject: String::new(),
+                    changes: Vec::new(),
+                },
+                Frame {
+                    hash: "tip".into(),
+                    name: String::new(),
+                    date: String::new(),
+                    subject: String::new(),
+                    changes: vec![(b"a/old".to_vec(), false), (b"a".to_vec(), true)],
+                },
+            ],
+            more: false,
+            shallow: false,
+        };
+        let rows = tree_rows(&data, 0, &|| true)?;
+        assert_eq!(
+            rows.iter().map(|r| r.path.as_slice()).collect::<Vec<_>>(),
+            vec![b"a".as_slice(), b"a/old", b"a-b"]
+        );
+        let rows = tree_rows(&data, 1, &|| true)?;
+        assert_eq!(rows.iter().filter(|r| r.path == b"a").count(), 2);
+        assert!(rows.iter().any(|r| r.path == b"a" && r.directory));
+        assert!(
+            rows.iter()
+                .any(|r| r.path == b"a" && !r.directory && r.changed && !r.removed)
+        );
+        assert!(rows.iter().any(|r| r.path == b"a/old" && r.removed));
+        Ok(())
+    }
+    #[test]
     fn real_tree_rows_keep_folders_and_deleted_contributor_hotspots() {
         let data = Growth {
             baseline: [b"src/old".to_vec()].into_iter().collect(),
@@ -213,7 +318,7 @@ mod tests {
             more: false,
             shallow: false,
         };
-        let rows = tree_rows(&data, 1).unwrap_or_default();
+        let rows = tree_rows(&data, 1, &|| true).unwrap_or_default();
         assert!(rows.iter().any(|r| r.path == b"src" && r.directory));
         assert!(
             rows.iter()
@@ -250,7 +355,7 @@ mod tests {
             more: false,
             shallow: false,
         });
-        let rows = tree_rows(&data, 0)?;
+        let rows = tree_rows(&data, 0, &|| true)?;
         tab.growth = Some(State {
             data: Some(data),
             rows,

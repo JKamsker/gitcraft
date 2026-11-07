@@ -151,19 +151,33 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
     Ok(frames)
 }
 impl Growth {
-    /// Rebuild only when the cursor moves. The 16 MiB stream bound caps total replay work.
-    pub fn files_at(&self, cursor: usize) -> BTreeSet<Vec<u8>> {
-        let mut files = self.baseline.clone();
+    /// Reconstruct with borrowed paths; source streams already bound their total
+    /// size. Cancellation is checked inside replay, before expanded rows allocate.
+    pub fn files_at_borrowed(
+        &self,
+        cursor: usize,
+        active: &dyn Fn() -> bool,
+    ) -> Result<BTreeSet<&[u8]>, String> {
+        let mut files = BTreeSet::new();
+        for path in &self.baseline {
+            if !active() {
+                return Err("Frame cancelled".into());
+            }
+            files.insert(path.as_slice());
+        }
         for frame in self.frames.iter().take(cursor.saturating_add(1)).skip(1) {
             for (path, present) in &frame.changes {
+                if !active() {
+                    return Err("Frame cancelled".into());
+                }
                 if *present {
-                    files.insert(path.clone());
+                    files.insert(path.as_slice());
                 } else {
-                    files.remove(path);
+                    files.remove(path.as_slice());
                 }
             }
         }
-        files
+        Ok(files)
     }
 }
 #[cfg(test)]
@@ -184,12 +198,12 @@ mod tests {
             shallow: false,
         };
         assert_eq!(
-            growth.files_at(0),
-            [b"src/a".to_vec()].into_iter().collect()
+            growth.files_at_borrowed(0, &|| true)?,
+            [b"src/a".as_slice()].into_iter().collect()
         );
         assert_eq!(
-            growth.files_at(1),
-            [b"src/b".to_vec()].into_iter().collect()
+            growth.files_at_borrowed(1, &|| true)?,
+            [b"src/b".as_slice()].into_iter().collect()
         );
         assert_eq!(growth.frames[1].name, "Two");
         assert!(parse(b"\0broken\0").is_err());

@@ -13,6 +13,9 @@ use crate::git::Commit;
 
 #[derive(Clone, Debug, Default)]
 pub struct Row {
+    /// Immutable minimap metadata captured with the layout.
+    pub hash: Arc<str>,
+    pub tagged: bool,
     /// Column of the commit's dot.
     pub col: usize,
     pub colours: HashMap<usize, usize>,
@@ -28,7 +31,7 @@ pub struct Row {
 
 #[derive(Clone, Default)]
 pub struct Graph {
-    pub rows: Vec<Row>,
+    pub rows: Arc<[Row]>,
     /// Widest the graph gets, in lanes.
     pub width: usize,
 }
@@ -103,6 +106,11 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
         }
         width = width.max(lanes.len()).max(col + 1);
         rows.push(Row {
+            hash: commit.hash.as_str().into(),
+            tagged: commit
+                .refs
+                .iter()
+                .any(|r| r.starts_with("tag: ") || r.starts_with("refs/tags/")),
             col,
             colours: HashMap::new(),
             origin,
@@ -112,7 +120,10 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
         });
     }
 
-    Graph { rows, width }
+    Graph {
+        rows: rows.into(),
+        width,
+    }
 }
 
 fn free_lane(lanes: &mut Vec<Option<&str>>) -> usize {
@@ -319,6 +330,11 @@ pub fn layout_banded<C: Borrow<Commit>>(
         }
         width = width.max(lanes.len()).max(col + 1);
         rows.push(Row {
+            hash: commit.hash.as_str().into(),
+            tagged: commit
+                .refs
+                .iter()
+                .any(|r| r.starts_with("tag: ") || r.starts_with("refs/tags/")),
             col,
             colours,
             origin,
@@ -351,7 +367,10 @@ pub fn layout_banded<C: Borrow<Commit>>(
         }
         width = bands.len();
     }
-    Graph { rows, width }
+    Graph {
+        rows: rows.into(),
+        width,
+    }
 }
 
 fn band_lane(lanes: &mut Vec<Option<&str>>, bands: &mut Vec<usize>, band: usize) -> usize {

@@ -163,7 +163,25 @@ fn read_observing(
     progress: &AtomicUsize,
     mut page_read: impl FnMut(usize),
 ) -> Result<History, String> {
+    let roots = capture_roots(repo, active)?;
+    read_roots_observing(repo, limit, active, progress, &roots.tips, &mut page_read)
+}
+
+pub(in crate::git) struct Roots {
+    pub head: String,
+    tips: BTreeSet<Vec<u8>>,
+}
+pub(in crate::git) fn capture_roots(
+    repo: &Path,
+    active: &dyn Fn() -> bool,
+) -> Result<Roots, String> {
     let run = |args: &[&str], input: Option<&[u8]>| process::run(repo, args, input, active);
+    let head = run(&["rev-parse", "--revs-only", "HEAD"], None)?;
+    let head = head.strip_suffix(b"\n").unwrap_or(&head);
+    if !head.is_empty() && !is_hash(head) {
+        return Err("Invalid history HEAD".into());
+    }
+    let head = String::from_utf8(head.to_vec()).map_err(|_| "Invalid history HEAD")?;
     let roots = run(
         &[
             "rev-parse",
@@ -171,11 +189,13 @@ fn read_observing(
             "--branches",
             "--remotes",
             "--tags",
-            "HEAD",
         ],
         None,
     )?;
     let mut tips = BTreeSet::new();
+    if !head.is_empty() {
+        tips.insert(head.as_bytes().to_vec());
+    }
     for line in roots.split(|b| *b == b'\n').filter(|s| !s.is_empty()) {
         if !is_hash(line) {
             return Err("Git returned an invalid history tip".into());
@@ -187,6 +207,27 @@ fn read_observing(
             "More than 10,000 reference tips; narrow this repository before analyzing it".into(),
         );
     }
+    Ok(Roots { head, tips })
+}
+
+pub(in crate::git) fn read_roots(
+    repo: &Path,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+    progress: &AtomicUsize,
+    roots: &Roots,
+) -> Result<History, String> {
+    read_roots_observing(repo, limit, active, progress, &roots.tips, &mut |_| {})
+}
+fn read_roots_observing(
+    repo: &Path,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+    progress: &AtomicUsize,
+    tips: &BTreeSet<Vec<u8>>,
+    page_read: &mut dyn FnMut(usize),
+) -> Result<History, String> {
+    let run = |args: &[&str], input: Option<&[u8]>| process::run(repo, args, input, active);
     let shallow = run(&["rev-parse", "--is-shallow-repository"], None)? == b"true\n";
     let mut history = History {
         shallow,
@@ -198,7 +239,8 @@ fn read_observing(
         return Ok(history);
     }
     let input: Vec<u8> = tips
-        .into_iter()
+        .iter()
+        .cloned()
         .flat_map(|mut tip| {
             tip.push(b'\n');
             tip
