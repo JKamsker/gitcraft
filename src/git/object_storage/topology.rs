@@ -4,14 +4,14 @@ use crate::remote;
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub(crate) struct Store {
     pub path: PathBuf,
     pub donor_of: Option<PathBuf>,
     pub available: bool,
     pub error: Option<String>,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub(crate) struct Topology {
     pub stores: Vec<Store>,
     pub worktrees: String,

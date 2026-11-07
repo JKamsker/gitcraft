@@ -1,5 +1,6 @@
 //! Read-only object representations. Git runs on the repository machine, without lazy fetch.
 mod files;
+pub(crate) mod helper;
 pub(crate) mod independent;
 #[cfg(test)]
 mod tests;

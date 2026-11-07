@@ -610,6 +610,7 @@ pub fn askpass_helper() -> Option<i32> {
     crate::connections::ssh_helper()
         .or_else(crate::connections::credential_helper)
         .or_else(crate::remote::askpass::run_helper)
+        .or_else(crate::git::object_storage::helper::run_cli)
 }
 
 /// How many commands for a repository on another machine were asked from the window's thread

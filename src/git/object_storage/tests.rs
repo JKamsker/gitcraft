@@ -816,3 +816,103 @@ mod native_windows_ownership {
         Ok(())
     }
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion() -> Result<(), String> {
+    const HELPER: &str = "GITCRAFT_OWNED_OBJECT_HELPER_FIXTURE";
+    const CHILD: &str = "GITCRAFT_OWNED_OBJECT_CLIENT_FIXTURE";
+    const NAME: &str = "git::object_storage::tests::fixed_owned_helper_roundtrips_ssh_and_wsl_and_checks_completion";
+    if std::env::var_os(HELPER).is_some() {
+        assert_eq!(helper::serve(), 0);
+        return Ok(());
+    }
+    if let Some(path) = std::env::var_os(CHILD) {
+        let root = PathBuf::from(path);
+        let ssh = remote::encode(
+            &remote::Host::Ssh("owned-objects-fixture.invalid".into()),
+            root.join("ssh/borrower").to_str().ok_or("path")?,
+        );
+        let data = inspect(&ssh, "HEAD", &|| true)?;
+        let plan = data
+            .independence
+            .ok_or_else(|| format!("No remote plan: {:?}", data.notes))?;
+        independent::make_independent(&plan, &|| true)?;
+        assert!(
+            !root
+                .join("ssh/borrower/.git/objects/info/alternates")
+                .exists()
+        );
+        let target = remote::Target {
+            host: remote::Host::Wsl("OwnedObjectsFixture".into()),
+            path: root.join("wsl/borrower").to_string_lossy().into_owned(),
+        };
+        assert!(helper::fixture_roundtrip(&target)?.contains("independent"));
+        assert!(
+            !root
+                .join("wsl/borrower/.git/objects/info/alternates")
+                .exists()
+        );
+        for platform in ["ssh", "wsl"] {
+            std::fs::rename(
+                root.join(platform).join("donor"),
+                root.join(platform).join("removed donor"),
+            )
+            .map_err(|e| e.to_string())?;
+            assert_eq!(
+                Fixture::git(
+                    &root.join(platform).join("borrower"),
+                    &["show", "HEAD:file ' $(touch ESCAPED).txt"]
+                )?,
+                "borrowed bytes"
+            );
+        }
+        return Ok(());
+    }
+    let root = Fixture::new()?;
+    for platform in ["ssh", "wsl"] {
+        let path = root.0.join(platform);
+        std::fs::create_dir(&path).map_err(|e| e.to_string())?;
+        let fixture = Fixture(path);
+        let _ = fixture.borrowing()?;
+        std::mem::forget(fixture);
+    }
+    let bin = root.0.join("bin");
+    std::fs::create_dir(&bin).map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    for program in ["ssh", "wsl.exe"] {
+        let path = bin.join(program);
+        std::fs::write(&path, "#!/bin/sh\nexec /bin/sh\n").map_err(|e| e.to_string())?;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
+    }
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let script = format!(
+        "#!/bin/sh\n{HELPER}=1 {} --exact {NAME} --nocapture --quiet | sed -n '/^{{\"protocol\":/p'\n",
+        remote::sh_quote(&exe.to_string_lossy())
+    );
+    let path = bin.join("gitcraft");
+    std::fs::write(&path, script).map_err(|e| e.to_string())?;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let output = Command::new(exe)
+        .args(["--exact", NAME, "--nocapture"])
+        .env(CHILD, &root.0)
+        .env(
+            "PATH",
+            std::env::join_paths(paths).map_err(|e| e.to_string())?,
+        )
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}

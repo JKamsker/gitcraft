@@ -187,6 +187,37 @@ impl Ownership {
         }
         Ok(())
     }
+    pub fn portable_identities(
+        &self,
+    ) -> Result<Vec<super::super::super::helper::Identity>, String> {
+        let mut files = Vec::new();
+        if let Some(first) = self.nodes.first() {
+            files.push(first.parent.as_ref());
+        }
+        files.extend(self.nodes.iter().map(|node| node.file.as_ref()));
+        files.push(self.alternate.as_ref());
+        files
+            .into_iter()
+            .map(|file| {
+                let (device, inode) = identity(file)?;
+                let birth = file
+                    .metadata()
+                    .map_err(err)?
+                    .created()
+                    .map_err(|_| {
+                        err("remote helper requires filesystem birth-time identity support")
+                    })?
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(err)?;
+                Ok(super::super::super::helper::Identity {
+                    device,
+                    inode,
+                    birth_seconds: birth.as_secs(),
+                    birth_nanos: birth.subsec_nanos(),
+                })
+            })
+            .collect()
+    }
     pub fn run(
         &self,
         original: &Path,

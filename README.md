@@ -648,3 +648,13 @@ alternate file while clearing its contents; its held-file recovery cannot overwr
 replacement metadata. SSH, WSL and other platforms retain read-only inspection and explain why this action
 is unavailable. Private `objects/gitcraft-independent-stage-*` directories are kept
 as recovery evidence; successfully installed packs share their file data with that stage.
+
+SSH/WSL independence requires a matching GitCraft executable in PATH on the repository
+machine, supporting the `gitcraft-owned-objects/1` headless helper protocol. The app
+never installs a helper automatically. The Linux helper binds preparation to actual
+ancestor/store/file device, inode and filesystem birth-time identities plus refs and
+borrowing metadata, then retains handles throughout copying, installation and recovery.
+Filesystems without birth-time identity support refuse the action. Requests/replies
+are capped at 4 MiB and the existing remote deadline applies. Only an exact transaction
+completion reply proves success; an interrupted connection reports the known recovery
+backup path and never retries automatically.

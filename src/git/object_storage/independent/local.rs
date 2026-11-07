@@ -226,19 +226,33 @@ pub(crate) fn make_with_checkpoints(
     active: &dyn Fn() -> bool,
     checkpoint: &mut dyn FnMut(&str) -> Result<(), String>,
 ) -> Result<String, String> {
+    make_transaction(snapshot, active, checkpoint, &fresh_transaction())
+}
+pub(crate) fn fresh_transaction() -> String {
+    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    format!("{time:x}{:016x}", SEQUENCE.fetch_add(1, Ordering::Relaxed))
+}
+pub(crate) fn make_transaction(
+    snapshot: &Snapshot,
+    active: &dyn Fn() -> bool,
+    checkpoint: &mut dyn FnMut(&str) -> Result<(), String>,
+    transaction: &str,
+) -> Result<String, String> {
+    if transaction.is_empty()
+        || transaction.len() > 64
+        || !transaction.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("Invalid ownership transaction identifier".into());
+    }
     let owner = &snapshot.ownership;
     let _lock = owner.lock()?;
     current(snapshot, active)?;
     let before = required(&snapshot.repo, owner, active)?;
-    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_nanos();
-    let stage_name = format!(
-        "gitcraft-independent-stage-{nonce}-{}",
-        SEQUENCE.fetch_add(1, Ordering::Relaxed)
-    );
+    let stage_name = format!("gitcraft-independent-stage-{transaction}");
     let stage = owner.stage(&stage_name)?;
     let imported = copy_pack(&snapshot.repo, owner, &stage, active)?;
     let index = stage.index(&imported);
@@ -268,7 +282,7 @@ pub(crate) fn make_with_checkpoints(
     current(snapshot, active)?;
     // Fixed-candidate tests can exercise ownership changes after final verification.
     checkpoint("verified")?;
-    let backup_name = format!("alternates.gitcraft-backup-{nonce}");
+    let backup_name = format!("alternates.gitcraft-backup-{transaction}");
     if let Err(error) = owner.detach(&backup_name) {
         let restored = owner.restore(&backup_name);
         return Err(format!(
@@ -313,4 +327,40 @@ pub(crate) fn make_with_checkpoints(
         owner.recovery_path(&backup_name).display(),
         stage_name
     ))
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn export_ticket(
+    snapshot: &Snapshot,
+    transaction: String,
+    active: &dyn Fn() -> bool,
+) -> Result<super::super::helper::Ticket, String> {
+    snapshot.ownership.current(true)?;
+    let mut refs = Vec::new();
+    for args in [
+        vec![
+            "for-each-ref",
+            "--format=%(refname)%00%(objectname)%00%(symref)",
+        ],
+        vec!["rev-parse", "--verify", "HEAD"],
+        vec!["ls-files", "--stage", "-z"],
+        vec!["reflog", "show", "--all", "--format=%H"],
+        vec!["worktree", "list", "--porcelain"],
+    ] {
+        refs.extend(super::super::bytes(&snapshot.repo, &args, active)?);
+        refs.push(0xff);
+        if refs.len() > 512 * 1024 {
+            return Err("Remote ownership snapshot exceeds 512 KiB of refs/index/reflogs; use Git on the repository machine.".into());
+        }
+    }
+    let ticket = super::super::helper::Ticket {
+        repo: snapshot.repo.to_string_lossy().into_owned(),
+        primary: snapshot.primary.to_string_lossy().into_owned(),
+        transaction,
+        identities: snapshot.ownership.portable_identities()?,
+        refs,
+        topology: serde_json::to_vec(&snapshot.topology).map_err(|e| e.to_string())?,
+    };
+    snapshot.ownership.current(true)?;
+    Ok(ticket)
 }
