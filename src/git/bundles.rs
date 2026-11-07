@@ -306,7 +306,10 @@ fn verify(repo: &Path, file: &str, refs: &[BundleRef]) -> Result<Vec<&'static st
     let args: Vec<_> = no_lazy
         .iter()
         .copied()
-        .chain(["bundle", "verify", file])
+        // Git for Windows accepts ordinary drive/UNC arguments, but not the
+        // verbatim prefix returned by Rust canonicalize. Its own long-path
+        // handling must remain enabled after that argument conversion.
+        .chain(["-c", "core.longpaths=true", "bundle", "verify", file])
         .collect();
     bounded::run(repo, &args, vec![], HEADER_LIMIT)?;
     Ok(no_lazy)
@@ -497,8 +500,11 @@ impl BundleFile {
                 target: Some(target),
             });
         }
-        static SEQ: AtomicU64 = AtomicU64::new(0);
         let root = std::fs::canonicalize(std::env::temp_dir()).map_err(|e| e.to_string())?;
+        Self::local(&root, bytes)
+    }
+    fn local(root: &Path, bytes: &[u8]) -> Result<Self, String> {
+        static SEQ: AtomicU64 = AtomicU64::new(0);
         for _ in 0..100 {
             let dir = root.join(format!(
                 "gitcraft-bundle-{}-{}",
@@ -519,10 +525,9 @@ impl BundleFile {
                         target: None,
                     };
                     let path = dir.join("exchange.bundle");
-                    temp.path = path
-                        .to_str()
-                        .ok_or("Temporary path is not UTF-8")?
-                        .to_owned();
+                    // Keep the native canonical PathBuf for file IO and cleanup.
+                    // Only the argument passed to Git uses its portable spelling.
+                    temp.path = bundle_git_path(&path)?;
                     OpenOptions::new()
                         .create_new(true)
                         .write(true)
@@ -537,6 +542,43 @@ impl BundleFile {
         }
         Err("Could not create a private bundle temporary directory".into())
     }
+}
+
+fn bundle_git_path(path: &Path) -> Result<String, String> {
+    let native = path.to_str().ok_or("Temporary path is not UTF-8")?;
+    #[cfg(windows)]
+    return windows_bundle_path(native);
+    #[cfg(not(windows))]
+    Ok(native.to_owned())
+}
+
+/// Convert only recognized Win32 verbatim drive/UNC prefixes. Never remove a
+/// generic device namespace, resolve dot components, or recanonicalize a link.
+#[cfg(any(windows, test))]
+fn windows_bundle_path(native: &str) -> Result<String, String> {
+    let normalized = native.replace('\\', "/");
+    if let Some(path) = normalized.strip_prefix("//?/") {
+        if path
+            .get(..4)
+            .is_some_and(|p| p.eq_ignore_ascii_case("UNC/"))
+        {
+            let network = &path[4..];
+            let mut parts = network.split('/');
+            if parts.next().is_none_or(str::is_empty) || parts.next().is_none_or(str::is_empty) {
+                return Err("The temporary UNC path needs both a server and share".into());
+            }
+            return Ok(format!("//{network}"));
+        }
+        let bytes = path.as_bytes();
+        if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1..3] == *b":/" {
+            return Ok(path.into());
+        }
+        return Err("Git cannot open this temporary Windows device namespace".into());
+    }
+    if normalized.starts_with("//./") {
+        return Err("Git cannot open this temporary Windows device namespace".into());
+    }
+    Ok(normalized)
 }
 impl Drop for BundleFile {
     fn drop(&mut self) {
