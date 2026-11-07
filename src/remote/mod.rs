@@ -15,6 +15,7 @@ mod fs;
 mod pool;
 mod session;
 mod shell;
+mod supervisor;
 mod transport;
 mod ui_guard;
 mod vault;

@@ -548,7 +548,7 @@ pub fn is_missing_folder(stderr: &[u8]) -> bool {
 
 /// `req` as one `sh` command: in a subshell, so its folder and variables stay its own, with
 /// `redirects` applied to it.
-fn inline(req: &Request, redirects: &str) -> String {
+pub(super) fn inline(req: &Request, redirects: &str) -> String {
     let mut s = String::from("(");
     if let Some(cwd) = &req.cwd {
         let path = sh_path(cwd);
