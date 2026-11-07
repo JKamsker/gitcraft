@@ -21,6 +21,14 @@ pub struct Project {
 }
 
 impl Project {
+    fn hosting(&self) -> forge::Hosting {
+        forge::Hosting {
+            forge: self.forge,
+            host: self.host.split(':').next().unwrap_or(&self.host).to_owned(),
+            path: self.path.clone(),
+            web: format!("https://{}", self.host),
+        }
+    }
     pub fn of(forge: Forge, remotes: &[Remote]) -> Option<Self> {
         // Builds are read through `gh` and `glab`; Forgejo's and Gitea's aren't yet.
         if !matches!(forge, Forge::GitHub | Forge::GitLab) {

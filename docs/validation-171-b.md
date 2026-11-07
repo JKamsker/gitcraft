@@ -149,3 +149,37 @@ other areas; shared load.rs, messages.rs, mod.rs and graph files need merge revi
   diff checks pass; only existing dead_code warnings remain.
 - Evidence: `/tmp/gitcraft-review8/area-b-fixes/{before.log,after.log,focused.log,inventory.txt,clippy.log}`.
   No live forge writes, UI layout changes, CI changes, PR, or dev merge were needed.
+
+## Review 9: explicit provider destinations
+
+- [x] GitHub and GitLab provider entry points, including PR/MR lists, merged/find,
+  create/reviewers, details/threads/reviews/comments, retarget, issues, inbox,
+  forks, CI reads/mutations, release lookup/create and assets, require the captured
+  `Hosting` at the CLI process boundary. Repository commands name the selected
+  repository; API commands name its host and use explicit project paths/GraphQL
+  variables. No production CLI entry point can infer a destination from cwd.
+- [x] Cross-host secondary remotes are supported. SSH tabs re-read the catalog and
+  require the selected host AND path to remain present; removed/invalid targets
+  fail without falling back to origin. Custom SSH hosts require a configured CLI
+  login; inherited global token variables cannot establish host trust.
+- [x] Same-number fork/upstream isolation is checked at the prepared Command, and
+  stale details cannot construct a mutation target for a different repository
+  on GitHub, Forgejo or Gitea. Local Git remote/upstream/pushDefault configuration
+  remains byte-for-byte unchanged in a real repository regression.
+- [x] Command syntax verified with installed `gh --help` for every used API, PR,
+  issue, release and run command. `gh api` uses `--hostname`, while repository
+  commands take `--repo [HOST/]OWNER/REPO`. `glab` is not installed; checked its
+  official command docs individually for api, mr list/create/update, issue
+  list/view and release view/create/upload. API takes `--hostname` and no
+  `--repo`; the others accept `--repo` with a full URL, retaining nested groups
+  and HTTP ports. Upload switches are inserted before the `--` filename marker.
+  References: https://cli.github.com/manual/gh_api,
+  https://docs.gitlab.com/cli/api/ and the corresponding command pages under
+  https://docs.gitlab.com/cli/.
+- Evidence: `/tmp/gitcraft-review9/area-b/before.log` contains the original
+  implementation's failing process-boundary regression (1 test, 1 failed).
+  `after-providers.log` contains 10 passing recording-only regressions, with
+  argv, target environment and stdin assertions. No gh/glab process executes in
+  these tests; mutation coverage performs no live forge writes.
+- This follow-up changes routing/state only. Existing area-B screenshots remain
+  under `/tmp/gitcraft-167-171/area-b/`; no layout change needs new screenshots.

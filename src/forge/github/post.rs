@@ -72,7 +72,7 @@ fn ref_tip(answer: &str) -> Option<String> {
 /// A pull request on GitHub to say something on.
 pub(super) struct GitHubTarget {
     repo: PathBuf,
-    host: String,
+    hosting: super::Hosting,
     /// `owner/name`.
     path: String,
     number: u64,
@@ -85,11 +85,21 @@ pub(super) struct GitHubTarget {
 
 impl GitHubTarget {
     /// The pull request `details` of the repository at `repo`.
-    pub(super) fn of(repo: &Path, details: &PrDetails) -> Option<GitHubTarget> {
+    pub(super) fn of(
+        repo: &Path,
+        hosting: &super::Hosting,
+        details: &PrDetails,
+    ) -> Option<GitHubTarget> {
         let (host, path) = repo_of_url(&details.url)?;
+        if !host.eq_ignore_ascii_case(&hosting.host)
+            || !path.eq_ignore_ascii_case(&hosting.path)
+            || details.number == 0
+        {
+            return None;
+        }
         Some(GitHubTarget {
             repo: repo.to_owned(),
-            host,
+            hosting: hosting.clone(),
             path,
             number: details.number,
             head_oid: details.head_oid.clone(),
@@ -105,11 +115,8 @@ impl GitHubTarget {
         if payload.is_some() {
             args.extend(["--input", "-"]);
         }
-        if self.host != "github.com" {
-            args.extend(["--hostname", &self.host]);
-        }
         let input = payload.map(Value::to_string);
-        gh_with_input(&self.repo, &args, input.as_deref())
+        gh_with_input(&self.repo, &self.hosting, &args, input.as_deref())
     }
 
     /// Runs a mutation taking one `input`, and returns what GitHub answers.
@@ -118,11 +125,8 @@ impl GitHubTarget {
         let query =
             format!("mutation($input: {upper}!) {{ {name}(input: $input) {{ {answer} }} }}");
         let payload = json!({ "query": query, "variables": { "input": input } });
-        let mut args = vec!["api", "graphql", "--input", "-"];
-        if self.host != "github.com" {
-            args.extend(["--hostname", &self.host]);
-        }
-        let out = gh_with_input(&self.repo, &args, Some(&payload.to_string()))?;
+        let args = vec!["api", "graphql", "--input", "-"];
+        let out = gh_with_input(&self.repo, &self.hosting, &args, Some(&payload.to_string()))?;
         serde_json::from_str(&out).map_err(|e| format!("unexpected output of gh: {e}"))
     }
 
@@ -424,7 +428,12 @@ mod tests {
     fn target_without_extras() -> GitHubTarget {
         GitHubTarget {
             repo: PathBuf::new(),
-            host: "github.com".to_owned(),
+            hosting: super::super::Hosting {
+                forge: crate::forge::Forge::GitHub,
+                host: "github.com".into(),
+                path: "o/r".into(),
+                web: "https://github.com".into(),
+            },
             path: "o/r".to_owned(),
             number: 1,
             head_oid: "h".to_owned(),

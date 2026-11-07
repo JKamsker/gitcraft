@@ -18,6 +18,8 @@ mod gitlab;
 pub(crate) mod http;
 pub mod inbox;
 pub mod links;
+#[cfg(test)]
+mod routing_tests;
 pub mod stack;
 #[cfg(test)]
 mod stack_tests;
@@ -577,7 +579,8 @@ pub fn web_url(url: &str) -> Option<String> {
 
 /// Runs the command-line tool of `forge` (`gh`, `glab`) in `repo`, for what goes past pull
 /// requests (builds). Forgejo and Gitea have none gitcraft uses.
-pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<String, String> {
+    let forge = hosting.forge;
     let tool = match forge {
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
@@ -585,7 +588,7 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
             return Err(format!("gitcraft has no tool for {}", forge.name()));
         }
     };
-    cli::run(tool, forge.noun(), repo, args)
+    cli::run(tool, forge.noun(), repo, hosting, args)
 }
 
 /// Asks each of `reviewers` for a review of the pull request just opened at `url`, one at a
