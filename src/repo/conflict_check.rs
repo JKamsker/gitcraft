@@ -107,6 +107,9 @@ struct Inner {
     asked: u64,
     /// Counts [`ConflictChecks::forget`]s: what a worker started before one is not kept.
     generation: u64,
+    /// [`crate::mergiraf::changes`] when the checks were made: git set up to merge with
+    /// Mergiraf, or set back, changes what merges cleanly.
+    mergiraf_changes: u32,
 }
 
 /// A check, as [`Inner::entries`] keeps it.
@@ -134,6 +137,14 @@ const MAX_QUEUE: usize = 32;
 const RETRY: Duration = Duration::from_secs(30);
 
 impl Inner {
+    /// Forgets every check, those running included (see [`ConflictChecks::forget`]).
+    fn forget(&mut self) {
+        self.entries.clear();
+        self.queue.clear();
+        self.repo_info = None;
+        self.generation += 1;
+    }
+
     /// Forgets the checks waiting for a worker that are about another HEAD than `head`: the
     /// branch moved on, and menus only ask about the current one.
     fn drop_stale(&mut self, head: &str) {
@@ -187,10 +198,7 @@ impl ConflictChecks {
     /// on `.gitattributes` and git's config, which the commits don't capture.
     pub fn forget(&self) {
         if let Ok(mut inner) = self.inner.lock() {
-            inner.entries.clear();
-            inner.queue.clear();
-            inner.repo_info = None;
-            inner.generation += 1;
+            inner.forget();
         }
     }
 }
@@ -211,6 +219,12 @@ impl ConflictChecks {
         let Ok(mut inner) = self.inner.lock() else {
             return Check::Failed("the conflict check stopped".to_owned());
         };
+        // Mergiraf's set-up changed (Settings → Git): every answer may have.
+        let mergiraf_changes = crate::mergiraf::changes();
+        if inner.mergiraf_changes != mergiraf_changes {
+            inner.forget();
+            inner.mergiraf_changes = mergiraf_changes;
+        }
         inner.asked += 1;
         let asked = inner.asked;
         let retry = |e: &Entry| e.failed.is_some_and(|at| at.elapsed() >= RETRY);

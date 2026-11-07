@@ -169,6 +169,12 @@ pub fn found(ctx: &egui::Context) -> Option<Found> {
     state(ctx).found
 }
 
+/// Counts the changes gitcraft made to Mergiraf's set-up (installed, git set up to merge with
+/// it or set back): what git merges cleanly may differ after one.
+pub fn changes() -> u32 {
+    FORGOTTEN.load(Ordering::Acquire)
+}
+
 fn forget() {
     if let Ok(mut cache) = STATE.lock() {
         FORGOTTEN.fetch_add(1, Ordering::AcqRel);
