@@ -548,6 +548,7 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     let kept = tab.last_op.as_ref().map(|op| op.ops.clone());
     let creds = git::Credentials {
+        scope: None,
         username: "u".to_owned(),
         password: "p".to_owned(),
     };
@@ -621,6 +622,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     tab.dialog = None;
     let after_cancel = tab.timeline.current;
     let creds = git::Credentials {
+        scope: None,
         username: "u".to_owned(),
         password: "p".to_owned(),
     };

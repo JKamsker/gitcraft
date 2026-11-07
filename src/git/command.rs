@@ -683,6 +683,8 @@ pub fn run_naming_hooks(
 pub struct Credentials {
     pub username: String,
     pub password: String,
+    /// None is legacy/unbound state and is refused by all transient helpers.
+    pub scope: Option<super::CredentialScope>,
 }
 
 /// A credential helper that answers git's `get` from the environment, so the secret never shows
@@ -690,7 +692,7 @@ pub struct Credentials {
 /// asks them to store what this one gave.
 /// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
 /// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
-const ENV_HELPER: &str = "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f";
+const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
 
 /// [`run`], answering a credential request with `creds` when given.
 pub fn run_with(
@@ -774,22 +776,23 @@ pub fn is_auth_error(err: &str) -> bool {
 
 /// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
 /// `creds` given to git when there are some.
-fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
+fn extra_for(
+    dir: Option<&Path>,
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> Result<Extra, String> {
     let mut extra = if quiet {
         unattended_extra(cfg!(unix) || dir.is_some_and(remote::is_remote))
     } else {
         Extra::default()
     };
     if let Some(c) = creds {
-        extra.pre.extend(["-c", ENV_HELPER]);
         extra
-            .env
-            .push(("GITCRAFT_GIT_USERNAME", c.username.clone()));
-        extra
-            .env
-            .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
+            .pre
+            .extend(["-c", "credential.useHttpPath=true", "-c", ENV_HELPER]);
+        extra.env.extend(c.helper_environment()?);
     }
-    extra
+    Ok(extra)
 }
 
 fn run_inner_extra(
@@ -800,7 +803,7 @@ fn run_inner_extra(
     quiet: bool,
     timeout: Option<std::time::Duration>,
 ) -> Result<String, String> {
-    let mut extra = extra_for(dir, creds, quiet);
+    let mut extra = extra_for(dir, creds, quiet)?;
     extra.timeout = timeout;
     finish(execute(dir, &extra, args)?, args, ok)
 }
@@ -812,7 +815,7 @@ fn run_extra(
     creds: Option<&Credentials>,
     mut extra: Extra,
 ) -> Result<String, String> {
-    let credentials = extra_for(dir, creds, false);
+    let credentials = extra_for(dir, creds, false)?;
     extra.pre.extend(credentials.pre);
     extra.env.extend(credentials.env);
     finish(execute(dir, &extra, args)?, args, ok)
@@ -837,7 +840,7 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
-    let extra = extra_for(dir, creds, quiet);
+    let extra = extra_for(dir, creds, quiet)?;
     finish(execute(dir, &extra, args)?, args, ok)
 }
 
@@ -906,7 +909,15 @@ fn run_inner_recorded(
     quiet: bool,
 ) -> (Result<String, String>, Recorded) {
     let started = std::time::Instant::now();
-    let mut extra = extra_for(dir, creds, quiet);
+    let mut extra = match extra_for(dir, creds, quiet) {
+        Ok(extra) => extra,
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, started),
+            );
+        }
+    };
     extra.trace_hooks = !quiet && super::hooks::wants_trace(args);
     let out = match execute(dir, &extra, args) {
         Ok(out) => out,
@@ -1001,7 +1012,8 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     if !out.status.success() {
         return None;
     }
-    parse_credentials(&String::from_utf8_lossy(&out.stdout))
+    let found = parse_credentials(&String::from_utf8_lossy(&out.stdout))?;
+    Credentials::for_url(url, found.username, found.password).ok()
 }
 
 /// The name and password in what `git credential fill` prints.
@@ -1012,7 +1024,11 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
             .map(str::to_owned)
     };
     let (username, password) = (field("username")?, field("password")?);
-    (!password.is_empty()).then_some(Credentials { username, password })
+    (!password.is_empty()).then_some(Credentials {
+        username,
+        password,
+        scope: None,
+    })
 }
 
 /// Bounded, non-fetching preparation for opt-in local syntax comparison.
@@ -1186,6 +1202,10 @@ mod tests {
                 "credential",
                 "fill",
             ])
+            .env("GITCRAFT_CREDENTIAL_PROTOCOL", "https")
+            .env("GITCRAFT_CREDENTIAL_HOST", "example.invalid:443")
+            .env("GITCRAFT_CREDENTIAL_DEFAULT_HOST", "example.invalid")
+            .env("GITCRAFT_CREDENTIAL_PATH", "")
             .env("GITCRAFT_GIT_USERNAME", user)
             .env("GITCRAFT_GIT_PASSWORD", pass)
             .stdin(Stdio::piped())
@@ -1331,6 +1351,10 @@ mod tests {
                 "credential",
                 "fill",
             ])
+            .env("GITCRAFT_CREDENTIAL_PROTOCOL", "https")
+            .env("GITCRAFT_CREDENTIAL_HOST", "example.invalid:443")
+            .env("GITCRAFT_CREDENTIAL_DEFAULT_HOST", "example.invalid")
+            .env("GITCRAFT_CREDENTIAL_PATH", "")
             .env("GITCRAFT_GIT_USERNAME", "nancy")
             .env("GITCRAFT_GIT_PASSWORD", "secret")
             .stdin(Stdio::piped())
