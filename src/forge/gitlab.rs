@@ -17,8 +17,8 @@ pub(super) struct GitLab;
 const TOOL: &str = "glab";
 
 impl GitLab {
-    fn run(&self, repo: &Path, args: &[&str]) -> Result<String, String> {
-        cli::run(TOOL, self.noun(), repo, args)
+    fn run(&self, repo: &Path, hosting: &Hosting, args: &[&str]) -> Result<String, String> {
+        cli::run(TOOL, self.noun(), repo, hosting, args)
     }
 }
 
@@ -35,13 +35,13 @@ impl Provider for GitLab {
         host.contains("gitlab")
     }
 
-    fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
+    fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
         // glab gives 30 at a time otherwise; 100, as GitHub's and Forgejo's lists have.
         let args = ["mr", "list", "--output", "json", "--per-page", "100"];
-        parse_list(&self.run(repo, &args)?)
+        parse_list(&self.run(repo, hosting, &args)?)
     }
 
-    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
+    fn merged(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
         let args = [
             "mr",
             "list",
@@ -52,10 +52,15 @@ impl Provider for GitLab {
             "100",
         ];
         let pointers = ["/iid", "/source_branch", "/sha", "/target_branch"];
-        super::parse_merged(&self.run(repo, &args)?, pointers, TOOL)
+        super::parse_merged(&self.run(repo, hosting, &args)?, pointers, TOOL)
     }
 
-    fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
+    fn create(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        new: &NewPullRequest,
+    ) -> Result<String, String> {
         let mut args = vec![
             "mr",
             "create",
@@ -72,7 +77,7 @@ impl Provider for GitLab {
         if new.draft {
             args.push("--draft");
         }
-        let out = self.run(repo, &args)?;
+        let out = self.run(repo, hosting, &args)?;
         let url = out
             .split_whitespace()
             .find(|w| w.starts_with("http"))
@@ -87,6 +92,7 @@ impl Provider for GitLab {
         super::ask_reviewers(url, &accounts, |who| {
             self.run(
                 repo,
+                hosting,
                 &["mr", "update", &iid, "--reviewer", &format!("+{who}")],
             )
             .map(|_| ())
@@ -94,7 +100,7 @@ impl Provider for GitLab {
     }
 
     /// `@me` is the account `glab` is signed in to for the host.
-    fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {
+    fn assigned_issues(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<Issue>, String> {
         let max = super::ISSUES_MAX.to_string();
         let args = [
             "issue",
@@ -105,13 +111,13 @@ impl Provider for GitLab {
             "--per-page",
             &max,
         ];
-        parse_issues(&cli::run(TOOL, "issue", repo, &args)?)
+        parse_issues(&cli::run(TOOL, "issue", repo, hosting, &args)?)
     }
 
-    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
+    fn issue(&self, repo: &Path, hosting: &Hosting, number: u64) -> Result<Issue, String> {
         let number = number.to_string();
         let args = ["issue", "view", &number, "--output", "json"];
-        let out = cli::run(TOOL, "issue", repo, &args)?;
+        let out = cli::run(TOOL, "issue", repo, hosting, &args)?;
         let value: Value =
             serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
         parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
@@ -122,7 +128,9 @@ impl Provider for GitLab {
     /// with its notes.
     fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
         const MAX: usize = 50;
-        let run = |args: &[&str]| cli::run_within(TOOL, self.noun(), repo, args, inbox::TOOL_FOR);
+        let run = |args: &[&str]| {
+            cli::run_within(TOOL, self.noun(), repo, hosting, args, inbox::TOOL_FOR)
+        };
         let list = |who: &str| {
             let max = MAX.to_string();
             run(&["mr", "list", who, "--output", "json", "--per-page", &max])
@@ -169,7 +177,7 @@ impl Provider for GitLab {
     fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
         let project = hosting.path.replace('/', "%2F");
         let host = api_authority(hosting);
-        let api = |endpoint: &str| self.run(repo, &["api", "--hostname", &host, endpoint]);
+        let api = |endpoint: &str| self.run(repo, hosting, &["api", "--hostname", &host, endpoint]);
         let mut list = super::forks::parse_gitlab(&api(&format!(
             "projects/{project}/merge_requests?state=opened&per_page=100"
         ))?)?;
@@ -191,7 +199,13 @@ impl Provider for GitLab {
         Ok(list)
     }
 
-    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+    fn retarget(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+        base: &str,
+    ) -> Result<(), String> {
         let number = number.to_string();
         let args = [
             "mr",
@@ -201,10 +215,10 @@ impl Provider for GitLab {
             base,
             "--yes",
         ];
-        self.run(repo, &args).map(drop)
+        self.run(repo, hosting, &args).map(drop)
     }
 
-    fn find(&self, repo: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+    fn find(&self, repo: &Path, hosting: &Hosting, branch: &str) -> Result<Option<Found>, String> {
         let args = [
             "mr",
             "list",
@@ -216,7 +230,7 @@ impl Provider for GitLab {
             "--per-page",
             "20",
         ];
-        let out = self.run(repo, &args)?;
+        let out = self.run(repo, hosting, &args)?;
         let states: Vec<PrState> = serde_json::from_str::<Value>(&out)
             .ok()
             .and_then(|v| v.as_array().cloned())
@@ -245,7 +259,10 @@ impl Provider for GitLab {
     ) -> Result<String, String> {
         let url = format!("{}/{}/-/releases/{}", hosting.web, hosting.path, new.tag);
         // Made already: that one.
-        if self.run(repo, &["release", "view", new.tag]).is_ok() {
+        if self
+            .run(repo, hosting, &["release", "view", new.tag])
+            .is_ok()
+        {
             return Ok(url);
         }
         // The notes from a file: a long history would not fit a command line.
@@ -258,6 +275,7 @@ impl Provider for GitLab {
         let path = notes.to_string_lossy().into_owned();
         let made = self.run(
             repo,
+            hosting,
             &[
                 "release",
                 "create",
@@ -275,13 +293,13 @@ impl Provider for GitLab {
     fn upload_assets(
         &self,
         repo: &Path,
-        _: &Hosting,
+        hosting: &Hosting,
         tag: &str,
         files: &[std::path::PathBuf],
     ) -> Result<(), String> {
         // One at a time: one sent already (a resumed upload) is passed over.
         for path in super::path_args(files) {
-            match self.run(repo, &["release", "upload", tag, &path]) {
+            match self.run(repo, hosting, &["release", "upload", tag, &path]) {
                 Err(e) if e.to_lowercase().contains("already") => {}
                 other => {
                     other?;
@@ -312,7 +330,7 @@ fn gitlab_reviewers(reviewers: &[String]) -> Vec<String> {
 
 /// Where a self-hosted GitLab's API is: its host, with the port of an `https://host:8443/…`
 /// remote (its web pages and API are on that port too).
-fn api_authority(hosting: &Hosting) -> String {
+pub(super) fn api_authority(hosting: &Hosting) -> String {
     hosting
         .web
         .split_once("://")

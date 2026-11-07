@@ -35,9 +35,10 @@ impl GiteaTarget {
         hosting: &Hosting,
         details: &PrDetails,
     ) -> Option<GiteaTarget> {
-        // The repository as the forge names it, which the remote may spell otherwise; the remote's
-        // own only when the pull request's address doesn't say.
-        let path = repo_of_url(&details.url).map_or_else(|| hosting.path.clone(), |(_, path)| path);
+        let (host, path) = repo_of_url(&details.url)?;
+        if !host.eq_ignore_ascii_case(&hosting.host) || !path.eq_ignore_ascii_case(&hosting.path) {
+            return None;
+        }
         Some(GiteaTarget {
             api,
             name,
@@ -363,6 +364,34 @@ fn branch_tip(branch: &Value) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_boundary_stale_details_cannot_retarget_gitea_or_forgejo() {
+        for forge in [crate::forge::Forge::Gitea, crate::forge::Forge::Forgejo] {
+            let h = Hosting {
+                forge,
+                host: "forge.test".into(),
+                path: "fork/project".into(),
+                web: "https://forge.test".into(),
+            };
+            for (url, expected) in [
+                ("https://forge.test/fork/project/pulls/7", true),
+                ("https://forge.test/upstream/project/pulls/7", false),
+                ("https://other.test/fork/project/pulls/7", false),
+            ] {
+                let details = PrDetails {
+                    number: 7,
+                    url: url.into(),
+                    ..Default::default()
+                };
+                let api = Api::new("Gitea", &h.web, &h.host, None);
+                assert_eq!(
+                    GiteaTarget::of(api, "Gitea", &h, &details).is_some(),
+                    expected
+                );
+            }
+        }
+    }
 
     /// Only "still testing it" is waited out; any other refusal of a merge is said at once.
     #[test]
