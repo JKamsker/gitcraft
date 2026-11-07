@@ -32,7 +32,7 @@ use serde_json::{Value, json};
 
 use super::http::{Api, Login};
 use super::inbox::Answer;
-use super::{Forge, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest};
+use super::{Forge, ForkInfo, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -131,6 +131,12 @@ impl Provider for GiteaFamily {
 
     fn pages(&self) -> Option<&dyn Pages> {
         Some(self)
+    }
+
+    fn forks(&self, _: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        let endpoint = format!("repos/{}/pulls?state=open", hosting.path);
+        let items = self.api(hosting).get_all(&endpoint, 100)?;
+        Ok(items.iter().map(super::forks::gitea_one).collect())
     }
 }
 

@@ -375,6 +375,7 @@ impl RepoTab {
             Action::Owners(act) => self.owners_act(act, ctx),
             Action::Rerere(act) => self.rerere_act(act, ctx),
             Action::Decisions(act) => self.decisions_act(act, ctx),
+            Action::Fork(act) => self.fork_act(act, ctx),
         }
     }
 

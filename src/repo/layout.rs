@@ -28,6 +28,7 @@ impl RepoTab {
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
         self.dco_frame(&ctx);
         self.owners_frame(&ctx);
+        self.forks_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);

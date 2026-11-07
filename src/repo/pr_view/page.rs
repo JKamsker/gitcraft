@@ -92,6 +92,20 @@ impl RepoTab {
                             false,
                         );
                     });
+                    if self.has_fork_items(details.number) {
+                        ui.horizontal_wrapped(|ui| {
+                            self.fork_items(ui, acts, details.number, idle, true);
+                        });
+                    } else if let Some(e) = self.forks.error() {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Couldn't tell where the pull requests come from: {}",
+                                e.lines().next().unwrap_or_default()
+                            ))
+                            .color(t.text_faint)
+                            .small(),
+                        );
+                    }
                 });
             ui.separator();
         }

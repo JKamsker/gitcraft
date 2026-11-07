@@ -12,7 +12,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::inbox;
-use super::{Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{ForkInfo, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -24,6 +24,15 @@ const NOUN: &str = "pull request";
 
 fn gh(repo: &Path, args: &[&str]) -> Result<String, String> {
     cli::run(TOOL, NOUN, repo, args)
+}
+
+/// `gh api …` about the repository's host (GitHub Enterprise named with `--hostname`).
+fn api(repo: &Path, hosting: &Hosting, args: &[&str]) -> Result<String, String> {
+    let mut args = args.to_vec();
+    if hosting.host != "github.com" {
+        args.extend(["--hostname", &hosting.host]);
+    }
+    gh(repo, &args)
 }
 
 /// [`gh`], with `input` on its stdin.
@@ -103,6 +112,41 @@ impl Provider for GitHub {
 
     fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
         issues::one(repo, number)
+    }
+
+    fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        let fields = "number,isCrossRepository,maintainerCanModify,headRepositoryOwner,\
+                      headRepository,headRefName,headRefOid,baseRefName";
+        let out = gh(
+            repo,
+            &[
+                "pr", "list", "--state", "open", "--limit", "100", "--json", fields,
+            ],
+        )?;
+        let mut list = super::forks::parse_github_list(&out, &hosting.host)?;
+        // Who is new to the repository is only in the REST list; without it, nobody is marked.
+        let endpoint = format!("repos/{}/pulls?state=open&per_page=100", hosting.path);
+        if let Ok(rest) = api(repo, hosting, &["api", &endpoint])
+            && let Ok(first) = super::forks::github_first_timers(&rest)
+        {
+            for info in &mut list {
+                info.first_time = first.contains(&info.number);
+            }
+        }
+        Ok(list)
+    }
+
+    fn waiting_runs(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<(String, u64)>, String> {
+        let endpoint = format!(
+            "repos/{}/actions/runs?status=action_required&per_page=100",
+            hosting.path
+        );
+        super::forks::parse_waiting_runs(&api(repo, hosting, &["api", &endpoint])?)
+    }
+
+    fn approve_run(&self, repo: &Path, hosting: &Hosting, run: u64) -> Result<(), String> {
+        let endpoint = format!("repos/{}/actions/runs/{run}/approve", hosting.path);
+        api(repo, hosting, &["api", "-X", "POST", &endpoint]).map(|_| ())
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each

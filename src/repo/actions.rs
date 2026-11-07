@@ -341,6 +341,8 @@ pub(crate) enum Action {
     Rehearse(super::rehearse::RehearseAct),
     /// Test commits for the test lane, stop them, show what one printed.
     TestLane(super::test_lane::LaneAct),
+    /// Something done on a pull request from a fork.
+    Fork(super::forks::ForkAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
@@ -620,6 +622,14 @@ impl RepoTab {
             ));
         }
         items.extend(self.decision_palette_items());
+        let unused = self.forks.unused().len();
+        if unused > 0 {
+            items.push((
+                format!("Remove unused fork remotes ({unused})"),
+                "remote".into(),
+                Action::Fork(super::forks::ForkAct::Tidy),
+            ));
+        }
         if !self.submodules.is_empty() {
             items.push((
                 "Update submodules".into(),

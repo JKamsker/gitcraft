@@ -131,6 +131,12 @@ impl RepoTab {
             self.push_flow.banner = Some(Banner::Detached);
             return;
         };
+        if let Some(mut args) = super::forks::plan::renamed_push(self.forks.setup(), &current) {
+            args.insert(1, "--porcelain".to_owned());
+            let attempt = Attempt { label: label.to_owned(), branch: current, target: None, commit: None, publish: false, done };
+            self.start_push(attempt, vec![args], ctx);
+            return;
+        }
         if self.tracks(&current) {
             let attempt = Attempt {
                 label: label.to_owned(),

@@ -432,6 +432,23 @@ so your config, credentials and hooks apply as usual.
   as seen. In the list (every forge, GitLab too) a request that changed says _changed since you
   last looked_, and its menu has _What changed since you last looked_ and _Mark as seen_. A
   request that only moved onto a newer base, every commit the same, says so quietly.
+- Pull requests from forks (GitHub, GitLab, Forgejo, Gitea): the list marks those with workflow
+  runs awaiting a maintainer's approval (GitHub; _Approve and run_ in the menu, chosen twice, as
+  it runs the contributor's code on your CI), those whose author lets maintainers push to their
+  branch (_can edit_) and first-time contributors (GitHub, GitLab). _Check out to push to ann_
+  (in the menu, and on the pull request's page) adds the fork as a remote named after its owner
+  (or uses the remote that already is it, by its URL), reached like `origin` (SSH or HTTPS),
+  fetches the branch, checks it out tracking it and sets `branch.<name>.pushRemote`, so that
+  Push sends your fixes back to the contributor's branch. When the branch's name is taken here
+  it is checked out as `ann/branch`, and Push sends it to theirs by name. A remote added this
+  way is marked `remote.<name>.gitcraftFork`. Ctrl+Z goes back, deleting the branch and the
+  remote it added (refused once the branch has commits of yours). _Rebase onto main and push to
+  ann_ fetches the base and their branch, refuses if they pushed commits you haven't, rebases,
+  then force-pushes to their fork with a lease, after showing what it will do; if the rebase
+  stops on conflicts, the push is offered once it is continued. Ctrl+Z puts the branch back on
+  their fork and here. _Remove unused fork remotes_ (in the palette when there are some) takes
+  out the marked remotes no branch uses any more, keeping those whose branches hold commits no
+  branch here has (Ctrl+Z adds them back).
 - Tags: create (light or annotated, optionally pushed), push, delete locally or on the remote.
 - CODEOWNERS: the file at HEAD, found where the forge of `origin` looks for it (GitHub:
   `.github/`, the root, `docs/`; GitLab: the root, `docs/`, `.gitlab/`; Gitea: the root, `docs/`,
@@ -1145,6 +1162,8 @@ was made this way, on a demo repository.
 | `src/pr_threads.rs` | review threads, the pending review and permissions                          |
 | `src/codeowners/` | CODEOWNERS of GitHub, GitLab and Gitea / Forgejo: where each looks, its patterns, who owns a file, the check |
 | `src/repo/owners/` | CODEOWNERS in the tab: owners on file rows, who a change needs, reviewers to suggest, the check's window |
+| `src/forge/forks.rs` | where each forge's pull requests come from (forks), what their authors allow, runs awaiting approval |
+| `src/repo/forks/` | pull requests from forks: badges, checking out to push to the contributor, rebase and push, tidying fork remotes |
 | `src/avatars.rs`         | avatars from GitHub, Forgejo / Gitea, GitLab or Gravatar, cached on disk           |
 | `src/update.rs`          | new-release check                                                                  |
 | `src/desktop_entry.rs`   | applications menu entry for the AppImage                                           |

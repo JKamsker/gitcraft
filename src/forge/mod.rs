@@ -9,6 +9,8 @@
 
 mod cli;
 pub(crate) use cli::tool_location;
+mod forks;
+pub use forks::ForkInfo;
 mod gitea;
 mod github;
 mod gitlab;
@@ -254,6 +256,29 @@ pub trait Provider: Sync {
     /// The page of one pull request, if gitcraft has one for this forge.
     fn pages(&self) -> Option<&dyn Pages> {
         None
+    }
+
+    /// Where each open pull request's branch is (a fork or the repository itself), and what its
+    /// author allows.
+    fn forks(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
+        Err(format!(
+            "{} can't say where its {}s come from",
+            self.name(),
+            self.noun()
+        ))
+    }
+
+    /// The workflow runs waiting for a maintainer's approval: `(commit, run id)`.
+    fn waiting_runs(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<(String, u64)>, String> {
+        Ok(Vec::new())
+    }
+
+    /// Approves the workflow run `run`, which then runs.
+    fn approve_run(&self, _repo: &Path, _hosting: &Hosting, _run: u64) -> Result<(), String> {
+        Err(format!(
+            "{} has no runs to approve from gitcraft",
+            self.name()
+        ))
     }
 }
 

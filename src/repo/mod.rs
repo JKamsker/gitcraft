@@ -43,6 +43,7 @@ mod find;
 mod graph_order;
 mod ghost;
 mod fold;
+pub(crate) mod forks;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
@@ -225,6 +226,8 @@ pub struct RepoTab {
     fence: fence_view::FenceState,
     /// The scope drift window of a worktree, while it is open.
     drift: Option<drift_view::DriftView>,
+    /// Where the pull requests come from (forks), and how their branches are set up here.
+    forks: forks::Forks,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -497,6 +500,7 @@ impl RepoTab {
             owners: owners::Owners::default(),
             fence: Default::default(),
             drift: None,
+            forks: forks::Forks::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
