@@ -1,0 +1,75 @@
+{
+  "commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+  "remote_commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+  "remote_ref": "refs/heads/codex/encrypted-diffs",
+  "branch": "codex/encrypted-diffs",
+  "tree": "024db91797a13fd7d1a28f67faa497c3b7f9b6f4",
+  "parent_checkpoint": "2528738ff76f6d1bb04b2c8d5a109a1adb5db22e",
+  "reviewed_integration_base": "4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "clean": true,
+  "unit_status": "STATIC ONLY; SOPS WIP RUNTIME UNVALIDATED; COMPILE QUARANTINE RETAINED",
+  "removed": [
+    "host process-table selector and PID signal loop",
+    "remote plaintext runner and framing APIs",
+    "executing remote-watchdog fixture"
+  ],
+  "runtime_design": "Ciphertext via reviewed Git transport; proposed SOPS/keys only on local UI computer, neutral local cwd and fixed argv. Not executed in this unit.",
+  "quarantine_guards": [
+    "src/repo/diff/encrypted/mod.rs",
+    "src/repo/diff/encrypted/tool.rs"
+  ],
+  "remote_sources_match_green_byte_for_byte": [
+    "src/remote/mod.rs",
+    "src/remote/session.rs"
+  ],
+  "static_validation": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p test_sops_safety.py -v",
+    "passed": 11,
+    "failed": 0,
+    "exhaustive_synthetic_parent_graphs": 216,
+    "log": "/workspace/work/sops-static-safety.log",
+    "log_sha256": "48ec69023e524cde5c110a4ee21cc851e81aff47dd35ddcaa4451f1e2c09ef11",
+    "recording_sink_only": true,
+    "live_pid_inspection": false,
+    "actual_signals": false,
+    "cargo_or_production_fixtures_run": false,
+    "coverage": [
+      "owned live root receipt",
+      "PID0/1/negative refusal",
+      "ancestor/sibling/unrelated exclusion",
+      "foreign owner and containment escapes",
+      "unknown/cyclic ancestry",
+      "duplicate handles and reused PID-label ambiguity",
+      "record order independence",
+      "recording sink target/action refusal",
+      "AST capability exclusion",
+      "quarantine, local-only tool and deleted remote-API source checks"
+    ]
+  },
+  "changed_files": {
+    "README.md": "75b7419ccc6ffda4c40b57b9776a2fd9cb2c9a386e09154579f81cc2c66e16d4",
+    "src/manual.rs": "b3f98c1ac02d93e0323c2867a064ad4c5385c1e2e89fe09e791dd130aaba3b47",
+    "src/remote/mod.rs": "eb45e3701fd6648c547c49fedf5f995a05ac7e5e56822eb3c148de2f6755445d",
+    "src/remote/session.rs": "99f260e75cc7b34313fa388f84f2e916068603bd321e34758634f65e923709e9",
+    "src/repo/diff/encrypted/SAFETY.md": "300214743e70fe4ccff1798873abacce7c75b17e9e9117e1bebc264be8483636",
+    "src/repo/diff/encrypted/mod.rs": "84c0c057bc0ed5033634001659b9659e0d66b3cf9eb987dd34ee376739be5859",
+    "src/repo/diff/encrypted/tests.rs": "3af763d3cb55bf7e0a1fe349f4f61c686f0c73f651f8c430abdf77ac5c15c05e",
+    "src/repo/diff/encrypted/tool.rs": "f5c2b731d6d05617f3856e0e39af3611553c030e809604615d0dd95c0724488e",
+    "src/repo/diff/encrypted/view.rs": "ed7e9f96fd619aa3c9ef7fe47e6530f28ddaf383f8eca20e6dec42fe04056793",
+    "src/repo/diff/view.rs": "c45747cdae3a4fcdae7b204ef3504b84c7214aa113dc7e40d6cdb25bb71237fb",
+    "tools/sops_safety.py": "34b165f05f6f06c5795f2dde7adc736934342000c7ba1228b59b75158cbc70b2",
+    "tools/test_sops_safety.py": "4e55056beca1c21e916c2066d116af5d3e67d2e54b50f6782c4e2028a75961cb"
+  },
+  "commit_push_policy": "Completed static unit committed and pushed; ls-remote verified exact SHA before handoff. Per-command hooks disabled to prevent any project hook from invoking quarantined runtime tests.",
+  "pending": [
+    "Independent static review by another agent.",
+    "Explicit authorization for isolated owned-child/fixture execution.",
+    "Authorized quarantine removal, then formatting/strict Clippy/full private-target tests and immutable independent feature review.",
+    "Final giant PR remains gated; no PR created."
+  ],
+  "limitations": [
+    "Synthetic receipt is an explicit fixture premise, not self-authenticating production process authority.",
+    "Synthetic selector is not imported by the application and must never be connected to host numeric PID signals.",
+    "No runtime validation or feature-completion claim."
+  ]
+}

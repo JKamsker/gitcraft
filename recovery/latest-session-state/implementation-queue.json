@@ -1,0 +1,2250 @@
+{
+  "repository": "JKamsker/gitcraft",
+  "base": "74027116e8f20334716a6b1208717bb33c9c6280",
+  "total": 72,
+  "features": [
+    {
+      "issue": 32,
+      "title": "Rebase weather (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 7,
+        "title": "Rebase weather (M).",
+        "source_text": "- [ ] **Rebase weather (M).** In the interactive-rebase list, each row gets a sun, a cloud or a storm for whether it applies cleanly at that position. The icons update while you move a commit, so you see the storm before you drop it. Hovering a storm names the conflicting files and says whether Mergiraf solves them. The todo list is replayed in memory, debounced, with results cached by (parent tree, commit).\n  _Closest:_ [I-Rebase](https://github.com/13hakta/i-rebase), a VS Code extension with a manual \"check conflicts\" button based on file overlap.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Replay the current interactive-rebase todo after reorder/action changes, debounced and cached by parent-tree and commit.",
+          "Draw per-row clean/uncertain/conflict weather; show conflict paths and Mergiraf likelihood on hover.",
+          "Handle dropped/squashed/fixup/reword steps correctly, old Git capabilities, cancellation and stale results; no working-tree mutation."
+        ],
+        "dev_evidence": [
+          "src/repo/rebase.rs:63 RebaseEditor contains entries/head/id/starting only; no simulation/weather state or painter.",
+          "src/git/mod.rs:4 git modules contain no simulation module; full src search finds no weather."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing RebaseEditor and background RepoTab::then.",
+          "Open #59 (simulate) and #97 (dry_run) provide related engines but neither adds live todo-row weather; do not reimplement their named features.",
+          "Open #83 rebase editor drag/actions may conflict in shared view."
+        ]
+      },
+      "status": "integrated",
+      "agent": "implement_weather",
+      "branch": "codex/repository-weather",
+      "worktree": "/workspace/work/weather",
+      "commit": "a2b2f479756f27cf14e9e4e9500f23bc88af8068",
+      "reviewer": "audit_45_50",
+      "validation": "private fmt/clippy/test PASS647+3ignored650total",
+      "findings": [
+        "original attributes/process blockers fixed; budgettimeout leaves absentrowsChecking forever"
+      ],
+      "review_report": "/workspace/work/review-weather-a2b2f47.json"
+    },
+    {
+      "issue": 32,
+      "title": "Push preflight with identity guard (S\u2013M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 8,
+        "title": "Push preflight with identity guard (S\u2013M).",
+        "source_text": "- [ ] **Push preflight with identity guard (S\u2013M).** Before a push, a short checklist catches:\n  - a work email going to a personal remote (from the profile's author per host);\n  - unsigned commits when the profile signs;\n  - leftover `fixup!` or WIP commits;\n  - likely secrets;\n  - blobs over a few MB that belong in LFS;\n  - _force push drops 2 commits by someone else_.\n\n  Each item has a fix button (amend the author, autosquash, move to LFS), and Ctrl+Z undoes it.\n  _Closest:_ hook-based checks such as [Git::MoreHooks](https://metacpan.org/pod/Git::MoreHooks::CheckCommitAuthorFromMailmap). None is in a GUI, and none knows about profiles.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Before push, inspect outgoing commits and actual push destination for profile email mismatch, unsigned commits under a signing profile, fixup/WIP subjects, likely secrets, oversized blobs and other authors' commits removed by a force push.",
+          "Show findings with evidence and fix actions (author amend, autosquash, LFS migration); fixes enter undo. Guard stale refs/lease and avoid storing secret contents."
+        ],
+        "dev_evidence": [
+          "src/repo/commands.rs:218 push immediately calls run_ops; no outgoing-content checklist.",
+          "src/settings/profiles.rs and signing.rs provide identities/signing but no remote-identity preflight."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing profile identity/signing and undo operations.",
+          "Open #57 handles rejected pushes and leases; #96 DCO is distinct; #106 LFS tools and #52/#134 autosquash helpers could be reused after merge."
+        ]
+      },
+      "status": "fixing_confirmed_adversarial_findings",
+      "agent": "review_weather",
+      "branch": "codex/push-preflight",
+      "worktree": "/workspace/work/push-preflight",
+      "base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93",
+      "commit": "3ef21abfb112cc0105b437737427291ce44c4842",
+      "reviewer": "baseline_validation",
+      "validation": "private fmt/clippy/test PASS711+3ignored714total23feature+2duplicateprocess tests",
+      "review_result": "FAIL on3ef21ab; actualApp deletion/tag flows blocked, LFS upload before hook veto"
+    },
+    {
+      "issue": 32,
+      "title": "Lost and found by content (S\u2013M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 13,
+        "title": "Lost and found by content (S\u2013M).",
+        "source_text": "- [ ] **Lost and found by content (S\u2013M).** \"I had a function `parse_header` on Tuesday and it's gone\": type what you remember. gitcraft searches the reflogs, dropped stashes, dangling commits and dangling blobs (things once staged but never committed), and shows the hits on a timeline. Each one can come back as a branch, a file or a stash. It uses `git fsck --unreachable --no-reflogs`, then `cat-file --batch` and a grep.\n  _Closest:_ Git Extensions' _Recover lost objects_, which covers commits only.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "User-initiated text search over reflog-reachable and unreachable commits, dropped stashes, and dangling blobs from staged-but-uncommitted data.",
+          "Use fsck --unreachable --no-reflogs and bounded cat-file batching/content search in background; show timeline and provenance.",
+          "Recover matches as a new branch, file or stash; cancellation, binary/large-object limits and non-destructive restoration previews."
+        ],
+        "dev_evidence": [
+          "src/git/mod.rs no reflog/fsck/recovery modules on dev; src/repo/file_view only reachable file history/blame.",
+          "Full src search has no lost-and-found/content-recovery feature."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Open #54 only scans/recovers lost commits and dropped stashes, not content search or dangling blobs.",
+          "Needs Git object reader and content search, remote background command support."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 32,
+      "title": "Drafts of the working tree (L, opt-in).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 14,
+        "title": "Drafts of the working tree (L, opt-in).",
+        "source_text": "- [ ] **Drafts of the working tree (L, opt-in).** Snapshot the working changes at pauses and before checkouts or rebases, without visible WIP commits. _Uncommitted changes_ gains _Earlier versions_, so a hunk overwritten by mistake can come back. The index stays separate, the snapshots are protected from gc, and old ones are cleared after a while.\n  _Seen in:_ [jj's working-copy commit](https://docs.jj-vcs.dev/latest/working-copy/), JetBrains' Local History.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Opt-in automatic snapshots at pauses and before checkout/rebase; preserve index separately, tracked and appropriate untracked changes, no visible WIP commits.",
+          "Protect snapshots under private refs, expire by retention policy, and show Earlier versions under uncommitted changes.",
+          "Inspect/restore files or hunks with guards and an undoable action; survive restarts and keep snapshot overhead bounded."
+        ],
+        "dev_evidence": [
+          "src/repo/state.rs:20 undo models operations only; no working-tree snapshot store.",
+          "Full src search has no refs/gitcraft draft snapshot/earlier-version mechanism."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Open #60 persists typed text only, not filesystem contents.",
+          "Open #132 agent checkpoints and #64 teleport use related temporary-index snapshots, but do not supply periodic general working-tree drafts."
+        ]
+      },
+      "status": "implementing",
+      "agent": "audit_32_38",
+      "branch": "codex/working-drafts",
+      "worktree": "/workspace/work/working-drafts",
+      "base": "48f2b234c4b9535c820138442295caeada1410fc"
+    },
+    {
+      "issue": 33,
+      "title": "Conflicts that can wait (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 13,
+        "title": "Conflicts that can wait (L).",
+        "source_text": "- [ ] **Conflicts that can wait (L).** Run a rebase or restack in its own worktree, and show its conflicts on the graph's nodes. You can go do other work and come back. The original branches don't move until you accept the result.\n  _Inspired by:_ [jj's first-class conflicts](https://docs.jj-vcs.dev/latest/conflicts/), [VisualJJ](https://www.visualjj.com/).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Run rebase/restack in a dedicated persistent worktree; show conflicts on corresponding graph nodes and allow opening/resuming it while ordinary work continues.",
+          "Keep original branch refs fixed until explicit accept; publish successful result with ref guards; support discard/continue/abort and restart recovery."
+        ],
+        "dev_evidence": [
+          "src/repo/rebase.rs starts rebase against current RepoTab path; no isolated pending rewrite model.",
+          "src/repo/worktree_tab provides navigation, not deferred conflict transactions."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing worktree creation/conflict editor.",
+          "Open #133 rehearses then reruns in original checkout; #139 selective undo scratch worktree and #117 restack conflict stops are related but do not implement deferred acceptance of an isolated rebase/restack."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 33,
+      "title": "Changelists (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 14,
+        "title": "Changelists (L).",
+        "source_text": "- [ ] **Changelists (L).** Group what you're working on into named lists such as _Feature_, _Cleanup_ and _Debug prints_, each with its own draft message. Commit or set aside (shelve) one list and keep the others. Lists by file could come first; by hunk is harder once the files keep changing.\n  _Seen in:_ [JetBrains changelists and shelve](https://www.jetbrains.com/help/idea/commit-and-push-changes.html).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Named changelists with per-list draft messages, initially file membership, selection-driven commit and shelve/unshelve of one list while preserving others.",
+          "Persist membership/drafts; safely handle rename/delete, concurrent edits, conflicts and optional hunk membership when implemented; no cross-list data loss."
+        ],
+        "dev_evidence": [
+          "src/repo/detail/changes.rs:17 only conflicted/unstaged/staged lists.",
+          "Full src search finds no changelist model or shelf store."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing stage/unstage, stash and draft-message UI.",
+          "Open #80 picked-file stash is a useful primitive but does not implement named persistent changelists."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 33,
+      "title": "Parallel branches in one folder (XL).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 15,
+        "title": "Parallel branches in one folder (XL).",
+        "source_text": "- [ ] **Parallel branches in one folder (XL).** Work on several branches in the same checkout and give each hunk to a branch, as GitButler does. This is a different way of working, not a feature, so it should wait until the pieces above exist.\n  _Seen in:_ [GitButler parallel branches](https://docs.gitbutler.com/features/branch-management/virtual-branches).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Multiple logical branches active in a single checkout with each changed hunk assigned to one branch.",
+          "Per-branch commit/publish and integration view, stable assignment across edits, conflict handling and recovery when assignments overlap.",
+          "Treat as a new workspace model built on changelists/snapshots/history rewrite primitives, not ordinary worktree switching."
+        ],
+        "dev_evidence": [
+          "src/repo/state.rs and git::Refs model one current branch; changes bind directly to actual index/worktree.",
+          "No virtual branch/parallel-branch assignment or integration-ref model in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Requires changelist/hunk ownership plus non-destructive snapshots and branch integration engine.",
+          "Existing worktrees and open #115 bake-off compose attempts in separate worktrees, not parallel branches in one checkout."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 34,
+      "title": "Same code, different machines (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 6,
+        "title": "Same code, different machines (L).",
+        "source_text": "- [ ] **Same code, different machines (L).** Link the local, WSL and SSH copies of a project. gitcraft then says something like _the tracked files match; Linux passes, Windows fails_, and expanding that shows why: case collisions, executable bits, line endings, tool versions, chosen git settings. It only ever collects facts from an allowlist, never environment variables or credentials.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Link local, WSL and SSH copies of a project and compare tracked tree identity plus per-machine test outcomes.",
+          "Explain differences via allowlisted facts: case collisions, executable bits, line endings, tool versions and chosen Git config.",
+          "Show unknown/stale facts and refuse environment-variable/credential collection; background bounded polling and user refresh."
+        ],
+        "dev_evidence": [
+          "src/remote supports execution/discovery only; no linked-project identity/comparison model.",
+          "src/repo/worktree_tab links Git worktrees, not project clones across machines."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing remote pools/discovery and tree IDs.",
+          "Open #89 machine test cache, #93 allowlist/config comparison and #144 diagnostics offer primitives only."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 34,
+      "title": "Behaviour timeline (L\u2013XL).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 9,
+        "title": "Behaviour timeline (L\u2013XL).",
+        "source_text": "- [ ] **Behaviour timeline (L\u2013XL).** Scrub through commits like frames in a video editor and watch something change across them: a command's output, a benchmark number, a rendered screenshot. Click the first frame where it changes to see the commit. Results are cached by tree, command and machine. Results that were never run, or don't repeat the same, are marked as such and never filled in by guessing.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Command/output, benchmark numeric, or screenshot timeline across a selected commit range with interactive scrubbing to changes.",
+          "Run in isolated worktrees and cache by tree, command and machine; retain artifact/output metadata.",
+          "Expose never-run, failed, timed-out and non-repeating/flaky states; cancellation, limits and repeat checks, never interpolate unrun results."
+        ],
+        "dev_evidence": [
+          "src/repo/ci_view shows forge CI; no user-run behavior artifact timeline or scrubber.",
+          "No behavior timeline/cache or screenshot/benchmark runner model in dev."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Open #111 test-lane and #89 parallel-bisect runners/cache can be reused after merge; do not duplicate their named features.",
+          "Needs artifact store and selected-range runner, machine identity and repeatability policy."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "One continuous review page (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 2,
+        "title": "One continuous review page (M).",
+        "source_text": "- [ ] **One continuous review page (M).** _Review all changes_ scrolls through every changed file as one document, with file headers you can fold and hunk actions in place. It would work for the working tree, a commit, a comparison or a pull request, which matters for refactors that touch many files. Being able to edit working-tree hunks right there could come later.\n  _Seen in:_ [Zed's project diff](https://zed.dev/docs/git#project-diff), [VS Code's multi-diff editor](https://code.visualstudio.com/updates/v1_86).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Continuous multi-file review document for working tree, commit, comparison and PR, foldable file headers and existing hunk actions inline.",
+          "Virtualize/lazily load large diffs without UI-thread Git; preserve per-file action context and scroll/selection state."
+        ],
+        "dev_evidence": [
+          "src/repo/diff/mod.rs holds one DiffView/DiffKey at a time; src/repo/pr_view/page.rs:60 renders a separate changed-file list.",
+          "No Review all changes or multi-file diff document found."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing per-file diff painter/action builders.",
+          "Open #128 generated-file folding and #119 rich diff frame must stay compatible."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Review freshness (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 4,
+        "title": "Review freshness (L).",
+        "source_text": "- [ ] **Review freshness (L).** Come back to a rewritten pull request and see three kinds of change:\n  - unchanged since you reviewed;\n  - changed directly;\n  - unchanged text whose dependencies changed, for example \"this caller didn't change, but its callee now returns a different error\".\n\n  The exact parts (blobs, patches) come first. Dependencies would follow through tree-sitter or a language server, one language at a time.\n  _Closest:_ [Reviewable's per-file review state](https://docs.reviewable.io/files).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Persist exact reviewed base/head plus per-file/blob/patch review state; classify unchanged since review and directly changed regions.",
+          "Add dependency-aware freshness (unchanged caller whose callee changed), language by language using tree-sitter/LSP.",
+          "Keep exact and inferred/dependency states distinct; invalidate stale analysis and explain evidence."
+        ],
+        "dev_evidence": [
+          "Dev PR state stores live details/drafts, no durable per-file reviewed fingerprint/freshness model.",
+          "Cargo.toml lacks tree-sitter/LSP support; no dependency graph in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Open #109 preserves PR versions and compares series, but no per-region review-freshness/dependency model.",
+          "Needs durable review state plus language analysis; start with exact blob/patch classification."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Reviewer echo (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 5,
+        "title": "Reviewer echo (M).",
+        "source_text": "- [ ] **Reviewer echo (M).** gitcraft builds a small personal rulebook from the review comments you have written on all forges. Before you push, it checks your outgoing diff against it: _you'd flag this: you asked for no `unwrap()` in handlers_, with a link to your own comment. It runs with your own API key or a local model, and it's opt-in.\n  _Closest:_ [cubic](https://www.cubic.dev/blog/ai-that-learns-your-team-s-unwritten-rules), which is hosted, team-wide and works only on pull requests.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Opt-in personal rulebook imported from viewer-authored review comments across forges, each rule linked to source comment.",
+          "Before push, use configured own-key/local model to check outgoing diff and display evidence-backed suggestions.",
+          "User can inspect/edit/disable/delete rules; no automatic push blocker or undisclosed external data transfer."
+        ],
+        "dev_evidence": [
+          "src/forge reads PR comments for current request; no cross-forge personal rulebook store.",
+          "No AI review/rule extraction model in current src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing forge authentication/comments; optional configured local model or own-key provider.",
+          "Open #67 generic CLI branch review is distinct but can supply CLI execution abstraction."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "AI objections that come with a reproducer (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 6,
+        "title": "AI objections that come with a reproducer (L).",
+        "source_text": "- [ ] **AI objections that come with a reproducer (L).** Instead of an AI review that says \"this might break Unicode\", ask it to _Show me_. A model writes a small test, gitcraft runs it against the base and the head, and puts the observed difference next to the hunk. The judgement that the change is wrong stays with the person. Start with one ecosystem, such as Rust unit tests, and run the generated code in a sandbox.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Ask an optional model to generate a small reproducer/test for a selected review objection, initially Rust.",
+          "Execute generated code against base and head inside a real sandbox, with resource/time/network/filesystem limits; capture observed difference next to hunk.",
+          "Keep test source, commands, exits and output inspectable; distinguish observed differences from correctness judgements and unknowns."
+        ],
+        "dev_evidence": [
+          "Cargo.toml/src contain no sandbox abstraction or generated-reproducer review feature.",
+          "Existing tests run gitcraft's own suite; no mechanism to run model-generated repository code against paired revisions."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Optional model integration, sandbox runtime and scratch worktree runner; model output is untrusted.",
+          "Open #111 test runner is not a sandbox; #67 generic AI review does not generate/compare reproducers."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Review storyboard (M\u2013L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 7,
+        "title": "Review storyboard (M\u2013L).",
+        "source_text": "- [ ] **Review storyboard (M\u2013L).** The author arranges a pull request into a short sequence: the old failure, the invariant, the fix, the result. Each card opens a pinned hunk, a file at a commit, or a test result. When new pushes change what a card points at, the card is marked stale. It's stored with base and head IDs, and the anchors survive rebases through range-diff.\n  _Closest:_ [CodeTour](https://github.com/microsoft/codetour), which isn't tied to revisions.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Author-editable ordered PR story cards for old failure, invariant, fix and result; cards pin hunk, revisioned file or recorded test artifact.",
+          "Persist exact base/head anchors, resolve through range-diff after rebase and mark stale/unresolvable cards on new push.",
+          "Presentation/navigation UI opens pinned evidence and supports edit/reorder/remove/export/share as appropriate."
+        ],
+        "dev_evidence": [
+          "src/repo/pr_view/timeline.rs is forge conversation only, no authored card sequence.",
+          "No storyboard/anchor store in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Open #109 range-diff pairing can provide anchor remapping after merge.",
+          "Needs durable PR metadata/card schema and exact revision/file/hunk anchors."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Fix survival radar (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 8,
+        "title": "Fix survival radar (L).",
+        "source_text": "- [ ] **Fix survival radar (L).** Pin an important fix and see where it stands on each release branch:\n  - same patch found (patch-id);\n  - adapted version linked;\n  - regression test passes;\n  - not checked.\n\n  A later revert turns a branch amber. \"The patch is there\" is kept apart from \"the behaviour was tested\".\n  _Closest:_ [Tower's merged-PR detection](https://www.git-tower.com/pro/pr-merged-detection) answers a different question, whether a pull request was merged.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Pin a fix and release branches; classify same patch via patch-id, explicitly linked adapted fix, regression-test pass, or not checked.",
+          "Detect later reverts and show amber; preserve patch-present and behavior-tested as separate evidence.",
+          "Background refresh with branch tip invalidation; optional regression runner in scratch worktrees."
+        ],
+        "dev_evidence": [
+          "No pinned-fix/patch-id release matrix in src; CI and branch lists are independent.",
+          "src/git has no patch-id reader or regression-evidence store."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Git patch-id, graph ancestry, optional test runner.",
+          "Open #111 test cache and #139 replay machinery related; no fix-survival UI in any PR."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Backport by contract (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 9,
+        "title": "Backport by contract (L).",
+        "source_text": "- [ ] **Backport by contract (L).** Drag a fix onto an older release and give its intended behaviour as a regression test. gitcraft cherry-picks it in a scratch worktree for each target and tells _patch applied_ apart from _test passes_. Any adaptation shows next to the original.\n  _Closest:_ [cherry-picker](https://github.com/python/cherry-picker), [Boro](https://github.com/nvidia/boro).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Choose a fix, target release branches and an explicit regression-test contract; cherry-pick in scratch worktree per target.",
+          "Show patch-applied separately from test-passed, adaptations beside original, and unknown/timeout/conflict states.",
+          "Guard accepting/publishing results, preserve source branch/worktree and clean up only own scratch state."
+        ],
+        "dev_evidence": [
+          "src/repo/commands.rs cherry-picks in active repo; no multi-target scratch backport/test contract flow.",
+          "No contract/backport model in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Scratch worktree pool, test runner and diff comparison.",
+          "Open #111 tests, #133 rehearsal and #138 interaction analysis are distinct reusable primitives."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Intent cards (M\u2013L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 10,
+        "title": "Intent cards (M\u2013L).",
+        "source_text": "- [ ] **Intent cards (M\u2013L).** Before you start, post a short, expiring note such as _changing token lifetime, until 15:00_ on a path or a symbol. Teammates using gitcraft see it next to that code before any commit exists. It travels through a small git ref of its own, never acts as a lock, and shows stale or offline as such.\n  _Closest:_ [Heddle's intent leases](https://github.com/zyads/heddle), [GitKraken's overlap warnings](https://help.gitkraken.com/gitkraken-desktop/conflict-prevention/).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Create short expiring intent notes on a path or symbol before commits; store/synchronize through a dedicated small Git ref.",
+          "Other users see relevant notes next to code, expiry/stale/offline state and authorship; no locks or silent editing exclusion.",
+          "Explicit sync, bounded retention, conflict-safe multi-author updates and malicious note/path validation."
+        ],
+        "dev_evidence": [
+          "No intent/lease ref, metadata schema or contextual note UI in src.",
+          "Existing Git notes attach to commits only (and notes UI is itself in open #74)."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing fetch/push and forge identity; private ref persistence/sync.",
+          "Symbol anchors need language support; paths can ship first only if full planned symbol scope is recorded."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 35,
+      "title": "Release choreography across repositories (XL).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 11,
+        "title": "Release choreography across repositories (XL).",
+        "source_text": "- [ ] **Release choreography across repositories (XL).** Put the backend, the SDK and the frontend on one board, and state a rule such as _the backend supports both protocols before the SDK switches_. gitcraft rehearses the in-between combinations and works out which release order keeps everything compatible. Planning and tests come first. Publishing comes later and needs its own coordination, since separate servers can't push atomically together.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Multi-repository release board with versions/branches and explicit compatibility/invariant ordering rules.",
+          "Rehearse intermediate cross-repo combinations with configured tests; derive a release order with evidence and surface unsupported/conflicting rules.",
+          "Planning/tests precede separately coordinated publishing; persist run/result matrix and partial/unknown states."
+        ],
+        "dev_evidence": [
+          "No multi-repo compatibility planner, intermediate-version test matrix or release board in src.",
+          "Current app models independent repository tabs."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Workspaces/project links, isolated multi-repo test environments, compatibility rule schema and DAG planner.",
+          "Open #145/#149 single-repository release/hotfix flows do not implement cross-repository choreography."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 36,
+      "title": "Saved views of the graph (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 4,
+        "title": "Saved views of the graph (M).",
+        "source_text": "- [ ] **Saved views of the graph (M).** Presets such as these:\n  - _My unpushed work_\n  - _My recent changes and what they depend on_\n  - _Descendants of this commit_\n  - _Only merges into main_\n\n  Long runs of history in between collapse into a connector you can expand. They pick commits by how they relate to each other, which hiding or soloing branches can't do. They would be built on git revision queries rather than a new query language.\n  _Seen in:_ [Sapling ISL](https://sapling-scm.com/docs/addons/isl/), [jj revsets](https://docs.jj-vcs.dev/latest/revsets/), [jjui](https://github.com/idursun/jjui).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Saved Git revision-query presets: my unpushed work, my recent work+dependencies, descendants of selected commit and only merges into default branch.",
+          "Persist saved views, execute queries in background and render selected commits with collapsible connector spans for omitted history.",
+          "Expanding connector restores intervening commits; do not confuse branch hide/solo with relation-based filtering."
+        ],
+        "dev_evidence": [
+          "src/repo/branch_visibility.rs only hides/solos refs; revisions() starts log from visible refs+HEAD.",
+          "src/graph.rs assigns lanes to complete provided commit list; no collapsed connector model/saved rev-query presets."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing git log/rev-list and lane layout.",
+          "Open #73 search operators and #84 graph order/first-parent are distinct and should compose."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 36,
+      "title": "Line dossier: why is this line like this? (M\u2013L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 6,
+        "title": "Line dossier: why is this line like this? (M\u2013L).",
+        "source_text": "- [ ] **Line dossier: why is this line like this? (M\u2013L).** Right-click a line and pick _Explain history_. A card shows every version of the line, following it through moves and reformatting (`blame -w -C -C -M`, repeated on each commit's parent). Each version shows its commit and the pull request that brought it in. The card also shows **the review comments that were made on those lines in that pull request**, and the linked issue. An optional LLM summary, run on your own key or a local model, cites each card. gitcraft can offer to add formatting-only commits to `.git-blame-ignore-revs`.\n  _Closest:_ GitLens line history and its pull-request hovers, which only work on GitHub and don't show review comments.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Explain history card for a selected line: follow previous versions using blame -w -C -C -M repeatedly through parents, moves/reformatting.",
+          "Each version has commit, introducing PR, review comments on corresponding lines and linked issue; show uncertainty/stop boundaries.",
+          "Optional local/own-key LLM summary with citations; offer formatting-commit additions to .git-blame-ignore-revs after preview."
+        ],
+        "dev_evidence": [
+          "src/repo/file_view/blame.rs:31 loads one ordinary git::blame result; no repeated ancestry trace or PR-line comment join.",
+          "No dossier or blame-ignore-revs editor in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing blame/file history/forge threads; robust line anchor mapping and PR lookup.",
+          "Open #110 history of selected lines is narrower and does not provide dossier/review comments."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 36,
+      "title": "Symbol biography (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 7,
+        "title": "Symbol biography (L).",
+        "source_text": "- [ ] **Symbol biography (L).** Pick a function and see its life on a timeline like a video editor's: when it was created, renamed, moved to another file, split and deleted. Scrubbing the timeline steps its body through each version, with the author and pull request of each step. A symbol is found by name with tree-sitter, and by how similar its body is across files linked by rename detection.\n  _Closest:_ `git log -L :func:file`, which loses the function once it moves to another file.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Tree-sitter symbol selection/search and history timeline tracking creation, rename, file moves, split and deletion.",
+          "Use rename detection plus body similarity to link versions across files; expose ambiguous matches as such.",
+          "Scrub symbol body versions with author/commit/PR and revision-aware navigation."
+        ],
+        "dev_evidence": [
+          "Cargo.toml has syntect highlighting, no tree-sitter symbol parser.",
+          "src/repo/file_view/history.rs tracks files only; no symbol identity/version model."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Language parsers/grammars, rename/body-similarity index, repository history cache and PR linkage."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 36,
+      "title": "What usually comes with this? (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 8,
+        "title": "What usually comes with this? (M).",
+        "source_text": "- [ ] **What usually comes with this? (M).** While you stage a change to the serializer, gitcraft notices: _changes like this usually also touch the compatibility fixtures, and those haven't changed_. A click shows the past commits behind the hint. It counts which files change together, leaving out bulk and generated commits. Every hint can be dismissed and shows its evidence.\n  _Closest:_ [CodeScene's change coupling](https://codescene.io/docs/guides/technical/change-coupling.html), a hosted analysis that doesn't help while you stage.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Build evidence of file co-change from historical commits, excluding generated/bulk changes and bounded by age/count.",
+          "While staging, suggest usually-coupled missing files and list exact supporting commits; threshold/sample counts visible.",
+          "Dismiss per hint/pair, background indexing/cache invalidation; never imply a deterministic requirement from correlation."
+        ],
+        "dev_evidence": [
+          "src/repo/detail/changes.rs renders current status only; no historical coupling/hint model.",
+          "No co-change/coupling analysis or cache in src."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Git commit-path history scanner, generated/bulk filters, persisted dismissals.",
+          "Open #128 generated-file patterns may supply reusable exclusions."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 37,
+      "title": "Clone options: shallow, partial and sparse (S\u2013M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 7,
+        "title": "Clone options: shallow, partial and sparse (S\u2013M).",
+        "source_text": "- [ ] **Clone options: shallow, partial and sparse (S\u2013M).** The clone dialog offers depth, blobless (`--filter=blob:none`) and the folders to check out. Later a folder-tree picker would edit an open repository's sparse-checkout, and say when reading an old file has to download objects.\n  _Seen in:_ GitKraken 11.8 / 11.10, [Magit sparse checkouts](https://docs.magit.vc/magit/Sparse-checkouts.html).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Clone dialog depth/shallow, blobless partial clone and sparse folder selection; validate combinations and pass explicit safe git arguments.",
+          "Folder-tree picker edits sparse-checkout for open repos; distinguish cone patterns and actual excluded paths.",
+          "Warn/ask when historical-file access downloads missing objects; honor remote machine execution and clone authentication."
+        ],
+        "dev_evidence": [
+          "src/app/clone.rs:12 CloneForm holds URL/name/parent/auth only; submit_clone invokes git::clone without options.",
+          "src/git/mod.rs:63 git::clone builds plain clone args; no depth/filter/sparse options."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing clone/auth flow.",
+          "Open #77 modifies clone progress/cancel; #93 reads sparse flags without editing sparse checkout. Neither implements clone options."
+        ]
+      },
+      "status": "integrated",
+      "agent": "audit_32_38",
+      "branch": "codex/clone-options",
+      "worktree": "/workspace/work/clone-options",
+      "commit": "c70f104aff780d798ffd9eb3318edf7f1786dce4",
+      "reviewer": "review_weather",
+      "validation": "private fmt/clippy/test PASS642+3ignored645total eightnewtests",
+      "findings": [
+        "Sparse-checkout set deletes ignored valuable files in excluded directories"
+      ],
+      "review_report": "/workspace/work/review-clone-c70f104.json",
+      "url": "https://github.com/JKamsker/gitcraft/pull/154",
+      "interim_pr": 154,
+      "interim_pr_closed": true
+    },
+    {
+      "issue": 37,
+      "title": "Bundles (S\u2013M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 11,
+        "title": "Bundles (S\u2013M).",
+        "source_text": "- [ ] **Bundles (S\u2013M).** Export chosen refs or a range to a `git bundle`, and check and look into an incoming one before importing its refs. This is for machines without network access, support handoffs and backups.\n  _Seen in:_ [Magit](https://docs.magit.vc/magit/Bundle.html).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Export chosen refs/ranges to Git bundle; inspect incoming bundle heads/prerequisites, verify before import.",
+          "Preview ref changes and import to chosen non-overwriting refs with stale-ref guards; support remote filesystem transfer.",
+          "Clear diagnostics for missing prerequisites, corrupt bundles, invalid refs and cancellation."
+        ],
+        "dev_evidence": [
+          "src/git/mod.rs exports no bundle module/functions; no user bundle dialog in app/repo actions.",
+          "Only source bundle mentions are OS app bundles/minified assets, not git bundle UI."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Git bundle create/list-heads/verify/unbundle and file picker.",
+          "Open #64/#89 use bundles internally for teleport/bisect only; this named import/export workflow remains absent."
+        ]
+      },
+      "status": "integrated",
+      "agent": "audit_32_38",
+      "branch": "codex/git-bundles",
+      "worktree": "/workspace/work/bundles",
+      "commit": "6625a2c2d62e422964017fce1bffd0de1952c980",
+      "reviewer": "review_weather",
+      "validation": "private fmt/clippy/test PASS648+3ignored651total14newtests",
+      "review_report": "/workspace/work/review-bundles-6625a2c.json",
+      "findings": [
+        "Readonly verify lazily fetches prerequisite objects from promisor remote"
+      ],
+      "integration_notes": "Practice bounded local routing adapted with actual red/green App bundle regression"
+    },
+    {
+      "issue": 37,
+      "title": "Scrub history with filter-repo (L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 12,
+        "title": "Scrub history with filter-repo (L).",
+        "source_text": "- [ ] **Scrub history with filter-repo (L).** A separate cleanup flow: pick paths or replacements, rewrite a fresh clone with `git filter-repo`, report the refs it changed, and check the result. Publishing it is its own step, with a reminder that a leaked secret also has to be revoked.\n  _Benchmark:_ [git-filter-repo](https://github.com/newren/git-filter-repo/blob/main/Documentation/git-filter-repo.txt).",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Dedicated history cleanup flow selecting paths/replacements, always rewrite a fresh clone with installed git-filter-repo.",
+          "Preview planned cleanup, show changed refs and validate resulting objects/history/content; retain recoverable source.",
+          "Publishing explicit separate step with reference guards and leaked-secret revocation reminder; never automatically force push."
+        ],
+        "dev_evidence": [
+          "No filter-repo command/tool detection, cleanup clone or rewrite validation flow in src.",
+          "Existing quick edits/rebase do not scrub arbitrary paths/replacements across history."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Installed git-filter-repo on repository machine; fresh-clone/worktree orchestration, protected evidence/report and publish guards."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 38,
+      "title": "A graph that reads better (S).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 3,
+        "title": "A graph that reads better (S).",
+        "source_text": "- [ ] **A graph that reads better (S).**\n  - The Description column ends up about 120 px wide, while the Branch / Tag column takes about 260 px and is mostly empty. Give Description the flexible width, and let the ref column shrink when no pill is in view.\n  - Summaries are cut hard with no ellipsis (`row.rs` uses a clip rect): \"fix: CodeRabbit on f\". Add an ellipsis and a tooltip with the whole message.\n  - Lanes that have commits but no ref in view read as orphans. Give them a faint label, the ref's name or _detached_.",
+        "partial_coverage_notes": [
+          "Dev already gives description residual width and ellipsizes body text. Remaining requested changes are adaptive ref width, summary ellipsis/full tooltip, lane labels."
+        ],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Let description use available space and let Branch/Tag shrink based on visible pills, especially no-ref viewport.",
+          "Ellipsize overflowing summary and show full message tooltip; preserve body fading.",
+          "Give lane runs with commits but no visible ref a faint ref-name or detached label without hiding graph geometry."
+        ],
+        "dev_evidence": [
+          "src/repo/columns.rs:12 MIN_REFS_W=210; description takes remainder with fixed refs preference and shrinks first.",
+          "src/repo/graph_view/row.rs:199 summary uses text_clip.text without truncation; body alone uses TextWrapping::truncate_at_width.",
+          "src/repo/graph_view/lanes.rs:15 paints lines/dots only, no offscreen-ref labels."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing column squeezing/tests and graph/ref mapping.",
+          "Open #66 paints keyboard focus and #84 changes ordering; neither claims readability feature."
+        ]
+      },
+      "status": "integrated",
+      "agent": "baseline_validation",
+      "branch": "codex/graph-readability",
+      "worktree": "/workspace/work/graph-readability",
+      "commit": "05d818add970e0b081166c71255048f4673e5390",
+      "review_report": "/workspace/work/review-graph-readability-05d818a.json",
+      "findings": [
+        "Full-message tooltip uses production truncated/flattened Commit.body"
+      ]
+    },
+    {
+      "issue": 38,
+      "title": "Keyboard-first staging and moving between panes (M).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 8,
+        "title": "Keyboard-first staging and moving between panes (M).",
+        "source_text": "- [ ] **Keyboard-first staging and moving between panes (M).**\n  - Ctrl+1/2/3 focus the sidebar, the graph and the right pane.\n  - In file lists, j / k move, Space stages or unstages, and Enter opens the diff.\n  - In a diff, S / U / D act on the current hunk.\n\n  Staging is mouse-only today.\n  _Seen in:_ Sublime Merge, lazygit.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Pane focus shortcuts (issue suggests Ctrl+1/2/3 but conflict with #75 tab shortcuts must be resolved coherently), visible focus and contextual navigation.",
+          "j/k select files, Space stage/unstage and Enter open diff; current-hunk S/U/D in diff with discard confirmation and proper applicability.",
+          "Keys never fire in text edits, terminal, palette or modal; selections survive reload/path changes and scroll into view."
+        ],
+        "dev_evidence": [
+          "src/repo/layout.rs:109 only Esc/undo/redo/find/hunk stepping; no pane focus or file/hunk action keys.",
+          "src/repo/detail/changes.rs uses mouse RowClick and buttons, no keyboard selection."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing staging/hunk actions and focus framework.",
+          "Open #66 adds Tab/Enter/Space accessibility activation, not j/k file selection or current-hunk S/U/D. Open #75 claims Ctrl+1\u20269 for tabs, so choose alternate pane keys or rebinding."
+        ]
+      },
+      "status": "integrated",
+      "agent": "baseline_validation",
+      "branch": "codex/keyboard-staging",
+      "worktree": "/workspace/work/keyboard-staging",
+      "base": "48f2b234c4b9535c820138442295caeada1410fc",
+      "commit": "34b1564e668adc08db73f3355fa3d4c66a542cb2",
+      "reviewer": "review_weather",
+      "review_report": "/workspace/work/review-keyboard-staging-34b1564.json",
+      "validation": "private fmt/clippy/test PASS708+3ignored711total6newUItests"
+    },
+    {
+      "issue": 38,
+      "title": "Motion that explains what changed (M\u2013L).",
+      "audit_file": "audit_32_38.json",
+      "details": {
+        "bullet": 14,
+        "title": "Motion that explains what changed (M\u2013L).",
+        "source_text": "- [ ] **Motion that explains what changed (M\u2013L).** After a fetch, pull or rebase the graph simply jumps. Instead:\n  - incoming commits light up briefly and get a _new_ marker after a fetch;\n  - pills slide to their new commit after a merge, reset or rebase;\n  - the graph scrolls smoothly to HEAD.\n\n  All of it follows the system's reduced-motion setting. `animate_value` is only used for sliding tabs today.",
+        "partial_coverage_notes": [],
+        "status": "eligible_remaining",
+        "implementation_scope": [
+          "Briefly mark commits newly discovered by fetch and label new until seen/expiry.",
+          "Animate ref pills moving after merge/reset/rebase using stable ref identity and previous positions; smoothly navigate to HEAD.",
+          "Honor system reduced motion; bounded animation state, no repeated highlighting on ordinary reload or scrolling."
+        ],
+        "dev_evidence": [
+          "src/app/tab_strip/mod.rs:154 contains tab slide animation, but graph row/pill painting has no transition state.",
+          "src/repo/graph_view/mod.rs uses scroll_to state without motion/new-commit markers."
+        ],
+        "open_pr_overlap_evidence": "Compared against all 99 open PR titles and performed full-body keyword/context search; no open PR implements this named idea. Related primitive/partial overlap is enumerated under dependencies.",
+        "dependencies": [
+          "Existing stable refs/history reload events.",
+          "Open #66 reduced-motion setting/helpers should be reused; its scope only disables tab/panel animations and does not add graph motion."
+        ]
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 39,
+      "title": "Contrast",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 39,
+        "idea": "Contrast",
+        "eligible": true,
+        "implementation_scope": [
+          "Repair the remaining small-text WCAG AA 4.5:1 failures for the original Pro Dark, Pro Medium Gray and Pro Light palettes; check the actual surfaces carrying faint section labels and accent foregrounds.",
+          "Retain the already implemented High Contrast Dark/Light choices. Add meaningful contrast assertions for the repaired combinations and adjust the existing exact-palette compatibility assertions intentionally."
+        ],
+        "dev_evidence": [
+          "src/theme/catalog.rs:133-220 preserves the original Pro palettes. Measured faint/chrome ratios are Dark 3.2463, Medium Gray 2.9416, Light 3.8742; white/accent Dark and Medium Gray 3.3387; Light accent already passes at 4.8998.",
+          "src/theme/catalog.rs:797-836 already implements the optional high-contrast themes. Current readability test at :849 checks faint text only at 2.2 and accent text only at 2.5."
+        ],
+        "open_pr_evidence": [
+          "PR #66 explicitly says: Contrast is left alone because a theming overhaul is in flight. No other open PR title/body claims the independent Contrast idea."
+        ],
+        "estimated_dependencies": [
+          "Existing theme::palette::contrast helper; no new crate needed. Coordinate src/theme/catalog.rs with any theme work."
+        ],
+        "effort": "S"
+      },
+      "status": "integrated",
+      "agent": "baseline_validation",
+      "branch": "codex/contrast-aa",
+      "worktree": "/workspace/work/contrast",
+      "commit": "1a77cfd99d2f72b002d95780f423f0b9ec8fa5dc",
+      "reviewer": "implement_weather",
+      "validation": "private fmt/clippy/test PASS640+3ignored643total",
+      "findings": [
+        "actual egui hint/status/dim-body painted surfaces fail AA despite palette tests"
+      ],
+      "review_report": "/workspace/work/review-contrast-1a77cfd.json"
+    },
+    {
+      "issue": 39,
+      "title": "A graph you can hear",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 39,
+        "idea": "A graph you can hear",
+        "eligible": true,
+        "implementation_scope": [
+          "Add a lane-walking mode: parent, child, next merge and branch-tip navigation rather than only adjacent rows.",
+          "Expose graph-shape descriptions through AccessKit, including branch relationships/ahead-behind/divergence/merges as proposed.",
+          "Offer optional brief lane-crossing/merge sounds, with a user control and sensible disabled/audio-unavailable behavior."
+        ],
+        "dev_evidence": [
+          "src/repo/graph_view/mod.rs:137-155 arrow_keys only selects row +/-1. src/repo/navigate.rs handles selection but no lane mode.",
+          "Existing git::Commit.parents and graph layout provide topology; no rodio dependency or auditory graph implementation was found."
+        ],
+        "open_pr_evidence": [
+          "PR #66 covers focus/labels/reduced motion and explicitly enumerates those three #39 items. Its graph controls remain row-based; no topology narration or sound scope is claimed anywhere among 99 open PRs."
+        ],
+        "estimated_dependencies": [
+          "Graph topology indexes from loaded history; graph/navigate UI; egui AccessKit. Integrate cleanly with in-flight #66 label/focus helpers; audio backend such as rodio is new."
+        ],
+        "effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 40,
+      "title": "Structural diff for refactors",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 40,
+        "idea": "Structural diff for refactors",
+        "eligible": true,
+        "implementation_scope": [
+          "Provide a read-only syntax comparison mode which discounts reindent/rewrap noise, reports unsupported languages and parse failures, and leaves staging in the ordinary patch view."
+        ],
+        "dev_evidence": [
+          "src/repo/diff/mod.rs:64 DiffData contains line/split/image/LFS data only. No structural renderer, difftastic invocation or syntax-tree comparison exists in dev."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims structural diff or Difftastic. #79 is moved-block detection; #128 selects text diff algorithms; #119 is prose/rich-frame rendering, all distinct."
+        ],
+        "estimated_dependencies": [
+          "Diff view and old/new blob readers; syntax comparison implementation or installed difftastic with robust fallback. In-flight #119 rich-view frame is a useful optional integration point; do not duplicate its feature."
+        ],
+        "effort": "L"
+      },
+      "status": "integrated",
+      "agent": "audit_39_44",
+      "branch": "codex/structural-refactor-diff",
+      "worktree": "/workspace/work/structural-diff",
+      "commit": "c4971a83711973d4f1c29ab6b5d420a03eba2e86",
+      "reviewer": "review_weather",
+      "validation": "private fmt/clippy/test PASS648+3ignored651total14Linuxstructuraltests",
+      "findings": [
+        "containment fixed; preserve complete supported special filenames/multisuffix language detection"
+      ],
+      "review_report": "/workspace/work/review-structural-c4971a8.json"
+    },
+    {
+      "issue": 40,
+      "title": "File migration map",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 40,
+        "idea": "File migration map",
+        "eligible": true,
+        "implementation_scope": [
+          "Visualize old and new folder organization joined by rename/copy ribbons annotated with Git similarity scores.",
+          "Click a move to show its content edits independently of relocation."
+        ],
+        "dev_evidence": [
+          "Dev file lists are flat/tree views; src/repo/diff/mod.rs has no migration visualization. No migration map or ribbon renderer was found."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims a migration map. #79 moved code is block movement; #110 file/line history and past-change revert is distinct."
+        ],
+        "estimated_dependencies": [
+          "Git rename/copy diff metadata (including similarity); commit/range file-list entry point; egui map layout and selection-to-existing-diff routing."
+        ],
+        "effort": "M"
+      },
+      "status": "implementing",
+      "agent": "audit_39_44",
+      "branch": "codex/file-comparison-views",
+      "worktree": "/workspace/work/file-comparison-views",
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+    },
+    {
+      "issue": 40,
+      "title": "Encrypted files",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 40,
+        "idea": "Encrypted files",
+        "eligible": true,
+        "implementation_scope": [
+          "Recognize SOPS files; explicitly decrypt old and new contents through the user-installed sops and their keys.",
+          "Distinguish key/recipient changes from decrypted content changes, show actionable errors, and never persist/cache plaintext."
+        ],
+        "dev_evidence": [
+          "No sops/SOPS/encrypted-file diff implementation or dependency appears in src/ or Cargo.toml. DiffData currently has no encrypted view."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims SOPS/encrypted-file diff. Binary/config renderers #136/#135 are independent features."
+        ],
+        "estimated_dependencies": [
+          "Background subprocess runner at the repository location (local/WSL/SSH); old/new blob loading; transient plaintext-only view; installed sops. Config readers of #135 could help but are not required."
+        ],
+        "effort": "M"
+      },
+      "status": "quarantined_static_safety_review",
+      "agent": "implement_gerrit",
+      "branch": "codex/encrypted-diffs",
+      "worktree": "/workspace/work/encrypted-diffs",
+      "base": "5af92d88aee563f9a3113c1edaef65d245a66f06",
+      "commit": "ee6e8482a09c27a2c40286996433bd1bd996b3d0",
+      "reviewer": "baseline_validation",
+      "validation": "Static-only11PASS/216syntheticgraphs; noCargo/runtime/signals; compileguards retained"
+    },
+    {
+      "issue": 42,
+      "title": "Gerrit",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 42,
+        "idea": "Gerrit",
+        "eligible": true,
+        "implementation_scope": [
+          "Push for review selects target branch/topic, checks Change-Id and pushes to refs/for/*.",
+          "Graph commits link to Gerrit changes; amending an existing change updates its patch set."
+        ],
+        "dev_evidence": [
+          "src/forge/mod.rs:26 Forge has GitHub/GitLab/Forgejo/Gitea only. Gerrit is mentioned solely as a special push-refspec consideration in commands, not a provider or flow."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims Gerrit integration. #57 excludes Gerrit refs/for/* from its refused-push banner; that is compatibility, not this feature."
+        ],
+        "estimated_dependencies": [
+          "Remote/hosting detection; Git push background operations; Change-Id parsing/commit-hook handling; Gerrit URL/query data and commit menu/graph links."
+        ],
+        "effort": "L"
+      },
+      "status": "integrated",
+      "agent": "implement_gerrit",
+      "branch": "codex/gerrit-review",
+      "worktree": "/workspace/work/gerrit",
+      "commit": "c08ff3bf079397e9f8e4e500828a16b192c73d4b",
+      "reviewer": "review_weather",
+      "validation": "isolated fmt/clippy/test PASS 642 passed 3 ignored, 8 new Gerrit tests executed",
+      "url": "https://github.com/JKamsker/gitcraft/pull/153",
+      "review_report": "/workspace/work/review-gerrit-c08ff3b.json",
+      "interim_pr": 153,
+      "interim_pr_closed": true
+    },
+    {
+      "issue": 42,
+      "title": "Patches by email",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 42,
+        "idea": "Patches by email",
+        "eligible": true,
+        "implementation_scope": [
+          "Accept public-inbox URL or Message-ID, use b4 to retrieve series, show cover letter/review trailers and preview/apply it.",
+          "Prepare numbered outgoing revisions and preview recipients/messages before the explicit send action."
+        ],
+        "dev_evidence": [
+          "src/repo/patches.rs currently saves one commit via git format-patch and imports a local patch/eml/mbox file via git am/apply. There is no b4/public-inbox retrieval, series composer or send flow."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims public-inbox, b4 or email patch-series workflow. Existing patch import/export does not satisfy the named idea."
+        ],
+        "estimated_dependencies": [
+          "Installed b4 on repository machine; existing patch apply and undo flows; series metadata and preview UI; user-configured mail/send transport. Network/send operations need explicit UI action."
+        ],
+        "effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 43,
+      "title": "Run an Actions workflow locally",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "Run an Actions workflow locally",
+        "eligible": true,
+        "implementation_scope": [
+          "Choose workflow, event, job and matrix entry and run installed act against current changes.",
+          "Stream output alongside hosted CI and explicitly identify unsupported Actions features."
+        ],
+        "dev_evidence": [
+          "src/ci/mod.rs supports hosted GitHub Actions/GitLab CI runs/jobs and has no local act backend. No act invocation or workflow-picker implementation was found."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims act/local Actions execution. #111 test lane and #133 rehearsal run test commands, not a local Actions workflow."
+        ],
+        "estimated_dependencies": [
+          "Workflow YAML parsing; installed act and Docker; background cancellable process with streaming output; CI UI integration; repository-machine execution (local/WSL/SSH)."
+        ],
+        "effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 43,
+      "title": "Full GitLab merge requests",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "Full GitLab merge requests",
+        "eligible": true,
+        "implementation_scope": [
+          "Open GitLab merge requests in the central PR-style page with changed files, line comments, replies/resolution, approvals and merging.",
+          "Show GitLab merge blockers and permissions faithfully."
+        ],
+        "dev_evidence": [
+          "src/forge/gitlab.rs implements Provider list/create/avatars only, not pages(). Provider::pages at src/forge/mod.rs:147 defaults to None.",
+          "README explicitly limits full pages to GitHub/Forgejo/Gitea; GitLab only lists/creates/checks out and opens browser."
+        ],
+        "open_pr_evidence": [
+          "No open PR claims full GitLab review pages. #125 explicitly says GitLab opens in browser because gitcraft has no page. #137 adds fork metadata/checkouts and #140 manages stack creation/retargeting, not MR reviews."
+        ],
+        "estimated_dependencies": [
+          "GitLab REST via glab; existing forge::Pages, PrDetails and pr_post::Target abstractions; GitLab discussions/approvals/merge-blocker data model. Coordinate shared forge interfaces with #137/#140 without implementing their work."
+        ],
+        "effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 43,
+      "title": "Azure DevOps and Bitbucket",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "Azure DevOps and Bitbucket",
+        "eligible": true,
+        "implementation_scope": [
+          "Add Azure DevOps and Bitbucket forge providers for listing, opening and reviewing pull requests, using az repos/REST and Bitbucket REST as appropriate."
+        ],
+        "dev_evidence": [
+          "src/forge/mod.rs:26-47 Forge enum/ALL/provider match enumerate exactly four existing forges; neither new provider exists. No Azure/Bitbucket API implementation was found."
+        ],
+        "open_pr_evidence": [
+          "No open PR claims either provider. #129 recognizes pasted Bitbucket web links only; recognizing a URL does not supply PR listing/review integration."
+        ],
+        "estimated_dependencies": [
+          "Forge enum/detection and hosting URL parsing; provider auth/CLI/HTTP; Pages/post targets; provider-specific reviewer/discussion/merge data. Azure and Bitbucket work can be independent modules but share enum matches."
+        ],
+        "effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 43,
+      "title": "Each profile with its own SSH key and forge account",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "Each profile with its own SSH key and forge account",
+        "eligible": true,
+        "implementation_scope": [
+          "Add a profile SSH-key choice and emit core.sshCommand into the existing profiles/<id>.gitconfig safely.",
+          "Select per-profile gh/glab/tea forge accounts so pushes and reviews use the selected personal/work identities."
+        ],
+        "dev_evidence": [
+          "src/settings/profiles.rs:21 UserProfile has id/name/author/own_signing/signing only; config_text:147-183 writes author and signing, no core.sshCommand.",
+          "Forge CLI/login plumbing is shared machine login, not a profile-specific account selection. SSH signing support is commit signatures, distinct from transport SSH identity."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims profile SSH keys or per-profile forge accounts. #77 uses a hanging core.sshCommand only to test cancellation; #74 uses SSH signature verification only."
+        ],
+        "estimated_dependencies": [
+          "Profile serialization/settings/config writer; shell-safe SSH command quoting; forge CLI account environment/selection and cache invalidation. Respect existing remote-profile boundary: README says remote repositories currently use that machine\u2019s own global config."
+        ],
+        "effort": "S-M"
+      },
+      "status": "integrated",
+      "agent": "implement_gerrit",
+      "branch": "codex/profile-connections",
+      "worktree": "/workspace/work/profile-connections",
+      "commit": "0854fa158cd7c9857db317378f586f3eebb91457",
+      "reviewer": "review_weather",
+      "validation": "private fmt/clippy/test PASS662+3ignored665total28featuretests",
+      "review_report": "/workspace/work/review-profile-connections-0854fa1.json",
+      "findings": [
+        "OAuth refresh env crosses profiles",
+        "expired pre-verification token returned after refresh",
+        "equivalentSSH~tokens falsely rejected",
+        "inheritedplinkvariant misroutesOpenSSHport"
+      ],
+      "prior_report": "/workspace/work/review-profile-connections-10b6595.json"
+    },
+    {
+      "issue": 43,
+      "title": "SSH key helper",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "SSH key helper",
+        "eligible": true,
+        "implementation_scope": [
+          "A Set up SSH flow creates an ed25519 key, adds it to the agent, uploads its public key to GitHub/Forgejo/Gitea with existing logins, and tests SSH connectivity.",
+          "Perform all operations on the repository\u2019s remote machine when applicable and explain outcomes without exposing private key material."
+        ],
+        "dev_evidence": [
+          "No ssh-add/key-generation/upload/test flow exists in src/. Existing ssh-keygen references are signing/verification, and remote::askpass handles credentials only."
+        ],
+        "open_pr_evidence": [
+          "No open PR claims an SSH helper. #95 explicitly says: The SSH-key case is explanation-only. The SSH helper from #43 can hook in later."
+        ],
+        "estimated_dependencies": [
+          "Local/remote process execution; ssh-keygen, ssh-add, ssh -T; existing forge login/API wrappers; key-path selection/non-overwrite checks and progress/results UI. Profile-key feature is a useful integration, not hard prerequisite."
+        ],
+        "effort": "S-M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 43,
+      "title": "Dev containers",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 43,
+        "idea": "Dev containers",
+        "eligible": true,
+        "implementation_scope": [
+          "Detect .devcontainer/devcontainer.json and offer Start environment, terminal in the container and handoff to editor.",
+          "Associate containers with worktrees and show actionable startup/rebuild failures."
+        ],
+        "dev_evidence": [
+          "No devcontainer/container environment model or Dev Container CLI integration exists in src/ or Cargo.toml. Current remote repositories model WSL/SSH, not containers."
+        ],
+        "open_pr_evidence": [
+          "No open PR title/body claims Dev Containers. #94 worktree setup recipes and #100 worktree collision views do not start/identify containers."
+        ],
+        "estimated_dependencies": [
+          "Installed Dev Container CLI and Docker; worktree identity/persistence; background CLI and logs; terminal backend/editor launch; configuration parsing and container discovery."
+        ],
+        "effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 44,
+      "title": "gitcraft as git difftool / mergetool, and comparing any two files",
+      "audit_file": "audit_39_44.json",
+      "details": {
+        "issue": 44,
+        "idea": "gitcraft as git difftool / mergetool, and comparing any two files",
+        "eligible": true,
+        "implementation_scope": [
+          "Add gitcraft --diff A B and --merge BASE LOCAL REMOTE MERGED entry points outside repositories using gitcraft\u2019s own diff/conflict editor.",
+          "Provide settings to register gitcraft in Git\u2019s difftool/mergetool config, including correct output-save/cancel/exit behavior."
+        ],
+        "dev_evidence": [
+          "src/main.rs:40 only takes args_os().nth(1) as a repository path. DiffKey and conflict editors are repo-bound; no standalone two/four-file CLI mode exists."
+        ],
+        "open_pr_evidence": [
+          "No open PR claims gitcraft as the tool. #70 invokes external programs via git difftool/mergetool (the reverse direction). #113 adds repository log/blame/show/compare commands, not standalone file --diff/--merge modes."
+        ],
+        "estimated_dependencies": [
+          "CLI dispatch before repository opening; reusable standalone diff/merge state and file IO; eframe window/lifecycle/exit status; safe Git config registration. Integrate with in-flight #68 single-instance and #113 CLI only as needed."
+        ],
+        "effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 45,
+      "title": "Practice repositories and a glossary",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 45,
+        "title": "Practice repositories and a glossary",
+        "status": "eligible",
+        "implementation_scope": [
+          "Start-page Practice entry; disposable conflict/divergence/detached-HEAD/already-pushed undo scenarios.",
+          "Goal and real repository-state success check for every scenario.",
+          "Context glossary hover explanations for HEAD, upstream, fast-forward, rebase throughout UI."
+        ],
+        "dev_evidence": [
+          "src/app/home.rs:58 has current start-page UI, no Practice entry.",
+          "src/repo/samples.rs:11 contains sample_actions for tests rather than scenario creation; no practice/glossary module or strings found.",
+          "PR #98 is guided empty states and tips, not practice repositories or a glossary."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            98
+          ]
+        },
+        "dependencies": [
+          "App home action and tab opening",
+          "Temporary repo fixture creation and persistent goal state",
+          "Shared glossary helpers across UI"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "integrated",
+      "agent": "audit_45_50",
+      "branch": "codex/practice-repositories",
+      "worktree": "/workspace/work/practice",
+      "commit": "bdd0ebd67a43ca6b7327cd4393d11a41b155f639",
+      "reviewer": "review_weather",
+      "validation": "private fmt/clippy/test PASS650+3ignored653total",
+      "findings": [
+        "normal practice UI Git operations inherit caller GIT_DIR/GIT_WORK_TREE and can mutate caller repository"
+      ],
+      "review_report": "/workspace/work/review-practice-bdd0ebd.json",
+      "url": "https://github.com/JKamsker/gitcraft/pull/155",
+      "interim_pr": 155,
+      "interim_pr_closed": true
+    },
+    {
+      "issue": 45,
+      "title": "A tour of this repository",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 45,
+        "title": "A tour of this repository",
+        "status": "eligible",
+        "implementation_scope": [
+          "Generated first-day page: README, inferred workflow with evidence, branch/tag scheme, top-folder activity/churn for 90 days, tooling requirements, contribution rules and PR templates.",
+          "Actionable setup checklist including LFS hooks and identity configuration."
+        ],
+        "dev_evidence": [
+          "No tour module/view or README-tour analysis in src.",
+          "Existing refs, history and submodules are separate baseline views; no first-day composition or checklist."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            93,
+            114,
+            130
+          ]
+        },
+        "dependencies": [
+          "Background git analysis (history/mailmap/files)",
+          "README/templates and tooling detection",
+          "RepoTab action/view integration; existing identity and LFS operations"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "implementing",
+      "agent": "audit_45_50",
+      "branch": "codex/onboarding-portability",
+      "worktree": "/workspace/work/onboarding-portability",
+      "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
+      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked"
+    },
+    {
+      "issue": 45,
+      "title": "New machine, same setup",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 45,
+        "title": "New machine, same setup",
+        "status": "eligible",
+        "implementation_scope": [
+          "Versioned single-file setup export containing profiles/settings/saved author identities plus selected recent repos, remotes, per-repo author and hidden branches.",
+          "Import preview/picker, clone selected repositories, restore worktrees and per-repo configuration."
+        ],
+        "dev_evidence": [
+          "src/app/mod.rs:541 saves internal eframe state only; no export/import workflow.",
+          "src/settings/profiles.rs:21 provides profile data, src/repo/branch_visibility.rs stores branch visibility; neither exports portable clone manifests."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            64,
+            71,
+            103
+          ]
+        },
+        "dependencies": [
+          "Settings/Profile serialization",
+          "Import preview and path mapping",
+          "Clone job orchestration and worktree recreation"
+        ],
+        "estimated_effort": "S-M"
+      },
+      "status": "implementing",
+      "agent": "audit_45_50",
+      "branch": "codex/onboarding-portability",
+      "worktree": "/workspace/work/onboarding-portability",
+      "base": "06fe1bd74280f9d24c8a1e1e12dccb528097dec8",
+      "base_note": "Reviewed History e65a65b merged with green992ec15; own combined base checked"
+    },
+    {
+      "issue": 46,
+      "title": "Lanes by branching model",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Lanes by branching model",
+        "status": "eligible",
+        "implementation_scope": [
+          "Branch-model presets and explicit branch band pinning; stable band/lane colours across reloads."
+        ],
+        "dev_evidence": [
+          "src/graph.rs:36 layout accepts only commits, allocating free lanes without branch model or persistent pinning.",
+          "src/repo/graph_view/lanes.rs: graph cells colour by lane index through Tokens::lane."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Graph layout constraints",
+          "Persisted per-repo branch-band assignments",
+          "Graph settings/UI integration"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 46,
+      "title": "History minimap",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "History minimap",
+        "status": "eligible",
+        "implementation_scope": [
+          "Loaded-history shape overview with viewport rectangle, HEAD/tags/search hits, drag-to-scroll, marked older-unloaded boundary."
+        ],
+        "dev_evidence": [
+          "src/repo/graph_view/mod.rs is a virtualized commit table with no history minimap.",
+          "src/repo/diff/map.rs is a diff change scrollbar, not history map."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Graph scroll position and loaded-history extent",
+          "Lightweight graph painter",
+          "Search hit navigation"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 46,
+      "title": "Activity calendar",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Activity calendar",
+        "status": "eligible",
+        "implementation_scope": [
+          "Day/month activity calendar; click day or drag date range to select/filter commits; author/committer date switch and dedupe across refs."
+        ],
+        "dev_evidence": [
+          "src/git/commits.rs:15 Commit includes author time only, no dedicated activity aggregate.",
+          "No activity calendar view; calendar occurrence in pull_request/parse.rs is date arithmetic."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Background unique-commit/date aggregation",
+          "Date selection/filter integration",
+          "Committer timestamp support"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "integrated",
+      "agent": "audit_45_50",
+      "branch": "codex/history-activity",
+      "worktree": "/workspace/work/history-activity",
+      "commit": "e65a65bf217a4a0eeb8f46297fd16f96de868584",
+      "base": "48f2b234c4b9535c820138442295caeada1410fc",
+      "reviewer": "baseline_validation",
+      "validation": "private fmt/clippy/test PASS727+3ignored730total24activitytests",
+      "review_report": "/workspace/work/review-history-activity-e65a65b.json",
+      "findings": [
+        "Missing mailmap.blob stderr ignored",
+        "Mutable mailmap changes across pages",
+        "Global ignoreSubmodules hides gitlink stats"
+      ]
+    },
+    {
+      "issue": 46,
+      "title": "Churn and contributor atlas",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Churn and contributor atlas",
+        "status": "eligible",
+        "implementation_scope": [
+          "Zoomable folder treemap sized by bytes/change frequency, coloured by churn/most frequent contributor, adjustable window, click file history."
+        ],
+        "dev_evidence": [
+          "No treemap/churn atlas analysis or view in src.",
+          "src/git/files.rs:130 file_history and existing file-view provide target navigation only."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Background tree/stat/mailmap analysis",
+          "Treemap layout and zoom/pan",
+          "File-history action"
+        ],
+        "estimated_effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 46,
+      "title": "Watch the repository grow",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Watch the repository grow",
+        "status": "eligible",
+        "implementation_scope": [
+          "Animated/scrubbable file tree with file additions/changes/deletions and contributor activity; pause/open commit at selected moment."
+        ],
+        "dev_evidence": [
+          "No repository-tree timeline or playback state in src.",
+          "Existing graph/history represent commits statically, not temporal file-tree snapshots."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Background bounded tree evolution model",
+          "Time scrub/playback renderer",
+          "Commit navigation"
+        ],
+        "estimated_effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 46,
+      "title": "Contributor statistics",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Contributor statistics",
+        "status": "eligible",
+        "implementation_scope": [
+          "Per-author commits, distinct files touched and active periods in chosen time window; canonical identities from .mailmap."
+        ],
+        "dev_evidence": [
+          "src/git/commits.rs uses %an/%ae and has no mailmap/statistics collector.",
+          "No contributor statistics view or mailmap references in baseline src."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Background history/name-status collection with mailmap",
+          "Time window controls",
+          "Author stats UI"
+        ],
+        "estimated_effort": "S-M"
+      },
+      "status": "integrated",
+      "agent": "audit_45_50",
+      "branch": "codex/history-activity",
+      "worktree": "/workspace/work/history-activity",
+      "commit": "e65a65bf217a4a0eeb8f46297fd16f96de868584",
+      "base": "48f2b234c4b9535c820138442295caeada1410fc",
+      "reviewer": "baseline_validation",
+      "validation": "private fmt/clippy/test PASS727+3ignored730total24activitytests",
+      "review_report": "/workspace/work/review-history-activity-e65a65b.json",
+      "findings": [
+        "Missing mailmap.blob stderr ignored",
+        "Mutable mailmap changes across pages",
+        "Global ignoreSubmodules hides gitlink stats"
+      ]
+    },
+    {
+      "issue": 46,
+      "title": "Quiet celebrations",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "Quiet celebrations",
+        "status": "eligible",
+        "implementation_scope": [
+          "Opt-in short visual flourish on first commit/release tag/successful merge; optional soft sound with separate sound/motion toggles; only after confirmed success."
+        ],
+        "dev_evidence": [
+          "src/app/panels.rs:112 toast_finished provides existing completion notifications only.",
+          "Cargo.toml has notify-rust but no audio/celebration path; no celebration strings/settings."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Operation success classification",
+          "Accessible animation preferences",
+          "Cross-platform audio facility and bundled soft sound"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 46,
+      "title": "History postcards",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 46,
+        "title": "History postcards",
+        "status": "eligible",
+        "implementation_scope": [
+          "Composed release graph PNG export with range/name/date and optional contributor names; explicit preview of included names/messages and anonymization."
+        ],
+        "dev_evidence": [
+          "Graph painter exists but no PNG composition/export/postcard workflow.",
+          "image dependency can encode PNG; no postcard templates/state."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Offscreen graph composition",
+          "Range/release metadata",
+          "Preview/anonymization and export dialog"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 47,
+      "title": "Connection doctor and proxy page",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 47,
+        "title": "Connection doctor and proxy page",
+        "status": "eligible",
+        "implementation_scope": [
+          "Settings Network page explains effective git/environment, forge and SSH proxies.",
+          "Remote connection test reports DNS/TCP/TLS/custom-CA/authentication/ls-remote duration and specific failed step."
+        ],
+        "dev_evidence": [
+          "src/settings/mod.rs:835 Page enum has nine pages and no Network.",
+          "src/forge/http.rs:232 with_proxy applies environment proxy behavior internally but has no UI/test doctor.",
+          "src/remote/session.rs executes SSH, but no phased connection diagnostic."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Proxy resolution reporting with secret redaction",
+          "Timeout/cancellable network probes on repository machine",
+          "Settings page and remote picker"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 47,
+      "title": "A tray icon that keeps watching",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 47,
+        "title": "A tray icon that keeps watching",
+        "status": "eligible",
+        "implementation_scope": [
+          "Opt-in close-to-tray, keep recent-repo fetch and review/check watchers running, tray notices/menu; GNOME notification fallback."
+        ],
+        "dev_evidence": [
+          "No tray integration/module/dependency in baseline.",
+          "src/app/mod.rs keeps repository polling in window UI lifecycle; closing exits rather than a tray lifecycle."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            99,
+            112,
+            121
+          ]
+        },
+        "dependencies": [
+          "Cross-platform safe tray wrapper",
+          "Window close lifecycle and background polling",
+          "Recent-repo status aggregation and notifications"
+        ],
+        "estimated_effort": "M-L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 47,
+      "title": "HTTPS sign-ins page",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 47,
+        "title": "HTTPS sign-ins page",
+        "status": "eligible",
+        "implementation_scope": [
+          "Show helper and stored account per host without showing secrets; per-host git credential reject sign-out; recognize wrong cached account after 401/403 and provide switch flow."
+        ],
+        "dev_evidence": [
+          "src/git/command.rs:344 stored_credentials fills one host credential for internal forge use.",
+          "src/repo/dialogs/remote.rs:74 only asks for credentials after failed operations.",
+          "No credential reject usage or host sign-in management page."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            95
+          ]
+        },
+        "dependencies": [
+          "Credential helper/account inspection and reject input",
+          "Settings page and cached-credential invalidation",
+          "Auth error integration"
+        ],
+        "estimated_effort": "S-M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 47,
+      "title": "Localization",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 47,
+        "title": "Localization",
+        "status": "eligible",
+        "implementation_scope": [
+          "Move every hard-coded UI/manual string to Fluent resources and support selecting/falling back among translations; defer RTL per issue."
+        ],
+        "dev_evidence": [
+          "src/manual.rs and src/settings/mod.rs page titles are English literals; no locale/Fluent dependency/resource layer in Cargo.toml.",
+          "No PR title/body mentions localization."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Fluent runtime and locale resources",
+          "App-wide dynamic formatting and error/message localization",
+          "Settings language preference and string completeness checks"
+        ],
+        "estimated_effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 48,
+      "title": "The prompt behind a commit",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 48,
+        "title": "The prompt behind a commit",
+        "status": "eligible",
+        "implementation_scope": [
+          "Commit Prompt & session tab reads Entire checkpoints, GitButler prompt-bearing messages, and local Claude/Codex transcripts matched by worktree/time.",
+          "Show prompts/summary/tool calls and hunk-to-step navigation locally; warn before pushing checkpoint branch."
+        ],
+        "dev_evidence": [
+          "src/repo/detail/commit.rs presents commit details without prompt/session provenance.",
+          "No Entire/transcript parsing or local agent session indexing in src or open PR bodies.",
+          "PR #132 checkpoints and #142 handoff are different named features, not commit session provenance."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            132,
+            142,
+            146
+          ]
+        },
+        "dependencies": [
+          "Provider-specific transcript/checkpoint parsers",
+          "Bounded local worktree/time indexing",
+          "Hunk provenance mapping",
+          "Push preview checkpoint-branch warning"
+        ],
+        "estimated_effort": "M-L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Pull from one remote, push to another",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Pull from one remote, push to another",
+        "status": "eligible",
+        "implementation_scope": [
+          "Show separate pull/push routes for every branch, independent ahead/behind counts and route pickers.",
+          "Honor branch.pushRemote/remote.pushDefault without conflating upstream; retain git target resolution."
+        ],
+        "dev_evidence": [
+          "src/git/refs.rs:8 Branch has only upstream/track fields.",
+          "src/repo/dialogs/upstream.rs:34 says one remote branch pulls from and pushes to.",
+          "No pushRemote/pushDefault references in baseline src."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            57,
+            137
+          ]
+        },
+        "dependencies": [
+          "Route resolution/read model",
+          "Independent counts for pull and push tracking targets",
+          "Undoable route config setters and picker UI"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Publish submodule changes before their parent",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Publish submodule changes before their parent",
+        "status": "eligible",
+        "implementation_scope": [
+          "Before superproject push list unpublished pointed-to submodule commits with checked remotes.",
+          "Push dependency repos first, then parent, reporting each result and stopping on dependency failure."
+        ],
+        "dev_evidence": [
+          "src/git/submodule.rs exposes checkout states/URLs only.",
+          "No --recurse-submodules or publication dependency check in baseline or any open PR body."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            57,
+            77
+          ]
+        },
+        "dependencies": [
+          "Submodule publication graph and remote visibility checks",
+          "Push job sequencing",
+          "Per-repo result reporting"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Submodule conflicts as graphs",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Submodule conflicts as graphs",
+        "status": "eligible",
+        "implementation_scope": [
+          "Open graph around index base/ours/theirs for gitlink conflict; choose commit containing both sides or open submodule merge; stage selected gitlink in parent."
+        ],
+        "dev_evidence": [
+          "src/repo/sidebar/submodules.rs:49 only update/open/copy actions.",
+          "src/git/submodule.rs:14 Conflicted enum is a label; no indexed conflict sides/ancestry picker.",
+          "PR #70 explicitly refuses submodule conflicts, #82 discusses display of remerge hunks, not graph resolution."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            70,
+            82
+          ]
+        },
+        "dependencies": [
+          "Index stage gitlink reads",
+          "Submodule ancestry/graph selection",
+          "Parent gitlink staging and stale conflict guards"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Remote refspec editor",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Remote refspec editor",
+        "status": "eligible",
+        "implementation_scope": [
+          "Fetch/push URL and positive/negative fetch refspec editor; mapping preview, mirror behavior and prune deletions preview."
+        ],
+        "dev_evidence": [
+          "src/repo/dialogs/remote.rs:11 edits name plus one URL only.",
+          "src/git/refs.rs:191 Remote contains name/url, no refspec/multiple URL model."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            57,
+            137
+          ]
+        },
+        "dependencies": [
+          "Read/write remote config without losing repeated values",
+          "Refspec parser and mapping/prune preview",
+          "Remote dialog expansion"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Publish to several hosts",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Publish to several hosts",
+        "status": "eligible",
+        "implementation_scope": [
+          "Named publication groups with multi-destination push, independent results and retry-failed-only; explicitly non-atomic."
+        ],
+        "dev_evidence": [
+          "No publication group model/UI, no remote groups push command path.",
+          "Current toolbar pushes one selected/default remote only."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Persisted group membership",
+          "Per-destination push orchestration/results",
+          "Git version capability or portable per-remote fallback"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Push outbox",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Push outbox",
+        "status": "eligible",
+        "implementation_scope": [
+          "Queue immutable exact commit/remote/branch while offline; select entries to send or opt into automatic plain pushes.",
+          "Pause entries for history rewrite/destination changes/rejection; later commits never join queued push silently."
+        ],
+        "dev_evidence": [
+          "No persistent queue/outbox model in src or any PR body.",
+          "PR #112 pauses network work but does not queue immutable pushes."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            112
+          ]
+        },
+        "dependencies": [
+          "Durable per-repo outbox storage",
+          "Connectivity scheduling and target snapshot validation",
+          "Exact-object refspec pushes and review UI"
+        ],
+        "estimated_effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Subtrees",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Subtrees",
+        "status": "eligible",
+        "implementation_scope": [
+          "Register source repo/branch per vendored folder, pull upstream, inspect local edits, split and send changes back; explain squash/full history and signing capability."
+        ],
+        "dev_evidence": [
+          "No subtree invocation/model/view in src or open PR bodies."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "git subtree capability detection",
+          "Persisted subtree registration",
+          "Safe plans and undo guards for add/pull/split/push"
+        ],
+        "estimated_effort": "L"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Shared and borrowed objects",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Shared and borrowed objects",
+        "status": "eligible",
+        "implementation_scope": [
+          "Show shared git directories and alternate object donors, missing donor paths; Make clone independent copies required objects before removing alternate link."
+        ],
+        "dev_evidence": [
+          "Worktree support discovers common git directories for watching but no object donor topology view.",
+          "No alternates inspection or independence operation in src or open PR bodies."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Git common-dir/object-dir and alternates discovery",
+          "Cross-machine path/status handling",
+          "Repack/connectivity verification then guarded alternate removal"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "All refs",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "All refs",
+        "status": "eligible",
+        "implementation_scope": [
+          "Browse root/bisect/original/application/namespaced refs, symbolic targets and pointed-to objects; namespace history."
+        ],
+        "dev_evidence": [
+          "src/git/refs.rs:50 hard-codes for-each-ref refs/heads refs/remotes refs/tags only.",
+          "No all-refs browser/root-ref capability or namespace history UI."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            54,
+            92,
+            132
+          ]
+        },
+        "dependencies": [
+          "General reference model beyond Branch",
+          "Git capability checks/fallback for root refs",
+          "Object/history navigation"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Replace refs and grafts",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Replace refs and grafts",
+        "status": "eligible",
+        "implementation_scope": [
+          "Mark replaced commits and toggle original/effective history; create visible removable temporary graft joins for imported histories."
+        ],
+        "dev_evidence": [
+          "No replace refs/graft handling or --no-replace-objects toggle in src or any PR body.",
+          "Current log always follows ordinary effective Git behavior."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Replacement ref discovery and original-history reads",
+          "Graph annotations and global per-view toggle",
+          "Guarded temporary replace/graft writes/undo"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "How an object is stored",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "How an object is stored",
+        "status": "eligible",
+        "implementation_scope": [
+          "Object ID/file-version inspector with type/logical+packed sizes, containing pack/delta chain; tree/delta-base navigation."
+        ],
+        "dev_evidence": [
+          "No verify-pack/object storage inspector in baseline or PR bodies.",
+          "PR #141 health doctor gives aggregate count-objects totals only, explicitly distinct scope."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            141
+          ]
+        },
+        "dependencies": [
+          "cat-file batch metadata and verify-pack parsing",
+          "Loose object handling and delta ancestry",
+          "Object/tree inspector UI"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 49,
+      "title": "Reftable: see it and migrate to it",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 49,
+        "title": "Reftable: see it and migrate to it",
+        "status": "eligible",
+        "implementation_scope": [
+          "Display ref storage backend/tool compatibility; guided git refs migrate with version checks and postmigration verification; refuse linked worktrees and require other writers stopped."
+        ],
+        "dev_evidence": [
+          "src/repo/watch.rs:77 knows reftable directory for watcher coverage only.",
+          "No refs migrate invocation/storage-backend inspector in baseline or open PR bodies."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "Git version/backend/tool capability probe",
+          "Linked-worktree and writer-safety guards",
+          "Migration preview, execution, verification and actionable failure handling"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "queued"
+    },
+    {
+      "issue": 50,
+      "title": "Three-state staging lens",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 50,
+        "title": "Three-state staging lens",
+        "status": "eligible",
+        "implementation_scope": [
+          "Aligned HEAD/index/worktree columns for partly staged files; stage/unstage line selection on either boundary; flag working edits that reverse staged changes."
+        ],
+        "dev_evidence": [
+          "src/repo/state.rs:79 DiffKey supports one Work diff or one two-end Range only.",
+          "src/repo/diff/mod.rs:73 DiffData.split is a two-column pair; no three-state data model."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": [
+            79,
+            107,
+            119
+          ]
+        },
+        "dependencies": [
+          "Triple content/line alignment",
+          "Reuse partial patch stage/unstage carefully against live index",
+          "Diff UI/selection and stale-state guards"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "implementing",
+      "agent": "audit_39_44",
+      "branch": "codex/file-comparison-views",
+      "worktree": "/workspace/work/file-comparison-views",
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+    },
+    {
+      "issue": 50,
+      "title": "File versions across branches",
+      "audit_file": "audit_45_50.json",
+      "details": {
+        "issue": 50,
+        "title": "File versions across branches",
+        "status": "eligible",
+        "implementation_scope": [
+          "Selected branches and folder as files\u00d7branches matrix, content identity markers, explicit missing/mode cells; select two cells to open content diff."
+        ],
+        "dev_evidence": [
+          "src/repo/detail/compare.rs only compares two ends at a time.",
+          "src/git/files.rs:47 tree_files returns paths; no multi-branch object/mode grid."
+        ],
+        "open_pr_evidence": {
+          "reviewed_pr_count": 99,
+          "no_named_feature_pr": true,
+          "related_but_distinct_prs": []
+        },
+        "dependencies": [
+          "NUL-delimited ls-tree metadata per branch",
+          "Content/mode equivalence and two-cell selection",
+          "Range diff integration"
+        ],
+        "estimated_effort": "M"
+      },
+      "status": "implementing",
+      "agent": "audit_39_44",
+      "branch": "codex/file-comparison-views",
+      "worktree": "/workspace/work/file-comparison-views",
+      "base": "992ec15ebc53c41639b6f704ca9bd89dfd8f2988"
+    }
+  ],
+  "audit_corrections": [
+    {
+      "issue": 38,
+      "title": "One action registry, rebindable keys, chords and a \"which-key\" overlay (L).",
+      "reason": "PR75 already introduces shared action registry; whole named feature excluded as in-flight despite missing key rebinding/chords/which-key."
+    }
+  ],
+  "validation_policy": "Private per-worktree CARGO_TARGET_DIR; force gitcraft rebuild; check new feature tests run. Shared-target results invalid after wrong-branch cache observed.",
+  "delivery_policy": {
+    "single_final_pr": true,
+    "integration_branch": "codex/remaining-features",
+    "integration_worktree": "/workspace/work/integration",
+    "integration_agent": "review_weather",
+    "interim_prs_to_close": [
+      153,
+      154,
+      155
+    ],
+    "final_pr": null,
+    "gate": "Combined complete task state must pass all required tests and independent adversarial review before single final PR creation.",
+    "interim_prs_closed": [
+      153,
+      154,
+      155
+    ],
+    "integration_remote_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+    "initial_combined_validation": "fmt/clippy/fulltest PASS686+3ignored689total",
+    "combined_validation": "fmt/clippy/fulltest PASS789+3ignored792total"
+  },
+  "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
+  "recovery_status": "Filesystem restored after outage; execution paused for backup.",
+  "verified_remote_head": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+  "preservation_policy": "Every completed unit commit AND push, verify remoteSHA, before next unit/riskytest. One final PR requires exact combined checks and independent adversarial PASS."
+}

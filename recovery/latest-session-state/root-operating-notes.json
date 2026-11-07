@@ -1,0 +1,65 @@
+{
+  "repository": "/workspace/gitcraft",
+  "work": "/workspace/work",
+  "canonical_queue": "/workspace/work/implementation-queue.json",
+  "original_scope": "Implement all eligible remaining named issue features with no open PR and not already on dev; audit72 eligible. Do not silently drop large ideas.",
+  "user_steering": "ONE final giant PR containing everything this task did. Branch pushes allowed. Preserve original feature goal. Interim153154155 already closed after remote integration preserved work. No further individual PRs.",
+  "agent_model": "All subagents explicitly GPT-6.1-sol high reasoning, fork none. User authorizes orchestrated agents; do not spawn other models.",
+  "agents": {
+    "audit_32_38": "Working drafts author; static edits pending test-hold release",
+    "audit_39_44": "Three file-comparison features author; static edits pending test-hold release",
+    "audit_45_50": "Tour and portability author; static edits pending test-hold release",
+    "baseline_validation": "Independent static SOPS safety review ee6e848; preserve Preflight FAIL review",
+    "implement_gerrit": "SOPS local-only safety unit ee6e848 pushed, compile quarantine remains",
+    "review_weather": "Push Preflight takeover author; integration sole writer when candidate reviews pass"
+  },
+  "integration": {
+    "worktree": "/workspace/work/integration",
+    "branch": "codex/remaining-features",
+    "remote_green_head": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+    "state": "/workspace/work/integration-state.json",
+    "checks": "Application src identical4fcb0df: prior fmt/strictClippy/789passed3ignored; only CI+AGENTS docs changed; finalcombinedreview pending",
+    "features": [
+      "Gerrit",
+      "Clone",
+      "Practice",
+      "Contrast",
+      "Structural",
+      "Weather",
+      "Graph readability",
+      "Bundles",
+      "Keyboard staging",
+      "Activity calendar",
+      "Contributor statistics",
+      "Profile SSH/accounts"
+    ],
+    "initial_green_base": "4f4fb565c3ade34d3b974f0545af21c51bb34b93 (firstfive,686pass3ignored)",
+    "final_gate": "At complete intended scope, exact combined final commit all required tests pass AND independent adversarial whole-combination review PASS before creating ONE PR. Existing scoped reviews do not replace finalcombinedreview."
+  },
+  "validation": "CRITICAL shared /workspace/gitcraft/target returned wrong-branch cached tests. Every feature uses PRIVATE CARGO_TARGET_DIR, force cargo clean -p gitcraft in private copy before gates; verify compiler worktree and added tests. Source /workspace/.gitcraft-env/env.sh. Dependency cp-al rootcache, unlink PRIVATE debug/.cargo-lock and target/.rustc_info.json before cargo. No sharedtarget gates. Review log hashes/commit binding; default3ignored tests documented. Windows/liveSSHWSL unavailable.",
+  "cleanup": "All reviewed+integrated private targets Gerrit/clone/practice/contrast/structural/weather removed after checking noactivecargo tosave32GBdisk; source/logs/manifests/reviews preserved. Integrationtarget activekeep. Rootcache cargo clean-pgitcraft done, dependenciesretained. Monitor df; delete only completed inactive artifacts.",
+  "integration_contract": "All local Git read/write/raw/piped/bounded commands must use practice-aware repository_command before with_profile. New profile/history/bundle transports may bypass whenbaseddev: adaptandaddactualhostileenvpractice cross-feature testbeforegreen. Profile snapshot/context pinning wins normaltabs butpracticebypassesprofile/ambient creds. SolewriterintegrationresolvesadditiveAction/Dialog/painter/Gerritmarker conflicts; preserveallfeaturetestnames.",
+  "audits": [
+    "/workspace/work/audit_32_38.json (28eligible57excluded)",
+    "/workspace/work/audit_39_44.json (14eligible)",
+    "/workspace/work/audit_45_50.json (30eligible)"
+  ],
+  "inputs": [
+    "/workspace/work/issues.json (20issues inclindex51)",
+    "/workspace/work/prs.json (99originalopenPRs,allinflightfeaturesexcludedwhole-namedbullet)"
+  ],
+  "scope_rule": "Namedidea with anyopenPR excludedwholeevenifomissions. Registry #38excludedbecausePR75sharedkeymap. ContrasteligiblePR66explicitlyexcludesit.",
+  "new_feature_base": "Latest immutable integration82189c4fcdb2d77fbb2746cb25d6390072266e9e, app source green4fcb0dfe226f30785dd2758a2959ff4379daa8ed",
+  "tools": "Use functions.exec tools.exec_command, tools.mcp__codex_apps__github_*; ALL_TOOLS filter specificnames forschemas. GitHubconnectorfor PR operations; normalgit pushbranches. No sendmessages/comments tothirdparties. GitHubupdate_pull_request stateclosed used153154155.",
+  "environment": "Managedcloud /workspace ready, networkpolicy enforced restricted github/packagehosts, VPNfalse, nosecretbindings. Cloudruntime skill read c7/cloud-environment-runtime plusnetworking. Do not dumpenv/credentials. GitHubownerJKamsker adminpush. devstill74027116e8f20334716a6b1208717bb33c9c6280 onlastfetch.",
+  "communications": "Start/continue concise meaningfulcommentary <=60s, no finaluntilgoalhandled. No userquestionsneeded; usersteering PRpackagingnotclearstop. FinalonlylinkonegiantPR, nowork/pathdeliverablelinks. Projectlesssaved useroutputs onlydesignated outputpath ifneeded.",
+  "checkpoint_policy": "After every completed unit of work, each agent and the orchestrator must commit AND push its branch before starting the next unit or risky test. Verify the remote SHA. Label WIP unvalidated. Only one final giant PR; all required tests and independent adversarial review must pass on the final combined source before PR creation.",
+  "recovery_status": "Workspace access restored. Current source and WIP preserved on remote branches; recovery ZIP published and download verified. Unsafe SOPS new remote watchdog removed in pushed static-only ee6e848, compile guards remain; independent safety review pending before runtime hold is lifted.",
+  "verified_remote_head": "82189c4fcdb2d77fbb2746cb25d6390072266e9e",
+  "backup": {
+    "url": "https://raw.githubusercontent.com/JKamsker/gitcraft/f6896061a3bc6c3a049f5cdd592ff21860ccb50b/recovery/gitcraft-recovery-20261107.zip",
+    "sha256": "0816c7c383acb5c130d3d019efacd573d6c70a8872f9cd91b67b076ccb887bf7",
+    "initial_integration_snapshot": "da0143c4f7574ab4ab9ec3607f927c89968c1a1f",
+    "note": "Archive is immutable initial recovery snapshot; source branches and metadata continue advancing."
+  }
+}

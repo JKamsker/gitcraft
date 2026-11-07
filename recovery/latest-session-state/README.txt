@@ -1,0 +1,1 @@
+Current session metadata checkpoint. The adjacent ZIP is the earlier immutable recovery snapshot; current source branches may be newer. This metadata-only recovery branch must not be merged into the final application PR. Application implementation and exact-head validation remain in progress.
