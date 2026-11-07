@@ -308,7 +308,10 @@ fn verify(
     // Verification resolves prerequisite commits, which otherwise triggers a promisor
     // fetch and modifies the object store before the user chooses Import.
     let no_lazy = no_lazy_fetch(repo)?;
-    let (args, input) = verification_command(cfg!(windows), &no_lazy, file, bytes)?;
+    // A Windows client can run Git on Unix through SSH/WSL. Only local native Git
+    // gets the Windows stdin workaround; remote hosts retain pathname verification.
+    let local_windows = cfg!(windows) && !remote::is_remote(repo);
+    let (args, input) = verification_command(local_windows, &no_lazy, file, bytes)?;
     bounded::run(repo, &args, input, HEADER_LIMIT)?;
     Ok(no_lazy)
 }

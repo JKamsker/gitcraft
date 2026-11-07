@@ -127,6 +127,11 @@ fn rename_uses_the_old_name_even_when_git_quotes_it() -> Result<(), String> {
     repo.write(old, "fn a() {}\n")?;
     let before = repo.commit()?;
     repo.git(&["mv", "--", old, new])?;
+    let quoted = repo.git(&["diff", "--cached", "--name-status", "-M"])?;
+    assert!(
+        quoted.contains("\\303\\274"),
+        "Git did not quote the Unicode path: {quoted}"
+    );
     let key = DiffKey::Work(StatusFile {
         path: new.into(),
         old_path: Some(old.into()),
