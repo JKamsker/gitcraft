@@ -148,3 +148,22 @@ fn mac_acl(file: &File, path: &Path) -> Result<Vec<exacl::AclEntry>, String> {
     check()?;
     Ok(acl)
 }
+
+/// APFS clonefile inherits destination ACLs by default. Install the captured source ACL
+/// exactly on the owned replacement, including an empty ACL, then verify its identity and
+/// policy. This never sets metadata on the original destination.
+#[cfg(target_os = "macos")]
+pub(super) fn restore_mac_acl(
+    file: &File,
+    path: &Path,
+    original: &AccessMetadata,
+) -> Result<(), String> {
+    // mac_acl verifies that this path still names the held, no-follow regular file.
+    let _ = mac_acl(file, path)?;
+    exacl::setfacl(&[path], &original.acl, exacl::AclOption::SYMLINK_ACL)
+        .map_err(|e| format!("Could not preserve output ACL: {e}"))?;
+    if mac_acl(file, path)? != original.acl {
+        return Err("Replacement ACL differs from the captured output policy".into());
+    }
+    Ok(())
+}

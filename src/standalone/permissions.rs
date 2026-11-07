@@ -69,6 +69,14 @@ pub(super) fn candidate(
             .rewrite_owned(OsStr::new("replacement"), bytes, original)
             .map_err(|e| e.to_string())?;
         unix_mode(&file, source)?;
+        super::access::restore_mac_acl(
+            &file,
+            &dir.path.join("replacement"),
+            original
+                .access
+                .as_ref()
+                .ok_or("No captured source access policy")?,
+        )?;
         return Ok(file);
     }
     #[cfg(not(windows))]
