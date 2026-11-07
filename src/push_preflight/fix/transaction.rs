@@ -403,7 +403,7 @@ impl Hook {
         std::fs::write(self.directory.join("mode"), b"probe")
             .map_err(|_| "Could not arm capability proof")?;
         let hooks = format!("core.hooksPath={}", remote::git_path(&self.directory));
-        let command_probe = self.directory.join("gitcraft-capability");
+        let command_probe = self.directory.join("pre-push");
         std::fs::write(&command_probe, "#!/bin/sh\ndirectory=$(dirname \"$0\")\ncat >\"$directory/hook-command.stdin\" || exit 1\nprintf 'probe\\n' >\"$directory/hook-command.ok\"\n")
             .map_err(|_| "Could not write owned hook-command proof")?;
         #[cfg(unix)]
@@ -426,7 +426,7 @@ impl Hook {
                 "run",
                 "--ignore-missing",
                 &input_arg,
-                "gitcraft-capability",
+                "pre-push",
             ],
             b"",
             &[],

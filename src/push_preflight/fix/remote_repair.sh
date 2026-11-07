@@ -63,10 +63,10 @@ cn=$(cap_commit After) || refuse 'Capability commit failed'
 cb=refs/heads/gitcraft-capability
 git -C "$C" -c core.hooksPath= symbolic-ref HEAD "$cb" && git -C "$C" -c core.hooksPath= update-ref "$cb" "$co" || refuse 'Capability HEAD failed'
 printf probe >"$D/mode"
-printf '#!/bin/sh\nd=$(dirname "$0")\ncat >"$d/hook-command.stdin" || exit 1\nprintf "probe\\n" >"$d/hook-command.ok"\n' >"$D/gitcraft-capability"
-chmod 700 "$D/gitcraft-capability" || refuse 'Capability command write failed'
+printf '#!/bin/sh\nd=$(dirname "$0")\ncat >"$d/hook-command.stdin" || exit 1\nprintf "probe\\n" >"$d/hook-command.ok"\n' >"$D/pre-push"
+chmod 700 "$D/pre-push" || refuse 'Capability command write failed'
 printf 'owned capability input\n' >"$D/hook-input"
-git -C "$C" -c core.hooksPath="$D" hook run --ignore-missing --to-stdin="$D/hook-input" gitcraft-capability >>"$D/capability.log" 2>&1 || refuse 'Capability hook command failed'
+git -C "$C" -c core.hooksPath="$D" hook run --ignore-missing --to-stdin="$D/hook-input" pre-push >>"$D/capability.log" 2>&1 || refuse 'Capability hook command failed'
 printf 'probe\n' >"$D/probe.expected"
 cmp -s -- "$D/probe.expected" "$D/hook-command.ok" && cmp -s -- "$D/hook-input" "$D/hook-command.stdin" || refuse 'Capability command acknowledgement absent'
 printf 'start\nupdate HEAD %s %s\nprepare\ncommit\n' "$cn" "$co" | git -C "$C" -c core.hooksPath="$D" update-ref --stdin >>"$D/capability.log" 2>&1 || refuse 'Native capability refused'

@@ -420,6 +420,9 @@ mod tests {
             };
             if let Msg::Then(next) = msg {
                 next(tab, ctx);
+                if matches!(tab.dialog, Some(Dialog::PushLoading { .. })) {
+                    continue;
+                }
                 return Ok(());
             }
             if let Msg::JobPanicked(error) = msg {
