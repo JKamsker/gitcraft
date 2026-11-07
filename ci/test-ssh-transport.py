@@ -77,7 +77,11 @@ def main():
                 env = os.environ.copy()
                 env["GITCRAFT_SSH_CONFIG"] = str(client_config)
                 env["GITCRAFT_SSH_TEST_HOST"] = "gitcraft-transport-test"
-                run("cargo", "test", "--locked", "--lib", TEST, "--", "--ignored", "--exact", "--nocapture", cwd=ROOT, env=env, timeout=900)
+                if args.binary:
+                    run(str(args.binary.resolve()), TEST, "--ignored", "--exact", "--nocapture",
+                        cwd=ROOT, env=env, timeout=900)
+                else:
+                    run("cargo", "test", "--locked", "--lib", TEST, "--", "--ignored", "--exact", "--nocapture", cwd=ROOT, env=env, timeout=900)
                 if args.benchmark:
                     if not args.binary:
                         parser.error("--benchmark requires --binary (a freshly compiled test harness)")

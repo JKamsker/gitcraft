@@ -123,3 +123,40 @@ reload benchmark's latency, process/thread and memory observations. Loopback mea
 measure handshake/process overhead; they do not establish WAN latency or resource savings
 on every deployment. Native Git and reload benchmark methodology/results are documented in
 [git-backend-baseline.md](git-backend-baseline.md).
+
+### Measured production reloads
+
+Measured 2026-11-07 on Apple M4 Max/macOS 27.2 with Rust 1.95 and Apple Git 2.54, fixture
+revision `f3c344e2`. The same saved debug executable and real GitCraft history were used
+for every case; the native Git backend was forced to CLI in both transport modes. Each
+case starts a fresh process, loads independent repository clones, waits for secondary
+panel jobs to settle, then reloads the same tabs once. There was no compiler or other test
+suite running during timing. This is one observed cold/warm pair per count, not a repeated
+statistical trial. Percentiles are completion times across the concurrently loaded tabs.
+
+Each pair is **multiplexing disabled → managed multiplexing**. Authenticated TCP connections
+are counted from the server's `Accepted publickey` log entries during the initial load.
+
+| Concurrent repositories | Initial authenticated connections | Initial completion p95 (ms) | Warm completion p95 (ms) |
+| ---: | ---: | ---: | ---: |
+| 1 | 7 → 1 | 470.3 → 283.5 | 203.8 → 196.1 |
+| 10 | 9 → 1 | 1353.7 → 1186.4 | 800.2 → 813.3 |
+| 50 | 9 → 1 | 4978.0 → 4878.2 | 3195.3 → 3196.6 |
+
+Warm loads opened **zero new authenticated connections in both modes** because the existing
+shell pools already retain their sessions. Managed multiplexing reduced cold connection
+count to one while retaining concurrent channels. Warm timing differences in this localhost
+sample are small and do not demonstrate a general warm-latency improvement.
+
+For 50 repositories, measured parent CPU was 2185.6 → 2155.2 ms on the initial load and
+1980.0 → 1957.0 ms on the warm load. Peak parent RSS was 128.0 → 127.4 MiB, sampled OS
+threads 42 → 42 and descendant processes 10 → 10. CPU/RSS exclude SSH server processes;
+persistent masters can daemonize/reparent and escape descendant sampling. These figures
+therefore describe client workload overhead, not total SSH CPU/memory savings. The server
+authentication log is the precise connection-count evidence.
+
+The real SSH reuse/concurrency/overflow/cancellation/reconnect regression passed against
+the same saved binary before measurement. [Compact results](git-backend-results.json)
+include all cold/warm wall times, p50/p95, CPU/resource counters, binary hash and fixture
+revision. Raw samples/logs remain under ignored `target/process-bench/`; ephemeral keys,
+server configuration and known-hosts files are destroyed by the harness afterward.
