@@ -425,7 +425,7 @@ impl RepoTab {
                             if matches!(e.step, Step::Squash | Step::Fixup) {
                                 ui.label(
                                     egui::RichText::new("↓ into the commit below")
-                                        .color(t.accent)
+                                        .color(t.accent_fg)
                                         .small(),
                                 );
                             }

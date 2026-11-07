@@ -123,7 +123,7 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
             waiting.len(),
             if waiting.len() == 1 { "" } else { "s" }
         ))
-        .color(t.accent)
+        .color(t.accent_fg)
         .small(),
     );
     for (thread, comment) in waiting {

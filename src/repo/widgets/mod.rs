@@ -155,7 +155,7 @@ pub fn status_color(t: &Tokens, code: char) -> Color32 {
     match code {
         'A' | '?' => t.success,
         'D' => t.danger,
-        'R' | 'C' => t.accent,
+        'R' | 'C' => t.accent_fg,
         'U' => t.danger,
         _ => t.warning,
     }

@@ -40,6 +40,8 @@ pub struct Palette {
     pub separator: Option<Color32>,
     pub icon: Option<Color32>,
     pub accent_text: Option<Color32>,
+    /// Accent used as text on panels, separately from the filled button colour.
+    pub accent_fg: Option<Color32>,
     pub row_selected: Option<Color32>,
     pub diff_add_bg: Option<Color32>,
     pub diff_del_bg: Option<Color32>,
@@ -56,7 +58,7 @@ pub struct Palette {
 
 /// The keys of a theme file's colours, as [`Palette::get`] and [`Palette::set`] know them (a
 /// file's `lanes` and `ansi` are lists of colours beside them).
-pub const KEYS: [&str; 28] = [
+pub const KEYS: [&str; 29] = [
     "tab_strip",
     "dock",
     "chrome",
@@ -78,6 +80,7 @@ pub const KEYS: [&str; 28] = [
     "separator",
     "icon",
     "accent_text",
+    "accent_fg",
     "row_selected",
     "diff_add_bg",
     "diff_del_bg",
@@ -120,6 +123,7 @@ impl Palette {
             separator: None,
             icon: None,
             accent_text: None,
+            accent_fg: None,
             row_selected: None,
             diff_add_bg: None,
             diff_del_bg: None,
@@ -172,6 +176,7 @@ impl Palette {
             "separator" => t.separator,
             "icon" => t.icon,
             "accent_text" => t.accent_text,
+            "accent_fg" => t.accent_fg,
             "row_selected" => t.row_selected,
             "diff_add_bg" => t.diff_add_bg,
             "diff_del_bg" => t.diff_del_bg,
@@ -194,7 +199,10 @@ impl Palette {
             "text" => &mut self.text,
             "text_dim" => &mut self.text_dim,
             "text_faint" => &mut self.text_faint,
-            "accent" => &mut self.accent,
+            "accent" => {
+                self.accent_fg = None;
+                &mut self.accent
+            }
             "red" => &mut self.red,
             "green" => &mut self.green,
             "yellow" => &mut self.yellow,
@@ -209,6 +217,7 @@ impl Palette {
                     "separator" => &mut self.separator,
                     "icon" => &mut self.icon,
                     "accent_text" => &mut self.accent_text,
+                    "accent_fg" => &mut self.accent_fg,
                     "row_selected" => &mut self.row_selected,
                     "diff_add_bg" => &mut self.diff_add_bg,
                     "diff_del_bg" => &mut self.diff_del_bg,
@@ -268,6 +277,7 @@ impl Palette {
                 .unwrap_or_else(|| mix(self.text, self.text_dim, 0.5)),
             accent: self.accent,
             accent_text,
+            accent_fg: self.accent_fg.unwrap_or(self.accent),
             separator,
             shadow: self.shadow.unwrap_or(if dark {
                 Color32::from_black_alpha(150)
@@ -363,6 +373,39 @@ pub fn contrast(a: Color32, b: Color32) -> f32 {
     let (la, lb) = (luminance(a), luminance(b));
     let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
     (hi + 0.05) / (lo + 0.05)
+}
+
+/// Move only as far toward white or black as needed, preserving the foreground's hue.
+pub(crate) fn aa_foreground(color: Color32, backgrounds: &[Color32]) -> Color32 {
+    let minimum = |fg| {
+        backgrounds
+            .iter()
+            .map(|bg| contrast(fg, *bg))
+            .fold(21.0, f32::min)
+    };
+    if minimum(color) >= 4.5 {
+        return color;
+    }
+    let toward = if minimum(Color32::WHITE) >= minimum(Color32::BLACK) {
+        Color32::WHITE
+    } else {
+        Color32::BLACK
+    };
+    let (mut low, mut high) = (1_u16, 255_u16);
+    while low < high {
+        let mid = (low + high) / 2;
+        if minimum(color.lerp_to_gamma(toward, mid as f32 / 255.0)) >= 4.5 {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+    color.lerp_to_gamma(toward, high as f32 / 255.0)
+}
+
+/// Branch pills keep white labels; darken their lane shade enough for small text.
+pub(crate) fn white_text_fill(color: Color32) -> Color32 {
+    aa_foreground(color, &[Color32::WHITE])
 }
 
 /// White or near-black, whichever reads better on `bg`.

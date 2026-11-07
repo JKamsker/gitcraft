@@ -186,7 +186,7 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         // A repository on another machine says which, first.
         if let Some(target) = crate::remote::parse(&self.path) {
-            widgets::chip(ui, &target.host.label(), t.accent).on_hover_text(format!(
+            widgets::chip(ui, &target.host.label(), t.accent_fg).on_hover_text(format!(
                 "git runs on {}, in {}",
                 target.host.label(),
                 target.path

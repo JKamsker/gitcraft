@@ -231,10 +231,10 @@ impl FolderBrowser {
         };
         if listing.repo {
             ui.horizontal(|ui| {
-                icons::inline(ui, "folder-git-2", 14.0, t.accent);
+                icons::inline(ui, "folder-git-2", 14.0, t.accent_fg);
                 ui.label(
                     RichText::new("This folder is a git repository.")
-                        .color(t.accent)
+                        .color(t.accent_fg)
                         .small(),
                 );
             });
@@ -266,7 +266,7 @@ impl FolderBrowser {
                         ui.painter().rect_filled(rect, t.radius_sm, fill);
                     }
                     let (icon, tint) = if folder.repo {
-                        ("folder-git-2", t.accent)
+                        ("folder-git-2", t.accent_fg)
                     } else {
                         ("folder-open", t.text_faint)
                     };
@@ -288,7 +288,7 @@ impl FolderBrowser {
                             egui::Align2::RIGHT_CENTER,
                             "repository",
                             egui::FontId::proportional(11.0),
-                            t.accent,
+                            t.accent_fg,
                         );
                     }
                     if resp.double_clicked() {

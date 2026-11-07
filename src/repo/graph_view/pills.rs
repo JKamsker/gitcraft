@@ -266,8 +266,10 @@ fn more_count(painter: &Painter, t: &Tokens, r: Rect, more: usize, lane: Color32
     painter.rect_filled(
         r,
         CornerRadius::same(t.radius as u8),
-        lane.lerp_to_gamma(Color32::BLACK, 0.35)
-            .lerp_to_gamma(Color32::BLACK, DIMMED),
+        theme::palette::white_text_fill(
+            lane.lerp_to_gamma(Color32::BLACK, 0.35)
+                .lerp_to_gamma(Color32::BLACK, DIMMED),
+        ),
     );
     painter.text(
         r.center(),
@@ -287,19 +289,7 @@ struct Marks {
     ci: Option<CheckState>,
 }
 
-/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
-fn ref_pill(
-    ui: &Ui,
-    painter: &Painter,
-    left_center: Pos2,
-    badge: &Badge,
-    lane: Color32,
-    max_w: f32,
-    marks: Marks,
-) -> Rect {
-    const ICON: f32 = 15.0;
-    let t = Tokens::get(ui.ctx());
-    let white = Color32::WHITE;
+fn pill_fill(t: &Tokens, badge: &Badge, lane: Color32) -> Color32 {
     let fill = match badge.kind {
         BadgeKind::Branch if badge.local => lane,
         // Only on a remote: a darker shade of the lane.
@@ -313,6 +303,23 @@ fn ref_pill(
     } else {
         fill.lerp_to_gamma(Color32::BLACK, DIMMED)
     };
+    theme::palette::white_text_fill(fill)
+}
+
+/// Paints a pill with white text and icons, at most `max_w` wide; returns its rect.
+fn ref_pill(
+    ui: &Ui,
+    painter: &Painter,
+    left_center: Pos2,
+    badge: &Badge,
+    lane: Color32,
+    max_w: f32,
+    marks: Marks,
+) -> Rect {
+    const ICON: f32 = 15.0;
+    let t = Tokens::get(ui.ctx());
+    let white = Color32::WHITE;
+    let fill = pill_fill(&t, badge, lane);
     let (lead, trail) = pill_icons(badge, marks.pr);
     let font = if badge.head {
         theme::semibold(11.0)
@@ -432,6 +439,45 @@ mod tests {
             local: false,
             remotes: vec![remote.to_owned()],
             head: false,
+        }
+    }
+
+    #[test]
+    fn white_pill_labels_meet_aa_for_every_builtin_and_lane_setting() {
+        use crate::theme::{LaneColors, Tweaks, catalog::BUILTIN, palette::contrast};
+        for builtin in BUILTIN {
+            for lanes in LaneColors::ALL {
+                let mut t = builtin.palette().tokens();
+                Tweaks {
+                    lanes,
+                    ..Tweaks::default()
+                }
+                .apply(&mut t);
+                for lane in t.lanes {
+                    for head in [false, true] {
+                        for (kind, local) in [
+                            (BadgeKind::Branch, true),
+                            (BadgeKind::Branch, false),
+                            (BadgeKind::Tag, false),
+                            (BadgeKind::DetachedHead, false),
+                        ] {
+                            let badge = Badge {
+                                label: "test".to_owned(),
+                                kind,
+                                local,
+                                remotes: vec![],
+                                head,
+                            };
+                            assert!(
+                                contrast(Color32::WHITE, pill_fill(&t, &badge, lane)) >= 4.5,
+                                "{}: {:?}, head={head}, lanes={lanes:?}",
+                                builtin.name,
+                                badge.kind
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 

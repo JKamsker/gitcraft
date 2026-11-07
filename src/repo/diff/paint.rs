@@ -38,7 +38,7 @@ pub(super) fn paint_line(
     let (bg, fg) = match line.kind {
         Kind::Add => (Some(t.diff_add_bg), t.text),
         Kind::Del => (Some(t.diff_del_bg), t.text),
-        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent),
+        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent_fg),
         Kind::Meta => (None, t.text_faint),
         Kind::Context => (None, t.text_dim),
     };
@@ -200,7 +200,7 @@ pub(super) fn hunk_button(
     let color = if pick == Pick::Discard {
         t.text_dim
     } else {
-        t.accent
+        t.accent_fg
     };
     let galley = ui
         .painter()

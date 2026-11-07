@@ -3,7 +3,7 @@
 
 use egui::Color32;
 
-use super::palette::{Palette, hex};
+use super::palette::{Palette, aa_foreground, hex, over};
 
 /// A theme of the catalogue.
 pub struct Builtin {
@@ -13,7 +13,79 @@ pub struct Builtin {
     pub name: &'static str,
     /// Who made the palette, and where it is published.
     pub credit: &'static str,
-    pub palette: Palette,
+    // Source palette for imports and inheritance, which keep the author's colours.
+    pub(super) palette: Palette,
+}
+
+impl Builtin {
+    /// Built-in UI text meets WCAG AA even at the small sizes of graph metadata and hints.
+    /// Keep the published surfaces, terminal and lane colours; user themes are never adjusted.
+    pub fn palette(&self) -> Palette {
+        let mut p = self.palette;
+        let t = p.tokens();
+        // Freeze derived backgrounds before raising text or changing the button fill.
+        p.hover = Some(t.hover);
+        p.pressed = Some(t.pressed);
+        p.row_selected = Some(t.row_selected);
+        p.separator = Some(t.separator);
+        p.icon = Some(t.icon);
+        p.lanes = Some(t.lanes);
+        p.ansi = Some(t.ansi);
+        let surfaces = [
+            t.tab_strip,
+            t.dock,
+            t.card,
+            t.field,
+            t.hover,
+            t.pressed,
+            t.row_selected,
+        ];
+        let mut text_surfaces = surfaces.to_vec();
+        for bg in [
+            t.field,
+            over(t.diff_add_bg, t.field),
+            over(t.diff_del_bg, t.field),
+        ] {
+            text_surfaces.push(bg);
+            text_surfaces.push(over(t.accent.gamma_multiply(0.22), bg));
+        }
+        p.text = aa_foreground(p.text, &text_surfaces);
+        // Pressed controls use normal or dim labels. Faint metadata belongs to rows/panels;
+        // keep its hierarchy without adjusting it for icon-only pressed backgrounds.
+        let quiet_surfaces = [
+            t.tab_strip,
+            t.dock,
+            t.card,
+            t.field,
+            t.hover,
+            t.row_selected,
+        ];
+        p.text_dim = aa_foreground(p.text_dim, &surfaces);
+        p.text_faint = aa_foreground(p.text_faint, &quiet_surfaces);
+        // The Pro themes deliberately have white primary-button labels.
+        p.accent = aa_foreground(p.accent, &[t.accent_text]);
+        p.accent_text = Some(t.accent_text);
+        let tinted = |mut color: Color32, fill: Color32| {
+            // Chips sit on panels; diff hunk labels sit on a tinted field.
+            loop {
+                let mut backgrounds = quiet_surfaces.to_vec();
+                for bg in [t.tab_strip, t.dock, t.card, t.field] {
+                    backgrounds.push(over(color.gamma_multiply(0.18), bg));
+                }
+                backgrounds.push(over(fill.gamma_multiply(0.22), t.field));
+                let raised = aa_foreground(color, &backgrounds);
+                if raised == color {
+                    return color;
+                }
+                color = raised;
+            }
+        };
+        p.accent_fg = Some(tinted(t.accent_fg, p.accent));
+        p.danger = Some(tinted(t.danger, t.danger));
+        p.warning = Some(tinted(t.warning, t.warning));
+        p.success = Some(tinted(t.success, t.success));
+        p
+    }
 }
 
 const fn pal(
@@ -119,7 +191,7 @@ const PRO_LIGHT_ANSI: [Color32; 16] = ansi([
     0xe63c46, 0x28aa5a, 0xc88c00, 0x2878f0, 0xb450dc, 0x00aab4, 0x282828,
 ]);
 
-/// PhotoCraft's Pro (Dark), exactly as gitcraft always had it.
+/// PhotoCraft's Pro (Dark), before the small-text contrast adjustment.
 const fn pro_dark() -> Palette {
     let mut p = Palette::new(
         true,
@@ -849,34 +921,107 @@ mod tests {
     }
 
     #[test]
-    fn every_theme_keeps_its_text_readable() {
+    fn every_builtin_small_text_token_meets_wcag_aa_on_its_surfaces() {
         let mut unreadable = Vec::new();
         for b in BUILTIN {
-            let t = b.palette.tokens();
-            let mut check = |what: &str, fg, bg, least: f32| {
-                let c = contrast(fg, bg);
-                if c < least {
-                    unreadable.push(format!("{}: {what} is {c:.2}:1", b.name));
+            let t = b.palette().tokens();
+            let mut check = |what: &str, fg, surface: &str, bg| {
+                let ratio = contrast(fg, bg);
+                if ratio < 4.5 {
+                    unreadable.push(format!("{}: {what} on {surface} is {ratio:.2}:1", b.name));
                 }
             };
-            for (what, bg) in [("dock", t.dock), ("chrome", t.chrome), ("field", t.field)] {
-                check(&format!("text on {what}"), t.text, bg, 4.5);
+            let surfaces = [
+                ("tab strip", t.tab_strip),
+                ("dock", t.dock),
+                ("card", t.card),
+                ("field", t.field),
+                ("hover", t.hover),
+                ("pressed", t.pressed),
+                ("selected row", t.row_selected),
+            ];
+            for (name, fg) in [
+                ("text", t.text),
+                ("dim text", t.text_dim),
+                ("faint text", t.text_faint),
+                ("accent foreground", t.accent_fg),
+                ("danger", t.danger),
+                ("warning", t.warning),
+                ("success", t.success),
+            ] {
+                for (surface, bg) in surfaces {
+                    if name == "text" || name == "dim text" || surface != "pressed" {
+                        check(name, fg, surface, bg);
+                    }
+                }
             }
-            // Faint text is for hints: it may be quieter, never unreadable.
-            check("faint text", t.text_faint, t.chrome, 2.2);
-            check("text on the accent", t.accent_text, t.accent, 2.5);
+            for (name, fg) in [
+                ("accent chip", t.accent_fg),
+                ("danger chip", t.danger),
+                ("warning chip", t.warning),
+                ("success chip", t.success),
+            ] {
+                for (surface, bg) in &surfaces[..4] {
+                    check(name, fg, surface, over(fg.gamma_multiply(0.18), *bg));
+                }
+            }
+            check("button label", t.accent_text, "accent", t.accent);
+            check(
+                "diff hunk label",
+                t.accent_fg,
+                "hunk fill",
+                over(t.accent.gamma_multiply(0.12), t.field),
+            );
+            for (name, fill) in [
+                ("added line", t.diff_add_bg),
+                ("deleted line", t.diff_del_bg),
+            ] {
+                check("diff text", t.text, name, over(fill, t.field));
+            }
         }
         assert!(unreadable.is_empty(), "{unreadable:#?}");
     }
 
     #[test]
+    fn contrast_changes_preserve_surfaces_terminal_and_graph_colours() {
+        for b in BUILTIN {
+            let original = b.palette.tokens();
+            let adjusted = b.palette().tokens();
+            assert_eq!(adjusted.tab_strip, original.tab_strip, "{}", b.name);
+            assert_eq!(adjusted.dock, original.dock, "{}", b.name);
+            assert_eq!(adjusted.chrome, original.chrome, "{}", b.name);
+            assert_eq!(adjusted.field, original.field, "{}", b.name);
+            assert_eq!(adjusted.hover, original.hover, "{}", b.name);
+            assert_eq!(adjusted.pressed, original.pressed, "{}", b.name);
+            assert_eq!(adjusted.row_selected, original.row_selected, "{}", b.name);
+            assert_eq!(adjusted.lanes, original.lanes, "{}", b.name);
+            assert_eq!(adjusted.ansi, original.ansi, "{}", b.name);
+        }
+        for b in &BUILTIN[..3] {
+            let t = b.palette().tokens();
+            assert_eq!(t.accent_text, Color32::WHITE);
+            assert!(contrast(t.accent_text, t.accent) >= 4.5);
+        }
+    }
+
+    #[test]
+    fn a_custom_palette_keeps_its_chosen_text_colours() {
+        let mut p = BUILTIN[0].palette();
+        p.text_faint = p.chrome;
+        p.accent_fg = None;
+        let t = p.tokens();
+        assert_eq!(t.text_faint, p.chrome);
+        assert_eq!(t.accent_fg, p.accent);
+    }
+
+    #[test]
     fn the_pro_themes_keep_their_colours() {
-        let dark = BUILTIN[0].palette.tokens();
+        let dark = BUILTIN[0].palette().tokens();
         assert_eq!(dark.chrome, Color32::from_rgb(50, 50, 50));
         assert_eq!(dark.hover, Color32::from_rgb(66, 66, 66));
         assert_eq!(dark.row_selected, Color32::from_rgb(38, 76, 122));
         assert_eq!(dark.lanes, CLASSIC_DARK_LANES);
-        let light = BUILTIN[2].palette.tokens();
+        let light = BUILTIN[2].palette().tokens();
         assert!(!light.dark);
         assert_eq!(light.field, Color32::WHITE);
         assert_eq!(light.separator, Color32::from_rgb(214, 214, 214));
