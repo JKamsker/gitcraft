@@ -1,0 +1,17 @@
+{
+  "application_candidate": "23816bd15ae471e9346730522d7941a491185dde",
+  "prior_application": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "status": "WIP corrected-source static re-review; author local gates/frozen manifest pending; no approval",
+  "source_sha256": {
+    "src/git/command.rs": "7c5901d0a6002ffdb8d6eee3ea8815dfabab5f027686eb76f31ee7c169d31305",
+    "src/git/command/setup.rs": "871d457cc6d965d57486b0a62a4b8447f43406bfc44d1b502403a33bbc3474d6",
+    "src/git/command/setup/tests.rs": "5af62766ee0528aa673fbcb45e27ae70f129bc574e383134c7acdb57ba848924",
+    "src/portability/restore.rs": "36cad7a88ae02886e1810c5b4a269f700ad77b8dc04e99fab5dcd41fc2e72107",
+    "src/portability/tests.rs": "a2832692a62101df002dfa391c03af46e004785b23b43dead1aa7e45a75b285d"
+  },
+  "findings_resolution_static": {
+    "PORTABLE-1": "Private empty-HOME Git context, no source/profile/global includes or parent-repository cwd; explicit captured account helper/SSH key only; source scheme and HTTPS redirects pinned. Added recording remote-helper fixture covers expected URL and selected auth under hostile ambient/global/profile/parent config. Appears addressed; pending frozen gates/runtime evidence.",
+    "PORTABLE-2": "worktree_is_locked resolves filesystem directory identity through is_same_dir_as instead of comparing display bytes. Added locked-first/later-missing-branch retry and native Windows/Git spelling regression. Appears addressed; native Windows runtime unavailable."
+  },
+  "scope": "Read-only static re-review using immutable git objects; no app edits, Cargo, new runtime claims or CI. Original b05 FAIL report is immutable."
+}
