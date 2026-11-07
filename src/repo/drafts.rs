@@ -391,6 +391,60 @@ impl RepoTab {
 mod tests {
     use super::*;
     #[test]
+    fn a_due_pause_dispatches_a_background_snapshot_and_disabled_repos_stay_empty()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let path =
+            std::env::temp_dir().join(format!("gitcraft-draft-pause-{}", std::process::id()));
+        std::fs::create_dir(&path).map_err(|e| e.to_string())?;
+        crate::git::run(Some(&path), &["init", "-q"])?;
+        std::fs::write(path.join("notes"), b"a pause saves this").map_err(|e| e.to_string())?;
+        store::set_enabled(&path, true)?;
+        let mut tab = RepoTab::new_deferred(path.clone(), &ctx);
+        tab.deferred = false;
+        tab.drafts.loaded = true;
+        tab.drafts.enabled = true;
+        tab.drafts.edited = Some(Instant::now() - PAUSE);
+        tab.poll_drafts(&ctx);
+        assert!(tab.drafts.running.is_some());
+        // The message carries a completed background result; no Git result was read
+        // synchronously by the UI dispatcher, which records the running generation.
+        let msg = tab
+            .rx
+            .recv_timeout(Duration::from_secs(20))
+            .map_err(|e| e.to_string())?;
+        match msg {
+            Msg::DraftSaved(id, result) => {
+                assert!(result.as_ref().is_ok_and(Option::is_some), "{result:?}");
+                tab.draft_saved(id, result);
+            }
+            _ => return Err("Unexpected worker result".into()),
+        }
+        assert!(tab.drafts.running.is_none());
+        assert_eq!(store::list(&path, &|| true)?.len(), 1);
+        store::set_enabled(&path, false)?;
+        std::fs::write(path.join("notes"), b"not saved while disabled")
+            .map_err(|e| e.to_string())?;
+        tab.drafts.edited = Some(Instant::now() - PAUSE);
+        tab.poll_drafts(&ctx);
+        match tab
+            .rx
+            .recv_timeout(Duration::from_secs(20))
+            .map_err(|e| e.to_string())?
+        {
+            Msg::DraftSaved(id, result) => {
+                assert!(result.as_ref().is_ok_and(Option::is_none));
+                tab.draft_saved(id, result);
+            }
+            _ => return Err("Unexpected worker result".into()),
+        }
+        assert_eq!(store::list(&path, &|| true)?.len(), 1);
+        drop(tab);
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[test]
     fn pauses_coalesce_and_stale_or_disabled_jobs_cannot_publish_ui_results() {
         let mut state = State::default();
         assert!(!state.due(Instant::now()));

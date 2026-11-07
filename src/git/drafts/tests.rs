@@ -3,6 +3,9 @@ use std::path::PathBuf;
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Result<Self, String> {
+        Self::new_with_format("sha1")
+    }
+    fn new_with_format(format: &str) -> Result<Self, String> {
         static ID: AtomicU64 = AtomicU64::new(0);
         let p = std::env::temp_dir().join(format!(
             "gitcraft-draft-test-{}-{}",
@@ -11,7 +14,7 @@ impl Fixture {
         ));
         std::fs::create_dir(&p).map_err(|e| e.to_string())?;
         for args in [
-            vec!["init", "-q"],
+            vec!["init", "-q", "--object-format", format],
             vec!["config", "user.name", "Test"],
             vec!["config", "user.email", "test@example.com"],
             vec!["config", "commit.gpgSign", "false"],
@@ -761,6 +764,206 @@ fn missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions() -> Re
     assert_eq!(
         std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
         index
+    );
+    Ok(())
+}
+
+#[test]
+fn unborn_sha256_and_linked_worktree_versions_keep_separate_identities() -> Result<(), String> {
+    let f = Fixture::new_with_format("sha256")?;
+    f.write("unborn ü", b"not committed yet")?;
+    let unborn = capture(&f.0, "Pause", &|| true)?.ok_or("No unborn version")?;
+    assert!(unborn.metadata.head.is_none());
+    assert_eq!(unborn.id.tree.len(), 64);
+    f.write("unborn ü", b"newer unborn bytes")?;
+    let view = preview(&f.0, &unborn.id, "unborn ü", false, &|| true)?;
+    restore(&f.0, &view, &[0], &|| true)?;
+    assert_eq!(
+        std::fs::read(f.0.join("unborn ü")).map_err(|e| e.to_string())?,
+        b"not committed yet"
+    );
+    f.commit()?;
+    let linked = f.0.join(".git/linked tree ü");
+    git::run(
+        Some(&f.0),
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "linked",
+            linked.to_str().ok_or("utf8")?,
+        ],
+    )?;
+    std::fs::write(linked.join("unborn ü"), b"linked version").map_err(|e| e.to_string())?;
+    let saved = capture(&linked, "Pause", &|| true)?.ok_or("No linked version")?;
+    assert_ne!(unborn.metadata.worktree, saved.metadata.worktree);
+    assert_eq!(list(&linked, &|| true)?.len(), 1);
+    assert!(preview(&f.0, &saved.id, "unborn ü", false, &|| true).is_err());
+    assert!(
+        list(&f.0, &|| true)?
+            .iter()
+            .all(|draft| draft.metadata.worktree == unborn.metadata.worktree)
+    );
+    Ok(())
+}
+
+#[test]
+fn rename_unicode_no_newline_and_hardlinks_recover_only_the_selected_path() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("old", b"base without newline")?;
+    f.commit()?;
+    git::run(Some(&f.0), &["mv", "old", "renamed ü ' file"])?;
+    f.write(
+        "renamed ü ' file",
+        b"saved \xf0\x9f\x8c\xb1 without newline",
+    )?;
+    let saved = capture(&f.0, "Renamed", &|| true)?.ok_or("No renamed version")?;
+    f.write("renamed ü ' file", b"newer no newline")?;
+    let linked = f.0.join(".git/outside-hardlink");
+    std::fs::hard_link(f.0.join("renamed ü ' file"), &linked).map_err(|e| e.to_string())?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    let view = preview(&f.0, &saved.id, "renamed ü ' file", false, &|| true)?;
+    assert_eq!(view.hunks.len(), 1);
+    restore(&f.0, &view, &[0], &|| true)?;
+    assert_eq!(
+        std::fs::read(f.0.join("renamed ü ' file")).map_err(|e| e.to_string())?,
+        b"saved \xf0\x9f\x8c\xb1 without newline"
+    );
+    assert_eq!(
+        std::fs::read(linked).map_err(|e| e.to_string())?,
+        b"newer no newline"
+    );
+    assert!(!f.0.join("old").exists());
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn ignored_rule_read_warnings_fail_closed_before_any_version_is_published() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"base")?;
+    f.commit()?;
+    f.write(".git/ignore-rules", b"*.secret\n")?;
+    std::os::unix::fs::symlink(".git/ignore-rules", f.0.join(".gitignore"))
+        .map_err(|e| e.to_string())?;
+    f.write("private.secret", b"must not copy")?;
+    let ctx = Context::new(&f.0, &|| true)?;
+    let read = ctx.source(
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        vec![],
+        &[0],
+        &|| true,
+    );
+    assert!(read.is_err(), "Uncertain ignore rules must be refused");
+    assert!(capture(&f.0, "Pause", &|| true).is_err());
+    assert!(git::run(Some(&f.0), &["for-each-ref", PREFIX])?.is_empty());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers()
+-> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new()?;
+    f.write("keep/file", b"keep base\n")?;
+    f.write("omit/file", b"unavailable blob\n")?;
+    f.commit()?;
+    git::run(Some(&f.0), &["config", "uploadpack.allowFilter", "true"])?;
+    let missing = git::run(Some(&f.0), &["rev-parse", "HEAD:omit/file"])?;
+    let dest = f.0.join(".git/partial-clone");
+    git::run(
+        None,
+        &[
+            "clone",
+            "--no-local",
+            "--filter=blob:none",
+            "--depth=1",
+            "--no-checkout",
+            "--",
+            f.0.to_str().ok_or("utf8")?,
+            dest.to_str().ok_or("utf8")?,
+        ],
+    )?;
+    git::run(Some(&dest), &["sparse-checkout", "set", "--cone", "keep"])?;
+    git::run(Some(&dest), &["checkout", "-q"])?;
+    assert_eq!(
+        git::run(Some(&dest), &["rev-parse", "--is-shallow-repository"])?.trim(),
+        "true"
+    );
+    assert!(
+        git::run(
+            Some(&dest),
+            &["--no-lazy-fetch", "cat-file", "-e", missing.trim()]
+        )
+        .is_err()
+    );
+    let helper = f.0.join(".git/upload-helper");
+    let marker = f.0.join(".git/network-helper-ran");
+    std::fs::write(
+        &helper,
+        format!(
+            "#!/bin/sh\ntouch {}\nexit 1\n",
+            remote::sh_quote(marker.to_str().ok_or("utf8")?)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(&helper, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    git::run(
+        Some(&dest),
+        &[
+            "config",
+            "remote.origin.uploadpack",
+            helper.to_str().ok_or("utf8")?,
+        ],
+    )?;
+    std::fs::write(dest.join("keep/file"), b"working edit\n").map_err(|e| e.to_string())?;
+    // A staged promisor blob is known by ID but has never been downloaded.
+    git::run(
+        Some(&dest),
+        &[
+            "update-index",
+            "--cacheinfo",
+            &format!("100644,{},keep/file", missing.trim()),
+        ],
+    )?;
+    let objects = git::run(Some(&dest), &["count-objects", "-v"])?;
+    let index = std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?;
+    let config = std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?;
+    let saved = capture(&dest, "Offline pause", &|| true)?.ok_or("No partial version")?;
+    assert!(
+        list(&dest, &|| true)?
+            .iter()
+            .any(|draft| draft.id == saved.id)
+    );
+    assert!(preview(&dest, &saved.id, "keep/file", true, &|| true).is_err());
+    assert!(!marker.exists());
+    assert_eq!(
+        std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    assert_eq!(
+        std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?,
+        config
+    );
+    // Snapshot objects are deliberately added; no existing promised pack is fetched.
+    let after = git::run(Some(&dest), &["count-objects", "-v"])?;
+    let packs = |text: &str| {
+        text.lines()
+            .filter(|line| line.starts_with("packs:") || line.starts_with("in-pack:"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(packs(&after), packs(&objects));
+    assert!(git::run(Some(&dest), &["cat-file", "-e", missing.trim()]).is_err());
+    assert!(
+        marker.exists(),
+        "Positive control must attempt the configured helper"
     );
     Ok(())
 }

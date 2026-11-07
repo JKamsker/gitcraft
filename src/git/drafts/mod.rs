@@ -256,7 +256,11 @@ fn capture_preserving(
     let metadata = Metadata {
         version: 1,
         created: git::now(),
-        reason: reason.chars().take(160).collect(),
+        reason: reason
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(160)
+            .collect(),
         worktree: ctx.id.clone(),
         head: before.head,
         branch: before.branch,
@@ -816,6 +820,13 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
         || !oid_valid(&meta.index_tree)
         || !oid_valid(&meta.work_tree)
         || meta.files.len() > MAX_FILES
+        || meta.reason.chars().count() > 160
+        || meta.reason.chars().any(char::is_control)
+        || meta.head.as_ref().is_some_and(|oid| !oid_valid(oid))
+        || meta
+            .branch
+            .as_ref()
+            .is_some_and(|branch| branch.len() > 4096 || branch.chars().any(char::is_control))
     {
         return Err("Unsupported draft metadata version or contents".into());
     }
@@ -834,7 +845,11 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
             return Err("Draft metadata does not match its protected trees".into());
         }
     }
+    let mut paths = BTreeSet::new();
     for file in &meta.files {
+        if !paths.insert(&file.path) {
+            return Err("Duplicate draft file entry".into());
+        }
         valid_path(&file.path)?;
         for entry in [&file.index, &file.work].into_iter().flatten() {
             if !oid_valid(&entry.oid)

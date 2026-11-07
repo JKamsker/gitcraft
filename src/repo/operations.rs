@@ -594,6 +594,72 @@ mod tests {
         assert_ne!(after, before);
     }
 
+    #[test]
+    fn working_drafts_protect_checkout_and_rebase_before_any_operation_step() -> Result<(), String>
+    {
+        let dir = repo("drafts-before-checkout");
+        std::fs::write(dir.join("notes"), b"before checkout").map_err(|e| e.to_string())?;
+        git::drafts::set_enabled(&dir, true)?;
+        let (checkout, _) = run_steps(
+            &dir,
+            &ops(&[&["checkout", "-b", "draft-side", "--"]]),
+            OpKind::plain(),
+            None,
+        );
+        checkout?;
+        let drafts = git::drafts::list(&dir, &|| true)?;
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(
+            drafts[0].metadata.branch.as_deref(),
+            Some("refs/heads/main")
+        );
+        std::fs::write(dir.join("notes"), b"before rebase").map_err(|e| e.to_string())?;
+        let (rebase, _) = run_steps(&dir, &ops(&[&["rebase", "HEAD"]]), OpKind::plain(), None);
+        rebase?;
+        let drafts = git::drafts::list(&dir, &|| true)?;
+        assert_eq!(drafts.len(), 2);
+        assert_eq!(
+            git::run_bytes(
+                Some(&dir),
+                &[
+                    "cat-file",
+                    "blob",
+                    &format!("{}:notes", drafts[0].metadata.work_tree)
+                ]
+            )?,
+            b"before rebase"
+        );
+        assert_eq!(drafts[0].metadata.reason, "Before checkout or rebase");
+        // A safety failure must precede even unrelated steps in the same operation.
+        std::fs::File::create(dir.join("too-large"))
+            .and_then(|file| file.set_len(git::drafts::FILE_LIMIT as u64 + 1))
+            .map_err(|e| e.to_string())?;
+        let steps = ops(&[&["branch", "must-not-exist"], &["checkout", "main", "--"]]);
+        let (blocked, _, stopped) =
+            super::run_steps_counted(&dir, &steps, OpKind::plain(), None, false);
+        assert!(blocked.is_err_and(|e| e.starts_with(super::super::drafts::CHECK_FAILED)));
+        assert_eq!(stopped, 0);
+        assert!(git::resolve(&dir, "refs/heads/must-not-exist").is_err());
+        assert_eq!(
+            git::run(Some(&dir), &["symbolic-ref", "HEAD"])?.trim(),
+            "refs/heads/draft-side"
+        );
+        std::fs::remove_file(dir.join("too-large")).map_err(|e| e.to_string())?;
+        git::drafts::set_enabled(&dir, false)?;
+        std::fs::write(dir.join("notes"), b"off means no automatic draft")
+            .map_err(|e| e.to_string())?;
+        run_steps(
+            &dir,
+            &ops(&[&["checkout", "main", "--"]]),
+            OpKind::plain(),
+            None,
+        )
+        .0?;
+        assert_eq!(git::drafts::list(&dir, &|| true)?.len(), 2);
+        std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     fn entry(kind: OpKind) -> Option<UndoEntry> {
         match kind {
             OpKind::Normal(Undo::Custom { undo, redo }, _) => Some(UndoEntry {

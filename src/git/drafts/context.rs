@@ -30,6 +30,7 @@ fn prefix(repo: &Path, hooks: Option<&Path>, lazy: bool) -> Vec<String> {
     for setting in [
         "core.fsmonitor=false".to_owned(),
         "core.untrackedCache=false".into(),
+        "advice.sparseIndexExpanded=false".into(),
         "core.protectNTFS=true".into(),
         "core.protectHFS=true".into(),
         "gc.auto=0".into(),
