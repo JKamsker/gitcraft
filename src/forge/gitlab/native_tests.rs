@@ -119,6 +119,35 @@ fn native_line_positions_keep_context_and_rename_coordinates_and_refuse_unread_l
     Ok(())
 }
 
+#[test]
+fn native_origins_bind_scheme_host_port_and_project_without_treating_default_ports_as_new_servers() {
+    let mut hosting = Hosting {
+        forge: super::super::Forge::GitLab,
+        host: "gitlab.fixture.invalid".into(),
+        path: "group/project".into(),
+        web: "https://gitlab.fixture.invalid:8443".into(),
+    };
+    assert!(api::source_matches(
+        &hosting,
+        "https://gitlab.fixture.invalid:8443/group/project/-/merge_requests/7",
+    ));
+    for url in [
+        "https://gitlab.fixture.invalid/group/project/-/merge_requests/7",
+        "https://gitlab.fixture.invalid:9443/group/project/-/merge_requests/7",
+        "http://gitlab.fixture.invalid:8443/group/project/-/merge_requests/7",
+        "https://other.fixture.invalid:8443/group/project/-/merge_requests/7",
+        "https://gitlab.fixture.invalid:8443/another/project/-/merge_requests/7",
+        "https://user@gitlab.fixture.invalid:8443/group/project/-/merge_requests/7",
+    ] {
+        assert!(!api::source_matches(&hosting, url), "{url}");
+    }
+    hosting.web = "https://gitlab.fixture.invalid".into();
+    assert!(api::source_matches(
+        &hosting,
+        "https://gitlab.fixture.invalid:443/group/project/-/merge_requests/7",
+    ));
+}
+
 #[cfg(unix)]
 mod recording {
     use super::*;
@@ -327,6 +356,11 @@ print(json.dumps(result))
         f.run(|api| {
             assert_eq!(GitLab.list(&f.repo, &f.hosting())?.len(), 1);
             let d = details::read(api, 7)?;
+            let mut other_origin = f.hosting();
+            other_origin.web = "https://gitlab.com:8443".into();
+            assert!(post::GitLabTarget::new(
+                api::Api::new(&f.repo, &other_origin)?, &d,
+            ).is_none());
             let files = crate::pull_request::files(
                 &f.repo,
                 &d,
@@ -405,7 +439,7 @@ print(json.dumps(result))
     }
     #[test]
     fn stale_head_account_repository_and_profile_cannot_send_a_write() -> Result<(), String> {
-        for changed in ["head", "start", "base", "id", "viewer", "remote", "profile"] {
+        for changed in ["port", "web-origin", "head", "start", "base", "id", "viewer", "remote", "profile"] {
             let f = Fixture::new()?;
             f.run(|api| {
                 let d = details::read(api, 7)?;
@@ -413,6 +447,12 @@ print(json.dumps(result))
                     .ok_or("target")?;
                 let mut fixture = f.fixture()?;
                 match changed {
+                    "port" => f.git(&[
+                        "remote", "set-url", "origin",
+                        "https://gitlab.com:8443/group/sub/repo.git",
+                    ])?,
+                    "web-origin" => fixture["mr"]["web_url"] =
+                        json!("https://gitlab.com:8443/group/sub/repo/-/merge_requests/7"),
                     "head" => fixture["mr"]["sha"] = json!("d".repeat(40)),
                     "id" => fixture["mr"]["id"] = json!(999),
                     "viewer" => fixture["viewer"]["username"] = json!("personal"),

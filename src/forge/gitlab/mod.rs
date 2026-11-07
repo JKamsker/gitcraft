@@ -55,9 +55,7 @@ impl Provider for GitLab {
             .get("web_url")
             .and_then(Value::as_str)
             .ok_or("GitLab did not return the created merge request URL")?;
-        if crate::pull_request::repo_of_url(url)
-            != Some((hosting.host.clone(), hosting.path.clone()))
-        {
+        if !api::source_matches(hosting, url) {
             return Err("GitLab returned a merge request URL for another repository".into());
         }
         Ok(url.into())

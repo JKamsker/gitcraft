@@ -16,9 +16,7 @@ pub(super) struct GitLabTarget {
 }
 impl GitLabTarget {
     pub fn new(mut api: Api, details: &PrDetails) -> Option<Self> {
-        let (host, path) = crate::pull_request::repo_of_url(&details.url)?;
-        if host != api.hosting.host
-            || path != api.hosting.path
+        if !super::api::source_matches(&api.hosting, &details.url)
             || details.forge != Some(crate::forge::Forge::GitLab)
             || details.extras.connection_binding != Some(crate::pr_threads::connection_binding())
         {
@@ -52,7 +50,8 @@ impl GitLabTarget {
             return Err("The GitLab account changed. Reload before sending.".into());
         }
         let mr = self.api.get(&self.endpoint())?;
-        if mr
+        if !super::api::source_matches(&self.api.hosting, at(&mr, "/web_url"))
+            || mr
             .get("id")
             .and_then(Value::as_u64)
             .map(|id| id.to_string())

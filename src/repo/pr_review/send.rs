@@ -322,7 +322,7 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
 mod native_ownership_tests {
     use super::*;
     #[test]
-    fn old_native_write_completion_after_profile_reload_cannot_clear_a_new_draft()
+    fn old_native_write_completion_after_profile_or_origin_change_cannot_clear_a_new_draft()
     -> Result<(), String> {
         crate::connections::Context::default().run(|| {
             let ctx = egui::Context::default();
@@ -355,6 +355,34 @@ mod native_ownership_tests {
             let draft = tab.pr_drafts.get(&7).ok_or("draft")?;
             assert!(draft.comment.is_empty());
             assert!(!draft.posting);
+
+            // A server port change on the same host/project also retires the request.
+            let original = crate::forge::Hosting {
+                forge: crate::forge::Forge::GitLab,
+                host: "gitlab.fixture.invalid".into(),
+                path: "group/project".into(),
+                web: "https://gitlab.fixture.invalid".into(),
+            };
+            tab.replace_pr_hosting(Some(original.clone()));
+            let draft = tab.pr_drafts.get_mut(&7).ok_or("draft")?;
+            draft.comment = "Text kept across an origin change".into();
+            draft.native_post_request = Some(3);
+            draft.posting = true;
+            let mut other_origin = original;
+            other_origin.web = "https://gitlab.fixture.invalid:8443".into();
+            tab.replace_pr_hosting(Some(other_origin));
+            let draft = tab.pr_drafts.get_mut(&7).ok_or("draft")?;
+            assert!(!draft.posting);
+            assert!(draft.native_post_request.is_none());
+            assert_eq!(draft.comment, "Text kept across an origin change");
+            draft.comment = "New server draft".into();
+            draft.native_post_request = Some(4);
+            draft.posting = true;
+            tab.pr_posted(7, Some(3), Posted::Comment, Ok(()), &ctx);
+            let draft = tab.pr_drafts.get(&7).ok_or("draft")?;
+            assert_eq!(draft.comment, "New server draft");
+            assert_eq!(draft.native_post_request, Some(4));
+            assert!(draft.posting);
             Ok(())
         })
     }

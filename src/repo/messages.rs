@@ -442,8 +442,8 @@ impl RepoTab {
             }
             Msg::PrDetails(request, result) => self.pr_details_arrived(request, *result, ctx),
             Msg::PrFiles(request, result) => self.pr_files_arrived(request, result, ctx),
-            Msg::PrPosted { hosting, .. }
-                if !super::load::same_repository(Some(&*hosting), self.hosting.as_ref()) => {}
+            Msg::PrPosted { hosting, request, .. }
+                if !pr_post_source_matches(self.hosting.as_ref(), &hosting, request) => {}
             Msg::PrPosted {
                 number,
                 request,
@@ -496,5 +496,39 @@ impl RepoTab {
                 self.op_done(label, result, refresh, kind, quiet, ctx)
             }
         }
+    }
+}
+
+/// Existing providers keep their established identity rules; native writes require the
+/// complete captured Hosting, including its web scheme and port, as well as their request ID.
+fn pr_post_source_matches(current: Option<&Hosting>, sent: &Hosting, request: Option<u64>) -> bool {
+    if request.is_some() {
+        current == Some(sent)
+    } else {
+        super::load::same_repository(Some(sent), current)
+    }
+}
+
+#[cfg(test)]
+mod native_post_source_tests {
+    use super::*;
+
+    #[test]
+    fn native_completion_requires_the_full_server_origin_while_legacy_rules_are_preserved() {
+        let original = Hosting {
+            forge: crate::forge::Forge::GitLab,
+            host: "gitlab.fixture.invalid".into(),
+            path: "group/project".into(),
+            web: "https://gitlab.fixture.invalid".into(),
+        };
+        let mut changed = original.clone();
+        changed.web = "https://gitlab.fixture.invalid:8443".into();
+        assert!(pr_post_source_matches(Some(&original), &original, Some(1)));
+        assert!(!pr_post_source_matches(Some(&changed), &original, Some(1)));
+        assert!(!pr_post_source_matches(None, &original, Some(1)));
+        assert_eq!(
+            pr_post_source_matches(Some(&changed), &original, None),
+            super::super::load::same_repository(Some(&original), Some(&changed)),
+        );
     }
 }

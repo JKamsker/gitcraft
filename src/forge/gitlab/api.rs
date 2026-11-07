@@ -94,3 +94,25 @@ pub(super) fn segment(value: &str) -> String {
         })
         .collect()
 }
+
+/// Keep the web authority, including a nondefault port, bound to the repository snapshot.
+/// The generic PR URL parser deliberately removes ports and cannot establish this alone.
+pub(super) fn source_matches(hosting: &Hosting, url: &str) -> bool {
+    fn origin(url: &str) -> Option<String> {
+        let (_, rest) = url.split_once("://")?;
+        if rest.split('/').next()?.contains('@') {
+            return None;
+        }
+        let base = super::super::web_base(url)?;
+        let (scheme, authority) = base.split_once("://")?;
+        let authority = authority
+            .strip_suffix(if scheme == "https" { ":443" } else { ":80" })
+            .unwrap_or(authority);
+        Some(format!("{scheme}://{authority}"))
+    }
+    let expected = origin(&hosting.web);
+    expected.is_some()
+        && expected == origin(url)
+        && crate::pull_request::repo_of_url(url)
+            == Some((hosting.host.clone(), hosting.path.clone()))
+}

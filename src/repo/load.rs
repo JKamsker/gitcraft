@@ -53,6 +53,24 @@ pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -
 }
 
 impl RepoTab {
+    /// Native provider completions belong to both the exact write and its server snapshot.
+    pub(super) fn invalidate_native_pr_writes(&mut self) {
+        for draft in self.pr_drafts.values_mut() {
+            if draft.native_post_request.take().is_some() {
+                draft.posting = false;
+                draft.settling = false;
+                draft.error=Some((super::pr_review::Place::Review,"A request using the previous connections may have reached the forge. Reload before retrying; your newer text is preserved.".into()));
+            }
+        }
+    }
+
+    pub(super) fn replace_pr_hosting(&mut self, hosting: Option<Hosting>) {
+        if self.hosting != hosting {
+            self.invalidate_native_pr_writes();
+        }
+        self.hosting = hosting;
+    }
+
     /// Account-specific permissions, viewer identity and cached private data must be read
     /// again after the profile's connection choices change. Request ids discard old replies.
     pub(crate) fn reload_profile_connections(&mut self, ctx: &egui::Context) {
@@ -61,13 +79,7 @@ impl RepoTab {
         self.activity = None;
         self.tour = None;
         self.cancel_draft_reads();
-        for draft in self.pr_drafts.values_mut() {
-            if draft.native_post_request.take().is_some() {
-                draft.posting = false;
-                draft.settling = false;
-                draft.error=Some((super::pr_review::Place::Review,"A request using the previous connections may have reached the forge. Reload before retrying; your newer text is preserved.".into()));
-            }
-        }
+        self.invalidate_native_pr_writes();
         self.reload_identity(ctx);
         self.load_prs(ctx);
         if self.pr_view.is_some() {
@@ -460,7 +472,7 @@ impl RepoTab {
         self.gerrit = loaded.gerrit;
         if loaded.hosting != self.hosting || remotes_changed {
             let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
-            self.hosting = loaded.hosting;
+            self.replace_pr_hosting(loaded.hosting);
             self.prs.clear();
             self.pr_error = None;
             self.prs_loaded = None;

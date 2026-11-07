@@ -31,8 +31,7 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
                 &commits,
                 number,
             )?;
-            let identity = crate::pull_request::repo_of_url(&result.url);
-            if identity != Some((api.hosting.host.clone(), api.hosting.path.clone())) {
+            if !super::api::source_matches(&api.hosting, &result.url) {
                 return Err("GitLab returned a merge request for a different repository".into());
             }
             result.changed_files = diffs.len() as u64;
