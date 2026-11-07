@@ -25,6 +25,7 @@ impl RepoTab {
                 | Action::OpenCi { .. }
         ) {
             self.dossier.close();
+            self.symbols.close();
         }
         let plain = OpKind::plain();
         // Fetch, Pull and Push asked for while something runs start once it is done.
@@ -96,7 +97,12 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
-            Action::OpenLineDossier(seed) => self.open_line_dossier(seed, ctx),
+            Action::OpenLineDossier(seed) => {
+                self.symbols.close();
+                self.open_line_dossier(seed, ctx)
+            }
+            Action::OpenSymbolBiography(seed) => self.open_symbol_biography(seed, ctx),
+            Action::CloseSymbolBiography => self.symbols.close(),
             Action::CloseLineDossier => self.dossier.close(),
             Action::OpenPinnedFileLine(seed) => {
                 if !git::investigations::oid(&seed.commit) || seed.line == 0 {

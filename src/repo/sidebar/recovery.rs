@@ -64,6 +64,9 @@ impl RepoTab {
             acts.push(Action::EarlierVersions);
         }
         let t = Tokens::get(ui.ctx());
+        if ui.button("Symbol biography…").clicked() {
+            acts.push(Action::OpenSymbolBiography(None));
+        }
         if ui.button("Explain line history…").clicked() {
             acts.push(Action::OpenLineDossier(None));
         }

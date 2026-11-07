@@ -154,6 +154,18 @@ impl RepoTab {
                             },
                         )));
                     }
+                    if let Some(rev) = &rev
+                        && crate::git::investigations::oid(rev)
+                        && ui.button("Symbol biography").clicked()
+                    {
+                        acts.push(Action::OpenSymbolBiography(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: rev.clone(),
+                                path: view.path.clone(),
+                                line: lines.first as usize,
+                            },
+                        )));
+                    }
                     if let (Some(rev), Some(menu)) = (&rev, menu.clone()) {
                         let target = Target::File {
                             rev: rev.clone(),

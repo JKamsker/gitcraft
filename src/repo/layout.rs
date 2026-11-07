@@ -118,6 +118,8 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.symbols.open {
+                    self.symbol_biography_view(ui, &mut acts);
                 } else if self.dossier.open {
                     self.line_dossier_view(ui, &mut acts);
                 } else if self.split.is_some() {

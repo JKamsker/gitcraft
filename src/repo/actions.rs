@@ -17,6 +17,8 @@ use crate::terminal::ShellSpec;
 pub(crate) enum Action {
     OpenLineDossier(Option<git::investigations::dossier::Seed>),
     CloseLineDossier,
+    OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
+    CloseSymbolBiography,
     OpenPinnedFileLine(git::investigations::dossier::Seed),
     EarlierVersions,
     DraftEnable(bool),

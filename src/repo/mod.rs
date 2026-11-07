@@ -110,6 +110,7 @@ mod sidebar;
 mod stack;
 mod state;
 mod surgery;
+mod symbol_biography;
 mod terminals;
 mod test_lane;
 #[cfg(test)]
@@ -199,6 +200,7 @@ pub struct RepoTab {
     content_recovery: content_recovery::State,
     working_drafts: working_drafts::State,
     dossier: line_dossier::State,
+    symbols: symbol_biography::State,
     cochanges: cochanges::State,
     saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
@@ -541,6 +543,7 @@ impl RepoTab {
             content_recovery: Default::default(),
             working_drafts: Default::default(),
             dossier: Default::default(),
+            symbols: Default::default(),
             cochanges: Default::default(),
             saved_views: Default::default(),
             history: Vec::new(),

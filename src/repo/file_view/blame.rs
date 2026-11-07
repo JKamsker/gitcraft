@@ -232,6 +232,18 @@ impl RepoTab {
                                 },
                             )));
                         }
+                        if !line.uncommitted()
+                            && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
+                            && ui.button("Symbol biography").clicked()
+                        {
+                            acts.push(Action::OpenSymbolBiography(Some(
+                                git::investigations::dossier::Seed {
+                                    commit: line.hash.clone(),
+                                    path,
+                                    line: line.orig as usize,
+                                },
+                            )));
+                        }
                     });
                 let spans = data.spans.as_ref().and_then(|s| s.get(i));
                 let galley = file_text::line_galley(ui, spans, &line.text, &font, t.text);
