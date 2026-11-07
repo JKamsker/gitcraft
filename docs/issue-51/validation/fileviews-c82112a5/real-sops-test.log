@@ -1,0 +1,7 @@
+
+running 1 test
+test repo::diff::encrypted::tests::fixture::real_sops_and_generated_age_compare_formats_and_key_rotation_offline ... Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, explicit ambiguous formats, cross-extension rename, binary NUL/non-UTF8 refusal; isolated HOME and explicit fixture keys only
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3233 filtered out; finished in 1.25s
+
