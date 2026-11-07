@@ -403,6 +403,9 @@ pub(crate) fn run_step(
     creds: Option<&git::Credentials>,
     hosting: Option<&Hosting>,
 ) -> Result<(), String> {
+    if matches!(step, Step::Bump | Step::Tag | Step::Push) {
+        preflight(repo, plan, hosting)?;
+    }
     match step {
         Step::Bump => {
             let bump = plan.bump.as_ref().ok_or("nothing to move")?;
@@ -489,9 +492,19 @@ pub(crate) fn run_step(
     Ok(())
 }
 
-/// A push URL, URL rewrite, or a remote edited during the release must not publish on a
-/// repository that did not receive its tag. Read this before each forge mutation, including
-/// resumed uploads; Git's configured transport routing itself is never rewritten.
+/// Validate a publishing plan before executing it, and again immediately before each
+/// local mutation and push. Resuming preserves the completed steps even when this refuses.
+pub(crate) fn preflight(repo: &Path, plan: &Plan, hosting: Option<&Hosting>) -> Result<(), String> {
+    if !plan.publish {
+        return Ok(());
+    }
+    let hosting = hosting.ok_or("The repository isn't on a forge gitcraft knows")?;
+    check_publication_destination(repo, plan, hosting)
+}
+
+/// A push URL, URL rewrite, or a remote edited during the release must not receive a tag
+/// intended for a different publishing repository. Also checked before forge mutations,
+/// including resumed uploads; Git's configured transport routing itself is never rewritten.
 fn check_publication_destination(
     repo: &Path,
     plan: &Plan,
@@ -511,15 +524,38 @@ fn check_publication_destination(
         .filter(|url| !url.trim().is_empty())
         .collect::<Vec<_>>();
     if urls.is_empty()
-        || !urls.iter().all(|url| {
-            crate::forge::web_url(url).is_some_and(|url| url.eq_ignore_ascii_case(&expected))
-        })
+        || !urls
+            .iter()
+            .all(|url| same_publication_repository(url, hosting))
     {
         return Err(format!(
             "Release publication stopped: the push destination of {remote} does not match the selected forge repository {expected}. Local release changes remain undoable."
         ));
     }
     Ok(())
+}
+
+/// Compare the web authority separately from the repository path. DNS names are case
+/// insensitive; GitLab's captured subgroup/project spelling must remain exact. GitHub,
+/// Forgejo and Gitea identify owner/repository names without regard to ASCII case.
+fn same_publication_repository(url: &str, hosting: &Hosting) -> bool {
+    let Some(web) = crate::forge::web_url(url) else {
+        return false;
+    };
+    let Some((scheme, rest)) = web.split_once("://") else {
+        return false;
+    };
+    let Some((authority, path)) = rest.split_once('/') else {
+        return false;
+    };
+    let base = format!("{scheme}://{authority}");
+    base.eq_ignore_ascii_case(hosting.web.trim_end_matches('/'))
+        && match hosting.forge {
+            Forge::GitLab => path == hosting.path,
+            Forge::GitHub | Forge::Forgejo | Forge::Gitea => {
+                path.eq_ignore_ascii_case(&hosting.path)
+            }
+        }
 }
 
 /// Writes the new version (and the notes in the changelog) and commits those files only.
