@@ -637,7 +637,16 @@ fn line_history_header_wrap_toggles_without_reloading_or_losing_logical_selectio
         .with_size(egui::vec2(1300., 950.))
         .build_ui_state(
             |ui, tab: &mut RepoTab| {
-                crate::theme::install_fonts(ui.ctx());
+                let fonts = egui::Id::new("line-history-test-fonts");
+                if !ui
+                    .ctx()
+                    .data(|d| d.get_temp::<bool>(fonts))
+                    .unwrap_or(false)
+                {
+                    crate::theme::install_fonts(ui.ctx());
+                    ui.ctx().data_mut(|d| d.insert_temp(fonts, true));
+                    return;
+                }
                 let mut acts = Vec::new();
                 tab.diff_view(ui, &mut acts);
                 for action in acts {
