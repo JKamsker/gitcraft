@@ -110,6 +110,19 @@ fn scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint() {
     assert_eq!(header_x(&scrolled, "GRAPH"), MIN_REFS_W + 10.0);
     assert!(texts(&scrolled).iter().any(|s| s.galley.job.text == "main"
         && s.galley.job.sections[0].format.color == Tokens::get(&ctx).text_faint));
+    let painted_label = scrolled.iter().find(|clipped| {
+        matches!(&clipped.shape,
+        Shape::Text(text) if text.galley.job.text == "main")
+    });
+    assert!(
+        painted_label.is_some_and(|clipped| match &clipped.shape {
+            Shape::Text(text) => clipped
+                .clip_rect
+                .contains(text.visual_bounding_rect().center()),
+            _ => false,
+        }),
+        "the lane name must be visible, not merely painted above the viewport clip"
+    );
     let summaries: Vec<_> = texts(&scrolled)
         .into_iter()
         .filter(|s| s.galley.job.text.starts_with("Commit "))

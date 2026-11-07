@@ -109,13 +109,15 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let total = self.commits.len() + usize::from(self.has_more);
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
-            // show_rows includes one overscan row. Only intersecting rows affect widths and
-            // labels, so a pill just outside the viewport does not hide the lane's name.
+            // show_rows includes overscan and partially clipped rows. Require the text's
+            // centre to be inside the viewport with enough room for its glyphs: a label on
+            // a mostly hidden top row would leave the visible lane looking unnamed.
             let top = ui.max_rect().top();
             let clip = ui.clip_rect();
             let mut visible = range.clone().filter(|i| {
                 let y = top + (i - range.start) as f32 * ROW_PITCH;
-                y < clip.bottom() && y + ROW_PITCH > clip.top()
+                let center = y + ROW_PITCH / 2.0;
+                center >= clip.top() + 8.0 && center <= clip.bottom() - 8.0
             });
             let first = visible.clone().next().unwrap_or(range.start);
             let end = visible.next_back().map_or(first, |i| i + 1);
