@@ -3,7 +3,7 @@ mod plan;
 #[cfg(test)]
 mod tests;
 
-use super::{Action, RepoTab};
+use super::RepoTab;
 use crate::connections::{self, Context};
 use crate::forge::{
     Forge, Hosting,

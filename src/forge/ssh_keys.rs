@@ -179,3 +179,139 @@ fn execute(
     }
     serde_json::from_slice(&output.stdout).map_err(|_| FAILED.to_owned())
 }
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    struct Fixture(PathBuf);
+    impl Fixture {
+        fn new() -> Result<Self, String> {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "gitcraft-ssh-account-fixture-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).map_err(|e| e.to_string())?;
+            let program = path.join("gh-record-only");
+            let base = crate::remote::sh_quote(&path.to_string_lossy());
+            std::fs::write(&program,format!(r#"#!/bin/sh
+set -eu
+base={base}
+case "$1 $2" in
+ 'auth token')
+   [ "$3" = --hostname ] && [ "$4" = github.com ] && [ "$5" = --user ] && [ "$6" = fixture-user ] || exit 81
+   printf 'lookup\n' >> "$base/lookups"
+   if [ -f "$base/changed" ]; then printf fixture-token-new; else printf fixture-token-old; fi;;
+ 'api --hostname')
+   [ "$3" = github.com ] || exit 82
+   if [ "$4" = user ]; then
+     if [ -f "$base/wrong-owner" ]; then printf '{{"login":"someone-else"}}'; else printf '{{"login":"fixture-user"}}'; fi
+   else
+     [ "$4 $5 $6 $7 $8" = '--method POST user/keys --input -' ] || exit 83
+     [ "${{GH_TOKEN:-}}" = fixture-token-old ] || exit 84
+     if [ -f "$base/fail-post" ]; then printf fixture-private-diagnostic >&2; exit 85; fi
+     cat > "$base/public-payload"
+     printf '{{}}'
+   fi;;
+ *) exit 86;;
+esac
+"#)).map_err(|e|e.to_string())?;
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+            connections::TEST_PROGRAMS.with(|map| map.borrow_mut().insert("gh".into(), program));
+            Ok(Self(path))
+        }
+        fn hosting() -> Hosting {
+            Hosting {
+                forge: Forge::GitHub,
+                host: "github.com".into(),
+                path: String::new(),
+                web: "https://github.com".into(),
+            }
+        }
+        fn public(&self) -> Result<PublicKey, String> {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&11u32.to_be_bytes());
+            bytes.extend_from_slice(b"ssh-ed25519");
+            bytes.extend_from_slice(&32u32.to_be_bytes());
+            bytes.extend_from_slice(&[7; 32]);
+            let path = self.0.join("fixture.pub");
+            std::fs::write(
+                &path,
+                format!(
+                    "ssh-ed25519 {} discarded-private-comment\n",
+                    STANDARD.encode(bytes)
+                ),
+            )
+            .map_err(|e| e.to_string())?;
+            public_key::read(&path)
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            connections::TEST_PROGRAMS.with(|map| {
+                map.borrow_mut().remove("gh");
+            });
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn checked_github_upload_pins_token_across_login_and_profile_changes() -> Result<(), String> {
+        Context::default().run(|| {
+            let fixture = Fixture::new()?;
+            let account = prepare(&Fixture::hosting(), "fixture-user", &|| true)?;
+            assert_eq!(account.owner(), "fixture-user");
+            std::fs::write(fixture.0.join("changed"), b"fixture").map_err(|e| e.to_string())?;
+            let mut other = Context::default();
+            other.choices.github.user = "someone-else".into();
+            let key = fixture.public()?;
+            other.run(|| account.upload("fixture title", &key, &|| true))?;
+            let payload: Value = serde_json::from_slice(
+                &std::fs::read(fixture.0.join("public-payload")).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+            assert_eq!(payload["title"], "fixture title");
+            assert!(
+                payload["key"]
+                    .as_str()
+                    .is_some_and(|s| s.starts_with("ssh-ed25519 ") && !s.contains("discarded"))
+            );
+            assert_eq!(
+                std::fs::read_to_string(fixture.0.join("lookups"))
+                    .map_err(|e| e.to_string())?
+                    .lines()
+                    .count(),
+                1
+            );
+            Ok(())
+        })
+    }
+    #[test]
+    fn account_mismatch_cancel_and_diagnostics_never_submit_or_leak_private_input()
+    -> Result<(), String> {
+        Context::default().run(|| {
+            let fixture = Fixture::new()?;
+            std::fs::write(fixture.0.join("wrong-owner"), b"fixture").map_err(|e| e.to_string())?;
+            assert!(prepare(&Fixture::hosting(), "fixture-user", &|| true).is_err());
+            assert!(!fixture.0.join("public-payload").exists());
+            std::fs::remove_file(fixture.0.join("wrong-owner")).map_err(|e| e.to_string())?;
+            let account = prepare(&Fixture::hosting(), "fixture-user", &|| true)?;
+            let key = fixture.public()?;
+            assert!(account.upload("fixture", &key, &|| false).is_err());
+            assert!(!fixture.0.join("public-payload").exists());
+            let account = prepare(&Fixture::hosting(), "fixture-user", &|| true)?;
+            std::fs::write(fixture.0.join("fail-post"), b"fixture").map_err(|e| e.to_string())?;
+            let error = account
+                .upload("fixture", &key, &|| true)
+                .err()
+                .ok_or("Expected fixture refusal")?;
+            assert!(!error.contains("fixture-private"));
+            Ok(())
+        })
+    }
+}
