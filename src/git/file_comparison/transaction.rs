@@ -328,7 +328,7 @@ mod owned_remote_correction_tests {
     use super::*;
     use crate::git::file_comparison::tests::Repo;
     use std::os::unix::fs::PermissionsExt;
-    fn run(r: &Repo, script: &str, bin: Option<&Path>) -> Result<crate::processes::Output, String> {
+    fn run(r: &Repo, script: &str, bin: Option<&Path>) -> Result<std::process::Output, String> {
         let mut cmd = std::process::Command::new("/bin/sh");
         cmd.args(["-c", script]).current_dir(&r.0);
         if let Some(bin) = bin {
