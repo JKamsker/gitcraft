@@ -130,7 +130,7 @@ fn open_input(path: &Path) -> std::io::Result<File> {
     File::open(path)
 }
 
-fn null_input(path: &Path) -> bool {
+pub(super) fn null_input(path: &Path) -> bool {
     path == Path::new("/dev/null")
         || (cfg!(windows)
             && path

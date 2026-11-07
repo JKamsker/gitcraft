@@ -34,6 +34,9 @@ impl Output {
         self.original.as_ref().map(|s| s.bytes.as_slice())
     }
     pub fn capture(path: &Path, inputs: &[Snapshot]) -> Result<Self, String> {
+        if super::files::null_input(path) {
+            return Err("An empty-input device cannot be the merged output".into());
+        }
         let path = std::path::absolute(path).map_err(|e| e.to_string())?;
         let name = path
             .file_name()
@@ -203,7 +206,7 @@ impl Output {
             )));
         }
         hook(Phase::AfterInstall);
-        let installed = self.current()?;
+        let installed = self.current().map_err(|e| recovery.error(&e))?;
         if !same_optional(installed.as_ref(), Some(&prepared))
             || !self.parent_current()
             || inputs.iter().any(|i| i.unchanged() != Ok(true))
@@ -395,6 +398,9 @@ mod tests {
     #[test]
     fn missing_outputs_install_create_only_aliases_and_read_only_outputs_are_refused()
     -> Result<(), String> {
+        assert!(Output::capture(Path::new("/dev/null"), &[]).is_err());
+        #[cfg(windows)]
+        assert!(Output::capture(Path::new("NUL"), &[]).is_err());
         let temp = crate::git::file_comparison::Scratch::new()?;
         let path = temp.0.join("new");
         let output = Output::capture(&path, &[])?;
