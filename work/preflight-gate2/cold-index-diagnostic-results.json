@@ -1,0 +1,9 @@
+{
+  "status": "CONFIRMED cold-index falsepositive; productionGate2 remainsFAIL",
+  "source": "fe3f30230980220022c59c1fcc2fa96b69b44c5d",
+  "compiler_binding_commit": "291cb897b43d1ddf5efd6c17cbf0e56e7327b73d",
+  "log_sha256": "3adf148b92dca52afc5c18c8e8d97828509a8d8d02b5028165ef07deb30082f4",
+  "evidence": "Actualrawindex==before.index; originalworkingfileunchanged. Production coldprivateindex diff-files --quiet exits1 on clean LFfile. --patch --exit-code also exits1 with empty stdout on clean, patchoutputonlyforactualsame-lengthbytechange inindependentcopiedrepo.",
+  "next": "Preserved bounded diagnostic will compare porcelain git diff with coldprivateindex and GIT_OPTIONAL_LOCKS0; no production changes yet",
+  "containment": "All originaluserfixture index/workbytes unchanged; copiedrepo onlymodified withinownednewroot; existing exactboundedrunner used; no refs/checkout/livehosts/CI"
+}

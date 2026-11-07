@@ -1,0 +1,7 @@
+actual_index_equals_saved=true
+original_clean: patch=false status=exit status: 1 stdout="" stderr=""
+original_clean: patch=true status=exit status: 1 stdout="" stderr=""
+copied_clean: patch=false status=exit status: 1 stdout="" stderr=""
+copied_clean: patch=true status=exit status: 1 stdout="" stderr=""
+copied_changed_same_length: patch=false status=exit status: 1 stdout="" stderr=""
+copied_changed_same_length: patch=true status=exit status: 1 stdout="diff --git a/file.txt b/file.txt\nindex 90be1f3..cbb0e85 100644\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-before\n+BEFORE\n" stderr=""
