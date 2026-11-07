@@ -80,9 +80,10 @@ impl Api {
         }
     }
 
-    /// Calls `forget` with the server's address when it refuses the login.
-    pub fn on_refused(mut self, forget: fn(&str)) -> Api {
+    /// The refusal belongs to the captured profile/login, even if the UI switched since.
+    pub fn on_refused_key(mut self, forget: fn(&str), key: &str) -> Api {
         self.on_refused = Some(forget);
+        self.web = key.to_owned();
         self
     }
 

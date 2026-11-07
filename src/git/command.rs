@@ -2,22 +2,8 @@
 //! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
 //! environment.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use std::sync::RwLock;
-
-/// The config file the active gitcraft profile has git read as its global config (see
-/// `settings::profiles`), if it sets anything.
-static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Has every git command from now on read `path` as its global config, or the user's own again
-/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
-/// `--worktree`) wins over it.
-pub fn set_profile_config(path: Option<PathBuf>) {
-    if let Ok(mut current) = PROFILE_CONFIG.write() {
-        *current = path;
-    }
-}
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
 /// (signing settings, Mergiraf's set-up), which must never land in the profile's file, which is
@@ -41,14 +27,23 @@ fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
 }
 
 /// Points `cmd` at the active profile's config, unless `args` is about the user's own.
-fn with_profile(cmd: &mut Command, args: &[&str]) {
+fn with_profile(cmd: &mut Command, args: &[&str]) -> Result<(), String> {
     if user_global_config(args) {
-        return;
+        return Ok(());
     }
-    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
-    if let Some(path) = path {
+    let context = crate::connections::current();
+    if let Some(error) = context.error {
+        return Err(error);
+    }
+    if let Some(path) = context.git_config {
         cmd.env("GIT_CONFIG_GLOBAL", path);
     }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    Ok(())
 }
 
 use crate::remote::{self, Target};
@@ -111,7 +106,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         return execute_there(&target, extra, args);
     }
     let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
+    with_profile(&mut cmd, args)?;
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
@@ -205,7 +200,7 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
         );
     }
     let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
+    with_profile(&mut cmd, args)?;
     cmd.arg("-C").arg(dir).args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -345,7 +340,7 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = git_cmd();
-    with_profile(&mut cmd, &["credential", "fill"]);
+    with_profile(&mut cmd, &["credential", "fill"]).ok()?;
     unattended(&mut cmd);
     cmd.args(["credential", "fill"])
         .env("GCM_INTERACTIVE", "never")
@@ -614,5 +609,47 @@ mod tests {
         );
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
+    }
+}
+
+#[cfg(test)]
+mod profile_connection_tests {
+    use super::*;
+    use crate::connections::{Choices, Context};
+
+    #[test]
+    fn local_git_gets_the_pinned_profile_but_remote_git_does_not_get_local_paths_or_accounts() {
+        let context = Context {
+            git_config: Some("/tmp/profile-work.gitconfig".into()),
+            choices: Choices {
+                ssh_key: "/tmp/work key".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        context.run(|| {
+            let mut cmd = git_cmd();
+            assert!(with_profile(&mut cmd, &["push"]).is_ok());
+            let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+            assert_eq!(
+                env.get(std::ffi::OsStr::new("GIT_CONFIG_GLOBAL")),
+                Some(&Some(std::ffi::OsStr::new("/tmp/profile-work.gitconfig")))
+            );
+            assert_eq!(
+                env.get(std::ffi::OsStr::new("GIT_SSH_COMMAND")),
+                Some(&None)
+            );
+            let target = crate::remote::parse(Path::new("ssh://build/home/me/app"));
+            assert!(target.is_some());
+            if let Some(target) = target {
+                let request = remote_request(&target, &Extra::default(), &["push"]);
+                assert!(
+                    !request.env.iter().any(|(key, _)| key == "GIT_CONFIG_GLOBAL"
+                        || key == "GH_TOKEN"
+                        || key == "GITLAB_TOKEN")
+                );
+                assert!(!request.script.contains("/tmp/work key"));
+            }
+        });
     }
 }

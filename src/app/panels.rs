@@ -165,7 +165,7 @@ impl App {
 /// A desktop notification, on its own thread (it can take a moment to show).
 fn notify(text: &str) {
     let text = notification_body(text);
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         let _ = notify_rust::Notification::new()
             .appname("gitcraft")
             .summary("gitcraft")

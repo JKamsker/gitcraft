@@ -174,7 +174,7 @@ pub(super) fn spawn_or(
 ) {
     let tx = tx.clone();
     let ctx = ctx.clone();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         // What the job owned goes with it; a lock it held is left poisoned, which those
         // taking it handle.
         let msg = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job))

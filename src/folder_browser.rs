@@ -79,7 +79,7 @@ impl FolderBrowser {
         let host = self.host.clone();
         let ctx = ctx.clone();
         let asked = dir.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(list(&host, &asked));
             ctx.request_repaint();
         });

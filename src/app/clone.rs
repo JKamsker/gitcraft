@@ -138,7 +138,7 @@ impl App {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         let dest2 = dest.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(git::clone(&url, &dest2, creds.as_ref()));
             ctx2.request_repaint();
         });

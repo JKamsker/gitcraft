@@ -1,5 +1,6 @@
 //! User settings: stored with the app state, readable from anywhere through the egui context.
 
+mod connection_page;
 mod layout;
 mod page;
 mod preview;
