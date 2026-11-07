@@ -249,7 +249,7 @@ fn a_folder_that_isnt_a_repository_says_so() -> Result<(), String> {
     let err = overview(&dir, Duration::from_secs(60))
         .err()
         .unwrap_or_default();
-    if !run(Some(&dir), &["rev-parse", "--git-dir"]).is_ok() {
+    if run(Some(&dir), &["rev-parse", "--git-dir"]).is_err() {
         assert!(err.contains("not a git repository"), "{err}");
     }
     let missing = dir.join("nothing here");

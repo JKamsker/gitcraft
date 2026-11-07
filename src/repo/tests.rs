@@ -580,7 +580,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = RepoTab::new(dir.clone(), &ctx);
     // The timeline is read (there is none yet) before undo goes ahead.
     for _ in 0..2000 {
         tab.poll(&ctx);

@@ -274,7 +274,7 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
     row(&[Command::StageAll], "Stage all changes"),
     row(
         &[Command::Commit],
-        "Commit; with nothing staged, everything; with no summary yet, go to the message",
+        "Commit; with nothing staged, everything; with no summary yet, go to the message. In a note editor, save the note",
     ),
 ];
 

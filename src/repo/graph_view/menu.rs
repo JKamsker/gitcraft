@@ -13,8 +13,7 @@ use crate::repo::conflict_check::Op;
 use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref_at, expect_symref};
 use crate::repo::{
-    Action, Dialog, Refresh, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops,
-    rebase_action,
+    Action, Dialog, RepoTab, Undo, WIP_HASH, fast_forward_action, merge_action, ops, rebase_action,
 };
 
 /// Where a row remembers which branch pill was right-clicked, for its menu.

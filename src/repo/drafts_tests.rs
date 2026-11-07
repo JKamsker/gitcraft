@@ -11,6 +11,12 @@ use crate::drafts::{self, RepoDrafts};
 use crate::git;
 use crate::pull_request::DiffSide;
 
+fn restored_tab(path: PathBuf, ctx: &egui::Context) -> RepoTab {
+    let mut tab = RepoTab::new_deferred(path, ctx);
+    tab.restore_drafts();
+    tab
+}
+
 /// A repository with three commits, in a fresh folder with a space and accents in its name.
 fn repo(name: &str) -> PathBuf {
     let dir =
@@ -60,12 +66,12 @@ fn on_disk(dir: &Path) -> RepoDrafts {
 fn the_commit_message_comes_back_and_goes_once_committed() {
     let dir = repo("commit");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.commit_summary = "Fix ünïcode in paths with spaces 🦀".to_owned();
     tab.commit_body = "First line\n\n  indented\ttab".to_owned();
     save(&tab);
 
-    let mut again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut again = restored_tab(dir.clone(), &ctx);
     assert_eq!(again.commit_summary, tab.commit_summary);
     assert_eq!(again.commit_body, tab.commit_body);
     assert!(!again.amend);
@@ -89,7 +95,7 @@ fn the_commit_message_comes_back_and_goes_once_committed() {
 fn a_commit_that_fails_keeps_its_message() {
     let dir = repo("commit-fails");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.commit_summary = "Nothing to commit".to_owned();
     // Nothing changed: git refuses the commit.
     tab.commit(&ctx);
@@ -105,7 +111,7 @@ fn a_commit_that_fails_keeps_its_message() {
 fn an_interactive_rebase_list_comes_back_and_goes_once_started() {
     let dir = repo("rebase");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     let commits = git::rebase_commits(&dir, "HEAD~2").unwrap_or_default();
     let mut editor = rebase::RebaseEditor::new("HEAD~2".to_owned(), "HEAD~2".to_owned(), commits);
     // Reordered, the older one reworded: what was set up is what comes back.
@@ -115,7 +121,7 @@ fn an_interactive_rebase_list_comes_back_and_goes_once_started() {
     tab.rebase = Some(editor.clone());
     save(&tab);
 
-    let mut again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut again = restored_tab(dir.clone(), &ctx);
     let restored = again.rebase.clone();
     let same = restored.as_ref().is_some_and(|r| {
         r.onto == editor.onto
@@ -149,7 +155,7 @@ fn an_interactive_rebase_list_comes_back_and_goes_once_started() {
 fn a_rebase_list_cancelled_is_not_kept() {
     let dir = repo("rebase-cancel");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     let commits = git::rebase_commits(&dir, "HEAD~1").unwrap_or_default();
     tab.rebase = Some(rebase::RebaseEditor::new(
         "HEAD~1".to_owned(),
@@ -169,7 +175,7 @@ fn a_rebase_list_cancelled_is_not_kept() {
 fn unsent_pull_request_text_comes_back_and_goes_once_sent() {
     let dir = repo("pr");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.pr_drafts.insert(
         5,
         PrDraft {
@@ -183,7 +189,7 @@ fn unsent_pull_request_text_comes_back_and_goes_once_sent() {
     tab.pr_drafts.insert(6, PrDraft::default());
     save(&tab);
 
-    let mut again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut again = restored_tab(dir.clone(), &ctx);
     let restored = again.pr_drafts.get(&5);
     let same = restored.is_some_and(|d| {
         d.comment == "Thanks!\nOne question"
@@ -222,7 +228,7 @@ fn unsent_pull_request_text_comes_back_and_goes_once_sent() {
 fn a_line_comment_keeps_its_line_only_while_the_pull_request_has_not_moved() {
     let dir = repo("pr-line");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     let target = LineTarget {
         path: "src/main.rs".to_owned(),
         line: 40,
@@ -262,7 +268,7 @@ fn a_line_comment_keeps_its_line_only_while_the_pull_request_has_not_moved() {
             ..Default::default()
         },
     );
-    let mut again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut again = restored_tab(dir.clone(), &ctx);
     again.put_back(drafts);
     let _ = std::fs::remove_dir_all(&dir);
     let back = again.pr_drafts.get(&3);
@@ -275,11 +281,11 @@ fn amend_is_not_ticked_again() {
     // The last commit may be another one by the next start: a click would rewrite it.
     let dir = repo("amend");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.commit_summary = "three".to_owned();
     tab.amend = true;
     save(&tab);
-    let again = RepoTab::new_deferred(dir.clone(), &ctx);
+    let again = restored_tab(dir.clone(), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(again.commit_summary, "three");
     assert!(!again.amend);
@@ -289,7 +295,7 @@ fn amend_is_not_ticked_again() {
 fn sending_one_box_while_another_has_text_is_saved_at_once() {
     let dir = repo("pr-shape");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.pr_drafts.insert(
         9,
         PrDraft {
@@ -309,7 +315,7 @@ fn sending_one_box_while_another_has_text_is_saved_at_once() {
 fn a_restored_line_keeps_its_head_until_the_page_is_seen() {
     let dir = repo("pr-line-kept");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     let mut drafts = RepoDrafts::default();
     let text = crate::drafts::PrText {
         line_text: "Here".to_owned(),
@@ -333,7 +339,7 @@ fn a_restored_line_keeps_its_head_until_the_page_is_seen() {
 fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
     let dir = repo("rebase-unknown");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     let step = crate::drafts::RebaseStep {
         hash: "a".to_owned(),
         author: String::new(),
@@ -341,7 +347,7 @@ fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
         summary: String::new(),
         original: String::new(),
         merge: false,
-        step: "edit".to_owned(),
+        step: "future-step".to_owned(),
         message: String::new(),
     };
     tab.put_back(RepoDrafts {
@@ -366,16 +372,13 @@ fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
 fn two_repositories_keep_their_own_drafts() {
     let (a, b) = (repo("apart-a"), repo("apart-b"));
     let ctx = egui::Context::default();
-    let mut tab_a = RepoTab::new_deferred(a.clone(), &ctx);
-    let mut tab_b = RepoTab::new_deferred(b.clone(), &ctx);
+    let mut tab_a = restored_tab(a.clone(), &ctx);
+    let mut tab_b = restored_tab(b.clone(), &ctx);
     tab_a.commit_summary = "Only in a".to_owned();
     tab_b.commit_summary = "Only in b".to_owned();
     save(&tab_a);
     save(&tab_b);
-    let (again_a, again_b) = (
-        RepoTab::new_deferred(a.clone(), &ctx),
-        RepoTab::new_deferred(b.clone(), &ctx),
-    );
+    let (again_a, again_b) = (restored_tab(a.clone(), &ctx), restored_tab(b.clone(), &ctx));
     let _ = std::fs::remove_dir_all(&a);
     let _ = std::fs::remove_dir_all(&b);
     assert_eq!(again_a.commit_summary, "Only in a");
@@ -386,7 +389,7 @@ fn two_repositories_keep_their_own_drafts() {
 fn an_empty_message_and_ticking_amend_alone_keep_nothing() {
     let dir = repo("empty");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.commit_summary = "   ".to_owned();
     tab.amend = true;
     let drafts = tab.drafts();
@@ -398,7 +401,7 @@ fn an_empty_message_and_ticking_amend_alone_keep_nothing() {
 fn sign_ins_typed_in_the_tab_are_never_kept() {
     let dir = repo("secrets");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.set_credentials(git::Credentials {
         username: "me".to_owned(),
         password: "hunter2-token".to_owned(),
@@ -414,7 +417,7 @@ fn sign_ins_typed_in_the_tab_are_never_kept() {
 fn a_huge_message_is_kept_in_part() {
     let dir = repo("huge");
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = restored_tab(dir.clone(), &ctx);
     tab.commit_summary = "Big".to_owned();
     tab.commit_body = "ü".repeat(1024 * 1024);
     save(&tab);
@@ -424,4 +427,20 @@ fn a_huge_message_is_kept_in_part() {
     assert!(file.commit.body.len() < tab.commit_body.len());
     assert!(file.commit.body.len() >= 128 * 1024);
     assert!(file.commit.body.chars().all(|c| c == 'ü'));
+}
+
+#[test]
+fn an_unopened_lazy_tab_does_not_erase_saved_drafts() {
+    let dir = repo("lazy-keeps-drafts");
+    let ctx = egui::Context::default();
+    let mut tab = restored_tab(dir.clone(), &ctx);
+    tab.commit_summary = "Keep this until the tab is shown".to_owned();
+    save(&tab);
+    let mut deferred = RepoTab::new_deferred(dir.clone(), &ctx);
+    assert!(deferred.all_drafts().is_empty());
+    assert!(deferred.draft_shapes().is_empty());
+    save(&deferred);
+    deferred.restore_drafts();
+    assert_eq!(deferred.commit_summary, tab.commit_summary);
+    let _ = std::fs::remove_dir_all(dir);
 }

@@ -402,7 +402,6 @@ impl RepoTab {
             self.work = loaded.work;
             self.stash_picks.keep_changed(&self.work);
         }
-        self.fold_loaded(loaded.read, state, ctx);
         self.refresh_detached(ctx);
         self.folding
             .saw_status(&self.work, &self.refs.head, std::time::Instant::now());
@@ -415,6 +414,7 @@ impl RepoTab {
             .collect();
         self.worktrees = loaded.worktrees;
         self.timeline_read(loaded.read, ctx);
+        self.fold_loaded(loaded.read, state, ctx);
         let remote = crate::remote::is_remote(&self.path);
         for wt in self
             .worktrees

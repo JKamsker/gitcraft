@@ -345,6 +345,8 @@ pub struct RepoTab {
     /// The search for the commits of two branches that fail together.
     interactions: interaction::Interactions,
 
+    /// Saved drafts have been restored; an unopened lazy tab must not overwrite them.
+    drafts_loaded: bool,
     commit_summary: String,
     commit_body: String,
     /// The commit box's helpers: templates, prefix picker, co-authors, completion.
@@ -594,6 +596,7 @@ impl RepoTab {
             test_lane: Default::default(),
             rehearsing: Default::default(),
             interactions: Default::default(),
+            drafts_loaded: false,
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),

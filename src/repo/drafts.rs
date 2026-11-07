@@ -45,6 +45,7 @@ impl RepoTab {
     pub(crate) fn all_drafts(&self) -> Vec<(PathBuf, RepoDrafts)> {
         std::iter::once(self)
             .chain(self.parked.iter().map(|p| &**p))
+            .filter(|tab| tab.drafts_loaded)
             .map(|tab| (tab.path.clone(), tab.drafts()))
             .collect()
     }
@@ -53,6 +54,7 @@ impl RepoTab {
     pub(crate) fn draft_shapes(&self) -> Vec<(PathBuf, DraftShape)> {
         std::iter::once(self)
             .chain(self.parked.iter().map(|p| &**p))
+            .filter(|tab| tab.drafts_loaded)
             .map(|tab| (tab.path.clone(), tab.draft_shape()))
             .collect()
     }
@@ -111,6 +113,7 @@ impl RepoTab {
 
     /// Puts `drafts` back into this view.
     pub(super) fn put_back(&mut self, drafts: RepoDrafts) {
+        self.drafts_loaded = true;
         // "Amend" isn't ticked again: the last commit may be another one by now (one made in
         // a terminal), which a click would then rewrite.
         if !drafts.commit.is_empty() {

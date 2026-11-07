@@ -11,7 +11,6 @@ use egui::{Color32, Galley, Rect, Ui, UiBuilder, pos2, vec2};
 use super::{App, Tab};
 use crate::app_buttons::{self, AppButton, Flow, Look, Place};
 use crate::icons;
-use crate::keymap::{self, Command};
 use crate::repo::worktree_tab::{self, Chip};
 use crate::tab_look::TabLook;
 use crate::theme::{self, Tokens};

@@ -308,11 +308,11 @@ fn prepare(
     } else {
         None
     };
-    let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(&text))
-        .then(|| binary::load_pair(repo, key, &path, images::renamed_from(&text)));
+    let binary = (image.is_none() && lfs.is_none() && binary::is_binary_patch(text))
+        .then(|| binary::load_pair(repo, key, &path, images::renamed_from(text)));
     // A diff of what the file's textconv made of it: its lines aren't the file's. Not for a
     // symbolic link: git diffs those with its default driver, whatever the attribute says.
-    let textconv = (binary.is_none() && !lines.is_empty() && !is_symlink_patch(&text))
+    let textconv = (binary.is_none() && !lines.is_empty() && !is_symlink_patch(text))
         .then(|| binary::textconv_for(repo, &path))
         .flatten();
     let partial = partial && textconv.is_none();
@@ -320,7 +320,7 @@ fn prepare(
         .as_ref()
         .and_then(|pair| image_compare::compare(repo, key, &path, pair));
     let notebook = (notebook::is_notebook(&path) && lfs.is_none())
-        .then(|| notebook::load(repo, key, &path, images::renamed_from(&text)))
+        .then(|| notebook::load(repo, key, &path, images::renamed_from(text)))
         .flatten();
     let mut spans = highlight_sides(&path, &lines, dark);
     let moves = find_moves(&lines);
@@ -341,7 +341,7 @@ fn prepare(
         .unwrap_or(0);
     let authors = line_authors(repo, key, &path, &lines);
     let line_counts = count_lines(&lines);
-    let weakened = weakened::by_hunk_line(&text, &lines);
+    let weakened = weakened::by_hunk_line(text, &lines);
     DiffData {
         line_counts,
         lines,

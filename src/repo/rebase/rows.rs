@@ -105,15 +105,11 @@ impl RebaseEditor {
         let top = n - 1;
         match (key, self.selected) {
             (Key::ArrowUp | Key::ArrowDown, None) => self.selected = Some(top),
-            (Key::ArrowUp, Some(i)) if alt => {
-                if i < top {
-                    self.move_entry(i, i + 1);
-                }
+            (Key::ArrowUp, Some(i)) if alt && i < top => {
+                self.move_entry(i, i + 1);
             }
-            (Key::ArrowDown, Some(i)) if alt => {
-                if i > 0 {
-                    self.move_entry(i, i - 1);
-                }
+            (Key::ArrowDown, Some(i)) if alt && i > 0 => {
+                self.move_entry(i, i - 1);
             }
             (Key::ArrowUp, Some(i)) => self.selected = Some((i + 1).min(top)),
             (Key::ArrowDown, Some(i)) => self.selected = Some(i.saturating_sub(1)),

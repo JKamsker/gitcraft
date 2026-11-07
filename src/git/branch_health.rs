@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use super::{END_OPTS, FS, run};
+use super::{FS, run};
 
 /// The local branches, newest last commit first: `(name, committer time in seconds)`.
 pub fn branches_by_date(repo: &Path) -> Result<Vec<(String, i64)>, String> {
@@ -61,17 +61,6 @@ pub fn cherry_equivalent(repo: &Path, base: &str, branch: &str) -> Result<bool, 
 fn all_upstream(out: &str) -> bool {
     let mut lines = out.lines().filter(|l| !l.trim().is_empty()).peekable();
     lines.peek().is_some() && lines.all(|l| l.starts_with('-'))
-}
-
-/// Whether the commit `commit` is `other` or one of its ancestors. False also when either is
-/// unknown here (a pull request's last commit never fetched).
-pub fn is_ancestor(repo: &Path, commit: &str, other: &str) -> bool {
-    commit == other
-        || run(
-            Some(repo),
-            &["merge-base", "--is-ancestor", END_OPTS, commit, other],
-        )
-        .is_ok()
 }
 
 #[cfg(test)]

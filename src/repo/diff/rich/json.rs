@@ -132,11 +132,11 @@ impl Reader<'_> {
         // JSON's numbers: no leading zero, digits on both sides of the point.
         let digits = text.trim_start_matches('-');
         let strict =
-            !(digits.len() > 1 && digits.starts_with('0') && digits.as_bytes()[1].is_ascii_digit())
-                && !text.contains(".e")
-                && !text.contains(".E")
-                && !text.ends_with('.')
-                && !digits.starts_with('.');
+            !(digits.len() > 1 && digits.starts_with('0') && digits.as_bytes()[1].is_ascii_digit()
+                || text.contains(".e")
+                || text.contains(".E")
+                || text.ends_with('.')
+                || digits.starts_with('.'));
         if !strict || text.parse::<f64>().is_err() {
             return Err(self.error(&format!("`{text}` isn't a number")));
         }

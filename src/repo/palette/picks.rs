@@ -43,6 +43,16 @@ impl RepoTab {
                 verb(format!("Compare {current} with…"), "compare", Pick::Compare),
             ]);
         }
+        if let Some(current) = &self.refs.current
+            && !self.interactions.going()
+            && self.refs.local.iter().any(|b| b.name != *current)
+        {
+            items.push(verb(
+                format!("Find the interaction of {current} with…"),
+                "interaction",
+                Pick::Interaction,
+            ));
+        }
         if self.pushable().next().is_some() {
             items.push(verb(
                 "Push another branch…".to_owned(),
@@ -75,6 +85,14 @@ impl RepoTab {
                 })
                 .collect(),
             Pick::Reset(hash) => self.reset_choices(hash),
+            Pick::Interaction => self
+                .interaction_palette_items()
+                .into_iter()
+                .map(|(label, hint, action)| {
+                    let item_key = key(&label);
+                    PaletteItem::action(label, &hint, action).key(item_key)
+                })
+                .collect(),
             _ => {
                 let Some(current) = self.refs.current.as_deref() else {
                     return Vec::new();
@@ -162,6 +180,6 @@ fn branch_action(pick: &Pick, at: BranchRef<'_>, current: &str) -> Option<Action
         Pick::InteractiveRebase => interactive_rebase_action(at),
         Pick::ChangesAdded => compare_branches_action(here, at, true),
         Pick::Compare => compare_branches_action(here, at, false),
-        Pick::Checkout | Pick::Push | Pick::Reset(_) => return None,
+        Pick::Checkout | Pick::Push | Pick::Reset(_) | Pick::Interaction => return None,
     })
 }

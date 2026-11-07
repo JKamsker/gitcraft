@@ -78,7 +78,7 @@ impl RepoTab {
         let folder = path
             .rsplit_once('/')
             .and_then(|(dir, _)| folder_pattern(dir).map(|p| (dir.to_owned(), p)));
-        if !state.only_pointer(path) && !(in_lfs && folder.is_some()) && track.is_none() {
+        if !(state.only_pointer(path) || in_lfs && folder.is_some()) && track.is_none() {
             return;
         }
         ui.separator();

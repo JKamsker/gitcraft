@@ -355,7 +355,7 @@ fn the_commits_made_again_are_signed_when_the_config_says_so() {
     let dir = repo("absorb-signed", HISTORY);
     sh(
         &dir,
-        "printf '#!/bin/sh\\necho \"[GNUPG:] SIG_CREATED D 1 8 00 0 X\" >&2\\necho \"-----BEGIN PGP SIGNATURE-----\"\\necho fake\\necho \"-----END PGP SIGNATURE-----\"\\n' > fake-gpg \
+        "printf '#!/bin/sh\\ncat >/dev/null\\necho \"[GNUPG:] SIG_CREATED D 1 8 00 0 X\" >&2\\necho \"-----BEGIN PGP SIGNATURE-----\"\\necho fake\\necho \"-----END PGP SIGNATURE-----\"\\n' > fake-gpg \
          && chmod +x fake-gpg && git config gpg.program \"$PWD/fake-gpg\" && git config commit.gpgsign true \
          && echo fake-gpg > .git/info/exclude \
          && printf '1\\nZWEI\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f é.txt' && git add 'f é.txt'",

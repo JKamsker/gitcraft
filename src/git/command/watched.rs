@@ -118,9 +118,9 @@ const PID_MARKER: &str = "__GITCRAFT_GIT_PID__";
 /// before anything git says, and what came before it (a server's login banner) is told apart.
 fn watched_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
     let mut req = super::remote_request(target, extra, args);
-    let git = req.script.strip_prefix("exec ").unwrap_or(&req.script);
     req.script = format!(
-        "exec sh -c 'printf \"\\n%s %s\\n\" {PID_MARKER} \"$$\" >&2; exec \"$@\"' sh {git}"
+        "printf '\\n%s %s\\n' {PID_MARKER} \"$$\" >&2\n{}",
+        req.script
     );
     req
 }
@@ -179,7 +179,17 @@ pub fn run_watched_recorded(
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
-    let extra = extra_for(dir, creds, quiet);
+    let mut extra = extra_for(dir, creds, quiet);
+    extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
+    let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
+        .then(crate::git::hooks::TraceFile::new)
+        .flatten();
+    if let Some(trace) = &trace {
+        extra.env.push((
+            crate::git::hooks::TRACE_VAR,
+            trace.path().to_string_lossy().into_owned(),
+        ));
+    }
     let target = dir.and_then(remote::parse);
     let spawned = match &target {
         Some(t) => remote::spawn(&t.host, &watched_request(t, &extra, &words))
@@ -190,7 +200,7 @@ pub fn run_watched_recorded(
         Ok(spawned) => spawned,
         Err(e) => return failed(e),
     };
-    let ended = match follow(child, host.as_ref(), control) {
+    let mut ended = match follow(child, host.as_ref(), control) {
         Ok(ended) => ended,
         Err(e) if e == CANCELLED => {
             return (
@@ -200,6 +210,14 @@ pub fn run_watched_recorded(
         }
         Err(e) => return failed(e),
     };
+    let failed_hook = if target.is_some() && extra.trace_hooks {
+        let (stderr, events) = crate::git::hooks::split_trace(ended.stderr.as_bytes());
+        ended.stderr = String::from_utf8_lossy(&stderr).into_owned();
+        crate::git::hooks::failed_hook(&events, args)
+    } else {
+        trace.as_ref().and_then(|t| t.failed_hook(args))
+    };
+    crate::git::doctor::hook_log::record(dir, args, ended.code == Some(0), ended.stderr.as_bytes());
     let recorded = Recorded::new(
         &words,
         ended.code,
@@ -227,6 +245,7 @@ pub fn run_watched_recorded(
         &ended.stdout,
         &without_progress(&ended.stderr),
     );
+    let e = failed_hook.map_or_else(|| e.clone(), |hook| hook.explain(&e, args));
     (Err(e), recorded)
 }
 
@@ -524,6 +543,15 @@ mod tests {
             .stderr(Stdio::null())
             .status()
             .is_ok_and(|s| s.success());
+        // A container's PID 1 may not reap orphans. A zombie was stopped; kill -0 alone
+        // reports it as alive even though it cannot execute anything.
+        let zombie = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim()))
+            .ok()
+            .is_some_and(|stat| {
+                stat.rsplit_once(") ")
+                    .is_some_and(|(_, rest)| rest.starts_with("Z "))
+            });
+        let alive = alive && !zombie;
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(result, Err(CANCELLED.to_owned()));
         assert!(!pid.trim().is_empty(), "the fake ssh never ran");

@@ -385,7 +385,7 @@ fn scan_here(dir: &Path) -> Result<Option<Vec<Scanned>>, String> {
         let name = entry.file_name().to_string_lossy().into_owned();
         let folder = meta.is_dir();
         // A folder matters only when git would try to run it.
-        if !meta.is_file() && !(folder && runs_on(&name).is_some()) {
+        if !(meta.is_file() || folder && runs_on(&name).is_some()) {
             continue;
         }
         let head = if folder {

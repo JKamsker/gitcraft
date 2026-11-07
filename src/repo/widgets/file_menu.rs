@@ -27,6 +27,7 @@ pub fn file_menu(
 }
 
 /// File menu with additional actions such as LFS locks and stashing.
+#[allow(clippy::too_many_arguments)]
 pub fn file_menu_with(
     resp: &Response,
     path: &str,

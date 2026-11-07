@@ -41,6 +41,7 @@ pub(crate) enum PaletteRun {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Pick {
     Checkout,
+    Interaction,
     Merge,
     Rebase,
     InteractiveRebase,
@@ -67,6 +68,7 @@ impl Pick {
     fn key(&self) -> &'static str {
         match self {
             Pick::Checkout => "checkout",
+            Pick::Interaction => "interaction",
             Pick::Merge => "merge",
             Pick::Rebase => "rebase",
             Pick::InteractiveRebase => "interactive-rebase",
@@ -148,7 +150,12 @@ impl RepoTab {
             .collect();
         for (label, hint, action) in self.additional_palette_items() {
             if labels.insert(label.trim_end_matches('…').to_owned()) {
-                items.push(PaletteItem::action(label, &hint, action));
+                let item = if crate::keymap::is_keys(&hint) {
+                    PaletteItem::action(label, "command", action).shortcut(&hint)
+                } else {
+                    PaletteItem::action(label, &hint, action)
+                };
+                items.push(item);
             }
         }
         items

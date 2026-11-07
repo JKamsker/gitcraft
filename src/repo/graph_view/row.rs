@@ -81,9 +81,9 @@ impl RepoTab {
         // click once the pointer moves a few points, so clicks stay clicks.
         let draggable = !is_wip && self.stash_at(i).is_none();
         let sense = if draggable {
-            Sense::click_and_drag()
+            sense | Sense::DRAG
         } else {
-            Sense::click()
+            sense
         };
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.

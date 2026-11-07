@@ -81,8 +81,14 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
     let args: Vec<OsString> = args.into_iter().collect();
     match args.as_slice() {
         [] => Parsed::Run(None),
-        [one] if one == crate::os_shell::CLONE_ARG => Parsed::Run(Some(Command::Clone)),
-        [one] if one == crate::os_shell::OPEN_ARG => Parsed::Run(Some(Command::PickFolder)),
+        [one] if one == crate::os_shell::CLONE_ARG || one == crate::os_shell::OPEN_ARG => {
+            let cmd = match crate::os_shell::start_action(Some(one)) {
+                crate::os_shell::StartAction::Clone => Command::Clone,
+                crate::os_shell::StartAction::PickFolder => Command::PickFolder,
+                _ => unreachable!("a launcher dialog flag"),
+            };
+            Parsed::Run(Some(cmd))
+        }
         [one] if one == "-h" || one == "--help" => Parsed::Print(USAGE.to_owned()),
         [one] if one == "-V" || one == "--version" => {
             Parsed::Print(format!("gitcraft {}", env!("CARGO_PKG_VERSION")))

@@ -803,7 +803,6 @@ impl RepoTab {
         items.extend(self.parallel_palette_items());
         items.extend(self.test_palette_items());
         items.extend(self.rehearse_palette_items());
-        items.extend(self.interaction_palette_items());
         items.extend(self.custom_palette_items());
         items
     }

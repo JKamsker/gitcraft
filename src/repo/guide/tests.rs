@@ -378,6 +378,7 @@ fn a_first_commit_does_not_redo_an_old_empty_commit_on_top() {
     let dir = empty_repo("redo-tree");
     let mut tab = read_tab(&ctx, &dir, false);
     tab.timeline.loaded = true;
+    tab.timeline_read(0, &ctx);
     let entry = UndoEntry {
         id: 0,
         agent: None,

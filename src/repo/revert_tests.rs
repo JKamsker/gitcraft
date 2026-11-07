@@ -7,6 +7,12 @@ use std::path::{Path, PathBuf};
 use super::{Action, DiffKey, RepoTab, diff};
 use crate::git;
 
+fn opened_tab(path: PathBuf, ctx: &egui::Context) -> RepoTab {
+    let mut tab = RepoTab::new(path, ctx);
+    assert!(wait(&mut tab, ctx, |t| !t.loading && t.timeline.loaded).is_ok());
+    tab
+}
+
 /// A fresh repository named after `name`, with `files` committed as "one".
 pub(super) fn scratch(name: &str, files: &[(&str, &str)]) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join(format!("gitcraft-{name}-{}", std::process::id()));
@@ -83,7 +89,9 @@ pub(super) fn wait(
 /// Sends `action` and waits for the operation it started to end; returns the status shown.
 fn run(tab: &mut RepoTab, ctx: &egui::Context, action: Action) -> Result<(String, bool), String> {
     tab.apply(action, ctx);
-    wait(tab, ctx, |t| t.busy_op.is_none())?;
+    wait(tab, ctx, |t| {
+        t.busy_op.is_none() && !t.loading && t.queued.is_empty()
+    })?;
     Ok(tab.status.clone().unwrap_or_default())
 }
 
@@ -143,7 +151,7 @@ fn a_file_is_reverted_into_the_working_tree_and_ctrl_z_brings_the_change_back() 
     let dir = scratch("revert-file", &[(path, &numbered(10, &[]))])?;
     let two = commit(&dir, &[(path, &numbered(10, &[(5, "five")]))], "two")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&two, path))?;
     assert!(!error, "{said}");
@@ -168,7 +176,7 @@ fn a_file_changed_since_is_merged_in_with_three_ways() -> Result<(), String> {
     let since = numbered(12, &[(4, "FOUR"), (6, "six")]);
     commit(&dir, &[("a.txt", &since)], "three")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&two, "a.txt"))?;
     assert!(!error, "{said}");
@@ -186,7 +194,7 @@ fn a_revert_that_conflicts_says_so_and_leaves_the_file_conflicted() -> Result<()
     let two = commit(&dir, &[("c.txt", &numbered(8, &[(4, "four")]))], "two")?;
     commit(&dir, &[("c.txt", &numbered(8, &[(4, "FOUR")]))], "three")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&two, "c.txt"))?;
     assert!(error);
@@ -210,7 +218,7 @@ fn unstaged_changes_in_the_way_of_a_merge_are_named() -> Result<(), String> {
     let edited = numbered(8, &[(4, "four, edited")]);
     write(&dir, "d.txt", &edited)?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&two, "d.txt"))?;
     assert!(error);
@@ -230,7 +238,7 @@ fn a_binary_file_is_refused_with_the_reason() -> Result<(), String> {
     std::fs::write(dir.join("img.bin"), [0u8, 1, 2, 3, 0, 9]).map_err(|e| e.to_string())?;
     let hash = commit(&dir, &[], "binary")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&hash, "img.bin"))?;
     assert!(error);
@@ -248,7 +256,7 @@ fn reverting_an_added_file_removes_it_and_a_rename_moves_it_back() -> Result<(),
     let edited = numbered(20, &[(3, "three")]);
     let renamed = commit(&dir, &[("renamed é.txt", &edited)], "rename")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
 
     let (said, error) = run(&mut tab, &ctx, revert_file(&added, "new.txt"))?;
     assert!(!error, "{said}");
@@ -268,7 +276,7 @@ fn one_hunk_of_a_commit_is_reverted_and_the_others_stay() -> Result<(), String> 
     let both = numbered(40, &[(5, "five"), (30, "thirty")]);
     let two = commit(&dir, &[("h.txt", &both)], "two")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let lines = open_diff(&mut tab, &ctx, &two, "h.txt")?;
     let hunks = hunks(&lines);
     assert_eq!(hunks.len(), 2);
@@ -288,7 +296,7 @@ fn only_the_lines_picked_are_reverted() -> Result<(), String> {
     let three = numbered(10, &[(4, "four"), (5, "five"), (6, "six")]);
     let two = commit(&dir, &[("l.txt", &three)], "two")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let lines = open_diff(&mut tab, &ctx, &two, "l.txt")?;
     // The removal of "5" and the addition of "five": line 5 goes back, 4 and 6 stay.
     let picked: BTreeSet<usize> = (0..lines.len())
@@ -317,7 +325,7 @@ fn a_hunk_whose_lines_changed_since_conflicts() -> Result<(), String> {
     let two = commit(&dir, &[("k.txt", &numbered(10, &[(5, "five")]))], "two")?;
     commit(&dir, &[("k.txt", &numbered(10, &[(5, "FIVE")]))], "three")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let lines = open_diff(&mut tab, &ctx, &two, "k.txt")?;
     let hunk = *hunks(&lines).first().ok_or("no hunk")?;
 
@@ -339,7 +347,7 @@ fn reverting_works_with_no_context_lines_in_the_users_config() -> Result<(), Str
     let both = numbered(20, &[(4, "four"), (15, "fifteen")]);
     let two = commit(&dir, &[("n.txt", &both)], "two")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let lines = open_diff(&mut tab, &ctx, &two, "n.txt")?;
     let hunk = *hunks(&lines).first().ok_or("no hunk")?;
     let (said, error) = run(
@@ -368,7 +376,7 @@ fn ctrl_z_brings_back_a_revert_whatever_apply_whitespace_says() -> Result<(), St
         "trailing space",
     )?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let (said, error) = run(&mut tab, &ctx, revert_file(&two, "s.txt"))?;
     assert!(!error, "{said}");
     assert_eq!(read(&dir, "s.txt")?, numbered(6, &[]));
@@ -401,7 +409,7 @@ fn a_submodule_change_offers_no_pieces_to_revert() -> Result<(), String> {
     let data = diff::load(&dir, &key, git::DiffOptions::default(), true)?;
     assert!(!data.revertable);
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let (said, error) = run(&mut tab, &ctx, revert_file(&sub, "lib"))?;
     assert!(error && said.contains("submodule"), "{said}");
     let _ = std::fs::remove_dir_all(&dir);
@@ -413,7 +421,7 @@ fn lines_picked_stay_picked_when_another_operation_holds_the_revert_up() -> Resu
     let dir = scratch("revert-busy", &[("b.txt", &numbered(6, &[]))])?;
     let two = commit(&dir, &[("b.txt", &numbered(6, &[(2, "two")]))], "two")?;
     let ctx = egui::Context::default();
-    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut tab = opened_tab(dir.clone(), &ctx);
     let lines = open_diff(&mut tab, &ctx, &two, "b.txt")?;
     let picked: BTreeSet<usize> = (0..lines.len())
         .filter(|&i| lines[i].text == "two")

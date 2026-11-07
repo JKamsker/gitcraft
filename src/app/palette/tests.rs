@@ -323,7 +323,8 @@ fn thousands_of_branches_open_and_filter_quickly() {
     let started = Instant::now();
     open_and_type(&mut harness, "");
     let first_step = listed(&harness).len();
-    assert!(first_step < 100, "{first_step} entries with nothing typed");
+    // Feature commands and themes are bounded; branches belong in the second step.
+    assert!(first_step < 200, "{first_step} entries with nothing typed");
     type_text(&mut harness, "feature-2999");
     assert_eq!(
         listed(&harness).first().map(String::as_str),

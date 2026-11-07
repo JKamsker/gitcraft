@@ -217,6 +217,10 @@ impl RepoTab {
                 };
                 (w.name(), found)
             });
+        if self.busy_op.is_some() {
+            return Some(pass);
+        }
+        self.busy_op = Some("Checking against the agent fence".to_owned());
         self.status = Some(("Checking against the agent fence…".to_owned(), false));
         let repo = self.path.clone();
         self.then(
@@ -229,6 +233,7 @@ impl RepoTab {
                 fence::check_ref(&repo, &tip, "HEAD", &patterns)
             },
             move |tab, commits, ctx| {
+                tab.busy_op = None;
                 tab.status = None;
                 let mut found: Vec<Violation> = Vec::new();
                 let mut errors: Vec<String> = Vec::new();

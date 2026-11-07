@@ -439,10 +439,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Changes",
         &[
             (
-                "Cmd+Enter",
-                "Save a note, or commit from the message fields",
-            ),
-            (
                 "Click / Shift+click",
                 "Pick lines in a diff or a file, or a range of them",
             ),

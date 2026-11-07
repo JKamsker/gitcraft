@@ -384,11 +384,11 @@ impl<'a> Rows<'a> {
         if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
             right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
         }
-        if kind == Some(Kind::Hunk) {
-            if let Some(tip) = data.weakened.get(&i) {
-                super::weakened::badge(ui, right, rect.center().y, tip, i);
-                right -= 24.0;
-            }
+        if kind == Some(Kind::Hunk)
+            && let Some(tip) = data.weakened.get(&i)
+        {
+            super::weakened::badge(ui, right, rect.center().y, tip, i);
+            right -= 24.0;
         }
         if matches!(kind, Some(Kind::Hunk | Kind::Fold)) {
             // Right of where the header's own text ends.

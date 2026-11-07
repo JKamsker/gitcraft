@@ -68,6 +68,7 @@ pub(crate) fn pushed_and_cloned(name: &str) -> Result<Option<(PathBuf, PathBuf)>
             &clone_to,
         ],
     )?;
+    git(&clone, &["lfs", "install", "--local"])?;
     git(&clone, &["config", "lfs.fetchrecentcommitsdays", "0"])?;
     Ok(Some((work, clone)))
 }

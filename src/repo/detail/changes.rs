@@ -658,7 +658,10 @@ mod tests {
         let plain = egui::Modifiers::NONE;
         frame(&tab, vec![egui::Event::PointerMoved(first)], plain);
         let acts = frame(&tab, click(plain).to_vec(), plain);
-        assert!(matches!(acts.as_slice(), [Action::OpenDiff(_)]));
+        assert!(matches!(
+            acts.as_slice(),
+            [Action::OpenDiff(_), Action::UnfoldDiff]
+        ));
     }
 
     /// The stash dialog opened from the toolbar with files picked offers them, chosen.

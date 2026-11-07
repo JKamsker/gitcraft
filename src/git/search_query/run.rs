@@ -11,6 +11,7 @@ use crate::git::{NO_SIGNATURE, UTF8, run as git, search, search_code};
 
 /// The commits `plan` finds, newest first; among those of the revisions `from` when given
 /// (as the graph shows them), else of every branch.
+#[cfg(test)]
 pub fn run(repo: &Path, from: Option<&[String]>, plan: &Plan) -> Result<Vec<String>, String> {
     run_with_order(repo, from, crate::git::LogOrder::default(), plan)
 }
