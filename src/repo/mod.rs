@@ -53,6 +53,7 @@ mod graph_order;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
+pub(crate) mod history_filter;
 mod hooks;
 mod hotfix;
 mod interaction;
@@ -250,6 +251,7 @@ pub struct RepoTab {
     forks: forks::Forks,
     /// What the commits record of who wrote them.
     authorship: authorship_view::Lens,
+    history_filter: history_filter::State,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -558,6 +560,7 @@ impl RepoTab {
             drift: None,
             forks: forks::Forks::default(),
             authorship: Default::default(),
+            history_filter: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

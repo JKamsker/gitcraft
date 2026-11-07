@@ -101,7 +101,7 @@ pub(super) enum Msg {
         result: Result<Vec<git::RebaseCommit>, String>,
     },
     /// Results for a query, searched in the code (`true`) or in the messages.
-    Search(String, bool, Result<Vec<String>, String>),
+    Search(Vec<String>, String, bool, Result<Vec<String>, String>),
     /// A comparison's files, for the request numbered so.
     Compare(u64, Result<CompareData, String>),
     /// The open pull requests, as asked for at that moment (see `RepoTab::prs_loaded`).
@@ -614,7 +614,11 @@ impl RepoTab {
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
             Msg::JobPanicked(e) => self.status = Some((e, true)),
             Msg::Then(then) => then(self, ctx),
-            Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
+            Msg::Search(excluded, query, code, result) => {
+                if super::history_filter::rules(ctx, self.repo_key()).excludes() == excluded {
+                    self.search_done(query, code, result, ctx);
+                }
+            }
             // Asked before the list asked for last (one read before a merge answering after
             // the one read since), or of the forge the remotes no longer point to.
             Msg::Prs(asked, _) if self.prs_loaded != Some(asked) => {}

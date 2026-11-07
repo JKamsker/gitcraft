@@ -6,6 +6,8 @@ mod drag;
 mod handles;
 mod header;
 mod lanes;
+#[cfg(test)]
+mod layout_tests;
 mod menu;
 mod order;
 mod pills;
@@ -50,8 +52,6 @@ pub(crate) const DIMMED: f32 = 0.4;
 /// A translucent black, so the column handles read as dark on every theme's header.
 const HANDLE_COLOR: egui::Color32 = egui::Color32::from_black_alpha(130);
 const HANDLE_WIDTH: f32 = 2.0;
-/// How far a handle sits left of the column it resizes.
-const HANDLE_GAP: f32 = 5.0;
 const AVATAR_D: f32 = 20.0;
 /// How opaque a commit a ghost run would make is drawn.
 const GHOST_OPACITY: f32 = 0.6;
@@ -87,6 +87,7 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.history_filters_frame(ui);
         let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
@@ -170,129 +171,141 @@ impl RepoTab {
         let settings = Settings::get(ui.ctx());
         let lanes = lane_layout(&settings, self.graph.width);
         let prefs = preferred_cols(&settings, lanes);
-        let cols = prefs.squeezed(ui.available_width(), settings.last_resized);
+        let available = ui.available_width();
+        let cols = prefs.squeezed(available, None);
+        egui::ScrollArea::horizontal()
+            .id_salt("graph-horizontal")
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                ui.set_width(cols.content_width(available));
 
-        // Column headers.
-        let (header, header_resp) =
-            ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
-        let graph_label = crate::repo::graph_order::header_label(self.log_order);
-        header::column_headers(ui, &t, header, &cols, &graph_label);
-        self.test_lane_frame(&settings, ui.ctx());
-        if self.test_lane.visible {
-            self.test_lane_header(ui, header, &cols, acts);
-        }
-        self.column_handles(ui, header, &prefs, &cols, &settings);
-        header::header_menu(&header_resp, &settings);
-        order::order_button(
-            ui,
-            header,
-            &cols,
-            (&graph_label, self.log_order),
-            &settings,
-            acts,
-        );
+                // Column headers.
+                let (header, header_resp) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
+                let graph_label = crate::repo::graph_order::header_label(self.log_order);
+                header::column_headers(ui, &t, header, &cols, &graph_label);
+                self.test_lane_frame(&settings, ui.ctx());
+                if self.test_lane.visible {
+                    self.test_lane_header(ui, header, &cols, acts);
+                }
+                self.column_handles(ui, header, &prefs, &cols, &settings);
+                header::header_menu(&header_resp, &settings);
+                order::order_button(
+                    ui,
+                    header,
+                    &cols,
+                    (&graph_label, self.log_order),
+                    &settings,
+                    acts,
+                );
 
-        let mut scroll = egui::ScrollArea::vertical()
-            .id_salt("graph_scroll")
-            .auto_shrink(false);
-        let offset_id = ui.id().with("graph_offset");
-        let offset_now = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
-        match self.ghost.take_shift() {
-            // Rows added on top: the rows in view stay where they are, unless the top is shown.
-            Some(Shift::In(rows)) if offset_now > 0.0 => {
-                let by = rows as f32 * ROW_PITCH;
-                self.ghost.shifted = by;
-                scroll = scroll.vertical_scroll_offset(offset_now + by);
-            }
-            Some(Shift::Out(by)) => {
-                scroll = scroll.vertical_scroll_offset((offset_now - by).max(0.0));
-            }
-            _ => {}
-        }
-        if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
-            let view_h = ui.available_height();
-            let top = row as f32 * ROW_PITCH;
-            // Only scroll if the row is outside the visible part.
-            let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
-            if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
-            }
-        }
+                let mut scroll = egui::ScrollArea::vertical()
+                    .id_salt("graph_scroll")
+                    .auto_shrink(false);
+                let offset_id = ui.id().with("graph_offset");
+                let offset_now = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
+                match self.ghost.take_shift() {
+                    // Rows added on top: the rows in view stay where they are, unless the top is shown.
+                    Some(Shift::In(rows)) if offset_now > 0.0 => {
+                        let by = rows as f32 * ROW_PITCH;
+                        self.ghost.shifted = by;
+                        scroll = scroll.vertical_scroll_offset(offset_now + by);
+                    }
+                    Some(Shift::Out(by)) => {
+                        scroll = scroll.vertical_scroll_offset((offset_now - by).max(0.0));
+                    }
+                    _ => {}
+                }
+                if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
+                    let view_h = ui.available_height();
+                    let top = row as f32 * ROW_PITCH;
+                    // Only scroll if the row is outside the visible part.
+                    let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
+                    if top < offset || top + ROW_PITCH > offset + view_h {
+                        scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                    }
+                }
 
-        // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
-        ui.spacing_mut().item_spacing.y = 0.0;
-        let idle = self.busy_op.is_none();
-        let now = git::now();
-        let total = self.commits.len() + usize::from(self.has_more);
-        // The merges shown, for their badges: only those are read.
-        let mut shown_merges = Vec::new();
-        // A new repository's first steps go under its few rows.
-        let first_steps = first_steps.filter(|_| !self.guide.steps_hidden);
-        if first_steps.is_some() {
-            scroll = scroll.max_height(total as f32 * ROW_PITCH);
-        }
-        let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
-            // Near the end: fetch the next page of history.
-            // Not from the ghost graph, whose rows don't grow as pages come in.
-            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more && !ghost
-            {
-                acts.push(Action::LoadMore);
-            }
-            self.drag_auto_scroll(ui);
-            // Tab reaches the selected row, else the first in view.
-            let stop = self
-                .selected
-                .filter(|s| range.contains(s))
-                .unwrap_or(range.start);
-            // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
-            ui.data_mut(|d| d.insert_temp(rows_id, stop));
-            let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
-            let mut menu_drawn = false;
-            for i in range {
-                if i >= self.commits.len() {
-                    loading_row(ui, &t);
-                    continue;
+                // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
+                ui.spacing_mut().item_spacing.y = 0.0;
+                let idle = self.busy_op.is_none();
+                let now = git::now();
+                let total = self.commits.len() + usize::from(self.has_more);
+                // The merges shown, for their badges: only those are read.
+                let mut shown_merges = Vec::new();
+                // A new repository's first steps go under its few rows.
+                let first_steps = first_steps.filter(|_| !self.guide.steps_hidden);
+                if first_steps.is_some() {
+                    scroll = scroll.max_height(total as f32 * ROW_PITCH);
                 }
-                if !ghost {
-                    if self.commits[i].parents.len() == 2 {
-                        shown_merges.push(self.commits[i].hash.clone());
+                let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
+                    ui.set_width(cols.content_width(available));
+                    // Near the end: fetch the next page of history.
+                    // Not from the ghost graph, whose rows don't grow as pages come in.
+                    if range.end + 40 >= self.commits.len()
+                        && self.has_more
+                        && !self.loading_more
+                        && !ghost
+                    {
+                        acts.push(Action::LoadMore);
                     }
-                    let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
-                    if i == stop {
-                        crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
+                    self.drag_auto_scroll(ui);
+                    // Tab reaches the selected row, else the first in view.
+                    let stop = self
+                        .selected
+                        .filter(|s| range.contains(s))
+                        .unwrap_or(range.start);
+                    // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
+                    ui.data_mut(|d| d.insert_temp(rows_id, stop));
+                    let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
+                    let mut menu_drawn = false;
+                    for i in range {
+                        if i >= self.commits.len() {
+                            loading_row(ui, &t);
+                            continue;
+                        }
+                        if !ghost {
+                            if self.commits[i].parents.len() == 2 {
+                                shown_merges.push(self.commits[i].hash.clone());
+                            }
+                            let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
+                            if i == stop {
+                                crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
+                            }
+                            if resp.clicked() {
+                                // Ctrl+click: compare the selected commit with this one.
+                                let compare = ui
+                                    .input(|inp| inp.modifiers.command)
+                                    .then(|| self.compare_rows(self.selected?, i))
+                                    .flatten();
+                                acts.push(compare.unwrap_or(Action::Select(i)));
+                            }
+                            if resp.secondary_clicked() {
+                                let hash = self.commits[i].hash.clone();
+                                ui.data_mut(|d| d.insert_temp(menu_row_id(), hash));
+                            }
+                            self.row_menu(&resp, i, idle, acts);
+                            continue;
+                        }
+                        // The ghost graph is only looked at: its rows do nothing, but the menu open
+                        // on a real commit (whose entry is being previewed) stays open.
+                        let resp = self.ghost_row(ui, i, cols, lanes, now);
+                        if !self.is_ghost_row(i) {
+                            menu_drawn |=
+                                menu_row.as_deref() == Some(self.commits[i].hash.as_str());
+                            self.row_menu(&resp, i, idle, acts);
+                        }
                     }
-                    if resp.clicked() {
-                        // Ctrl+click: compare the selected commit with this one.
-                        let compare = ui
-                            .input(|inp| inp.modifiers.command)
-                            .then(|| self.compare_rows(self.selected?, i))
-                            .flatten();
-                        acts.push(compare.unwrap_or(Action::Select(i)));
+                    if ghost && !menu_drawn {
+                        self.keep_menu_open(ui, menu_row.as_deref(), idle, acts);
                     }
-                    if resp.secondary_clicked() {
-                        let hash = self.commits[i].hash.clone();
-                        ui.data_mut(|d| d.insert_temp(menu_row_id(), hash));
-                    }
-                    self.row_menu(&resp, i, idle, acts);
-                    continue;
+                });
+                ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+                if let Some(steps) = first_steps {
+                    self.first_steps_view(ui, steps, acts);
                 }
-                // The ghost graph is only looked at: its rows do nothing, but the menu open
-                // on a real commit (whose entry is being previewed) stays open.
-                let resp = self.ghost_row(ui, i, cols, lanes, now);
-                if !self.is_ghost_row(i) {
-                    menu_drawn |= menu_row.as_deref() == Some(self.commits[i].hash.as_str());
-                    self.row_menu(&resp, i, idle, acts);
-                }
-            }
-            if ghost && !menu_drawn {
-                self.keep_menu_open(ui, menu_row.as_deref(), idle, acts);
-            }
-        });
-        ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
-        if let Some(steps) = first_steps {
-            self.first_steps_view(ui, steps, acts);
-        }
-        self.want_remerge_badges(&shown_merges, ui.ctx());
+                self.want_remerge_badges(&shown_merges, ui.ctx());
+            });
     }
 
     /// A row of the ghost graph, faded as what it is: a commit the operation would make, one
@@ -616,7 +629,7 @@ mod tests {
         show_commits(&mut tab, &refs);
         // A short window: the header and a few rows.
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1200.0, 160.0));
-        let second = egui::pos2(600.0, 26.0 + ROW_PITCH * 1.5);
+        let second = egui::pos2(600.0, 52.0 + ROW_PITCH * 1.5);
         let frame = |tab: &mut RepoTab, events: Vec<egui::Event>| {
             let input = egui::RawInput {
                 screen_rect: Some(screen),
@@ -699,7 +712,7 @@ mod tests {
         );
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1200.0, 800.0));
         // The header, then the rows: the second row's middle, away from its pills.
-        let second = egui::pos2(600.0, 26.0 + ROW_PITCH * 1.5);
+        let second = egui::pos2(600.0, 52.0 + ROW_PITCH * 1.5);
         let frame = |tab: &mut RepoTab, events: Vec<egui::Event>| {
             let input = egui::RawInput {
                 screen_rect: Some(screen),
