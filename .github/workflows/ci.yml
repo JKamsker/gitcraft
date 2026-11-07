@@ -61,7 +61,7 @@ jobs:
         timeout-minutes: 30
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip repo::bakeoff::tests::a_branch_is_assembled_from_the_page_and_an_attempt_is_built
+        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped
       # This test counts `sleep 6789` processes globally on Linux. Running it in
       # parallel with other subprocess-heavy tests can produce a false failure.
       - name: Timed-out subprocess cleanup (isolated)
@@ -69,13 +69,6 @@ jobs:
         env:
           RUST_BACKTRACE: "1"
         run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
-      # The bakeoff test drives asynchronous Git operations and can time out when
-      # run alongside thousands of parallel tests; keep its assertions unchanged.
-      - name: Bakeoff assembly and build (isolated)
-        timeout-minutes: 5
-        env:
-          RUST_BACKTRACE: "1"
-        run: cargo test --locked -p gitcraft --lib repo::bakeoff::tests::a_branch_is_assembled_from_the_page_and_an_attempt_is_built -- --exact --nocapture
 
   windows-build:
     name: Windows test build
