@@ -8,6 +8,7 @@ mod panels;
 mod practice;
 mod profiles;
 mod remote_open;
+mod setup;
 mod tab_strip;
 mod tabs;
 #[cfg(test)]
@@ -87,6 +88,7 @@ pub struct App {
     was_focused: bool,
     clone_form: Option<CloneForm>,
     practice_open: bool,
+    setup: setup::SetupWindow,
     practicing: Option<Receiver<Result<PathBuf, String>>>,
     /// A clone running in the background: (destination, result).
     cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
@@ -172,6 +174,7 @@ impl App {
             was_focused: true,
             clone_form: None,
             practice_open: false,
+            setup: Default::default(),
             practicing: None,
             cloning: None,
             cloning_form: None,
@@ -374,6 +377,7 @@ impl App {
             || self.askpass_open()
             || self.palette.is_some()
             || self.practice_open
+            || self.setup.open
             || self.manual_open
             || ctx.egui_wants_keyboard_input();
         let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
@@ -394,7 +398,8 @@ impl App {
             self.open_settings();
         }
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.practice_open
+        let asking = self.setup.open
+            || self.practice_open
             || self.clone_form.is_some()
             || self.remote_form.is_some()
             || self.askpass_open();
@@ -437,6 +442,7 @@ impl App {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
                     || self.practice_open
+                    || self.setup.open
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
@@ -494,6 +500,7 @@ impl eframe::App for App {
         }
         self.poll_clone(&ctx);
         self.poll_practice(&ctx);
+        self.poll_setup(&ctx);
         self.poll_connecting(&ctx);
         self.poll_update(&ctx);
         self.notice_profile_git(&ctx);
@@ -547,6 +554,7 @@ impl eframe::App for App {
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
         self.practice_dialog(&ctx);
+        self.setup_ui(&ctx);
         crate::glossary::hover(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
