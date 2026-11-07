@@ -17,6 +17,7 @@ pub(super) use text::{blocks, only_web_links};
 
 pub(crate) struct PrView {
     pub number: u64,
+    pub(super) relocated: super::review_workflow::Relocations,
     request: u64,
     loading: bool,
     pub(super) details: Option<Result<PrDetails, String>>,
@@ -85,6 +86,7 @@ impl RepoTab {
         self.versions.view = None;
         self.pr_view = Some(PrView {
             number,
+            relocated: Default::default(),
             request: 0,
             loading: true,
             details: None,
@@ -194,6 +196,33 @@ impl RepoTab {
             _ => None,
         };
         view.files = Some(result);
+        if let Some(details) = details.clone() {
+            let path = self.path.clone();
+            let base = view
+                .files
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .map(|f| f.from.clone());
+            if let Some(base) = base {
+                self.then_or(
+                    ctx,
+                    true,
+                    Err,
+                    move || super::review_workflow::relocate_threads(&path, &details, &base),
+                    move |tab, result, _| {
+                        if let Some(view) = tab.pr_view.as_mut().filter(|v| v.request == request) {
+                            match result {
+                                Ok(anchors) => view.relocated = anchors,
+                                Err(e) => {
+                                    tab.status = Some((format!("Comment relocation: {e}"), true))
+                                }
+                            }
+                        }
+                    },
+                );
+            }
+        }
+
         if let Some(details) = details {
             self.check_pr_since(&details, ctx);
         }

@@ -25,6 +25,30 @@ impl RepoTab {
             return;
         };
         page_header(ui, view, popped, acts);
+        if !view.relocated.is_empty() {
+            egui::CollapsingHeader::new(format!(
+                "{} earlier comment anchors relocated",
+                view.relocated.len()
+            ))
+            .show(ui, |ui| {
+                if let Some(Ok(files)) = &view.files {
+                    for target in view.relocated.values() {
+                        if ui
+                            .button(format!("{}:{} · unchanged text", target.path, target.line))
+                            .clicked()
+                        {
+                            acts.push(Action::OpenDiff(DiffKey::Range {
+                                from: files.from.clone(),
+                                to: Some(files.to.clone()),
+                                path: target.path.clone(),
+                            }));
+                            acts.push(Action::Pr(pr_review::PrAct::OpenLine(target.clone())));
+                        }
+                    }
+                }
+            });
+        }
+
         if let Some(Ok(_)) = &view.details {
             crate::repo::versions::since_banner(
                 ui,

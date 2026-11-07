@@ -98,6 +98,7 @@ mod remerge;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
+mod review_workflow;
 mod rewrite;
 mod running;
 #[cfg(test)]
