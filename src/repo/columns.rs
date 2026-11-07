@@ -11,6 +11,23 @@ pub(super) const MIN_COL_W: f32 = 50.0;
 pub(crate) const MIN_DESCRIPTION_W: f32 = 140.0;
 pub(crate) const CELL_PAD: f32 = 6.0;
 
+/// An explicit Description allocation from a manual gesture, separate from column widths.
+/// At smaller viewports Description gives back this space first. No viewport visit mutates it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct DescriptionSpace {
+    pub viewport: f32,
+    pub width: f32,
+}
+impl DescriptionSpace {
+    pub fn floor(self, available: f32) -> f32 {
+        if !self.viewport.is_finite() || !self.width.is_finite() {
+            return MIN_DESCRIPTION_W;
+        }
+        (self.width - (self.viewport - available).max(0.0)).max(MIN_DESCRIPTION_W)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Cols {
     pub refs: f32,
@@ -67,7 +84,9 @@ impl Bar {
     }
     /// A drag is measured from its starting snapshot, never from last frame's compression.
     pub fn drag(self, prefs: &Cols, _last: Option<Bar>, dx: f32, available: f32) -> Cols {
-        let shown = prefs.squeezed(available, None);
+        self.drag_shown(prefs, &prefs.squeezed(available, None), dx, available)
+    }
+    pub fn drag_shown(self, prefs: &Cols, shown: &Cols, dx: f32, available: f32) -> Cols {
         let sign = if matches!(self, Self::Refs | Self::Graph) {
             1.0
         } else {
@@ -126,6 +145,12 @@ impl Cols {
         available.max(self.minimum_width())
     }
     pub fn squeezed(self, available: f32, _last: Option<Bar>) -> Self {
+        self.allocated(available, DescriptionSpace::default())
+    }
+    pub fn allocated(self, available: f32, description: DescriptionSpace) -> Self {
+        let floor = description
+            .floor(available)
+            .min((available - self.minimum_width() + MIN_DESCRIPTION_W).max(MIN_DESCRIPTION_W));
         let mut out = Self { push: 0.0, ..self };
         for bar in Bar::ALL {
             let w = out.width_mut(bar);
@@ -133,8 +158,7 @@ impl Cols {
                 *w = bar.bounded(*w);
             }
         }
-        let mut overflow =
-            (out.refs + out.graph + out.trailing() + MIN_DESCRIPTION_W - available).max(0.0);
+        let mut overflow = (out.refs + out.graph + out.trailing() + floor - available).max(0.0);
         for bar in [
             Bar::Graph,
             Bar::Refs,
@@ -271,5 +295,45 @@ mod tests {
         let next = Bar::When.drag(&prefs(), None, 10000.0, 1800.0);
         assert_eq!(next.when, Bar::When.min());
         assert_eq!(next.date, prefs().date);
+    }
+}
+
+#[cfg(test)]
+mod exchange_tests {
+    use super::*;
+    #[test]
+    fn released_space_does_not_restore_an_unrelated_compressed_preference() {
+        let initial = Cols {
+            refs: 280.0,
+            graph: 100.0,
+            hash: 0.0,
+            author: 150.0,
+            when: 100.0,
+            date: 0.0,
+            push: 0.0,
+        };
+        let shown = initial.allocated(600.0, DescriptionSpace::default());
+        assert_eq!((shown.refs, shown.graph), (150.0, 60.0));
+        let saved = Bar::Refs.drag_shown(&initial, &shown, -20.0, 600.0);
+        let space = DescriptionSpace {
+            viewport: 600.0,
+            width: 160.0,
+        };
+        let after = saved.allocated(600.0, space);
+        assert_eq!(
+            (after.refs, after.graph, after.author, after.when),
+            (130.0, 60.0, 150.0, 100.0)
+        );
+        assert_eq!(saved.graph, initial.graph);
+        assert_eq!(saved.allocated(580.0, space).graph, 60.0);
+        assert_eq!(space.floor(580.0), 140.0);
+        assert_eq!(saved.allocated(640.0, space).graph, 100.0);
+        let round_trip: DescriptionSpace = ron::from_str(&ron::to_string(&space).unwrap()).unwrap();
+        for width in [1800.0, 380.0, 580.0, 600.0, 420.0, 600.0] {
+            assert_eq!(
+                saved.allocated(width, space),
+                saved.allocated(width, round_trip)
+            );
+        }
     }
 }

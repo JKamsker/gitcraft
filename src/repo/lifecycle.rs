@@ -175,6 +175,7 @@ impl super::RepoTab {
         self.resume_diff = self.diff.as_ref().map(|d| d.key.clone());
         self.pending_goto = None;
         self.history = Vec::new();
+        self.history_index.clear();
         self.commits = Vec::new();
         self.graph = crate::graph::Graph {
             rows: Vec::new(),

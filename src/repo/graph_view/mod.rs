@@ -194,7 +194,7 @@ impl RepoTab {
         let lanes = lane_layout(&settings, self.graph.width);
         let mut prefs = preferred_cols(&settings, lanes);
         let available = ui.available_width();
-        let mut cols = prefs.squeezed(available, None);
+        let mut cols = prefs.allocated(available, settings.description_space);
         egui::ScrollArea::horizontal()
             .id_salt("graph-horizontal")
             .auto_shrink(false)
@@ -256,7 +256,7 @@ impl RepoTab {
                     let readable = self.readable_viewport(ui, first..end, lanes.shown);
                     if settings.fit_visible_refs() {
                         prefs.refs = readable.refs_width;
-                        cols = prefs.squeezed(available, None);
+                        cols = prefs.allocated(available, settings.description_space);
                     }
                     ui.set_width(cols.content_width(available));
                     // Near the end: fetch the next page of history.

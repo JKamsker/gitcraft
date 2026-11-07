@@ -69,6 +69,8 @@ pub struct Settings {
     pub last_resized: Option<crate::repo::columns::Bar>,
     /// Legacy cascading-resize offset; new divider drags clear it.
     pub column_push: f32,
+    /// Description space exchanged by the most recent manual column gesture.
+    pub description_space: crate::repo::columns::DescriptionSpace,
     pub show_author: bool,
     /// How long ago each commit was made ("3 hours ago").
     pub show_when: bool,
@@ -196,6 +198,7 @@ impl Default for Settings {
             hash_width: 70.0,
             last_resized: None,
             column_push: 0.0,
+            description_space: Default::default(),
             show_author: true,
             show_when: true,
             show_date: false,
@@ -286,6 +289,7 @@ impl Settings {
         self.hash_width = fresh.hash_width;
         self.last_resized = fresh.last_resized;
         self.column_push = fresh.column_push;
+        self.description_space = fresh.description_space;
     }
 
     /// Puts the graph's lanes closer together or back apart. The graph column then fits them

@@ -194,6 +194,8 @@ pub struct RepoTab {
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
+    /// Operational lookup into raw history; display filtering must never break ancestry.
+    history_index: HashMap<String, usize>,
     /// A selected pull request's tip, including one with no local or tracking ref.
     pr_graph_head: Option<Arc<Commit>>,
     has_more: bool,
@@ -539,6 +541,7 @@ impl RepoTab {
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
             history: Vec::new(),
+            history_index: HashMap::new(),
             pr_graph_head: None,
             has_more: false,
             loading_more: false,

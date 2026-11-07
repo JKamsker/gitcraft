@@ -329,7 +329,8 @@ impl RepoTab {
             .unwrap_or_else(git::history_scope::default_hidden_namespaces);
         let stream = Arc::clone(&self.log_stream);
         // Answered all the same if it panics: no more is read until it is.
-        let failed = move |e| Msg::More(generation, Err(e));
+        let failed_excluded = excluded.clone();
+        let failed = move |e| Msg::More(generation, failed_excluded, Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
             let page = (|| {
                 let mut slot = stream
@@ -363,7 +364,7 @@ impl RepoTab {
                 }
                 page
             })();
-            Msg::More(generation, page)
+            Msg::More(generation, excluded, page)
         });
     }
 
@@ -603,6 +604,12 @@ impl RepoTab {
     /// The WIP pseudo-commit (when the tree is dirty), then `history` with its stashes, laid out
     /// as the graph.
     pub(super) fn rebuild_rows(&mut self) {
+        self.history_index = self
+            .history
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.hash.clone(), i))
+            .collect();
         let selected_hash = self.selected_hash();
         let mut protected = self.history_filter.revealed.clone();
         protected.extend(self.selected_hash());
@@ -611,8 +618,13 @@ impl RepoTab {
         protected.insert(self.refs.head.clone());
         protected.extend(self.stashes.iter().map(|s| s.base.clone()));
         let rules = self.history_filter.applied.clone().unwrap_or_default();
-        let (visible, graph_history, hidden, kept) =
-            super::history_filter::compact(&self.history, &rules, &protected);
+        let (visible, graph_history, hidden, kept) = super::history_filter::compact(
+            &self.history,
+            &rules,
+            &protected,
+            self.log_order.first_parent,
+            self.has_more,
+        );
         self.history_filter.hidden_loaded = hidden;
         self.history_filter.kept_loaded = kept;
         let old_rows = std::mem::take(&mut self.commits);

@@ -317,3 +317,129 @@ fn a_note_being_written_survives_selecting_elsewhere() {
     assert_eq!(tab.extras.notes.draft.as_deref(), Some("half written"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scope() {
+    let dir = repo("namespace-in-flight");
+    let base = commit(&dir, "base");
+    assert!(git::run(Some(&dir), &["switch", "-q", "--orphan", "checkpoint-temp"]).is_ok());
+    let checkpoint = commit(&dir, &format!("only checkpoint\n\nFixes: {base}"));
+    for args in [
+        &["update-ref", "refs/t3/test", &checkpoint][..],
+        &["switch", "-q", "main"],
+        &["branch", "-D", "checkpoint-temp"],
+    ] {
+        assert!(git::run(Some(&dir), args).is_ok());
+    }
+    let refs_before = git::run(
+        Some(&dir),
+        &["for-each-ref", "--format=%(refname) %(objectname)"],
+    )
+    .unwrap();
+    let ctx = egui::Context::default();
+    let mut settings = crate::settings::Settings {
+        history_filter: crate::repo::history_filter::Rules::empty(),
+        ..Default::default()
+    };
+    settings.set(&ctx);
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.life.phase = crate::repo::lifecycle::Phase::Live;
+    tab.refs = git::refs(&dir).unwrap();
+    tab.history = git::log_scoped(&dir, None, Default::default(), 0, 1, &[])
+        .unwrap()
+        .into_iter()
+        .map(std::sync::Arc::new)
+        .collect();
+    tab.history_filter.applied = Some(settings.history_filter.clone());
+    tab.history_filter.read_namespaces = Some(Vec::new());
+    tab.has_more = true;
+    tab.rebuild_rows();
+    tab.detail_hash = Some(base.clone());
+    tab.load_extras(&base, &ctx);
+    tab.extras.jobs.due = None;
+    tab.want(super::Kind::Backlinks, &ctx);
+    tab.search.open = true;
+    tab.search.query = "only checkpoint".into();
+    tab.run_search(&ctx);
+    // Hold the actual log stream before requesting the page. Its worker cannot complete
+    // until after the namespace toggle, and the reload generation deliberately stays equal.
+    let stream = std::sync::Arc::clone(&tab.log_stream);
+    let hold = stream.lock().unwrap();
+    let generation = tab.history_gen;
+    let history_before = tab.history.clone();
+    tab.load_more(&ctx);
+    assert!(tab.loading_more);
+    settings.history_filter.namespaces = "refs/t3/*".into();
+    settings.set(&ctx);
+    tab.backlinks_scope_changed(&ctx);
+    tab.run_search(&ctx);
+    drop(hold);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    loop {
+        tab.poll(&ctx);
+        assert!(
+            !tab.search.results.contains(&checkpoint),
+            "stale scoped search result was applied"
+        );
+        if let Some(Ok((links, _))) = &tab.extras.backlinks {
+            assert!(
+                !links.iter().any(|l| l.hash == checkpoint),
+                "stale backlink result was applied"
+            );
+        }
+        if !tab.loading_more
+            && !tab.search.running
+            && tab.extras.backlinks.is_some()
+            && !tab.extras.jobs.running[super::Kind::Backlinks as usize]
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "scoped readers did not settle"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert_eq!(tab.history_gen, generation);
+    assert_eq!(
+        tab.history.iter().map(|c| &c.hash).collect::<Vec<_>>(),
+        history_before.iter().map(|c| &c.hash).collect::<Vec<_>>()
+    );
+    assert!(tab.search.results.is_empty());
+    assert!(matches!(&tab.extras.backlinks, Some(Ok((links, _))) if links.is_empty()));
+    // Complete a real replacement reload in the new scope, then reveal and load it again.
+    for (hidden, expected) in [(true, 1), (false, 2)] {
+        settings.history_filter.namespaces = if hidden { "refs/t3/*" } else { "" }.into();
+        settings.set(&ctx);
+        tab.selected = None;
+        tab.reload(&ctx);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        while tab.loading {
+            tab.poll(&ctx);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "scope reload did not finish: {:?}",
+                tab.status
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(tab.history.len(), expected);
+        assert_eq!(tab.history.iter().any(|c| c.hash == checkpoint), !hidden);
+        assert_eq!(tab.history_filter.excluded_total, Some(usize::from(hidden)));
+    }
+    assert_eq!(
+        git::run(
+            Some(&dir),
+            &["for-each-ref", "--format=%(refname) %(objectname)"]
+        )
+        .unwrap(),
+        refs_before
+    );
+    assert_eq!(git::head(&dir), base);
+    assert!(
+        git::run(Some(&dir), &["status", "--porcelain"])
+            .unwrap()
+            .is_empty()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

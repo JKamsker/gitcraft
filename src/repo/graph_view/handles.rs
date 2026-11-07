@@ -4,7 +4,7 @@ use egui::{Rect, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{HANDLE_COLOR, HANDLE_WIDTH};
 use crate::repo::RepoTab;
-use crate::repo::columns::{Bar, Cols};
+use crate::repo::columns::{Bar, Cols, DescriptionSpace, MIN_DESCRIPTION_W};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
@@ -12,6 +12,8 @@ use crate::theme::Tokens;
 #[derive(Clone, Copy)]
 struct DragStart {
     prefs: Cols,
+    shown: Cols,
+    description: DescriptionSpace,
     available: f32,
     pointer: f32,
     preference: f32,
@@ -102,6 +104,8 @@ impl RepoTab {
                         drag_id,
                         DragStart {
                             prefs: *prefs,
+                            shown: *cols,
+                            description: settings.description_space,
                             available: header.width(),
                             pointer: origin,
                             preference: preference(settings, bar),
@@ -121,10 +125,20 @@ impl RepoTab {
             let dx = resp
                 .interact_pointer_pos()
                 .map_or(0.0, |p| p.x - start.pointer);
-            let widths = bar.drag(&start.prefs, None, dx, start.available);
+            let widths = bar.drag_shown(&start.prefs, &start.shown, dx, start.available);
             save_drag(&mut next, bar, prefs, &widths);
             if widths.width(bar) == start.prefs.width(bar) {
                 *preference_mut(&mut next, bar) = start.preference;
+                next.description_space = start.description;
+            } else {
+                // Keep every other displayed allocation exactly as at gesture start. Changing
+                // only the dragged preference would let the squeeze policy restore a sibling.
+                let shown_sum = start.shown.refs + start.shown.graph + start.shown.trailing();
+                let change = widths.width(bar) - start.shown.width(bar);
+                next.description_space = DescriptionSpace {
+                    viewport: start.available,
+                    width: (start.available - shown_sum - change).max(MIN_DESCRIPTION_W),
+                };
             }
         }
         if next != *settings {
@@ -237,7 +251,7 @@ mod interaction_tests {
                             let settings = Settings::get(&ctx);
                             let prefs = preferred_cols(&settings, lane_layout(&settings, 3));
                             let header = Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 26.0));
-                            let shown = prefs.squeezed(header.width(), None);
+                            let shown = prefs.allocated(header.width(), settings.description_space);
                             tab.column_handles(ui, header, &prefs, &shown, &settings);
                         },
                     )

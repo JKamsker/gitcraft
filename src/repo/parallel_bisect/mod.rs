@@ -310,9 +310,9 @@ impl RepoTab {
             return;
         }
         let parents = self
-            .index
+            .history_index
             .get(&hash)
-            .and_then(|&i| self.commits.get(i))
+            .and_then(|&i| self.history.get(i))
             .map(|c| c.parents.clone());
         let path = self.path.clone();
         self.busy_op = Some("Mark in the bisect".to_owned());

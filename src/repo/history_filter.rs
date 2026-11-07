@@ -121,6 +121,8 @@ pub(super) fn compact(
     history: &[Arc<Commit>],
     rules: &Rules,
     protected: &HashSet<String>,
+    first_parent: bool,
+    has_more: bool,
 ) -> (Vec<Arc<Commit>>, Vec<Arc<Commit>>, usize, usize) {
     let by_hash: HashMap<&str, &Arc<Commit>> =
         history.iter().map(|c| (c.hash.as_str(), c)).collect();
@@ -130,7 +132,10 @@ pub(super) fn compact(
             rules.matches(c)
                 && c.refs.is_empty()
                 && !protected.contains(&c.hash)
-                && c.parents.iter().all(|p| by_hash.contains_key(p.as_str()))
+                // --first-parent intentionally omits side parents; only an unresolved
+                // parent on a traversed path can be a genuine next-page frontier.
+                && (!has_more || c.parents.iter().take(if first_parent { 1 } else { usize::MAX })
+                    .all(|p| by_hash.contains_key(p.as_str())))
         })
         .map(|c| c.hash.as_str())
         .collect();
@@ -155,7 +160,12 @@ pub(super) fn compact(
                     continue;
                 }
                 stack.push((hash, true));
-                for parent in c.parents.iter().rev() {
+                for parent in c
+                    .parents
+                    .iter()
+                    .take(if first_parent { 1 } else { usize::MAX })
+                    .rev()
+                {
                     if hidden.contains(parent.as_str()) && !visiting.contains(parent.as_str()) {
                         stack.push((parent.as_str(), false));
                     }
@@ -163,7 +173,11 @@ pub(super) fn compact(
             } else {
                 let mut nearest = Vec::new();
                 let mut seen = HashSet::new();
-                for p in &c.parents {
+                for p in c
+                    .parents
+                    .iter()
+                    .take(if first_parent { 1 } else { usize::MAX })
+                {
                     let ancestors = frontiers
                         .get(p.as_str())
                         .cloned()
@@ -184,7 +198,11 @@ pub(super) fn compact(
         .map(|c| {
             let mut parents = Vec::new();
             let mut seen = HashSet::new();
-            for p in &c.parents {
+            for p in c
+                .parents
+                .iter()
+                .take(if first_parent { 1 } else { usize::MAX })
+            {
                 let nearest = frontiers
                     .get(p.as_str())
                     .cloned()
