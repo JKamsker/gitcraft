@@ -53,7 +53,7 @@ impl RepoTab {
         }
         ui.horizontal(|ui| {
             if ui.add_enabled(self.dossier.result.is_some()&&!self.dossier.summary_reader.busy()&&crate::settings::Settings::get(ui.ctx()).ai.tool!=crate::ai::AiTool::Off,egui::Button::new("Summarize cited history with configured AI…")).on_hover_text("Sends the displayed history cards to your Settings → AI tool; a custom command can use your own key or a local model").clicked(){self.summarize_dossier(ui.ctx());}
-            if self.dossier.summary_reader.busy(){ui.spinner();if ui.button("Cancel summary").clicked(){self.dossier.summary_reader.cancel();}}
+            if self.dossier.summary_reader.busy(){ui.add(crate::spinner::Spinner::new());if ui.button("Cancel summary").clicked(){self.dossier.summary_reader.cancel();}}
         });
         if let Some(summary) = &self.dossier.summary {
             match summary {
@@ -80,16 +80,15 @@ impl RepoTab {
                 result.cards.len()
             ));
             ui.horizontal_wrapped(|ui| {
-                if let Some(seed) = &result.continuation {
-                    if ui
+                if let Some(seed) = &result.continuation
+                    && ui
                         .add_enabled(
                             !self.dossier.reader.busy(),
                             egui::Button::new("Trace earlier versions"),
                         )
                         .clicked()
-                    {
-                        append = Some(seed.clone());
-                    }
+                {
+                    append = Some(seed.clone());
                 }
                 for (i, seed) in result.alternatives.iter().enumerate() {
                     if ui
@@ -117,7 +116,8 @@ impl RepoTab {
      egui::ScrollArea::both().id_salt("dossier_line").max_height(180.0).show(ui,|ui|{ui.monospace(clip(&card.text,4000));});
      ui.small(clip(&card.note,1000));ui.small(format!("Whitespace/copy/move-aware blame: {} at {}:{}",super::super::short(&card.attribution.commit),clip(&card.attribution.path,200),card.attribution.line));
      if card.whitespace_only{ui.label("Whitespace-only file changes detected; review the full commit before choosing any ignore revision.");if ui.add_enabled(!self.dossier.reader.busy()&&self.busy_op.is_none(),egui::Button::new("Review formatting ignore…")).clicked(){prepare_ignore=Some(card.at.commit.clone());}}
-     ui.horizontal_wrapped(|ui|{if ui.button("Show commit").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::SelectHash(card.at.commit.clone()));}if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::OpenPinnedFileLine(card.at.clone()));}});
+     ui.horizontal_wrapped(|ui|{if ui.button("Show commit").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::SelectHash(card.at.commit.clone()));}
+if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::OpenPinnedFileLine(card.at.clone()));}});
     }
    });
         } else if !self.dossier.reader.busy() {
@@ -126,7 +126,7 @@ impl RepoTab {
         ui.separator();
         ui.heading("Pull requests, line review comments and linked issues");
         if self.dossier.forge_reader.busy() {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new());
             ui.label("Reading evidence for the selected card…");
         }
         if let Some(card) = self

@@ -166,7 +166,7 @@ impl Trace<'_> {
         while i < fields.len() {
             let status = fields[i];
             i += 1;
-            let path = std::str::from_utf8(*fields.get(i).ok_or("Truncated file change")?)
+            let path = std::str::from_utf8(fields.get(i).ok_or("Truncated file change")?)
                 .map_err(|_| "Non-UTF-8 file history")?;
             i += 1;
             if !path_ok(path) {
@@ -174,7 +174,7 @@ impl Trace<'_> {
                 continue;
             }
             if matches!(status.first(), Some(b'R' | b'C')) {
-                let next = std::str::from_utf8(*fields.get(i).ok_or("Truncated rename")?)
+                let next = std::str::from_utf8(fields.get(i).ok_or("Truncated rename")?)
                     .map_err(|_| "Non-UTF-8 rename")?;
                 i += 1;
                 if !path_ok(next) {

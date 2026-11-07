@@ -80,7 +80,7 @@ impl RepoTab {
             return;
         }
         egui::CollapsingHeader::new("What usually comes with this?").id_salt("cochange-hints").default_open(true).show(ui,|ui|{
-        if self.cochanges.reader.busy(){ui.horizontal(|ui|{ui.spinner();ui.label("Reading local change coupling…");});}
+        if self.cochanges.reader.busy(){ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label("Reading local change coupling…");});}
         if let Some(error)=&self.cochanges.error{ui.label(format!("History hints unavailable: {error}"));}
         if let Some(history)=&self.cochanges.history {for note in &history.notes{ui.small(note);}ui.small(format!("{} qualifying commits; {} bulk/generated/unsupported commits excluded{}",history.records.len(),history.skipped,if history.limited{"; sample is incomplete"}else{""}));}
         let mut dismissed=None;
@@ -95,7 +95,8 @@ impl RepoTab {
         }
         if let Some(key)=dismissed{self.cochanges.dismissed.insert(key);}
         if shown==0&&!self.cochanges.reader.busy(){ui.small("No qualifying undismissed companion-file hints for the staged paths.");}
-        ui.horizontal(|ui|{if !self.cochanges.dismissed.is_empty()&&ui.small_button("Restore dismissed hints").clicked(){self.cochanges.dismissed.clear();}if ui.small_button("Refresh history hints").clicked(){self.cochanges.head.clear();self.cochanges.reader.cancel();}});
+        ui.horizontal(|ui|{if !self.cochanges.dismissed.is_empty()&&ui.small_button("Restore dismissed hints").clicked(){self.cochanges.dismissed.clear();}
+if ui.small_button("Refresh history hints").clicked(){self.cochanges.head.clear();self.cochanges.reader.cancel();}});
     });
     }
 }

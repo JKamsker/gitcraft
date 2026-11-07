@@ -91,12 +91,12 @@ impl RepoTab {
         if !self.shown {
             self.symbols.close();
         }
-        if let Some(result) = self.symbols.reader.poll(ctx) {
-            if self.symbols.open {
-                match result {
-                    Ok(r) => self.symbols.result = Some(r),
-                    Err(e) => self.symbols.error = Some(e),
-                }
+        if let Some(result) = self.symbols.reader.poll(ctx)
+            && self.symbols.open
+        {
+            match result {
+                Ok(r) => self.symbols.result = Some(r),
+                Err(e) => self.symbols.error = Some(e),
             }
         }
         if let Some(result) = self.symbols.forge_reader.poll(ctx) {
@@ -190,7 +190,7 @@ impl RepoTab {
                 trace = true;
             }
             if self.symbols.reader.busy() {
-                ui.spinner();
+                ui.add(crate::spinner::Spinner::new());
                 if ui.button("Cancel trace").clicked() {
                     self.symbols.reader.cancel();
                     self.symbols.error = Some("Trace cancelled".into());
@@ -277,7 +277,7 @@ impl RepoTab {
                     }
                     if self.symbols.forge_reader.busy() {
                         ui.horizontal(|ui| {
-                            ui.spinner();
+                            ui.add(crate::spinner::Spinner::new());
                             ui.label("Loading associated pull requests…");
                         });
                     }
@@ -345,7 +345,14 @@ impl RepoTab {
                                         ui.monospace(format!(
                                             "{:>5} {}",
                                             symbol.first + i,
-                                            lines[i].chars().take(2000).collect::<String>()
+                                            if lines[i].chars().count() > 2000 {
+                                                format!(
+                                                    "{} … [long line clipped; open pinned source]",
+                                                    lines[i].chars().take(2000).collect::<String>()
+                                                )
+                                            } else {
+                                                lines[i].to_owned()
+                                            }
                                         ));
                                     }
                                 },

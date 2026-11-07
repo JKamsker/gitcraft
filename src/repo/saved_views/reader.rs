@@ -113,7 +113,7 @@ impl<T: Send + 'static> Reader<T> {
                 .map_err(str::to_owned)
             });
             if let Err(error) = submitted {
-                let _ = rejected.send(Err(error.into()));
+                let _ = rejected.send(Err(error));
             }
             self.running = Some(Running {
                 id: self.generation,

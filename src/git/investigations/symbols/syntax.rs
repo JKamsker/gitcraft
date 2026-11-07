@@ -140,44 +140,43 @@ pub(super) fn parse(
         if visited > 200_000 || out.len() > 5000 || !active() {
             return Err("Symbol parsing cancelled or exceeded structural budget".into());
         }
-        if function(node) {
-            if let (Some(n), Some(body)) = (name(node), node.child_by_field_name("body")) {
-                let own = source(n, text).trim().to_owned();
-                let mut scopes = Vec::new();
-                let mut parent = node.parent();
-                while let Some(p) = parent {
-                    if function(p)
-                        || matches!(
-                            p.kind(),
-                            "impl_item"
-                                | "trait_item"
-                                | "mod_item"
-                                | "class_definition"
-                                | "class_declaration"
-                                | "class_specifier"
-                                | "struct_specifier"
-                                | "namespace_definition"
-                        )
-                    {
-                        if let Some(scope) = name(p).or_else(|| p.child_by_field_name("type")) {
-                            scopes.push(source(scope, text).trim().to_owned());
-                        }
-                    }
-                    parent = p.parent();
+        if function(node)
+            && let (Some(n), Some(body)) = (name(node), node.child_by_field_name("body"))
+        {
+            let own = source(n, text).trim().to_owned();
+            let mut scopes = Vec::new();
+            let mut parent = node.parent();
+            while let Some(p) = parent {
+                if (function(p)
+                    || matches!(
+                        p.kind(),
+                        "impl_item"
+                            | "trait_item"
+                            | "mod_item"
+                            | "class_definition"
+                            | "class_declaration"
+                            | "class_specifier"
+                            | "struct_specifier"
+                            | "namespace_definition"
+                    ))
+                    && let Some(scope) = name(p).or_else(|| p.child_by_field_name("type"))
+                {
+                    scopes.push(source(scope, text).trim().to_owned());
                 }
-                scopes.reverse();
-                scopes.push(own.clone());
-                out.push(Symbol {
-                    name: own,
-                    qualified: scopes.join("::"),
-                    path: path.into(),
-                    first: node.start_position().row + 1,
-                    last: node.end_position().row + 1,
-                    body: source(node, text).into(),
-                    blob: blob.into(),
-                    tokens: tokens(body, text)?,
-                });
+                parent = p.parent();
             }
+            scopes.reverse();
+            scopes.push(own.clone());
+            out.push(Symbol {
+                name: own,
+                qualified: scopes.join("::"),
+                path: path.into(),
+                first: node.start_position().row + 1,
+                last: node.end_position().row + 1,
+                body: source(node, text).into(),
+                blob: blob.into(),
+                tokens: tokens(body, text)?,
+            });
         }
         let mut cursor = node.walk();
         let children = node.named_children(&mut cursor).collect::<Vec<_>>();

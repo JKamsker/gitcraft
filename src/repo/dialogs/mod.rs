@@ -503,10 +503,10 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
-                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.spinner();ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}},
+                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.add(crate::spinner::Spinner::new());ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}},
                 Dialog::PushPreflight{plan,acknowledge}=>super::push_preflight::dialog(ui,plan,acknowledge),
                 Dialog::PushError(error)=>{ui.heading("Push preflight could not finish");ui.label(error.as_str());if ui.button("Close").clicked(){Outcome::Cancel}else{Outcome::Open}},
-                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.spinner();if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
+                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
                 Dialog::WorkingDraftHistory { on,versions,error,index } => super::working_drafts::view::history(ui,on,versions,error.as_deref(),index,idle,working_draft_undo),
                 Dialog::WorkingDraftRecovery { preview,selected } => super::working_drafts::view::recovery(ui,preview,selected,idle),
                 Dialog::ContentRecovery => self.content_recovery.show(ui, idle),

@@ -326,11 +326,7 @@ fn lookup_with(
                 continue;
             }
         };
-        let merge = if h.forge == Forge::GitLab {
-            text(&details, "/merge_commit_sha")
-        } else {
-            text(&details, "/merge_commit_sha")
-        };
+        let merge = text(&details, "/merge_commit_sha");
         let squash = text(&details, "/squash_commit_sha");
         let mut pull = Pull {
             number: n,
@@ -463,6 +459,8 @@ fn range(v: &Value, end: &str, start: &str) -> Option<(usize, usize)> {
         .unwrap_or(end);
     (begin > 0 && begin <= end && end <= 20000).then_some((begin, end))
 }
+// Each evidence record carries independent author/body/link/provenance fields.
+#[allow(clippy::too_many_arguments)]
 fn add(
     v: &Value,
     anchors: Vec<(String, String, usize, usize)>,
@@ -541,10 +539,11 @@ fn github_comment(
                 anchors.push((text(v, rev), path.clone(), start, end));
             }
         }
-    } else if side == "LEFT" && text(v, "/commit_id") == text(pr, "/head/sha") {
-        if let Some((start, end)) = range(v, "/line", "/start_line") {
-            anchors.push((text(pr, "/base/sha"), path, start, end));
-        }
+    } else if side == "LEFT"
+        && text(v, "/commit_id") == text(pr, "/head/sha")
+        && let Some((start, end)) = range(v, "/line", "/start_line")
+    {
+        anchors.push((text(pr, "/base/sha"), path, start, end));
     }
     add(
         v,

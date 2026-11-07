@@ -532,20 +532,19 @@ pub(crate) fn trace(
         let (parents, author, email, time, subject) = t.parents(&cursor.commit)?;
         let mut mapped = Vec::new();
         for parent in &parents {
-            if let Some(path) = t.old_path(parent, &cursor.commit, &cursor.path)? {
-                if let Some(old) = t.file(parent, &path)? {
-                    if let Some((line, note)) = previous_line(&file.text, &old.text, cursor.line)? {
-                        mapped.push((
-                            Seed {
-                                commit: parent.clone(),
-                                path,
-                                line,
-                            },
-                            old,
-                            note,
-                        ));
-                    }
-                }
+            if let Some(path) = t.old_path(parent, &cursor.commit, &cursor.path)?
+                && let Some(old) = t.file(parent, &path)?
+                && let Some((line, note)) = previous_line(&file.text, &old.text, cursor.line)?
+            {
+                mapped.push((
+                    Seed {
+                        commit: parent.clone(),
+                        path,
+                        line,
+                    },
+                    old,
+                    note,
+                ));
             }
         }
         // A partial copy may be below whole-file rename/copy similarity. Follow its
@@ -624,14 +623,12 @@ pub(crate) fn trace(
             break;
         }
         let (mut next, old, _) = mapped.remove(0);
-        if let Some(touch) = t.touch(&next.commit, &next.path)? {
-            if touch != next.commit {
-                if let Some(previous) = t.file(&touch, &next.path)? {
-                    if previous.oid == old.oid {
-                        next.commit = touch;
-                    }
-                }
-            }
+        if let Some(touch) = t.touch(&next.commit, &next.path)?
+            && touch != next.commit
+            && let Some(previous) = t.file(&touch, &next.path)?
+            && previous.oid == old.oid
+        {
+            next.commit = touch;
         }
         cursor = next;
         if step + 1 == STEPS {
