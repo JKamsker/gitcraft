@@ -1,0 +1,71 @@
+{
+  "review_state": "WIP static review; no approval yet",
+  "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "author_manifest_sha256": "c8d102c216a3a64b7d34d332679c15d0a337fc1f5657f7880132c7c92a5517a0",
+  "author_log_checks": {
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches_manifest": true
+    },
+    "clippy": {
+      "sha256": "0749c9560e04f0a6c0010a416eb070d52420d5c0afa14fd10cff5c5df8561559",
+      "matches_manifest": true
+    },
+    "test": {
+      "sha256": "f388785a2571d0d39b243fe25d9c8f725e8436ba807b6316ac6e6eb9478c2fb0",
+      "matches_manifest": true
+    },
+    "targeted_setup": {
+      "sha256": "c249ee9ef949d9234fb80b9e500ca29cece71e35c3ee28953978650ebec96f26",
+      "matches_manifest": true
+    },
+    "targeted_tour": {
+      "sha256": "43433fdff90b5ebe19ea37042adb3b6286689742c14de51897397c0c90584035",
+      "matches_manifest": true
+    },
+    "targeted_restore": {
+      "sha256": "6ae9cf1a4f97197f1eb4e4ee205f804c73da9bd970f51341d5f155a3d513c00b",
+      "matches_manifest": true
+    },
+    "targeted_startup": {
+      "sha256": "9c7e3265655b344eab3e18ddd8405d56118813b9ede0a319e4c5eb7fe1ad3e9f",
+      "matches_manifest": true
+    }
+  },
+  "source_hashes_all_match": true,
+  "source_count": 34,
+  "full_log_successful_test_names": 809,
+  "new_tests_present_and_ok": {
+    "app::setup::pending::tests::tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder": true,
+    "app::setup::tests::cancelled_profile_answers_cannot_activate_stale_setup": true,
+    "app::setup::tests::changed_profile_answers_do_not_clear_the_current_pending_requirements": true,
+    "app::setup::tests::deleted_imported_profile_mappings_are_not_reused_for_another_profiles_id": true,
+    "app::setup::tests::export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup": true,
+    "app::setup::tests::malicious_setup_file_cannot_restore_commands_paths_or_credential_urls": true,
+    "app::tests::a_pending_startup_profile_stays_parked_instead_of_using_ambient_accounts": true,
+    "portability::tests::cancelled_restore_never_creates_a_destination": true,
+    "portability::tests::malicious_setup_fields_and_command_urls_are_data_errors": true,
+    "portability::tests::partial_worktree_restore_can_retry_but_changed_config_cannot": true,
+    "portability::tests::portable_profiles_keep_public_policy_but_never_export_auth_paths_or_commands": true,
+    "portability::tests::practice_export_and_local_restore_isolate_hostile_git_environment_and_profile": true,
+    "portability::tests::repository_snapshot_and_restore_round_trip_remotes_author_hidden_refs_and_linked_worktrees": true,
+    "portability::tests::restoration_refuses_overwrite_traversal_and_missing_branch_without_substitution": true,
+    "portability::tests::signing_safety_cannot_be_disabled_by_a_missing_pending_flag": true,
+    "repo::tour::tests::closed_or_replaced_tours_reject_stale_answers": true,
+    "repo::tour::tests::tour_ui_checklist_and_close_button_are_connected": true,
+    "tour::tests::encoded_remote_tour_and_portable_snapshot_use_only_the_recording_local_launcher": true,
+    "tour::tests::real_repository_tour_reads_documents_needs_and_one_cached_history_without_hooks": true,
+    "tour::tests::workflow_observations_do_not_verify_signatures_or_assert_a_policy": true
+  },
+  "full_log_results": [
+    "test result: ok. 809 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 11.49s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "scope": "Independent source review and evidence consistency. No fresh Cargo build or independent runtime test yet. No CI use.",
+  "open_questions": [
+    "Network setup_clone deliberately keeps ready profile/global config; inspect whether ambient URL rewrites can change portable remote routing.",
+    "Continue static review of Windows path comparisons, restore retries, and explicit profile matching."
+  ]
+}
