@@ -605,3 +605,19 @@ fn excerpt(text: &str, at: usize) -> (usize, String) {
 pub(super) fn valid_oid(oid: &str) -> bool {
     matches!(oid.len(), 40 | 64) && oid.bytes().all(|b| b.is_ascii_hexdigit())
 }
+
+/// Shared reviewed filesystem pins for explicit, append-only repository-file actions.
+/// No scan, ref/index mutation, filter, signing or lazy object download occurs here.
+pub(crate) fn pinned_worktree(repo: &Path, active: &dyn Fn() -> bool) -> Result<Identity, String> {
+    let identity = Reader::new(repo, active).identity()?;
+    if identity.root.is_none() || identity.root_pin.is_none() {
+        return Err("A stable working-root identity is required for this file action".into());
+    }
+    Ok(identity)
+}
+#[cfg(any(unix, windows))]
+pub(crate) use file::native_file_identity;
+#[cfg(unix)]
+pub(crate) use file::parent as pinned_parent;
+#[cfg(windows)]
+pub(crate) use file::windows_parent as pinned_parent;

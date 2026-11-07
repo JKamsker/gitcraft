@@ -118,6 +118,8 @@ impl RepoTab {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.dossier.open {
+                    self.line_dossier_view(ui, &mut acts);
                 } else if self.split.is_some() {
                     self.graph_diff_view(ui, &mut acts);
                 } else if self.absorb.is_some() {

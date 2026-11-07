@@ -64,6 +64,9 @@ impl RepoTab {
             acts.push(Action::EarlierVersions);
         }
         let t = Tokens::get(ui.ctx());
+        if ui.button("Explain line history…").clicked() {
+            acts.push(Action::OpenLineDossier(None));
+        }
         let shown = self.reflog.as_ref().map(|v| &v.source);
         for (icon, title, about, source, act) in rows {
             let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 36.0));

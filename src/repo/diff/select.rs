@@ -183,6 +183,23 @@ fn lines_menu(
             more(ui, acts);
             match history() {
                 Ok(action) => {
+                    if let crate::repo::Action::LineHistory {
+                        path,
+                        at: crate::git::LinesAt::Rev(commit),
+                        range,
+                    } = &action
+                        && crate::git::investigations::oid(commit)
+                        && ui.button("Explain history").clicked()
+                    {
+                        acts.push(crate::repo::Action::OpenLineDossier(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: commit.clone(),
+                                path: path.clone(),
+                                line: range.0 as usize,
+                            },
+                        )));
+                    }
+
                     let b = ui.button("History of these lines").on_hover_text(
                         "Every commit up to this version that changed the selected lines, \
                          followed back through earlier edits and renames",

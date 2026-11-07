@@ -77,3 +77,6 @@ pub(crate) fn page(
     }
     super::commits::investigation_page(&Reader::new(repo, active), tips, order, skip, limit)
 }
+
+pub(crate) mod dossier;
+pub(crate) mod ignore;

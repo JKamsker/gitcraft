@@ -66,6 +66,7 @@ mod layout;
 mod lfs_locks;
 mod lfs_storage;
 mod lifecycle;
+mod line_dossier;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
@@ -196,6 +197,7 @@ pub struct RepoTab {
     /// Commits as git listed them.
     content_recovery: content_recovery::State,
     working_drafts: working_drafts::State,
+    dossier: line_dossier::State,
     saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -536,6 +538,7 @@ impl RepoTab {
             graph_badge_index: graph_view::BadgeIndex::default(),
             content_recovery: Default::default(),
             working_drafts: Default::default(),
+            dossier: Default::default(),
             saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,

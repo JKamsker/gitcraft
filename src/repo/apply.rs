@@ -16,6 +16,16 @@ impl RepoTab {
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::ShowActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+        ) {
+            self.dossier.close();
+        }
         let plain = OpKind::plain();
         // Fetch, Pull and Push asked for while something runs start once it is done.
         if self.busy_op.is_some()
@@ -86,6 +96,26 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::OpenLineDossier(seed) => self.open_line_dossier(seed, ctx),
+            Action::CloseLineDossier => self.dossier.close(),
+            Action::OpenPinnedFileLine(seed) => {
+                if !git::investigations::oid(&seed.commit) || seed.line == 0 {
+                    return;
+                }
+                super::file_text::focus(
+                    ctx,
+                    ("file_view", &seed.path, Some(&seed.commit)),
+                    seed.line,
+                );
+                self.apply(
+                    Action::FileView {
+                        path: seed.path,
+                        rev: Some(seed.commit),
+                        tab: super::file_view::FileTab::File,
+                    },
+                    ctx,
+                );
+            }
             Action::EarlierVersions => self.earlier_versions(ctx),
             Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
             Action::DraftSnapshot => self.save_working_draft(false, ctx),
