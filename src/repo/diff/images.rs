@@ -9,13 +9,14 @@ use crate::git::{self, Area};
 use crate::repo::DiffKey;
 use crate::theme::{self, Tokens};
 
-const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "ico"];
+const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "svg"];
 
 pub struct ImagePair {
     pub old: Option<Arc<[u8]>>,
     pub new: Option<Arc<[u8]>>,
     /// Makes the image URIs unique to this diff.
     pub id: String,
+    pub svg: bool,
 }
 
 pub(super) fn is_image(path: &str) -> bool {
@@ -64,7 +65,14 @@ pub(super) fn load_images(
         DiffKey::Remerge { hash, .. } => (None, get(Some(hash), path)),
     };
     let id = image_id(old.as_deref(), new.as_deref());
-    ImagePair { old, new, id }
+    ImagePair {
+        old,
+        new,
+        id,
+        svg: Path::new(path)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("svg")),
+    }
 }
 
 /// Names the pictures by what they hold: egui keeps an image by its URI for good, so the same
@@ -94,7 +102,8 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
                 ui.add_space(6.0);
                 match bytes {
                     Some(bytes) => {
-                        let uri = format!("bytes://diff/{}/{side}.png", images.id);
+                        let extension = if images.svg { "svg" } else { "png" };
+                        let uri = format!("bytes://diff/{}/{side}.{extension}", images.id);
                         let max = vec2(ui.available_width() - 16.0, ui.available_height() - 40.0);
                         ui.add(
                             egui::Image::from_bytes(uri, Bytes::Shared(bytes.clone()))
@@ -120,4 +129,38 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
             });
         }
     });
+}
+
+#[cfg(test)]
+mod svg_tests {
+    use super::*;
+    #[test]
+    fn svg_uses_the_rendered_image_path_and_keeps_its_code_patch() -> Result<(), String> {
+        let r = crate::git::file_comparison::tests::Repo::new()?;
+        r.write("icon.svg",r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#)?;
+        r.commit()?;
+        r.write("icon.svg",r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><circle r="5"/></svg>"#)?;
+        let key = DiffKey::Work(git::StatusFile {
+            path: "icon.svg".into(),
+            old_path: None,
+            area: Area::Unstaged,
+            code: 'M',
+        });
+        let data = super::super::load(&r.0, &key, git::DiffOptions::default(), true)?;
+        let image = data.image.as_ref().ok_or("no SVG preview")?;
+        assert!(image.svg && image.old.is_some() && image.new.is_some());
+        assert!(data.lines.iter().any(|l| l.text.contains("circle")));
+        assert!(data.partial);
+        let ctx = egui::Context::default();
+        egui_extras::install_image_loaders(&ctx);
+        ctx.include_bytes(
+            "bytes://test.svg",
+            image.new.as_ref().ok_or("new")?.to_vec(),
+        );
+        assert!(
+            ctx.try_load_image("bytes://test.svg", egui::load::SizeHint::default())
+                .is_ok()
+        );
+        Ok(())
+    }
 }

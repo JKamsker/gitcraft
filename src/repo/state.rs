@@ -166,6 +166,7 @@ pub(crate) struct DiffView {
     pub(super) lines: Option<Vec<crate::git::LineRange>>,
     /// A folded file's lines (a lockfile…) were opened.
     pub(super) unfolded: bool,
+    pub(super) svg_source: bool,
     /// Where the view was when the diff was asked for again another way (another algorithm):
     /// put back at the top once the new reading arrives.
     pub(super) keep_place: Option<diff::Place>,
@@ -211,6 +212,7 @@ impl DiffView {
             data_request: 0,
             lines: None,
             unfolded: false,
+            svg_source: false,
             keep_place: None,
             restore: None,
             algorithm: None,

@@ -824,8 +824,23 @@ fn ready_data<'a>(
         return None;
     }
     if let Some(images) = &data.image {
-        image_view(ui, images);
-        return None;
+        if images.svg {
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(!view.svg_source, "Rendered SVG")
+                    .clicked()
+                {
+                    acts.push(Action::DiffSvgSource(false));
+                }
+                if ui.selectable_label(view.svg_source, "SVG source").clicked() {
+                    acts.push(Action::DiffSvgSource(true));
+                }
+            });
+        }
+        if !images.svg || !view.svg_source {
+            image_view(ui, images);
+            return None;
+        }
     }
     if let Some(binary) = &data.binary {
         binary_view(ui, binary, view.key.path());

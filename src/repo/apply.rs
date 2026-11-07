@@ -297,6 +297,11 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffSvgSource(on) => {
+                if let Some(view) = &mut self.diff {
+                    view.svg_source = on;
+                }
+            }
             Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
             Action::DiffDecryptedEncoding(encoding) => {
                 if let Some(view) = &mut self.diff {
