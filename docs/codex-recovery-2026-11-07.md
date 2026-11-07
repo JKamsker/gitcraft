@@ -4,17 +4,19 @@ The integration starts at `dev` (`d82b2586aa073d23bc031717576d883d02bd187c`). Al
 
 ## Included
 
+The table records the original feature-port commits. Subsequent review narrowed bundle support to export and read-only inspection, and Syntax execution to local repositories; the current scope and gates are recorded in the final follow-up below.
+
 | Feature | Frozen source tip | Source integration delta | Final feature commit |
 | --- | --- | --- | --- |
 | Gerrit review submission and amendments | `c08ff3b` | `90d2521` | `43ee866` |
 | Theme and painted-text contrast | `1a77cfd` | `419ade0` | `697ae7a` |
 | Read-only structural diffs with Difftastic | `c4971a8` | `234000a` | `5f58cb5` |
 | Graph columns, lane labels and full-message tooltips | `05d818a` | `14bcdd2` | `25854b0` |
-| Bounded Git bundle export, inspection and atomic import | `6625a2c` | `a175310` plus accepted `ab68bde` bundle fixes | `fb88026` |
+| Git bundle export and inspection (import subsequently deferred) | `6625a2c` | `a175310` plus accepted `ab68bde` bundle fixes | `fb88026` |
 
 Full SHAs and the complete branch inventory are recorded in [the validation record](validation/codex-recovery-2026-11-07.json).
 
-The ports retain current dev's operation expectations and cancellation controls, push rejection handling, profile-specific Git environment, blame/search behavior, rich diff views, graph overlays, first-parent layout, keyboard and drag interactions. Structural views remain read-only, and switching diff modes clears incompatible rendering state. Bundle imports create new refs atomically and revalidate the exact previewed bytes; they do not check out work or overwrite existing refs. No Cargo dependency or CI workflow change is included.
+The ports retain current dev's operation expectations and cancellation controls, push rejection handling, profile-specific Git environment, blame/search behavior, rich diff views, graph overlays, first-parent layout, keyboard and drag interactions. Structural views remain read-only, and switching diff modes clears incompatible rendering state. The original bundle import was removed after follow-up review found that input limits and deadlines do not bound expanded pack memory. Current bundle inspection reads headers and prerequisites without installing objects; it explicitly leaves pack contents unverified. No Cargo dependency or CI workflow change is included.
 
 ## Review and exclusions
 
@@ -49,3 +51,18 @@ Linux CI passed on `5529892`. Windows found three failures: native Git could not
 Candidate `d73f132a929e8ded9d306f4ef5136b146ad56bcf` streams the exact validated bundle header only to supported local native Windows Git. Unix, SSH/WSL repositories and legacy Git retain pathname verification. An earlier all-platform stdin attempt failed connected-prerequisite verification locally and its initial review pass was revoked; it was corrected before updating the PR. Git's Unix and Windows subprocess handling differ here. No-lazy-fetch, strict pack validation and immutable preview protections remain intact. The rename fixture now proves Git quotes a Windows-legal Unicode name while retaining the Unix quote case. The receipt test waits up to thirty seconds for asynchronous completion and reports its state on failure; its functional assertions remain unchanged.
 
 All 74 bundle, structural-diff and timeline tests passed on the final candidate, as did two synthetic command/argument checks, the all-target test build, formatting and Clippy with the previously documented macOS allowance. The receipt test also passed with an injected eleven-second post-rebase snapshot delay. Independent review passed. Native Windows execution remains pending; source-based reasoning is not reported as a Windows runtime pass. The [follow-up record](validation/pr164-windows-2026-11-07.json) preserves diagnostics, rejected-candidate evidence, tagged Git source links, review and exact-candidate logs.
+
+
+## PR #164 review follow-up and current scope
+
+The earlier `0d2d86d5` Windows portability delivery passed Linux tests, strict lint, Windows build and all ten Windows shards plus their aggregate. CodeRabbit then identified functional and containment issues. All 20 inline comments and 22 grouped findings/notes were triaged; the [review validation record](validation/pr164-review-2026-11-07.json) records each disposition. The bot's separate OSS review rate limit and inconclusive docstring metric were not treated as repository gates.
+
+Current application candidate `f8cacb06cffaf8a942da6301c11e8265d52fec35`, tree `72c0c69df7930fed45bb49fab688789a0d281be3`, retains Gerrit submission/amendment, graph readability, contrast, local read-only Syntax, and bundle export/header inspection. Gerrit preparation now honors cancellation, selected-branch upstreams and symbolic-HEAD expectations; identity restoration preserves trailer blocks and invalid web overrides produce warnings. Rebuilds reuse graph indexes. Painted labels and selected intraline backgrounds have contrast checks. The full-message popup retains pointer interaction and its final paragraph is reachable by scrolling.
+
+Bundle export refuses missing-object lazy fetch, checks selected refs against one listing, and logs completion while resuming queued operations. Unicode ref whitespace and legacy prerequisite descriptions are covered. **Bundle import is deferred**: compressed input and deadline limits do not contain `index-pack` memory allocation. Its UI, action and backend execution were removed; source branches and the immutable pre-review delivery retain the recovered work. Inspection never verifies or installs the pack. This also removes import collision, non-UTF8 worktree enumeration and external worktree-switch races from the active API.
+
+**Remote Syntax is deferred** until remote cleanup can be independently bounded through disconnects. SSH/WSL use patch fallback before starting the tool. Local Syntax has one active comparison per tab and one coalesced replacement, bounded Git preparation with no lazy fetch, correct rename sources, aligned scrolling headings and working patch-fallback navigation/Find. Syntax remains read-only across toolbar and filename menus. Custom Windows Difftastic launchers still have best-effort descendant cleanup; no Windows Job or arbitrary-launcher containment is claimed.
+
+The complete locked native suite passed **3,056 tests, zero failures, seven existing ignores, zero filtered tests**, including real Difftastic 0.72.0. All 98 focused tests, the all-target build, formatting and all-target Clippy with the existing six-warning macOS dead-code allowance passed. The environment uses the previously documented GNU sed, canonical temporary path and validation shell, and the full suite ran serially. Independent adversarial review passed on the exact candidate after rejecting an earlier review candidate for four issues, all subsequently corrected. The [compressed logs](validation/pr164-review-2026-11-07-tests.log.gz) and record bind these results to the immutable application commit.
+
+Native Windows execution of this review candidate awaits CI; the preceding delivery's passing Windows checks are not reused as a runtime pass for these changes. Live SSH/WSL bundle export/inspection remain untested locally. No dependency or workflow change is included.

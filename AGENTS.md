@@ -5,7 +5,7 @@
 
 # Commit authorship
 
-- Use exactly `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`, matching commit `028242cd4bc3c82ced848ea0fa73639981cd71d7`, for every new task commit. Verify the commit author before pushing. Do not use the earlier session email.
+- Use exactly `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`, matching commit `028242cd4bc3c82ced848ea0fa73639981cd71d7`, for this Codex recovery and PR #164 follow-up task. For unrelated work, use the contributor's configured author identity. Verify the commit author before pushing. Do not use the earlier session email.
 - Preserve published WIP/recovery branches. Build the final PR branch from `dev` with one commit per feature under this author identity; keep provenance and verify the final source matches the accepted combined implementation.
 
 # CI timing
