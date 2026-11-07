@@ -15,6 +15,7 @@ mod branch_health;
 mod branch_order;
 mod branch_tree;
 mod branch_visibility;
+mod bundles;
 mod ci_status;
 mod ci_view;
 mod collision_view;
