@@ -2,6 +2,7 @@
 
 mod a11y;
 mod ai;
+mod across;
 pub mod app;
 mod avatars;
 mod ci;

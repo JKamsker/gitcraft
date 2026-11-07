@@ -38,6 +38,32 @@ fn tab_looks_survive_a_restart() {
     );
 }
 
+/// Workspaces come back after a restart as they were, and state saved before workspaces
+/// existed loads with none.
+#[test]
+fn workspaces_survive_a_restart() -> Result<(), String> {
+    let mut saved = Saved::default();
+    let i = saved.workspaces.create("Kunden — ünïcode ✓")?;
+    saved
+        .workspaces
+        .add_repo(i, std::path::Path::new("/home/me/a repo"));
+    saved
+        .workspaces
+        .add_repo(i, std::path::Path::new("ssh://build/~/x"));
+    let mut storage = Memory::default();
+    eframe::set_value(&mut storage, eframe::APP_KEY, &saved);
+    let back: Option<Saved> = eframe::get_value(&storage, eframe::APP_KEY);
+    assert_eq!(back.map(|b| b.workspaces), Some(saved.workspaces));
+    let mut old = Memory::default();
+    eframe::set_value(&mut old, eframe::APP_KEY, &Saved::default());
+    let text = old.get_string(eframe::APP_KEY).unwrap_or_default();
+    let without = text.replace("workspaces:(list:[]),", "");
+    old.set_string(eframe::APP_KEY, without);
+    let back: Option<Saved> = eframe::get_value(&old, eframe::APP_KEY);
+    assert!(back.is_some_and(|b| b.workspaces.is_empty()));
+    Ok(())
+}
+
 /// A tab whose folder is gone doesn't make the one after the active tab active.
 #[test]
 fn active_tab_survives_a_gone_folder() {

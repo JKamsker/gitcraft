@@ -64,7 +64,7 @@ pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 /// - `LANGUAGE`: messages in English whatever the user's language: errors are told apart by
 ///   their words (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only,
 ///   so the character set (and what hooks see of it) stays the user's.
-const GIT_ENV: [(&str, &str); 4] = [
+pub(super) const GIT_ENV: [(&str, &str); 4] = [
     ("GIT_TERMINAL_PROMPT", "0"),
     ("GIT_OPTIONAL_LOCKS", "0"),
     ("GIT_EDITOR", "true"),
@@ -72,7 +72,7 @@ const GIT_ENV: [(&str, &str); 4] = [
 ];
 
 /// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
-const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
+pub(super) const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
 
 pub(super) fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
@@ -118,6 +118,8 @@ pub(super) struct Extra {
     trace_hooks: bool,
     /// On another machine: a test of a parallel bisect (see [`run_for_test`]).
     test: Option<std::time::Duration>,
+    /// How long it may run on another machine before it is stopped there.
+    timeout: Option<std::time::Duration>,
 }
 
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
@@ -230,7 +232,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
-        timeout: extra.test.or_else(|| extra.tool.then_some(TOOL_FOR)),
+        timeout: extra.timeout.or(extra.test).or_else(|| extra.tool.then_some(TOOL_FOR)),
         test: extra.test.is_some(),
         apart: false,
     }
@@ -427,6 +429,17 @@ pub fn run_tool(dir: &Path, args: &[&str]) -> Result<ToolRun, String> {
     })
 }
 
+/// Runs git in `dir` (on this machine) and returns its exit code and output: stdout when it
+/// succeeds, stderr when it doesn't. For a caller that reads failures as answers (see
+/// [`super::overview`]), which runs a repository elsewhere through one script instead.
+pub(super) fn run_coded(dir: &Path, args: &[&str]) -> Result<(i32, Vec<u8>), String> {
+    let out = execute(Some(dir), &Extra::default(), args)?;
+    match out.code {
+        Some(0) => Ok((0, out.stdout)),
+        code => Ok((code.unwrap_or(-1), out.stderr)),
+    }
+}
+
 /// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
 pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
     if let Some(target) = remote::parse(dir) {
@@ -559,6 +572,17 @@ pub fn run_unattended(
     run_inner(dir, args, &[0], creds, true)
 }
 
+/// [`run_unattended`] (with no credentials typed in) that, on another machine, is stopped there
+/// after `limit`: for what runs for many repositories at once, which gives up on each after a
+/// while and must not leave it running.
+pub fn run_unattended_within(
+    dir: &Path,
+    args: &[&str],
+    limit: std::time::Duration,
+) -> Result<String, String> {
+    run_inner_extra(Some(dir), args, &[0], None, true, Some(limit))
+}
+
 /// What sets git (before its subcommand) to open no sign-in window: no credential helper window
 /// (Git Credential Manager and git ≥ 2.46 heed `credential.interactive`), nor git's askpass
 /// program. git reads `GIT_ASKPASS` before `core.askPass` and `SSH_ASKPASS`, so an inherited one
@@ -583,6 +607,7 @@ fn unattended_extra(unix: bool) -> Extra {
         stdin: None,
         trace_hooks: false,
         test: None,
+        timeout: None,
     }
 }
 
@@ -615,6 +640,17 @@ pub fn is_auth_error(err: &str) -> bool {
 /// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
 /// `creds` given to git when there are some.
 fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
+    run_inner_extra(dir, args, ok, creds, quiet, None)
+}
+
+fn run_inner_extra(
+    dir: Option<&Path>,
+    args: &[&str],
+    ok: &[i32],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    timeout: Option<std::time::Duration>,
+) -> Result<String, String> {
     let mut extra = Extra::default();
     if quiet {
         // Unix on the machine git runs on: another one is always Linux (WSL, an SSH server).
@@ -632,6 +668,7 @@ fn run_extra(
     creds: Option<&Credentials>,
     mut extra: Extra,
 ) -> Result<String, String> {
+    extra.timeout = timeout;
     if let Some(c) = creds {
         extra.pre.extend(["-c", ENV_HELPER]);
         extra

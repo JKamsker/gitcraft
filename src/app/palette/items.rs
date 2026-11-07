@@ -35,6 +35,7 @@ pub(crate) enum AppCommand {
     ForgetSignIns,
     Settings,
     Manual,
+    MyWork,
     Theme(ThemeId),
     /// The settings' themes.
     Themes,
@@ -99,6 +100,7 @@ impl App {
                     .shortcut(&crate::keymap::label(crate::keymap::Command::ReopenTab)),
             );
         }
+        list.push(Item::app("Where's my work? (unpushed commits, stashes, changes everywhere)", "app", AppCommand::MyWork));
         list.extend([
             Item::app("Open repository…", "app", AppCommand::Open),
             Item::app("Create repository…", "app", AppCommand::Create),
@@ -206,6 +208,7 @@ impl App {
             }
             AppCommand::Settings => self.open_settings(),
             AppCommand::Manual => self.manual_open = true,
+            AppCommand::MyWork => self.open_my_work(ctx),
             AppCommand::Theme(id) => self.set_theme(ctx, id),
             AppCommand::Themes => {
                 crate::settings::show_page(ctx, crate::settings::Page::Appearance);

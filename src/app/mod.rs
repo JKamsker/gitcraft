@@ -9,6 +9,7 @@ mod dropped;
 mod home;
 mod home_filter;
 mod home_recent;
+mod my_work;
 mod palette;
 mod panels;
 mod profiles;
@@ -21,6 +22,7 @@ mod teleport;
 #[cfg(test)]
 mod tests;
 mod update_banner;
+mod workspaces;
 mod worktrees;
 
 use std::collections::BTreeMap;
@@ -74,6 +76,10 @@ struct Saved {
     palette_recent: palette::recent::Recent,
     /// When each recent repository was last opened, in seconds since 1970 (of every profile).
     last_opened: BTreeMap<PathBuf, i64>,
+    /// Named groups of repositories, on the start page.
+    workspaces: crate::across::workspaces::Workspaces,
+    /// Repositories found on a machine by "Where's my work?".
+    found_repos: Vec<PathBuf>,
 }
 
 enum Tab {
@@ -162,6 +168,12 @@ pub struct App {
     patches: dropped::PatchQueue,
     /// _Scan a folder for repositories_, while its dialog is open.
     repo_scan: Option<repo_scan::RepoScan>,
+    workspaces: crate::across::workspaces::Workspaces,
+    /// How the workspaces' repositories stand, as last looked at.
+    workspaces_view: workspaces::WorkspacesView,
+    /// Repositories found on a machine by "Where's my work?", looked at with the others.
+    found_repos: Vec<PathBuf>,
+    my_work: my_work::MyWork,
 }
 
 impl App {
@@ -237,6 +249,10 @@ impl App {
             pinned_version: update::settle_pin(&saved.pinned_version, update::CURRENT),
             previous_version: update::previous(),
             tab_looks: saved.tab_looks,
+            workspaces: saved.workspaces,
+            workspaces_view: Default::default(),
+            found_repos: saved.found_repos,
+            my_work: Default::default(),
         };
         update::clean_up();
         if let crate::portable::Mode::Unusable(why) = crate::portable::mode() {
@@ -456,6 +472,7 @@ impl App {
         let modal_open = self.clone_form.is_some()
             || self.remote_form.is_some()
             || self.teleport.is_some()
+            || self.my_work.open
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
@@ -488,7 +505,7 @@ impl App {
     ) -> bool {
         use keymap::Command;
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.teleport.is_some() || self.askpass_open();
+        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.teleport.is_some() || self.my_work.open || self.askpass_open();
         match command {
             Command::Manual if !asking && self.palette.is_none() => {
                 self.manual_open = !self.manual_open;
@@ -536,6 +553,7 @@ impl App {
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
                     || self.teleport.is_some()
+                    || self.my_work.open
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
                 // every repository tab lays out the same widgets, which would otherwise share
@@ -656,6 +674,7 @@ impl eframe::App for App {
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);
         self.repo_scan_dialog(&ctx);
+        self.my_work_ui(&ctx);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         crate::a11y::end_frame(&ctx);
@@ -682,6 +701,8 @@ impl eframe::App for App {
             profile_states: self.profile_states.clone(),
             palette_recent: self.palette_recent.clone(),
             last_opened: self.last_opened.clone(),
+            workspaces: self.workspaces.clone(),
+            found_repos: self.found_repos.clone(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

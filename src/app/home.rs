@@ -112,8 +112,11 @@ impl App {
                         });
                     }
 
+                    ui.add_space(30.0);
+                    self.workspaces_section(ui);
+
                     if !self.recent.is_empty() {
-                        ui.add_space(30.0);
+                        ui.add_space(24.0);
                         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
                             match self.recent_section(ui, &t) {
                                 Some(RecentClick::Open(path)) => open = Some(path),

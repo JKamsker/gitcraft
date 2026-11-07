@@ -262,9 +262,26 @@ impl Pool {
 
 type Pools = Mutex<HashMap<(Host, Lane), Arc<Pool>>>;
 
+static POOLS: OnceLock<Pools> = OnceLock::new();
+
+/// Whether a shell to `host` is connected, in either lane: a command for it now won't make
+/// a new connection (which may ask for a password).
+pub(super) fn connected(host: &Host) -> bool {
+    let Some(pools) = POOLS.get() else {
+        return false;
+    };
+    let pools: Vec<Arc<Pool>> = [Lane::Quick, Lane::Long]
+        .iter()
+        .filter_map(|lane| lock(pools).get(&(host.clone(), *lane)).cloned())
+        .collect();
+    pools.iter().any(|pool| {
+        let state = lock(&pool.state);
+        state.open > state.connecting
+    })
+}
+
 /// The pool of `host`'s shells of `lane`.
 pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
-    static POOLS: OnceLock<Pools> = OnceLock::new();
     let pools = POOLS.get_or_init(|| {
         // Closes idle shells now and then, also of machines no tab shows any more.
         std::thread::spawn(|| {
