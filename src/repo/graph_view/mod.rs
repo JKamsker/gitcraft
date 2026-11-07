@@ -123,6 +123,8 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.graph_motion.expire();
+        self.graph_motion.schedule_expiry(ui.ctx());
         self.celebration_ui(ui);
         self.graph_walk_header(ui);
         let map_area = ui.available_rect_before_wrap();
@@ -216,11 +218,22 @@ impl RepoTab {
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                scroll = scroll.vertical_scroll_offset(self.graph_motion.start_scroll(
+                    offset,
+                    (top - view_h / 2.0).max(0.0),
+                    ui.ctx(),
+                ));
             }
         }
 
+        if ui.input(|i| i.smooth_scroll_delta.y != 0.0 || i.pointer.any_pressed()) {
+            self.graph_motion.cancel_scroll();
+        }
+        if let Some(offset) = self.graph_motion.scroll_offset(ui.ctx()) {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
         if let Some(offset) = self.history_minimap.offset.take() {
+            self.graph_motion.cancel_scroll();
             scroll = scroll.vertical_scroll_offset(offset);
         }
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.

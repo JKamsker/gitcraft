@@ -92,7 +92,15 @@ impl RepoTab {
             format!(
                 "{}. {}",
                 self.graph_description(i),
-                self.row_label(commit, viewport.now)
+                format!(
+                    "{}{}",
+                    if self.graph_motion.new_commit(&commit.hash) {
+                        "Newly received commit. "
+                    } else {
+                        ""
+                    },
+                    self.row_label(commit, viewport.now)
+                )
             )
         };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
@@ -108,6 +116,16 @@ impl RepoTab {
             is_match,
             self.is_compared(commit, is_wip),
         );
+        if self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing() {
+            painter.rect_filled(
+                rect,
+                0.0,
+                t.accent
+                    .gamma_multiply(self.graph_motion.highlight(ui.ctx())),
+            );
+            let marker = egui::Rect::from_min_size(rect.left_top(), vec2(3.0, rect.height()));
+            painter.rect_filled(marker, 0.0, t.accent);
+        }
         let resp = match self.bisect_mark(&painter, &t, rect, &commit.hash) {
             Some(said) => resp.on_hover_text(said),
             None => resp,

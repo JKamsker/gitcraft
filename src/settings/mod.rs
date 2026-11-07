@@ -57,6 +57,7 @@ pub struct Settings {
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
     pub compact_graph: bool,
+    pub graph_motion: bool,
     pub graph_lane_walk: bool,
     pub graph_sounds: bool,
     pub celebration_motion: bool,
@@ -186,6 +187,7 @@ impl Default for Settings {
             branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
+            graph_motion: true,
             graph_lane_walk: false,
             graph_sounds: false,
             celebration_motion: false,
@@ -720,6 +722,9 @@ impl Settings {
                 });
             }
             Page::Graph => {
+                section(ui, f, "Graph feedback", None, |card| {
+                    card.row("Explanatory motion", "fetch incoming refs scroll reduced motion", |ui| { ui.checkbox(&mut self.graph_motion,"Short ref transitions and smooth navigation"); ui.small("Respects system reduced motion. Incoming markers remain readable without animation."); });
+                });
                 section(ui, f, "Commit graph", None, |card| {
                     card.row(
                         "Topology navigation",

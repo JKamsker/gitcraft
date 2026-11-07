@@ -54,6 +54,7 @@ mod forge_link;
 pub(crate) mod forks;
 mod gerrit;
 mod ghost;
+mod graph_motion;
 mod graph_order;
 pub(crate) mod graph_view;
 mod graph_walk;
@@ -411,6 +412,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    graph_motion: graph_motion::State,
     celebration: celebration::State,
     topology: std::sync::Arc<graph_walk::Topology>,
     topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
@@ -672,6 +674,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            graph_motion: Default::default(),
             celebration: Default::default(),
             topology: Default::default(),
             topology_reader: Default::default(),

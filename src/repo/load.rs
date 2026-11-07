@@ -500,6 +500,7 @@ impl RepoTab {
         }
         self.want_health(ctx);
         self.rebuild(ctx);
+        self.graph_motion_loaded(loaded.read, ctx);
         // After the selection is settled: not for a commit that went (amended, rebased).
         self.extras_after_reload(refs_moved, ctx);
         self.hint_avatars(ctx);
