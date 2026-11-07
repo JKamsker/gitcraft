@@ -1,0 +1,51 @@
+{
+  "gate": "2 owned local runtime fixtures",
+  "status": "PRESERVED PLAN; NOT EXECUTED",
+  "production_source": "490a9e7c3b579e24718ffdcb446b86c6f1b2c66f",
+  "review": "push-repair-protocol-8b8b9b9.json PASS_STATIC_ONLY; root accepted Gate1 and authorized Gate2",
+  "test": "push_preflight::fix::transaction::owned_fixtures::gate2_owned_local_fixture",
+  "cases": [
+    "files-sha1",
+    "files-sha256",
+    "reftable-sha1",
+    "reftable-sha256",
+    "held-ref-lock",
+    "veto",
+    "switch-head",
+    "detach-head",
+    "index-change",
+    "work-change",
+    "checkout-failure",
+    "committed-failure",
+    "timeout",
+    "split-index",
+    "old-git",
+    "missing-ack"
+  ],
+  "git": [
+    {
+      "path": "/usr/local/bin/git",
+      "version": "git version 2.52.0",
+      "sha256": "8a2ae22e7898e163330a96319b541f92ed6f90fc87576414f72c5a89aa1dc352"
+    },
+    {
+      "path": "/usr/bin/git",
+      "version": "git version 2.47.3",
+      "sha256": "356db14e102d68a1a37d8a1ac577dfd678d45d46e92f468bef8b7154e7bfdc60"
+    }
+  ],
+  "containment": [
+    "Test-only cfg(unix) module; production body unchanged",
+    "Each case isolated child test process env_clear/private HOME,XDG,Gitconfig,TMPDIR; default pinned Git2.52.0; oldGit case PATH intentionally2.47.3",
+    "No SSH/WSL/network/credentials/promisor/userrepos/CI; local owned fixtures only",
+    "Every Git and child test process uses existing bounded_process::run_input; no new controller/watchdog/signals/PID selection",
+    "Owned locks create_new; lock paths retained; no other-process cleanup",
+    "15second production timeout; original prepared hook sleeps20 only inside owned child; outer deadline45",
+    "Before/after raw index/dependency/work bytes+modes+refs/HEAD; actual ACKs hardlinked from empty placeholders to retain writes after legitimate successful cleanup",
+    "No production protocol fixes permitted before independent static re-review; feature not yet accepted"
+  ],
+  "remaining": [
+    "Actual full scan/fix integration success and any additional capability/refusal fixtures may follow only after this preserved fixture unit results; current cases call actual production Hook constructor/execution directly",
+    "Remote repair completion/outcome acceptance remains OPEN; Windows/backend native claims require separate evidence"
+  ]
+}

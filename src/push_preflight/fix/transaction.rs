@@ -956,3 +956,6 @@ esac
         result
     }
 }
+
+#[cfg(all(test, unix))]
+mod owned_fixtures;
