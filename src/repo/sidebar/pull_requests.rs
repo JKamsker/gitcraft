@@ -10,7 +10,8 @@ use crate::forge::{Forge, PullRequest};
 use crate::git::Branch;
 use crate::icons;
 use crate::menu_item::MenuItem;
-use crate::repo::pinned_sections::{Header, Sections};
+use crate::repo::issue_work::IssueAct;
+use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::Tokens;
 
@@ -33,7 +34,11 @@ impl RepoTab {
                 title,
                 count: self.prs.len(),
                 default_open: true,
-                button: None,
+                button: Some(Button {
+                    icon: "git-branch-plus",
+                    tooltip: "Start work from an issue assigned to you…",
+                    action: Some(Action::Issue(IssueAct::OpenPicker)),
+                }),
             },
         );
         if !open {
@@ -391,7 +396,7 @@ impl RepoTab {
     /// The folder a worktree on `branch` goes in, beside the main one: `app` + `feature/x` →
     /// `app-feature-x`, as the dialog that adds one suggests.
     /// For a repository on another machine, a folder of that machine.
-    fn worktree_folder(&self, branch: &str) -> PathBuf {
+    pub(in crate::repo) fn worktree_folder(&self, branch: &str) -> PathBuf {
         let main = self.main_worktree().unwrap_or(&self.path);
         let suffix = branch.replace(['/', '\\', ' '], "-");
         if let Some(target) = crate::remote::parse(main) {
@@ -416,7 +421,7 @@ impl RepoTab {
     /// `path`, or `path-2`, `path-3`… when there is something there already. On another
     /// machine, only the worktrees known here count: asking it would hold up the window, and
     /// git refuses a folder that isn't empty anyway.
-    fn free_folder(&self, path: &Path) -> PathBuf {
+    pub(in crate::repo) fn free_folder(&self, path: &Path) -> PathBuf {
         let taken = |p: &Path| {
             if crate::remote::is_remote(p) {
                 self.worktrees.iter().any(|w| w.path == p)

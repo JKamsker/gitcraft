@@ -71,6 +71,7 @@ impl RepoTab {
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
+            Action::Issue(act) => self.issue_act(act, ctx),
             Action::CloseDiff => {
                 self.diff = None;
                 self.conflict = None;

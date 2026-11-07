@@ -302,13 +302,13 @@ impl Dialog {
         }
     }
 
-    pub fn create_pr(noun: &str, branch: &str, base: &str, title: &str) -> Self {
+    pub fn create_pr(noun: &str, branch: &str, base: &str, title: &str, body: &str) -> Self {
         Dialog::CreatePr {
             noun: noun.to_owned(),
             branch: branch.to_owned(),
             base: base.to_owned(),
             title: title.to_owned(),
-            body: String::new(),
+            body: body.to_owned(),
             draft: false,
             focus: true,
         }

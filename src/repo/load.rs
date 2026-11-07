@@ -37,6 +37,8 @@ pub(super) struct Loaded {
     pub(super) order: git::LogOrder,
     /// Which read this is (see `RepoTab::reads`).
     pub(super) read: u64,
+    /// The issues the branches were made for, and the remotes' default branches.
+    pub(super) issues: super::issue_work::Read,
 }
 
 /// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
@@ -87,7 +89,7 @@ impl RepoTab {
                 // Independent reads, side by side: a reload waits for the slowest of them
                 // rather than for all of them in turn.
                 let path = path.as_path();
-                let (history, work, worktrees, stashes, remotes, submodules, lfs, identity) =
+                let (history, work, worktrees, stashes, remotes, submodules, lfs, identity, issues) =
                     std::thread::scope(|scope| {
                         let history =
                             scope.spawn(|| git::log(path, log_from.as_deref(), order, 0, count));
@@ -109,6 +111,7 @@ impl RepoTab {
                         let remotes = scope.spawn(|| git::remotes(path).unwrap_or_default());
                         let submodules = scope.spawn(|| git::submodules(path).unwrap_or_default());
                         let lfs = scope.spawn(|| git::uses_lfs(path) && git::lfs_installed(path));
+                        let issues = scope.spawn(|| super::issue_work::read(path));
                         let identity = git::identity(path);
                         let join = |e| format!("Reading the repository failed: {e:?}");
                         let history: Vec<Arc<Commit>> = history
@@ -127,6 +130,7 @@ impl RepoTab {
                             submodules.join().map_err(join)?,
                             lfs.join().map_err(join)?,
                             identity,
+                            issues.join().map_err(join)?,
                         ))
                     })?;
                 let hosting = forge::detect(path, &remotes);
@@ -145,6 +149,7 @@ impl RepoTab {
                     log_from,
                     order,
                     read,
+                    issues,
                 }))
             })())
         });
@@ -426,6 +431,7 @@ impl RepoTab {
             self.submodules = loaded.submodules;
         }
         self.lfs = loaded.lfs;
+        self.take_issue_read(loaded.issues);
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;

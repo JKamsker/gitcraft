@@ -1,7 +1,9 @@
 //! GitHub, through `gh`: the list of pull requests, opening one, and the page of one in full —
-//! reading it ([`details`], [`threads`]) and acting on it ([`post`]).
+//! reading it ([`details`], [`threads`]) and acting on it ([`post`]); the issues assigned to the
+//! user ([`issues`]).
 
 mod details;
+mod issues;
 mod post;
 mod threads;
 
@@ -9,7 +11,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
+use super::{Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 use crate::pr_post::Target;
 use crate::pull_request::{PrDetails, at};
@@ -88,6 +90,14 @@ impl Provider for GitHub {
             args.push("--draft");
         }
         gh(repo, &args).map(|out| out.trim().to_owned())
+    }
+
+    fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {
+        issues::assigned(repo)
+    }
+
+    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
+        issues::one(repo, number)
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each

@@ -351,6 +351,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         log_from: None,
         order: Default::default(),
         read: 1,
+        issues: Default::default(),
     }))));
     tab.poll(&ctx);
     let _ = std::fs::remove_dir_all(&dir);

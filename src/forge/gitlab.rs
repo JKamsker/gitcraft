@@ -1,10 +1,11 @@
-//! GitLab, through `glab`: the list of merge requests and opening one. Their page is the web's.
+//! GitLab, through `glab`: the list of merge requests and opening one (their page is the web's),
+//! and the issues assigned to the user.
 
 use std::path::Path;
 
 use serde_json::Value;
 
-use super::{Hosting, MergedPullRequest, NewPullRequest, Provider, PullRequest, cli};
+use super::{Hosting, Issue, MergedPullRequest, NewPullRequest, Provider, PullRequest, cli};
 use crate::avatars::Hint;
 
 pub(super) struct GitLab;
@@ -70,6 +71,30 @@ impl Provider for GitLab {
         self.run(repo, &args).map(|out| out.trim().to_owned())
     }
 
+    /// `@me` is the account `glab` is signed in to for the host.
+    fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {
+        let max = super::ISSUES_MAX.to_string();
+        let args = [
+            "issue",
+            "list",
+            "--assignee=@me",
+            "--output",
+            "json",
+            "--per-page",
+            &max,
+        ];
+        parse_issues(&cli::run(TOOL, "issue", repo, &args)?)
+    }
+
+    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
+        let number = number.to_string();
+        let args = ["issue", "view", &number, "--output", "json"];
+        let out = cli::run(TOOL, "issue", repo, &args)?;
+        let value: Value =
+            serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+        parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
+    }
+
     /// The host's own avatar API, asked by email.
     fn avatars(&self, _: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)> {
         let api = api_authority(hosting);
@@ -115,9 +140,64 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
         .collect())
 }
 
+/// glab's list of issues.
+fn parse_issues(json: &str) -> Result<Vec<Issue>, String> {
+    let value: Value =
+        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let list = value
+        .as_array()
+        .ok_or_else(|| format!("unexpected {TOOL} output: not a list of issues"))?;
+    Ok(list.iter().filter_map(parse_issue).collect())
+}
+
+/// One issue: `iid` is the number `#N` means in the project (`id` is the server's).
+fn parse_issue(item: &Value) -> Option<Issue> {
+    let text = |key: &str| {
+        item.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    Some(Issue {
+        number: item.get("iid").and_then(Value::as_u64)?,
+        title: text("title"),
+        body: text("description"),
+        url: text("web_url"),
+        labels: item
+            .get("labels")
+            .and_then(Value::as_array)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_issues() {
+        let gl = r###"[
+            {"id": 9001, "iid": 12, "title": "Crash on login",
+             "description": "## Acceptance criteria\n- [ ] works",
+             "web_url": "https://gitlab.com/g/p/-/issues/12", "labels": ["bug", "ui"]},
+            {"id": 9002, "iid": 13, "title": "Bare", "description": null, "web_url": "u",
+             "labels": []},
+            {"id": 9003, "title": "no iid"}
+        ]"###;
+        let issues = parse_issues(gl).unwrap_or_default();
+        assert_eq!(issues.len(), 2);
+        assert_eq!(issues[0].number, 12);
+        assert_eq!(issues[0].body, "## Acceptance criteria\n- [ ] works");
+        assert_eq!(issues[0].url, "https://gitlab.com/g/p/-/issues/12");
+        assert_eq!(issues[0].labels, ["bug", "ui"]);
+        assert_eq!((issues[1].number, issues[1].body.as_str()), (13, ""));
+        assert!(parse_issues("oops").is_err());
+        assert!(parse_issues(r#"{"message": "401 Unauthorized"}"#).is_err());
+    }
 
     #[test]
     fn parses_merge_requests() {

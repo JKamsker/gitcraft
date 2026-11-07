@@ -44,6 +44,7 @@ pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
 mod hooks;
+mod issue_work;
 mod keep_submodules;
 mod keys;
 mod layout;
@@ -197,6 +198,8 @@ pub struct RepoTab {
     dco: dco::Dco,
     /// The collision matrix window, while it is open.
     collisions: Option<collision_view::CollisionView>,
+    /// The issues branches were made for, and the list of those assigned to you.
+    issue_work: issue_work::IssueWork,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -437,6 +440,7 @@ impl RepoTab {
             weakened: Default::default(),
             dco: dco::Dco::default(),
             collisions: None,
+            issue_work: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

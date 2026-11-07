@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::dialogs::StashChoice;
 use super::pull::PullMode;
 use super::{
-    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash,
+    Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop, partial_stash, issue_work,
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
@@ -51,6 +51,8 @@ pub(crate) enum Action {
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
+    /// Something asked of the issues assigned to you.
+    Issue(issue_work::IssueAct),
     CloseDiff,
     Ops {
         label: String,
@@ -532,6 +534,13 @@ impl RepoTab {
                 "LFS: Storage…".into(),
                 "remote".into(),
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
+            ));
+        }
+        if self.hosting.is_some() {
+            items.push((
+                "Start work from an issue…".into(),
+                "issue".into(),
+                Action::Issue(issue_work::IssueAct::OpenPicker),
             ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {

@@ -235,7 +235,12 @@ impl RepoTab {
                     self.ai_committed();
                 }
                 // Quiet success for staging, which happens all the time.
-                if refresh == Refresh::All && !quiet {
+                if let Ok(out) = &result
+                    && let Some(note) = tried_note(out)
+                    && !quiet
+                {
+                    self.status = Some((format!("{label}: done, but {note}"), true));
+                } else if refresh == Refresh::All && !quiet {
                     self.status = Some((format!("{label}: done"), false));
                 }
                 if label.contains("etch") {
@@ -503,8 +508,18 @@ pub(super) fn run_steps_counted(
     }
     let mut result = Ok(String::new());
     let mut stopped = ops.len();
+    let mut tried = Vec::new();
     for (i, op) in ops.iter().enumerate() {
         if is_expectation(op) {
+            continue;
+        }
+        if let [mark, says, args @ ..] = &op[..]
+            && mark == TRY
+        {
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            if let Err(e) = git::run_unattended(Some(path), &args, creds) {
+                tried.push(format!("{says} ({})", headline(&e)));
+            }
             continue;
         }
         let args: Vec<&str> = op.iter().map(String::as_str).collect();
@@ -513,6 +528,9 @@ pub(super) fn run_steps_counted(
             stopped = i;
             break;
         }
+    }
+    if result.is_ok() && !tried.is_empty() {
+        result = Ok(format!("{TRIED}{}", tried.join("; ")));
     }
     // "No local changes to save" makes no stash: undoing would pop an older one.
     let no_stash = stash_before.is_some_and(|b| b == git::resolve(path, "refs/stash").ok());
@@ -610,6 +628,27 @@ fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
         [mark, name, target] if mark == EXPECT_SYMREF => Some((name, target)),
         _ => None,
     }
+}
+
+/// Marks a step whose failure doesn't stop the operation.
+const TRY: &str = "\u{0}try";
+/// Starts what an operation says when it went through but a step tried failed.
+const TRIED: &str = "\u{0}tried\u{0}";
+
+/// A step that runs `args` unattended (nobody is asked to sign in) and doesn't stop the
+/// operation when it fails: the status says `says` then. A fetch before starting from what it
+/// fetches, when what was fetched before will do (offline).
+pub(super) fn try_step(args: &[&str], says: &str) -> Vec<String> {
+    [TRY, says]
+        .into_iter()
+        .chain(args.iter().copied())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// What the steps tried and failed say, from what an operation that went through gave.
+pub(super) fn tried_note(out: &str) -> Option<&str> {
+    out.strip_prefix(TRIED)
 }
 
 /// Whether `op` is a step that runs nothing, only checks.

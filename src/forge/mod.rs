@@ -168,6 +168,22 @@ fn merged_items(items: &[serde_json::Value], pointers: [&str; 4]) -> Vec<MergedP
         .collect()
 }
 
+/// How many of the issues assigned to you are listed at most: the list says when it may have
+/// more.
+pub(crate) const ISSUES_MAX: usize = 100;
+
+/// An open issue assigned to the person signed in, to start work from.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Issue {
+    /// Its number on the forge (GitLab's `iid`, the one `#N` means).
+    pub number: u64,
+    pub title: String,
+    /// The description, as Markdown.
+    pub body: String,
+    pub url: String,
+    pub labels: Vec<String>,
+}
+
 /// What a forge does for gitcraft.
 pub trait Provider: Sync {
     /// "GitHub", "Forgejo"…
@@ -200,6 +216,19 @@ pub trait Provider: Sync {
 
     /// Where the account pictures of the authors (by commit email) are.
     fn avatars(&self, repo: &Path, hosting: &Hosting, emails: &[String]) -> Vec<(String, Hint)>;
+
+    /// The open issues of the repository assigned to the person signed in.
+    fn assigned_issues(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<Issue>, String> {
+        Err(format!("gitcraft can't list {}'s issues", self.name()))
+    }
+
+    /// Issue `number` of the repository as it is now, to read its description again.
+    fn issue(&self, _repo: &Path, _hosting: &Hosting, number: u64) -> Result<Issue, String> {
+        Err(format!(
+            "gitcraft can't read {}'s issue #{number}",
+            self.name()
+        ))
+    }
 
     /// The page of one pull request, if gitcraft has one for this forge.
     fn pages(&self) -> Option<&dyn Pages> {

@@ -102,8 +102,19 @@ impl Api {
 
     /// Every item of a list the API gives page by page, up to `max`.
     pub fn get_all(&self, endpoint: &str, max: usize) -> Result<Vec<Value>, Failure> {
+        self.get_all_kept(endpoint, max, |_| true)
+    }
+
+    /// [`Api::get_all`], of the items `keep` keeps: the others don't count toward `max`.
+    pub fn get_all_kept(
+        &self,
+        endpoint: &str,
+        max: usize,
+        keep: impl Fn(&Value) -> bool,
+    ) -> Result<Vec<Value>, Failure> {
         let joint = if endpoint.contains('?') { '&' } else { '?' };
         let mut all: Vec<Value> = Vec::new();
+        let mut first: Option<Value> = None;
         for page in 1.. {
             let answer = self.get(&format!("{endpoint}{joint}limit={PAGE}&page={page}"))?;
             let items = match answer {
@@ -113,10 +124,13 @@ impl Api {
             };
             // An endpoint that doesn't page gives everything every time: the first page is it.
             // A short page isn't the last one: the server's own cap on a page may be below ours.
-            let repeats = page > 1 && !items.is_empty() && items.first() == all.first();
+            let repeats = page > 1 && !items.is_empty() && items.first() == first.as_ref();
             let last = items.is_empty() || repeats;
+            if page == 1 {
+                first = items.first().cloned();
+            }
             if !repeats {
-                all.extend(items);
+                all.extend(items.into_iter().filter(|item| keep(item)));
             }
             if last || all.len() >= max {
                 break;
