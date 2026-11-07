@@ -141,7 +141,7 @@ mod tests {
         }
         let mut acts = Vec::new();
         let mut clicked = None;
-        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
             tab.graph_stacks(ui, &mut acts);
         });
         let text: Vec<_> = output
@@ -185,7 +185,9 @@ mod tests {
             ],
             ..Default::default()
         };
-        let _ = ctx.run_ui(input, |ui| tab.graph_stacks(ui, &mut acts));
+        let mut clicked_output = ctx.run_ui(input, |ui| tab.graph_stacks(ui, &mut acts));
+        clicked_output.textures_delta.clear();
+        output.textures_delta.clear();
         assert!(
             acts.iter()
                 .any(|a| matches!(a, Action::SelectHash(h) if h == "same-tip"))
