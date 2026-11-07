@@ -2,6 +2,7 @@
 //! Git as the compatibility backend (config, credentials, hooks and remote machines).
 
 mod absorb;
+pub(crate) mod activity;
 mod attributes;
 pub mod backend;
 mod backlinks;

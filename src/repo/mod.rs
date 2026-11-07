@@ -56,6 +56,7 @@ mod graph_order;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
+mod history_activity;
 mod history_reader;
 mod hooks;
 mod hotfix;
@@ -405,6 +406,7 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
     branch_bands: branch_bands::Preferences,
     band_reader: history_reader::Reader<crate::graph::Graph>,
@@ -658,6 +660,7 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            history_activity: None,
             history_minimap: Default::default(),
             branch_bands,
             band_reader: Default::default(),

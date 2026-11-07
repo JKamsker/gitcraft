@@ -29,6 +29,7 @@ pub(crate) enum Action {
     SetOffline(bool),
     Select(usize),
     SelectHash(String),
+    ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),
     SelectStash(usize),

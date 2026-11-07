@@ -173,6 +173,14 @@ impl RepoTab {
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
         ui.menu_button("Graph tools…", |ui| {
+            if ui.button("Activity calendar…").clicked() {
+                self.open_activity(super::history_activity::Page::Calendar, ui.ctx());
+                ui.close();
+            }
+            if ui.button("Contributor statistics…").clicked() {
+                self.open_activity(super::history_activity::Page::Contributors, ui.ctx());
+                ui.close();
+            }
             egui::ComboBox::from_id_salt("branch-model")
                 .selected_text(self.branch_bands.model.label())
                 .show_ui(ui, |ui| {
