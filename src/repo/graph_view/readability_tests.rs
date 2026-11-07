@@ -212,7 +212,7 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
         &message_path.to_string_lossy(),
     ])?;
     // Use production Git and parse_record, rather than injecting a synthetic Commit.body.
-    let commits = git::log(&path, None, 0, 10)?;
+    let commits = git::log(&path, None, Default::default(), 0, 10)?;
     assert_eq!(commits[0].body.chars().count(), 400);
     assert!(!commits[0].body.contains("TAIL THAT MUST BE VISIBLE"));
     let first = commits[0].hash.clone();

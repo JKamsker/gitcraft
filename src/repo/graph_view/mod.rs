@@ -24,7 +24,6 @@ use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
 use super::ghost::{Kind, Shift};
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
-use crate::git;
 use crate::keymap::Command;
 use crate::menu_item::MenuItem;
 use crate::settings::Settings;
@@ -534,7 +533,6 @@ pub(super) fn compare_items(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git;
 
     #[test]
     fn a_compact_graph_column_fits_its_lanes_closer_together() {
