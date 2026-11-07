@@ -2,6 +2,7 @@
 //! right pane lists the files it changes, which open in the normal diff.
 
 mod page;
+mod select;
 mod text;
 mod timeline;
 

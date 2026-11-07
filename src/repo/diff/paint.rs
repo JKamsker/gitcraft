@@ -185,30 +185,35 @@ pub(super) fn line_job(
     let mut job = LayoutJob::default();
     let mut pos = 0usize;
     for (color, text) in spans {
+        let format = |inside| TextFormat {
+            font_id: font.clone(),
+            color: *color,
+            background: if inside { strong } else { Color32::TRANSPARENT },
+            ..Default::default()
+        };
+        let Some((a, b)) = changed else {
+            if !text.is_empty() {
+                job.append(text, 0.0, format(false));
+            }
+            continue;
+        };
         let n = text.chars().count();
         let (start, end) = (pos, pos + n);
         // Split the span at the changed range's edges.
-        let cuts: Vec<usize> = match changed {
-            Some((a, b)) => vec![start, a.clamp(start, end), b.clamp(start, end), end],
-            None => vec![start, end],
-        };
+        let cuts = [start, a.clamp(start, end), b.clamp(start, end), end];
         for w in cuts.windows(2) {
             let (from, to) = (w[0], w[1]);
             if to <= from {
                 continue;
             }
-            let piece: String = text.chars().skip(from - start).take(to - from).collect();
+            let byte_at = |char_at| {
+                text.char_indices()
+                    .nth(char_at)
+                    .map_or(text.len(), |(i, _)| i)
+            };
+            let piece = &text[byte_at(from - start)..byte_at(to - start)];
             let inside = changed.is_some_and(|(a, b)| from >= a && to <= b);
-            job.append(
-                &piece,
-                0.0,
-                TextFormat {
-                    font_id: font.clone(),
-                    color: *color,
-                    background: if inside { strong } else { Color32::TRANSPARENT },
-                    ..Default::default()
-                },
-            );
+            job.append(piece, 0.0, format(inside));
         }
         pos = end;
     }

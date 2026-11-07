@@ -1,7 +1,8 @@
-//! Tabs in the title bar (Windows): the window is made without the system's title bar and the
-//! tab strip takes its place, as in a browser. The strip's empty space moves the window and a
+//! Tabs in the title bar (Windows and macOS): the window is made without the system's title bar.
+//! The tab strip takes its place, as in a browser. The strip's empty space moves the window and a
 //! double click on it maximizes it, the caption buttons (minimize, maximize, close) sit at the
 //! strip's end, and the window's edges resize it.
+//! macOS keeps its native frame with a transparent title bar so the corners stay rounded.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -33,7 +34,7 @@ static DECORATED_AT_START: AtomicBool = AtomicBool::new(true);
 
 /// Whether the tab strip stands in for the system's title bar.
 pub(super) fn wanted(settings: &Settings) -> bool {
-    cfg!(windows) && settings.tabs_in_title_bar
+    cfg!(any(windows, target_os = "macos")) && settings.tabs_in_title_bar
 }
 
 /// Whether to make the window with the system's title bar, from the settings eframe saved in
@@ -71,13 +72,32 @@ pub(super) fn decorated_now() -> bool {
     DECORATED_AT_START.load(Ordering::Relaxed)
 }
 
+/// macOS needs a titled window for native rounded corners and shadows. Its content extends
+/// behind a transparent title bar, with the native title and buttons hidden.
+pub(super) fn viewport(decorated: bool) -> egui::ViewportBuilder {
+    let builder = egui::ViewportBuilder::default();
+    if cfg!(target_os = "macos") {
+        builder
+            .with_decorations(true)
+            .with_fullsize_content_view(!decorated)
+            .with_titlebar_shown(decorated)
+            .with_title_shown(decorated)
+            .with_titlebar_buttons_shown(decorated)
+    } else {
+        builder.with_decorations(decorated)
+    }
+}
+
 /// Gives the window the system's title bar back or takes it away, when that changes.
 /// `decorated` is what the window has now.
 pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bool) {
     let want = !wanted(settings);
     if *decorated != want {
         *decorated = want;
-        ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(want));
+        // macOS keeps the native frame; sync_border updates its title bar in place.
+        if !cfg!(target_os = "macos") {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(want));
+        }
     }
 }
 
@@ -85,6 +105,7 @@ pub(super) fn apply(ctx: &egui::Context, settings: &Settings, decorated: &mut bo
 /// bar it goes unnoticed; along the tab strip it reads as an edge of the first tab, so it is
 /// taken away while the tabs are in the title bar (the window's shadow still sets it apart).
 /// `shown` is what was last asked of Windows.
+/// On macOS this synchronizes the transparent native title bar instead.
 pub(super) fn sync_border(
     window: &impl raw_window_handle::HasWindowHandle,
     settings: &Settings,
@@ -131,7 +152,50 @@ fn set_window_border(window: &impl raw_window_handle::HasWindowHandle, shown: bo
     };
 }
 
-#[cfg(not(windows))]
+/// Change the native title bar without replacing the titled frame that rounds the corners.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+fn set_window_border(window: &impl raw_window_handle::HasWindowHandle, shown: bool) {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSView, NSWindowButton, NSWindowStyleMask, NSWindowTitleVisibility};
+    use raw_window_handle::RawWindowHandle;
+
+    let Some(_main_thread) = MainThreadMarker::new() else {
+        return;
+    };
+    let Ok(handle) = window.window_handle() else {
+        return;
+    };
+    let RawWindowHandle::AppKit(appkit) = handle.as_raw() else {
+        return;
+    };
+    // SAFETY: the borrowed window handle guarantees a live NSView, and the main-thread check
+    // above ensures that AppKit is accessed only from the window's own thread.
+    let view = unsafe { appkit.ns_view.cast::<NSView>().as_ref() };
+    let Some(window) = view.window() else {
+        return;
+    };
+    let mut style = window.styleMask();
+    style.set(NSWindowStyleMask::FullSizeContentView, !shown);
+    window.setStyleMask(style);
+    window.setTitlebarAppearsTransparent(!shown);
+    window.setTitleVisibility(if shown {
+        NSWindowTitleVisibility::Visible
+    } else {
+        NSWindowTitleVisibility::Hidden
+    });
+    for kind in [
+        NSWindowButton::CloseButton,
+        NSWindowButton::MiniaturizeButton,
+        NSWindowButton::ZoomButton,
+    ] {
+        if let Some(button) = window.standardWindowButton(kind) {
+            button.setHidden(!shown);
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn set_window_border(_window: &impl raw_window_handle::HasWindowHandle, _shown: bool) {}
 
 /// Window state the title bar is drawn by.
@@ -247,7 +311,7 @@ fn moves_window(ctx: &egui::Context, resp: &Response) {
         let maximized = window_state(ctx).maximized;
         ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));
     } else if resp.drag_started_by(egui::PointerButton::Primary) {
-        // Windows moves it from here on, snapping it to the screen's edges as it does any
+        // The system moves it from here on, snapping it to the screen's edges as it does any
         // window, and puts a maximized one back to its size.
         ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
     }
@@ -338,8 +402,12 @@ fn paint_glyph(painter: &egui::Painter, rect: Rect, kind: Caption, color: Color3
 }
 
 /// Resizing from the window's edges and corners, which have no system frame to do it: over
-/// everything else, and only while the window is neither maximized nor fullscreen.
+/// everything else, and only while the window is neither maximized nor fullscreen. macOS
+/// resizes borderless windows natively; winit's BeginResize is unsupported there.
 pub(super) fn resize_edges(ctx: &egui::Context) {
+    if cfg!(target_os = "macos") {
+        return;
+    }
     let state = window_state(ctx);
     if state.maximized || state.fullscreen {
         return;
@@ -430,13 +498,30 @@ mod tests {
     }
 
     #[test]
-    fn only_windows_takes_the_title_bar() {
+    fn supported_platforms_can_replace_the_title_bar() {
         let settings = Settings {
             tabs_in_title_bar: true,
             ..Settings::default()
         };
-        assert_eq!(wanted(&settings), cfg!(windows));
+        assert_eq!(wanted(&settings), cfg!(any(windows, target_os = "macos")));
         assert!(!wanted(&Settings::default()));
+    }
+
+    #[test]
+    fn custom_title_bar_keeps_the_native_macos_frame() {
+        let custom = viewport(false);
+        if cfg!(target_os = "macos") {
+            assert_eq!(custom.decorations, Some(true));
+            assert_eq!(custom.fullsize_content_view, Some(true));
+            assert_eq!(custom.titlebar_shown, Some(false));
+            assert_eq!(custom.title_shown, Some(false));
+            assert_eq!(custom.titlebar_buttons_shown, Some(false));
+            let native = viewport(true);
+            assert_eq!(native.fullsize_content_view, Some(false));
+            assert_eq!(native.titlebar_buttons_shown, Some(true));
+        } else {
+            assert_eq!(custom.decorations, Some(false));
+        }
     }
 
     #[test]
@@ -466,6 +551,9 @@ mod tests {
         assert!(decorated);
         settings.tabs_in_title_bar = true;
         apply(&ctx, &settings, &mut decorated);
-        assert_eq!(decorated, !cfg!(windows));
+        assert_eq!(decorated, !cfg!(any(windows, target_os = "macos")));
+        settings.tabs_in_title_bar = false;
+        apply(&ctx, &settings, &mut decorated);
+        assert!(decorated);
     }
 }

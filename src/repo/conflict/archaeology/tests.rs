@@ -282,7 +282,7 @@ fn the_tab_reads_and_searches_for_the_open_editor() -> Result<(), String> {
     // A read for an earlier opening isn't taken by the one open now: its answer is caught and
     // handed to the tab after the editor was opened again.
     let (tx, rx) = std::sync::mpsc::channel();
-    tab.tx = tx;
+    tab.tx.sender = tx;
     if let Some(ed) = tab.conflict.as_mut() {
         ed.history.timelines = Read::NotAsked;
     }
@@ -639,7 +639,7 @@ fn a_pair_in_flight_is_not_merged_twice() -> Result<(), String> {
     });
     // Answers caught, to count the merges started.
     let (tx, rx) = std::sync::mpsc::channel();
-    tab.tx = tx;
+    tab.tx.sender = tx;
     tab.archaeology_act(Act::TestPair(2, 1), &ctx);
     tab.archaeology_act(Act::TestPair(0, 0), &ctx);
     tab.archaeology_act(Act::TestPair(2, 1), &ctx);

@@ -24,6 +24,8 @@ mod commands;
 mod commit_actions;
 mod conflict;
 mod conflict_check;
+#[cfg(test)]
+mod cpu_benchmarks;
 pub(crate) mod custom_commands;
 mod dco;
 mod detached;
@@ -83,6 +85,8 @@ pub(crate) mod popout;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+#[cfg(test)]
+mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
 mod quick_edit;
@@ -119,7 +123,7 @@ pub(crate) mod worktree_tab;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{Receiver, channel};
 use std::time::Instant;
 
 use crate::forge::{Forge, Hosting, PullRequest};
@@ -156,7 +160,8 @@ pub enum OpenRequest {
 pub struct RepoTab {
     pub path: PathBuf,
     pub name: String,
-    tx: Sender<Msg>,
+    tx: messages::JobSender,
+    _jobs: crate::tasks::Scope,
     rx: Receiver<Msg>,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
@@ -186,6 +191,8 @@ pub struct RepoTab {
     refs: Refs,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
+    /// A selected pull request's tip, including one with no local or tracking ref.
+    pr_graph_head: Option<Arc<Commit>>,
     has_more: bool,
     loading_more: bool,
     /// The branches hidden from the graph or soloed in it.
@@ -280,6 +287,8 @@ pub struct RepoTab {
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
     compare_requests: u64,
+    /// A PR's exact endpoints are still being fetched for this comparison request.
+    pr_selection_request: Option<u64>,
     file_view: Option<file_view::FileView>,
     /// The recent views, for back and forward.
     nav: nav_history::NavHistory<navigation::View>,
@@ -436,9 +445,8 @@ pub struct RepoTab {
     resume_select: Option<String>,
     /// The diff open when the tab was suspended, opened again once read.
     resume_diff: Option<DiffKey>,
-    /// For a repository on another machine, which no watcher sees: what keeps its poller
-    /// going (it stops once this is dropped).
-    poller: Option<std::sync::Arc<()>>,
+    /// A remote watcher schedules one bounded look at a time from its UI timer.
+    poller: Option<watch_remote::Poller>,
     /// The worktrees' changes are being counted (see `count_worktrees`).
     counting_worktrees: bool,
     /// A read came in while they were counted: they are counted again after.
@@ -492,11 +500,18 @@ impl RepoTab {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string());
-        let (tx, rx) = channel();
+        let (sender, rx) = channel();
+        let jobs = crate::tasks::Scope::default();
+        let tx = messages::JobSender {
+            sender,
+            cancel: jobs.0.clone(),
+            repo: messages::mutation_key(&path),
+        };
         Self {
             path,
             name,
             tx,
+            _jobs: jobs,
             rx,
             opened: Instant::now(),
             life: lifecycle::Lifecycle::new(Instant::now()),
@@ -512,6 +527,7 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             history: Vec::new(),
+            pr_graph_head: None,
             has_more: false,
             loading_more: false,
             visibility: Default::default(),
@@ -573,6 +589,7 @@ impl RepoTab {
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
+            pr_selection_request: None,
             file_view: None,
             nav: Default::default(),
             nav_jump: false,

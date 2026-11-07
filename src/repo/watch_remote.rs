@@ -3,12 +3,12 @@
 //! and HEAD, the index, the submodules, the working tree's status and the times of its changed
 //! files).
 
-use std::path::Path;
-use std::sync::Weak;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-use super::messages::Msg;
+use super::messages::{JobSender, Msg};
 use super::watch::FsChange;
 use crate::remote::{self, Target, sh_quote};
 
@@ -34,46 +34,109 @@ struct Look {
     files: String,
 }
 
-/// Looks at the repository `repo` every few seconds and sends what each change calls for to
-/// `tx`, until `alive` is gone (its tab closed or watching again). Once it has a first look
-/// (what later ones are compared with), says so to the tab on `arrived`: what changed before
-/// that, between the tab's first read and the first look, showed in no look, so the tab
-/// checks again, as it does when a watcher of this machine is set up.
-pub(super) fn poll(
-    repo: &Path,
-    tx: &Sender<FsChange>,
-    arrived: &Sender<Msg>,
+/// Poll timers live on the UI thread; only a single look enters the bounded job queue.
+/// No thread stays parked between looks, and a slow look never queues another behind it.
+pub(super) struct Poller {
+    target: Target,
+    tx: Sender<FsChange>,
+    arrived: JobSender,
     watch: u64,
-    ctx: &egui::Context,
-    alive: &Weak<()>,
-) {
-    let Some(target) = remote::parse(repo) else {
-        return;
-    };
-    let mut last: Option<Look> = None;
-    while alive.upgrade().is_some() {
-        // Not reached this time (the network…): next time.
-        if let Some(look) = look_at(&target) {
-            let change = match &last {
-                Some(before) => compare(before, &look),
-                None => {
-                    if arrived.send(Msg::Watcher(watch, None)).is_err() {
-                        return;
-                    }
-                    ctx.request_repaint();
-                    None
-                }
-            };
-            last = Some(look);
-            if let Some(change) = change {
-                if tx.send(change).is_err() {
-                    return;
-                }
-                ctx.request_repaint_after(Duration::from_millis(500));
-            }
+    last: Arc<Mutex<Option<Look>>>,
+    running: Arc<AtomicBool>,
+    next: Instant,
+    scope: crate::tasks::Scope,
+}
+
+impl Poller {
+    pub(super) fn new(
+        target: Target,
+        tx: Sender<FsChange>,
+        arrived: JobSender,
+        watch: u64,
+    ) -> Self {
+        Self {
+            scope: crate::tasks::Scope(arrived.cancel.child()),
+            target,
+            tx,
+            arrived,
+            watch,
+            last: Arc::new(Mutex::new(None)),
+            running: Arc::new(AtomicBool::new(false)),
+            next: Instant::now(),
         }
-        let focused = ctx.input(|i| i.focused);
-        std::thread::sleep(if focused { EVERY } else { EVERY_UNFOCUSED });
+    }
+
+    pub(super) fn tick(&mut self, ctx: &egui::Context) {
+        let now = Instant::now();
+        if now < self.next {
+            ctx.request_repaint_after(self.next - now);
+            return;
+        }
+        if self.running.load(Ordering::Acquire) {
+            return;
+        }
+        self.next = now
+            + if ctx.input(|i| i.focused) {
+                EVERY
+            } else {
+                EVERY_UNFOCUSED
+            };
+        ctx.request_repaint_after(self.next - now);
+        let (target, tx, arrived, watch) = (
+            self.target.clone(),
+            self.tx.clone(),
+            self.arrived.clone(),
+            self.watch,
+        );
+        let (last, running, repaint) = (
+            Arc::clone(&self.last),
+            Arc::clone(&self.running),
+            ctx.clone(),
+        );
+        self.running.store(true, Ordering::Release);
+        // This guard also resets the flag when a queued job is cancelled or panics.
+        let finished = Finished(Arc::clone(&running));
+        let submitted = crate::tasks::pool().and_then(|pool| {
+            pool.submit(
+                self.scope.0.clone(),
+                crate::tasks::Priority::Background,
+                None,
+                Box::new(move || {
+                    let finished = finished;
+                    if let Some(look) = look_at(&target) {
+                        let mut last = last
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        let change = match &*last {
+                            Some(before) => compare(before, &look),
+                            None => {
+                                let _ = arrived.send(Msg::Watcher(watch, None));
+                                repaint.request_repaint();
+                                None
+                            }
+                        };
+                        *last = Some(look);
+                        if let Some(change) = change {
+                            let _ = tx.send(change);
+                            repaint.request_repaint_after(Duration::from_millis(500));
+                        }
+                    }
+                    drop(finished);
+                    repaint.request_repaint();
+                }),
+            )
+            .map_err(str::to_owned)
+        });
+        if submitted.is_err() {
+            self.running.store(false, Ordering::Release);
+        }
+    }
+}
+
+struct Finished(Arc<AtomicBool>);
+impl Drop for Finished {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
     }
 }
 

@@ -28,7 +28,7 @@ use crate::keymap::Command;
 use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
-use badge::{BadgeKind, badges};
+use badge::{Badge, BadgeKind, badges};
 /// For the settings' previews, which draw a graph of their own like this one.
 pub(crate) use lanes::edge;
 use row::Lanes;
@@ -62,6 +62,31 @@ const GHOST_OPACITY: f32 = 0.6;
 const GOING_OPACITY: f32 = 0.4;
 
 impl RepoTab {
+    /// A comparison opened from a pull request focuses that branch, including when several
+    /// branches share its tip and the ordinary ordering would put it behind `+N`.
+    fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
+        let mut badges = badges(&commit.refs, &self.refs);
+        if let Some(compare) = &self.compare
+            && compare.target.as_deref() == Some(commit.hash.as_str())
+        {
+            let focused = match badges.iter().position(|badge| {
+                badge.kind == BadgeKind::Branch && badge.label == compare.target_label
+            }) {
+                Some(index) => badges.remove(index),
+                None if self.prs.iter().any(|pr| pr.branch == compare.target_label) => Badge {
+                    label: compare.target_label.clone(),
+                    kind: BadgeKind::PullRequest,
+                    local: false,
+                    remotes: Vec::new(),
+                    head: false,
+                },
+                None => return badges,
+            };
+            badges.insert(0, focused);
+        }
+        badges
+    }
+
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
@@ -534,6 +559,48 @@ pub(super) fn compare_items(
 mod tests {
     use super::*;
     use crate::git;
+
+    #[test]
+    fn a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-pill-focus".into(), &ctx);
+        let commit = git::Commit {
+            hash: "head".into(),
+            refs: vec!["HEAD -> dev".into(), "feature".into()],
+            ..git::Commit::default()
+        };
+        tab.compare = Some(crate::repo::Compare {
+            base: "main".into(),
+            base_label: "main".into(),
+            target: Some("head".into()),
+            target_label: "feature".into(),
+            since_fork: true,
+            data: None,
+            request: 1,
+        });
+        let focused = tab.graph_badges(&commit);
+        assert_eq!(focused[0].label, "feature");
+        assert_eq!(focused[1].label, "dev");
+        tab.prs.push(crate::forge::PullRequest {
+            number: 7,
+            title: String::new(),
+            branch: "fork-feature".into(),
+            base: "main".into(),
+            sha: "head".into(),
+            from_fork: true,
+            author: String::new(),
+            url: String::new(),
+            draft: false,
+        });
+        if let Some(compare) = &mut tab.compare {
+            compare.target_label = "fork-feature".into();
+        }
+        let focused = tab.graph_badges(&commit);
+        assert_eq!(focused[0].label, "fork-feature");
+        assert_eq!(focused[0].kind, BadgeKind::PullRequest);
+        assert!(focused[0].full_refs().is_empty());
+        assert!(!focused[0].local && focused[0].remotes.is_empty());
+    }
 
     #[test]
     fn a_compact_graph_column_fits_its_lanes_closer_together() {

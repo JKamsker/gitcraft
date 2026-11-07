@@ -39,6 +39,7 @@ fn settings_of_an_older_version_still_load() {
         (1.25, 270.0, false, true)
     );
     assert_eq!(back.editor, "subl");
+    assert!(back.branch_names_keep_end);
     let fresh = Settings::default();
     assert_eq!(
         (back.show_when, back.files_as_tree, back.author_width),
@@ -90,6 +91,7 @@ fn settings_survive_a_restart() {
         last_resized: Some(crate::repo::columns::Bar::Graph),
         column_push: 12.5,
         compact_graph: true,
+        branch_names_keep_end: false,
         diff_whole_file: true,
         fold_generated: false,
         fold_patterns: "*.snap, dist/**".to_owned(),

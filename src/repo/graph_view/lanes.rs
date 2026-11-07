@@ -39,7 +39,7 @@ impl RepoTab {
         let going = |lanes: fn(&RowGhost) -> &Vec<usize>, lane: usize| {
             ghost.is_some_and(|g| lanes(g).contains(&lane))
         };
-        for &lane in &graph_row.through {
+        for &lane in graph_row.through.iter() {
             if lane < lanes {
                 let ends = [pos2(x(lane), top), pos2(x(lane), bottom)];
                 if ghost_lane(|g| &g.through, lane) {
@@ -51,7 +51,7 @@ impl RepoTab {
                 }
             }
         }
-        for &lane in &graph_row.incoming {
+        for &lane in graph_row.incoming.iter() {
             let end = pos2(x(lane), top);
             if ghost_lane(|g| &g.incoming, lane) {
                 dashed(&gp, &edge_points(node, end), t.lane(lane), width);
@@ -61,7 +61,7 @@ impl RepoTab {
                 edge(&gp, node, end, t.lane(lane), width);
             }
         }
-        for &lane in &graph_row.outgoing {
+        for &lane in graph_row.outgoing.iter() {
             let color = if is_wip || stash.is_some() {
                 t.text_faint
             } else {

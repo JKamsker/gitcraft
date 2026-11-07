@@ -29,6 +29,8 @@ pub(crate) enum Action {
     SetOffline(bool),
     Select(usize),
     SelectHash(String),
+    /// Focus a pull request's branch and compare all of its proposed changes.
+    SelectPr(u64),
     SelectStash(usize),
     OpenDiff(DiffKey),
     /// Show a pull request in the big area.

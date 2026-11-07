@@ -111,11 +111,12 @@ pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
         return in_progress_there(&target);
     }
     let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
+    // Ask git once for the private worktree directory. In particular, a linked worktree's
+    // operation markers do not live in the shared git directory.
+    let directory = run(Some(repo), &["rev-parse", "--absolute-git-dir"])?;
+    let directory = Path::new(directory.strip_suffix('\n').unwrap_or(&directory));
     for dir in ["rebase-merge", "rebase-apply"] {
-        let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir]) else {
-            continue;
-        };
-        let state = crate::remote::resolve(repo, path.trim());
+        let state = directory.join(dir);
         if crate::remote::try_is_dir(&state).map_err(asked)? {
             // `git am` keeps its state there too, marked by this file.
             let am = crate::remote::try_is_file(&state.join("applying")).map_err(asked)?;
@@ -126,14 +127,20 @@ pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
             }));
         }
     }
-    Ok([
+    for (state, head) in [
         (InProgress::Merge, "MERGE_HEAD"),
         (InProgress::CherryPick, "CHERRY_PICK_HEAD"),
         (InProgress::Revert, "REVERT_HEAD"),
-    ]
-    .into_iter()
-    .find(|(_, head)| run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok())
-    .map(|(state, _)| state))
+    ] {
+        // Keep git's validation of present markers (an empty or malformed file is not an
+        // operation), but avoid spawning git to check each missing marker on every refresh.
+        if crate::remote::try_is_file(&directory.join(head)).map_err(asked)?
+            && run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok()
+        {
+            return Ok(Some(state));
+        }
+    }
+    Ok(None)
 }
 
 /// [`in_progress`] for a repository on another machine: asked there in one go, not in six
@@ -236,6 +243,48 @@ pub(super) fn parse_status(out: &str) -> WorkStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn operation_markers_are_private_to_each_worktree_and_validated() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("state-private")?;
+        let head = repo.commit("initial", &[("file", Some("text"))])?;
+        let linked = repo.dir.join("linked worktree ü");
+        repo.git(&[
+            "worktree",
+            "add",
+            "--detach",
+            &linked.to_string_lossy(),
+            "HEAD",
+        ])?;
+        let git_dir = run(Some(&linked), &["rev-parse", "--absolute-git-dir"])?;
+        let git_dir = Path::new(git_dir.trim_end_matches('\n'));
+        assert_eq!(in_progress(repo.path())?, None);
+        assert_eq!(in_progress(&linked)?, None);
+        for (marker, state) in [
+            ("MERGE_HEAD", InProgress::Merge),
+            ("CHERRY_PICK_HEAD", InProgress::CherryPick),
+            ("REVERT_HEAD", InProgress::Revert),
+        ] {
+            std::fs::write(git_dir.join(marker), "").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, None);
+            std::fs::write(git_dir.join(marker), "invalid\n").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, None);
+            std::fs::write(git_dir.join(marker), format!("{head}\n")).map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(state));
+            assert_eq!(in_progress(repo.path())?, None);
+            std::fs::remove_file(git_dir.join(marker)).map_err(|e| e.to_string())?;
+        }
+        for name in ["rebase-merge", "rebase-apply"] {
+            let dir = git_dir.join(name);
+            std::fs::create_dir(&dir).map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(InProgress::Rebase));
+            std::fs::write(dir.join("applying"), "").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(InProgress::Am));
+            assert_eq!(in_progress(repo.path())?, None);
+            std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
 
     #[test]
     fn status_sides_renames_and_conflicts() {

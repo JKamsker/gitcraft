@@ -20,6 +20,21 @@ use super::workspace::Workspace;
 use super::{MAX_PARALLEL, short};
 use crate::git;
 
+type SessionThread = (std::sync::Weak<AtomicBool>, std::thread::JoinHandle<()>);
+static SESSIONS: Mutex<Vec<SessionThread>> = Mutex::new(Vec::new());
+
+pub(crate) fn shutdown() {
+    let sessions = std::mem::take(&mut *SESSIONS.lock().unwrap_or_else(PoisonError::into_inner));
+    for (stop, _) in &sessions {
+        if let Some(stop) = stop.upgrade() {
+            stop.store(true, Ordering::Relaxed);
+        }
+    }
+    for (_, thread) in sessions {
+        let _ = thread.join();
+    }
+}
+
 /// What to bisect, with what, and where.
 #[derive(Clone, Debug)]
 pub struct Setup {
@@ -126,7 +141,8 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
         events,
         stop: Arc::clone(&stop),
     };
-    std::thread::spawn(move || {
+    let weak_stop = Arc::downgrade(&stop);
+    let thread = std::thread::spawn(move || {
         let out = Out {
             tx: Mutex::new(tx),
             wake: Box::new(wake),
@@ -137,6 +153,9 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
         .unwrap_or_else(|_| Outcome::Failed("the bisect stopped on an error in gitcraft".into()));
         out.send(Event::Done(outcome));
     });
+    let mut sessions = SESSIONS.lock().unwrap_or_else(PoisonError::into_inner);
+    sessions.retain(|(_, thread)| !thread.is_finished());
+    sessions.push((weak_stop, thread));
     handle
 }
 

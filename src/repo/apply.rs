@@ -41,6 +41,7 @@ impl RepoTab {
                 self.doctor = None;
                 self.goto(&hash, ctx);
             }
+            Action::SelectPr(number) => self.select_pr(number, ctx),
             Action::SelectStash(i) => {
                 self.leave_pages();
                 self.doctor = None;
@@ -389,6 +390,7 @@ impl RepoTab {
                 ctx,
             ),
             Action::CompareSinceFork(on) => {
+                self.pr_selection_request = None;
                 if let Some(c) = &mut self.compare {
                     c.since_fork = on;
                     self.reload_compare(ctx);
@@ -429,6 +431,7 @@ impl RepoTab {
             Action::Hotfix(act) => self.hotfix_act(act, ctx),
             Action::Package(act) => self.package_act(act, ctx),
         }
+        self.drop_unfocused_pr_head();
     }
 
     /// Side by side and the whole file are kept for next time; whitespace is per tab.

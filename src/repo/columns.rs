@@ -9,7 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
-pub(super) const MIN_REFS_W: f32 = 96.0;
+/// Enough room for a short branch name such as `dev`, with its pill's padding.
+pub(crate) const MIN_REFS_W: f32 = 70.0;
 pub(super) const MIN_GRAPH_W: f32 = 60.0;
 pub(super) const MIN_COL_W: f32 = 50.0;
 const MIN_DESCRIPTION_W: f32 = 140.0;

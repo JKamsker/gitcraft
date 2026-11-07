@@ -294,12 +294,33 @@ pub struct Identity {
 }
 
 pub fn identity(repo: &Path) -> Identity {
-    let get = |args: &[&str]| run(Some(repo), args).map(|s| s.trim().to_owned()).ok();
+    let get = |local: bool| {
+        let mut args = vec!["config", "-z"];
+        if local {
+            args.push("--local");
+        }
+        args.extend(["--get-regexp", "^user\\.(name|email)$"]);
+        let out = run(Some(repo), &args).unwrap_or_default();
+        let mut values = (None, None);
+        // `key\nvalue\0`: split only the first newline, since values may contain newlines.
+        // The last occurrence wins, as with `git config user.name`.
+        for entry in out.split('\0') {
+            let (key, value) = entry.split_once('\n').unwrap_or((entry, ""));
+            match key {
+                "user.name" => values.0 = Some(value.trim().to_owned()),
+                "user.email" => values.1 = Some(value.trim().to_owned()),
+                _ => {}
+            }
+        }
+        values
+    };
+    let (name, email) = get(false);
+    let (local, local_email) = get(true);
     Identity {
-        name: get(&["config", "user.name"]).unwrap_or_default(),
-        email: get(&["config", "user.email"]).unwrap_or_default(),
-        local: get(&["config", "--local", "user.name"]).is_some(),
-        local_email: get(&["config", "--local", "user.email"]).is_some(),
+        name: name.unwrap_or_default(),
+        email: email.unwrap_or_default(),
+        local: local.is_some(),
+        local_email: local_email.is_some(),
     }
 }
 

@@ -1,0 +1,979 @@
+{
+  "baseline_revision": "35a26a5",
+  "samples_per_run": 7,
+  "target_batch_ms": 60,
+  "before_runs": [
+    "workflow-before",
+    "workflow-before-2",
+    "workflow-before-3"
+  ],
+  "after_runs": [
+    "workflow-optimized",
+    "workflow-after-2",
+    "workflow-after-3"
+  ],
+  "compared_workloads": 106,
+  "total_final_workloads": 118,
+  "inputs_sha256": "b4e5038d5bdc09fe063755e95fa96b3a2007a82188ab3ddc446e81f8c950897d",
+  "measurements": [
+    {
+      "name": "analysis/weakened-checks",
+      "before_median_ms": 0.2388608103448276,
+      "before_median_cpu_ms": 0.23868965517241467,
+      "after_median_ms": 0.24486445064377685,
+      "after_median_cpu_ms": 0.24485836909871106,
+      "cpu_reduction_percent": -2.5844077414417077,
+      "elapsed_reduction_percent": -2.513447178832817
+    },
+    {
+      "name": "branches/by-date",
+      "before_median_ms": 7.525865777777778,
+      "before_median_cpu_ms": 0.26222222222218583,
+      "after_median_ms": 7.834354125,
+      "after_median_cpu_ms": 0.26137500000004366,
+      "cpu_reduction_percent": 0.3230932203085013,
+      "elapsed_reduction_percent": -4.099041310743545
+    },
+    {
+      "name": "branches/merged",
+      "before_median_ms": 7.689171333333334,
+      "before_median_cpu_ms": 0.2618888888888857,
+      "after_median_ms": 7.019407444444445,
+      "after_median_cpu_ms": 0.2316666666666707,
+      "cpu_reduction_percent": 11.540093338987612,
+      "elapsed_reduction_percent": 8.710482051367418
+    },
+    {
+      "name": "diff/index",
+      "before_median_ms": 14.61596875,
+      "before_median_cpu_ms": 0.5307500000001255,
+      "after_median_ms": 14.421358399999999,
+      "after_median_cpu_ms": 0.5257999999999811,
+      "cpu_reduction_percent": 0.9326424870736316,
+      "elapsed_reduction_percent": 1.3314912841477011
+    },
+    {
+      "name": "diff/open/src/app/title_bar.rs",
+      "before_median_ms": 50.43575,
+      "before_median_cpu_ms": 5.610999999999876,
+      "after_median_ms": 46.710875,
+      "after_median_cpu_ms": 5.253999999999905,
+      "cpu_reduction_percent": 6.362502227766509,
+      "elapsed_reduction_percent": 7.385386357890978
+    },
+    {
+      "name": "diff/open/src/image_cache.rs",
+      "before_median_ms": 51.9508545,
+      "before_median_cpu_ms": 7.589499999999816,
+      "after_median_ms": 50.286958,
+      "after_median_cpu_ms": 7.417500000000018,
+      "cpu_reduction_percent": 2.2662889518387574,
+      "elapsed_reduction_percent": 3.2028279727333464
+    },
+    {
+      "name": "diff/open/src/repo/diff/image_compare/decode.rs",
+      "before_median_ms": 53.9284795,
+      "before_median_cpu_ms": 7.927500000000009,
+      "after_median_ms": 52.011708500000005,
+      "after_median_cpu_ms": 7.795000000000073,
+      "cpu_reduction_percent": 1.6713970356346364,
+      "elapsed_reduction_percent": 3.5542834097519793
+    },
+    {
+      "name": "diff/worktree",
+      "before_median_ms": 13.521073,
+      "before_median_cpu_ms": 0.4819999999999709,
+      "after_median_ms": 14.4284834,
+      "after_median_cpu_ms": 0.5322000000000117,
+      "cpu_reduction_percent": -10.41493775934519,
+      "elapsed_reduction_percent": -6.71108276687804
+    },
+    {
+      "name": "files/blame-2000-lines",
+      "before_median_ms": 10.128632,
+      "before_median_cpu_ms": 0.8456666666666782,
+      "after_median_ms": 9.312738142857144,
+      "after_median_cpu_ms": 0.7854285714285132,
+      "cpu_reduction_percent": 7.12314882595556,
+      "elapsed_reduction_percent": 8.055321361688872
+    },
+    {
+      "name": "files/history",
+      "before_median_ms": 17.016875000000002,
+      "before_median_cpu_ms": 0.6105000000000018,
+      "after_median_ms": 16.028146,
+      "after_median_cpu_ms": 0.5595000000000709,
+      "cpu_reduction_percent": 8.35380835379701,
+      "elapsed_reduction_percent": 5.810285378484603
+    },
+    {
+      "name": "files/read-blob",
+      "before_median_ms": 7.585296874999999,
+      "before_median_cpu_ms": 0.2723750000000109,
+      "after_median_ms": 7.1958796666666665,
+      "after_median_cpu_ms": 0.2576666666666622,
+      "cpu_reduction_percent": 5.400030595079619,
+      "elapsed_reduction_percent": 5.133842679471035
+    },
+    {
+      "name": "files/tree",
+      "before_median_ms": 8.023046333333333,
+      "before_median_cpu_ms": 0.32488888888888645,
+      "after_median_ms": 7.790398222222223,
+      "after_median_cpu_ms": 0.3421111111110804,
+      "cpu_reduction_percent": -5.300957592330602,
+      "elapsed_reduction_percent": 2.899747819534937
+    },
+    {
+      "name": "find/literal-50000-lines",
+      "before_median_ms": 2.301855769230769,
+      "before_median_cpu_ms": 2.3018846153846217,
+      "after_median_ms": 1.2422575,
+      "after_median_cpu_ms": 1.2420999999999913,
+      "cpu_reduction_percent": 46.0398669986137,
+      "elapsed_reduction_percent": 46.03234848136746
+    },
+    {
+      "name": "find/regex-50000-lines",
+      "before_median_ms": 2.3785052083333333,
+      "before_median_cpu_ms": 2.3786250000000564,
+      "after_median_ms": 1.3237844130434784,
+      "after_median_cpu_ms": 1.323434782608709,
+      "cpu_reduction_percent": 44.36135235235997,
+      "elapsed_reduction_percent": 44.343850566083866
+    },
+    {
+      "name": "find/unicode-50000-lines",
+      "before_median_ms": 1.6950150277777776,
+      "before_median_cpu_ms": 1.694472222222228,
+      "after_median_ms": 0.7063877840909091,
+      "after_median_cpu_ms": 0.7060113636363728,
+      "cpu_reduction_percent": 58.33443863066287,
+      "elapsed_reduction_percent": 58.32557396160626
+    },
+    {
+      "name": "highlight/App.tsx",
+      "before_median_ms": 0.9050429104477612,
+      "before_median_cpu_ms": 0.9049701492537285,
+      "after_median_ms": 0.8962475588235295,
+      "after_median_cpu_ms": 0.8962499999999958,
+      "cpu_reduction_percent": 0.963584186829114,
+      "elapsed_reduction_percent": 0.9718159794081305
+    },
+    {
+      "name": "highlight/App.vue",
+      "before_median_ms": 3.6291421764705882,
+      "before_median_cpu_ms": 3.6288823529412184,
+      "after_median_ms": 3.5408504705882353,
+      "after_median_cpu_ms": 3.5403529411764527,
+      "cpu_reduction_percent": 2.4395778962911896,
+      "elapsed_reduction_percent": 2.4328533187481294
+    },
+    {
+      "name": "highlight/Cargo.lock",
+      "before_median_ms": 18.949875000000002,
+      "before_median_cpu_ms": 18.942500000000052,
+      "after_median_ms": 18.831875,
+      "after_median_cpu_ms": 18.82325000000003,
+      "cpu_reduction_percent": 0.6295367559721377,
+      "elapsed_reduction_percent": 0.6226954003654472
+    },
+    {
+      "name": "highlight/Main.cs",
+      "before_median_ms": 1.7090833235294116,
+      "before_median_cpu_ms": 1.7087647058823516,
+      "after_median_ms": 1.7083449166666667,
+      "after_median_cpu_ms": 1.7083611111110661,
+      "cpu_reduction_percent": 0.02361909570675058,
+      "elapsed_reduction_percent": 0.043204848621425374
+    },
+    {
+      "name": "highlight/main.cpp",
+      "before_median_ms": 0.748775,
+      "before_median_cpu_ms": 0.7487125000000106,
+      "after_median_ms": 0.7461473875,
+      "after_median_cpu_ms": 0.7461624999999913,
+      "cpu_reduction_percent": 0.34058467035333884,
+      "elapsed_reduction_percent": 0.3509215051250347
+    },
+    {
+      "name": "highlight/main.go",
+      "before_median_ms": 0.3944092993197279,
+      "before_median_cpu_ms": 0.39436734693877384,
+      "after_median_ms": 0.39214704516129034,
+      "after_median_cpu_ms": 0.3921032258064506,
+      "cpu_reduction_percent": 0.5741147561780235,
+      "elapsed_reduction_percent": 0.5735803294545705
+    },
+    {
+      "name": "highlight/main.java",
+      "before_median_ms": 0.5575523628318585,
+      "before_median_cpu_ms": 0.5570442477876099,
+      "after_median_ms": 0.5516246216216216,
+      "after_median_cpu_ms": 0.5515495495495473,
+      "cpu_reduction_percent": 0.9864024733915899,
+      "elapsed_reduction_percent": 1.063172108199728
+    },
+    {
+      "name": "highlight/main.py",
+      "before_median_ms": 0.8163474054054054,
+      "before_median_cpu_ms": 0.8159459459459352,
+      "after_median_ms": 0.8140067567567567,
+      "after_median_cpu_ms": 0.8137432432432508,
+      "cpu_reduction_percent": 0.2699569393816659,
+      "elapsed_reduction_percent": 0.2867221275097087
+    },
+    {
+      "name": "highlight/script.ps1",
+      "before_median_ms": 0.46327660000000004,
+      "before_median_cpu_ms": 0.46280769230768504,
+      "after_median_ms": 0.45870293129770995,
+      "after_median_cpu_ms": 0.4586259541984866,
+      "cpu_reduction_percent": 0.9035584711972078,
+      "elapsed_reduction_percent": 0.98724362557705
+    },
+    {
+      "name": "highlight/src/app/mod.rs",
+      "before_median_ms": 15.28928125,
+      "before_median_cpu_ms": 15.26925,
+      "after_median_ms": 15.787864499999998,
+      "after_median_cpu_ms": 15.75875000000002,
+      "cpu_reduction_percent": -3.2057894133636022,
+      "elapsed_reduction_percent": -3.2609986162691396
+    },
+    {
+      "name": "highlight/src/repo/load.rs",
+      "before_median_ms": 14.563812500000001,
+      "before_median_cpu_ms": 14.559750000000008,
+      "after_median_ms": 14.60153125,
+      "after_median_cpu_ms": 14.598500000000001,
+      "cpu_reduction_percent": -0.26614467968195665,
+      "elapsed_reduction_percent": -0.2589895331322145
+    },
+    {
+      "name": "history/commit-detail",
+      "before_median_ms": 42.3819795,
+      "before_median_cpu_ms": 1.4420000000000073,
+      "after_median_ms": 38.3553955,
+      "after_median_cpu_ms": 1.3155000000001564,
+      "cpu_reduction_percent": 8.772538141459796,
+      "elapsed_reduction_percent": 9.500698286166642
+    },
+    {
+      "name": "history/layout-1500",
+      "before_median_ms": 0.7265843414634146,
+      "before_median_cpu_ms": 0.726317073170732,
+      "after_median_ms": 0.734753125,
+      "after_median_cpu_ms": 0.7346375000000002,
+      "cpu_reduction_percent": -1.1455639880452395,
+      "elapsed_reduction_percent": -1.1242718939046714
+    },
+    {
+      "name": "history/next-page-500",
+      "before_median_ms": 18.3351875,
+      "before_median_cpu_ms": 3.3802499999999327,
+      "after_median_ms": 17.21085425,
+      "after_median_cpu_ms": 3.3775000000000546,
+      "cpu_reduction_percent": 0.08135492936552913,
+      "elapsed_reduction_percent": 6.132106639214896
+    },
+    {
+      "name": "history/read-first-500",
+      "before_median_ms": 16.22883325,
+      "before_median_cpu_ms": 1.915750000000001,
+      "after_median_ms": 15.78447925,
+      "after_median_cpu_ms": 1.9030000000000022,
+      "cpu_reduction_percent": 0.6655356909825771,
+      "elapsed_reduction_percent": 2.738052656989376
+    },
+    {
+      "name": "history/reflog",
+      "before_median_ms": 13.766524999999998,
+      "before_median_cpu_ms": 0.49020000000000435,
+      "after_median_ms": 16.075573,
+      "after_median_cpu_ms": 0.6087499999999864,
+      "cpu_reduction_percent": -24.18400652794388,
+      "elapsed_reduction_percent": -16.772918365382704
+    },
+    {
+      "name": "images/decode-fit-pair-1080p",
+      "before_median_ms": 22.569346999999997,
+      "before_median_cpu_ms": 22.555333333333692,
+      "after_median_ms": 22.084430333333334,
+      "after_median_cpu_ms": 22.079999999999927,
+      "cpu_reduction_percent": 2.107409925222814,
+      "elapsed_reduction_percent": 2.148563122657754
+    },
+    {
+      "name": "images/decode-png-1080p",
+      "before_median_ms": 8.999238142857143,
+      "before_median_cpu_ms": 8.995999999999965,
+      "after_median_ms": 8.909613,
+      "after_median_cpu_ms": 8.909714285714342,
+      "cpu_reduction_percent": 0.9591564504849215,
+      "elapsed_reduction_percent": 0.9959192259878069
+    },
+    {
+      "name": "images/difference-fully-edited-1080p",
+      "before_median_ms": 6.906476777777778,
+      "before_median_cpu_ms": 6.902444444444376,
+      "after_median_ms": 6.851476888888889,
+      "after_median_cpu_ms": 6.851888888888627,
+      "cpu_reduction_percent": 0.7324297350403186,
+      "elapsed_reduction_percent": 0.796352332145045
+    },
+    {
+      "name": "images/difference-identical-1080p",
+      "before_median_ms": 6.7417125,
+      "before_median_cpu_ms": 6.738999999999942,
+      "after_median_ms": 2.445662037037037,
+      "after_median_cpu_ms": 2.4446296296296675,
+      "cpu_reduction_percent": 63.724148543853865,
+      "elapsed_reduction_percent": 63.723430255487216
+    },
+    {
+      "name": "images/difference-one-percent-edited-1080p",
+      "before_median_ms": 7.348120333333333,
+      "before_median_cpu_ms": 7.344777777777684,
+      "after_median_ms": 2.5382847083333333,
+      "after_median_cpu_ms": 2.536625000000034,
+      "cpu_reduction_percent": 65.46355687336339,
+      "elapsed_reduction_percent": 65.4566801686835
+    },
+    {
+      "name": "images/difference-resized",
+      "before_median_ms": 3.6198431176470587,
+      "before_median_cpu_ms": 3.6174117647060484,
+      "after_median_ms": 3.6196053529411762,
+      "after_median_cpu_ms": 3.6173529411764105,
+      "cpu_reduction_percent": 0.0016261220304514268,
+      "elapsed_reduction_percent": 0.0065683704557062406
+    },
+    {
+      "name": "mcp/blame-json-response",
+      "before_median_ms": 8.840214285714286,
+      "before_median_cpu_ms": 0.5161428571428976,
+      "after_median_ms": 8.198198,
+      "after_median_cpu_ms": 0.4872500000000173,
+      "cpu_reduction_percent": 5.597841129259528,
+      "elapsed_reduction_percent": 7.262451621243827
+    },
+    {
+      "name": "mcp/branches-json-response",
+      "before_median_ms": 55.770832999999996,
+      "before_median_cpu_ms": 2.2950000000000728,
+      "after_median_ms": 49.587832999999996,
+      "after_median_cpu_ms": 2.018000000000029,
+      "cpu_reduction_percent": 12.069716775600646,
+      "elapsed_reduction_percent": 11.08644011108817
+    },
+    {
+      "name": "mcp/conflicts-json-response",
+      "before_median_ms": 37.042375,
+      "before_median_cpu_ms": 1.4455000000002656,
+      "after_median_ms": 29.945097,
+      "after_median_cpu_ms": 1.143999999999778,
+      "cpu_reduction_percent": 20.85783465931733,
+      "elapsed_reduction_percent": 19.15988918097179
+    },
+    {
+      "name": "mcp/diff-json-response",
+      "before_median_ms": 15.671478999999998,
+      "before_median_cpu_ms": 0.5822499999999309,
+      "after_median_ms": 14.6982418,
+      "after_median_cpu_ms": 0.514600000000064,
+      "cpu_reduction_percent": 11.618720480871602,
+      "elapsed_reduction_percent": 6.210244738227955
+    },
+    {
+      "name": "mcp/log-json-response",
+      "before_median_ms": 8.64075525,
+      "before_median_cpu_ms": 0.32162500000004,
+      "after_median_ms": 8.576363142857144,
+      "after_median_cpu_ms": 0.31657142857147846,
+      "cpu_reduction_percent": 1.5712620065482907,
+      "elapsed_reduction_percent": 0.7452138763316518
+    },
+    {
+      "name": "mcp/show_commit-json-response",
+      "before_median_ms": 47.687625,
+      "before_median_cpu_ms": 1.7979999999997744,
+      "after_median_ms": 43.729729,
+      "after_median_cpu_ms": 1.5229999999996835,
+      "cpu_reduction_percent": 15.294771968861266,
+      "elapsed_reduction_percent": 8.299629096647188
+    },
+    {
+      "name": "mcp/status-json-response",
+      "before_median_ms": 67.959542,
+      "before_median_cpu_ms": 2.6220000000002983,
+      "after_median_ms": 30.137978999999998,
+      "after_median_cpu_ms": 1.0844999999999345,
+      "cpu_reduction_percent": 58.63844393593398,
+      "elapsed_reduction_percent": 55.65305752060543
+    },
+    {
+      "name": "metadata/authorship",
+      "before_median_ms": 13.239208399999999,
+      "before_median_cpu_ms": 0.44239999999990687,
+      "after_median_ms": 15.35964575,
+      "after_median_cpu_ms": 0.5740000000000691,
+      "cpu_reduction_percent": -29.746835443080922,
+      "elapsed_reduction_percent": -16.016345433462643
+    },
+    {
+      "name": "metadata/notes-namespaces",
+      "before_median_ms": 14.120041599999999,
+      "before_median_cpu_ms": 0.5180000000000291,
+      "after_median_ms": 13.6740916,
+      "after_median_cpu_ms": 0.5072000000000116,
+      "cpu_reduction_percent": 2.0849420849453404,
+      "elapsed_reduction_percent": 3.158276814141947
+    },
+    {
+      "name": "operations/checkout-cycle",
+      "before_median_ms": 21.119569333333335,
+      "before_median_cpu_ms": 0.5503333333335831,
+      "after_median_ms": 20.152458333333332,
+      "after_median_cpu_ms": 0.5460000000000491,
+      "cpu_reduction_percent": 0.7874015748392638,
+      "elapsed_reduction_percent": 4.579217429749372
+    },
+    {
+      "name": "operations/commit-reset-cycle",
+      "before_median_ms": 25.091277666666667,
+      "before_median_cpu_ms": 0.5603333333334982,
+      "after_median_ms": 24.237028,
+      "after_median_cpu_ms": 0.5223333333333358,
+      "cpu_reduction_percent": 6.781677572900291,
+      "elapsed_reduction_percent": 3.404568224923532
+    },
+    {
+      "name": "operations/merge-reset-cycle",
+      "before_median_ms": 33.558229000000004,
+      "before_median_cpu_ms": 0.5879999999997381,
+      "after_median_ms": 32.5272705,
+      "after_median_cpu_ms": 0.6075000000000728,
+      "cpu_reduction_percent": -3.3163265306706435,
+      "elapsed_reduction_percent": 3.0721481160403408
+    },
+    {
+      "name": "operations/rebase-restore-cycle",
+      "before_median_ms": 41.9888545,
+      "before_median_cpu_ms": 0.8379999999997381,
+      "after_median_ms": 42.5449165,
+      "after_median_cpu_ms": 0.8530000000000655,
+      "cpu_reduction_percent": -1.7899761336911846,
+      "elapsed_reduction_percent": -1.3243085733620097
+    },
+    {
+      "name": "operations/stage-unstage-cycle",
+      "before_median_ms": 19.259625,
+      "before_median_cpu_ms": 0.48033333333326783,
+      "after_median_ms": 21.350944666666667,
+      "after_median_cpu_ms": 0.5826666666665309,
+      "cpu_reduction_percent": -21.304649548912625,
+      "elapsed_reduction_percent": -10.858568983906313
+    },
+    {
+      "name": "operations/stash-restore-cycle",
+      "before_median_ms": 104.21066599999999,
+      "before_median_cpu_ms": 0.7340000000003783,
+      "after_median_ms": 101.672459,
+      "after_median_cpu_ms": 0.6770000000005894,
+      "cpu_reduction_percent": 7.765667574899126,
+      "elapsed_reduction_percent": 2.4356499170631762
+    },
+    {
+      "name": "owners/gitea-lint-1000-files",
+      "before_median_ms": 19.21433325,
+      "before_median_cpu_ms": 19.212999999999738,
+      "after_median_ms": 19.204718749999998,
+      "after_median_cpu_ms": 19.202749999999924,
+      "cpu_reduction_percent": 0.05334929474738459,
+      "elapsed_reduction_percent": 0.050038166169530385
+    },
+    {
+      "name": "owners/gitea-lookup-1000-files",
+      "before_median_ms": 19.08871875,
+      "before_median_cpu_ms": 19.07724999999982,
+      "after_median_ms": 19.19015625,
+      "after_median_cpu_ms": 19.18899999999985,
+      "cpu_reduction_percent": -0.5857762518184151,
+      "elapsed_reduction_percent": -0.5314002544041907
+    },
+    {
+      "name": "owners/gitea-parse-400-rules",
+      "before_median_ms": 38.984521,
+      "before_median_cpu_ms": 38.96349999999984,
+      "after_median_ms": 38.443125,
+      "after_median_cpu_ms": 38.44300000000021,
+      "cpu_reduction_percent": 1.3358656178208639,
+      "elapsed_reduction_percent": 1.3887460615458092
+    },
+    {
+      "name": "owners/github-lint-1000-files",
+      "before_median_ms": 0.5869507575757575,
+      "before_median_cpu_ms": 0.5864040404040413,
+      "after_median_ms": 0.5692944150943396,
+      "after_median_cpu_ms": 0.5691603773584918,
+      "cpu_reduction_percent": 2.9405771204557785,
+      "elapsed_reduction_percent": 3.008147149233209
+    },
+    {
+      "name": "owners/github-lookup-1000-files",
+      "before_median_ms": 0.4628985813953488,
+      "before_median_cpu_ms": 0.4624651162790655,
+      "after_median_ms": 0.4609707404580152,
+      "after_median_cpu_ms": 0.46076335877862346,
+      "cpu_reduction_percent": 0.36797532193004745,
+      "elapsed_reduction_percent": 0.41647155874238173
+    },
+    {
+      "name": "owners/github-parse-400-rules",
+      "before_median_ms": 40.3212295,
+      "before_median_cpu_ms": 40.30450000000019,
+      "after_median_ms": 39.4960625,
+      "after_median_cpu_ms": 39.48750000000018,
+      "cpu_reduction_percent": 2.0270689377116735,
+      "elapsed_reduction_percent": 2.046482734362054
+    },
+    {
+      "name": "owners/gitlab-lint-1000-files",
+      "before_median_ms": 25.641999999999996,
+      "before_median_cpu_ms": 25.63866666666642,
+      "after_median_ms": 11.9448584,
+      "after_median_cpu_ms": 11.94300000000003,
+      "cpu_reduction_percent": 53.41801445732951,
+      "elapsed_reduction_percent": 53.416822400748764
+    },
+    {
+      "name": "owners/gitlab-lookup-1000-files",
+      "before_median_ms": 26.074555666666665,
+      "before_median_cpu_ms": 26.067666666666508,
+      "after_median_ms": 11.902972166666666,
+      "after_median_cpu_ms": 11.89950000000014,
+      "cpu_reduction_percent": 54.351495466925,
+      "elapsed_reduction_percent": 54.35023967874071
+    },
+    {
+      "name": "owners/gitlab-parse-400-rules",
+      "before_median_ms": 40.045208,
+      "before_median_cpu_ms": 40.03700000000026,
+      "after_median_ms": 39.667812500000004,
+      "after_median_cpu_ms": 39.65950000000021,
+      "cpu_reduction_percent": 0.942877837999978,
+      "elapsed_reduction_percent": 0.9424236228214866
+    },
+    {
+      "name": "repository/identity",
+      "before_median_ms": 27.39194433333333,
+      "before_median_cpu_ms": 1.0743333333333187,
+      "after_median_ms": 13.005808399999998,
+      "after_median_cpu_ms": 0.4868000000000393,
+      "cpu_reduction_percent": 54.688178715478195,
+      "elapsed_reduction_percent": 52.51958662834608
+    },
+    {
+      "name": "repository/operation-state",
+      "before_median_ms": 35.7058125,
+      "before_median_cpu_ms": 1.4549999999999272,
+      "after_median_ms": 6.1949458,
+      "after_median_cpu_ms": 0.24149999999999636,
+      "cpu_reduction_percent": 83.40206185566952,
+      "elapsed_reduction_percent": 82.65003548091785
+    },
+    {
+      "name": "repository/overview",
+      "before_median_ms": 82.083375,
+      "before_median_cpu_ms": 2.755999999999858,
+      "after_median_ms": 75.23266600000001,
+      "after_median_cpu_ms": 2.481999999999971,
+      "cpu_reduction_percent": 9.941944847601647,
+      "elapsed_reduction_percent": 8.346037184752685
+    },
+    {
+      "name": "repository/refs",
+      "before_median_ms": 22.17302766666667,
+      "before_median_cpu_ms": 0.8340000000001359,
+      "after_median_ms": 15.748479249999999,
+      "after_median_cpu_ms": 0.58725000000004,
+      "cpu_reduction_percent": 29.586330935258477,
+      "elapsed_reduction_percent": 28.97461056400914
+    },
+    {
+      "name": "repository/reload-metadata",
+      "before_median_ms": 40.0526665,
+      "before_median_cpu_ms": 3.723499999999831,
+      "after_median_ms": 15.919541749999999,
+      "after_median_cpu_ms": 2.3893333333332216,
+      "cpu_reduction_percent": 35.83098339376044,
+      "elapsed_reduction_percent": 60.25347837952313
+    },
+    {
+      "name": "repository/remotes",
+      "before_median_ms": 6.6665,
+      "before_median_cpu_ms": 0.23188888888888767,
+      "after_median_ms": 6.2380167,
+      "after_median_cpu_ms": 0.21970000000001164,
+      "cpu_reduction_percent": 5.256348826060608,
+      "elapsed_reduction_percent": 6.427410185254634
+    },
+    {
+      "name": "repository/stashes",
+      "before_median_ms": 6.6597875,
+      "before_median_cpu_ms": 0.24780000000000654,
+      "after_median_ms": 6.363012499999999,
+      "after_median_cpu_ms": 0.22759999999998398,
+      "cpu_reduction_percent": 8.151735270388228,
+      "elapsed_reduction_percent": 4.456223265381986
+    },
+    {
+      "name": "repository/status-clean-400-files",
+      "before_median_ms": 46.9786045,
+      "before_median_cpu_ms": 1.8430000000000746,
+      "after_median_ms": 15.38235425,
+      "after_median_cpu_ms": 0.5112500000000182,
+      "cpu_reduction_percent": 72.25990233315261,
+      "elapsed_reduction_percent": 67.25668117706647
+    },
+    {
+      "name": "repository/status-dirty-200-files",
+      "before_median_ms": 43.896,
+      "before_median_cpu_ms": 1.581000000000131,
+      "after_median_ms": 17.073103999999997,
+      "after_median_cpu_ms": 0.5739999999998417,
+      "cpu_reduction_percent": 63.69386464264426,
+      "elapsed_reduction_percent": 61.1055585930381
+    },
+    {
+      "name": "repository/status-linked-worktree",
+      "before_median_ms": 50.1763955,
+      "before_median_cpu_ms": 1.6765000000000327,
+      "after_median_ms": 19.61909375,
+      "after_median_cpu_ms": 0.5240000000000009,
+      "cpu_reduction_percent": 68.74440799284278,
+      "elapsed_reduction_percent": 60.89975464658477
+    },
+    {
+      "name": "repository/status-merge-conflict",
+      "before_median_ms": 34.8713125,
+      "before_median_cpu_ms": 1.2764999999999418,
+      "after_median_ms": 28.611805333333333,
+      "after_median_cpu_ms": 1.0413333333332655,
+      "cpu_reduction_percent": 18.422770596685233,
+      "elapsed_reduction_percent": 17.95030561773856
+    },
+    {
+      "name": "repository/status-rebase-conflict",
+      "before_median_ms": 23.563402666666665,
+      "before_median_cpu_ms": 0.8923333333332266,
+      "after_median_ms": 21.80441666666667,
+      "after_median_cpu_ms": 0.7999999999998787,
+      "cpu_reduction_percent": 10.347403810238209,
+      "elapsed_reduction_percent": 7.464906596398746
+    },
+    {
+      "name": "repository/worktrees",
+      "before_median_ms": 7.331421333333334,
+      "before_median_cpu_ms": 0.2946666666666715,
+      "after_median_ms": 6.870046333333333,
+      "after_median_cpu_ms": 0.27022222222219877,
+      "cpu_reduction_percent": 8.29562594269423,
+      "elapsed_reduction_percent": 6.293118060236081
+    },
+    {
+      "name": "rich/Cargo.lock",
+      "before_median_ms": 19.868396,
+      "before_median_cpu_ms": 3.8817500000004657,
+      "after_median_ms": 18.077229,
+      "after_median_cpu_ms": 3.680750000000444,
+      "cpu_reduction_percent": 5.1780768983061165,
+      "elapsed_reduction_percent": 9.015156533018576
+    },
+    {
+      "name": "rich/README.md",
+      "before_median_ms": 15.768021000000001,
+      "before_median_cpu_ms": 0.867750000000342,
+      "after_median_ms": 15.163483199999998,
+      "after_median_cpu_ms": 0.8417999999997846,
+      "cpu_reduction_percent": 2.9904926534770504,
+      "elapsed_reduction_percent": 3.8339484707688
+    },
+    {
+      "name": "rich/data.dvc",
+      "before_median_ms": 16.2667085,
+      "before_median_cpu_ms": 0.6244999999998981,
+      "after_median_ms": 14.8055834,
+      "after_median_cpu_ms": 0.5521999999997206,
+      "cpu_reduction_percent": 11.577261809477879,
+      "elapsed_reduction_percent": 8.98230333444532
+    },
+    {
+      "name": "rich/openapi.json",
+      "before_median_ms": 17.32121875,
+      "before_median_cpu_ms": 0.6632499999996071,
+      "after_median_ms": 14.8174375,
+      "after_median_cpu_ms": 0.54424999999992,
+      "cpu_reduction_percent": 17.941952506559765,
+      "elapsed_reduction_percent": 14.4549946867913
+    },
+    {
+      "name": "rich/settings.json",
+      "before_median_ms": 104.66729199999999,
+      "before_median_cpu_ms": 86.42599999999948,
+      "after_median_ms": 16.167825,
+      "after_median_cpu_ms": 1.6588000000003376,
+      "cpu_reduction_percent": 98.08067016869883,
+      "elapsed_reduction_percent": 84.55312572718515
+    },
+    {
+      "name": "rich/settings.toml",
+      "before_median_ms": 15.833625,
+      "before_median_cpu_ms": 0.6262500000002547,
+      "after_median_ms": 14.900858199999998,
+      "after_median_cpu_ms": 0.5601999999998952,
+      "cpu_reduction_percent": 10.546906187677852,
+      "elapsed_reduction_percent": 5.891050217495996
+    },
+    {
+      "name": "rich/settings.yaml",
+      "before_median_ms": 16.45416675,
+      "before_median_cpu_ms": 0.6622500000003129,
+      "after_median_ms": 14.7852168,
+      "after_median_cpu_ms": 0.5583999999995285,
+      "cpu_reduction_percent": 15.68138920358404,
+      "elapsed_reduction_percent": 10.143023195021394
+    },
+    {
+      "name": "rich/table.csv",
+      "before_median_ms": 17.772333250000003,
+      "before_median_cpu_ms": 2.462000000000444,
+      "after_median_ms": 16.393375000000002,
+      "after_median_cpu_ms": 2.269000000000233,
+      "cpu_reduction_percent": 7.839155158414957,
+      "elapsed_reduction_percent": 7.75901639139025
+    },
+    {
+      "name": "search/code-history",
+      "before_median_ms": 17.144354,
+      "before_median_cpu_ms": 0.31274999999993724,
+      "after_median_ms": 17.578854,
+      "after_median_cpu_ms": 0.3306666666667297,
+      "cpu_reduction_percent": -5.728750333108268,
+      "elapsed_reduction_percent": -2.534362041287763
+    },
+    {
+      "name": "search/history-message",
+      "before_median_ms": 38.8571875,
+      "before_median_cpu_ms": 1.4120000000000346,
+      "after_median_ms": 37.5039375,
+      "after_median_cpu_ms": 1.4589999999998327,
+      "cpu_reduction_percent": -3.3286118980026203,
+      "elapsed_reduction_percent": 3.4826246752933443
+    },
+    {
+      "name": "search/history-operators",
+      "before_median_ms": 8.8313855,
+      "before_median_cpu_ms": 0.2838750000000232,
+      "after_median_ms": 8.513476142857142,
+      "after_median_cpu_ms": 0.2687142857142654,
+      "cpu_reduction_percent": 5.340630307620087,
+      "elapsed_reduction_percent": 3.5997676371715137
+    },
+    {
+      "name": "settings/serialize",
+      "before_median_ms": 0.006257143143671488,
+      "before_median_cpu_ms": 0.00625683521587677,
+      "after_median_ms": 0.006361842552721652,
+      "after_median_cpu_ms": 0.0063618195870595974,
+      "cpu_reduction_percent": -1.6779149132204907,
+      "elapsed_reduction_percent": -1.673278150205948
+    },
+    {
+      "name": "startup/create-20-deferred-tabs",
+      "before_median_ms": 0.027362003036876355,
+      "before_median_cpu_ms": 0.027346288209606807,
+      "after_median_ms": 0.029519345089285717,
+      "after_median_cpu_ms": 0.02951785714285669,
+      "cpu_reduction_percent": -7.941000682085275,
+      "elapsed_reduction_percent": -7.884444897918708
+    },
+    {
+      "name": "terminal/paint-build-output-frame",
+      "before_median_ms": 0.03988133640552995,
+      "before_median_cpu_ms": 0.039858459512836245,
+      "after_median_ms": 0.04060030549898167,
+      "after_median_cpu_ms": 0.040598778004073105,
+      "cpu_reduction_percent": -1.8573685493250114,
+      "elapsed_reduction_percent": -1.8027708152528854
+    },
+    {
+      "name": "terminal/parse-build-output",
+      "before_median_ms": 2.661265181818182,
+      "before_median_cpu_ms": 2.6594090909089902,
+      "after_median_ms": 2.66709375,
+      "after_median_cpu_ms": 2.666333333333417,
+      "cpu_reduction_percent": -0.2603677052957831,
+      "elapsed_reduction_percent": -0.21901493401104144
+    },
+    {
+      "name": "text/cap-50000-source-lines",
+      "before_median_ms": 1.31924918,
+      "before_median_cpu_ms": 1.3188999999999942,
+      "after_median_ms": 0.7485173246753246,
+      "after_median_cpu_ms": 0.7484025974025554,
+      "cpu_reduction_percent": 43.25554648551378,
+      "elapsed_reduction_percent": 43.26186924934646
+    },
+    {
+      "name": "text/myers-rewrite",
+      "before_median_ms": 3.565919,
+      "before_median_cpu_ms": 3.5647777777776355,
+      "after_median_ms": 3.460990176470588,
+      "after_median_cpu_ms": 3.4604705882351587,
+      "cpu_reduction_percent": 2.9260502630125917,
+      "elapsed_reduction_percent": 2.942546466406326
+    },
+    {
+      "name": "text/myers-sparse",
+      "before_median_ms": 0.010549970191226096,
+      "before_median_cpu_ms": 0.010549118860142526,
+      "after_median_ms": 0.010526004987070557,
+      "after_median_cpu_ms": 0.010524381233838752,
+      "cpu_reduction_percent": 0.2344994556582436,
+      "elapsed_reduction_percent": 0.2271589750601377
+    },
+    {
+      "name": "transport/clone-remove-local-cycle",
+      "before_median_ms": 277.534167,
+      "before_median_cpu_ms": 55.95000000000073,
+      "after_median_ms": 280.78775,
+      "after_median_cpu_ms": 56.31700000000001,
+      "cpu_reduction_percent": -0.655942806075549,
+      "elapsed_reduction_percent": -1.1723180014805212
+    },
+    {
+      "name": "transport/fetch-up-to-date-local",
+      "before_median_ms": 26.895388999999998,
+      "before_median_cpu_ms": 0.3113333333333988,
+      "after_median_ms": 24.662305333333332,
+      "after_median_cpu_ms": 0.2673333333333782,
+      "cpu_reduction_percent": 14.132762312637471,
+      "elapsed_reduction_percent": 8.302849483480855
+    },
+    {
+      "name": "transport/push-up-to-date-local",
+      "before_median_ms": 15.81920825,
+      "before_median_cpu_ms": 0.3205000000000382,
+      "after_median_ms": 14.1625,
+      "after_median_cpu_ms": 0.25679999999993014,
+      "cpu_reduction_percent": 19.875195007831657,
+      "elapsed_reduction_percent": 10.472763388774542
+    },
+    {
+      "name": "ui/blame-frame",
+      "before_median_ms": 0.09024091277258567,
+      "before_median_cpu_ms": 0.09018380062305459,
+      "after_median_ms": 0.08799239009287926,
+      "after_median_cpu_ms": 0.08796284829721443,
+      "cpu_reduction_percent": 2.462695418130778,
+      "elapsed_reduction_percent": 2.491688759147259
+    },
+    {
+      "name": "ui/diff-split-frame",
+      "before_median_ms": 0.11998627613412229,
+      "before_median_cpu_ms": 0.1199072978303705,
+      "after_median_ms": 0.1061,
+      "after_median_cpu_ms": 0.10604601769911695,
+      "cpu_reduction_percent": 11.559997082798679,
+      "elapsed_reduction_percent": 11.573220356134751
+    },
+    {
+      "name": "ui/diff-split-scroll-frame",
+      "before_median_ms": 0.6109835858585858,
+      "before_median_cpu_ms": 0.6107373737373711,
+      "after_median_ms": 0.5743758155339805,
+      "after_median_cpu_ms": 0.5743300970873693,
+      "cpu_reduction_percent": 5.961200053504124,
+      "elapsed_reduction_percent": 5.991612732633744
+    },
+    {
+      "name": "ui/diff-unified-frame",
+      "before_median_ms": 0.09726649443561208,
+      "before_median_cpu_ms": 0.09724165341812539,
+      "after_median_ms": 0.08805860837070253,
+      "after_median_cpu_ms": 0.08801345291480003,
+      "cpu_reduction_percent": 9.489966674718497,
+      "elapsed_reduction_percent": 9.466657679335743
+    },
+    {
+      "name": "ui/diff-unified-scroll-frame",
+      "before_median_ms": 0.6002141775700935,
+      "before_median_cpu_ms": 0.5998878504672737,
+      "after_median_ms": 0.5743352685185186,
+      "after_median_cpu_ms": 0.5742500000000021,
+      "cpu_reduction_percent": 4.273773914124335,
+      "elapsed_reduction_percent": 4.3116124241421865
+    },
+    {
+      "name": "ui/file-history-frame",
+      "before_median_ms": 0.068793509895227,
+      "before_median_cpu_ms": 0.06877182770663647,
+      "after_median_ms": 0.06755888683886838,
+      "after_median_cpu_ms": 0.06752767527675008,
+      "cpu_reduction_percent": 1.809101882814046,
+      "elapsed_reduction_percent": 1.794679553694778
+    },
+    {
+      "name": "ui/graph-scroll-frame",
+      "before_median_ms": 0.17619920749279538,
+      "before_median_cpu_ms": 0.1761498559077804,
+      "after_median_ms": 0.17208249132947978,
+      "after_median_cpu_ms": 0.17208381502890222,
+      "cpu_reduction_percent": 2.308285100730867,
+      "elapsed_reduction_percent": 2.336398796506467
+    },
+    {
+      "name": "ui/graph-warm-frame",
+      "before_median_ms": 0.12934006896551725,
+      "before_median_cpu_ms": 0.12930172413793123,
+      "after_median_ms": 0.12724846420824296,
+      "after_median_cpu_ms": 0.12725379609544515,
+      "cpu_reduction_percent": 1.5838366086298072,
+      "elapsed_reduction_percent": 1.617135953307658
+    },
+    {
+      "name": "ui/palette-items",
+      "before_median_ms": 0.012731996552516662,
+      "before_median_cpu_ms": 0.0127308664674787,
+      "after_median_ms": 0.012458476125199909,
+      "after_median_cpu_ms": 0.012456477039068048,
+      "cpu_reduction_percent": 2.1553083532184325,
+      "elapsed_reduction_percent": 2.1482917167668147
+    },
+    {
+      "name": "ui/sidebar-frame",
+      "before_median_ms": 0.027246563767462824,
+      "before_median_cpu_ms": 0.027238846327174087,
+      "after_median_ms": 0.026620521892967715,
+      "after_median_cpu_ms": 0.026619195046440298,
+      "cpu_reduction_percent": 2.274880783462596,
+      "elapsed_reduction_percent": 2.2976911137789546
+    },
+    {
+      "name": "ui/whole-file-frame",
+      "before_median_ms": 0.051402640329218104,
+      "before_median_cpu_ms": 0.051372839506174064,
+      "after_median_ms": 0.050469586578293285,
+      "after_median_cpu_ms": 0.05046230323115116,
+      "cpu_reduction_percent": 1.7724079178326746,
+      "elapsed_reduction_percent": 1.8151864280684715
+    }
+  ],
+  "platform": "macOS 27.2 arm64, Apple M4 Max, Rust 1.95.0, Apple Git 2.54.0",
+  "note": "Medians of three serial interleaved runs per binary; CPU excludes Git children. Only 106 common workloads have before/after comparisons; 12 final document dispatch cases have no old-binary comparison.",
+  "public_baseline_revision": "08da3736e3723ecdbeb2b096d6d308c3afccdd24",
+  "public_frozen_revision": "a936407552c3aecb3c07d7a88ef6dbef9742b273",
+  "publication_note": "Captured local commit IDs predate the GitHub email-privacy rewrite; the public equivalents have identical trees."
+}

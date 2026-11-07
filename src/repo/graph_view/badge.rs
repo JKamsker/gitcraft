@@ -23,6 +23,8 @@ pub(super) enum BadgeKind {
     Branch,
     Tag,
     DetachedHead,
+    /// A PR tip fetched as an object, with no corresponding branch ref here.
+    PullRequest,
 }
 
 impl Badge {
@@ -39,6 +41,7 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),
             BadgeKind::DetachedHead => "detached HEAD".to_owned(),
+            BadgeKind::PullRequest => format!("pull request branch {}", self.label),
             BadgeKind::Branch if self.head => format!("branch {}, checked out", self.label),
             BadgeKind::Branch if !self.local => format!("remote branch {}", self.git_ref()),
             BadgeKind::Branch => format!("branch {}", self.label),
@@ -50,6 +53,7 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => vec![format!("refs/tags/{}", self.label)],
             BadgeKind::DetachedHead => vec!["HEAD".to_owned()],
+            BadgeKind::PullRequest => Vec::new(),
             BadgeKind::Branch => {
                 let mut refs: Vec<String> = self
                     .remotes
@@ -68,6 +72,10 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),
             BadgeKind::DetachedHead => "HEAD (detached)".to_owned(),
+            BadgeKind::PullRequest => format!(
+                "{} — pull request branch (not fetched as a branch)",
+                self.label
+            ),
             BadgeKind::Branch => {
                 let mut places = Vec::new();
                 if self.local {
@@ -96,6 +104,8 @@ pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
 /// Reuse the repository-wide lookup tables across all decorated commits in a rebuild.
 pub(super) struct BadgeIndex<'a> {
     local: HashSet<&'a str>,
+    heads: HashSet<&'a str>,
+    current: Option<&'a str>,
     names: Vec<&'a str>,
     remote_branches: HashMap<&'a str, &'a str>,
 }
@@ -112,7 +122,15 @@ impl<'a> BadgeIndex<'a> {
                     .or_insert(remote.as_str());
             }
         }
+        let heads = refs
+            .local
+            .iter()
+            .filter(|b| b.is_head)
+            .map(|b| b.name.as_str())
+            .collect();
         Self {
+            heads,
+            current: refs.current.as_deref(),
             local,
             names,
             remote_branches,
@@ -121,6 +139,8 @@ impl<'a> BadgeIndex<'a> {
 
     pub(super) fn badges(&self, decorations: &[String]) -> Vec<Badge> {
         let Self {
+            heads,
+            current,
             local,
             names,
             remote_branches,
@@ -218,13 +238,41 @@ impl<'a> BadgeIndex<'a> {
                 }
             }
         }
-        // Checked out first, then local branches, remote-only ones, tags.
-        out.sort_by_key(|b| match b.kind {
-            _ if b.head => 0,
-            BadgeKind::Branch if b.local => 1,
-            BadgeKind::Branch => 2,
-            BadgeKind::Tag => 3,
-            BadgeKind::DetachedHead => 4,
+        for badge in &mut out {
+            // A log's decorations needn't include HEAD (for example a filtered graph). The refs
+            // read alongside it still identify the checked-out local branch.
+            if badge.kind == BadgeKind::Branch && badge.local {
+                badge.head = match *current {
+                    Some(current) => current == badge.label,
+                    None => badge.head || heads.contains(badge.label.as_str()),
+                };
+            }
+            badge.remotes.sort();
+            badge.remotes.dedup();
+        }
+        // These pills all point at the same commit, so their commit distance to the default
+        // branch ties. Show the checked-out branch first, then the usual default/integration
+        // branches, before other local branches, remote-only branches and tags. Name ties are
+        // explicit: git's decoration order mustn't decide which branch hides under +N.
+        out.sort_by(|a, b| {
+            let rank = |badge: &Badge| match badge.kind {
+                _ if badge.head => 0,
+                BadgeKind::Branch => match badge.label.as_str() {
+                    "main" => 1,
+                    "master" => 2,
+                    "dev" => 3,
+                    "develop" => 4,
+                    _ if badge.local => 5,
+                    _ => 6,
+                },
+                BadgeKind::Tag => 7,
+                BadgeKind::DetachedHead => 8,
+                BadgeKind::PullRequest => 9,
+            };
+            rank(a)
+                .cmp(&rank(b))
+                .then_with(|| a.label.cmp(&b.label))
+                .then_with(|| a.remotes.cmp(&b.remotes))
         });
         out
     }
@@ -358,6 +406,63 @@ mod tests {
     }
 
     #[test]
+    fn checked_out_branch_wins_even_without_a_head_decoration() {
+        let refs = Refs {
+            current: Some("topic".to_owned()),
+            local: vec![branch("main"), branch("topic")],
+            ..refs_with_origin()
+        };
+        let b = badges(&["main", "origin/main", "topic"].map(String::from), &refs);
+        assert_eq!(b[0].label, "topic");
+        assert!(b[0].head);
+        assert_eq!(b[1].label, "main");
+        // Live checkout metadata also takes precedence over decorations read earlier.
+        let b = badges(&["HEAD -> main", "topic"].map(String::from), &refs);
+        assert_eq!(b[0].label, "topic");
+        assert!(!b[1].head);
+    }
+
+    #[test]
+    fn default_branch_names_win_over_other_branches_at_the_same_commit() {
+        for (names, first) in [
+            (vec!["topic", "dev", "master", "main"], "main"),
+            (vec!["topic", "dev", "master"], "master"),
+            (vec!["topic", "dev", "develop"], "dev"),
+            (vec!["topic", "develop"], "develop"),
+        ] {
+            let decos: Vec<String> = names.into_iter().map(str::to_owned).collect();
+            assert_eq!(badges(&decos, &refs_with_origin())[0].label, first);
+        }
+        // A default branch on the remote still represents this commit ahead of a local
+        // feature branch; it needn't have been checked out locally.
+        let decos = ["topic", "origin/dev"].map(String::from);
+        let b = badges(&decos, &refs_with_origin());
+        assert_eq!(b[0].label, "dev");
+        assert!(!b[0].local);
+    }
+
+    #[test]
+    fn branch_ties_are_independent_of_git_decoration_order() {
+        let refs = Refs {
+            remotes: vec![("z".to_owned(), vec![]), ("a".to_owned(), vec![])],
+            ..Refs::default()
+        };
+        let names = ["beta", "a/topic", "alpha", "z/topic", "tag: release"];
+        let forward = badges(&names.map(String::from), &refs);
+        let backward = badges(
+            &names
+                .into_iter()
+                .rev()
+                .map(String::from)
+                .collect::<Vec<_>>(),
+            &refs,
+        );
+        let describe =
+            |badges: Vec<Badge>| badges.into_iter().map(|b| b.describe()).collect::<Vec<_>>();
+        assert_eq!(describe(forward), describe(backward));
+    }
+
+    #[test]
     fn local_branch_with_slash_is_not_remote() {
         let decos = ["feature/x".to_owned()];
         let b = badges(&decos, &refs_with_origin());
@@ -387,7 +492,9 @@ mod tests {
         assert_eq!(got.len(), 3001);
         assert_eq!(got[0].label, "team/feature-2999");
         assert!(got[0].head);
-        for (badge, name) in got[1..3000].iter().zip(&names[..2999]) {
+        let mut sorted = names[..2999].to_vec();
+        sorted.sort();
+        for (badge, name) in got[1..3000].iter().zip(&sorted) {
             assert_eq!(&badge.label, name);
             assert!(!badge.head);
         }

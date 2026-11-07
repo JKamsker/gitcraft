@@ -190,6 +190,9 @@ so your config, credentials and hooks apply as usual.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
+- The branch column can shrink to 70 px for short names such as `dev`. Long pill names keep
+  their end (`…xyz`) by default; Settings → Graph → Shortened branch names can keep the start
+  (`xyz…`) instead. Pill icons give way to the name when the column is narrow.
 - Click _GRAPH_ in the header to order history topologically, by commit date (the default) or
   by author date, and to show _First parent only_: a merge without the commits it brought in,
   so main reads one merge per pull request. Kept per repository; the header names the order
@@ -468,7 +471,9 @@ so your config, credentials and hooks apply as usual.
   working tree and the staging exactly as they are. All of them are undone with Ctrl+Z.
 - Pull / merge requests of GitHub (through `gh`), GitLab (through `glab`), Forgejo and Gitea
   (through their API; Codeberg is Forgejo): list, open in the browser, check out, create from a
-  branch. On GitHub, Forgejo and Gitea a click opens one in the big area: description, checks,
+  branch. Click a request to focus its branch pill and show its full patch since the merge base.
+  Double-click opens its details (in the browser for GitLab). On GitHub, Forgejo and Gitea
+  the details open in the big area: description, checks,
   commits, conversation and changed files; comment, review (with comments on lines, pending until
   sent), reply, apply suggested changes, dismiss reviews and merge. Forgejo's and Gitea's API can't
   resolve conversations, so that stays on their web page. _Open in worktree_ (in a request's menu,
@@ -1281,9 +1286,9 @@ so your config, credentials and hooks apply as usual.
   date, editor command, external diff and merge tools, default shell and terminal font size, saved identities, custom commands,
   SSH sign-ins, agents, the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
-- Tabs in the title bar (Windows, Settings → Appearance): the tab strip takes the place of the
-  system's title bar, as in a browser. Drag the space next to the tabs to move the window (it
-  snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
+- Tabs in the title bar (Windows and macOS, Settings → Appearance): the tab strip takes the
+  place of the system's title bar, as in a browser. Drag the space next to the tabs to move the
+  window (it snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
   close sit at the end of the strip, drawn as Windows 11 draws them, and the window's edges
   resize it.
 - The settings, command palette, theme and manual buttons sit in the title bar, or in the footer
@@ -1433,6 +1438,14 @@ cargo run --release -- path/to/repo   # open a repository directly
 cargo test
 ```
 
+The default syntax highlighter compiles bundled Oniguruma with the platform's C compiler.
+`cargo run --release --no-default-features` selects the pure-Rust regex backend instead.
+For reproducible CPU benchmarks, stack profiles and source-line coverage, see
+[CPU performance](docs/cpu-performance.md) and the [workflow suite](docs/cpu-workflows.md).
+
+For subprocess limits, lifecycle handling and before/after stress measurements, see
+[Process orchestration](docs/process-orchestration.md).
+
 Linux needs the usual eframe system packages (e.g. `libxkbcommon-dev`, `libgtk-3-dev` for the
 file dialogs, `libdbus-1-dev` for notifications). Pull requests need the GitHub CLI (`gh`) or
 GitLab CLI (`glab`), logged in.
@@ -1559,7 +1572,7 @@ was made this way, on a demo repository.
 | `src/agent/handoff.rs` | hand-off: the messages typed into an agent's terminal (notes, conflicts, CI logs, threads), the notes tray |
 | `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
 | `src/repo/bakeoff/` | the bake-off page and its attempt picker |
-| `src/app/title_bar.rs`   | Windows: the tab strip as the title bar (moving, caption buttons, resizing)       |
+| `src/app/title_bar.rs`   | Windows and macOS: the tab strip as the title bar (moving, caption buttons, resizing) |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
 | `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |

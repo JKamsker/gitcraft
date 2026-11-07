@@ -172,8 +172,10 @@ impl RepoTab {
                 }
                 history.timelines = Read::Reading;
                 let file = path.clone();
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    Err,
                     move || git::timelines(&repo, &file, state),
                     move |tab, read, _| {
                         if let Some(h) = tab.history_for(generation, &path) {
@@ -200,8 +202,10 @@ impl RepoTab {
                     result: Read::Reading,
                 });
                 let (file, repaint, mine) = (path.clone(), ctx.clone(), Arc::clone(&cancel));
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    |error| Err(Stop::Failed(error)),
                     move || find(&repo, &file, &timelines, (&cancel, &merges), &repaint),
                     move |tab, found, _| {
                         // Only for this search: not one cancelled since, nor one started after.
@@ -236,8 +240,10 @@ impl RepoTab {
                 }
                 history.testing.push((i, j));
                 let file = path.clone();
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    Err,
                     move || git::merge_conflicts(&repo, (&a, &b), base.as_deref(), &file),
                     move |tab, conflicts, _| {
                         let Some(h) = tab.history_for(generation, &path) else {
@@ -261,8 +267,10 @@ impl RepoTab {
                 }
                 history.change = Some((hash.clone(), short, Read::Reading));
                 let (file, shown) = (path.clone(), hash.clone());
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    Err,
                     move || git::change(&repo, &shown, &file),
                     move |tab, read, _| {
                         if let Some(change) = tab

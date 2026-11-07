@@ -6,6 +6,7 @@
 //! lines that pass through a row are always vertical.
 
 use std::borrow::Borrow;
+use std::sync::Arc;
 
 use crate::git::Commit;
 
@@ -16,11 +17,11 @@ pub struct Row {
     /// Identity of this continuous lane run, distinct when a column is reused.
     pub origin: usize,
     /// Lanes drawn straight through the row, top to bottom.
-    pub through: Vec<usize>,
+    pub through: Arc<[usize]>,
     /// Lanes that come from the top edge into the dot (children of this commit).
-    pub incoming: Vec<usize>,
+    pub incoming: Box<[usize]>,
     /// Lanes that leave the dot towards the bottom edge (parents of this commit).
-    pub outgoing: Vec<usize>,
+    pub outgoing: Box<[usize]>,
 }
 
 #[derive(Default)]
@@ -41,7 +42,7 @@ pub fn layout<C: Borrow<Commit>>(commits: &[C]) -> Graph {
 pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Graph {
     let followed = if first_parent { 1 } else { usize::MAX };
     let mut lanes: Vec<Option<&str>> = Vec::new();
-    let mut rows = Vec::with_capacity(commits.len());
+    let mut rows: Vec<Row> = Vec::with_capacity(commits.len());
     let mut origins = Vec::new();
     let mut next_origin = 0;
     let mut width = 0;
@@ -62,9 +63,15 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
             next_origin += 1;
         }
         let origin = origins[col];
-        let through: Vec<usize> = (0..lanes.len())
-            .filter(|&i| lanes[i].is_some() && lanes[i] != Some(hash))
-            .collect();
+        let through = (0..lanes.len()).filter(|&i| lanes[i].is_some() && lanes[i] != Some(hash));
+        // Along a branch, the other lanes usually pass through many consecutive rows
+        // unchanged. Share that immutable list instead of allocating a copy for each row.
+        let through = match rows.last() {
+            Some(previous) if previous.through.iter().copied().eq(through.clone()) => {
+                Arc::clone(&previous.through)
+            }
+            _ => through.collect(),
+        };
         for &i in &incoming {
             lanes[i] = None;
         }
@@ -97,8 +104,8 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
             col,
             origin,
             through,
-            incoming,
-            outgoing,
+            incoming: incoming.into_boxed_slice(),
+            outgoing: outgoing.into_boxed_slice(),
         });
     }
 
@@ -148,13 +155,13 @@ mod tests {
             c("a", &[]),
         ]);
         assert_eq!(g.width, 2);
-        assert_eq!(g.rows[0].outgoing, vec![0, 1]);
+        assert_eq!(&*g.rows[0].outgoing, &[0, 1]);
         assert_eq!(g.rows[1].col, 1);
-        assert_eq!(g.rows[1].through, vec![0]);
+        assert_eq!(&*g.rows[1].through, &[0]);
         assert_eq!(g.rows[2].col, 0);
-        assert_eq!(g.rows[2].outgoing, vec![0]);
+        assert_eq!(&*g.rows[2].outgoing, &[0]);
         // Both lanes wait for `a` and meet at its dot, in the leftmost lane.
-        assert_eq!(g.rows[3].incoming, vec![0, 1]);
+        assert_eq!(&*g.rows[3].incoming, &[0, 1]);
         assert_eq!(g.rows[3].col, 0);
     }
 
@@ -166,7 +173,7 @@ mod tests {
         let g = layout_with(&commits, true);
         assert_eq!(g.width, 1);
         assert!(g.rows.iter().all(|r| r.col == 0 && r.through.is_empty()));
-        assert_eq!(g.rows[0].outgoing, vec![0]);
+        assert_eq!(&*g.rows[0].outgoing, &[0]);
         assert!(g.rows[2].outgoing.is_empty());
         // Laid out with every parent, the same rows would leave lanes waiting for good.
         assert!(layout(&commits).width > 1);
@@ -186,5 +193,26 @@ mod tests {
         assert_ne!(g.rows[1].origin, g.rows[0].origin);
         assert_eq!(g.rows[4].col, g.rows[0].col);
         assert_ne!(g.rows[4].origin, g.rows[0].origin);
+    }
+
+    #[test]
+    fn a_branch_shares_unchanged_bypass_lanes() {
+        let g = layout(&[
+            c("merge", &["c", "side"]),
+            c("c", &["b"]),
+            c("b", &["a"]),
+            c("a", &["root"]),
+            c("side", &["root"]),
+            c("root", &[]),
+        ]);
+        for i in 1..=3 {
+            assert_eq!(g.rows[i].col, 0);
+            assert_eq!(&*g.rows[i].through, &[1]);
+            assert!(Arc::ptr_eq(&g.rows[1].through, &g.rows[i].through));
+        }
+        assert_eq!(&*g.rows[4].through, &[0]);
+        assert!(!Arc::ptr_eq(&g.rows[3].through, &g.rows[4].through));
+        assert!(g.rows[5].through.is_empty());
+        assert_eq!(&*g.rows[5].incoming, &[0, 1]);
     }
 }

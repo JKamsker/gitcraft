@@ -8,6 +8,11 @@ mod sniff;
 mod view;
 mod zip;
 
+#[cfg(test)]
+pub(in crate::repo) use extract::tests::{make_docx, make_pdf};
+#[cfg(test)]
+pub(in crate::repo) use zip::tests::make_zip;
+
 use std::path::Path;
 
 pub(super) use view::{binary_view, textconv_note};

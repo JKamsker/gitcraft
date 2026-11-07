@@ -39,84 +39,113 @@ jobs:
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
 
+
   test:
-    name: ${{ matrix.name }}
+    name: test (ubuntu-latest)
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        # macOS is off for now: hosted macOS runners are often not assigned at all, which leaves
-        # pull requests red over a job that never ran. The release workflow's macOS build is off
-        # for the same reason for now.
-        include:
-          - os: ubuntu-latest
-            name: test (ubuntu-latest)
-            shard: all
-          - os: windows-latest
-            name: Windows tests (git)
-            shard: git
-          - os: windows-latest
-            name: Windows tests (repo A-M)
-            shard: repo-a-m
-          - os: windows-latest
-            name: Windows tests (repo rest)
-            shard: repo-rest
-          - os: windows-latest
-            name: Windows tests (core)
-            shard: core
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          # Keep the expensive native build even when a platform test fails.
           cache-on-failure: true
       - name: Linux build dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
             libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
       - name: Build tests
         run: cargo test --locked --no-run
-      - name: Reflog recovery (Windows, isolated)
-        if: matrix.shard == 'repo-rest'
-        timeout-minutes: 5
-        env:
-          RUST_BACKTRACE: "1"
-        run: cargo test --locked -p gitcraft --lib repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch -- --exact --nocapture
-      - name: Parallel bisect (Windows, isolated)
-        if: matrix.shard == 'core'
-        timeout-minutes: 10
-        env:
-          RUST_BACKTRACE: "1"
-        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism -- --exact --nocapture
       - name: Test
-        if: matrix.shard == 'all'
         timeout-minutes: 30
         env:
           RUST_BACKTRACE: "1"
-        run: cargo test --locked -- --nocapture
-      - name: Test shard (with coverage verification)
-        if: matrix.shard != 'all'
+        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped
+      # This test counts `sleep 6789` processes globally on Linux. Running it in
+      # parallel with other subprocess-heavy tests can produce a false failure.
+      - name: Timed-out subprocess cleanup (isolated)
+        timeout-minutes: 5
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
+
+  windows-build:
+    name: Windows test build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Reuse the previous test matrix's Windows dependency cache.
+          shared-key: test
+          cache-on-failure: true
+      - name: Build test binaries
+        run: python ci/windows-test-build.py
+      - name: Verify complete and disjoint Windows test shards
+        run: python ci/test-shards.py --check-only
+      - name: Windows doctests (not included in compiled test executables)
+        run: cargo test --locked --doc
+      - name: Upload Windows test binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-binaries
+          path: |
+            target/debug/deps/*.exe
+            target/debug/deps/*.dll
+            target/debug/*.exe
+            target/debug/*.dll
+            ci/test-binaries.json
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 1
+
+  windows-tests:
+    name: Windows tests (${{ matrix.shard }})
+    needs: windows-build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - git-a-m
+          - git-rest
+          - repo-a-c
+          - repo-d-f
+          - repo-g-m
+          - repo-n-p
+          - repo-q-r
+          - repo-s
+          - repo-rest
+          - core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-test-binaries
+      - name: Run precompiled test shard
         timeout-minutes: 20
         env:
           RUST_BACKTRACE: "1"
         run: python ci/test-shards.py ${{ matrix.shard }}
 
   windows-test-result:
-    # Preserve the existing check name for branch protection while the work runs
-    # in parallel. A failed or skipped matrix job cannot produce a green result.
+    # Preserve the required branch protection check while running Windows tests in parallel.
     name: test (windows-latest)
-    needs: test
+    needs: [windows-build, windows-tests]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require every test job to pass
+      - name: Require the Windows build and every shard to pass
         env:
-          TEST_RESULT: ${{ needs.test.result }}
-        run: test "$TEST_RESULT" = success
+          BUILD_RESULT: ${{ needs.windows-build.result }}
+          TESTS_RESULT: ${{ needs.windows-tests.result }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$TESTS_RESULT" = success
 
   forges:
     name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})

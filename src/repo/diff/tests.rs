@@ -586,6 +586,34 @@ fn changed_part_gets_its_own_section() {
     assert_eq!(job.sections[1].format.background, Color32::GREEN);
 }
 
+#[test]
+fn changed_unicode_crosses_colour_spans_without_splitting_utf8() {
+    let spans = [(Color32::RED, "aé😀"), (Color32::BLUE, "日本z")];
+    let font = theme::mono(12.0);
+    for (range, expected) in [
+        (Some((1, 4)), "é😀日"),
+        (Some((0, 99)), "aé😀日本z"),
+        (Some((2, 2)), ""),
+        (Some((90, 99)), ""),
+        (None, ""),
+    ] {
+        let job = line_job(&spans, range, &font, Color32::GREEN);
+        assert_eq!(job.text, "aé😀日本z");
+        let marked: String = job
+            .sections
+            .iter()
+            .filter(|s| s.format.background == Color32::GREEN)
+            .map(|s| &job.text[s.byte_range.start.0..s.byte_range.end.0])
+            .collect();
+        assert_eq!(marked, expected);
+    }
+    assert!(
+        line_job(&[(Color32::RED, "")], None, &font, Color32::GREEN)
+            .sections
+            .is_empty()
+    );
+}
+
 /// Unstaging `[ab].txt` leaves `a.txt` staged: write commands take file names literally.
 #[test]
 fn unstaging_a_file_does_not_treat_its_name_as_a_pattern() {

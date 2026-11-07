@@ -85,24 +85,39 @@ pub fn count_changes(repo: &Path, list: &mut [Worktree]) {
         remote_changes(&target, list);
         return;
     }
-    // One `status` per worktree, side by side. `--no-optional-locks` so that looking doesn't take
-    // the index lock from under whatever runs in that worktree.
-    std::thread::scope(|scope| {
-        for wt in list.iter_mut().filter(|w| w.needs_count()) {
-            scope.spawn(|| {
-                let args = [
-                    "--no-optional-locks",
-                    "status",
-                    "--porcelain=v1",
-                    "-z",
-                    "--untracked-files=all",
-                ];
-                wt.changes = run(Some(&wt.path), &args)
-                    .ok()
-                    .map(|out| parse_status(&out).changed_files());
-            });
+    // Submit small batches to the event loop, with no scoped waiter threads. A reload
+    // can list arbitrarily many worktrees without allocating one thread per status call.
+    let args = [
+        "--no-optional-locks",
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+    ];
+    for batch in list.chunks_mut(8) {
+        let pending: Vec<_> = batch
+            .iter_mut()
+            .filter(|w| w.needs_count())
+            .map(|wt| {
+                let command = super::command::local_command(
+                    Some(&wt.path),
+                    &super::command::Extra::default(),
+                    &args,
+                );
+                let ticket =
+                    crate::processes::service().and_then(|s| s.submit(command, Default::default()));
+                (wt, ticket)
+            })
+            .collect();
+        for (wt, ticket) in pending {
+            wt.changes = ticket
+                .ok()
+                .and_then(|t| t.wait().ok())
+                .and_then(|out| out.complete().ok())
+                .filter(|out| out.status.success())
+                .map(|out| parse_status(&String::from_utf8_lossy(&out.stdout)).changed_files());
         }
-    });
+    }
 }
 
 /// For a repository on another machine, the changes of every worktree counted there in one

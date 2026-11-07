@@ -34,7 +34,7 @@ impl PillHit {
         let target = match badge.kind {
             BadgeKind::Branch => branch.clone().map(DropTarget::Branch),
             BadgeKind::DetachedHead => Some(DropTarget::DetachedHead),
-            BadgeKind::Tag => None,
+            BadgeKind::Tag | BadgeKind::PullRequest => None,
         };
         Self {
             rect,

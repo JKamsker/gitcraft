@@ -42,13 +42,19 @@ pub(super) fn text(
     p.text(pos, align, s, font, color)
 }
 
-/// A branch or tag pill as the graph draws it: the lane's colour, darker unless checked out.
-/// Returns its rect.
+/// A branch or tag name and the end to keep when the pill is too narrow to show it whole.
+pub(super) struct PillLabel<'a> {
+    pub text: &'a str,
+    pub keep_end: bool,
+}
+
+/// Paints a branch or tag pill in its lane's colour, darker unless checked out, and returns
+/// its rect.
 pub(super) fn pill(
     p: &Painter,
     t: &Tokens,
     left_center: Pos2,
-    label: &str,
+    label: PillLabel<'_>,
     color: Color32,
     head: bool,
     max_w: f32,
@@ -64,7 +70,12 @@ pub(super) fn pill(
     } else {
         theme::medium(11.0)
     };
-    let label = fit(p, label, &font, (max_w - 16.0).max(12.0));
+    let label = crate::settings::fit_branch_name(label.text, label.keep_end, |text| {
+        p.layout_no_wrap(text.to_owned(), font.clone(), Color32::WHITE)
+            .size()
+            .x
+            <= (max_w - 16.0).max(12.0)
+    });
     let galley = p.layout_no_wrap(label, font, Color32::WHITE);
     let w = (galley.size().x + 16.0).min(max_w.max(28.0));
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 10.0), vec2(w, 20.0));

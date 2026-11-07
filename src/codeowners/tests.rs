@@ -114,6 +114,22 @@ fn gitlab_exclusions_win_wherever_they_are_and_sections_of_a_name_are_one() {
 }
 
 #[test]
+fn approval_sections_keep_defaults_and_their_review_summary() {
+    let file = CodeOwners::parse(
+        "CODEOWNERS",
+        Flavor::GitLab,
+        "[Security][2] @acme/security\n*.rs\n[Docs]\ndocs/ @writer\n",
+        false,
+    );
+    assert_eq!(file.section_labels(), ["Security (2 approvals)", "Docs"]);
+    assert_eq!(file.rule_count(), 2);
+    assert_eq!(file.owners("lib.rs"), ["@acme/security"]);
+    let reviewers = reviewers_for(&file, ["lib.rs", "docs/guide.md"]);
+    let labels: Vec<_> = reviewers.iter().map(Reviewer::label).collect();
+    assert_eq!(labels, ["@acme/security", "@writer"]);
+}
+
+#[test]
 fn gitlab_reads_owners_after_a_hash_and_says_so() {
     let file = CodeOwners::parse("CODEOWNERS", Flavor::GitLab, "*.rb @a # ask @b\n", false);
     assert_eq!(file.owners("x.rb"), ["@a", "@b"]);

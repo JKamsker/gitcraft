@@ -2,6 +2,7 @@
 
 mod agents;
 mod ai_page;
+mod branch_names;
 mod custom_commands;
 mod diffs;
 mod external_tools;
@@ -20,6 +21,7 @@ use egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
+pub(crate) use branch_names::fit as fit_branch_name;
 use file_menus::file_menu_rows;
 use layout::{Card, Filter, section};
 pub(crate) use page::show as show_page;
@@ -49,6 +51,8 @@ pub struct Settings {
     pub refs_width: f32,
     /// Fit Branch / Tag to visible pills; dragging its border switches to a fixed width.
     pub auto_refs_width: bool,
+    /// Shortened branch and tag pills keep their end rather than their beginning.
+    pub branch_names_keep_end: bool,
     /// Width of the graph column; 0 = fit the lanes of the repository.
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
@@ -76,7 +80,7 @@ pub struct Settings {
     pub show_detail: bool,
     /// A worktree opens in the tab it was opened from, which then shows its branch.
     pub worktrees_in_same_tab: bool,
-    /// Windows: the tab strip stands in for the system's title bar.
+    /// Windows and macOS: the tab strip stands in for the system's title bar.
     pub tabs_in_title_bar: bool,
     /// Where the settings, command palette, theme and manual buttons sit, and in what order.
     pub button_layout: crate::app_buttons::ButtonLayout,
@@ -175,6 +179,7 @@ impl Default for Settings {
             shell: String::new(),
             refs_width: DEFAULT_REFS_WIDTH,
             auto_refs_width: true,
+            branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
             author_width: 150.0,
@@ -249,6 +254,14 @@ impl Settings {
     /// Older settings with a custom ref width keep that explicit preference.
     pub(crate) fn fit_visible_refs(&self) -> bool {
         self.auto_refs_width && self.refs_width == DEFAULT_REFS_WIDTH
+    }
+
+    /// Read just the pill shortening preference without cloning the settings for every pill.
+    pub(crate) fn branch_names_keep_end(ctx: &egui::Context) -> bool {
+        ctx.data_mut(|d| {
+            d.get_temp_mut_or_default::<Settings>(id())
+                .branch_names_keep_end
+        })
     }
 
     /// Gives the graph's columns their first widths back; which of them show stays.
@@ -600,10 +613,10 @@ impl Settings {
                             }
                         }
                     });
-                    if cfg!(windows) {
+                    if cfg!(any(windows, target_os = "macos")) {
                         card.row("Title bar", "window frame caption native tabs", |ui| {
                             ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
-                                .on_hover_text("The tabs take the place of Windows' title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                                .on_hover_text("The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
                         });
                     }
                     for button in crate::app_buttons::AppButton::ALL {
@@ -702,9 +715,12 @@ impl Settings {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
                         if ui
                             .add(layout::slider(
-                                egui::Slider::new(&mut self.refs_width, 96.0..=2000.0)
-                                    .step_by(10.0)
-                                    .suffix(" px"),
+                                egui::Slider::new(
+                                    &mut self.refs_width,
+                                    crate::repo::columns::MIN_REFS_W..=2000.0,
+                                )
+                                .step_by(10.0)
+                                .suffix(" px"),
                             ))
                             .changed()
                         {
@@ -718,6 +734,26 @@ impl Settings {
                             }
                         }
                     });
+                    card.preview(Preview::GraphRefs);
+                    card.row(
+                        "Shortened branch names",
+                        "refs tags pills abbreviation ellipsis suffix prefix",
+                        |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing.x = 18.0;
+                                ui.radio_value(
+                                    &mut self.branch_names_keep_end,
+                                    true,
+                                    "Keep end (…xyz)",
+                                );
+                                ui.radio_value(
+                                    &mut self.branch_names_keep_end,
+                                    false,
+                                    "Keep start (xyz…)",
+                                );
+                            });
+                        },
+                    );
                     card.preview(Preview::GraphColumns);
                     card.row_hint(
                         "Columns",

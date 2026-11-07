@@ -1,64 +1,163 @@
 #!/usr/bin/env python3
-"""Partition Cargo's default test suite without dropping targets or doctests."""
+"""Run Cargo's precompiled Windows test binaries in complete, disjoint shards.
+
+Cargo builds all targets once in ci/windows-test-build.py. Every shard downloads
+that same artifact and uses the original libtest harness without recompiling.
+"""
 
 import argparse
 from collections import Counter
+import json
+from pathlib import Path
 import subprocess
 import sys
 
 
-# libtest filters are substrings. Each later partition excludes earlier ones,
-# so the partition also covers new tests and names in integration test targets.
-REPO_FIRST = [f"repo::{letter}" for letter in "abcdefghijklm"]
-SHARDS = {
-    "git": ["git::"],
-    "repo-a-m": [*REPO_FIRST, "--skip", "git::"],
-    "repo-rest": [
-        "repo::", "--skip", "git::",
-        *[arg for prefix in REPO_FIRST for arg in ("--skip", prefix)],
+GIT_FIRST = [f"git::{letter}" for letter in "abcdefghijklm"]
+REPO_A_C = [f"repo::{letter}" for letter in "abc"]
+REPO_D_F = [f"repo::{letter}" for letter in "def"]
+REPO_G_M = [f"repo::{letter}" for letter in "ghijklm"]
+REPO_N_P = [f"repo::{letter}" for letter in "nop"]
+REPO_Q_R = [f"repo::{letter}" for letter in "qr"]
+REPO_S = ["repo::s"]
+REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_P + REPO_Q_R + REPO_S
+
+# These tests run in their own libtest process: some race with concurrent Git
+# subprocesses, while the palette performance test has a strict 10-second budget
+# that can be exceeded when other libtest threads contend for the Windows runner.
+ISOLATED = {
+    # This rewrite test can race with concurrent Git-heavy test processes on Windows.
+    # Run it separately from the main repo-d-f libtest harness.
+    "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
+    "repo-q-r": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
+    "core": [
+        "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
     ],
-    "core": ["--skip", "git::", "--skip", "repo::"],
+}
+
+# libtest accepts multiple substring includes and --skip exclusions.
+# Catch-all shards ensure new or unusually named tests cannot silently disappear.
+SHARDS = {
+    "git-a-m": GIT_FIRST,
+    "git-rest": ["git::", *[arg for p in GIT_FIRST for arg in ("--skip", p)]],
+    "repo-a-c": [*REPO_A_C, "--skip", "git::"],
+    "repo-d-f": [*REPO_D_F, "--skip", "git::", "--skip", ISOLATED["repo-d-f"][0]],
+    "repo-g-m": [*REPO_G_M, "--skip", "git::"],
+    "repo-n-p": [*REPO_N_P, "--skip", "git::"],
+    "repo-q-r": [*REPO_Q_R, "--skip", "git::", "--skip", ISOLATED["repo-q-r"][0]],
+    "repo-s": [*REPO_S, "--skip", "git::"],
+    "repo-rest": [
+        "repo::",
+        "--skip", "git::",
+        *[arg for p in REPO_A_S for arg in ("--skip", p)],
+    ],
+    "core": [
+        "--skip", "git::",
+        "--skip", "repo::",
+        *[arg for test in ISOLATED["core"] for arg in ("--skip", test)],
+    ],
 }
 
 
-def inventory(filters):
-    result = subprocess.run(
-        ["cargo", "test", "--locked", "--", "--list", *filters],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    # Keep multiplicities: separate test binaries may use the same test name.
-    return Counter(
-        line.rsplit(": ", 1)[0]
-        for line in result.stdout.splitlines()
-        if line.endswith((": test", ": benchmark"))
-    )
+def load_binaries():
+    root = Path.cwd().resolve()
+    manifest = json.loads((root / "ci" / "test-binaries.json").read_text())
+    binaries = []
+    for entry in manifest["binaries"]:
+        path = (root / entry["path"]).resolve()
+        cwd = (root / entry["cwd"]).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            raise RuntimeError(f"Missing or unexpected test executable: {path}")
+        if not cwd.is_relative_to(root) or not cwd.is_dir():
+            raise RuntimeError(f"Missing or unexpected test working directory: {cwd}")
+        binaries.append((path, cwd))
+    if not binaries:
+        raise RuntimeError("No test binaries in the Windows build artifact")
+    return binaries
 
 
-def verify_partition():
-    full = inventory([])
+def inventory(binaries, filters):
+    tests = Counter()
+    for path, cwd in binaries:
+        result = subprocess.run(
+            [str(path), "--list", *filters],
+            cwd=cwd,
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        tests.update(
+            line.rsplit(": ", 1)[0]
+            for line in result.stdout.splitlines()
+            if line.endswith((": test", ": benchmark"))
+        )
+    return tests
+
+
+def isolated_inventory(binaries, shard):
+    tests = Counter()
+    for name in ISOLATED.get(shard, []):
+        selected = inventory(binaries, [name, "--exact"])
+        if selected != Counter({name: 1}):
+            raise RuntimeError(f"Isolated test not found exactly once: {name}: {selected}")
+        tests.update(selected)
+    return tests
+
+
+def verify_partition(binaries):
+    full = inventory(binaries, [])
     if not full:
-        raise RuntimeError("Cargo listed no tests; refusing to run an empty partition")
+        raise RuntimeError("No tests found; refusing an empty partition")
     assigned = Counter()
     counts = {}
-    for name, filters in SHARDS.items():
-        tests = inventory(filters)
+    for shard, filters in SHARDS.items():
+        tests = inventory(binaries, filters)
+        tests.update(isolated_inventory(binaries, shard))
         if not tests:
-            raise RuntimeError(f"The {name} shard has no tests")
+            raise RuntimeError(f"Shard {shard} has no tests")
         overlap = assigned & tests
         if overlap:
             raise RuntimeError(f"Tests assigned to multiple shards: {dict(overlap)}")
         assigned.update(tests)
-        counts[name] = tests.total()
+        counts[shard] = tests.total()
     if assigned != full:
         raise RuntimeError(
-            f"Test partition differs from the full suite: "
+            f"Partition differs from full Windows test suite: "
             f"missing={dict(full - assigned)}, extra={dict(assigned - full)}"
         )
-    print(f"Verified complete, disjoint test partition: {counts}; total={full.total()}", flush=True)
+    print(f"Verified complete, disjoint partition: {counts}; total={full.total()}", flush=True)
+
+
+def run_shard(binaries, shard):
+    filters = SHARDS[shard]
+    print(f"Running precompiled Windows test shard {shard}", flush=True)
+    ran = 0
+    for path, cwd in binaries:
+        selected = inventory([(path, cwd)], filters)
+        if not selected:
+            continue
+        print(f"{path.name}: {selected.total()} tests", flush=True)
+        result = subprocess.run([str(path), "--nocapture", *filters], cwd=cwd)
+        if result.returncode:
+            return result.returncode
+        ran += selected.total()
+
+    for name in ISOLATED.get(shard, []):
+        for path, cwd in binaries:
+            if inventory([(path, cwd)], [name, "--exact"]):
+                print(f"Running isolated test: {name}", flush=True)
+                result = subprocess.run([str(path), "--nocapture", name, "--exact"], cwd=cwd)
+                if result.returncode:
+                    return result.returncode
+                ran += 1
+
+    if not ran:
+        raise RuntimeError(f"Refusing empty shard {shard}")
+    print(f"Passed {ran} tests in {shard}", flush=True)
+    return 0
 
 
 def main():
@@ -68,13 +167,12 @@ def main():
     args = parser.parse_args()
     if not args.check_only and args.shard is None:
         parser.error("choose a shard or use --check-only")
-    verify_partition()
+
+    binaries = load_binaries()
     if args.check_only:
+        verify_partition(binaries)
         return 0
-    print(f"Running the {args.shard} test shard", flush=True)
-    return subprocess.run(
-        ["cargo", "test", "--locked", "--", "--nocapture", *SHARDS[args.shard]]
-    ).returncode
+    return run_shard(binaries, args.shard)
 
 
 if __name__ == "__main__":
