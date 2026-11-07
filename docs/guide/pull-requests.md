@@ -148,4 +148,3 @@ a project-qualified change search, which also works without knowing the change n
 Googlesource links use its corresponding `-review` host.
 For SSH, the default web URL uses HTTPS without the SSH port. Override the review web address
 (including a reverse-proxy prefix) with `git config gitcraft.gerritUrl https://review.example.org/gerrit`.
-

@@ -89,7 +89,25 @@
   ],
   "documentation_binding": {
     "application_candidate": "978fb9bb97e69193caa0121664ff39a93165f133",
-    "rule": "Documentation-only delivery binds these gates after verifying source/crates/manifests/lockfile/tests unchanged."
+    "rule": "Documentation-only delivery binds these gates after verifying source/crates/manifests/lockfile/tests unchanged.",
+    "merged_docs_commit": "77d1bd7238b0743b532826ff0baae948014b91c3",
+    "merged_docs_base": "1ead560bc87805d65ccbd423215b96c949623228",
+    "source_unchanged_verified": true,
+    "checked_paths": [
+      "src",
+      "crates",
+      "Cargo.toml",
+      "Cargo.lock",
+      "tests",
+      ".github/workflows"
+    ],
+    "guide_ports": [
+      "graph-and-history.md",
+      "rewriting-history.md",
+      "diffs.md",
+      "pull-requests.md",
+      "settings-and-appearance.md"
+    ]
   },
   "logs": {
     "build-final-4": {
