@@ -386,6 +386,7 @@ impl RepoTab {
             self.handle(msg, ctx);
         }
         if !self.sleeping() {
+            self.sync_branch_bands(ctx);
             self.poll_branch_bands(ctx);
             self.poll_graph_topology(ctx);
             self.poll_postcards(ctx);

@@ -425,6 +425,7 @@ impl RepoTab {
             .map(|w| (w.path.clone(), w.changes))
             .collect();
         self.worktrees = loaded.worktrees;
+        self.sync_branch_bands(ctx);
         if crate::remote::is_remote(&self.path) {
             self.tx.repo = self.repo_key().to_owned();
         }

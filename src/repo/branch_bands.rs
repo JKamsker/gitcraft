@@ -26,7 +26,7 @@ impl Model {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub(super) struct Preferences {
     model: Model,
@@ -44,6 +44,9 @@ impl Preferences {
             .pins
             .retain(|name, band| name.len() <= 1024 && *band < 4);
         prefs
+    }
+    fn store(&self, ctx: &egui::Context, path: &Path) {
+        ctx.data_mut(|d| d.insert_persisted(id(path), self.clone()));
     }
     fn band(&self, full: &str, remotes: &[String]) -> usize {
         if let Some(band) = self.pins.get(full) {
@@ -141,6 +144,15 @@ impl Preferences {
     }
 }
 impl RepoTab {
+    // Reconcile after worktree discovery and before accepting a layout. Sibling
+    // tabs observe the shared persisted value on their next awake poll.
+    pub(super) fn sync_branch_bands(&mut self, ctx: &egui::Context) {
+        let prefs = Preferences::load(ctx, self.repo_key());
+        if prefs != self.branch_bands {
+            self.branch_bands = prefs;
+            self.queue_branch_bands();
+        }
+    }
     pub(super) fn queue_branch_bands(&mut self) {
         let prefs = self.branch_bands.clone();
         let commits = self.commits.clone();
@@ -257,8 +269,7 @@ impl RepoTab {
             }
         });
         if changed {
-            ui.ctx()
-                .data_mut(|d| d.insert_persisted(id(self.repo_key()), self.branch_bands.clone()));
+            self.branch_bands.store(ui.ctx(), self.repo_key());
             self.queue_branch_bands();
         }
     }
@@ -268,6 +279,37 @@ impl RepoTab {
 mod tests {
     use super::*;
     use crate::git::Branch;
+    #[test]
+    fn linked_worktrees_reconcile_shared_preferences_and_reopen() {
+        let ctx = egui::Context::default();
+        let main = std::path::PathBuf::from("/repos/main");
+        let linked = std::path::PathBuf::from("/repos/linked");
+        let mut tab = RepoTab::new_deferred(linked.clone(), &ctx);
+        let mut sibling = RepoTab::new_deferred(main.clone(), &ctx);
+        let worktrees = vec![crate::git::Worktree {
+            path: main.clone(),
+            main: true,
+            ..Default::default()
+        }];
+        tab.worktrees = worktrees.clone();
+        sibling.worktrees = worktrees;
+        let prefs = Preferences {
+            model: Model::GitFlow,
+            pins: BTreeMap::from([("refs/heads/feature/x".into(), 1)]),
+        };
+        prefs.store(&ctx, tab.repo_key());
+        tab.sync_branch_bands(&ctx);
+        sibling.sync_branch_bands(&ctx);
+        assert_eq!(tab.branch_bands, prefs);
+        assert_eq!(sibling.branch_bands, prefs);
+        let mut reopened = RepoTab::new_deferred(linked, &ctx);
+        reopened.continue_from(&tab);
+        reopened.sync_branch_bands(&ctx);
+        assert_eq!(reopened.branch_bands, prefs);
+        Preferences::default().store(&ctx, sibling.repo_key());
+        reopened.sync_branch_bands(&ctx);
+        assert_eq!(reopened.branch_bands, Preferences::default());
+    }
     #[test]
     fn real_tips_reserve_ancestry_colour_and_slash_remote_main_remains_trunk() {
         let c = |hash: &str, parents: &[&str]| {
