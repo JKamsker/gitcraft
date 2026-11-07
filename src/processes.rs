@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 use crate::tasks::Cancellation;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+#[cfg(test)]
+mod trace;
+
 const ACTIVE: usize = 8;
 const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
@@ -86,14 +89,30 @@ struct Request {
     reply: mpsc::Sender<ResultOutput>,
     ticket: Cancellation,
     deadline: Option<Instant>,
+    #[cfg(test)]
+    trace: Option<Arc<trace::Trace>>,
 }
 
 pub(crate) struct Ticket {
     reply: mpsc::Receiver<ResultOutput>,
     cancel: Cancellation,
+    #[cfg(test)]
+    trace: Option<Arc<trace::Trace>>,
 }
 impl Ticket {
     pub(crate) fn wait(self) -> ResultOutput {
+        #[cfg(test)]
+        if let Some(trace) = &self.trace {
+            loop {
+                match self.reply.recv_timeout(Duration::from_secs(30)) {
+                    Ok(result) => return result,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        return Err("Process service stopped before returning a result".into());
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => trace.report(),
+                }
+            }
+        }
         self.reply
             .recv()
             .map_err(|_| "Process service stopped before returning a result".to_owned())?
@@ -205,6 +224,8 @@ impl Service {
                                     &stop,
                                     &stats,
                                     &blocking,
+                                    #[cfg(test)]
+                                    request.trace.as_deref(),
                                 )
                                 .await;
                                 stats.active.fetch_sub(1, Ordering::Relaxed);
@@ -249,6 +270,8 @@ impl Service {
         let (reply, receive) = mpsc::channel();
         let ticket = Cancellation::default();
         let deadline = options.timeout.map(|limit| Instant::now() + limit);
+        #[cfg(test)]
+        let trace = trace::Trace::new(&command).map(Arc::new);
         let mut queued = self.counters.queued.load(Ordering::Relaxed);
         loop {
             if queued >= self.capacity {
@@ -272,6 +295,8 @@ impl Service {
                 reply,
                 ticket: ticket.clone(),
                 deadline,
+                #[cfg(test)]
+                trace: trace.clone(),
             })
             .is_err()
         {
@@ -281,6 +306,8 @@ impl Service {
         Ok(Ticket {
             reply: receive,
             cancel: ticket,
+            #[cfg(test)]
+            trace,
         })
     }
 
@@ -343,6 +370,7 @@ async fn execute(
     shutdown: &Cancellation,
     stats: &Counters,
     blocking: &Arc<tokio::sync::Semaphore>,
+    #[cfg(test)] trace: Option<&trace::Trace>,
 ) -> ResultOutput {
     let cancelled = || {
         options.cancel.is_cancelled()
@@ -376,9 +404,18 @@ async fn execute(
     cmd.process_group(0);
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0004); // CREATE_NO_WINDOW | CREATE_SUSPENDED
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.stage("spawning");
+    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not run process: {e}"))?;
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.spawned(child.id());
+        trace.stage("supervising");
+    }
     #[cfg(windows)]
     let mut process_job = match child
         .id()
@@ -393,6 +430,10 @@ async fn execute(
         }
     };
     stats.spawned.fetch_add(1, Ordering::Relaxed);
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.stage("running");
+    }
     #[cfg(unix)]
     let pid = child.id();
     let mut input = child.stdin.take();
@@ -411,6 +452,18 @@ async fn execute(
     let mut obuf = [0; 8192];
     let mut ebuf = [0; 8192];
     loop {
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.io(
+                input.is_some(),
+                out.is_some(),
+                err.is_some(),
+                status.is_some(),
+                written,
+                stdout.len(),
+                stderr.len(),
+            );
+        }
         if status.is_some() && out.is_none() && err.is_none() {
             break;
         }
@@ -497,6 +550,10 @@ async fn execute(
         }
     }
     if stopped.is_some() {
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage("stopping");
+        }
         // Remote cleanup may need its PID marker. The stderr callback has consumed every
         // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
         if let Some(stop) = options.stop_remote.take()
@@ -507,6 +564,10 @@ async fn execute(
         // The remote stop can also end the local loopback/SSH child. Reap it before
         // signaling its group: Darwin rejects SIGKILL on a group containing only zombies.
         if status.is_none() {
+            #[cfg(test)]
+            if let Some(trace) = trace {
+                trace.stage("reaping");
+            }
             status = child
                 .try_wait()
                 .map_err(|e| format!("could not reap process: {e}"))?;
@@ -543,6 +604,10 @@ async fn execute(
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
         let until = tokio::time::Instant::now() + options.drain_for;
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage("draining");
+        }
         let mut overflow = None;
         while out.is_some() || err.is_some() {
             tokio::select! {
