@@ -30,7 +30,6 @@ fn prefix(repo: &Path, hooks: Option<&Path>, lazy: bool) -> Vec<String> {
     for setting in [
         "core.fsmonitor=false".to_owned(),
         "core.untrackedCache=false".into(),
-        "core.splitIndex=false".into(),
         "core.protectNTFS=true".into(),
         "core.protectHFS=true".into(),
         "gc.auto=0".into(),
@@ -113,15 +112,10 @@ impl Context {
             "objects",
         ])?;
         let index_file = initial(&["rev-parse", "--path-format=absolute", "--git-path", "index"])?;
-        // The safe default disables split-index writes, but this read-only query
-        // must still discover an existing shared cache for the private copy.
-        let shared_file = initial(&[
-            "-c",
-            "core.splitIndex=true",
-            "rev-parse",
-            "--path-format=absolute",
-            "--shared-index-path",
-        ])?;
+        // Keep Git's automatic read mode here: forcing splitIndex=false hides
+        // an existing link, while true invents one for ordinary/sparse indexes.
+        // No source command writes the index; only the isolated copy is flattened.
+        let shared_file = initial(&["rev-parse", "--path-format=absolute", "--shared-index-path"])?;
         let format = initial(&["rev-parse", "--show-object-format"])?;
         if !matches!(format.as_str(), "sha1" | "sha256") {
             return Err("Unknown Git object format".into());
