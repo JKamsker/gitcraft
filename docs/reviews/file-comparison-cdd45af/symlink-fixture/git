@@ -1,0 +1,28 @@
+#!/bin/sh
+# Use the frozen UI stage/unstage test with an emulated symlink index entry.
+# Change only its private initial fixture; subsequent UI operations are untouched.
+repo=
+if [ "$1" = -C ]; then repo=$2; fi
+case "$repo" in
+    /tmp/gitcraft-file-views-test-*) ;;
+    *) exec /usr/local/bin/git "$@" ;;
+esac
+if [ "$3" = add ] && [ "$4" = -A ] && [ -f "$repo/a" ] && [ ! -e "$repo/.git/reviewer-symlink-seeded" ]; then
+    /usr/local/bin/git "$@" || exit 1
+    /usr/local/bin/git -C "$repo" config core.symlinks false || exit 1
+    oid=$(/usr/local/bin/git -C "$repo" rev-parse :a) || exit 1
+    /usr/local/bin/git -C "$repo" update-index --cacheinfo "120000,$oid,a" || exit 1
+    : > "$repo/.git/reviewer-symlink-seeded" || exit 1
+    printf 'SEEDED regular physical checkout with indexed120000 and core.symlinks=false\n' >> "$REVIEW_SYMLINK_TRACE" || exit 1
+    exit 0
+fi
+if [ "$3" = show ] && [ "$4" = :0:a ] && [ -f "$repo/.git/reviewer-symlink-seeded" ]; then
+    entry=$(/usr/local/bin/git -C "$repo" ls-files --stage -- a) || exit 1
+    case "$entry" in
+        '120000 '*) ;;
+        *) echo 'Reviewer expected preserved symlink index mode' >&2; exit 1 ;;
+    esac
+    [ -f "$repo/a" ] && [ ! -L "$repo/a" ] || exit 1
+    printf 'CHECKED UI boundary result retains120000 and regular physical checkout\n' >> "$REVIEW_SYMLINK_TRACE" || exit 1
+fi
+exec /usr/local/bin/git "$@"
