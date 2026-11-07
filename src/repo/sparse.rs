@@ -175,10 +175,10 @@ pub(super) fn dialog(
             .add_enabled(valid, egui::Button::new("Apply folders"))
             .clicked()
         {
-            outcome = Outcome::Done(Action::SetSparse {
+            outcome = Outcome::Done(Box::new(Action::SetSparse {
                 before: Box::new(state.clone()),
                 folders: enabled.then_some(folders),
-            });
+            }));
         }
         if ui.button("Cancel").clicked() {
             outcome = Outcome::Cancel;

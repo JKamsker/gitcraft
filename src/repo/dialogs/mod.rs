@@ -497,7 +497,7 @@ impl RepoTab {
                     let mut outcome = Outcome::Open;
                     ui.horizontal(|ui| {
                         if ui.button("Download and open").clicked() && let Some(action) = action.take() {
-                            outcome = Outcome::Done(Action::AllowHistoryDownload(action));
+                            outcome = Outcome::Done(Box::new(Action::AllowHistoryDownload(action)));
                         }
                         if ui.button("Cancel").clicked() { outcome = Outcome::Cancel; }
                     });
