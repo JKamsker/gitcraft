@@ -15,6 +15,14 @@ pub(super) struct Narration {
     hash: String,
     result: Option<String>,
     reader: Option<std::sync::mpsc::Receiver<String>>,
+    active: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Drop for Narration {
+    fn drop(&mut self) {
+        self.active
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 #[derive(Default)]
@@ -27,13 +35,20 @@ impl Topology {
     pub(super) fn build(
         commits: &[std::sync::Arc<crate::git::Commit>],
         index: &HashMap<String, usize>,
+        ignored: &HashSet<String>,
     ) -> Self {
         let mut out = Self {
             parents: vec![Vec::new(); commits.len()],
             children: vec![Vec::new(); commits.len()],
         };
         for (i, commit) in commits.iter().enumerate() {
+            if commit.hash == super::WIP_HASH || ignored.contains(&commit.hash) {
+                continue;
+            }
             for parent in &commit.parents {
+                if ignored.contains(parent) || parent == super::WIP_HASH {
+                    continue;
+                }
                 if let Some(&p) = index.get(parent) {
                     out.parents[i].push(p);
                     out.children[p].push(i);
@@ -43,10 +58,13 @@ impl Topology {
         out
     }
 
-    fn ancestors(&self, start: usize) -> HashSet<usize> {
+    fn ancestors(&self, start: usize, active: &dyn Fn() -> bool) -> HashSet<usize> {
         let mut seen = HashSet::new();
         let mut todo = vec![start];
         while let Some(row) = todo.pop() {
+            if !active() {
+                break;
+            }
             if !seen.insert(row) {
                 continue;
             }
@@ -104,6 +122,7 @@ impl RepoTab {
             .walk(start, direction, &tips)
             .filter(|row| !self.is_wip(*row) && self.stash_at(*row).is_none());
         if let Some(next) = next {
+            self.graph_walk_focus = self.commits.get(next).map(|c| c.hash.clone());
             // A collapsed span is expanded locally; raw row identity is never treated as a
             // projected offset. Filtering remains intact, with the selected commit as context.
             self.saved_views.dirty = true;
@@ -164,6 +183,13 @@ impl RepoTab {
                 }
             }
         }
+        if self.selected == Some(row)
+            && self.graph_narration.hash == commit.hash
+            && let Some(narration) = &self.graph_narration.result
+        {
+            description.push_str("; ");
+            description.push_str(narration);
+        }
         description
     }
 
@@ -183,6 +209,9 @@ impl RepoTab {
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
             }
         }
+        if self.graph_narration.reader.is_some() {
+            return;
+        }
         let Some(selected) = self.selected else {
             return;
         };
@@ -192,10 +221,11 @@ impl RepoTab {
         if commit.hash == self.graph_narration.hash {
             return;
         }
-        self.graph_narration = Narration {
-            hash: commit.hash.clone(),
-            ..Default::default()
-        };
+        self.graph_narration = Narration::default();
+        self.graph_narration.hash = commit.hash.clone();
+        self.graph_narration
+            .active
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         if self.is_wip(selected) || self.stash_at(selected).is_some() {
             return;
         }
@@ -215,6 +245,7 @@ impl RepoTab {
         if base == selected {
             return;
         }
+        let active = self.graph_narration.active.clone();
         let topology = self.topology.clone();
         let commits = self.commits.clone();
         let name = baseline.name.clone();
@@ -222,8 +253,10 @@ impl RepoTab {
         let (tx, rx) = std::sync::mpsc::channel();
         self.graph_narration.reader = Some(rx);
         let _ = std::thread::Builder::new().name("graph-narration".into()).spawn(move || {
-            let selected_set = topology.ancestors(selected);
-            let base_set = topology.ancestors(base);
+            let running = || active.load(std::sync::atomic::Ordering::Relaxed);
+            let selected_set = topology.ancestors(selected, &running);
+            let base_set = topology.ancestors(base, &running);
+            if !running() { return; }
             let ahead = selected_set.difference(&base_set).count();
             let behind = base_set.difference(&selected_set).count();
             let common = selected_set.intersection(&base_set).copied().min();
@@ -255,7 +288,12 @@ impl RepoTab {
                 if let Some(row) = self.selected {
                     ui.small(self.graph_description(row));
                 }
-                if let Some(description) = &self.graph_narration.result {
+                if self
+                    .selected
+                    .and_then(|row| self.commits.get(row))
+                    .is_some_and(|c| c.hash == self.graph_narration.hash)
+                    && let Some(description) = &self.graph_narration.result
+                {
                     ui.small(description);
                 }
                 if ui
@@ -301,13 +339,13 @@ mod tests {
             .enumerate()
             .map(|(i, c)| (c.hash.clone(), i))
             .collect();
-        let topology = Topology::build(&commits, &index);
+        let topology = Topology::build(&commits, &index, &HashSet::new());
         let tips = HashSet::from([0, 1]);
         assert_eq!(topology.walk(0, Direction::Parent, &tips), Some(3));
         assert_eq!(topology.walk(2, Direction::Child, &tips), Some(0));
         assert_eq!(topology.walk(4, Direction::Merge, &tips), Some(0));
         assert_eq!(topology.walk(4, Direction::Tip, &tips), Some(0));
         assert_eq!(topology.walk(1, Direction::Parent, &tips), None);
-        assert_eq!(topology.ancestors(2), HashSet::from([2, 4]));
+        assert_eq!(topology.ancestors(2, &|| true), HashSet::from([2, 4]));
     }
 }

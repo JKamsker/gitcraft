@@ -57,7 +57,7 @@ pub(super) fn row_id(ui: &Ui, hash: &str) -> egui::Id {
 
 impl RepoTab {
     pub(super) fn commit_row(
-        &self,
+        &mut self,
         ui: &mut Ui,
         i: usize,
         cols: Cols,
@@ -73,10 +73,30 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
+        if self.graph_walk_focus.as_deref() == Some(commit.hash.as_str()) {
+            resp.request_focus();
+            self.graph_walk_focus = None;
+            self.graph_walk_focus_id = Some(resp.id);
+        }
+        if self.graph_walk_focus_id == Some(resp.id)
+            && crate::settings::Settings::get(ui.ctx()).graph_lane_walk
+        {
+            ui.memory_mut(|memory| {
+                memory.set_focus_lock_filter(
+                    resp.id,
+                    egui::EventFilter {
+                        horizontal_arrows: true,
+                        vertical_arrows: true,
+                        ..Default::default()
+                    },
+                )
+            });
+        }
         resp.widget_info(|| {
-            egui::WidgetInfo::labeled(
+            egui::WidgetInfo::selected(
                 egui::WidgetType::SelectableLabel,
                 true,
+                self.selected == Some(i),
                 format!(
                     "Commit {}, {}, by {}. {}",
                     commit.hash.get(..8).unwrap_or(&commit.hash),
@@ -103,13 +123,6 @@ impl RepoTab {
         if self.graph_motion.new_commit(&commit.hash) {
             let fade = self.graph_motion.highlight(ui.ctx());
             painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(fade));
-            painter.text(
-                rect.right_top(),
-                Align2::RIGHT_TOP,
-                "new",
-                FontId::proportional(9.0),
-                t.accent,
-            );
         }
 
         let gx = rect.left() + cols.refs;
@@ -140,7 +153,7 @@ impl RepoTab {
                 &painter,
                 &t,
                 &row,
-                is_match,
+                (is_match, self.graph_motion.new_commit(&commit.hash)),
                 usize::from(ci.is_some()) + usize::from(change.is_some()),
             );
             if let Some((server, id)) = change {
@@ -295,9 +308,17 @@ fn row_background(
 
 /// The summary, then the rest of the message in the faint text colour, cut with an ellipsis.
 /// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dots: usize) {
+fn description(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    row: &Row,
+    flags: (bool, bool),
+    dots: usize,
+) {
+    let (is_match, incoming) = flags;
     let (rect, mid) = (row.rect, row.mid());
-    let x = row.gx + row.cols.graph + 6.0;
+    let mut x = row.gx + row.cols.graph + 6.0;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - 16.0 * dots as f32;
     let font = if is_match {
         theme::medium(12.5)
@@ -308,6 +329,16 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
         pos2(x, rect.top()),
         pos2(text_right.max(x), rect.bottom()),
     ));
+    if incoming {
+        text_clip.text(
+            pos2(x + 2.0, mid),
+            Align2::LEFT_CENTER,
+            "new",
+            theme::medium(11.0),
+            t.text_dim,
+        );
+        x += 28.0;
+    }
     let mut job = egui::text::LayoutJob::single_section(
         row.commit.summary.clone(),
         egui::TextFormat::simple(font, t.text),

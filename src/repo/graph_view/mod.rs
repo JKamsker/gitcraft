@@ -80,8 +80,12 @@ impl RepoTab {
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
         // is over the tab: the manual, the palette, the clone form).
-        if !ui.ctx().egui_wants_keyboard_input()
+        let graph_row_focused = self
+            .graph_walk_focus_id
+            .is_some_and(|id| ui.ctx().memory(|m| m.focused()) == Some(id));
+        if (!ui.ctx().egui_wants_keyboard_input() || graph_row_focused)
             && self.dialog.is_none()
+            && self.ssh_setup.is_none()
             && !self.keys_blocked
             && self.keyboard_graph_active()
             && !egui::Popup::is_any_open(ui.ctx())
@@ -236,6 +240,9 @@ impl RepoTab {
     fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
         if Settings::get(ui.ctx()).graph_lane_walk {
             let direction = ui.input(|i| {
+                if !i.modifiers.is_none() {
+                    return None;
+                }
                 use crate::repo::graph_walk::Direction;
                 if i.key_pressed(Key::ArrowDown) {
                     Some(Direction::Parent)

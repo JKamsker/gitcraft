@@ -483,6 +483,7 @@ impl RepoTab {
         }
         self.refresh_ci(ctx);
         self.rebuild(ctx);
+        self.prepare_graph_projection();
         self.graph_motion_loaded(loaded.read, ctx);
         self.celebration_loaded(loaded.read, ctx);
         self.hint_avatars(ctx);
@@ -588,6 +589,7 @@ impl RepoTab {
         self.topology = Arc::new(super::graph_walk::Topology::build(
             &self.commits,
             &self.index,
+            &self.stashes.iter().map(|s| s.hash.clone()).collect(),
         ));
         self.graph_narration = Default::default();
         self.rebuild_graph_labels();

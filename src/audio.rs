@@ -31,26 +31,35 @@ pub(crate) fn play(cue: Cue) {
     RECORDED.with(|sounds| sounds.borrow_mut().push(cue));
     #[cfg(not(test))]
     {
-        use std::sync::{OnceLock, mpsc};
-        static QUEUE: OnceLock<Option<mpsc::SyncSender<Cue>>> = OnceLock::new();
+        use std::sync::{Mutex, OnceLock, mpsc};
+        static QUEUE: OnceLock<Mutex<Option<mpsc::SyncSender<Cue>>>> = OnceLock::new();
         if unavailable() {
             return;
         }
-        let sender = QUEUE.get_or_init(|| {
+        let Ok(mut sender) = QUEUE.get_or_init(|| Mutex::new(None)).lock() else {
+            return;
+        };
+        if sender.is_none() {
             let (tx, rx) = mpsc::sync_channel(2);
             match std::thread::Builder::new()
                 .name("gitcraft-earcons".into())
                 .spawn(move || worker(rx))
             {
-                Ok(_) => Some(tx),
+                Ok(_) => *sender = Some(tx),
                 Err(_) => {
                     UNAVAILABLE.store(true, Ordering::Relaxed);
-                    None
+                    return;
                 }
             }
-        });
-        if let Some(sender) = sender {
-            let _ = sender.try_send(cue);
+        }
+        if let Some(queue) = sender.as_ref()
+            && matches!(
+                queue.try_send(cue),
+                Err(mpsc::TrySendError::Disconnected(_))
+            )
+        {
+            *sender = None;
+            UNAVAILABLE.store(true, Ordering::Relaxed);
         }
     }
 }
@@ -59,7 +68,22 @@ pub(crate) fn play(cue: Cue) {
 fn worker(rx: std::sync::mpsc::Receiver<Cue>) {
     // Keep stream and sink on their owning thread. No subprocess, terminal bell or unsafe FFI.
     let mut output = None;
-    while let Ok(cue) = rx.recv() {
+    loop {
+        let cue = if output.is_some() {
+            match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+                Ok(cue) => cue,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    output = None;
+                    continue;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        } else {
+            match rx.recv() {
+                Ok(cue) => cue,
+                Err(_) => break,
+            }
+        };
         if unavailable() {
             continue;
         }

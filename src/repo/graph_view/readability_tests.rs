@@ -434,3 +434,79 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() -> Result<()
     assert!(egui::Popup::is_any_open(&ctx));
     Ok(())
 }
+
+/// Source-only frame fixture: topology keys keep screen-reader focus and never invoke Git.
+#[test]
+fn topology_keyboard_frame_skips_unrelated_rows_and_keeps_focus() {
+    let (ctx, mut tab) = fixture(6);
+    Settings {
+        graph_lane_walk: true,
+        avatars: false,
+        ..Default::default()
+    }
+    .set(&ctx);
+    let parent = tab.commits[3].hash.clone();
+    Arc::make_mut(&mut tab.commits[0]).parents = vec![parent];
+    tab.index = tab
+        .commits
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.hash.clone(), i))
+        .collect();
+    tab.graph = crate::graph::layout(&tab.commits);
+    tab.topology = Arc::new(crate::repo::graph_walk::Topology::build(
+        &tab.commits,
+        &tab.index,
+        &std::collections::HashSet::new(),
+    ));
+    tab.selected = Some(0);
+    let key = |key| Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    frame(&ctx, &mut tab, vec2(1100.0, 600.0), vec![], 0.0);
+    let (_, actions) = frame(
+        &ctx,
+        &mut tab,
+        vec2(1100.0, 600.0),
+        vec![key(Key::ArrowDown)],
+        0.1,
+    );
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Select(3)))
+    );
+    tab.selected = Some(3);
+    frame(&ctx, &mut tab, vec2(1100.0, 600.0), vec![], 0.2);
+    assert!(tab.graph_walk_focus_id.is_some());
+    assert_eq!(ctx.memory(|m| m.focused()), tab.graph_walk_focus_id);
+    let (_, actions) = frame(
+        &ctx,
+        &mut tab,
+        vec2(1100.0, 600.0),
+        vec![key(Key::ArrowDown)],
+        0.3,
+    );
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Select(4)))
+    );
+    tab.keys_blocked = true;
+    let (_, actions) = frame(
+        &ctx,
+        &mut tab,
+        vec2(1100.0, 600.0),
+        vec![key(Key::ArrowDown)],
+        0.4,
+    );
+    assert!(
+        !actions
+            .iter()
+            .any(|action| matches!(action, Action::Select(_)))
+    );
+}
