@@ -99,13 +99,11 @@ fn header_x(shapes: &[ClippedShape], label: &str) -> f32 {
 
 // Locate rows from painted content: the history filter strip can move the graph vertically.
 fn summary_y(shapes: &[ClippedShape], summary: &str) -> f32 {
-    texts(shapes)
+    let found = texts(shapes)
         .into_iter()
-        .find(|t| t.galley.job.text == summary)
-        .expect("painted commit summary")
-        .visual_bounding_rect()
-        .center()
-        .y
+        .find(|t| t.galley.job.text == summary);
+    assert!(found.is_some(), "missing painted commit summary: {summary}");
+    found.map_or(0.0, |text| text.visual_bounding_rect().center().y)
 }
 
 #[test]
