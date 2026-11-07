@@ -230,10 +230,27 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
     ui.heading("Push preflight");
     ui.label(format!(
         "{} → {} on {}",
-        plan.branch,
+        if plan.deleting {
+            "Delete remote ref"
+        } else {
+            &plan.branch
+        },
         plan.destination,
         plan.targets.join(", ")
     ));
+    if plan.deleting {
+        ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning, format!(
+            "Delete {} only while the server tip is {}. No outgoing objects or LFS payloads are sent.",
+            plan.destination, super::short(plan.base.as_deref().unwrap_or(""))
+        ));
+    }
+    for (before, step) in plan.local_steps() {
+        ui.label(format!(
+            "{} reviewed push: {}",
+            if before { "Before" } else { "After" },
+            step
+        ));
+    }
     ui.label(format!(
         "{} outgoing commits ({} have embedded signatures), pinned to {}. Author policy: {} <{}>.",
         plan.commits.len(),
@@ -250,7 +267,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning, reason);
     }
     let mut out = Outcome::Open;
-    if !plan.is_current_branch() {
+    if !plan.deleting && !plan.is_current_branch() {
         ui.label("Repairs require the underlying branch checked out. The push itself still sends the inspected object.");
         if let Some(name) = plan.branch.strip_prefix("refs/heads/")
             && ui.button("Check out for repairs").clicked()
@@ -335,7 +352,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                 }
             }
         });
-    if !plan.destination.starts_with("refs/for/") {
+    if !plan.deleting && !plan.destination.starts_with("refs/for/") {
         ui.add_enabled_ui(plan.base.is_some(), |ui| {
             ui.checkbox(
                 &mut plan.force,
@@ -354,7 +371,9 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         if ui
             .add_enabled(
                 *acknowledge && check::push_args(plan).is_ok(),
-                egui::Button::new(if plan.force {
+                egui::Button::new(if plan.deleting {
+                    "Delete inspected remote ref"
+                } else if plan.force {
                     "Push with inspected lease"
                 } else {
                     "Push inspected commit"
@@ -513,6 +532,210 @@ mod tests {
         assert_eq!(f.git(&["show", "HEAD:feature"])?, "two");
         Ok(())
     }
+    #[test]
+    fn existing_delete_restore_tag_and_push_dispatch_matrix() -> Result<(), String> {
+        use crate::repo::operations::run_steps;
+        use crate::repo::{OpKind, ops};
+        let mut rows = Vec::new();
+        for case in [
+            "remote_delete",
+            "both_delete_d",
+            "both_delete_D",
+            "undo_both",
+            "redo_both",
+            "remote_tag_delete",
+            "normal_ff",
+            "publish",
+            "force_lease",
+            "branch_context",
+            "annotated_tag",
+            "detached_tag",
+            "gerrit",
+            "create_then_push_tag",
+        ] {
+            let f = Fixture::new()?;
+            let base = f.receiver_head()?;
+            f.git(&["branch", "victim"])?;
+            f.git(&["push", "-q", "origin", "victim"])?;
+            f.git(&["branch", "--set-upstream-to=origin/victim", "victim"])?;
+            let lease = format!("--force-with-lease=refs/heads/victim:{base}");
+            let remote_delete =
+                ops(&[&["push", &lease, "origin", "--delete", "refs/heads/victim"]]);
+            let both = |flag: &str| {
+                let here = ops(&[&["branch", flag, "--", "victim"]]);
+                if flag == "-d" {
+                    [here, remote_delete.clone()].concat()
+                } else {
+                    [remote_delete.clone(), here].concat()
+                }
+            };
+            let kind = OpKind::plain();
+            let steps = match case {
+                "remote_delete" => remote_delete.clone(),
+                "both_delete_d" => both("-d"),
+                "both_delete_D" | "redo_both" => both("-D"),
+                "undo_both" => {
+                    let (result, _) = run_steps(&f.repo, &both("-D"), OpKind::plain(), None);
+                    result?;
+                    ops(&[
+                        &["push", "origin", &format!("{base}:refs/heads/victim")],
+                        &["branch", "--", "victim", &base],
+                        &["branch", "--set-upstream-to=origin/victim", "--", "victim"],
+                    ])
+                }
+                "remote_tag_delete" => {
+                    f.git(&["tag", "release"])?;
+                    f.git(&["push", "-q", "origin", "refs/tags/release"])?;
+                    ops(&[&["push", "origin", "--delete", "refs/tags/release"]])
+                }
+                "normal_ff" => {
+                    f.commit("next", "next", "Next")?;
+                    ops(&[&["push"]])
+                }
+                "publish" => {
+                    f.git(&["checkout", "-qb", "newbranch"])?;
+                    f.commit("next", "next", "Next")?;
+                    ops(&[&[
+                        "-c",
+                        "push.default=simple",
+                        "push",
+                        "-u",
+                        "origin",
+                        "refs/heads/newbranch",
+                    ]])
+                }
+                "force_lease" => {
+                    f.advance_receiver()?;
+                    f.git(&["fetch", "-q", "origin"])?;
+                    f.commit("next", "next", "Next")?;
+                    ops(&[&["push", "--force-with-lease"]])
+                }
+                "branch_context" => {
+                    f.git(&["checkout", "-qb", "feature"])?;
+                    f.commit("next", "next", "Next")?;
+                    f.git(&["checkout", "-q", "main"])?;
+                    ops(&[&["push", "origin", "refs/heads/feature:refs/heads/feature"]])
+                }
+                "annotated_tag" | "detached_tag" => {
+                    f.git(&["tag", "-a", "-m", "Release", "release"])?;
+                    if case == "detached_tag" {
+                        f.git(&["checkout", "-q", "--detach"])?;
+                    }
+                    ops(&[&["push", "origin", "refs/tags/release"]])
+                }
+                "gerrit" => {
+                    let head = f.commit(
+                        "next",
+                        "next",
+                        "Next\n\nChange-Id: I0123456789abcdef0123456789abcdef01234567",
+                    )?;
+                    crate::gerrit::review_ops("origin", "main", "", &head, &base)?
+                }
+                "create_then_push_tag" => ops(&[
+                    &["tag", "-a", "-m", "Release", "release"],
+                    &["push", "origin", "refs/tags/release"],
+                ]),
+                _ => unreachable!(),
+            };
+            let ctx = egui::Context::default();
+            let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
+            if case == "undo_both" {
+                let entry = UndoEntry {
+                    label: case.into(),
+                    undo: steps.clone(),
+                    redo: both("-D"),
+                    heads: None,
+                };
+                tab.undo_stack.push(entry);
+                tab.undo(&ctx);
+            } else if case == "redo_both" {
+                let entry = UndoEntry {
+                    label: case.into(),
+                    undo: vec![],
+                    redo: steps.clone(),
+                    heads: None,
+                };
+                tab.redo_stack.push(entry);
+                tab.redo(&ctx);
+            } else {
+                tab.run_ops(case, steps.clone(), Refresh::All, kind.clone(), &ctx);
+            }
+            // Run the exact local-tag completion path before its preview.
+            if case == "create_then_push_tag" {
+                let deadline = Instant::now() + Duration::from_secs(20);
+                while tab.busy_op.is_some() && Instant::now() < deadline {
+                    if let Ok(Msg::OpDone {
+                        label,
+                        result,
+                        refresh,
+                        kind,
+                        quiet,
+                        ..
+                    }) = tab.rx.recv_timeout(Duration::from_secs(1))
+                    {
+                        tab.op_done(label, result, refresh, kind, quiet, &ctx);
+                    }
+                }
+            }
+            receive(&mut tab, &ctx)?;
+            let dialog = tab.dialog.take();
+            let (preview, error, control) = match dialog {
+                Some(Dialog::PushPreflight { plan, .. }) => {
+                    let approved = check::approved_ops(*plan);
+                    let (r, _) = run_steps(&f.repo, &approved, OpKind::plain(), None);
+                    (true, String::new(), r.err().unwrap_or_default())
+                }
+                Some(Dialog::PushError(error)) => {
+                    return Err(format!("{case}: preview refused: {error}"));
+                }
+                _ => return Err(format!("{case}: unexpected dialog")),
+            };
+            if matches!(
+                case,
+                "remote_delete" | "both_delete_d" | "both_delete_D" | "redo_both"
+            ) {
+                assert!(
+                    crate::git::run(
+                        Some(&f.receiver),
+                        &["rev-parse", "--verify", "refs/heads/victim"]
+                    )
+                    .is_err()
+                );
+                assert_eq!(
+                    f.git(&["rev-parse", "--verify", "refs/heads/victim"])
+                        .is_ok(),
+                    case == "remote_delete"
+                );
+            }
+            if case == "undo_both" {
+                assert_eq!(f.git(&["rev-parse", "refs/heads/victim"])?, base);
+                assert_eq!(
+                    crate::git::run(Some(&f.receiver), &["rev-parse", "refs/heads/victim"])?.trim(),
+                    base
+                );
+            }
+            if case == "remote_tag_delete" {
+                assert!(
+                    crate::git::run(
+                        Some(&f.receiver),
+                        &["rev-parse", "--verify", "refs/tags/release"]
+                    )
+                    .is_err()
+                );
+            }
+            rows.push(serde_json::json!({"case":case,"preview":preview,"preview_error":error,"production_dispatch_or_raw_git_error":control}));
+            assert!(
+                rows.last()
+                    .and_then(|r| r["production_dispatch_or_raw_git_error"].as_str())
+                    .is_some_and(str::is_empty),
+                "{case}: {:?}",
+                rows.last()
+            );
+        }
+        assert!(rows.iter().all(|row| row["preview"] == true));
+        Ok(())
+    }
+
     #[test]
     fn approval_from_a_different_profile_cannot_start_a_push() -> Result<(), String> {
         let f = Fixture::new()?;

@@ -432,3 +432,6 @@ pub(crate) fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
         .map(|args| args.iter().map(|a| (*a).to_owned()).collect())
         .collect()
 }
+
+// Shared guarded-operation protocol used by push preflight companion steps.
+pub(crate) use operations::expect_ref_at;

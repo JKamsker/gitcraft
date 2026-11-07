@@ -479,7 +479,7 @@ pub(super) fn expect_ref(name: &str) -> Vec<String> {
 }
 
 /// A step that runs nothing, but refuses the whole operation unless `name` is at `commit`.
-pub(super) fn expect_ref_at(name: &str, commit: &str) -> Vec<String> {
+pub(crate) fn expect_ref_at(name: &str, commit: &str) -> Vec<String> {
     vec![EXPECT.to_owned(), name.to_owned(), commit.to_owned()]
 }
 

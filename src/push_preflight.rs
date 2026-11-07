@@ -62,6 +62,7 @@ pub(crate) struct Plan {
     pub expected_email: String,
     pub profile: UserProfile,
     pub force: bool,
+    pub deleting: bool,
     pub tracking: bool,
     pub lfs_objects: BTreeSet<String>,
     push_oid: String,
@@ -70,6 +71,8 @@ pub(crate) struct Plan {
     checkout: String,
     checkout_oid: String,
     config: String,
+    config_before_push: String,
+    local_refs: BTreeMap<String, String>,
     extras: Vec<String>,
     tracking_ref: Option<String>,
     lfs_config: Vec<(String, String)>,
@@ -148,12 +151,20 @@ fn push_words(op: &[String]) -> Option<&[String]> {
     (words.first()?.as_str() == "push").then_some(&words[1..])
 }
 
-type ParsedPush = (Option<String>, Option<String>, bool, bool, Vec<String>);
+type ParsedPush = (
+    Option<String>,
+    Option<String>,
+    bool,
+    bool,
+    Vec<String>,
+    bool,
+);
 
 fn parse(words: &[String]) -> Result<ParsedPush, String> {
     let (mut positional, mut force, mut tracking, mut extras) =
         (Vec::new(), false, false, Vec::new());
     let mut ended = false;
+    let mut deleting = false;
     for word in words {
         if !ended && word == "--" {
             ended = true;
@@ -164,9 +175,10 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
                 "-u" | "--set-upstream" => tracking = true,
                 "-f" | "--force" | "--force-with-lease" => force = true,
                 "--no-follow-tags" => {},
+                "--delete" | "-d" => deleting = true,
                 _ if word.starts_with("--force-with-lease=") => force = true,
                 _ if word.starts_with("--push-option=") => extras.push(word.clone()),
-                _ => return Err("This push option needs an explicit single-ref preview; multi-ref, matching, mirror, delete, atomic and recursive pushes are not sent by this checklist.".into()),
+                _ => return Err("This push option needs an explicit single-ref preview; multi-ref, matching, mirror, atomic and recursive pushes are not sent by this checklist.".into()),
             }
         } else {
             positional.push(word.clone());
@@ -181,7 +193,35 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
         force,
         tracking,
         extras,
+        deleting,
     ))
+}
+
+fn companion_branch(op: &[String]) -> Option<&str> {
+    match op {
+        [command, flag, end, name]
+            if command == "branch" && matches!(flag.as_str(), "-d" | "-D") && end == "--" =>
+        {
+            Some(name)
+        }
+        [command, end, name, oid] if command == "branch" && end == "--" && valid_object_id(oid) => {
+            Some(name)
+        }
+        [command, upstream, end, name]
+            if command == "branch" && upstream.starts_with("--set-upstream-to=") && end == "--" =>
+        {
+            Some(name)
+        }
+        [command, key, _] if command == "config" => key
+            .strip_prefix("branch.")
+            .and_then(|key| key.rsplit_once('.'))
+            .and_then(|(name, option)| matches!(option, "remote" | "merge").then_some(name)),
+        _ => None,
+    }
+}
+
+fn valid_object_id(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 pub(crate) fn scan(
@@ -206,15 +246,60 @@ pub(crate) fn scan(
                 }
                 prefix = rest;
             }
-        } else if !op.first().is_some_and(|v| v.starts_with('\0')) {
-            return Err("Create the tag or complete the local operation first, then preview its push separately.".into());
+        } else if !op.first().is_some_and(|v| v.starts_with('\0')) && companion_branch(op).is_none()
+        {
+            return Err(
+                "Complete this local operation first, then preview its push separately.".into(),
+            );
         }
     }
     let pushes: Vec<_> = original.iter().filter_map(|o| push_words(o)).collect();
     if pushes.len() != 1 {
         return Err("Preview one push at a time; no push was run.".into());
     }
-    let (remote, spec, mut force, tracking, extras) = parse(pushes[0])?;
+    let (remote, spec, mut force, tracking, extras, delete_option) = parse(pushes[0])?;
+    let mut local_refs = BTreeMap::new();
+    for op in &original {
+        if let Some(name) = companion_branch(op) {
+            let reference = format!("refs/heads/{name}");
+            valid_ref(repo, &reference, active)?;
+            let oid = optional(
+                repo,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "-q",
+                    "--end-of-options",
+                    &reference,
+                ],
+                active,
+            )?;
+            local_refs.insert(reference, oid.trim().to_owned());
+        }
+    }
+    let removed_before_push: Vec<_> = original
+        .iter()
+        .take_while(|op| push_words(op).is_none())
+        .filter_map(|op| match op.as_slice() {
+            [command, flag, end, name]
+                if command == "branch" && matches!(flag.as_str(), "-d" | "-D") && end == "--" =>
+            {
+                Some(format!("branch.{name}."))
+            }
+            _ => None,
+        })
+        .collect();
+    let config_before_push = initial_config
+        .split('\0')
+        .filter(|item| {
+            let key = item.split_once('\n').map_or(*item, |(key, _)| key);
+            !removed_before_push
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
+        })
+        .filter(|item| !item.is_empty())
+        .map(|item| format!("{item}\0"))
+        .collect::<String>();
     let checkout = optional(repo, &["symbolic-ref", "-q", "HEAD"], active)?
         .trim()
         .to_owned();
@@ -228,7 +313,9 @@ pub(crate) fn scan(
         Some(r) => r,
         None => {
             if current.is_empty() {
-                return Err("Choose an explicit remote and source ref when HEAD is detached.".into());
+                return Err(
+                    "Choose an explicit remote and source ref when HEAD is detached.".into(),
+                );
             }
             let mut selected = String::new();
             for key in [
@@ -314,6 +401,11 @@ pub(crate) fn scan(
             }
         }
     };
+    let spec = if delete_option {
+        format!(":{spec}")
+    } else {
+        spec
+    };
     let spec = if let Some(s) = spec.strip_prefix('+') {
         force = true;
         s
@@ -321,12 +413,16 @@ pub(crate) fn scan(
         &spec
     };
     let (source, destination) = spec.split_once(':').unwrap_or((spec, spec));
-    if source.is_empty() || source.contains('*') || destination.contains('*') {
-        return Err(
-            "Deletion and wildcard pushes need a separate ref review; no push was run.".into(),
-        );
+    let deleting = source.is_empty();
+    if source.contains('*') || destination.contains('*') || destination.is_empty() {
+        return Err("Choose one complete ref; wildcard pushes are not sent.".into());
     }
-    let source = if source == "HEAD" {
+    if deleting && tracking {
+        return Err("A deletion cannot set an upstream.".into());
+    }
+    let source = if deleting {
+        String::new()
+    } else if source == "HEAD" {
         checkout.clone()
     } else if matches!(source.len(), 40 | 64) && source.bytes().all(|b| b.is_ascii_hexdigit()) {
         let refs = read(
@@ -342,39 +438,49 @@ pub(crate) fn scan(
         refs.lines()
             .find(|r| *r == checkout)
             .or_else(|| refs.lines().next())
-            .ok_or("The pushed commit is no longer on a local branch")?
+            .unwrap_or(source)
             .to_owned()
     } else if source.starts_with("refs/") {
         source.to_owned()
     } else {
         format!("refs/heads/{source}")
     };
-    valid_ref(repo, &source, active)?;
-    let destination = if destination == spec && !destination.starts_with("refs/") {
+    if !deleting && !valid_object_id(&source) {
+        valid_ref(repo, &source, active)?;
+    }
+    let destination = if !deleting && destination == spec && !destination.starts_with("refs/") {
         source.clone()
     } else {
         destination.to_owned()
     };
     valid_ref(repo, &destination, active)?;
-    let head = read(
-        repo,
-        &[
-            "rev-parse",
-            "--verify",
-            "--end-of-options",
-            &format!("{source}^{{commit}}"),
-        ],
-        active,
-    )?
-    .trim()
-    .to_owned();
-    let push_oid = read(
-        repo,
-        &["rev-parse", "--verify", "--end-of-options", &source],
-        active,
-    )?
-    .trim()
-    .to_owned();
+    let head = if deleting {
+        checkout_oid.clone()
+    } else {
+        read(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                &format!("{source}^{{commit}}"),
+            ],
+            active,
+        )?
+        .trim()
+        .to_owned()
+    };
+    let push_oid = if deleting {
+        String::new()
+    } else {
+        read(
+            repo,
+            &["rev-parse", "--verify", "--end-of-options", &source],
+            active,
+        )?
+        .trim()
+        .to_owned()
+    };
     let mut base = None;
     let mut tracking_ref = None;
     let fetch = optional(
@@ -406,7 +512,11 @@ pub(crate) fn scan(
                         "--verify",
                         "-q",
                         "--end-of-options",
-                        &format!("{tracked}^{{commit}}"),
+                        &if deleting {
+                            tracked.clone()
+                        } else {
+                            format!("{tracked}^{{commit}}")
+                        },
                     ],
                     active,
                 )?
@@ -417,6 +527,45 @@ pub(crate) fn scan(
         }
     }
     base = base.filter(|b| !b.is_empty());
+    if deleting {
+        if destination.starts_with("refs/tags/") && base.is_none() {
+            base = optional(
+                repo,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "-q",
+                    "--end-of-options",
+                    &destination,
+                ],
+                active,
+            )?
+            .trim()
+            .to_owned()
+            .into();
+            base = base.filter(|oid| !oid.is_empty());
+        }
+        for lease in pushes[0]
+            .iter()
+            .filter_map(|arg| arg.strip_prefix("--force-with-lease="))
+        {
+            let (reference, expected) = lease
+                .split_once(':')
+                .ok_or("Deletion needs an exact ref lease")?;
+            if reference != destination || !valid_object_id(expected) {
+                return Err("The deletion lease must name this exact ref and object.".into());
+            }
+            if base.as_deref().is_some_and(|tip| tip != expected) {
+                return Err("The fetched target differs from the deletion lease; reopen its original action.".into());
+            }
+            base = Some(expected.to_owned());
+        }
+        if base.is_none() {
+            return Err(
+                "Fetch this exact target before deleting it; no remote tip was inspected.".into(),
+            );
+        }
+    }
     if destination.starts_with("refs/for/")
         && let Some(check) = original
             .iter()
@@ -434,10 +583,14 @@ pub(crate) fn scan(
     if let Some(base) = &base {
         args.extend(["--not", base]);
     }
-    let ids: Vec<String> = read(repo, &args, active)?
-        .lines()
-        .map(str::to_owned)
-        .collect();
+    let ids: Vec<String> = if deleting {
+        Vec::new()
+    } else {
+        read(repo, &args, active)?
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    };
     if ids.len() > MAX_COMMITS {
         return Err("The outgoing history exceeds 10,000 commits; split the push or fetch its exact target before checking.".into());
     }
@@ -501,7 +654,7 @@ pub(crate) fn scan(
         || config(repo, "commit.gpgSign", active)?.eq_ignore_ascii_case("true");
     let mut commits = Vec::new();
     let mut findings = Vec::new();
-    if push_oid != head {
+    if !deleting && push_oid != head {
         let tag = read(repo, &["cat-file", "tag", &push_oid], active)?;
         if secret_lines(tag.split_once("\n\n").map_or("", |x| x.1))
             .next()
@@ -668,7 +821,7 @@ pub(crate) fn scan(
             }
         }
     }
-    if let Some(base) = &base {
+    if !deleting && let Some(base) = &base {
         let lost = read(
             repo,
             &[
@@ -713,6 +866,7 @@ pub(crate) fn scan(
         expected_email,
         profile,
         force,
+        deleting,
         tracking,
         lfs_objects,
         push_oid,
@@ -721,24 +875,27 @@ pub(crate) fn scan(
         checkout,
         checkout_oid,
         config,
+        config_before_push,
+        local_refs,
         extras,
         tracking_ref,
         lfs_config,
         receive_pack,
     };
     check_active(repo, &plan, active)?;
-    if read(
-        repo,
-        &[
-            "rev-parse",
-            "--verify",
-            "--end-of-options",
-            &format!("{}^{{commit}}", plan.push_oid),
-        ],
-        active,
-    )?
-    .trim()
-        != plan.head
+    if !plan.deleting
+        && read(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                &format!("{}^{{commit}}", plan.push_oid),
+            ],
+            active,
+        )?
+        .trim()
+            != plan.head
     {
         return Err("The source changed while checking. Reopen preflight.".into());
     }
@@ -791,7 +948,7 @@ pub(crate) fn display_path(path: &str) -> String {
 
 impl Plan {
     pub(crate) fn is_current_branch(&self) -> bool {
-        self.branch == self.checkout && self.branch.starts_with("refs/heads/")
+        !self.deleting && self.branch == self.checkout && self.branch.starts_with("refs/heads/")
     }
     pub(crate) fn lfs_targets(&self) -> Vec<String> {
         let values: BTreeSet<_> = self
@@ -805,6 +962,19 @@ impl Plan {
         } else {
             values.into_iter().collect()
         }
+    }
+
+    pub(crate) fn local_steps(&self) -> Vec<(bool, String)> {
+        let mut before = true;
+        let mut steps = Vec::new();
+        for op in &self.original {
+            if push_words(op).is_some() {
+                before = false;
+            } else if !op.first().is_some_and(|value| value.starts_with('\0')) {
+                steps.push((before, display_path(&op.join(" "))));
+            }
+        }
+        steps
     }
 
     pub(crate) fn again(&self) -> Vec<Vec<String>> {
@@ -972,15 +1142,17 @@ fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(
     if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
         return Err("The checked-out branch moved. Reopen push preflight.".into());
     }
-    if config_stamp(repo, active)? != plan.config
+    let config = config_stamp(repo, active)?;
+    if (config != plan.config && config != plan.config_before_push)
         || optional(repo, &["symbolic-ref", "-q", "HEAD"], active)?.trim() != plan.checkout
-        || read(
-            repo,
-            &["rev-parse", "--verify", "--end-of-options", &plan.branch],
-            active,
-        )?
-        .trim()
-            != plan.push_oid
+        || (!plan.deleting
+            && read(
+                repo,
+                &["rev-parse", "--verify", "--end-of-options", &plan.branch],
+                active,
+            )?
+            .trim()
+                != plan.push_oid)
     {
         return Err("The branch, checkout, identity or push configuration changed. Reopen push preflight; nothing was pushed.".into());
     }
@@ -999,7 +1171,7 @@ fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(
 }
 
 pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
-    if plan.force && plan.base.is_none() {
+    if (plan.force || plan.deleting) && plan.base.is_none() {
         return Err(
             "Fetch this exact target before force pushing: no remote lease was inspected.".into(),
         );
@@ -1010,7 +1182,10 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
         "--recurse-submodules=no".into(),
     ];
     if !plan.destination.starts_with("refs/for/") {
-        if !plan.force && plan.findings.iter().any(|f| f.kind == Kind::RemoteHistory) {
+        if !plan.deleting
+            && !plan.force
+            && plan.findings.iter().any(|f| f.kind == Kind::RemoteHistory)
+        {
             return Err("The fetched target is not an ancestor. Keep its commits or deliberately choose force-with-lease.".into());
         }
         // Normal mode is still a fast-forward (or absent-ref creation). The explicit
@@ -1032,12 +1207,19 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
 
 pub(crate) fn approved_ops(plan: Plan) -> Vec<Vec<String>> {
     let mut ops: Vec<_> = plan
-        .original
+        .local_refs
         .iter()
-        .filter(|o| push_words(o).is_none())
-        .cloned()
+        .map(|(name, oid)| crate::repo::expect_ref_at(name, oid))
         .collect();
-    ops.push(register(plan));
+    let original = plan.original.clone();
+    let approved = register(plan);
+    ops.extend(original.into_iter().map(|step| {
+        if push_words(&step).is_some() {
+            approved.clone()
+        } else {
+            step
+        }
+    }));
     ops
 }
 
@@ -1074,18 +1256,22 @@ pub(crate) fn execute(
     }
     if let Some(reference) = &plan.tracking_ref {
         // A background fetch may already have updated it. Never overwrite a newer tip.
-        let _ = git::forecast_run(
-            repo,
-            &[
+        let args = if plan.deleting {
+            vec![
+                "update-ref",
+                "-d",
+                reference,
+                plan.base.as_deref().unwrap_or(""),
+            ]
+        } else {
+            vec![
                 "update-ref",
                 reference,
                 &plan.head,
                 plan.base.as_deref().unwrap_or(""),
-            ],
-            &[],
-            &[0],
-            &|| true,
-        );
+            ]
+        };
+        let _ = git::forecast_run(repo, &args, &[], &[0], &|| true);
     }
     if plan.tracking
         && plan.branch.starts_with("refs/heads/")

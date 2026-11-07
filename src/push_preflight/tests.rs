@@ -652,12 +652,23 @@ fn rejecting_pre_push_hook_preserves_receiver_refs_and_lfs_objects() -> Result<(
     let plan = f.plan(f.profile())?;
     let before = f.receiver_head()?;
     let oid = plan.lfs_objects.iter().next().ok_or("No LFS object")?;
-    let stored = f.receiver.join("lfs/objects").join(&oid[..2]).join(&oid[2..4]).join(oid);
-    assert!(!stored.exists(), "The receiver starts without this LFS object");
+    let stored = f
+        .receiver
+        .join("lfs/objects")
+        .join(&oid[..2])
+        .join(&oid[2..4])
+        .join(oid);
+    assert!(
+        !stored.exists(),
+        "The receiver starts without this LFS object"
+    );
     assert!(execute(&f.repo, &plan, None).is_err());
     assert!(marker.exists(), "The original hook must run");
     assert_eq!(f.receiver_head()?, before);
-    assert!(!stored.exists(), "A hook veto must precede explicit LFS upload");
+    assert!(
+        !stored.exists(),
+        "A hook veto must precede explicit LFS upload"
+    );
     Ok(())
 }
 
@@ -670,7 +681,11 @@ fn explicit_annotated_tag_push_works_with_detached_head() -> Result<(), String> 
     let checkout = f.git(&["rev-parse", "HEAD"])?;
     let plan = scan(
         &f.repo,
-        vec![vec!["push".into(), "origin".into(), "refs/tags/release".into()]],
+        vec![vec![
+            "push".into(),
+            "origin".into(),
+            "refs/tags/release".into(),
+        ]],
         f.profile(),
         &|| true,
     )?;
