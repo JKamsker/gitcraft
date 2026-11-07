@@ -794,12 +794,16 @@ mod native_windows_ownership {
         std::fs::hard_link(&alt, &other).map_err(|e| e.to_string())?;
         let data = inspect(&borrower, "HEAD", &|| true)?;
         assert!(data.independence.is_none());
-        assert!(data.notes.iter().any(|note| note.contains("multiple hard links")));
+        assert!(
+            data.notes
+                .iter()
+                .any(|note| note.contains("multiple hard links"))
+        );
         assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, expected);
         assert_eq!(std::fs::read(&other).map_err(|e| e.to_string())?, expected);
         for clone in [&borrower, &second] {
             assert_eq!(
-                Fixture::git(clone, &["show", "HEAD:file ' $(touch ESCAPED).txt"] )?,
+                Fixture::git(clone, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
                 "borrowed bytes"
             );
         }
