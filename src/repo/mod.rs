@@ -18,6 +18,7 @@ mod branch_visibility;
 mod bundles;
 mod ci_status;
 mod ci_view;
+mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
@@ -198,6 +199,7 @@ pub struct RepoTab {
     content_recovery: content_recovery::State,
     working_drafts: working_drafts::State,
     dossier: line_dossier::State,
+    cochanges: cochanges::State,
     saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -539,6 +541,7 @@ impl RepoTab {
             content_recovery: Default::default(),
             working_drafts: Default::default(),
             dossier: Default::default(),
+            cochanges: Default::default(),
             saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,

@@ -391,6 +391,7 @@ impl RepoTab {
         self.poll_saved_views(ctx);
         self.poll_content_recovery(ctx);
         self.poll_line_dossier(ctx);
+        self.poll_cochanges(ctx);
         self.poll_working_drafts(ctx);
         if !shown || self.sleeping() {
             return;

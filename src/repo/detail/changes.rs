@@ -46,6 +46,7 @@ impl RepoTab {
                 self.agent_turns(ui, acts);
                 self.unstaged_list(ui, acts);
                 self.staged_list(ui, acts);
+                self.cochange_hints(ui, acts);
             });
     }
 

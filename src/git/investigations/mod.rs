@@ -80,3 +80,5 @@ pub(crate) fn page(
 
 pub(crate) mod dossier;
 pub(crate) mod ignore;
+
+pub(crate) mod cochange;
