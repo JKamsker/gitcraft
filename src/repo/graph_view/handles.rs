@@ -73,9 +73,13 @@ impl RepoTab {
                 .interact(
                     grab,
                     ui.id().with(("col-handle", bar)),
-                    Sense::click_and_drag(),
+                    // Not a Tab stop: the keyboard can't drag it.
+                    Sense::CLICK | Sense::DRAG,
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+            crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {
+                format!("Resize the {} column", bar_name(bar))
+            });
             let active = resp.hovered() || resp.dragged();
             ui.painter().line_segment(
                 [pos2(x, header.top() + 5.0), pos2(x, header.bottom() - 5.0)],
@@ -102,6 +106,18 @@ impl RepoTab {
             // The new widths apply from the next frame: make sure there is one.
             ui.ctx().request_repaint();
         }
+    }
+}
+
+/// The column a bar resizes, as a screen reader says it.
+fn bar_name(bar: Bar) -> &'static str {
+    match bar {
+        Bar::Refs => "branches",
+        Bar::Graph => "graph",
+        Bar::Hash => "hash",
+        Bar::Author => "author",
+        Bar::When => "age",
+        Bar::Date => "date",
     }
 }
 

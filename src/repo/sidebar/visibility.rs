@@ -1,7 +1,7 @@
 //! Hiding and soloing branches from the sidebar: the eye on a branch's row, the entries of its
 //! menu, and how many branches the graph shows.
 
-use egui::{Rect, Response, RichText, Sense, Ui, pos2, vec2};
+use egui::{Rect, Response, RichText, Ui, pos2, vec2};
 
 use crate::icons;
 use crate::repo::branch_visibility::Change;
@@ -89,18 +89,25 @@ pub(super) fn eye(ui: &Ui, row: &Response, full: &str, shown: bool) -> Option<Ac
         pos2(row.rect.left() + 14.0, row.rect.center().y),
         vec2(18.0, 18.0),
     );
-    let resp = ui.interact(rect, row.id.with("eye"), Sense::click());
-    if shown && !row.contains_pointer() && !resp.contains_pointer() {
-        return None;
-    }
-    let t = Tokens::get(ui.ctx());
-    let tint = if resp.hovered() { t.text } else { t.text_faint };
-    icons::paint(ui, rect, if shown { "eye" } else { "eye-off" }, 13.0, tint);
+    // A Tab stop only while it shows to the keyboard (the row or the eye has it) or the branch
+    // is hidden, so a branch row isn't two stops.
+    let id = row.id.with("eye");
+    let keyboard = crate::a11y::keyboard_on(row) || ui.memory(|m| m.has_focus(id));
+    let resp = ui.interact(rect, id, crate::a11y::list_row_sense(keyboard || !shown));
     let tip = if shown {
         "Hide in the graph"
     } else {
         "Show in the graph"
     };
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
+        crate::a11y::labels::join([tip, crate::a11y::labels::ref_name(full)])
+    });
+    if shown && !keyboard && !row.contains_pointer() && !resp.contains_pointer() {
+        return None;
+    }
+    let t = Tokens::get(ui.ctx());
+    let tint = if resp.hovered() { t.text } else { t.text_faint };
+    icons::paint(ui, rect, if shown { "eye" } else { "eye-off" }, 13.0, tint);
     resp.on_hover_text(tip)
         .clicked()
         .then(|| Action::BranchVisibility(Change::Toggle(full.to_owned())))

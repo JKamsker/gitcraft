@@ -119,7 +119,16 @@ impl RepoTab {
                     age_color(&t, line, data.span),
                 );
                 let mid = rect.center().y;
-                let gutter_resp = ui.interact(gutter, ui.id().with(("blame", i)), Sense::click());
+                // One Tab stop per block of lines of a commit, not one per line.
+                let stop = first && !line.uncommitted();
+                let sense = crate::a11y::list_row_sense(stop);
+                let gutter_resp = ui.interact(gutter, ui.id().with(("blame", i)), sense);
+                if stop {
+                    crate::repo::widgets::a11y(&gutter_resp, egui::WidgetType::Button, || {
+                        let short = line.hash.get(..7).unwrap_or(&line.hash);
+                        format!("line {}, go to commit {short}", i + 1)
+                    });
+                }
                 if first {
                     let small = FontId::proportional(11.5);
                     if line.uncommitted() {

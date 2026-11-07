@@ -16,6 +16,7 @@ use egui::{Sense, Ui, vec2};
 
 use super::pinned_sections::{Sections, bottom_gap};
 use super::{Action, RepoTab, widgets};
+use crate::a11y::Named;
 use crate::git::Branch;
 use crate::icons;
 use crate::theme::Tokens;
@@ -124,6 +125,7 @@ impl RepoTab {
         // Level with the filter, then with the first section header.
         col.add_space(5.0);
         if icons::tool_button(&mut col, "search", "", true)
+            .named("Filter branches and tags")
             .on_hover_text("Filter branches and tags")
             .clicked()
         {
@@ -174,6 +176,7 @@ fn section_buttons(
     for (key, icon, tooltip) in sections {
         let Some(tooltip) = tooltip else { continue };
         if icons::tool_button(ui, icon, "", true)
+            .named(tooltip)
             .on_hover_text(tooltip)
             .clicked()
         {

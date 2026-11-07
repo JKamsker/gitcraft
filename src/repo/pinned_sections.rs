@@ -116,6 +116,10 @@ fn header_row(
     let t = Tokens::get(ui.ctx());
     let header = &placed.header;
     let resp = ui.interact(rect, placed.id, Sense::click());
+    crate::repo::widgets::a11y(&resp, egui::WidgetType::CollapsingHeader, || {
+        let count = crate::a11y::labels::count(header.count, "item", "items");
+        crate::a11y::labels::section(header.title, &count, placed.open)
+    });
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, t.card);
     if resp.hovered() {
@@ -168,6 +172,7 @@ fn header_row(
         let b = ui
             .interact(r, placed.id.with("button"), Sense::click())
             .on_hover_text(button.tooltip);
+        crate::repo::widgets::a11y(&b, egui::WidgetType::Button, button.tooltip);
         if b.hovered() {
             ui.painter().rect_filled(r, t.radius_sm, t.pressed);
         }

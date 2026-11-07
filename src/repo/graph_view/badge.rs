@@ -32,6 +32,17 @@ impl Badge {
         }
     }
 
+    /// The pill as a screen reader says it, in a row's name: "branch dev, checked out".
+    pub(super) fn spoken(&self) -> String {
+        match self.kind {
+            BadgeKind::Tag => format!("tag {}", self.label),
+            BadgeKind::DetachedHead => "detached HEAD".to_owned(),
+            BadgeKind::Branch if self.head => format!("branch {}, checked out", self.label),
+            BadgeKind::Branch if !self.local => format!("remote branch {}", self.git_ref()),
+            BadgeKind::Branch => format!("branch {}", self.label),
+        }
+    }
+
     pub(super) fn describe(&self) -> String {
         match self.kind {
             BadgeKind::Tag => format!("tag {}", self.label),

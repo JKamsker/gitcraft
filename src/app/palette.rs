@@ -334,6 +334,7 @@ fn palette_row(
     scroll: bool,
 ) -> bool {
     let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::click());
+    crate::repo::widgets::a11y_selected(&r, || crate::a11y::labels::join([label, hint]), selected);
     if selected {
         ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
         if scroll {

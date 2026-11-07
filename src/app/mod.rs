@@ -380,7 +380,7 @@ impl App {
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
-            || ctx.egui_wants_keyboard_input();
+            || crate::a11y::keyboard_taken(ctx);
         let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
             ctx.input(|i| {
                 let t = i.modifiers.command && i.key_pressed(Key::T);
@@ -555,6 +555,7 @@ impl eframe::App for App {
         self.keep_drafts(&ctx, focused);
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
+        crate::a11y::end_frame(&ctx);
     }
 
     fn on_exit(&mut self) {

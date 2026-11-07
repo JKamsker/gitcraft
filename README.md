@@ -387,6 +387,17 @@ so your config, credentials and hooks apply as usual.
     under the buttons.
   - For any theme: your own accent colour, rounder or square corners, and the graph's lanes in
     the theme's hues, gitcraft's classic ones or colour-blind-safe ones (Okabe–Ito).
+- Keyboard and screen readers: Tab / Shift+Tab move through the toolbar, the sidebar's rows, the
+  file lists, the graph, the tabs and the start page's cards; a painted button or row with the
+  keyboard is ringed in the accent colour (egui's own buttons and fields show their pressed
+  look), and Enter or Space clicks it. The graph is one Tab stop on the selected commit, ↑ / ↓
+  moving the keyboard along. Each painted widget has a name for screen readers (AccessKit): a
+  graph row reads "commit a301da9, Merge…, Jonas, 26 minutes ago, branch dev". Right-click
+  menus and double-clicks (checking out a pill) still need the mouse.
+- Reduced motion: when gitcraft starts it asks the system whether to animate (GNOME's
+  `enable-animations`, KDE's animation speed, macOS' Reduce motion, Windows' "Animate windows
+  when minimizing and maximizing"); with animations off, tabs and panels move into place without
+  sliding. `GITCRAFT_REDUCE_MOTION=1` (or `0`) decides instead.
 
 ## Download
 
@@ -510,6 +521,7 @@ was made this way, on a demo repository.
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
+| `src/a11y/`              | keyboard focus ring, screen-reader names of painted widgets, reduced motion        |
 | `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |
 | `src/terminal.rs`        | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection          |

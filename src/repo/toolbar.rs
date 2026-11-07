@@ -8,6 +8,7 @@ use egui::Ui;
 
 use super::pull::pull_menu;
 use super::{Action, Dialog, RepoTab, ci_status, widgets};
+use crate::a11y::Named;
 use crate::icons;
 use crate::settings::Settings;
 use crate::theme::Tokens;
@@ -24,6 +25,7 @@ impl RepoTab {
             self.repo_buttons(ui, idle, acts);
             widgets::toolbar_separator(ui);
             if icons::tool_button(ui, "refresh-cw", "", !self.loading)
+                .named("Reload (F5)")
                 .on_hover_text("Reload (F5)")
                 .clicked()
             {
@@ -45,6 +47,7 @@ impl RepoTab {
             None => "Nothing to undo".to_owned(),
         };
         if icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
+            .named(&undo_tip)
             .on_hover_text(undo_tip)
             .on_disabled_hover_text("Nothing to undo")
             .clicked()
@@ -56,6 +59,7 @@ impl RepoTab {
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
+            .named(&redo_tip)
             .on_hover_text(redo_tip)
             .on_disabled_hover_text("Nothing to redo")
             .clicked()
@@ -87,6 +91,7 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
+                .named(|| behind_ahead("Pull", behind, "behind"))
                 .on_hover_text(mode.tip());
         if pull.clicked() {
             acts.push(Action::Pull);
@@ -101,6 +106,7 @@ impl RepoTab {
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
         if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
+            .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
             .clicked()
         {
@@ -144,8 +150,9 @@ impl RepoTab {
         if terminal.clicked() {
             acts.push(Action::ToggleTerminal);
         }
-        let search =
-            icons::tool_button(ui, "search", "", true).on_hover_text("Search commits (Ctrl+F)");
+        let search = icons::tool_button(ui, "search", "", true)
+            .named("Search commits (Ctrl+F)")
+            .on_hover_text("Search commits (Ctrl+F)");
         if self.search.open {
             widgets::active_underline(ui, search.rect, t.accent);
         }
@@ -153,6 +160,7 @@ impl RepoTab {
             acts.push(Action::ToggleSearch);
         }
         let open = icons::tool_button(ui, "external-link", "", true)
+            .named("Open the folder or the repository's page")
             .on_hover_text("Open the folder or the repository's page…");
         let page = self.web_page();
         egui::Popup::menu(&open)
@@ -280,6 +288,12 @@ pub(crate) fn reveal_label() -> &'static str {
     } else {
         "Open folder"
     }
+}
+
+/// Pull or Push as a screen reader says it: "Pull, 2 behind".
+fn behind_ahead(name: &str, n: u32, how: &str) -> String {
+    let count = (n > 0).then(|| format!("{n} {how}"));
+    crate::a11y::labels::join([name, count.as_deref().unwrap_or("")])
 }
 
 fn short_duration(d: Duration) -> String {

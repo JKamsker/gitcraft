@@ -13,7 +13,7 @@ use super::row::Row;
 use crate::ci::CheckState;
 use crate::icons;
 use crate::repo::columns::Cols;
-use crate::repo::{Action, RepoTab, ci_status};
+use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -258,6 +258,7 @@ impl RepoTab {
             _ => "double-click to check out",
         };
         let resp = resp.on_hover_text(format!("{} ({hint})", b.describe()));
+        widgets::a11y(&resp, egui::WidgetType::Button, || b.spoken());
         if resp.double_clicked() {
             if let Some(act) = self.pill_checkout(b) {
                 acts.push(act);

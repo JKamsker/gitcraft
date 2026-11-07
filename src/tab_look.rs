@@ -122,6 +122,11 @@ pub fn menu(ui: &mut Ui, look: &TabLook) -> Option<TabLook> {
                     for &(name, what) in row {
                         let (rect, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
                         let current = look.icon() == name;
+                        crate::repo::widgets::a11y_selected(
+                            &resp,
+                            || format!("Icon {what}"),
+                            current,
+                        );
                         if current {
                             ui.painter().rect_filled(
                                 rect,
@@ -155,6 +160,11 @@ pub fn menu(ui: &mut Ui, look: &TabLook) -> Option<TabLook> {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 for color in TabColor::ALL {
                     let (rect, resp) = ui.allocate_exact_size(vec2(25.0, 25.0), Sense::click());
+                    crate::repo::widgets::a11y_selected(
+                        &resp,
+                        || format!("Highlight {}", color.label()),
+                        color == look.color,
+                    );
                     let c = rect.center();
                     if color == look.color {
                         ui.painter()

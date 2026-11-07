@@ -170,6 +170,9 @@ fn delete_tag_undo(name: &str, object: &str) -> Undo {
 fn plain_row(ui: &mut Ui, key: impl egui::AsIdSalt, icon: &str, name: &str, sub: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, key);
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        crate::a11y::labels::join([name, sub])
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }

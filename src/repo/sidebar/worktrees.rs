@@ -2,6 +2,7 @@
 
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
+use crate::a11y::labels;
 use crate::git::Worktree;
 use crate::icons;
 use crate::repo::pinned_sections::{Button, Header, Sections};
@@ -62,6 +63,15 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
     // Known by its folder, not its place: one added or removed in the terminal shifts the rows,
     // and a menu left open (Lock, Prune…) must stay this worktree's.
     let (rect, r) = widgets::keyed_row(ui, 36.0, ("worktree-row", &wt.path));
+    widgets::a11y(&r, egui::WidgetType::Button, || {
+        let notes = [
+            (wt.current, "open here"),
+            (wt.locked.is_some(), "locked"),
+            (wt.prunable.is_some(), "prunable"),
+        ];
+        let path = crate::remote::display(&wt.path);
+        labels::worktree(&path, wt.branch.as_deref(), wt.changes, &notes)
+    });
     let painter = ui.painter_at(rect);
     if wt.current {
         painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.14));

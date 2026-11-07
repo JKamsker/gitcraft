@@ -4,6 +4,7 @@
 use egui::{Key, Ui};
 
 use super::{Action, RepoTab, pr_review, widgets};
+use crate::a11y::Named;
 use crate::icons;
 use crate::settings::Settings;
 use crate::theme::Tokens;
@@ -116,7 +117,7 @@ impl RepoTab {
     /// the next and previous change of a diff.
     fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
-            self.dialog.is_none() && !self.keys_blocked && !ctx.egui_wants_keyboard_input();
+            self.dialog.is_none() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
@@ -268,6 +269,7 @@ fn panel_toggle(ui: &mut Ui, icon: &str, name: &str, open: bool) -> bool {
         format!("Show the {name} panel")
     };
     icons::tool_button(ui, icon, "", true)
+        .named(&tip)
         .on_hover_text(tip)
         .clicked()
 }

@@ -157,7 +157,7 @@ impl App {
                 _ => ctx.animate_value_with_time(
                     id.with("x"),
                     place.get(i).copied().unwrap_or(strip.left()),
-                    TAB_SLIDE,
+                    crate::a11y::motion::seconds(&ctx, TAB_SLIDE),
                 ),
             };
             let rect = Rect::from_min_size(pos2(x, strip.top()), vec2(title.width, TAB_H));

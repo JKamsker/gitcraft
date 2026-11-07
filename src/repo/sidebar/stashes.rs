@@ -46,6 +46,11 @@ impl RepoTab {
                 ui.id().with(("stash-row", &stash.hash)),
                 Sense::click(),
             );
+            crate::repo::widgets::a11y_selected(
+                &r,
+                || crate::a11y::labels::stash(&stash.name, &stash.message),
+                self.stash_view == Some(i),
+            );
             if self.stash_view == Some(i) {
                 ui.painter().rect_filled(rect, 0.0, t.row_selected);
             } else if r.hovered() {

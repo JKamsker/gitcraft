@@ -160,6 +160,13 @@ pub fn tool_button_count(
     };
     ui.add_enabled(enabled, |ui: &mut Ui| {
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 28.0), Sense::click());
+        // An icon-only button is named where it is used (`a11y::Named`), after what it does.
+        if !label.is_empty() {
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                let count = (count > 0).then(|| count.to_string());
+                crate::a11y::labels::join([label, &count.unwrap_or_default()])
+            });
+        }
         let r = egui::CornerRadius::same(t.radius_sm as u8);
         if resp.is_pointer_button_down_on() {
             ui.painter().rect_filled(rect, r, t.pressed);
@@ -205,6 +212,7 @@ pub fn tool_button_count(
 pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, tooltip);
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
@@ -223,6 +231,7 @@ pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
 pub fn bar_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, tooltip);
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius, t.pressed);
     }

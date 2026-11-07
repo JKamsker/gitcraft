@@ -2,11 +2,13 @@
 
 use std::path::Path;
 
-use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, WidgetType, pos2, vec2};
 
 use super::App;
+use crate::a11y::labels;
 use crate::git;
 use crate::icons;
+use crate::repo::widgets;
 use crate::theme::{self, Tokens};
 
 enum RecentClick {
@@ -196,6 +198,9 @@ impl App {
 fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 116.0), Sense::click());
+    widgets::a11y(&resp, WidgetType::Button, || {
+        labels::join([title, subtitle])
+    });
     let fill = if resp.hovered() { t.hover } else { t.card };
     let stroke = if resp.hovered() {
         t.accent
@@ -237,6 +242,7 @@ fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str)
 fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
+    widgets::a11y(&resp, WidgetType::Button, || crate::remote::display(path));
     let hovered = resp.hovered();
     if hovered {
         ui.painter().rect_filled(rect, t.radius, t.hover);
@@ -275,11 +281,15 @@ fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
         t.text_faint,
     );
     let mut forget = false;
-    if hovered || ui.rect_contains_pointer(rect) {
+    // Shown to the keyboard too, while the row or the button has it.
+    let forget_id = resp.id.with("forget");
+    let keyboard = crate::a11y::keyboard_on(&resp) || ui.memory(|m| m.has_focus(forget_id));
+    if hovered || keyboard || ui.rect_contains_pointer(rect) {
         let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
         let x = ui
-            .interact(x_rect, resp.id.with("forget"), Sense::click())
+            .interact(x_rect, forget_id, Sense::click())
             .on_hover_text("Remove from list");
+        widgets::a11y(&x, WidgetType::Button, "Remove from list");
         if x.hovered() {
             ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
         }
