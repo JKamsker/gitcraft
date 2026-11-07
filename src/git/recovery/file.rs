@@ -16,6 +16,15 @@ impl PartialEq for RootPin {
     }
 }
 impl Eq for RootPin {}
+impl RootPin {
+    /// A caller must enter the captured repository directory before this guard.
+    /// The shell's cwd then retains that object through subsequent relative operations.
+    pub(crate) fn remote_guard(&self) -> String {
+        use crate::remote::sh_quote;
+        format!("[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .)\" = {} ] || exit 1\n", sh_quote(&self.physical), sh_quote(&self.token))
+    }
+}
+
 pub(super) fn capture(reader: &Reader<'_>, root: &str) -> Result<RootPin, String> {
     if let Some(target) = crate::remote::parse(reader.repo) {
         let out = crate::remote::exec(
@@ -98,6 +107,12 @@ fn native_token(file: &std::fs::File) -> Result<String, String> {
     }
     Ok(format!("{}:{}", meta.dev(), meta.ino()))
 }
+#[cfg(unix)]
+pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64), String> {
+    use std::os::unix::fs::MetadataExt;
+    let meta=file.metadata().map_err(|e|e.to_string())?;
+    Ok((format!("{}:{}",meta.dev(),meta.ino()),meta.nlink()))
+}
 #[cfg(windows)]
 fn local_pin(root: &Path) -> Result<RootPin, String> {
     use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -119,14 +134,18 @@ fn local_pin(root: &Path) -> Result<RootPin, String> {
     })
 }
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn native_token(file: &std::fs::File) -> Result<String, String> {
+    native_file_identity(file).map(|(token, _)| token)
+}
+#[cfg(windows)]
+#[allow(unsafe_code)]
+pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64), String> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
     };
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    // SAFETY: file owns a live directory handle throughout this synchronous call;
+    // SAFETY: file owns a live file/directory handle throughout this synchronous call;
     // info is a valid, writable output structure of the exact API type and size.
     if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
         return Err(std::io::Error::last_os_error().to_string());
@@ -134,10 +153,10 @@ fn native_token(file: &std::fs::File) -> Result<String, String> {
     if info.nFileIndexHigh == 0 && info.nFileIndexLow == 0 {
         return Err("This filesystem does not expose a usable directory identity".into());
     }
-    Ok(format!(
+    Ok((format!(
         "{}:{}:{}",
         info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow
-    ))
+    ),u64::from(info.nNumberOfLinks)))
 }
 #[cfg(not(any(unix, windows)))]
 fn local_pin(_: &Path) -> Result<RootPin, String> {
@@ -267,7 +286,7 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
         "umask 077\ncd -P -- {} || exit 1\nrecovery_root=$(pwd -P) || exit 1\n[ \"$recovery_root\" = / ] && recovery_root=\n",
         sh_quote(root)
     );
-    script.push_str(&format!("[ \"$(pwd -P)\" = {} ] || exit 1\n[ \"$(LC_ALL=C TZ=UTC0 stat -c '%d:%i:%z' .)\" = {} ] || exit 1\n",sh_quote(&pin.physical),sh_quote(&pin.token)));
+    script.push_str(&pin.remote_guard());
     script.push_str(&format!("recovery_metadata=$(cd -P -- {} && pwd -P) || exit 1\n[ \"$recovery_metadata\" = / ] && recovery_metadata=\n[ \"$recovery_root\" != \"$recovery_metadata\" ] || exit 1\n", sh_quote(&identity.common)));
     let mut relative = String::new();
     for parent in parents {
@@ -293,7 +312,7 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
     Ok(script)
 }
 #[cfg(unix)]
-fn parent(
+pub(crate) fn parent(
     root: &Path,
     common: &Path,
     path: &str,
@@ -372,7 +391,7 @@ fn physical_ancestors(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     Ok(paths)
 }
 #[cfg(windows)]
-fn windows_parent(
+pub(crate) fn windows_parent(
     root: &Path,
     common: &Path,
     path: &str,
