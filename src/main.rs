@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
+use eframe::egui_wgpu::{SurfaceConfig, WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew, wgpu};
 use gitcraft::app;
 
 fn main() -> eframe::Result {
@@ -102,6 +102,9 @@ fn wgpu_options() -> WgpuConfiguration {
     }
 
     WgpuConfiguration {
+        // Prefer lower memory and input latency over queueing another frame. On macOS the
+        // extra full-window drawable alone costs 16 MiB at 2800×1720.
+        surface: SurfaceConfig::LOW_LATENCY,
         wgpu_setup: WgpuSetup::CreateNew(setup),
         ..Default::default()
     }

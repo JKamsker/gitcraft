@@ -232,6 +232,7 @@ impl App {
         let ctx = &cc.egui_ctx;
         egui_extras::install_image_loaders(ctx);
         crate::image_fit::install(ctx);
+        crate::image_cache::install(ctx);
         theme::install_fonts(ctx);
         let mut settings = saved.settings;
         theme::apply(ctx, &saved.theme, &settings.theme_tweaks);
@@ -674,6 +675,7 @@ impl App {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        crate::image_cache::maintain(&ctx);
         let t = Tokens::get(&ctx);
         // A button dropped moves in the settings, read just below.
         crate::app_buttons::begin_frame(&ctx);

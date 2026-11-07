@@ -24,6 +24,7 @@ mod forge;
 mod git;
 mod graph;
 mod icons;
+mod image_cache;
 mod image_fit;
 mod instance;
 mod keymap;

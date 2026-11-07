@@ -46,11 +46,14 @@ pub fn ready(
         let img = if scaled {
             let w = ((f64::from(width) * factor).round() as u32).max(1);
             let h = ((f64::from(height) * factor).round() as u32).max(1);
-            img.resize_exact(w, h, image::imageops::FilterType::Triangle)
+            let resized = img.resize_exact(w, h, image::imageops::FilterType::Triangle);
+            // Release the large decoded original before allocating the display pixels.
+            drop(img);
+            resized
         } else {
             img
         };
-        let rgba = img.to_rgba8();
+        let rgba = img.into_rgba8();
         let size = [rgba.width() as usize, rgba.height() as usize];
         Decoded {
             image: Arc::new(ColorImage::from_rgba_unmultiplied(size, rgba.as_raw())),
