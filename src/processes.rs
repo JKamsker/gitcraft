@@ -562,7 +562,7 @@ async fn execute(
                             if let Some(consume) = &mut options.stderr {
                                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n])));
                             }
-                            append(&mut stderr, &ebuf[..n], options.output_limit, &mut overflow);
+                            append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
                         }
                     }
                 }
