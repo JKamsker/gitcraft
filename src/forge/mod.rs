@@ -18,6 +18,7 @@ mod gitlab;
 pub(crate) mod http;
 pub mod inbox;
 pub mod links;
+pub(crate) mod ssh_keys;
 pub mod stack;
 #[cfg(test)]
 mod stack_tests;
@@ -894,3 +895,7 @@ mod tests {
         );
     }
 }
+
+pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
+
+pub(crate) use http::environment_proxy;

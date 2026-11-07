@@ -92,9 +92,14 @@ pub(super) fn credentials(
     if refused {
         ui.colored_label(
             t.danger,
-            "Those credentials were refused. Check them and try again.",
+            "The server refused the sign-in. A 401 or 403 immediately after signing in often means the wrong account is stored, or that this account lacks repository access.",
         );
         ui.add_space(6.0);
+        if crate::settings::network_page::valid_https(url)
+            && ui.button("Forget stored account and switch…").clicked()
+        {
+            return Outcome::Done(Box::new(Action::SwitchHttps(url.to_owned())));
+        }
     }
     field(ui, username, "Username", focus);
     ui.add_space(4.0);

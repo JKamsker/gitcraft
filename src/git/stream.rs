@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use super::command::{Extra, git_cmd, remote_request, with_profile};
+use super::command::{Extra, remote_request, repository_command};
 use crate::remote::{self, Host};
 
 /// What the script on another machine prints first: the process of the shell it runs in,
@@ -193,9 +193,8 @@ fn stream_here(
     stopper: &Stopper,
     line: impl FnMut(String),
 ) -> Result<Option<i32>, String> {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

@@ -54,6 +54,8 @@ impl App {
                 || self.teleport.is_some()
                 || self.askpass_open()
                 || self.palette.is_some()
+                || self.practice_open
+                || self.setup.open
                 || self.manual_open
                 || self.my_work.open,
             update: self.update_check(),
@@ -68,11 +70,27 @@ impl App {
             unpin: false,
             request: None,
         };
+        let mut repositories = self.recent.clone();
+        for tab in &self.tabs {
+            if let Tab::Repo(repo) = tab
+                && !repositories.contains(&repo.path)
+            {
+                repositories.push(repo.path.clone());
+            }
+        }
+        crate::settings::network_page::repositories(&ctx, repositories);
         let tweaks = self.settings.theme_tweaks;
         if self.settings.page(ui, &mut view) {
             self.settings.set(&ctx);
             if self.settings.theme_tweaks != tweaks {
                 self.apply_theme(&ctx);
+            }
+        }
+        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
+            for tab in &mut self.tabs {
+                if let Tab::Repo(repo) = tab {
+                    repo.forget_https_memory(&path, &url);
+                }
             }
         }
         let check_now = view.check_updates_now;
@@ -118,7 +136,7 @@ impl App {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             close = true;
                         }
-                        let tip = "Copies what a bug report needs: versions, system, graphics, \
+                        let tip = "Copies diagnostics and opens a prefilled issue for review: versions, system, graphics, \
                                    git, gh, glab and tea (signed in or not, never a token), and \
                                    the git settings in effect (no name or email)";
                         if ui

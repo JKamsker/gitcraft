@@ -5,7 +5,9 @@
 use std::path::Path;
 use std::time::Duration;
 
-use super::command::{Extra, git_cmd, remote_request, with_profile};
+#[cfg(test)]
+use super::command::git_cmd;
+use super::command::{Extra, remote_request, repository_command};
 use crate::remote;
 
 /// Runs git with `args` in `dir`, `input` on its standard input, and stops it (with what it
@@ -69,9 +71,8 @@ fn run_here(
     limit: Duration,
     what: &str,
 ) -> Result<Finished, String> {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     let out = crate::processes::run(
         cmd,
         crate::processes::Options {

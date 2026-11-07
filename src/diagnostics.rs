@@ -5,6 +5,8 @@
 //! or an email; a setting whose value is a path says only that it is set, and any folder of a
 //! user's (`/home/x`, `C:\Users\x`, `/mnt/c/Users/x`…) is written `~`.
 
+pub(crate) mod crash;
+
 use std::path::{Path, PathBuf};
 
 use crate::git::doctor::config::{self, SETTINGS};
@@ -30,7 +32,11 @@ pub fn collect(facts: &Facts) -> String {
     let tools: Vec<crate::forge::ToolReport> = std::thread::scope(|scope| {
         let asked: Vec<_> = ["gh", "glab", "tea"]
             .into_iter()
-            .map(|tool| scope.spawn(move || crate::forge::tool_report(tool)))
+            .map(|tool| {
+                scope.spawn(crate::connections::inherit(move || {
+                    crate::forge::tool_report(tool)
+                }))
+            })
             .collect();
         asked.into_iter().filter_map(|t| t.join().ok()).collect()
     });
@@ -129,6 +135,17 @@ pub fn report(
             }
             out.push_str("```\n");
         }
+    }
+    if let Some(panic) = crash::last() {
+        out.push_str("\nLast panic (local log; paths and known secret forms redacted):\n\n");
+        out.push_str(&panic);
+        out.push('\n');
+    }
+    out.push_str("\nRecent operations (arguments, output and paths omitted):\n");
+    for row in crash::recent() {
+        out.push_str("- ");
+        out.push_str(&row);
+        out.push('\n');
     }
     redact_users(&redact_home(&out, home))
 }
@@ -402,5 +419,44 @@ mod tests {
         );
         assert!(text.contains("repository on this machine"));
         Ok(())
+    }
+}
+
+/// A bounded prefilled issue URL. Full diagnostics remain on the clipboard.
+pub(crate) fn issue_url(report: &str) -> String {
+    let mut body = String::from("Please describe what happened and how to reproduce it.\n\n");
+    for line in report.lines() {
+        if encode(&(body.clone() + line)).len() > 6500 {
+            body.push_str("\n[Remaining diagnostics are on the clipboard.]\n");
+            break;
+        }
+        body.push_str(line);
+        body.push('\n');
+    }
+    format!(
+        "https://github.com/JKamsker/gitcraft/issues/new?title=Bug%20report&body={}",
+        encode(&body)
+    )
+}
+fn encode(text: &str) -> String {
+    let mut out = String::new();
+    for b in text.bytes() {
+        if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod issue_tests {
+    #[test]
+    fn issue_link_is_encoded_bounded_and_preserves_full_lines() {
+        let url = super::issue_url("A & B?\n".repeat(5000).as_str());
+        assert!(url.starts_with("https://github.com/JKamsker/gitcraft/issues/new?"));
+        assert!(url.contains("%26") && url.len() < 7200 && !url.contains('\n'));
+        assert!(url.contains("clipboard"));
     }
 }

@@ -39,6 +39,9 @@ pub(super) struct CiStatuses {
 }
 
 impl CiStatuses {
+    pub(super) fn account_changed(&mut self) {
+        self.moved_to(self.project.clone());
+    }
     /// The repository's builds are now read from `project` (its remotes changed): what was read
     /// from the one before goes, along with the answer still on its way from there. That one
     /// keeps the slot until it comes, so the two can't land in the wrong order.

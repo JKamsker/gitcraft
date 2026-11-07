@@ -94,6 +94,7 @@ mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 #[cfg(test)]
 mod process_benchmarks;
 pub(crate) mod pull;
@@ -112,6 +113,7 @@ mod running;
 #[cfg(test)]
 mod samples;
 mod sidebar;
+mod ssh_setup;
 mod stack;
 mod state;
 mod surgery;
@@ -121,6 +123,7 @@ mod test_lane;
 mod tests;
 mod timeline;
 mod toolbar;
+mod tour;
 mod unity;
 mod versions;
 mod watch;
@@ -233,6 +236,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
@@ -293,6 +299,8 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    tour: Option<tour::TourView>,
+    ssh_setup: Option<ssh_setup::State>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -326,6 +334,7 @@ pub struct RepoTab {
     push_flow: push::PushFlow,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
+    connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
@@ -575,6 +584,9 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
             unity: Default::default(),
@@ -610,6 +622,8 @@ impl RepoTab {
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            tour: None,
+            ssh_setup: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
@@ -628,6 +642,7 @@ impl RepoTab {
             reword: None,
             push_flow: Default::default(),
             credentials: None,
+            connection_context: crate::connections::current(),
             last_op: None,
             error_card: None,
             avatars_hinted: false,

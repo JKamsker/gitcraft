@@ -55,7 +55,7 @@ impl Thumbs {
         if s.running < WORKERS {
             s.running += 1;
             let (shared, ctx, repo) = (self.shared.clone(), ctx.clone(), repo.to_path_buf());
-            std::thread::spawn(move || work(&shared, &ctx, &repo));
+            crate::connections::spawn(move || work(&shared, &ctx, &repo));
         }
         Thumb::Loading
     }

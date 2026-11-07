@@ -125,11 +125,21 @@ fn prepared(
 ) -> Result<(Command, impl Fn(std::io::Error) -> String), String> {
     let mut cmd = tool_command(tool);
     let remote = crate::remote::parse(repo).is_some();
-    if remote {
+    let context = crate::connections::current();
+    if let Some(error) = &context.error {
+        return Err(error.clone());
+    }
+    let selected = if tool == "gh" {
+        context.choices.github.selected()
+    } else {
+        context.choices.gitlab.selected()
+    };
+    if remote || selected {
         // The tool runs here, where the user signed in to it, about the repository there:
         // named rather than found from the folder, which it can't read.
         let forge = forge_of(tool)?;
         let (host, path) = remote_location(repo, forge)?;
+        crate::connections::configure_cli(&mut cmd, tool, &host)?;
         // The hosts the arguments name (`--hostname`, `-R host/owner/repo`) were read when the
         // tab loaded: only the one just checked, so a changed `origin` can't send the tool, and
         // a token, to the one before.
@@ -285,6 +295,17 @@ const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
 /// said is remembered: yes while the app runs, no for [`NOT_SIGNED_IN_FOR`].
 /// An error when the tool can't be run at all (not installed).
 fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
+    let context = crate::connections::current();
+    let account = if tool == "gh" {
+        &context.choices.github
+    } else {
+        &context.choices.gitlab
+    };
+    if account.selected() {
+        account.validate()?;
+        return Ok(account.host.eq_ignore_ascii_case(host));
+    }
+
     use std::sync::{Mutex, OnceLock};
     type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
     static KNOWN: OnceLock<Known> = OnceLock::new();
@@ -351,7 +372,7 @@ fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
 
 /// The forge's tool, set to answer this repository in plain JSON.
 fn tool_command(tool: &str) -> Command {
-    let mut cmd = Command::new(tool);
+    let mut cmd = Command::new(crate::connections::program(tool));
     cmd.env("GH_PROMPT_DISABLED", "1").env("NO_PROMPT", "1");
     // What it prints is read as JSON: `CLICOLOR_FORCE` or `GH_FORCE_TTY` in the user's
     // environment would colour it even into a pipe, escape codes no JSON reader takes.

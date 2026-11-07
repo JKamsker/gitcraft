@@ -291,7 +291,9 @@ pub fn run_tests(
     std::thread::scope(|s| {
         for scratch in &scratches {
             let shared = &shared;
-            s.spawn(move || work(shared, &scratch.path));
+            s.spawn(crate::connections::inherit(move || {
+                work(shared, &scratch.path)
+            }));
         }
     });
     let mut cleanup = Vec::new();

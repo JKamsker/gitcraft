@@ -6,25 +6,9 @@ pub(super) mod bounded;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::RwLock;
-
-/// The config file the active gitcraft profile has git read as its global config (see
-/// `settings::profiles`), if it sets anything.
-static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Has every git command from now on read `path` as its global config, or the user's own again
-/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
-/// `--worktree`) wins over it.
-pub fn set_profile_config(path: Option<PathBuf>) {
-    if let Ok(mut current) = PROFILE_CONFIG.write() {
-        *current = path;
-    }
-}
-
-/// The active profile's config file, when git reads it as the global config (see
-/// [`set_profile_config`]).
+/// The initiating task's immutable profile config (including queued and nested reads).
 pub fn profile_config() -> Option<PathBuf> {
-    PROFILE_CONFIG.read().ok().and_then(|p| p.clone())
+    crate::connections::current().git_config
 }
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
@@ -56,7 +40,17 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
     if user_global_config(args) {
         return;
     }
-    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    let context = crate::connections::current();
+    if context.error.is_some() {
+        cmd.arg("-c").arg("=invalid-profile");
+        return;
+    }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    let path = context.git_config;
     if let Some(path) = path {
         cmd.env("GIT_CONFIG_GLOBAL", path);
     }
@@ -64,6 +58,10 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod connection;
+mod setup;
+pub(crate) use connection::*;
+pub(crate) use setup::{setup_clone, setup_fetch, setup_run};
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
@@ -197,11 +195,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
+    let mut cmd = repository_command(dir, args);
     cmd.args(&extra.pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
@@ -579,9 +573,8 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
             &remote_request(&target, &Extra::default(), args),
         );
     }
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -951,6 +944,7 @@ impl Recorded {
         creds: Option<&Credentials>,
         started: std::time::Instant,
     ) -> Self {
+        crate::diagnostics::crash::operation(args, code, started.elapsed());
         let password = creds.map(|c| c.password.as_str());
         Self {
             args: args.iter().map(|a| super::redact(a, password)).collect(),
@@ -1358,4 +1352,113 @@ mod tests {
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
+}
+
+/// Bounded, read-only repository tour requests. Callers supply only fixed Git operations.
+pub(crate) fn tour_read(
+    repo: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    bounded::run(repo, args, input.unwrap_or_default().to_vec(), 64 << 20)
+}
+
+/// All local execution routes, including streaming and watched operations, use this builder.
+pub(super) fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
+    if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
+        return practice_command(dir);
+    }
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
+    if let Some(dir) = dir {
+        cmd.arg("-C").arg(dir);
+    }
+    cmd
+}
+fn practice_command(dir: &Path) -> Command {
+    let mut cmd = git_cmd();
+    for name in crate::practice::ISOLATED_ENV_REMOVE {
+        cmd.env_remove(name);
+    }
+    for (name, value) in crate::practice::ISOLATED_ENV_SET {
+        cmd.env(name, value);
+    }
+    cmd.arg("--no-replace-objects").arg("-C").arg(dir);
+    cmd
+}
+pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
+    if remote::is_remote(dir) {
+        return Err("Practice repositories are local".into());
+    }
+    let mut cmd = practice_command(dir);
+    cmd.args(args);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            timeout: Some(std::time::Duration::from_secs(30)),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}
+
+#[cfg(test)]
+mod practice_environment_tests {
+    use super::*;
+    #[test]
+    fn synthetic_practice_command_removes_every_inherited_route() {
+        let cmd = practice_command(Path::new("sandbox"));
+        let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        for name in crate::practice::ISOLATED_ENV_REMOVE {
+            assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+        }
+        for (name, value) in crate::practice::ISOLATED_ENV_SET {
+            assert_eq!(
+                env.get(std::ffi::OsStr::new(name)).copied().flatten(),
+                Some(std::ffi::OsStr::new(value)),
+                "{name}"
+            );
+        }
+        assert!(cmd.get_args().any(|a| a == "--no-replace-objects"));
+    }
+}
+
+pub(crate) fn onboarding_local_config(
+    repo: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    if !active() {
+        return Err("Export cancelled".into());
+    }
+    let bytes = execute(
+        Some(repo),
+        &Extra {
+            timeout: Some(std::time::Duration::from_secs(20)),
+            output_limit: Some(65536),
+            ..Default::default()
+        },
+        &["config", "--local", "--null", "--get", key],
+    )?;
+    if bytes.code == Some(1) {
+        return Ok(None);
+    }
+    if bytes.code != Some(0) {
+        return Err("Could not inspect local setup configuration".into());
+    }
+    let value = bytes
+        .stdout
+        .strip_suffix(&[0])
+        .ok_or("Invalid configuration response")?;
+    String::from_utf8(value.to_vec())
+        .map(Some)
+        .map_err(|_| "Local configuration is not UTF-8".into())
 }
