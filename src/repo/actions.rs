@@ -13,6 +13,7 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    Keyboard(super::keyboard::Request),
     Select(usize),
     SelectHash(String),
     SelectStash(usize),

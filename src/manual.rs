@@ -107,6 +107,10 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+P", "Command palette: every action and branch"),
             ("Cmd+,", "Settings"),
             ("F5", "Reload the repository"),
+            (
+                "Cmd+Alt+1 / 2 / 3",
+                "Focus sidebar / graph or diff / detail pane",
+            ),
             ("F1", "This manual"),
         ],
     ),
@@ -125,6 +129,16 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Changes",
         &[
             ("Cmd+Enter", "Commit (from the message fields)"),
+            ("j / k", "Next / previous file in the focused detail pane"),
+            (
+                "Space",
+                "Stage / unstage the selected file; conflicts are excluded",
+            ),
+            ("Enter", "Open the selected file's diff"),
+            (
+                "S / U / D",
+                "Stage / unstage / confirm discard of the current diff hunk",
+            ),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",

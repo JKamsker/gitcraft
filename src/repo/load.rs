@@ -152,6 +152,7 @@ impl RepoTab {
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
         let read = self.next_read();
+        self.work_pending = read;
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || Msg::Status(read, git::status(&path)));
     }
@@ -367,6 +368,9 @@ impl RepoTab {
         self.history = loaded.history;
         // A status read since this reload started is newer.
         if Self::newer(loaded.read, &mut self.work_read) {
+            if loaded.read >= self.work_pending {
+                self.work_pending = 0;
+            }
             self.work = loaded.work;
         }
         // The last counts of worktrees this read left uncounted (on another machine) stay
