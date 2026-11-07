@@ -112,6 +112,7 @@ mod test_lane;
 mod tests;
 mod timeline;
 mod toolbar;
+mod tour;
 mod unity;
 mod versions;
 mod watch;
@@ -284,6 +285,7 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    tour: Option<tour::TourView>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -588,6 +590,7 @@ impl RepoTab {
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            tour: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,

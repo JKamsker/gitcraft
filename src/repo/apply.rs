@@ -89,6 +89,7 @@ impl RepoTab {
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
+            Action::OpenTour => self.open_tour(true, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),

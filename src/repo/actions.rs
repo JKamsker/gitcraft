@@ -62,6 +62,7 @@ pub(crate) enum Action {
     /// Show the repository doctor in the big area, at a section.
     OpenDoctor(doctor::Section),
     CloseDoctor,
+    OpenTour,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
     /// Agent tasks and the worktree setup recipe.

@@ -297,6 +297,13 @@ impl RepoTab {
         if search.clicked() {
             acts.push(Action::ToggleSearch);
         }
+        if ui
+            .button("Tour")
+            .on_hover_text("README, workflow, contributors and setup checklist")
+            .clicked()
+        {
+            acts.push(Action::OpenTour);
+        }
         let doctor = icons::tool_button(ui, "wrench", "", true).on_hover_text(
             "Repository doctor: ignore rules, hooks, health, configuration, hidden changes",
         );

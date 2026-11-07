@@ -1359,3 +1359,12 @@ mod tests {
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
     }
 }
+
+/// Bounded, read-only repository tour requests. Callers supply only fixed Git operations.
+pub(crate) fn tour_read(
+    repo: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    bounded::run(repo, args, input.unwrap_or_default().to_vec(), 64 << 20)
+}

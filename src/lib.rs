@@ -56,6 +56,7 @@ mod tasks;
 mod teleport;
 mod terminal;
 mod theme;
+mod tour;
 mod update;
 mod vscode_theme;
 mod weakened;

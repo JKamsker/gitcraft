@@ -129,6 +129,8 @@ impl RepoTab {
                     && self.docked(Panel::Diff)
                 {
                     self.diff_view(ui, &mut acts);
+                } else if self.tour.is_some() {
+                    self.tour_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
