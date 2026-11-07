@@ -125,8 +125,9 @@ mod tests {
                 let _ = std::fs::remove_dir_all(&self.0);
             }
         }
-        let _cleanup = Cleanup(repo.parent().unwrap().to_owned());
-        let record = repo.parent().unwrap().join("helper-record");
+        let root = repo.parent().ok_or("No owned credential fixture root")?;
+        let _cleanup = Cleanup(root.to_owned());
+        let record = root.join("helper-record");
         let quoted = crate::remote::sh_quote(&record.to_string_lossy());
         let helper = format!(
             "!f() {{ printf '%s\\n' \"$1\" >> {quoted}; while IFS= read -r line && test -n \"$line\"; do case \"$line\" in host=*|path=*) printf '%s\\n' \"$line\" >> {quoted};; esac; done; if test \"$1\" = get; then printf 'username=fixture-account\\npassword=fixture-secret\\n'; fi; }}; f"

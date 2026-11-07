@@ -176,7 +176,7 @@ impl RepoTab {
 mod tests {
     use super::*;
     #[test]
-    fn closed_or_replaced_tour_rejects_stale_results() {
+    fn closed_or_replaced_tour_rejects_stale_results() -> Result<(), String> {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/tour-generation".into(), &ctx);
         tab.tour = Some(TourView {
@@ -195,7 +195,11 @@ mod tests {
                 .as_ref()
                 .is_some_and(|v| v.loading && v.error.is_none())
         );
-        let cancelled = tab.tour.as_ref().unwrap()._jobs.0.clone();
+        let cancelled = tab
+            .tour
+            .as_ref()
+            .map(|v| v._jobs.0.clone())
+            .ok_or("fixture tour missing")?;
         assert!(
             tab.current_view().is_none(),
             "the tour must not be recorded as the graph"
@@ -207,5 +211,6 @@ mod tests {
         );
         tab.tour_arrived(2, Err("closed".into()));
         assert!(tab.tour.is_none());
+        Ok(())
     }
 }

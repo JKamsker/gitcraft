@@ -153,13 +153,14 @@ impl Settings {
                 let selected=remotes.iter().find(|(name,_)|name==&s.remote).cloned();
                 if https {
                     let selected=selected.filter(|(_,url)|valid_https(url));
-                    if ui.add_enabled(!busy&&selected.is_some(),egui::Button::new("Inspect helper and account")).clicked(){let p=s.repo.clone();let url=selected.as_ref().unwrap().1.clone();s.launch(ui.ctx(),move||{let helpers=crate::git::connection_read(&p,&["config","--get-urlmatch","credential.helper",&url])?;let mut lines=helper_lines(&helpers);let account=crate::git::https_account(&p,&url)?;
+                    if ui.add_enabled(!busy&&selected.is_some(),egui::Button::new("Inspect helper and account")).clicked() && let Some((_,url))=selected.as_ref(){let p=s.repo.clone();let url=url.clone();s.launch(ui.ctx(),move||{let helpers=crate::git::connection_read(&p,&["config","--get-urlmatch","credential.helper",&url])?;let mut lines=helper_lines(&helpers);let account=crate::git::https_account(&p,&url)?;
                         lines.push("Helpers actually invoked by Git for this lookup (in order):".into());
                         if account.helpers.is_empty(){lines.push("none invoked".into());}else{lines.extend(account.helpers);}
                         Ok(Answer::Account(lines,account.username))});}
                     if let Some(account)=&s.account{ui.label(format!("Stored account: {account}"));}else{layout::note(ui,"No stored account inspected, or the helper supplied none without prompting.");}
                     if ui.add_enabled(!busy&&selected.is_some(),egui::Button::new("Sign out / switch account…")).clicked(){s.confirm_reject=true;}
-                    if s.confirm_reject {layout::note(ui,"This runs git credential reject for this remote URL, following credential.useHttpPath. A shared helper may remove the host's account for other applications too.");ui.horizontal(|ui|{if ui.add_enabled(!busy,egui::Button::new("Forget this sign-in")).clicked(){if let Some((_,url))=selected{let p=s.repo.clone();s.launch(ui.ctx(),move||{crate::git::https_reject(&p,&url)?;Ok(Answer::Rejected(p,url))});}s.confirm_reject=false;}if ui.button("Keep it").clicked(){s.confirm_reject=false;}});}
+                    if s.confirm_reject {layout::note(ui,"This runs git credential reject for this remote URL, following credential.useHttpPath. A shared helper may remove the host's account for other applications too.");ui.horizontal(|ui|{if ui.add_enabled(!busy,egui::Button::new("Forget this sign-in")).clicked(){if let Some((_,url))=selected{let p=s.repo.clone();s.launch(ui.ctx(),move||{crate::git::https_reject(&p,&url)?;Ok(Answer::Rejected(p,url))});}s.confirm_reject=false;}
+                        if ui.button("Keep it").clicked(){s.confirm_reject=false;}});}
                 } else if ui.add_enabled(!busy&&selected.is_some(),egui::Button::new("Test connection")).clicked(){let p=s.repo.clone();let name=s.remote.clone();s.launch(ui.ctx(),move||doctor::test(&p,&name).map(Answer::Test));}
                 if busy&&ui.button("Cancel check").clicked(){s.jobs.0.cancel();s.jobs=Default::default();s.job=None;s.lines=vec!["Check cancelled".into()];}
                 for line in &s.lines{ui.label(line);}

@@ -515,12 +515,14 @@ fn ssh_alias_repository_forces_fresh_key_setup_even_when_the_old_profile_used_an
 
 #[test]
 fn portable_preferences_round_trip_workflow_and_layout_without_executables() -> Result<(), String> {
-    let mut original = Settings::default();
-    original.offline = true;
-    original.branch_names_keep_end = true;
-    original.fold_patterns = "*.generated.*\npackage-lock.json".into();
-    original.auto_fetch_minutes = 15;
-    original.shell = "SECRET_EXECUTABLE".into();
+    let original = Settings {
+        offline: true,
+        branch_names_keep_end: true,
+        fold_patterns: "*.generated.*\npackage-lock.json".into(),
+        auto_fetch_minutes: 15,
+        shell: "SECRET_EXECUTABLE".into(),
+        ..Default::default()
+    };
     let bytes = Setup::new(&original, &Default::default()).encode()?;
     let decoded = Setup::decode(&bytes)?;
     let mut restored = Settings::default();
