@@ -33,5 +33,6 @@
   ],
   "containment": "Only supplied fake Git and owned temp plain files; env_clear wrapper process via existing bounded_process::run_input5s; no repository/ref protocol, process selectors/signals/controllers, live hosts, credentials, CI",
   "required_before_execution": "Correct-author source+plan push, private INCR0/jobs2 exact no-run compile+binaryhash binding push",
-  "next": "Preserve six exact test results+log hashes, commit+push/remoteverify; root accepts before full owned production Gate2"
+  "next": "Preserve six exact test results+log hashes, commit+push/remoteverify; root accepts before full owned production Gate2",
+  "test_only_lint_correction": "Initial no-run compile PASS; strictClippy exposed26 diagnostics only in previously added ignored Gate2 harness (unwraps/range). Replaced with propagated errors and range.contains; no production bytes changed, no recording/runtime executed. InitialClippy log preserved."
 }

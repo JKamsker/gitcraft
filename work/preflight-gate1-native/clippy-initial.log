@@ -1,0 +1,245 @@
+    Checking gitcraft v0.3.4 (/workspace/work/push-preflight)
+error: used `unwrap()` on a `Result` value
+  --> src/push_preflight/fix/transaction/owned_fixtures.rs:46:45
+   |
+46 |             json!({"hex":hex(&bytes),"mode":fs::metadata(path).unwrap().permissions().mode()})
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: if this value is an `Err`, it will panic
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+   = note: requested on the command line with `-D clippy::unwrap-used`
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:262:13
+    |
+262 | /             serde_json::to_vec_pretty(
+263 | |                 &json!({"case":case,"before":before,"after":after,"error":error}),
+264 | |             )
+265 | |             .unwrap(),
+    | |_____________________^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:321:42
+    |
+321 | ..."),serde_json::to_vec_pretty(&json!({"case":case,"constructor_error":error,"before":before,"after":snapshot(&f.repo)?})).unwrap())?;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:353:34
+    |
+353 | ..."),serde_json::to_vec_pretty(&json!({"case":case,"backend":refs,"obj...e":retained})).unwrap())?;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:359:20
+    |
+359 |         assert_eq!(fs::read(f.repo.join("file.txt")).unwrap(), b"after\n");
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:368:17
+    |
+368 |                 fs::read(root.join(format!("observed-{phase}.ok"))).unwrap(),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:379:13
+    |
+379 |             fs::read(root.join("original-args-prepared")).unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:383:13
+    |
+383 | /             fs::read_to_string(root.join("original-config-prepared"))
+384 | |                 .unwrap()
+    | |_________________________^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on an `Option` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:386:13
+    |
+386 |             f.root.join("original hooks ' \\ path").to_str().unwrap()
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is `None`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:400:21
+    |
+400 |                     fs::read(f.repo.join(".git/index")).unwrap(),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:401:21
+    |
+401 |                     fs::read(root.join("external.index")).unwrap()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:409:21
+    |
+409 |                     fs::read(f.repo.join("file.txt")).unwrap(),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:416:21
+    |
+416 |                     fs::read(f.repo.join("file.txt")).unwrap(),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:438:17
+    |
+438 | /                 fs::read_to_string(root.join("mutation.stderr"))
+439 | |                     .unwrap()
+    | |_____________________________^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: manual `Range::contains` implementation
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:444:21
+    |
+444 |             assert!(elapsed >= 14_000 && elapsed < 25_000);
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(14_000..25_000).contains(&elapsed)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_range_contains
+    = note: `-D clippy::manual-range-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
+
+error: used `unwrap()` on an `Option` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:457:36
+    |
+457 |     let dependency = snapshot_pair(index.to_str().unwrap(), &current, |saved| {
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is `None`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:497:9
+    |
+497 |         fs::read(current.join("before.shared-index")).unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:498:9
+    |
+498 |         fs::read(&selected).unwrap()
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on an `Option` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:506:9
+    |
+506 |         current.join("before.index").to_str().unwrap(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is `None`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:519:34
+    |
+519 | ..."),serde_json::to_vec_pretty(&json!({"case":"split-index","before":before,"after":after,"saved_dependency":selected,"live_dependency":live,"missing_result":result,"saved_pair":evidence(&current)})).unwrap())?;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:618:34
+    |
+618 | ..."),serde_json::to_vec_pretty(&json!({"case":case,"diagnostic_only":t...mpted":true})).unwrap())?;
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:637:13
+    |
+637 |             fs::read(root.join("native-prepared.ok")).unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:641:13
+    |
+641 |             fs::read(root.join("native-committed.ok")).unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:645:13
+    |
+645 |             fs::read(root.join("native-args-prepared")).unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:650:17
+    |
+650 | /                 fs::read_to_string(root.join("mutation-status"))
+651 | |                     .unwrap()
+    | |_____________________________^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: used `unwrap()` on a `Result` value
+   --> src/push_preflight/fix/transaction/owned_fixtures.rs:656:17
+    |
+656 | /                 fs::read_to_string(root.join("mutation.stderr"))
+657 | |                     .unwrap()
+    | |_____________________________^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used
+
+error: could not compile `gitcraft` (lib test) due to 26 previous errors

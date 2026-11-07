@@ -41,11 +41,11 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 fn file(path: &Path) -> Value {
-    match fs::read(path) {
-        Ok(bytes) => {
-            json!({"hex":hex(&bytes),"mode":fs::metadata(path).unwrap().permissions().mode()})
+    match (fs::read(path), fs::metadata(path)) {
+        (Ok(bytes), Ok(metadata)) => {
+            json!({"hex":hex(&bytes),"mode":metadata.permissions().mode()})
         }
-        Err(error) => json!({"error":error.to_string()}),
+        (Err(error), _) | (_, Err(error)) => json!({"error":error.to_string()}),
     }
 }
 fn snapshot(repo: &Path) -> Result<Value, String> {
@@ -262,7 +262,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
             serde_json::to_vec_pretty(
                 &json!({"case":case,"before":before,"after":after,"error":error}),
             )
-            .unwrap(),
+            .map_err(|error| error.to_string())?,
         )?;
         assert_eq!(before, after);
         assert!(error.contains("Git 2.50"), "{error}");
@@ -318,7 +318,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
                     write(root.join("diagnostic-status"), output.status.to_string())?;
                 }
             }
-            write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"constructor_error":error,"before":before,"after":snapshot(&f.repo)?})).unwrap())?;
+            write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"constructor_error":error,"before":before,"after":snapshot(&f.repo)?})).map_err(|error| error.to_string())?)?;
             return Err(format!(
                 "supported {refs}/{objects} capability refused: {error}"
             ));
@@ -350,13 +350,16 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     let elapsed = started.elapsed().as_millis();
     let after = snapshot(&f.repo)?;
     let retained = evidence(&directory);
-    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"backend":refs,"object_format":objects,"old":f.old,"new":f.new,"before":before,"after":after,"result":result,"elapsed_ms":elapsed,"directory":directory,"directory_retained":directory.exists(),"capability":capability,"evidence":retained})).unwrap())?;
+    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"backend":refs,"object_format":objects,"old":f.old,"new":f.new,"before":before,"after":after,"result":result,"elapsed_ms":elapsed,"directory":directory,"directory_retained":directory.exists(),"capability":capability,"evidence":retained})).map_err(|error| error.to_string())?)?;
     drop(held_lock); // Owned file handle only. The owned lock file is deliberately retained.
     if case.starts_with("files-") || case.starts_with("reftable-") {
         result?;
         assert_eq!(after["head"], f.new);
         assert_eq!(after["symref"], "refs/heads/main");
-        assert_eq!(fs::read(f.repo.join("file.txt")).unwrap(), b"after\n");
+        assert_eq!(
+            fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
+            b"after\n"
+        );
         run(
             &f.repo,
             &["diff-index", "--cached", "--quiet", &f.new, "--"],
@@ -365,7 +368,8 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
         )?;
         for phase in ["prepared", "checkout", "committed"] {
             assert_eq!(
-                fs::read(root.join(format!("observed-{phase}.ok"))).unwrap(),
+                fs::read(root.join(format!("observed-{phase}.ok")))
+                    .map_err(|error| error.to_string())?,
                 format!("refs/heads/main\n{}\n{}\n", f.old, f.new).as_bytes()
             );
         }
@@ -376,14 +380,17 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
                 .any(|line| line == format!("{} {} refs/heads/main\n", f.old, f.new).as_bytes())
         );
         assert_eq!(
-            fs::read(root.join("original-args-prepared")).unwrap(),
+            fs::read(root.join("original-args-prepared")).map_err(|error| error.to_string())?,
             b"prepared\0"
         );
         assert_eq!(
             fs::read_to_string(root.join("original-config-prepared"))
-                .unwrap()
+                .map_err(|error| error.to_string())?
                 .trim(),
-            f.root.join("original hooks ' \\ path").to_str().unwrap()
+            f.root
+                .join("original hooks ' \\ path")
+                .to_str()
+                .ok_or("Owned fixture path is not UTF-8")?
         );
         assert!(!directory.exists());
     } else {
@@ -397,8 +404,8 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
             "index-change" => {
                 assert_eq!(after["head"], before["head"]);
                 assert_eq!(
-                    fs::read(f.repo.join(".git/index")).unwrap(),
-                    fs::read(root.join("external.index")).unwrap()
+                    fs::read(f.repo.join(".git/index")).map_err(|error| error.to_string())?,
+                    fs::read(root.join("external.index")).map_err(|error| error.to_string())?
                 );
                 assert_eq!(after["work"], before["work"]);
             }
@@ -406,14 +413,14 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
                 assert_eq!(after["head"], before["head"]);
                 assert_eq!(after["index"], before["index"]);
                 assert_eq!(
-                    fs::read(f.repo.join("file.txt")).unwrap(),
+                    fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
                     b"external-work\n"
                 );
             }
             "committed-failure" => {
                 assert_eq!(after["head"], f.new);
                 assert_eq!(
-                    fs::read(f.repo.join("file.txt")).unwrap(),
+                    fs::read(f.repo.join("file.txt")).map_err(|error| error.to_string())?,
                     b"external-after-commit\n"
                 );
                 assert!(directory.join("checkout.ok").is_file());
@@ -436,12 +443,12 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
         if ["switch-head", "detach-head"].contains(&case) {
             assert!(
                 fs::read_to_string(root.join("mutation.stderr"))
-                    .unwrap()
+                    .map_err(|error| error.to_string())?
                     .contains("HEAD.lock")
             );
         }
         if case == "timeout" {
-            assert!(elapsed >= 14_000 && elapsed < 25_000);
+            assert!((14_000..25_000).contains(&elapsed));
         }
     }
     Ok(())
@@ -454,37 +461,41 @@ fn split_case(root: &Path) -> Result<(), String> {
     let index = f.repo.join(".git/index");
     let before = snapshot(&f.repo)?;
     let mut selected = String::new();
-    let dependency = snapshot_pair(index.to_str().unwrap(), &current, |saved| {
-        // Force an actual new dependency only after immutable before.index was captured.
-        run(&f.repo, &["update-index", "--no-split-index"], b"", None)?;
-        run(
-            &f.repo,
-            &[
-                "update-index",
-                "--add",
-                "--cacheinfo",
-                &format!(
-                    "100755,{},file.txt",
-                    run(
-                        &f.repo,
-                        &["rev-parse", &format!("{}:file.txt", f.old)],
-                        b"",
-                        None
-                    )?
-                ),
-            ],
-            b"",
-            None,
-        )?;
-        run(&f.repo, &["update-index", "--split-index"], b"", None)?;
-        selected = path_line(local(
-            &f.repo,
-            &["rev-parse", "--path-format=absolute", "--shared-index-path"],
-            b"",
-            &[("GIT_INDEX_FILE", saved.to_string_lossy().into_owned())],
-        )?)?;
-        Ok(Some(selected.clone()))
-    })?;
+    let dependency = snapshot_pair(
+        index.to_str().ok_or("Owned fixture path is not UTF-8")?,
+        &current,
+        |saved| {
+            // Force an actual new dependency only after immutable before.index was captured.
+            run(&f.repo, &["update-index", "--no-split-index"], b"", None)?;
+            run(
+                &f.repo,
+                &[
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    &format!(
+                        "100755,{},file.txt",
+                        run(
+                            &f.repo,
+                            &["rev-parse", &format!("{}:file.txt", f.old)],
+                            b"",
+                            None
+                        )?
+                    ),
+                ],
+                b"",
+                None,
+            )?;
+            run(&f.repo, &["update-index", "--split-index"], b"", None)?;
+            selected = path_line(local(
+                &f.repo,
+                &["rev-parse", "--path-format=absolute", "--shared-index-path"],
+                b"",
+                &[("GIT_INDEX_FILE", saved.to_string_lossy().into_owned())],
+            )?)?;
+            Ok(Some(selected.clone()))
+        },
+    )?;
     let live = run(
         &f.repo,
         &["rev-parse", "--path-format=absolute", "--shared-index-path"],
@@ -494,8 +505,8 @@ fn split_case(root: &Path) -> Result<(), String> {
     assert_ne!(selected, live, "fixture did not rotate dependency");
     assert_eq!(dependency.as_deref(), Some(selected.as_str()));
     assert_eq!(
-        fs::read(current.join("before.shared-index")).unwrap(),
-        fs::read(&selected).unwrap()
+        fs::read(current.join("before.shared-index")).map_err(|error| error.to_string())?,
+        fs::read(&selected).map_err(|error| error.to_string())?
     );
     assert_eq!(before["shared_path"], selected);
     // Only remove this fixture's now-unreferenced dependency; live index uses another.
@@ -503,7 +514,10 @@ fn split_case(root: &Path) -> Result<(), String> {
     let missing = root.join("missing-pair");
     fs::create_dir(&missing).map_err(|e| e.to_string())?;
     let result = snapshot_pair(
-        current.join("before.index").to_str().unwrap(),
+        current
+            .join("before.index")
+            .to_str()
+            .ok_or("Owned fixture path is not UTF-8")?,
         &missing,
         |saved| {
             let bytes = local(
@@ -516,7 +530,7 @@ fn split_case(root: &Path) -> Result<(), String> {
         },
     );
     let after = snapshot(&f.repo)?;
-    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":"split-index","before":before,"after":after,"saved_dependency":selected,"live_dependency":live,"missing_result":result,"saved_pair":evidence(&current)})).unwrap())?;
+    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":"split-index","before":before,"after":after,"saved_dependency":selected,"live_dependency":live,"missing_result":result,"saved_pair":evidence(&current)})).map_err(|error| error.to_string())?)?;
     assert!(result.is_err(), "missing dependency unexpectedly qualified");
     assert_eq!(after["head"], before["head"]);
     assert_eq!(after["work"], before["work"]);
@@ -615,7 +629,7 @@ fi
     write(root.join("native-transaction-input"), &input)?;
     write(root.join("native.stdout"), &output.stdout)?;
     write(root.join("native.stderr"), &output.stderr)?;
-    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"diagnostic_only":true,"production_protocol_unchanged":true,"before":before,"after":after,"old":f.old,"new":f.new,"status":output.status.to_string(),"backend":refs,"object_format":objects,"no_checkout_attempted":true})).unwrap())?;
+    write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"diagnostic_only":true,"production_protocol_unchanged":true,"before":before,"after":after,"old":f.old,"new":f.new,"status":output.status.to_string(),"backend":refs,"object_format":objects,"no_checkout_attempted":true})).map_err(|error| error.to_string())?)?;
     assert_eq!(before["index"], after["index"]);
     assert_eq!(before["work"], after["work"]);
     if case == "native-prelock-switch" {
@@ -634,27 +648,27 @@ fi
         assert_eq!(after["head"], f.new);
         assert_eq!(after["symref"], "refs/heads/main");
         assert_eq!(
-            fs::read(root.join("native-prepared.ok")).unwrap(),
+            fs::read(root.join("native-prepared.ok")).map_err(|error| error.to_string())?,
             b"owned-native-prepared\n"
         );
         assert_eq!(
-            fs::read(root.join("native-committed.ok")).unwrap(),
+            fs::read(root.join("native-committed.ok")).map_err(|error| error.to_string())?,
             b"owned-native-committed\n"
         );
         assert_eq!(
-            fs::read(root.join("native-args-prepared")).unwrap(),
+            fs::read(root.join("native-args-prepared")).map_err(|error| error.to_string())?,
             b"prepared\0"
         );
         if ["native-switch-head", "native-detach-head"].contains(&case) {
             assert_ne!(
                 fs::read_to_string(root.join("mutation-status"))
-                    .unwrap()
+                    .map_err(|error| error.to_string())?
                     .trim(),
                 "0"
             );
             assert!(
                 fs::read_to_string(root.join("mutation.stderr"))
-                    .unwrap()
+                    .map_err(|error| error.to_string())?
                     .contains("HEAD.lock")
             );
         }
