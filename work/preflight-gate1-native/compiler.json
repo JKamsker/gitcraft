@@ -1,0 +1,21 @@
+{
+  "compiled_source_commit": "f2935ee0a12b6713c67337d2b3733a9be62793d0",
+  "application_source_tree": "e7ed7db26ecf66c43cf07f2592af9c1b30b7f829",
+  "production_source_static_pass": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "production_prefix_sha256": "37b090eaaa01d28c9183a24f51fe4cb71e6f06ebde06e2f0f3207dad83e4bb60",
+  "binding": "Production prefix byte-identical reviewed5f; only recording/test fixture additions and error propagation changed",
+  "private_target": "/workspace/work/push-preflight/target",
+  "incremental": "0",
+  "jobs": 2,
+  "compiler": "cargo test --locked --lib --no-run PASS; compiler worktree /workspace/work/push-preflight",
+  "clippy": "cargo clippy --locked --all-targets -- -D warnings PASS",
+  "fmt": "cargo fmt --all --check PASS",
+  "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "ab66b3d2e1f49838723acdcfaa8c409244419a05289183dc0fc976ba3160d6a9",
+  "log_sha256": {
+    "compiler.log": "fe5a474da58471d27bd0eb56edaeda750ca9102f7c7457bb9abda14f9c8b8c44",
+    "clippy.log": "dcd6d1fdd5568f66918d205773c7a1f6f2ccd58157abf17bfcaac107505fb6eb",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "runtime": "NOT EXECUTED; only six named recordingtests authorized after this preserved binding"
+}
