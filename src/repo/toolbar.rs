@@ -581,12 +581,12 @@ mod area_d_tests {
                         (tab, false, Vec::new()),
                     );
                 h.run();
-                let reload = h.get_by_label("Reload (F5)").rect();
+                let reload = h.get_by_label("Reload").rect();
                 assert!(
                     h.ctx.content_rect().contains_rect(reload),
                     "{width}/{scale}: {reload:?}"
                 );
-                h.get_by_label("Reload (F5)").click();
+                h.get_by_label("Reload").click();
                 h.run();
                 assert!(h.state().2.iter().any(|a| matches!(a, Action::Reload)));
             }

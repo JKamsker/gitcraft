@@ -501,7 +501,8 @@ fn contents_regex_and_merges_on_a_real_repository() -> Result<(), String> {
         [h.feature.as_str()]
     );
     assert_eq!(
-        h.repo.search("regex:fn\\s+main", false)?,
+        // Git uses the platform POSIX regex engine; \s is a GNU extension.
+        h.repo.search("regex:fn[[:space:]]+main", false)?,
         [h.login.as_str(), h.init.as_str()]
     );
     assert_eq!(
