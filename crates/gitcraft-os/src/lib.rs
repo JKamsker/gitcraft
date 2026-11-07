@@ -25,6 +25,8 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod private;
+pub use private::{create_private_directory, detach_controller, random_bytes};
 mod owned_child;
 #[cfg(windows)]
 mod process_job;

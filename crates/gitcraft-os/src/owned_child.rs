@@ -10,40 +10,64 @@ pub struct OwnedChild {
 
 struct Process {
     child: Child,
+    controller: bool,
+    controller_status: Option<ExitStatus>,
     #[cfg(unix)]
-    status: super::unix_anchor::Status,
+    status: Option<super::unix_anchor::Status>,
     #[cfg(windows)]
-    job: super::process_job::ProcessJob,
+    job: Option<super::process_job::ProcessJob>,
 }
 
 impl OwnedChild {
-    pub fn spawn(mut command: Command) -> io::Result<Self> {
+    pub fn spawn(command: Command) -> io::Result<Self> {
+        Self::start(command, false)
+    }
+    /// Own only a transport/controller's direct child. Its authenticated endpoint owns the
+    /// actual command tree. Never use this for user commands or ordinary local execution.
+    pub fn spawn_controller(command: Command) -> io::Result<Self> {
+        Self::start(command, true)
+    }
+    fn start(mut command: Command, controller: bool) -> io::Result<Self> {
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
-            command.process_group(0);
+            if !controller {
+                command.process_group(0);
+            }
         }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            command.creation_flags(0x0800_0004);
+            command.creation_flags(if controller { 0x0800_0000 } else { 0x0800_0004 });
         }
         #[cfg(unix)]
-        let status = super::unix_anchor::prepare(&mut command)?;
+        let status = if controller {
+            None
+        } else {
+            Some(super::unix_anchor::prepare(&mut command)?)
+        };
         #[allow(unused_mut)]
         let mut child = command.spawn()?;
         #[cfg(windows)]
-        let job = match super::process_job::supervise_suspended_process(child.id()) {
-            Ok(job) => job,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(io::Error::other(error));
-            }
+        let job = if controller {
+            None
+        } else {
+            Some(
+                match super::process_job::supervise_suspended_process(child.id()) {
+                    Ok(job) => job,
+                    Err(error) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(io::Error::other(error));
+                    }
+                },
+            )
         };
         Ok(Self {
             process: Process {
                 child,
+                controller,
+                controller_status: None,
                 #[cfg(unix)]
                 status,
                 #[cfg(windows)]
@@ -70,9 +94,19 @@ impl OwnedChild {
     /// Observe exit without releasing the Unix identity anchor. No SIGCHLD handler or
     /// other waiter may reap this private child. Windows retains the Job HANDLE instead.
     pub fn observe(&mut self) -> io::Result<Option<ExitStatus>> {
+        if self.process.controller {
+            if self.process.controller_status.is_none() {
+                self.process.controller_status = self.process.child.try_wait()?;
+            }
+            return Ok(self.process.controller_status);
+        }
         #[cfg(unix)]
         {
-            self.process.status.observe()
+            self.process
+                .status
+                .as_mut()
+                .ok_or_else(|| io::Error::other("missing group anchor"))?
+                .observe()
         }
         #[cfg(windows)]
         {
@@ -112,6 +146,12 @@ impl Control for Process {
     /// exited leader is not reaped first. EPERM is an error (including Darwin's zombie-only
     /// case): callers must report uncertain cleanup rather than silently claim success.
     fn stop(&mut self) -> io::Result<()> {
+        if self.controller {
+            if self.controller_status.is_none() {
+                self.child.kill()?;
+            }
+            return Ok(());
+        }
         #[cfg(unix)]
         {
             let pid = i32::try_from(self.child.id()).map_err(io::Error::other)?;
@@ -128,11 +168,16 @@ impl Control for Process {
             }
         }
         #[cfg(windows)]
-        self.job.terminate().map_err(io::Error::other)?;
+        if let Some(job) = &self.job {
+            job.terminate().map_err(io::Error::other)?;
+        }
         Ok(())
     }
 
     fn reap(&mut self) -> io::Result<ExitStatus> {
+        if let Some(status) = self.controller_status {
+            return Ok(status);
+        }
         // Handle-based/direct-child fallback also bounds a refused group signal.
         let _ = self.child.kill();
         self.child.wait()

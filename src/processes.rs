@@ -23,6 +23,8 @@ const POLL: Duration = Duration::from_millis(20);
 pub(crate) type Filter = Box<dyn FnMut(&[u8]) -> Vec<u8> + Send>;
 pub(crate) type Chunk = Box<dyn FnMut(&[u8]) + Send>;
 pub(crate) struct Options {
+    /// Only the packaged native endpoint uses direct-child controller ownership.
+    pub native_controller: bool,
     pub input: Option<Vec<u8>>,
     /// Keep the control channel open after flushing a remote request.
     pub hold_input: bool,
@@ -49,6 +51,7 @@ pub(crate) struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            native_controller: false,
             input: None,
             hold_input: false,
             background: false,
@@ -432,8 +435,12 @@ async fn execute(
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Spawning);
     }
-    let mut child = gitcraft_os::OwnedChild::spawn(command)
-        .map_err(|e| format!("could not run process: {e}"))?;
+    let mut child = if options.native_controller {
+        gitcraft_os::OwnedChild::spawn_controller(command)
+    } else {
+        gitcraft_os::OwnedChild::spawn(command)
+    }
+    .map_err(|e| format!("could not run process: {e}"))?;
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.spawned(Some(child.id()));

@@ -12,6 +12,7 @@ pub mod askpass;
 pub(crate) use pool::shutdown;
 mod discover;
 mod fs;
+pub(crate) mod native_owner;
 mod pool;
 mod session;
 mod shell;

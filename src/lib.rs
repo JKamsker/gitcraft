@@ -59,3 +59,11 @@ mod theme;
 mod update;
 mod vscode_theme;
 mod weakened;
+
+/// Packaged process endpoint used for durable local operations, before UI startup.
+pub fn owned_endpoint_helper() -> Option<i32> {
+    std::env::args_os()
+        .nth(1)
+        .filter(|arg| arg == "--gitcraft-owned-endpoint")
+        .map(|_| remote::native_owner::entrypoint())
+}
