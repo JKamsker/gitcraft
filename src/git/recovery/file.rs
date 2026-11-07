@@ -355,6 +355,23 @@ fn local_create(
     file.write_all(bytes).and_then(|_|file.sync_all()).map_err(|e|format!("A new recovery file may be incomplete at {path}; existing files were preserved: {e}"))
 }
 #[cfg(windows)]
+fn physical_ancestors(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
+    if !root.is_absolute() {
+        return Err("Recovery root must be a physical absolute path".into());
+    }
+    let mut paths: Vec<_> = root
+        .ancestors()
+        .filter(|path| path.has_root())
+        .map(Path::to_path_buf)
+        .collect();
+    paths.reverse();
+    paths.dedup();
+    if paths.last().is_none_or(|path| path != root) {
+        return Err("Cannot anchor the physical recovery path".into());
+    }
+    Ok(paths)
+}
+#[cfg(windows)]
 fn windows_parent(
     root: &Path,
     common: &Path,
@@ -370,11 +387,22 @@ fn windows_parent(
             .open(path)
             .map_err(|e| e.to_string())
     };
-    let root_file = open(root, true)?;
-    if native_token(&root_file)? != pin.token {
+    // Hold every physical component, not only the worktree and its descendants.
+    // No-delete sharing directly prevents each ancestor's rename/replacement while
+    // the final absolute-path CREATE_NEW is resolved. Reparse points fail closed.
+    let mut held = Vec::new();
+    for ancestor in physical_ancestors(root)? {
+        let directory = open(&ancestor, true)?;
+        let meta = directory.metadata().map_err(|e| e.to_string())?;
+        if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
+            return Err("A physical recovery ancestor is linked or unavailable".into());
+        }
+        held.push(directory);
+    }
+    let root_file = held.last().ok_or("Missing physical recovery root")?;
+    if native_token(root_file)? != pin.token {
         return Err("The working-root filesystem identity changed since preview".into());
     }
-    let mut held = vec![root_file];
     let metadata_root = std::fs::canonicalize(common).map_err(|e| e.to_string())?;
     if std::fs::canonicalize(root).map_err(|e| e.to_string())? == metadata_root {
         return Err("Working root is Git metadata".into());
@@ -598,6 +626,31 @@ mod root_replacement_tests {
             }
             std::fs::rename(&saved, &selected).map_err(|e| e.to_string())?;
         }
+        Ok(())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_ancestor_tests {
+    use super::*;
+    #[test]
+    fn physical_paths_include_every_drive_and_unc_ancestor_without_drive_relative_prefixes()
+    -> Result<(), String> {
+        for root in [r"\\?\C:\parent\repo", r"\\?\UNC\server\share\parent\repo"] {
+            let root = Path::new(root);
+            let paths = physical_ancestors(root)?;
+            assert_eq!(paths.last().map(std::path::PathBuf::as_path), Some(root));
+            assert!(
+                paths
+                    .iter()
+                    .all(|path| path.is_absolute() && path.has_root())
+            );
+            assert!(paths.len() >= 3);
+            for pair in paths.windows(2) {
+                assert_eq!(pair[1].parent(), Some(pair[0].as_path()));
+            }
+        }
+        assert!(physical_ancestors(Path::new(r"C:relative")).is_err());
         Ok(())
     }
 }
