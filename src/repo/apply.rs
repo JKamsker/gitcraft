@@ -27,7 +27,15 @@ impl RepoTab {
         let Some(action) = self.fence_gate(action, ctx) else {
             return;
         };
+        if self.check_history_download(&action, ctx) {
+            return;
+        }
         match action {
+            Action::AllowHistoryDownload(action) => {
+                self.history_download_allowed = true;
+                self.apply(*action, ctx);
+                self.history_download_allowed = false;
+            }
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
@@ -145,6 +153,8 @@ impl RepoTab {
             Action::ToggleActivity => self.activity.open = !self.activity.open,
             Action::ShowActivity(id) => self.activity.reveal(id),
             Action::SetOffline(offline) => super::offline::set_offline(ctx, offline),
+            Action::OpenSparse => self.open_sparse(ctx),
+            Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => {
                 if !self.refuse_undo() {

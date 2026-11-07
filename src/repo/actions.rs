@@ -98,6 +98,12 @@ pub(crate) enum Action {
     /// Push without running the `pre-push` hook, this once.
     PushSkippingHooks,
     Reload,
+    OpenSparse,
+    AllowHistoryDownload(Box<Action>),
+    SetSparse {
+        before: Box<git::SparseState>,
+        folders: Option<Vec<String>>,
+    },
     LoadMore,
     Undo,
     Redo,
@@ -541,6 +547,11 @@ impl RepoTab {
                 "Push, skipping hooks".into(),
                 "--no-verify".into(),
                 Action::PushSkippingHooks,
+            ),
+            (
+                "Sparse checkout…".into(),
+                "folders".into(),
+                Action::OpenSparse,
             ),
         ];
         items.extend(

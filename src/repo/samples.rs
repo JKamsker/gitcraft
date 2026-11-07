@@ -16,6 +16,7 @@ impl RepoTab {
         match phase {
             1 => {
                 acts.push(Action::Reload);
+                acts.push(Action::OpenSparse);
                 acts.push(Action::Select(1));
                 acts.push(Action::Select(0));
                 // What a merge resolved: read in the background, never from the window's thread.

@@ -55,6 +55,11 @@ impl RepoTab {
                 .frame(egui::Frame::new())
                 .show(ui, |ui| self.progress_bar(ui));
         }
+        if self.partial_clone {
+            egui::Panel::top("partial_clone_notice").show(ui, |ui| {
+                ui.label(egui::RichText::new("Partial clone: opening older files, diffs or blame may download missing contents from the repository's remote.").small().color(t.text_dim));
+            });
+        }
         self.side_panels(ui, &mut acts);
         self.tray_panel(ui, &mut acts);
         if self.activity.open {

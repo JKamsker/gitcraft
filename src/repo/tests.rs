@@ -338,6 +338,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         ..Default::default()
     };
     let _ = tab.tx.send(Msg::Loaded(Ok(Box::new(super::load::Loaded {
+        partial_clone: false,
         refs: Default::default(),
         history: Vec::new(),
         work: git::WorkStatus::default(),

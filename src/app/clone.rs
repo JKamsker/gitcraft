@@ -22,6 +22,11 @@ pub(super) struct CloneForm {
     auth: bool,
     username: String,
     password: String,
+    shallow: bool,
+    depth: u32,
+    blobless: bool,
+    sparse: bool,
+    folders: String,
 }
 
 /// A clone running in the background.
@@ -56,6 +61,11 @@ impl App {
             auth: false,
             username: String::new(),
             password: String::new(),
+            shallow: false,
+            depth: 1,
+            blobless: false,
+            sparse: false,
+            folders: String::new(),
         });
     }
 
@@ -153,6 +163,21 @@ impl App {
             return;
         }
         let url = form.url.trim().to_owned();
+        let options = git::CloneOptions {
+            depth: form.shallow.then_some(form.depth),
+            blobless: form.blobless,
+            folders: form.sparse.then(|| {
+                form.folders
+                    .lines()
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            }),
+        };
+        if let Err(e) = options.validate() {
+            form.error = Some(e);
+            return;
+        }
         let creds = (form.auth && !form.username.trim().is_empty()).then(|| git::Credentials {
             username: form.username.trim().to_owned(),
             password: form.password.clone(),
@@ -165,7 +190,13 @@ impl App {
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
         std::thread::spawn(move || {
-            let _ = tx.send(git::clone(&url, &dest2, creds.as_ref(), &following));
+            let _ = tx.send(git::clone_with_options_watched(
+                &url,
+                &dest2,
+                creds.as_ref(),
+                &options,
+                &following,
+            ));
             ctx2.request_repaint();
         });
         self.cloning = Some(Cloning { dest, rx, control });
@@ -322,6 +353,21 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .color(t.text_faint)
             .small(),
     );
+    ui.collapsing("Clone options", |ui| {
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut form.shallow, "Shallow history");
+            ui.add_enabled(form.shallow, egui::DragValue::new(&mut form.depth).range(1..=u32::MAX).prefix("Depth "));
+        });
+        ui.checkbox(&mut form.blobless, "Download file contents when needed (blobless)");
+        if form.blobless {
+            ui.label(RichText::new("The server must support partial clones. Opening older files can download their contents. Files checked out now are downloaded now.").small().color(t.text_dim));
+        }
+        ui.checkbox(&mut form.sparse, "Check out selected folders only");
+        if form.sparse {
+            ui.label(RichText::new("One repository-relative folder per line, for example src or packages/api. Root files and files immediately inside parent folders stay included. Leave blank for root files only; edit later with Sparse checkout… in the palette.").small().color(t.text_dim));
+            ui.add(egui::TextEdit::multiline(&mut form.folders).desired_rows(3).desired_width(f32::INFINITY));
+        }
+    });
     if form.auth {
         ui.add_space(6.0);
         ui.label(
