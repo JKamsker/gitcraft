@@ -112,6 +112,18 @@ impl ImageLoader for Loader {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
     }
+    fn has_pending(&self) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .any(|j| {
+                j.result
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .is_none()
+            })
+    }
     fn byte_size(&self) -> usize {
         self.0
             .lock()
@@ -140,8 +152,16 @@ fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
     }
     let doc = roxmltree::Document::parse(text).map_err(|_| "Invalid SVG")?;
     let mut nodes = 0;
+    let mut complexity = 0usize;
     for n in doc.descendants().filter(|n| n.is_element()) {
         nodes += 1;
+        complexity = complexity.saturating_add(
+            1 + n
+                .attributes()
+                .filter(|a| matches!(a.name(), "d" | "points"))
+                .map(|a| a.value().len() / 16)
+                .sum::<usize>(),
+        );
         if nodes > 4096 || n.ancestors().count() > 64 {
             return Err("SVG complexity exceeds preview limits; use source view".into());
         }
@@ -209,7 +229,13 @@ fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
         _ => size.width().max(size.height()),
     }
     .clamp(1., 1024.);
-    let scale = requested / size.width().max(size.height());
+    let mut scale = requested / size.width().max(size.height());
+    // Bound overdraw/geometry work too: complex documents use a smaller thumbnail.
+    let budget = (16 * PIXELS / complexity.max(1) as u64).clamp(1024, PIXELS) as f32;
+    let pixels = size.width() * size.height() * scale * scale;
+    if pixels > budget {
+        scale *= (budget / pixels).sqrt();
+    }
     let width = (size.width() * scale).ceil().max(1.) as u32;
     let height = (size.height() * scale).ceil().max(1.) as u32;
     let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height).ok_or("SVG allocation failed")?;
@@ -232,9 +258,23 @@ mod tests {
         let path = temp.0.join("outside.svg");
         std::fs::write(&path, r#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><path fill="magenta" d="M0 0h8v8H0z"/></svg>"#).map_err(|e| e.to_string())?;
         // Reading the benign outside resource would turn the otherwise transparent image magenta.
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let root = cwd.ancestors().last().ok_or("cwd root")?;
+        let relative = format!(
+            "{}{}",
+            "../".repeat(
+                cwd.components()
+                    .filter(|c| matches!(c, std::path::Component::Normal(_)))
+                    .count()
+            ),
+            path.strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .display()
+        );
+        assert!(std::path::Path::new(&relative).is_file());
         for href in [
             path.to_string_lossy().into_owned(),
-            "outside.svg".into(),
+            relative,
             format!("file://{}", path.display()),
         ] {
             let svg = format!(
@@ -243,6 +283,16 @@ mod tests {
             let image = render(svg.as_bytes(), SizeHint::default())?;
             assert!(image.pixels.iter().all(|p| p.a() == 0));
         }
+        Ok(())
+    }
+    #[test]
+    fn complex_overdraw_has_a_smaller_bounded_thumbnail() -> Result<(), String> {
+        let svg = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000">{}</svg>"#,
+            r#"<rect width="1000" height="1000"/>"#.repeat(4000)
+        );
+        let image = render(svg.as_bytes(), SizeHint::default())?;
+        assert!(image.pixels.len() <= 5000);
         Ok(())
     }
     #[test]
