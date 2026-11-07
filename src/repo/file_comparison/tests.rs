@@ -312,6 +312,15 @@ fn actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches() -> R
     let state = h.state_mut().0.file_comparison.as_mut().ok_or("state")?;
     state.accept_pair(stale, Err("late pending pair".into()));
     assert!(state.pair.is_none() && !state.loading && state.cells.is_empty());
+    // A queued old cell must not cancel a refresh of the matrix itself.
+    let refresh = state.begin(true);
+    h.state_mut()
+        .0
+        .comparison_cell(epoch, b"config".to_vec(), 0, &ctx);
+    let state = h.state().0.file_comparison.as_ref().ok_or("state")?;
+    assert_eq!(state.request, refresh);
+    assert_eq!(state.data_request, 0);
+    assert!(state.loading && state.data.is_none() && state.cells.is_empty());
     Ok(())
 }
 #[test]

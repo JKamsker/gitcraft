@@ -101,6 +101,7 @@ impl State {
         self.loading = true;
         self.pair = None;
         if clear {
+            self.data_request = 0;
             self.data = None;
             self.cells.clear();
             self.code_move = None;
