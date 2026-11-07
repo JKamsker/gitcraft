@@ -73,6 +73,69 @@ fn parse(output: &[u8]) -> Result<Vec<Commit>, String> {
 mod tests {
     use super::*;
     #[test]
+    fn release_range_is_pinned_mailmapped_and_read_only_across_a_merge() -> Result<(), String> {
+        let repo = super::super::tests::Repo::new()?;
+        let base = repo.commit("base@test.invalid", 1_700_000_000)?;
+        std::fs::write(
+            repo.0.join(".mailmap"),
+            "Canonical Name <canonical@test.invalid> View tester <alias@test.invalid>\n",
+        )
+        .map_err(|e| e.to_string())?;
+        repo.git(&["branch", "feature"])?;
+        let main = repo.commit("alias@test.invalid", 1_700_000_100)?;
+        repo.git(&["checkout", "-q", "feature"])?;
+        let feature = repo.commit("alias@test.invalid", 1_700_000_200)?;
+        repo.git(&["checkout", "-q", "main"])?;
+        repo.git(&["merge", "--no-ff", "-qm", "Release merge", "feature"])?;
+        let tip = repo.git(&["rev-parse", "HEAD"])?;
+        repo.git(&["tag", "release", &tip])?;
+        let refs = repo.git(&["show-ref"])?;
+        let index = std::fs::read(repo.0.join(".git/index")).map_err(|e| e.to_string())?;
+        let commits = range(&repo.0, &base, &tip, &|| true)?;
+        assert_eq!(commits.len(), 3);
+        assert_eq!(commits[0].hash, tip);
+        assert!(
+            commits
+                .iter()
+                .filter(|c| c.hash == main || c.hash == feature)
+                .all(|c| c.author == "Canonical Name")
+        );
+        assert_eq!(repo.git(&["show-ref"])?, refs);
+        assert_eq!(
+            std::fs::read(repo.0.join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        repo.git(&["tag", "-f", "release", &base])?;
+        assert_eq!(
+            range(&repo.0, &base, &tip, &|| true)?
+                .iter()
+                .map(|c| &c.hash)
+                .collect::<Vec<_>>(),
+            commits.iter().map(|c| &c.hash).collect::<Vec<_>>()
+        );
+        assert!(range(&repo.0, &base, &tip, &|| false).is_err());
+        assert!(range(&repo.0, "", "--all", &|| true).is_err());
+        Ok(())
+    }
+    #[test]
+    fn postcard_reads_practice_before_a_broken_active_profile() -> Result<(), String> {
+        let repo = crate::practice::create(crate::practice::Scenario::Detached)?;
+        let result = (|| {
+            let tip = crate::git::practice_run(&repo, &["rev-parse", "HEAD"])?;
+            let profile = crate::connections::Context {
+                error: Some("Profile unavailable".into()),
+                ..Default::default()
+            };
+            let commits = profile.run(|| range(&repo, "", tip.trim(), &|| true))?;
+            assert!(!commits.is_empty());
+            Ok(())
+        })();
+        if let Some(root) = repo.parent() {
+            let _ = std::fs::remove_dir_all(root);
+        }
+        result
+    }
+    #[test]
     fn release_metadata_keeps_subject_boundaries_and_rejects_truncation() -> Result<(), String> {
         let h = "a".repeat(40);
         let p = "b".repeat(40);

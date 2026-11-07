@@ -306,6 +306,33 @@ impl RepoTab {
 mod tests {
     use super::*;
     #[test]
+    fn profile_change_cancels_a_queued_read_and_discards_prior_disclosures() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/postcard-profile-fixture".into(), &ctx);
+        tab.postcards.open = true;
+        tab.postcards.commits = Some(vec![Commit {
+            author: "Old profile contributor".into(),
+            ..Default::default()
+        }]);
+        tab.postcards.context = Some(crate::connections::Context {
+            error: Some("Changed profile".into()),
+            ..Default::default()
+        });
+        tab.postcards
+            .reader
+            .queue(|_| Err("A cancelled queued read must not start".into()));
+        tab.poll_postcards(&ctx);
+        assert!(!tab.postcards.reader.busy());
+        assert!(tab.postcards.commits.is_none());
+        assert!(tab.postcards.preview.is_none());
+        assert!(
+            tab.postcards
+                .status
+                .as_ref()
+                .is_some_and(|status| status.contains("Profile changed"))
+        );
+    }
+    #[test]
     fn anonymization_removes_names_and_subjects_from_render_input_and_preview() {
         let mut state = State {
             anonymize: true,
