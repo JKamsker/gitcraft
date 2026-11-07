@@ -13,7 +13,9 @@ struct Repo(PathBuf);
 
 impl Drop for Repo {
     fn drop(&mut self) {
+        eprintln!("[reflog fixture] removing {}", self.0.display());
         let _ = std::fs::remove_dir_all(&self.0);
+        eprintln!("[reflog fixture] removed {}", self.0.display());
     }
 }
 
@@ -80,8 +82,11 @@ fn idle(tab: &RepoTab) -> bool {
 }
 
 fn act(tab: &mut RepoTab, ctx: &egui::Context, action: Action) -> Result<(), String> {
+    eprintln!("[reflog action] applying");
     tab.apply(action, ctx);
+    eprintln!("[reflog action] waiting for idle");
     if until(tab, ctx, idle) {
+        eprintln!("[reflog action] idle");
         Ok(())
     } else {
         Err("the tab never settled".to_owned())
@@ -90,17 +95,26 @@ fn act(tab: &mut RepoTab, ctx: &egui::Context, action: Action) -> Result<(), Str
 
 #[test]
 fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> {
+    let started = Instant::now();
+    let phase = |name| eprintln!("[reflog recovery +{:?}] {name}", started.elapsed());
+    phase("creating fixture");
     let repo = Repo::new("reset")?;
+    phase("committing base");
     repo.commit("base.txt")?;
+    phase("committing lost file");
     let lost = repo.commit("lost.txt")?;
+    phase("resetting HEAD");
     repo.git(&["reset", "-q", "--hard", "HEAD~1"])?;
     let ctx = egui::Context::default();
+    phase("opening tab");
     let mut tab = RepoTab::new(repo.path().to_owned(), &ctx);
+    phase("waiting for tab to open");
     if !until(&mut tab, &ctx, idle) {
         return Err("the repository never opened".to_owned());
     }
     assert!(!tab.index.contains_key(&lost));
 
+    phase("opening HEAD reflog");
     act(
         &mut tab,
         &ctx,
@@ -117,7 +131,9 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
         .ok_or("the lost commit isn't listed")?;
 
     // Selected: it shows in the detail pane, though the graph doesn't have it.
+    phase("selecting lost commit");
     act(&mut tab, &ctx, Action::Reflog(ReflogAct::Select(at)))?;
+    phase("waiting for lost commit detail");
     assert!(until(&mut tab, &ctx, |t| t.detail.is_some()));
     assert_eq!(
         tab.detail.as_ref().map(|d| d.hash.clone()),
@@ -137,6 +153,7 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
         menu::create_branch(&pick),
         Action::Dialog(crate::repo::Dialog::CreateBranch { at, checkout: false, .. }) if at == lost
     ));
+    phase("creating recovered branch");
     act(
         &mut tab,
         &ctx,
@@ -146,8 +163,10 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
             refresh: crate::repo::Refresh::All,
         },
     )?;
+    phase("waiting for recovered commit in graph");
     assert!(until(&mut tab, &ctx, |t| t.index.contains_key(&lost)));
     until(&mut tab, &ctx, idle);
+    phase("verifying recovered branch");
     assert_eq!(repo.git(&["rev-parse", "recovered"])?, lost);
     let row = tab.index.get(&lost).copied();
     assert!(row.is_some() && tab.selected == row);
@@ -158,6 +177,7 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
         .is_some_and(|d| d.hash == lost)));
 
     // The branch's own reflog.
+    phase("opening recovered branch reflog");
     act(
         &mut tab,
         &ctx,
@@ -167,6 +187,13 @@ fn a_commit_lost_in_the_terminal_comes_back_as_a_branch() -> Result<(), String> 
     assert_eq!(view.entries.len(), 1);
     assert_eq!(view.entries[0].message.kind, ReflogKind::Branch);
     assert_eq!(view.selected, None);
+    phase("dropping tab");
+    drop(tab);
+    phase("dropping context");
+    drop(ctx);
+    phase("removing fixture");
+    drop(repo);
+    phase("finished");
     Ok(())
 }
 
