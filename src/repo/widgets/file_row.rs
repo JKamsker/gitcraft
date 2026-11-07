@@ -83,7 +83,21 @@ pub fn file_row_owned(
     if code != ' ' {
         let color = status_color(&t, code);
         let badge = Rect::from_center_size(pos2(rect.left() + 18.0 + shift, y), vec2(16.0, 16.0));
-        painter.rect_filled(badge, CornerRadius::same(3), color.gamma_multiply(0.22));
+        painter.rect_filled(
+            badge,
+            CornerRadius::same(3),
+            t.text_tint(
+                color,
+                0.22,
+                if selected {
+                    t.row_selected
+                } else if hovered {
+                    t.hover
+                } else {
+                    t.card
+                },
+            ),
+        );
         let letter = if code == '?' { 'A' } else { code };
         painter.text(
             badge.center(),
@@ -138,7 +152,7 @@ pub fn file_row_owned(
             Align2::RIGHT_CENTER,
             &owners.label,
             egui::FontId::proportional(11.0),
-            t.accent,
+            t.accent_fg,
         );
         right = r.left().max(clip.left()) - 8.0;
     }
@@ -326,6 +340,76 @@ pub(super) fn split_dir(path: &str) -> (&str, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn painted_file_badges_meet_aa_on_normal_hovered_and_selected_rows() {
+        let ctx = theme::test_paint::context();
+        for builtin in theme::catalog::BUILTIN {
+            let t = builtin.palette().tokens();
+            theme::set_tokens(&ctx, t);
+            for state in 0..3 {
+                for code in ['M', 'A', 'D', 'R', 'C', 'U', '?'] {
+                    let mut last = None;
+                    for _ in 0..2 {
+                        let mut output = ctx.run_ui(
+                            egui::RawInput {
+                                events: vec![egui::Event::PointerMoved(if state == 1 {
+                                    pos2(20.0, 20.0)
+                                } else {
+                                    pos2(700.0, 700.0)
+                                })],
+                                ..Default::default()
+                            },
+                            |ctx| {
+                                egui::CentralPanel::default()
+                                    .frame(egui::Frame::new().fill(t.card))
+                                    .show(ctx, |ui| {
+                                        let response = file_row_owned(
+                                            ui,
+                                            code,
+                                            &format!("{code}.rs"),
+                                            None,
+                                            None,
+                                            state == 2,
+                                            RowExtra::Stats(None, None),
+                                            Some(&OwnerTag {
+                                                label: "Owners".to_owned(),
+                                                full: "Owners".to_owned(),
+                                            }),
+                                        );
+                                        assert_eq!(
+                                            ui.rect_contains_pointer(response.row.rect),
+                                            state == 1,
+                                            "{} {code} state {state}",
+                                            builtin.name
+                                        );
+                                    });
+                            },
+                        );
+                        output.textures_delta.clear();
+                        last = Some(output);
+                    }
+                    if let Some(output) = last {
+                        for label in [
+                            if code == '?' {
+                                "A".to_owned()
+                            } else {
+                                code.to_string()
+                            },
+                            "Owners".to_owned(),
+                        ] {
+                            theme::test_paint::assert_text_aa(
+                                &output.shapes,
+                                t.card,
+                                &label,
+                                &format!("{} {code} state {state}", builtin.name),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_path_splits_into_folder_and_name() {

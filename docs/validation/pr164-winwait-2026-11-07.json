@@ -1,0 +1,286 @@
+{
+  "candidate": "02a1a161ddb63157d7e9e25dd07cafe6bba5da99",
+  "tree": "7657684a7da3447ce66c8c879b1d1e8ef18dc86b",
+  "previous_pr_head": "0f5ec9c6e6d4fca89532defa42400c4c79723d0f",
+  "base": "78f4dc8b427d2450a5c55d63d8a47fa06987cc6f",
+  "failure": {
+    "jobs": [
+      "https://github.com/JKamsker/gitcraft/actions/runs/42409071727/job/128514167103",
+      "https://github.com/JKamsker/gitcraft/actions/runs/42409071727/job/128514167245",
+      "https://github.com/JKamsker/gitcraft/actions/runs/42409071727/job/128519240754"
+    ],
+    "observed": "Two Windows shards hit the 20-minute step deadline, each with one outstanding test and no assertion failures. Aggregate reflects shard failures.",
+    "outstanding_tests": [
+      "repo::interaction::tests::the_palette_offers_every_other_branch",
+      "repo::timeline::receipt_tests::a_commit_has_no_receipt"
+    ],
+    "diagnosis": "UNRESOLVED: current libtest output cannot distinguish ordinary fixture Git setup, active subprocess I/O, tab polling or disposal. No Windows hang was reproduced locally."
+  },
+  "changes": [
+    {
+      "commit": "a3290f5a532735a80fc33699b0b68c4aec6c4264",
+      "path": "src/processes.rs",
+      "disposition": "Separate concrete stdin completion defect fixed; NOT a confirmed cause of these hangs.",
+      "response": "Windows buffered writes can report acceptance before completion. Flush the final accepted write inside the main cancellation/deadline select before closing stdin while the child remains alive. Preserve legacy authoritative child exit and tolerated BrokenPipe; do not require early-exiting commands to consume all input. Synthetic deferred-write test checks pending flush success and deferred non-BrokenPipe error."
+    },
+    {
+      "commit": "73a2dbc8604ab8e13346b040ac624adafdcb9b47",
+      "paths": [
+        "src/processes.rs",
+        "src/processes/trace.rs",
+        ".github/workflows/windows-tests.yml"
+      ],
+      "disposition": "Investigative diagnostics; no timeouts extended, tests skipped or shard isolation added.",
+      "response": "cfg(test) opt-in GITCRAFT_TEST_PROCESS_TRACE=1; waiting synchronous tickets report every30seconds. Atomic snapshots include caller test name, allowlisted Git verb, elapsed time, owned child PID, queued/spawning/supervising/running/stopping/reaping/draining stage, open-pipe flags and byte counts. No arbitrary arguments, paths, environment or input logged. Enable only in Windows shard job; production diagnostics compile out."
+    },
+    {
+      "commit": "02a1a161ddb63157d7e9e25dd07cafe6bba5da99",
+      "disposition": "Typed diagnostic stages, lint cleanup and explicit early-child-exit contract."
+    }
+  ],
+  "review": {
+    "reviewer": "independent adversarial agent /root/review_codex_integration",
+    "candidate": "02a1a161ddb63157d7e9e25dd07cafe6bba5da99",
+    "result": "PASS",
+    "verbatim": "PASS \u2014 02a1a161ddb63157d7e9e25dd07cafe6bba5da99. The delta safely replaces string stages with an enum, preserves test assertions, and documents early-child-exit behavior. Prior review carries forward with no mandatory findings. Windows hangs remain unexplained. Read-only review; no tests or CI executed."
+  },
+  "validation": {
+    "candidate": "02a1a161ddb63157d7e9e25dd07cafe6bba5da99",
+    "environment": {
+      "platform": "macOS arm64",
+      "rust": "1.95.0",
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "tools": "Difftastic0.72.0, GNU sed4.10"
+    },
+    "processes": {
+      "passed": 18,
+      "failed": 0,
+      "command": "cargo +1.95.0 test --locked --lib processes:: -- --nocapture",
+      "includes": "Three synthetic tests plus existing owned-child I/O, queue, timeout, cancellation and descendant cleanup tests."
+    },
+    "affected_shards_native": {
+      "repo-g-m": 236,
+      "repo-rest": 140,
+      "failed": 0,
+      "execution": "Same unmodified ci/test-shards.py substring filters, default parallel libtest, native macOS; no Windows runtime claim."
+    },
+    "real_ssh": "PASS;1real integration test with10authenticated disposable local SSH connections, including forced reconnect.",
+    "build": "cargo +1.95.0 test --locked --all-targets --no-run: PASS",
+    "fmt": "cargo +1.95.0 fmt --all -- --check: PASS",
+    "clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code: PASS; same documented six preexisting native dead-code allowances.",
+    "full": {
+      "command": "cargo +1.95.0 test --locked -- --test-threads=1",
+      "passed": 3152,
+      "failed": 0,
+      "ignored": 10,
+      "filtered": 0,
+      "result_lines": [
+        "test result: ok. 3143 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 580.55s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.77s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "trace_env": "GITCRAFT_TEST_PROCESS_TRACE=1"
+    },
+    "binary_sha256": "a5e93798a933d043ac169035fc6e5ea70f06a340b445b747cd1f17f93553d4bf"
+  },
+  "process_test_safety": "Checkpoint commits were pushed and remote SHAs verified before owned-process checks. New synthetic completion/diagnostic tests passed first. Existing process containment logic was not changed; no host-wide selectors or signaling introduced.",
+  "rejected_validation": [
+    {
+      "candidate": "73a2dbc8604ab8e13346b040ac624adafdcb9b47",
+      "gate": "Clippy",
+      "result": "6new lint errors (unwraps and eighth test-only function argument); corrected in02a1a161 before final gates."
+    }
+  ],
+  "limits": [
+    "Windows indefinite-wait root cause remains unknown. This candidate repairs a separate input-completion defect and adds diagnostics for the next Windows execution.",
+    "No native Windows execution locally. Passing macOS affected-shard filters is not a Windows pass.",
+    "No blanket retries, longer workflow timeout, skipped tests, new serial isolation or relaxed assertions.",
+    "Bundle import and remote Syntax remain deferred; live external SSH/WSL bundle runtime remains untested."
+  ],
+  "documentation_binding": {
+    "application_candidate": "02a1a161ddb63157d7e9e25dd07cafe6bba5da99",
+    "scope": "Final docs-only delivery must verify application, crates, manifests, tests, workflows and CI files unchanged from this candidate."
+  },
+  "created_utc": "2026-11-07T20:49:21.252654+00:00",
+  "logs": {
+    "failed-windows-g-m": {
+      "sha256": "108bd3e00ed33aaf4097f7c9cb4deea30586b245fc4a756d6d5050d6f25978b7",
+      "bytes": 42633,
+      "tail": [
+        "2026-11-07T20:26:57.8704521Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader",
+        "2026-11-07T20:26:57.8920522Z http.https://github.com/.extraheader",
+        "2026-11-07T20:26:57.8948258Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --unset-all http.https://github.com/.extraheader",
+        "2026-11-07T20:26:57.9184592Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"sh -c \\\"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\\\"\"",
+        "2026-11-07T20:26:58.2841176Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp ^includeIf\\.gitdir:",
+        "2026-11-07T20:26:58.3072953Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"git config --local --show-origin --name-only --get-regexp remote.origin.url\"",
+        "2026-11-07T20:26:58.6728999Z Cleaning up orphan processes",
+        "2026-11-07T20:26:58.7054271Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/download-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      ]
+    },
+    "failed-windows-rest": {
+      "sha256": "57a03094b5ca51cae53893e9563ff67f1acc7ed7891868808094bbdc922b04e4",
+      "bytes": 30889,
+      "tail": [
+        "2026-11-07T20:26:59.4366753Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader",
+        "2026-11-07T20:26:59.4700848Z http.https://github.com/.extraheader",
+        "2026-11-07T20:26:59.4748947Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --unset-all http.https://github.com/.extraheader",
+        "2026-11-07T20:26:59.5132401Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"sh -c \\\"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\\\"\"",
+        "2026-11-07T20:27:00.1119553Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" config --local --name-only --get-regexp ^includeIf\\.gitdir:",
+        "2026-11-07T20:27:00.1499298Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" submodule foreach --recursive \"git config --local --show-origin --name-only --get-regexp remote.origin.url\"",
+        "2026-11-07T20:27:00.7311089Z Cleaning up orphan processes",
+        "2026-11-07T20:27:00.7514660Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/download-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      ]
+    },
+    "failed-windows-aggregate": {
+      "sha256": "1a4714f8dcec5ffe2e66e02e5ca14ba0eca7adac8dc36238332f822b1782c96b",
+      "bytes": 2249,
+      "tail": [
+        "2026-11-07T20:27:07.0321077Z \u001b[36;1mtest \"$TESTS_RESULT\" = success\u001b[0m",
+        "2026-11-07T20:27:07.1729317Z shell: /usr/bin/bash -e {0}",
+        "2026-11-07T20:27:07.1730284Z env:",
+        "2026-11-07T20:27:07.1730798Z   CARGO_TERM_COLOR: always",
+        "2026-11-07T20:27:07.1731373Z   TESTS_RESULT: failure",
+        "2026-11-07T20:27:07.1731944Z ##[endgroup]",
+        "2026-11-07T20:27:07.1955600Z ##[error]Process completed with exit code 1.",
+        "2026-11-07T20:27:07.2130414Z Cleaning up orphan processes"
+      ]
+    },
+    "stdin-synthetic-earlier": {
+      "sha256": "be080fc22d7c9a6a724f9b8d7857aa6e01369b4686275711cea765bf2471a8f7",
+      "bytes": 1294,
+      "tail": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3150 filtered out; finished in 0.00s",
+        "",
+        "     Running unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    "trace-synthetic-earlier": {
+      "sha256": "d1f9accef6bf4c625a81326e88df9876976c149ab700257fb77361bd2fe8670b",
+      "bytes": 1381,
+      "tail": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3151 filtered out; finished in 0.00s",
+        "",
+        "     Running unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    "processes-final": {
+      "sha256": "0a5a5b6390226bcdfcc5a4441090f8c038c0d7df9d602dfc32d156088855e649",
+      "bytes": 2706,
+      "tail": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 3135 filtered out; finished in 1.35s",
+        "",
+        "     Running unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s",
+        ""
+      ]
+    },
+    "native-affected-shards": {
+      "sha256": "8cc2f4985f94c0b6aed1640cef09bf1d985e03754e678d3df95eca8de0ed99d1",
+      "bytes": 31919,
+      "tail": [
+        "test repo::versions::tests::a_rebase_continued_after_conflicts_is_kept_from_where_it_started ... ok",
+        "test repo::timeline::remove_tests::nothing_is_lost_or_left_behind ... ok",
+        "test repo::versions::tests::a_rebase_keeps_both_versions_and_offers_to_compare_them ... ok",
+        "test repo::timeline::tab_tests::the_undo_tree_keeps_an_undone_future_to_jump_back_to ... ok",
+        "test repo::unity::tests::unity_in_the_tab ... ok",
+        "",
+        "test result: ok. 140 passed; 0 failed; 0 ignored; 0 measured; 3013 filtered out; finished in 5.41s",
+        ""
+      ]
+    },
+    "build-final": {
+      "sha256": "e446b5952bae0c87a946554457e3a5c21f55e651ec990a46e518f0708a0159f4",
+      "bytes": 2366,
+      "tail": [
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-130befab7ec1fec1)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-f74b6ccb8ad0c5e5)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-75a901363b46d695)",
+        "  Executable unittests examples/async_git_transport.rs (target/debug/examples/async_git_transport-a1e87999cab06cf7)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-bc6520aea5d297cb)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-b42a6638fb9aa8b5)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "clippy-final": {
+      "sha256": "338ce178cb3a78821e3e6ab1135d758a30dc46b8ba937b7db7696d552aae9137",
+      "bytes": 206,
+      "tail": [
+        "    Blocking waiting for file lock on build directory",
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.48s"
+      ]
+    },
+    "real-ssh": {
+      "sha256": "f0c1ae1a3d7f2120252435c4eb82abdeff9600a473a507fd71a573267a1efa66",
+      "bytes": 314,
+      "tail": [
+        "",
+        "running 1 test",
+        "Exit request sent.",
+        "test remote::transport::unix::tests::real_openssh_reuses_concurrently_and_recovers ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3152 filtered out; finished in 0.95s",
+        "",
+        "Disposable sshd accepted 10 authenticated TCP connections (includes explicit reconnect)."
+      ]
+    },
+    "full": {
+      "sha256": "d750f74940c39a755d3cc112cc499e15c7f924aea4cfba9326462fc32649fbea",
+      "bytes": 250526,
+      "tail": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests gitcraft_os",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    "rejected-clippy": {
+      "sha256": "a1c217ee5e8857f7fd198737ea21539272a0d4aba121218d49ea78999802484f",
+      "bytes": 2962,
+      "tail": [
+        "    |",
+        "742 |                     assert!(result.unwrap());",
+        "    |                             ^^^^^^^^^^^^^^^",
+        "    |",
+        "    = note: if this value is an `Err`, it will panic",
+        "    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unwrap_used",
+        "",
+        "error: could not compile `gitcraft` (lib test) due to 6 previous errors"
+      ]
+    }
+  },
+  "durable_logs": {
+    "path": "docs/validation/pr164-winwait-2026-11-07-tests.log.gz",
+    "sha256": "653cbe7fbcfb01cd6cf0695f80f1fab6dd7152e4e893c4899b4bc5d65350d888",
+    "uncompressed_sha256": "09881c66f02111e56ab4eea094206878bc85b70c8e33c3d571a99f881f2de32c"
+  }
+}

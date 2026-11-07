@@ -21,6 +21,7 @@ mod fence;
 mod finder_actions;
 mod folder_browser;
 mod forge;
+mod gerrit;
 mod git;
 mod graph;
 mod icons;

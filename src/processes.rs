@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 use crate::tasks::Cancellation;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+#[cfg(test)]
+mod trace;
+
 const ACTIVE: usize = 8;
 const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
@@ -34,6 +37,8 @@ pub(crate) struct Options {
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
+    /// A smaller independent stderr cap; otherwise use the stdout capture limit.
+    pub stderr_limit: Option<usize>,
     pub drain_for: Duration,
 }
 impl Default for Options {
@@ -51,6 +56,7 @@ impl Default for Options {
             stop_ready: None,
             stdout_ready: None,
             output_limit: OUTPUT_LIMIT,
+            stderr_limit: None,
             drain_for: Duration::from_secs(1),
         }
     }
@@ -83,14 +89,30 @@ struct Request {
     reply: mpsc::Sender<ResultOutput>,
     ticket: Cancellation,
     deadline: Option<Instant>,
+    #[cfg(test)]
+    trace: Option<Arc<trace::Trace>>,
 }
 
 pub(crate) struct Ticket {
     reply: mpsc::Receiver<ResultOutput>,
     cancel: Cancellation,
+    #[cfg(test)]
+    trace: Option<Arc<trace::Trace>>,
 }
 impl Ticket {
     pub(crate) fn wait(self) -> ResultOutput {
+        #[cfg(test)]
+        if let Some(trace) = &self.trace {
+            loop {
+                match self.reply.recv_timeout(Duration::from_secs(30)) {
+                    Ok(result) => return result,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        return Err("Process service stopped before returning a result".into());
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => trace.report(),
+                }
+            }
+        }
         self.reply
             .recv()
             .map_err(|_| "Process service stopped before returning a result".to_owned())?
@@ -202,6 +224,8 @@ impl Service {
                                     &stop,
                                     &stats,
                                     &blocking,
+                                    #[cfg(test)]
+                                    request.trace.as_deref(),
                                 )
                                 .await;
                                 stats.active.fetch_sub(1, Ordering::Relaxed);
@@ -246,6 +270,8 @@ impl Service {
         let (reply, receive) = mpsc::channel();
         let ticket = Cancellation::default();
         let deadline = options.timeout.map(|limit| Instant::now() + limit);
+        #[cfg(test)]
+        let trace = trace::Trace::new(&command).map(Arc::new);
         let mut queued = self.counters.queued.load(Ordering::Relaxed);
         loop {
             if queued >= self.capacity {
@@ -269,6 +295,8 @@ impl Service {
                 reply,
                 ticket: ticket.clone(),
                 deadline,
+                #[cfg(test)]
+                trace: trace.clone(),
             })
             .is_err()
         {
@@ -278,6 +306,8 @@ impl Service {
         Ok(Ticket {
             reply: receive,
             cancel: ticket,
+            #[cfg(test)]
+            trace,
         })
     }
 
@@ -332,6 +362,8 @@ pub(crate) fn shutdown() {
     }
 }
 
+// The eighth argument only exists in opt-in libtest diagnostics.
+#[cfg_attr(test, allow(clippy::too_many_arguments))]
 async fn execute(
     command: Command,
     mut options: Options,
@@ -340,6 +372,7 @@ async fn execute(
     shutdown: &Cancellation,
     stats: &Counters,
     blocking: &Arc<tokio::sync::Semaphore>,
+    #[cfg(test)] trace: Option<&trace::Trace>,
 ) -> ResultOutput {
     let cancelled = || {
         options.cancel.is_cancelled()
@@ -373,9 +406,18 @@ async fn execute(
     cmd.process_group(0);
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0004); // CREATE_NO_WINDOW | CREATE_SUSPENDED
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.stage(trace::Stage::Spawning);
+    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not run process: {e}"))?;
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.spawned(child.id());
+        trace.stage(trace::Stage::Supervising);
+    }
     #[cfg(windows)]
     let mut process_job = match child
         .id()
@@ -390,6 +432,10 @@ async fn execute(
         }
     };
     stats.spawned.fetch_add(1, Ordering::Relaxed);
+    #[cfg(test)]
+    if let Some(trace) = trace {
+        trace.stage(trace::Stage::Running);
+    }
     #[cfg(unix)]
     let pid = child.id();
     let mut input = child.stdin.take();
@@ -408,6 +454,18 @@ async fn execute(
     let mut obuf = [0; 8192];
     let mut ebuf = [0; 8192];
     loop {
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.io(
+                input.is_some(),
+                out.is_some(),
+                err.is_some(),
+                status.is_some(),
+                written,
+                stdout.len(),
+                stderr.len(),
+            );
+        }
         if status.is_some() && out.is_none() && err.is_none() {
             break;
         }
@@ -450,29 +508,27 @@ async fn execute(
                             && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n]))).is_err() {
                             stopped = Some("process progress callback panicked".into());
                         }
-                        append(&mut stderr, &ebuf[..n], options.output_limit, &mut stopped);
+                        append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
                     }
                     Err(e) => stopped = Some(format!("could not read process errors: {e}")),
                 }
             }
             result = async {
                 match &mut input {
-                    Some(pipe) => pipe.write(&options.input.as_deref().unwrap_or_default()[written..]).await,
+                    Some(pipe) => write_input(pipe, options.input.as_deref().unwrap_or_default(), &mut written).await,
                     None => std::future::pending().await,
                 }
             } => {
                 match result {
-                    Ok(0) => input = None,
-                    Ok(n) => {
-                        written += n;
-                        if written == options.input.as_ref().map_or(0, Vec::len) { input = None; }
-                    }
+                    Ok(true) => input = None,
+                    Ok(false) => {},
                     Err(e) if e.kind() == io::ErrorKind::BrokenPipe => input = None,
                     Err(e) => stopped = Some(format!("could not pass process its input: {e}")),
                 }
             }
             result = child.wait(), if status.is_none() => {
                 match result {
+                    // Preserve early-reader semantics: an exited child need not consume all input.
                     Ok(s) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
                     Err(e) => stopped = Some(format!("could not wait for process: {e}")),
                 }
@@ -497,6 +553,10 @@ async fn execute(
         }
     }
     if stopped.is_some() {
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage(trace::Stage::Stopping);
+        }
         // Remote cleanup may need its PID marker. The stderr callback has consumed every
         // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
         if let Some(stop) = options.stop_remote.take()
@@ -507,6 +567,10 @@ async fn execute(
         // The remote stop can also end the local loopback/SSH child. Reap it before
         // signaling its group: Darwin rejects SIGKILL on a group containing only zombies.
         if status.is_none() {
+            #[cfg(test)]
+            if let Some(trace) = trace {
+                trace.stage(trace::Stage::Reaping);
+            }
             status = child
                 .try_wait()
                 .map_err(|e| format!("could not reap process: {e}"))?;
@@ -543,6 +607,10 @@ async fn execute(
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
         let until = tokio::time::Instant::now() + options.drain_for;
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage(trace::Stage::Draining);
+        }
         let mut overflow = None;
         while out.is_some() || err.is_some() {
             tokio::select! {
@@ -559,7 +627,7 @@ async fn execute(
                             if let Some(consume) = &mut options.stderr {
                                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n])));
                             }
-                            append(&mut stderr, &ebuf[..n], options.output_limit, &mut overflow);
+                            append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
                         }
                     }
                 }
@@ -583,6 +651,28 @@ async fn execute(
     })
 }
 
+/// Windows pipe writes can report acceptance before their blocking I/O finishes. Keep
+/// polling that final write through flush before dropping the handle to deliver EOF,
+/// while the child is alive. Child exit or BrokenPipe can still end input early.
+/// Each await stays inside the main select so cancellation and deadlines still advance.
+async fn write_input<W: tokio::io::AsyncWrite + Unpin>(
+    pipe: &mut W,
+    bytes: &[u8],
+    written: &mut usize,
+) -> io::Result<bool> {
+    if *written < bytes.len() {
+        let n = pipe.write(&bytes[*written..]).await?;
+        if n == 0 {
+            return Err(io::ErrorKind::WriteZero.into());
+        }
+        *written += n;
+        Ok(false)
+    } else {
+        pipe.flush().await?;
+        Ok(true)
+    }
+}
+
 fn append(output: &mut Vec<u8>, bytes: &[u8], limit: usize, stopped: &mut Option<String>) {
     let keep = bytes.len().min(limit.saturating_sub(output.len()));
     output.extend_from_slice(&bytes[..keep]);
@@ -598,6 +688,61 @@ fn append(output: &mut Vec<u8>, bytes: &[u8], limit: usize, stopped: &mut Option
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn final_buffered_stdin_write_is_flushed_and_its_error_is_observed() -> io::Result<()> {
+        use std::pin::Pin;
+        use std::task::{Context, Poll};
+        struct Buffered {
+            fail: bool,
+            flushed: bool,
+        }
+        impl tokio::io::AsyncWrite for Buffered {
+            fn poll_write(
+                self: Pin<&mut Self>,
+                _: &mut Context<'_>,
+                bytes: &[u8],
+            ) -> Poll<io::Result<usize>> {
+                Poll::Ready(Ok(bytes.len()))
+            }
+            fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+                if !self.flushed {
+                    self.flushed = true;
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+                Poll::Ready(if self.fail {
+                    Err(io::Error::other("deferred write failed"))
+                } else {
+                    Ok(())
+                })
+            }
+            fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+                unreachable!()
+            }
+        }
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        runtime.block_on(async {
+            for fail in [false, true] {
+                let mut pipe = Buffered {
+                    fail,
+                    flushed: false,
+                };
+                let mut written = 0;
+                assert!(!write_input(&mut pipe, b"input", &mut written).await?);
+                assert_eq!(written, 5);
+                assert!(!pipe.flushed, "acceptance is not completion");
+                let result = write_input(&mut pipe, b"input", &mut written).await;
+                assert!(pipe.flushed);
+                if fail {
+                    assert!(result.is_err_and(|e| e.to_string() == "deferred write failed"));
+                } else {
+                    assert!(result?);
+                }
+            }
+            Ok(())
+        })
+    }
 
     /// A real child executable on every OS, independent of shell quoting/tools.
     #[test]
@@ -837,6 +982,29 @@ mod tests {
                 .is_some_and(|s| s.contains("capture limit"))
         );
         assert!(out.stdout.len() <= 32768 && out.stderr.len() <= 32768);
+        Ok(())
+    }
+
+    #[test]
+    fn smaller_stderr_limit_stops_a_process_with_large_stdout_budget() -> Result<(), String> {
+        let service = Service::new(1, 2).map_err(|e| e.to_string())?;
+        let out = service
+            .submit(
+                command("flood")?,
+                Options {
+                    output_limit: 2 << 20,
+                    stderr_limit: Some(1024),
+                    ..Default::default()
+                },
+            )?
+            .wait()?;
+        assert!(
+            out.stopped
+                .as_deref()
+                .is_some_and(|s| s.contains("capture limit"))
+        );
+        assert!(out.stderr.len() <= 1024);
+        assert!(out.stdout.len() < 2 << 20);
         Ok(())
     }
 

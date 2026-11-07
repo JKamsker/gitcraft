@@ -514,7 +514,7 @@ pub(super) fn run_steps_counted(
         .is_some_and(|op| op.len() >= 2 && op[0] == "stash" && op[1] == "push");
     let stash_before = pushes_stash.then(|| git::resolve(path, "refs/stash").ok());
     // Checked before anything runs, so a refused undo changes nothing.
-    if let Err(e) = check_expected(path, ops) {
+    if let Err(e) = check_expected(path, ops, control) {
         return (Err(e), kind, 0);
     }
     let mut result = Ok(String::new());
@@ -545,7 +545,16 @@ pub(super) fn run_steps_counted(
             stopped = i;
             break;
         }
-        result = run_step(path, &args, creds, quiet, control);
+        result = (|| {
+            if let [mark, original @ ..] = op.as_slice()
+                && mark == crate::gerrit::AMEND
+            {
+                let prepared = crate::gerrit::amend_args(path, original)?;
+                let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
+                return run_step(path, &args, creds, quiet, control);
+            }
+            run_step(path, &args, creds, quiet, control)
+        })();
         if result.is_err() {
             stopped = i;
             break;
@@ -685,10 +694,30 @@ pub(super) fn tried_note(out: &str) -> Option<&str> {
 
 /// Whether `op` is a step that runs nothing, only checks.
 pub(super) fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some() || expected_symref(op).is_some() || expected_tree(op).is_some()
+    expected_ref(op).is_some()
+        || expected_symref(op).is_some()
+        || expected_tree(op).is_some()
+        || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
 }
 
-fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
+fn check_expected(
+    path: &Path,
+    ops: &[Vec<String>],
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<(), String> {
+    for op in ops {
+        if let [mark, base, head] = op.as_slice()
+            && mark == crate::gerrit::CHECK
+        {
+            crate::gerrit::check_stack_with(base, head, |args| {
+                if let Some(control) = control {
+                    git::run_watched(Some(path), args, None, true, control)
+                } else {
+                    git::run(Some(path), args)
+                }
+            })?;
+        }
+    }
     for (rev, tree) in ops.iter().filter_map(|op| expected_tree(op)) {
         let now = git::run(
             Some(path),

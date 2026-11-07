@@ -96,12 +96,21 @@ pub fn panel_footer(
 
 /// A rounded label with a tinted background.
 pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
+    let t = Tokens::get(ui.ctx());
     let font = theme::medium(11.0);
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font, color);
     let size = vec2(galley.size().x + 12.0, 18.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
-    ui.painter()
-        .rect_filled(rect, CornerRadius::same(9), color.gamma_multiply(0.18));
+    ui.painter().rect_filled(
+        rect,
+        CornerRadius::same(9),
+        theme::palette::readable_tint(
+            color,
+            0.18,
+            &[t.card, t.dock, t.field, t.tab_strip],
+            &[color],
+        ),
+    );
     ui.painter().galley(
         pos2(rect.left() + 6.0, rect.center().y - galley.size().y / 2.0),
         galley,
@@ -156,7 +165,7 @@ pub fn status_color(t: &Tokens, code: char) -> Color32 {
     match code {
         'A' | '?' => t.success,
         'D' => t.danger,
-        'R' | 'C' => t.accent,
+        'R' | 'C' => t.accent_fg,
         'U' => t.danger,
         _ => t.warning,
     }

@@ -26,6 +26,7 @@ pub(super) struct Loaded {
     pub(super) remotes: Vec<Remote>,
     /// The forge `origin` is on, if gitcraft knows it.
     pub(super) hosting: Option<Hosting>,
+    pub(super) gerrit: Option<crate::gerrit::Server>,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
@@ -141,7 +142,12 @@ impl RepoTab {
                     issues.join()?,
                 );
                 let path = path.as_path();
-                let hosting = forge::detect(path, &remotes);
+                let gerrit = crate::gerrit::detect(path, &remotes);
+                let hosting = if gerrit.is_none() {
+                    forge::detect(path, &remotes)
+                } else {
+                    None
+                };
                 Ok(Box::new(Loaded {
                     refs,
                     history,
@@ -151,6 +157,7 @@ impl RepoTab {
                     stashes,
                     remotes,
                     hosting,
+                    gerrit,
                     submodules,
                     lfs,
                     identity,
@@ -402,6 +409,7 @@ impl RepoTab {
         self.loading_more = false;
         let refs_moved = loaded.refs != self.refs;
         self.refs = loaded.refs;
+        self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.has_more = loaded.history.len() >= loaded.requested;
         self.history = loaded.history;
         // A status read since this reload started is newer.
@@ -465,6 +473,7 @@ impl RepoTab {
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
         self.remotes = loaded.remotes;
+        self.gerrit = loaded.gerrit;
         if loaded.hosting != self.hosting || remotes_changed {
             let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
             self.hosting = loaded.hosting;
@@ -606,6 +615,7 @@ impl RepoTab {
             .collect();
         let old_graph = std::mem::replace(&mut self.graph, graph);
         let old_index = std::mem::replace(&mut self.index, index);
+        self.rebuild_graph_labels();
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {

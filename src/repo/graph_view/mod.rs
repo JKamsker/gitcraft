@@ -7,8 +7,12 @@ mod handles;
 mod header;
 mod lanes;
 mod menu;
+pub(super) mod message_tooltip;
 mod order;
 mod pills;
+mod readability;
+#[cfg(test)]
+mod readability_tests;
 mod row;
 mod search;
 pub(super) mod suggest;
@@ -25,6 +29,7 @@ use crate::keymap::Command;
 use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
+pub(super) use badge::BadgeIndex;
 use badge::{Badge, BadgeKind, badges};
 /// For the settings' previews, which draw a graph of their own like this one.
 pub(crate) use lanes::edge;
@@ -62,7 +67,7 @@ impl RepoTab {
     /// A comparison opened from a pull request focuses that branch, including when several
     /// branches share its tip and the ordinary ordering would put it behind `+N`.
     fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
-        let mut badges = badges(&commit.refs, &self.refs);
+        let mut badges = self.graph_badge_index.badges(&commit.refs);
         if let Some(compare) = &self.compare
             && compare.target.as_deref() == Some(commit.hash.as_str())
         {
@@ -169,28 +174,12 @@ impl RepoTab {
 
         let settings = Settings::get(ui.ctx());
         let lanes = lane_layout(&settings, self.graph.width);
-        let prefs = preferred_cols(&settings, lanes);
-        let cols = prefs.squeezed(ui.available_width(), settings.last_resized);
+        let mut prefs = preferred_cols(&settings, lanes);
+        let mut cols = prefs.squeezed(ui.available_width(), settings.last_resized);
 
         // Column headers.
         let (header, header_resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::CLICK);
-        let graph_label = crate::repo::graph_order::header_label(self.log_order);
-        header::column_headers(ui, &t, header, &cols, &graph_label);
-        self.test_lane_frame(&settings, ui.ctx());
-        if self.test_lane.visible {
-            self.test_lane_header(ui, header, &cols, acts);
-        }
-        self.column_handles(ui, header, &prefs, &cols, &settings);
-        header::header_menu(&header_resp, &settings);
-        order::order_button(
-            ui,
-            header,
-            &cols,
-            (&graph_label, self.log_order),
-            &settings,
-            acts,
-        );
 
         let mut scroll = egui::ScrollArea::vertical()
             .id_salt("graph_scroll")
@@ -222,7 +211,6 @@ impl RepoTab {
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let now = git::now();
         let total = self.commits.len() + usize::from(self.has_more);
         // The merges shown, for their badges: only those are read.
         let mut shown_merges = Vec::new();
@@ -231,7 +219,26 @@ impl RepoTab {
         if first_steps.is_some() {
             scroll = scroll.max_height(total as f32 * ROW_PITCH);
         }
+        self.test_lane_frame(&settings, ui.ctx());
+        let mut hovered_message = None;
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
+            // show_rows includes overscan and partially clipped rows. Require the text's
+            // centre to be inside the viewport with enough room for its glyphs: a label on
+            // a mostly hidden top row would leave the visible lane looking unnamed.
+            let top = ui.max_rect().top();
+            let clip = ui.clip_rect();
+            let mut visible = range.clone().filter(|i| {
+                let y = top + (i - range.start) as f32 * ROW_PITCH;
+                let center = y + ROW_PITCH / 2.0;
+                center >= clip.top() + 8.0 && center <= clip.bottom() - 8.0
+            });
+            let first = visible.clone().next().unwrap_or(range.start);
+            let end = visible.next_back().map_or(first, |i| i + 1);
+            let readable = self.readable_viewport(ui, first..end, lanes.shown);
+            if settings.fit_visible_refs() {
+                prefs.refs = readable.refs_width;
+            }
+            cols = prefs.squeezed(ui.available_width(), settings.last_resized);
             // Near the end: fetch the next page of history.
             // Not from the ghost graph, whose rows don't grow as pages come in.
             if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more && !ghost
@@ -257,7 +264,11 @@ impl RepoTab {
                     if self.commits[i].parents.len() == 2 {
                         shown_merges.push(self.commits[i].hash.clone());
                     }
-                    let resp = self.commit_row(ui, i, cols, lanes, now, i == stop, acts);
+                    let (resp, hovered) =
+                        self.commit_row(ui, i, cols, lanes, &readable, i == stop, acts);
+                    if hovered.is_some() {
+                        hovered_message = hovered;
+                    }
                     if i == stop {
                         crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                     }
@@ -278,7 +289,7 @@ impl RepoTab {
                 }
                 // The ghost graph is only looked at: its rows do nothing, but the menu open
                 // on a real commit (whose entry is being previewed) stays open.
-                let resp = self.ghost_row(ui, i, cols, lanes, now);
+                let resp = self.ghost_row(ui, i, cols, lanes, &readable);
                 if !self.is_ghost_row(i) {
                     menu_drawn |= menu_row.as_deref() == Some(self.commits[i].hash.as_str());
                     self.row_menu(&resp, i, idle, acts);
@@ -293,11 +304,41 @@ impl RepoTab {
             self.first_steps_view(ui, steps, acts);
         }
         self.want_remerge_badges(&shown_merges, ui.ctx());
+        let graph_label = crate::repo::graph_order::header_label(self.log_order);
+        header::column_headers(ui, &t, header, &cols, &graph_label);
+        if self.test_lane.visible {
+            self.test_lane_header(ui, header, &cols, acts);
+        }
+        self.column_handles(ui, header, &prefs, &cols, &settings);
+        header::header_menu(&header_resp, &settings);
+        order::order_button(
+            ui,
+            header,
+            &cols,
+            (&graph_label, self.log_order),
+            &settings,
+            acts,
+        );
+        self.hover_graph_message(
+            ui.ctx(),
+            if ghost {
+                None
+            } else {
+                hovered_message.as_deref()
+            },
+        );
     }
 
     /// A row of the ghost graph, faded as what it is: a commit the operation would make, one
     /// it would leave on no ref, or one as it is.
-    fn ghost_row(&self, ui: &mut Ui, i: usize, cols: Cols, lanes: Lanes, now: i64) -> Response {
+    fn ghost_row(
+        &self,
+        ui: &mut Ui,
+        i: usize,
+        cols: Cols,
+        lanes: Lanes,
+        viewport: &readability::Viewport,
+    ) -> Response {
         let fade = match self.ghost.kind(i) {
             Kind::New => GHOST_OPACITY,
             Kind::Going => GOING_OPACITY,
@@ -306,7 +347,9 @@ impl RepoTab {
         let before = ui.opacity();
         ui.multiply_opacity(fade);
         // What its pills and build dots would do is dropped: nothing here is real yet.
-        let resp = self.commit_row(ui, i, cols, lanes, now, false, &mut Vec::new());
+        let resp = self
+            .commit_row(ui, i, cols, lanes, viewport, false, &mut Vec::new())
+            .0;
         ui.set_opacity(before);
         resp
     }
@@ -517,6 +560,7 @@ pub(super) fn compare_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git;
 
     #[test]
     fn a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip() {

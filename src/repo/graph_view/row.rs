@@ -66,15 +66,15 @@ impl RepoTab {
         i: usize,
         cols: Cols,
         lanes: Lanes,
-        now: i64,
+        viewport: &super::readability::Viewport,
         tab_stop: bool,
         acts: &mut Vec<Action>,
-    ) -> Response {
+    ) -> (Response, Option<String>) {
         let t = Tokens::get(ui.ctx());
         let (auto_id, rect) = ui.allocate_space(vec2(ui.available_width(), ROW_PITCH));
         let sense = crate::a11y::list_row_sense(tab_stop);
         let Some(commit) = self.commits.get(i) else {
-            return ui.interact(rect, auto_id, sense);
+            return (ui.interact(rect, auto_id, sense), None);
         };
         let is_wip = commit.hash == WIP_HASH;
         // Commits are dragged (the changes row and stashes aren't): egui tells a drag from a
@@ -88,11 +88,12 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
-        let label = || self.row_label(commit, now);
+        let label = || self.row_label(commit, viewport.now);
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
+        let mut hovered_message = None;
         let is_match = self.search.matches.contains(&commit.hash);
-        row_background(
+        let background = row_background(
             &painter,
             &t,
             rect,
@@ -124,9 +125,14 @@ impl RepoTab {
         };
 
         let (resp, pill) = self.refs_cell(ui, &painter, &row, resp, acts);
+        if !self.ghost.drawing()
+            && let Some(label) = viewport.labels.get(&i)
+        {
+            faint_lane_label(ui, &painter, &t, &row, label);
+        }
         self.graph_cell(ui, &painter, &row, lanes.shown);
         if is_wip {
-            self.wip_description(&painter, &t, &row);
+            self.wip_description(&painter, &t, &row, background);
         } else {
             let ci = self.ci_status(&commit.hash);
             let robot = self.authorship.of(commit).map_or(0.0, |a| {
@@ -141,7 +147,8 @@ impl RepoTab {
             } else {
                 0.0
             } + lane;
-            let dot_w = dots;
+            let change = self.gerrit.as_ref().zip(commit.change_id.as_ref());
+            let dot_w = dots + if change.is_some() { 16.0 } else { 0.0 };
             // Only where the description has room for it beside some of the summary.
             let room = rect.right() - cols.trailing() - dot_w - (gx + cols.graph);
             let resolved = self
@@ -157,7 +164,47 @@ impl RepoTab {
                     Stroke::new(1.2, t.text),
                 );
             }
-            trailing_columns(ui, &painter, &t, &row, now);
+            if let Some((server, id)) = change {
+                let center = pos2(rect.right() - cols.trailing() - 9.0 - dots, row.mid());
+                let link = ui.interact(
+                    Rect::from_center_size(center, vec2(14.0, 18.0)),
+                    ui.id().with(("gerrit-change", &commit.hash)),
+                    Sense::click(),
+                );
+                painter.text(
+                    center,
+                    Align2::CENTER_CENTER,
+                    "↗",
+                    FontId::proportional(14.0),
+                    t.accent_fg,
+                );
+                if link
+                    .on_hover_text(format!("Open Gerrit change {id}"))
+                    .clicked()
+                {
+                    acts.push(Action::OpenUrl(server.change_url(id)));
+                }
+            }
+            let description_rect = Rect::from_min_max(
+                pos2((gx + cols.graph).min(rect.right()), rect.top()),
+                pos2(
+                    (rect.right() - cols.trailing()).max(gx + cols.graph),
+                    rect.bottom(),
+                ),
+            );
+            if !self.ghost.drawing()
+                && super::message_tooltip::show(
+                    ui,
+                    &resp,
+                    description_rect.intersect(rect),
+                    &self.path,
+                    &commit.hash,
+                    self.graph_messages.message(&self.path, &commit.hash),
+                )
+            {
+                hovered_message = Some(commit.hash.clone());
+            }
+            trailing_columns(ui, &painter, &t, &row, viewport.now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
                 let id = ui.id().with(("ci-dot", &commit.hash));
@@ -183,7 +230,7 @@ impl RepoTab {
         if draggable {
             self.row_drag_drop(ui, &resp, &row, pill.as_ref(), acts);
         }
-        resp
+        (resp, hovered_message)
     }
 
     /// What a screen reader says for the row of `commit`: the changes row's counts, a stash's
@@ -220,7 +267,7 @@ impl RepoTab {
     }
 
     /// The changes row's description: how many files are conflicted, staged and unstaged.
-    fn wip_description(&self, painter: &Painter, t: &Tokens, row: &Row) {
+    fn wip_description(&self, painter: &Painter, t: &Tokens, row: &Row, background: Color32) {
         let mid = row.mid();
         let mut x = row.gx + row.cols.graph + 6.0;
         let font = theme::medium(12.5);
@@ -243,7 +290,14 @@ impl RepoTab {
             (self.work.unstaged.len(), "unstaged", t.warning),
         ] {
             if n > 0 {
-                x += pill(painter, pos2(x, mid), &format!("{n} {label}"), color) + 6.0;
+                x += pill(
+                    painter,
+                    t,
+                    pos2(x, mid),
+                    &format!("{n} {label}"),
+                    color,
+                    background,
+                ) + 6.0;
             }
         }
     }
@@ -290,16 +344,22 @@ fn row_background(
     hovered: bool,
     is_match: bool,
     compared: bool,
-) {
+) -> Color32 {
     // The row's own band, without the gap.
     let band = rect.shrink2(vec2(0.0, ROW_GAP / 2.0));
-    if selected {
+    let background = if selected {
         painter.rect_filled(band, 0.0, t.row_selected);
+        t.row_selected
     } else if hovered {
         painter.rect_filled(band, 0.0, t.hover);
+        t.hover
     } else if is_match {
-        painter.rect_filled(band, 0.0, t.warning.gamma_multiply(0.10));
-    }
+        let tint = t.match_tint();
+        painter.rect_filled(band, 0.0, tint);
+        theme::palette::over(tint, t.dock)
+    } else {
+        t.dock
+    };
     if is_match {
         painter.rect_filled(
             Rect::from_min_size(band.min, vec2(3.0, ROW_H)),
@@ -315,6 +375,7 @@ fn row_background(
             egui::StrokeKind::Inside,
         );
     }
+    background
 }
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
@@ -338,26 +399,27 @@ fn description(
     };
     let text_clip = painter.with_clip_rect(Rect::from_min_max(
         pos2(x, rect.top()),
-        pos2(text_right, rect.bottom()),
+        pos2(text_right.max(x), rect.bottom()),
     ));
-    let summary = text_clip.text(
-        pos2(x + 2.0, mid),
-        Align2::LEFT_CENTER,
-        &row.commit.summary,
-        font.clone(),
-        t.text,
+    let mut job = egui::text::LayoutJob::single_section(
+        row.commit.summary.clone(),
+        egui::TextFormat::simple(font, t.text),
     );
-    let room = text_right - summary.right() - 12.0;
-    let end = summary.right().min(text_right);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((text_right - x - 2.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let summary_right = x + 2.0 + galley.size().x;
+    text_clip.galley(pos2(x + 2.0, mid - galley.size().y / 2.0), galley, t.text);
+    let room = text_right - summary_right - 12.0;
+    let end = summary_right.min(text_right);
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
-            egui::TextFormat::simple(FontId::proportional(12.5), t.text.gamma_multiply(0.5)),
+            egui::TextFormat::simple(FontId::proportional(12.5), t.text_faint),
         );
         job.wrap = egui::text::TextWrapping::truncate_at_width(room);
         let galley = ui.fonts_mut(|f| f.layout_job(job));
         text_clip.galley(
-            pos2(summary.right() + 10.0, mid - galley.size().y / 2.0),
+            pos2(summary_right + 10.0, mid - galley.size().y / 2.0),
             galley,
             t.text,
         );
@@ -426,15 +488,139 @@ fn trailing_columns(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, now: i64)
 }
 
 /// A small rounded count label; returns its width.
-fn pill(painter: &Painter, left_center: Pos2, text: &str, color: Color32) -> f32 {
+fn pill(
+    painter: &Painter,
+    t: &Tokens,
+    left_center: Pos2,
+    text: &str,
+    color: Color32,
+    background: Color32,
+) -> f32 {
     let galley = painter.layout_no_wrap(text.to_owned(), theme::medium(11.0), color);
     let w = galley.size().x + 12.0;
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 9.0), vec2(w, 18.0));
-    painter.rect_filled(r, CornerRadius::same(9), color.gamma_multiply(0.18));
+    painter.rect_filled(
+        r,
+        CornerRadius::same(9),
+        t.text_tint(color, 0.18, background),
+    );
     painter.galley(
         pos2(r.left() + 6.0, r.center().y - galley.size().y / 2.0),
         galley,
         color,
     );
     w
+}
+
+fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {
+    let x = row.rect.left() + 8.0;
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(FontId::proportional(11.0), t.text_faint),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width((row.cols.refs - 24.0).max(0.0));
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let right = x + galley.size().x;
+    let clip = Rect::from_min_max(row.rect.min, pos2(row.gx - 4.0, row.rect.bottom()));
+    painter.with_clip_rect(clip).galley(
+        pos2(x, row.mid() - galley.size().y / 2.0),
+        galley,
+        t.text_faint,
+    );
+    if let Some(node_x) = row.node_x {
+        painter.line_segment(
+            [
+                pos2(right + 6.0, row.mid()),
+                pos2(node_x.min(row.gx + row.cols.graph), row.mid()),
+            ],
+            Stroke::new(1.0, t.text_faint.gamma_multiply(0.35)),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn painted_graph_bodies_and_wip_chips_meet_aa_in_combined_row_states() {
+        let ctx = theme::test_paint::context();
+        for builtin in theme::catalog::BUILTIN {
+            let t = builtin.palette().tokens();
+            theme::set_tokens(&ctx, t);
+            let mut tab = RepoTab::new_deferred("/nonexistent/contrast-paint".into(), &ctx);
+            let file = git::StatusFile {
+                path: "file".into(),
+                old_path: None,
+                code: 'M',
+                area: git::Area::Unstaged,
+            };
+            tab.work.unstaged.push(file.clone());
+            tab.work.staged.push(file.clone());
+            tab.work.conflicted.push(file);
+            let commit = Commit {
+                summary: "Subject".into(),
+                body: "faintbody".into(),
+                ..Default::default()
+            };
+            for state in 0..4 {
+                let mut output = ctx.run_ui(Default::default(), |ctx| {
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::new().fill(t.dock))
+                        .show(ctx, |ui| {
+                            let painter = ui.painter();
+                            let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(700.0, ROW_PITCH));
+                            let mut row = Row {
+                                i: 0,
+                                commit: &commit,
+                                rect,
+                                cols: Cols {
+                                    refs: 0.0,
+                                    graph: 0.0,
+                                    hash: 0.0,
+                                    author: 0.0,
+                                    when: 0.0,
+                                    date: 0.0,
+                                    push: 0.0,
+                                },
+                                gx: 0.0,
+                                lane_w: 0.0,
+                                node_x: None,
+                                color: t.accent,
+                            };
+                            row_background(
+                                painter,
+                                &t,
+                                row.rect,
+                                state == 2,
+                                state == 1,
+                                state == 3,
+                                false,
+                            );
+                            description(ui, painter, &t, &row, state == 3, 0.0, 0.0);
+                            row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
+                            let background = row_background(
+                                painter,
+                                &t,
+                                row.rect,
+                                state == 2,
+                                state == 1,
+                                state == 3,
+                                false,
+                            );
+                            tab.wip_description(painter, &t, &row, background);
+                        });
+                });
+                output.textures_delta.clear();
+                for label in ["faintbody", "1 conflict", "1 staged", "1 unstaged"] {
+                    theme::test_paint::assert_text_aa(
+                        &output.shapes,
+                        t.dock,
+                        label,
+                        &format!("{} state {state}", builtin.name),
+                    );
+                }
+            }
+        }
+    }
 }
