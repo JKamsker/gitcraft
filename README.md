@@ -108,6 +108,7 @@ that move the checkout, including checkout and rebase. Saved index contents and 
 stay separate; no WIP commits appear in history. Choose a version, preview a file from either
 layer, then recover selected hunks. Recovery preserves the real index and other working edits,
 and first saves a safety version; **Undo last recovery…** previews that safety version.
+Closing or replacing a read cancels it; a replacement waits for the previous read to stop.
 
 Drafts include tracked changes and nonignored untracked regular files. Ignored files and
 submodule contents are excluded; changed links, special files and conflicted indexes require

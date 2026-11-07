@@ -12,7 +12,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub use context::{configure as set_enabled, configured as enabled};
+pub use context::{
+    configure as set_enabled, configured as enabled, configured_with as enabled_while,
+};
 pub use restore::{RestoreHunk, RestorePreview, preview, restore};
 const MAX_INDEX: usize = 20_000;
 const MAX_FILES: usize = 2_000;

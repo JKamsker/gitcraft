@@ -236,6 +236,7 @@ impl RepoTab {
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }
+        self.sync_draft_reader();
         if !shown {
             return;
         }
@@ -454,7 +455,7 @@ impl RepoTab {
             Msg::Then(then) => then(self, ctx),
             Msg::DraftConfigured(id, result) => self.drafts_configured(id, result),
             Msg::DraftSaved(id, result) => self.draft_saved(id, result),
-            Msg::DraftRead(id, result) => self.draft_read(id, result),
+            Msg::DraftRead(id, result) => self.draft_read(id, result, ctx),
             Msg::DraftChanged(change, result) => self.draft_changed(change, result, ctx),
             Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
             // Asked before the list asked for last (one read before a merge answering after

@@ -49,6 +49,9 @@ fn prefix(repo: &Path, hooks: Option<&Path>, lazy: bool) -> Vec<String> {
 }
 
 pub fn configured(repo: &Path) -> Result<bool, String> {
+    configured_with(repo, &|| true)
+}
+pub fn configured_with(repo: &Path, active: &dyn Fn() -> bool) -> Result<bool, String> {
     let mut args = prefix(repo, None, false);
     args.extend(
         [
@@ -62,7 +65,7 @@ pub fn configured(repo: &Path) -> Result<bool, String> {
         .map(str::to_owned),
     );
     let args: Vec<_> = args.iter().map(String::as_str).collect();
-    let value = git::draft_bytes(repo, &args, &[], vec![], &[0, 1], &|| true)?;
+    let value = git::draft_bytes(repo, &args, &[], vec![], &[0, 1], active)?;
     Ok(value == b"true\n")
 }
 

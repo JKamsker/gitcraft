@@ -303,6 +303,8 @@ pub(super) enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        self.sync_draft_reader();
+        let draft_reader_waiting = self.draft_reader_waiting();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -335,6 +337,7 @@ impl RepoTab {
             match dialog {
                 Dialog::DraftLoading(_) => {
                     ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());
+                    if draft_reader_waiting { ui.label("Waiting for the previous read to stop…"); }
                     if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}
                 }
                 Dialog::DraftHistory { on, versions, error, index } => drafts::history(ui,on,versions,error.as_deref(),index,idle,draft_undo),
@@ -509,10 +512,10 @@ impl RepoTab {
         match response.inner {
             Outcome::Done(action) => {
                 acts.push(action);
-                self.dialog = None;
+                self.dismiss_dialog();
             }
-            Outcome::Cancel => self.dialog = None,
-            Outcome::Open if response.should_close() => self.dialog = None,
+            Outcome::Cancel => self.dismiss_dialog(),
+            Outcome::Open if response.should_close() => self.dismiss_dialog(),
             Outcome::Open => {}
             Outcome::Suggest => dialog.suggest_path(),
         }
