@@ -277,6 +277,7 @@ pub struct RepoTab {
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
     review_document: review_workflow::ReviewState,
+    review_tools: review_workflow::Tools,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     /// The reflog (or the lost commits) shown above the graph.
@@ -587,6 +588,7 @@ impl RepoTab {
             compare: None,
             pr_view: None,
             review_document: Default::default(),
+            review_tools: Default::default(),
             ci_view: None,
             reflog: None,
             versions: Default::default(),

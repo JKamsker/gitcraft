@@ -32,6 +32,7 @@ impl RepoTab {
         self.owners_frame(&ctx);
         self.forks_frame(&ctx);
         self.hotfix_frame(&ctx);
+        self.echo_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);
@@ -157,6 +158,7 @@ impl RepoTab {
         self.dialogs(&ctx, &mut acts);
         self.keep_both_dialog(&ctx);
         self.ai_review_window(&ctx);
+        self.review_tools_ui(&ctx, &mut acts);
         self.lfs_locks_ui(&ctx, &mut acts);
         self.ghost_frame(&ctx);
         self.collision_window(&ctx, &mut acts);

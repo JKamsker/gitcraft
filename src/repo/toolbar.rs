@@ -317,6 +317,12 @@ impl RepoTab {
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
+                if MenuItem::new("Review evidence and release coordination…")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::ReviewTools(super::review_workflow::ToolsAct::Open));
+                }
                 let browser = MenuItem::new("Open in browser")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);

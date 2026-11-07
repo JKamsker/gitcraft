@@ -41,6 +41,7 @@ impl RepoTab {
             self.review_document.open = false;
         }
         match action {
+            Action::ReviewTools(act) => self.review_tools_act(act, ctx),
             Action::Story(act) => self.story_act(act, ctx),
             Action::Freshness(act) => self.freshness_act(act, ctx),
             Action::Review(act) => self.review_act(act, ctx),

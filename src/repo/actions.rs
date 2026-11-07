@@ -36,6 +36,7 @@ pub(crate) enum Action {
     Review(super::review_workflow::ReviewAct),
     Freshness(super::review_workflow::FreshnessAct),
     Story(super::review_workflow::StoryAct),
+    ReviewTools(super::review_workflow::ToolsAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
