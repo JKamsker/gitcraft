@@ -105,7 +105,39 @@ impl RepoTab {
             self.wip_description(&painter, &t, &row);
         } else {
             let ci = self.ci_status(&commit.hash);
-            description(ui, &painter, &t, &row, is_match, ci.is_some());
+            let change = self.gerrit.as_ref().zip(commit.change_id.as_ref());
+            description(
+                ui,
+                &painter,
+                &t,
+                &row,
+                is_match,
+                usize::from(ci.is_some()) + usize::from(change.is_some()),
+            );
+            if let Some((server, id)) = change {
+                let center = pos2(
+                    rect.right() - cols.trailing() - 9.0 - if ci.is_some() { 16.0 } else { 0.0 },
+                    row.mid(),
+                );
+                let link = ui.interact(
+                    Rect::from_center_size(center, vec2(14.0, 18.0)),
+                    ui.id().with(("gerrit-change", &commit.hash)),
+                    Sense::click(),
+                );
+                painter.text(
+                    center,
+                    Align2::CENTER_CENTER,
+                    "↗",
+                    FontId::proportional(14.0),
+                    t.accent,
+                );
+                if link
+                    .on_hover_text(format!("Open Gerrit change {id}"))
+                    .clicked()
+                {
+                    acts.push(Action::OpenUrl(server.change_url(id)));
+                }
+            }
             trailing_columns(ui, &painter, &t, &row, now);
             if let Some(status) = ci {
                 let center = pos2(rect.right() - cols.trailing() - 9.0, row.mid());
@@ -197,10 +229,10 @@ fn row_background(
 
 /// The summary, then the rest of the message faded, cut with an ellipsis.
 /// `dot`: room is left at the end for the build status.
-fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
+fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dots: usize) {
     let (rect, mid) = (row.rect, row.mid());
     let x = row.gx + row.cols.graph + 6.0;
-    let text_right = rect.right() - row.cols.trailing() - 10.0 - if dot { 14.0 } else { 0.0 };
+    let text_right = rect.right() - row.cols.trailing() - 10.0 - 16.0 * dots as f32;
     let font = if is_match {
         theme::medium(12.5)
     } else {

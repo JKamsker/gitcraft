@@ -319,7 +319,16 @@ impl RepoTab {
         let mut items: Vec<(String, String, Action)> = vec![
             ("Fetch".into(), "remote".into(), Action::Fetch),
             ("Pull".into(), "remote".into(), Action::Pull),
-            ("Push".into(), "remote".into(), Action::Push),
+            (
+                if self.gerrit.is_some() {
+                    "Push for review"
+                } else {
+                    "Push"
+                }
+                .into(),
+                "remote".into(),
+                Action::Push,
+            ),
         ];
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),

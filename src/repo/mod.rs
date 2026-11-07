@@ -15,6 +15,7 @@ mod dialogs;
 mod diff;
 mod file_text;
 mod file_view;
+mod gerrit;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
@@ -132,6 +133,7 @@ pub struct RepoTab {
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
+    gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
@@ -295,6 +297,7 @@ impl RepoTab {
             lfs: false,
             identity: Identity::default(),
             hosting: None,
+            gerrit: None,
             prs: Vec::new(),
             pr_error: None,
             prs_loaded: None,

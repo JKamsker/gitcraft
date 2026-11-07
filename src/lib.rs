@@ -6,6 +6,7 @@ mod ci;
 mod desktop_entry;
 mod folder_browser;
 mod forge;
+mod gerrit;
 mod git;
 mod graph;
 mod icons;

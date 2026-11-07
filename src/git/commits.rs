@@ -22,6 +22,8 @@ pub struct Commit {
     pub body: String,
     /// Decorations (`HEAD -> main`, `origin/main`, `tag: v1`), as git prints them.
     pub refs: Vec<String>,
+    /// A validated Gerrit trailer; kept before the body is flattened for the graph.
+    pub change_id: Option<String>,
 }
 
 /// The commits of every branch (stashes aside), or of the revisions `from` when given, newest
@@ -124,6 +126,9 @@ fn parse_record<S: AsRef<str>>(fields: &[S]) -> Option<Commit> {
         date: date.to_owned(),
         summary: summary.to_owned(),
         body: one_line(body),
+        change_id: crate::gerrit::change_id(&format!("{summary}\n\n{body}"))
+            .ok()
+            .map(str::to_owned),
         refs: decor
             .split(", ")
             .filter(|s| !s.is_empty())

@@ -110,6 +110,7 @@ impl RepoTab {
             acts.push(Action::ApplyPatch);
         }
         ui.separator();
+        self.gerrit_menu(ui, commit, acts);
         copy_items(ui, &hash, &summary, branch_name.as_deref());
     }
 
