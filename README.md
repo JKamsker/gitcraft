@@ -243,6 +243,10 @@ so your config, credentials and hooks apply as usual.
     with `GLAB_CONFIG_DIR` set accordingly. The token's actual owner is checked before use;
     a mismatch stops the operation. A host-wide OS keyring slot cannot hold two accounts at
     once; use the CLI's supported separate configuration/file-storage setup for that case.
+    OAuth sessions refresh only through that selected CLI configuration after its stored
+    login name matches. Gitcraft re-reads the refreshed access token, verifies its owner,
+    and pins that exact token for the operation; expiry during an operation fails rather
+    than refreshing into another identity. A missing stored login name requires CLI sign-in.
   - Forgejo/Gitea: enter the login **name** from `tea login add --name …`. It is bound to that
     login's HTTPS server; a missing/refused login does not fall back to another identity.
   - HTTPS Git pushes use the same selected accounts through host-scoped credential helpers.
@@ -251,7 +255,9 @@ so your config, credentials and hooks apply as usual.
   - The SSH private key is separate from the signing key. `core.sshCommand` uses a helper that selects it
     with `IdentitiesOnly=yes`, checks the effective host configuration and refuses additional
     `IdentityFile` entries instead of falling back to another account. Proxy and host options
-    remain in use; a repository's own `core.sshCommand` still wins.
+    remain in use. Equivalent tilde and SSH token paths are expanded by OpenSSH itself.
+    The generated profile sets `ssh.variant=ssh` so an inherited PuTTY configuration cannot
+    change port arguments; repository-local `core.sshCommand` and `ssh.variant` still win.
   - Background jobs retain the initiating profile's account choices and an immutable config
     snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
     that machine's own credentials; forge commands run here with this profile's account.

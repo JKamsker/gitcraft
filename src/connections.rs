@@ -267,6 +267,11 @@ const GL_TOKENS: &[&str] = &[
     "OAUTH_TOKEN",
     "GLAB_TOKEN",
     "CI_JOB_TOKEN",
+    "JOB_TOKEN",
+    "OAUTH2_REFRESH_TOKEN",
+    "OAUTH2_EXPIRY_DATE",
+    "GITLAB_CLIENT_ID",
+    "CLIENT_ID",
 ];
 
 /// A selected account ignores tokens inherited from a terminal/other profile. No process
@@ -385,6 +390,14 @@ fn install_token(cmd: &mut Command, tool: &str, account: &Account, token: &Secre
     cmd.env(name, &token.value);
     if tool == "glab" {
         cmd.env("GLAB_IS_OAUTH2", if token.oauth { "true" } else { "false" });
+        if token.oauth {
+            // Pin the verified access token for this command. A later config/account edit
+            // must not let glab refresh into a different identity during a mutation.
+            // Keep OAuth's Bearer scheme, but disable automatic renewal with a nonsecret
+            // sentinel and nonexpiring process-local metadata (never written to config).
+            cmd.env("OAUTH2_REFRESH_TOKEN", "gitcraft-immutable-access-token")
+                .env("OAUTH2_EXPIRY_DATE", "9999-12-31T23:59:59Z");
+        }
     }
 }
 
@@ -437,6 +450,35 @@ fn token(tool: &str, account: &Account) -> Result<Secret, String> {
             "--global",
         ]);
         secret.oauth = read_private(config)?.eq_ignore_ascii_case("true");
+        if secret.oauth {
+            // A known different login must never be renewed just to discover its owner.
+            // `user` is nonsecret CLI login metadata; the API still verifies the token.
+            let mut owner = account_command(tool, account)?;
+            owner.args(["config", "get", "user", "--host", &account.host, "--global"]);
+            if !read_private(owner)?.eq_ignore_ascii_case(&account.user) {
+                return Err("The selected GitLab configuration belongs to another user; sign in as the selected account in its account folder".to_owned());
+            }
+            // Refresh only through the deliberately selected CLI configuration, with no
+            // inherited access/refresh credentials. Its owner must match before proceeding.
+            let mut refresh = account_command(tool, account)?;
+            refresh.args(["api", "user", "--hostname", &account.host]);
+            verify_user_output(tool, account, &read_private(refresh)?)?;
+            let mut current = account_command(tool, account)?;
+            current.args([
+                "config",
+                "get",
+                "token",
+                "--host",
+                &account.host,
+                "--global",
+            ]);
+            secret.value = read_private(current)?;
+            if secret.value.is_empty() || secret.value.chars().any(char::is_whitespace) {
+                return Err("No usable token after refreshing the selected account".to_owned());
+            }
+        }
+        // Verify the exact immutable token passed to CLI writes and HTTPS Git, including
+        // a replacement persisted during refresh or a concurrent CLI account change.
         verify_user(tool, account, &secret)?;
     }
     Ok(secret)
@@ -446,9 +488,12 @@ fn verify_user(tool: &str, account: &Account, token: &Secret) -> Result<String, 
     let mut cmd = account_command(tool, account)?;
     install_token(&mut cmd, tool, account, token);
     cmd.args(["api", "user", "--hostname", &account.host]);
-    let json = read_private(cmd)?;
-    let value: serde_json::Value = serde_json::from_str(&json)
-        .map_err(|_| "The account CLI did not return an account name")?;
+    verify_user_output(tool, account, &read_private(cmd)?)
+}
+
+fn verify_user_output(tool: &str, account: &Account, json: &str) -> Result<String, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(json).map_err(|_| "The account CLI did not return an account name")?;
     let name = value
         .get(if tool == "gh" { "login" } else { "username" })
         .and_then(serde_json::Value::as_str)
@@ -583,7 +628,11 @@ mod tests;
 
 /// SSH command-line identities are additive with ~/.ssh/config's IdentityFile entries.
 /// Refuse another effective identity rather than silently pushing as another account.
-pub(crate) fn validate_ssh_identities(key: &str, config: &str) -> Result<(), String> {
+pub(crate) fn validate_ssh_identities(
+    key: &str,
+    config: &str,
+    ssh_args: &[String],
+) -> Result<(), String> {
     let mut seen = false;
     let normalized = |value: &str| {
         let path = PathBuf::from(value);
@@ -602,6 +651,26 @@ pub(crate) fn validate_ssh_identities(key: &str, config: &str) -> Result<(), Str
         if identity == "none" {
             continue;
         }
+        let expanded;
+        let identity =
+            if identity.starts_with('~') || identity.contains('%') || identity.contains("${") {
+                // `ssh -G` leaves IdentityFile unexpanded. ControlPath uses OpenSSH's same
+                // tilde/environment/percent expansion, including passwd home and %C, and -G
+                // prints that expanded value without opening a connection or reading a key.
+                let mut cmd = ssh_command(key);
+                let quoted = identity.replace('\\', "\\\\").replace('"', "\\\"");
+                cmd.args(["-G", "-o", &format!("ControlPath=\"{quoted}\"")])
+                    .args(ssh_args);
+                let output = read_private(cmd)?;
+                expanded = output
+                    .lines()
+                    .find_map(|line| line.strip_prefix("controlpath "))
+                    .ok_or("SSH did not expand the configured identity path")?
+                    .to_owned();
+                expanded.as_str()
+            } else {
+                identity
+            };
         if normalized(identity) != selected {
             return Err("SSH configuration offers another IdentityFile for this host. Keep only the profile's selected identity for this host before pushing.".to_owned());
         }
@@ -623,6 +692,13 @@ pub(crate) fn ssh_helper_command(key: &str, executable: &Path) -> String {
     )
 }
 
+fn ssh_command(key: &str) -> Command {
+    let mut cmd = Command::new("ssh");
+    crate::shell_path::apply(&mut cmd);
+    cmd.args(["-o", "IdentitiesOnly=yes", "-i", key]);
+    cmd
+}
+
 pub(crate) fn ssh_helper() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) != Some("--gitcraft-profile-ssh") {
@@ -641,17 +717,11 @@ pub(crate) fn ssh_helper() -> Option<i32> {
         if !Path::new(&key).is_absolute() || key.chars().any(char::is_control) {
             return Err("Invalid profile SSH key path".to_owned());
         }
-        let command = || {
-            let mut cmd = Command::new("ssh");
-            crate::shell_path::apply(&mut cmd);
-            cmd.args(["-o", "IdentitiesOnly=yes", "-i", &key]);
-            cmd
-        };
-        let mut inspect = command();
+        let mut inspect = ssh_command(&key);
         inspect.arg("-G").args(rest);
         let config = read_private(inspect)?;
-        validate_ssh_identities(&key, &config)?;
-        let status = command()
+        validate_ssh_identities(&key, &config, rest)?;
+        let status = ssh_command(&key)
             .args(rest)
             .status()
             .map_err(|_| "Could not start SSH")?;

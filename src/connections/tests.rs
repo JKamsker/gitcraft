@@ -63,6 +63,19 @@ fn explicit_account_commands_remove_ambient_identity_without_changing_the_proces
         for key in vars {
             assert_eq!(env.get(std::ffi::OsStr::new(key)), Some(&None), "{key}");
         }
+        if tool == "glab" {
+            // Independent regression list: omitting these from the implementation's token
+            // list must fail even if ordinary access-token scrubbing remains intact.
+            for key in [
+                "OAUTH2_REFRESH_TOKEN",
+                "OAUTH2_EXPIRY_DATE",
+                "GITLAB_CLIENT_ID",
+                "CLIENT_ID",
+                "JOB_TOKEN",
+            ] {
+                assert_eq!(env.get(std::ffi::OsStr::new(key)), Some(&None), "{key}");
+            }
+        }
         let config = if tool == "gh" {
             "GH_CONFIG_DIR"
         } else {
@@ -285,7 +298,8 @@ exit 34"#,
 case "$1 $2 $3" in
  'config get token') test -z "${GITLAB_TOKEN+x}${GITLAB_ACCESS_TOKEN+x}${OAUTH_TOKEN+x}" || exit 21; printf 'fixture-token\n';;
  'config get is_oauth2') printf 'true\n';;
- 'api user --hostname') test "$GITLAB_TOKEN" = fixture-token || exit 22; test "$GLAB_IS_OAUTH2" = true || exit 23; printf '{"username":"alice"}\n';;
+ 'config get user') printf 'alice\n';;
+ 'api user --hostname') test "${GITLAB_TOKEN-fixture-token}" = fixture-token || exit 22; test "${GLAB_IS_OAUTH2-true}" = true || exit 23; printf '{"username":"alice"}\n';;
  *) exit 24;;
 esac"#,
         );
@@ -303,6 +317,164 @@ esac"#,
         assert!(
             credential_reply("glab", &wrong, "get", "protocol=https\nhost=gitlab.com\n").is_err()
         );
+    }
+
+    #[test]
+    fn oauth_refresh_is_selected_then_the_exact_replacement_is_verified_and_pinned()
+    -> Result<(), String> {
+        let programs = Programs::new(
+            "oauth-refresh",
+            r#"
+case "$1 $2 $3" in
+ 'config get token') cat "$GLAB_CONFIG_DIR/token";;
+ 'config get is_oauth2') printf 'true\n';;
+ 'config get user') printf 'alice\n';;
+ 'api user --hostname')
+  if test -z "${GITLAB_TOKEN+x}"; then
+   # Initial CLI-config refresh cannot inherit foreign OAuth/access metadata.
+   test -z "${OAUTH2_REFRESH_TOKEN+x}${OAUTH2_EXPIRY_DATE+x}${JOB_TOKEN+x}" || exit 51
+   printf 'fixture-refreshed\n' > "$GLAB_CONFIG_DIR/token"
+   printf 'refresh\n' >> "$GLAB_CONFIG_DIR/events"
+  else
+   test "$GITLAB_TOKEN" = fixture-refreshed || exit 52
+   test "$OAUTH2_REFRESH_TOKEN" = gitcraft-immutable-access-token || exit 53
+   test "$OAUTH2_EXPIRY_DATE" = 9999-12-31T23:59:59Z || exit 54
+   printf 'verify-exact\n' >> "$GLAB_CONFIG_DIR/events"
+  fi
+  printf '{"username":"alice"}\n';;
+ 'fixture-operation  ')
+  test "$GITLAB_TOKEN" = fixture-refreshed || exit 55
+  test "$OAUTH2_REFRESH_TOKEN" = gitcraft-immutable-access-token || exit 56
+  test "$OAUTH2_EXPIRY_DATE" = 9999-12-31T23:59:59Z || exit 57
+  printf 'write-with-verified-token\n' >> "$GLAB_CONFIG_DIR/events";;
+ *) exit 58;;
+esac"#,
+        );
+        let selected = Account {
+            host: "gitlab.com".into(),
+            user: "alice".into(),
+            config_dir: programs.directory.to_string_lossy().into_owned(),
+        };
+        let events = programs.directory.join("events");
+        let reset = || -> Result<(), String> {
+            std::fs::write(programs.directory.join("token"), "fixture-expired\n")
+                .map_err(|e| e.to_string())?;
+            std::fs::write(&events, "").map_err(|e| e.to_string())
+        };
+        reset()?;
+        let context = Context {
+            choices: Choices {
+                gitlab: selected.clone(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        context.run(|| -> Result<(), String> {
+            let mut cmd = Command::new(program("glab"));
+            configure_cli(&mut cmd, "glab", "gitlab.com")?;
+            assert!(
+                cmd.arg("fixture-operation")
+                    .status()
+                    .map_err(|e| e.to_string())?
+                    .success()
+            );
+            Ok(())
+        })?;
+        assert_eq!(
+            std::fs::read_to_string(&events).map_err(|e| e.to_string())?,
+            "refresh\nverify-exact\nwrite-with-verified-token\n"
+        );
+        reset()?;
+        assert_eq!(
+            credential_reply(
+                "glab",
+                &selected,
+                "get",
+                "protocol=https\nhost=gitlab.com\n"
+            )?,
+            Some("username=alice\npassword=fixture-refreshed\n\n".into())
+        );
+        assert_eq!(
+            std::fs::read_to_string(&events).map_err(|e| e.to_string())?,
+            "refresh\nverify-exact\n"
+        );
+        reset()?;
+        assert_eq!(check_account("glab", &selected)?, "gitlab.com as alice");
+        assert_eq!(
+            std::fs::read_to_string(&events).map_err(|e| e.to_string())?,
+            "refresh\nverify-exact\nverify-exact\n"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn oauth_refresh_or_concurrent_config_changes_cannot_substitute_an_unverified_owner() {
+        let programs = Programs::new(
+            "oauth-owner",
+            r#"
+case "$1 $2 $3" in
+ 'config get token') printf 'fixture-bob-token\n';;
+ 'config get is_oauth2') printf 'true\n';;
+ 'config get user') printf 'alice\n';;
+ 'api user --hostname')
+  if test -z "${GITLAB_TOKEN+x}"; then
+   test -z "${OAUTH2_REFRESH_TOKEN+x}${OAUTH2_EXPIRY_DATE+x}" || exit 61
+   printf '{"username":"alice"}\n'
+  else
+   # Config changed between refresh and re-read: immutable verification refuses Bob.
+   test "$GITLAB_TOKEN" = fixture-bob-token || exit 62
+   printf '{"username":"bob"}\n'
+  fi;;
+ *) printf 'UNEXPECTED-WRITE' > "$GLAB_CONFIG_DIR/wrote"; exit 63;;
+esac"#,
+        );
+        let selected = Account {
+            host: "gitlab.com".into(),
+            user: "alice".into(),
+            config_dir: programs.directory.to_string_lossy().into_owned(),
+        };
+        assert!(token("glab", &selected).is_err());
+        assert!(
+            credential_reply(
+                "glab",
+                &selected,
+                "get",
+                "protocol=https\nhost=gitlab.com\n"
+            )
+            .is_err()
+        );
+        assert!(check_account("glab", &selected).is_err());
+        assert!(!programs.directory.join("wrote").exists());
+    }
+
+    #[test]
+    fn oauth_account_metadata_mismatch_refuses_before_refresh_or_any_write() {
+        let programs = Programs::new(
+            "oauth-metadata-owner",
+            r#"
+case "$1 $2 $3" in
+ 'config get token') printf 'fixture-expired\n';;
+ 'config get is_oauth2') printf 'true\n';;
+ 'config get user') printf 'bob\n';;
+ *) printf 'UNEXPECTED-REFRESH-OR-WRITE' > "$GLAB_CONFIG_DIR/refreshed"; exit 71;;
+esac"#,
+        );
+        let selected = Account {
+            host: "gitlab.com".into(),
+            user: "alice".into(),
+            config_dir: programs.directory.to_string_lossy().into_owned(),
+        };
+        assert!(token("glab", &selected).is_err());
+        assert!(
+            credential_reply(
+                "glab",
+                &selected,
+                "get",
+                "protocol=https\nhost=gitlab.com\n"
+            )
+            .is_err()
+        );
+        assert!(!programs.directory.join("refreshed").exists());
     }
 
     #[test]
@@ -400,18 +572,20 @@ fn ssh_effective_config_cannot_fall_back_to_another_identity() {
     assert!(
         validate_ssh_identities(
             "/tmp/work-key",
-            "hostname forge.example\nidentityfile /tmp/work-key\nidentitiesonly yes\n"
+            "hostname forge.example\nidentityfile /tmp/work-key\nidentitiesonly yes\n",
+            &[]
         )
         .is_ok()
     );
     assert!(
         validate_ssh_identities(
             "/tmp/work-key",
-            "identityfile /tmp/work-key\nidentityfile /tmp/personal-key\n"
+            "identityfile /tmp/work-key\nidentityfile /tmp/personal-key\n",
+            &[]
         )
         .is_err()
     );
-    assert!(validate_ssh_identities("/tmp/work-key", "identityfile none\n").is_err());
+    assert!(validate_ssh_identities("/tmp/work-key", "identityfile none\n", &[]).is_err());
 }
 
 #[cfg(unix)]
@@ -442,7 +616,7 @@ fn openssh_fixture_configuration_confirms_additive_identity_files_are_refused() 
     assert!(output.status.success());
     let printed = String::from_utf8_lossy(&output.stdout);
     assert!(printed.contains("identityfile /tmp/another-profile-key"));
-    assert!(validate_ssh_identities(&key.to_string_lossy(), &printed).is_err());
+    assert!(validate_ssh_identities(&key.to_string_lossy(), &printed, &[]).is_err());
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
 }
@@ -467,4 +641,66 @@ fn expected_accounts_are_nonsecret_exact_host_metadata_not_transport_or_tea_alia
         assert_eq!(expected_account("github.com:8443"), None);
         assert_eq!(expected_account("forge.example"), None);
     });
+}
+
+#[cfg(unix)]
+#[test]
+fn openssh_expands_equivalent_tilde_and_percent_identity_paths_but_refuses_other_keys()
+-> Result<(), String> {
+    let dir = std::env::temp_dir().join(format!(
+        "gitcraft-profile-ssh-expansion-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let config = dir.join("ssh_config");
+    let key = dir.join("fixture.invalid-2222-git key");
+    std::fs::write(&key, "").map_err(|e| e.to_string())?;
+    let probe = Command::new("ssh")
+        .args(["-G", "-F", "/dev/null", "-o", "ControlPath=%d", "fixture"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    assert!(probe.status.success());
+    let text = String::from_utf8_lossy(&probe.stdout);
+    let home = text
+        .lines()
+        .find_map(|line| line.strip_prefix("controlpath "))
+        .ok_or("No SSH home expansion")?;
+    let up = "../".repeat(
+        Path::new(home)
+            .components()
+            .filter(|part| matches!(part, std::path::Component::Normal(_)))
+            .count(),
+    );
+    let absolute = key.to_string_lossy();
+    for identity in [
+        format!("~/{up}{}", absolute.trim_start_matches('/')),
+        format!("%d/{up}{}", absolute.trim_start_matches('/')),
+        format!("{}/%h-%p-%r key", dir.display()),
+        format!("{}/%n-%p-%r key", dir.display()),
+    ] {
+        std::fs::write(&config, format!("Host fixture.invalid\n HostName fixture.invalid\n User git\n Port 2222\n IdentityFile \"{identity}\"\n")).map_err(|e|e.to_string())?;
+        let args = vec![
+            "-F".to_owned(),
+            config.to_string_lossy().into_owned(),
+            "fixture.invalid".into(),
+        ];
+        let output = ssh_command(&absolute)
+            .arg("-G")
+            .args(&args)
+            .output()
+            .map_err(|e| e.to_string())?;
+        assert!(output.status.success());
+        let printed = String::from_utf8_lossy(&output.stdout);
+        assert!(printed.contains(&format!("identityfile {identity}")));
+        assert_eq!(
+            validate_ssh_identities(&absolute, &printed, &args),
+            Ok(()),
+            "{identity}"
+        );
+        let other = dir.join("different key");
+        std::fs::write(&other, "").map_err(|e| e.to_string())?;
+        assert!(validate_ssh_identities(&other.to_string_lossy(), &printed, &args).is_err());
+    }
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
 }
