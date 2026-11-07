@@ -7,6 +7,7 @@ mod apply;
 mod branch_tree;
 mod branch_visibility;
 mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
 pub(crate) mod columns;
@@ -154,6 +155,7 @@ pub struct RepoTab {
     graph_motion: graph_motion::State,
     topology: Arc<graph_walk::Topology>,
     graph_narration: graph_walk::Narration,
+    celebration: celebration::State,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -342,6 +344,7 @@ impl RepoTab {
             graph_motion: Default::default(),
             topology: Default::default(),
             graph_narration: Default::default(),
+            celebration: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),

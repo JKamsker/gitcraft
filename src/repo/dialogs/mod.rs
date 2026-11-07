@@ -111,6 +111,7 @@ pub enum Dialog {
         /// Remote to push the tag to, if any.
         remote: Option<String>,
         push: bool,
+        release: bool,
         focus: bool,
     },
     RenameBranch {
@@ -216,6 +217,7 @@ impl Dialog {
             message: String::new(),
             remote,
             push: false,
+            release: false,
             focus: true,
         }
     }
@@ -439,8 +441,9 @@ impl RepoTab {
                     message,
                     remote,
                     push,
+                    release,
                     focus,
-                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, focus),
+                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, release, focus),
                 Dialog::RenameBranch { old, new, focus } => {
                     branch::rename_branch(ui, enter, old, new, focus)
                 }

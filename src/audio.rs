@@ -21,6 +21,11 @@ pub(crate) fn retry() {
 #[cfg(test)]
 thread_local! { static RECORDED: std::cell::RefCell<Vec<Cue>> = const { std::cell::RefCell::new(Vec::new()) }; }
 
+#[cfg(test)]
+pub(crate) fn take_recorded() -> Vec<Cue> {
+    RECORDED.with(|sounds| std::mem::take(&mut *sounds.borrow_mut()))
+}
+
 pub(crate) fn play(cue: Cue) {
     #[cfg(test)]
     RECORDED.with(|sounds| sounds.borrow_mut().push(cue));

@@ -51,6 +51,10 @@ pub struct Settings {
     pub graph_lane_walk: bool,
     /// Quiet lane-crossing and merge earcons; always opt-in.
     pub graph_sounds: bool,
+    /// Short acknowledgements for confirmed first commits, release tags and merges.
+    pub celebration_motion: bool,
+    /// Separate opt-in soft acknowledgement sound, independent of visual motion.
+    pub celebration_sound: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -125,6 +129,8 @@ impl Default for Settings {
             graph_motion: true,
             graph_lane_walk: false,
             graph_sounds: false,
+            celebration_motion: false,
+            celebration_sound: false,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,
@@ -366,6 +372,12 @@ impl Settings {
             Page::Profile => self.profile_ui(ui, f, view),
             Page::General => {
                 section(ui, f, "Behaviour", None, |card| {
+                    card.row("Quiet celebrations", "first commit release tag merge motion sound", |ui| {
+                        ui.checkbox(&mut self.celebration_motion, "Short visual flourish after success");
+                        ui.checkbox(&mut self.celebration_sound, "Soft sound after success");
+                        layout::note(ui, "First commit, a tag marked as a release, or a completed merge. Visual motion follows the system preference.");
+                        if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } }
+                    });
                     card.row("Worktrees", "open same tab switch", |ui| {
                         ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
                             .on_hover_text("The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.");

@@ -37,6 +37,7 @@ impl RepoTab {
             return;
         }
         self.graph_motion_begin(&ops);
+        self.celebration_begin(label, &ops, ctx);
         self.discard_decrypted();
         self.busy_op = Some(label.to_owned());
         self.drafts.cancel_pending();
@@ -181,6 +182,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.graph_motion_done(result.is_ok());
+        self.celebration_done(result.is_ok());
         self.busy_op = None;
         let long = self
             .op_started

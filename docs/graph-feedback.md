@@ -45,3 +45,18 @@ audio. Test builds record dispatches without opening a sound device.
 Native dependency note: Linux playback requires the ALSA development package when building.
 Cargo.lock must be resolved in the working execution handoff; no dependency installation,
 compilation, protocol fixture or real audio playback has run for this source cut.
+
+## Quiet celebrations
+
+Settings → General → Quiet celebrations has separate **Short visual flourish after success**
+and **Soft sound after success** switches. Both default off. A 900 ms status flourish can
+acknowledge a repository's first confirmed commit, a completed merge that moved HEAD, or a
+successfully created tag explicitly marked **This is a release tag** in the tag dialog.
+Arbitrary release names work; the app does not infer a release from a version-number pattern.
+
+The operation must finish successfully and a subsequent repository read must confirm the new
+root commit, tag target or moved HEAD. Failed operations, aborted merges, an up-to-date merge,
+ordinary reloads and existing tags produce no celebration. A tag created locally followed by
+a failed push also stays quiet. Motion follows the system preference and graph animation
+policy does not change the separate celebration switches. Sound can be enabled without
+motion. Neither feature tracks commit counts or rewards changed lines.
