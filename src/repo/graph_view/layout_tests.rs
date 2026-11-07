@@ -372,6 +372,7 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
             crate::theme::install_fonts(&h.ctx);
             h.ctx.set_zoom_factor(scale);
             let initial = Settings {
+                ui_scale: scale,
                 refs_width: 280.0,
                 graph_width: 100.0,
                 author_width: 150.0,
