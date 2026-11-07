@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use egui::Ui;
 
-use super::badge::{BadgeKind, badges};
+use super::badge::{BadgeIndex, BadgeKind};
 use crate::repo::columns::MIN_REFS_W;
 use crate::repo::{RepoTab, WIP_HASH};
 
@@ -19,6 +19,7 @@ pub(super) struct Viewport {
 impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
         self.graph_labels.clear();
+        let index = BadgeIndex::new(&self.refs);
         for (i, commit) in self.commits.iter().enumerate() {
             if commit.refs.is_empty() {
                 continue;
@@ -26,7 +27,8 @@ impl RepoTab {
             let Some(row) = self.graph.rows.get(i) else {
                 continue;
             };
-            if let Some(badge) = badges(&commit.refs, &self.refs)
+            if let Some(badge) = index
+                .badges(&commit.refs)
                 .into_iter()
                 .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
             {
