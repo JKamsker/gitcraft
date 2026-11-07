@@ -351,7 +351,10 @@ mod integration_tests {
         let reworded = git::head(&path);
         assert_ne!(reworded, amended);
         let message = git::head_message(&path)?;
-        assert_eq!(crate::gerrit::change_id(&message)?, ID);
+        assert_eq!(
+            crate::gerrit::change_id(&message)?,
+            "I0123456789abcdef0123456789abcdef01234567"
+        );
         let trailers = run(&[
             "show",
             "-s",
@@ -388,7 +391,6 @@ mod integration_tests {
             remote: "origin".into(),
             web: "https://gerrit.example.invalid".into(),
             project: "project".into(),
-            web_warning: None,
             web_warning: None,
         });
         tab.refs.head = "a".repeat(40);
