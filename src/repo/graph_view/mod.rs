@@ -161,13 +161,13 @@ impl RepoTab {
             }
             for projected in range {
                 let i = if filtered {
-                    match self.saved_views.row(projected).cloned() {
-                        Some(super::saved_views::Row::Commit(raw)) => raw,
+                    match self.saved_views.row(projected) {
+                        Some(super::saved_views::Row::Commit(raw)) => *raw,
                         Some(super::saved_views::Row::Gap { range, top, bottom }) => {
                             if connector_row(ui, &t, cols, lanes, range.len(), &top, &bottom)
                                 .clicked()
                             {
-                                self.expand_graph_span(range);
+                                self.expand_graph_span(range.clone());
                             }
                             continue;
                         }

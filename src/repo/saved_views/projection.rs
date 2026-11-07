@@ -7,8 +7,8 @@ pub(in crate::repo) enum Row {
     Commit(usize),
     Gap {
         range: Range<usize>,
-        top: [Option<usize>; LANES],
-        bottom: [Option<usize>; LANES],
+        top: Box<[Option<usize>; LANES]>,
+        bottom: Box<[Option<usize>; LANES]>,
     },
 }
 #[derive(Default)]
@@ -49,8 +49,8 @@ impl Projection {
             } else {
                 rows.push(Row::Gap {
                     range: start..i,
-                    top: [None; LANES],
-                    bottom: [None; LANES],
+                    top: Box::new([None; LANES]),
+                    bottom: Box::new([None; LANES]),
                 });
             }
         }
@@ -66,7 +66,7 @@ impl Projection {
             if let Some(index) = gaps.get(gap) {
                 if let Row::Gap { range, top, .. } = &mut rows[*index] {
                     if range.start == i {
-                        *top = active;
+                        **top = active;
                     }
                 }
             }
@@ -97,7 +97,7 @@ impl Projection {
             if let Some(index) = gaps.get(gap) {
                 if let Row::Gap { range, bottom, .. } = &mut rows[*index] {
                     if range.end == i + 1 {
-                        *bottom = active;
+                        **bottom = active;
                         gap += 1;
                     }
                 }
@@ -137,6 +137,10 @@ mod tests {
     }
     #[test]
     fn expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows() {
+        assert!(
+            std::mem::size_of::<Row>() <= 48,
+            "Commit rows must not allocate lane arrays for every visible commit"
+        );
         let commits: Vec<_> = (0..20).map(|i| c(i, &[i + 1])).collect();
         let graph = crate::graph::layout(&commits);
         let matched = BTreeSet::from([commits[0].hash.clone(), commits[19].hash.clone()]);
