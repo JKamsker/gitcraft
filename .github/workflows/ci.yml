@@ -106,7 +106,8 @@ jobs:
         shard:
           - git-a-m
           - git-rest
-          - repo-a-f
+          - repo-a-c
+          - repo-d-f
           - repo-g-m
           - repo-n-s
           - repo-rest

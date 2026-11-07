@@ -14,16 +14,17 @@ import sys
 
 
 GIT_FIRST = [f"git::{letter}" for letter in "abcdefghijklm"]
-REPO_A_F = [f"repo::{letter}" for letter in "abcdef"]
+REPO_A_C = [f"repo::{letter}" for letter in "abc"]
+REPO_D_F = [f"repo::{letter}" for letter in "def"]
 REPO_G_M = [f"repo::{letter}" for letter in "ghijklm"]
 REPO_N_S = [f"repo::{letter}" for letter in "nopqrs"]
-REPO_A_S = REPO_A_F + REPO_G_M + REPO_N_S
+REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_S
 
 # These Git-process-heavy tests need their own libtest invocation.
 ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
-    # Run it separately from the main repo-a-f libtest harness.
-    "repo-a-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
+    # Run it separately from the main repo-d-f libtest harness.
+    "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
     "repo-n-s": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
     "core": ["parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism"],
 }
@@ -33,7 +34,8 @@ ISOLATED = {
 SHARDS = {
     "git-a-m": GIT_FIRST,
     "git-rest": ["git::", *[arg for p in GIT_FIRST for arg in ("--skip", p)]],
-    "repo-a-f": [*REPO_A_F, "--skip", "git::", "--skip", ISOLATED["repo-a-f"][0]],
+    "repo-a-c": [*REPO_A_C, "--skip", "git::"],
+    "repo-d-f": [*REPO_D_F, "--skip", "git::", "--skip", ISOLATED["repo-d-f"][0]],
     "repo-g-m": [*REPO_G_M, "--skip", "git::"],
     "repo-n-s": [*REPO_N_S, "--skip", "git::", "--skip", ISOLATED["repo-n-s"][0]],
     "repo-rest": [
