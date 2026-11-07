@@ -30,6 +30,8 @@ pub struct UserProfile {
     pub own_signing: bool,
     pub signing: Signing,
     pub connections: crate::connections::Choices,
+    /// Imported public safety requirements; never use ambient credentials while pending.
+    pub pending_setup: Option<crate::portability::ConnectionRequirements>,
 }
 
 impl Default for UserProfile {
@@ -41,6 +43,7 @@ impl Default for UserProfile {
             author_email: String::new(),
             own_signing: false,
             signing: Signing::default(),
+            pending_setup: None,
             connections: crate::connections::Choices {
                 github: crate::connections::Account::on("github.com"),
                 gitlab: crate::connections::Account::on("gitlab.com"),
