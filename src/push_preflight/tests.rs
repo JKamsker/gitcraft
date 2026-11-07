@@ -660,3 +660,25 @@ fn rejecting_pre_push_hook_preserves_receiver_refs_and_lfs_objects() -> Result<(
     assert!(!stored.exists(), "A hook veto must precede explicit LFS upload");
     Ok(())
 }
+
+#[test]
+fn explicit_annotated_tag_push_works_with_detached_head() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.git(&["tag", "-a", "-m", "Release", "release"])?;
+    let tag = f.git(&["rev-parse", "refs/tags/release"])?;
+    f.git(&["checkout", "-q", "--detach"])?;
+    let checkout = f.git(&["rev-parse", "HEAD"])?;
+    let plan = scan(
+        &f.repo,
+        vec![vec!["push".into(), "origin".into(), "refs/tags/release".into()]],
+        f.profile(),
+        &|| true,
+    )?;
+    assert!(plan.checkout.is_empty());
+    assert_eq!(plan.checkout_oid, checkout);
+    assert_eq!(plan.push_oid, tag);
+    execute(&f.repo, &plan, None)?;
+    assert_eq!(git::resolve(&f.receiver, "refs/tags/release")?, tag);
+    assert_eq!(f.git(&["rev-parse", "HEAD"])?, checkout);
+    Ok(())
+}

@@ -221,12 +221,15 @@ pub(crate) fn scan(
     let checkout_oid = read(repo, &["rev-parse", "--verify", "HEAD"], active)?
         .trim()
         .to_owned();
-    let current = checkout
-        .strip_prefix("refs/heads/")
-        .ok_or("Push preflight needs a checked-out branch.")?;
+    // Explicit refs (notably release tags) are independent of the checkout. A
+    // detached HEAD is still pinned below and checked again before transmission.
+    let current = checkout.strip_prefix("refs/heads/").unwrap_or("");
     let remote = match remote {
         Some(r) => r,
         None => {
+            if current.is_empty() {
+                return Err("Choose an explicit remote and source ref when HEAD is detached.".into());
+            }
             let mut selected = String::new();
             for key in [
                 format!("branch.{current}.pushRemote"),
@@ -285,6 +288,9 @@ pub(crate) fn scan(
     let spec = match spec {
         Some(s) => s,
         None => {
+            if current.is_empty() {
+                return Err("Choose an explicit source ref when HEAD is detached.".into());
+            }
             let configured = optional(
                 repo,
                 &["config", "--get-all", &format!("remote.{remote}.push")],
