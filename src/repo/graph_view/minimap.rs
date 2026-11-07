@@ -285,6 +285,14 @@ mod tests {
         assert!(tab.history_minimap.bins[70].hit);
         let rect = Rect::from_min_size(egui::Pos2::ZERO, vec2(78.0, 400.0));
         let point = pos2(38.0, 300.0);
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(rect),
+                ..Default::default()
+            },
+            |ui| tab.history_minimap(ui, rect, 0.0, 300.0),
+        )
+        .drop_without_applying_deltas();
         for pressed in [true, false] {
             let events = vec![
                 egui::Event::PointerMoved(point),
