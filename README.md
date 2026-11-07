@@ -189,6 +189,18 @@ so your config, credentials and hooks apply as usual.
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
+- AI commit messages through a command-line tool you already have: the sparkles button in the
+  commit box sends the staged diff to `claude -p`, `codex exec`, `gh copilot` or a command of
+  your own (Settings → AI) and fills in the message; a message already typed is only replaced
+  if you choose to. _Review this branch_ in a branch's menu does the same with what the branch
+  adds to the branch pull requests go to (main, master or develop) and shows the answer in a
+  window. When amending, the message is written from the last commit with what is staged. The tool runs on the repository's machine (here,
+  in WSL or over SSH) with its own sign-in, the prompt on its input: gitcraft keeps no API key.
+  Off until you pick a tool; the tools installed there are found for you. The diff sent is cut
+  to a size you set (64 KB at first), each file getting a fair share, lock files and what didn't
+  fit named with their line counts; the prompt follows the repository's style (Conventional
+  Commits when its history uses them) and can be edited. Cancel stops the tool, and one that
+  takes over 5 minutes is stopped.
 - The commit box starts from the repository's `commit.template` (`~` and relative paths as git
   reads them; its comment lines are left out, because git keeps a message it is given as it
   is) and then runs its `prepare-commit-msg` hook with the arguments git passes, as git's own
@@ -336,7 +348,7 @@ so your config, credentials and hooks apply as usual.
   use and what is its own, zoom, branch column width, graph columns, avatars, notifications,
   update check (with a Check for updates button), background fetch, keeping submodules up to
   date, editor command, default shell and terminal font size, saved identities, SSH sign-ins,
-  and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
+  the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
 - Previews beside the settings: point at a setting and a panel on the right (above the page in
   a narrow window) draws what it does with the values set now, as the app draws it. The branch
@@ -520,6 +532,8 @@ was made this way, on a demo repository.
 | `src/shell_path.rs`      | on macOS, the login shell's PATH for the commands gitcraft starts                  |
 | `src/remote/` | repositories in WSL or over SSH: their paths, the shells kept open there, their files |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
+| `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
+| `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
 | `src/a11y/`              | keyboard focus ring, screen-reader names of painted widgets, reduced motion        |
 | `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |

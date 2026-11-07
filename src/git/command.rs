@@ -180,6 +180,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         stdin: extra.stdin.clone(),
         long: extra.long || goes_over_network(args),
         timeout: None,
+        apart: false,
     }
 }
 

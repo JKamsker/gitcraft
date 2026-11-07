@@ -2,6 +2,7 @@
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
 mod actions;
+mod ai;
 mod apply;
 mod branch_tree;
 mod branch_visibility;
@@ -206,6 +207,8 @@ pub struct RepoTab {
     /// The commit box's helpers: templates, prefix picker, co-authors, completion.
     compose: detail::compose::Compose,
     amend: bool,
+    /// The AI tool's commit message and branch review (see `ai`).
+    ai: ai::AiState,
     dialog: Option<Dialog>,
     search: Search,
     /// Find in the diff, file or blame shown.
@@ -363,6 +366,7 @@ impl RepoTab {
             commit_body: String::new(),
             compose: Default::default(),
             amend: false,
+            ai: Default::default(),
             dialog: None,
             search: Search::default(),
             find: find::Find::default(),

@@ -41,6 +41,7 @@ impl RepoTab {
                 if !rebasing {
                     self.fold_picker(ui, amending, acts);
                 }
+                self.ai_message_button(ui, !rebasing);
             });
         });
         self.amend = amending;
@@ -82,6 +83,7 @@ impl RepoTab {
         // `--continue` commits with the message git kept: edits here would be lost.
         let (summary, body) = self.message_fields(ui, !rebasing);
         self.compose_notice(ui);
+        self.ai_message_status(ui);
         if rebasing {
             ui.label(
                 RichText::new("The commit keeps its message: reword it once this is done.")

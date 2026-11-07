@@ -189,6 +189,7 @@ impl RepoTab {
                     self.commit_body.clear();
                     self.amend = false;
                     self.compose.committed();
+                    self.ai_committed();
                 }
                 // Quiet success for staging, which happens all the time.
                 if refresh == Refresh::All && !quiet {

@@ -1,6 +1,7 @@
 //! gitcraft: a small, personal visual git client (egui front end over the git command line).
 
 mod a11y;
+mod ai;
 pub mod app;
 mod avatars;
 mod ci;
