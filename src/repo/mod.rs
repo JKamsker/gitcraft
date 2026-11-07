@@ -99,6 +99,8 @@ pub struct RepoTab {
     /// The read the working tree shown comes from.
     work_read: u64,
     work_pending: u64,
+    /// Invalidates mutation preparations as soon as a full/status read starts, even if it fails.
+    work_epoch: u64,
     keyboard: std::cell::RefCell<keyboard::State>,
     /// The read the submodules shown come from.
     submodules_read: u64,
@@ -282,6 +284,7 @@ impl RepoTab {
             reads: 0,
             work_read: 0,
             work_pending: 0,
+            work_epoch: 0,
             keyboard: Default::default(),
             submodules_read: 0,
             recheck_after_load: false,

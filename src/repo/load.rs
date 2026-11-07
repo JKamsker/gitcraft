@@ -56,6 +56,7 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         // Changes seen on disk so far are read by this reload (or the one queued after the
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
@@ -151,6 +152,7 @@ impl RepoTab {
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
         let read = self.next_read();
         self.work_pending = read;
         let path = self.path.clone();
