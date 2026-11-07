@@ -115,7 +115,7 @@ pub fn clean_path(typed: &str, top: &str) -> Result<String, String> {
     let top = top.replace('\\', "/");
     let top = top.trim_end_matches('/');
     if !top.is_empty()
-        && let Some(rest) = path.strip_prefix(top).and_then(|r| r.strip_prefix('/'))
+        && let Some(rest) = strip_top(&path, top).and_then(|r| r.strip_prefix('/'))
     {
         path = rest.to_owned();
     } else if path.starts_with('/') || path.as_bytes().get(1) == Some(&b':') {
@@ -134,6 +134,19 @@ pub fn clean_path(typed: &str, top: &str) -> Result<String, String> {
         return Err("The path must be inside the repository (no ..)".to_owned());
     }
     Ok(path)
+}
+
+/// `path` without its leading `top`; on Windows (a drive letter) letter case doesn't count, as
+/// there `C:/Code/r` and `c:/code/r` are the same folder.
+fn strip_top<'a>(path: &'a str, top: &str) -> Option<&'a str> {
+    let windows = top.as_bytes().get(1) == Some(&b':');
+    let head = path.get(..top.len())?;
+    let same = if windows {
+        head.eq_ignore_ascii_case(top)
+    } else {
+        head == top
+    };
+    same.then(|| &path[top.len()..])
 }
 
 /// The rule deciding about `path`, from `check-ignore -v -n --no-index` (which also says it for
@@ -530,6 +543,14 @@ mod tests {
             clean_path("C:\\code\\r\\a.txt", "C:/code/r"),
             Ok("a.txt".to_owned())
         );
+        // On Windows letter case doesn't count; elsewhere it does.
+        assert_eq!(
+            clean_path("c:\\Code\\R\\a.txt", "C:/code/r"),
+            Ok("a.txt".to_owned())
+        );
+        assert!(clean_path("/home/me/My Repo/a.txt", top).is_err());
+        // A name with characters wider than a byte where the top would end is no panic.
+        assert!(clean_path("/home/me/my rép/x", top).is_err());
         for refused in ["", "  ", ".", "./", "a\nb", "../outside", "a/../../b"] {
             assert!(clean_path(refused, top).is_err(), "{refused:?}");
         }
