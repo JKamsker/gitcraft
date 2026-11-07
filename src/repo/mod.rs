@@ -45,6 +45,7 @@ mod keep_submodules;
 mod keys;
 mod layout;
 mod lfs_locks;
+mod lifecycle;
 mod load;
 mod messages;
 mod navigate;
@@ -123,8 +124,8 @@ pub struct RepoTab {
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
     opened: Instant,
-    /// The first read waits to be started (see [`RepoTab::new_deferred`]).
-    deferred: bool,
+    /// Whether it has been read yet, or was suspended (see `lifecycle`).
+    life: lifecycle::Lifecycle,
     /// Numbers the reads of the repository, in the order they start: an answer that arrives
     /// after a later read's doesn't put back what that one replaced.
     reads: u64,
@@ -303,6 +304,16 @@ pub struct RepoTab {
     popouts: popout::Popouts,
 
     watcher: Option<notify::RecommendedWatcher>,
+    /// How many times the tab set up its watching: a watcher arriving for an earlier time is
+    /// not this one's (see `Msg::Watcher`).
+    watches: u64,
+    /// Suspended and shown again, not read again yet: the opening screen shows meanwhile, and
+    /// nothing is laid out from the empty history (see `lifecycle`).
+    resuming: bool,
+    /// The commit selected when the tab was suspended, selected again once read.
+    resume_select: Option<String>,
+    /// The diff open when the tab was suspended, opened again once read.
+    resume_diff: Option<DiffKey>,
     /// For a repository on another machine, which no watcher sees: what keeps its poller
     /// going (it stops once this is dropped).
     poller: Option<std::sync::Arc<()>>,
@@ -346,21 +357,21 @@ impl RepoTab {
         tab
     }
 
-    /// A tab whose first read waits until [`Self::start_deferred`] (or until it is shown): the
-    /// tabs restored on start read one after the other, the one shown first.
-    pub fn new_deferred(path: PathBuf, ctx: &egui::Context) -> Self {
+    /// A tab that reads and watches nothing until [`Self::start_deferred`] (it is shown): the
+    /// tabs restored on start are read only once looked at.
+    pub fn new_deferred(path: PathBuf, _ctx: &egui::Context) -> Self {
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string());
         let (tx, rx) = channel();
-        let mut tab = Self {
+        Self {
             path,
             name,
             tx,
             rx,
             opened: Instant::now(),
-            deferred: true,
+            life: lifecycle::Lifecycle::new(Instant::now()),
             reads: 0,
             work_read: 0,
             submodules_read: 0,
@@ -470,6 +481,10 @@ impl RepoTab {
             terminal_error: None,
             popouts: Default::default(),
             watcher: None,
+            watches: 0,
+            resuming: false,
+            resume_select: None,
+            resume_diff: None,
             poller: None,
             counting_worktrees: false,
             recount_worktrees: false,
@@ -485,23 +500,18 @@ impl RepoTab {
             keys_blocked: false,
             finished: Vec::new(),
             custom: Default::default(),
-        };
-        tab.watch(ctx);
-        // What was typed here and not used, the last time this repository was open.
-        tab.restore_drafts();
-        tab
+        }
     }
 
-    /// Starts the first read of a tab made with [`Self::new_deferred`], if not started yet.
+    /// Starts the first read of a tab made with [`Self::new_deferred`] (and its watcher), or
+    /// the read after it was suspended: it is shown.
     pub fn start_deferred(&mut self, ctx: &egui::Context) {
-        if std::mem::take(&mut self.deferred) {
-            self.reload(ctx);
-        }
+        self.shown_now(ctx);
     }
 
     /// Nothing read yet: the tab shows its opening screen.
     pub fn opening(&self) -> bool {
-        self.history_gen == 0 && self.load_error.is_none()
+        (self.history_gen == 0 && self.load_error.is_none()) || self.resuming
     }
 
     pub fn is_busy(&self) -> bool {

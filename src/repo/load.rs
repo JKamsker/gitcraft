@@ -55,10 +55,14 @@ impl RepoTab {
     /// Re-reads refs, history, working tree, worktrees, stashes, remotes and submodules in the
     /// background.
     pub fn reload(&mut self, ctx: &egui::Context) {
+        // Not read yet, or suspended: woken as when shown, which watches and reads once.
+        if self.sleeping() {
+            self.start_deferred(ctx);
+            return;
+        }
         // Changes seen on disk so far are read by this reload (or the one queued after the
         // current one): reloading for them again would read the same.
         self.fs_pending = None;
-        self.deferred = false;
         // What merges couldn't be redone for (a machine not reached…) is tried again.
         self.remerges.forget_failures();
         if self.loading {
@@ -157,7 +161,7 @@ impl RepoTab {
     /// it. Not for a first read yet to start (it reads after this), nor for a parked view
     /// (it reloads when shown).
     pub(super) fn watcher_arrived(&mut self, ctx: &egui::Context) {
-        if self.deferred || !self.shown {
+        if self.sleeping() || !self.shown {
             return;
         }
         if self.loading {
@@ -339,6 +343,7 @@ impl RepoTab {
     /// Takes in what `reload` read, then reads again if a reload was asked for meanwhile.
     pub(super) fn loaded(&mut self, result: Result<Box<Loaded>, String>, ctx: &egui::Context) {
         self.loading = false;
+        let resumed = std::mem::take(&mut self.resuming);
         match result {
             Ok(loaded) => {
                 self.take_loaded(*loaded, ctx);
@@ -348,6 +353,9 @@ impl RepoTab {
                 self.explain_failure(&e, super::error_help::RELOAD, ctx);
                 self.load_error = Some(e);
             }
+        }
+        if resumed {
+            self.reopen_after_resume(ctx);
         }
         if std::mem::take(&mut self.reload_again) {
             self.reload(ctx);
@@ -479,6 +487,10 @@ impl RepoTab {
 
     /// Rebuilds the graph rows from `history` and `work`, keeping the selection.
     pub(super) fn rebuild(&mut self, ctx: &egui::Context) {
+        // Asleep, or woken and not read again: there is no history to lay out.
+        if self.sleeping() || self.resuming {
+            return;
+        }
         let previous = self.selected_hash();
         self.rebuild_rows();
         self.restore_selection(previous, ctx);

@@ -51,6 +51,13 @@ so your config, credentials and hooks apply as usual.
   a one-line hint, once ever, the first time you do something with a shortcut nearby (selecting
   a commit: Ctrl+click another to compare; clicking a pill: double-click checks it out; hiding a
   branch: Solo; opening a diff: F7 / Alt+↓).
+- Lazy tabs: tabs restored on start read the repository and watch its folder only once they are
+  first shown, so many saved tabs don't mean as many history loads and folder watchers at
+  startup (nor background fetches until then). A tab left in the background for 30 minutes with
+  nothing going on (no operation, running terminal, typed message, open editor, unsent review,
+  pull request or builds view) drops its graph, diff and commit details and stops watching,
+  fetching and following builds; shown again, it reads afresh (the opening screen meanwhile),
+  then selects the same commit and opens the same diff if they are still there.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
   git runs there (see below).
 
