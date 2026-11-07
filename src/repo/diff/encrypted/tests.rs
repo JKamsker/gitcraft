@@ -379,8 +379,14 @@ mod fixture {
         // Pure command construction. There is no repository/host parameter to route it.
         let command = tool::command(Format::Json);
         assert_eq!(command.get_program(), std::ffi::OsStr::new("sops"));
-        assert_eq!(command.get_current_dir(), Some(std::env::temp_dir().as_path()));
-        assert_eq!(command.get_args().collect::<Vec<_>>(), tool::args(Format::Json).map(std::ffi::OsStr::new));
+        assert_eq!(
+            command.get_current_dir(),
+            Some(std::env::temp_dir().as_path())
+        );
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            tool::args(Format::Json).map(std::ffi::OsStr::new)
+        );
     }
 
     #[test]
@@ -457,19 +463,14 @@ mod fixture {
                 .is_err_and(|e| e.contains("Install SOPS"))
         );
         program(&repo, "cat >/dev/null; printf '\\377'")?;
-        assert!(
-            tool::decrypt(Format::Json, &input, &|| true)
-                .is_err_and(|e| e.contains("UTF-8"))
-        );
+        assert!(tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("UTF-8")));
         program(&repo, "cat >/dev/null; head -c 2097153 /dev/zero")?;
         assert!(
-            tool::decrypt(Format::Json, &input, &|| true)
-                .is_err_and(|e| e.contains("size limit"))
+            tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("size limit"))
         );
         program(&repo, "cat >/dev/null; head -c 32769 /dev/zero >&2")?;
         assert!(
-            tool::decrypt(Format::Json, &input, &|| true)
-                .is_err_and(|e| e.contains("size limit"))
+            tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("size limit"))
         );
         Ok(())
     }
@@ -488,11 +489,9 @@ mod fixture {
         )?;
         let start = std::time::Instant::now();
         assert!(
-            tool::decrypt(
-                Format::Json,
-                &json("age1fixture", "cipher"),
-                &|| start.elapsed() < Duration::from_millis(100)
-            )
+            tool::decrypt(Format::Json, &json("age1fixture", "cipher"), &|| start
+                .elapsed()
+                < Duration::from_millis(100))
             .is_err_and(|e| e.contains("cancelled"))
         );
         assert!(start.elapsed() < Duration::from_secs(2));

@@ -259,7 +259,3 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State) {
     state.poll();
     view::show(ui, state);
 }
-
-
-// RECOVERY_QUARANTINE_UNSAFE_SOPS_WATCHDOG
-compile_error!("Recovery quarantine: unsafe SOPS watchdog; replace and independently review it before building or running tests.");

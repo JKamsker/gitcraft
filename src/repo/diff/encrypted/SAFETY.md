@@ -1,9 +1,18 @@
 # SOPS recovery safety checkpoint — not runtime validated
 
-Both `mod.rs` and `tool.rs` retain their `compile_error!` recovery quarantine. Do not
-remove either guard or run Cargo, SOPS, watchdog, process-kill, or transport fixtures
-until an independent reviewer has approved this static unit and the next isolated
-execution step is explicitly authorized.
+Independent static review passed the exact local-only deletion/safety checkpoint
+`ee6e8482a09c27a2c40286996433bd1bd996b3d0`; evidence is
+`/workspace/work/review-sops-static-ee6e848.json`. Root accepted that review and
+explicitly authorized a separately preserved guard-removal unit. Both compile-time
+guards are removed in this unit; it must be committed, pushed and remote-SHA verified
+before local-only owned-child execution. This is not runtime or feature validation.
+
+Do not run a host watchdog, live process-table selector or actual remote fixtures.
+Unset `GITCRAFT_TEST_SSH` and `GITCRAFT_TEST_WSL`. Until the separately reviewed
+baseline test-containment fix is integrated, test commands must skip exactly
+`remote::session::tests::stopping_ends_a_whole_tree` and be labeled **partial gates**.
+Only one assigned Cargo slot may be used, with a private target and
+`CARGO_INCREMENTAL=0`. Independent exact-head feature review is still required.
 
 ## Removed architecture
 
@@ -48,23 +57,26 @@ Passing these tests never authorizes converting handles to host PIDs or attachin
 this model to live signals. Actual authority must come from the launcher's retained
 OS child/session/job containment capability, independently reviewed for the platform.
 
-Run only the inert validation at this stage:
+The inert validation remains available without executing application/process fixtures:
 
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p test_sops_safety.py -v
 ```
 
 It uses explicit tables, 216 small ancestry graphs, recording-only intents, source
-AST capability checks and quarantine/locality assertions. It does not inspect live
+AST capability checks and reviewed local-only boundary assertions. It does not inspect live
 processes or execute the production SOPS request, tool, transport or cleanup code.
 
 ## Next gates
 
-1. Commit and push this completed static unit; verify its remote SHA.
-2. Obtain independent static review of the synthetic/recording behavior and deletions.
-3. With separate authorization, validate local execution using explicitly owned children
-   and fixture tools only. No global host PID table or process selector may be signaled.
-4. Remove quarantine only when authorized, then run formatting, strict Clippy and the
-   full private-target suite; independently review the immutable feature candidate.
-5. Commit and push every completed unit before another unit or risky test. The final
-   giant PR remains gated on all required tests and independent review.
+1. Commit and push the authorized guard-removal unit; verify the remote SHA before
+   any local-only runtime fixture or other unit.
+2. Await root authorization/slot assignment for fixture execution. Use only dummy
+   inputs, test-owned children and the reviewed local launch containment. No host
+   PID-table selector or live SSH/WSL fixture is authorized.
+3. Retain the exact baseline test skip until its separate containment fix passes
+   independent static review and is integrated. Partial gates are not a full-suite pass.
+4. Run formatting, strict Clippy and full private-target tests after the contained
+   baseline fixture is available; independently review the immutable feature candidate.
+5. Commit and push every completed unit before another unit or risky test. One final
+   giant PR remains gated on all required combined tests and independent review.

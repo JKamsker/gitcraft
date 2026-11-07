@@ -129,15 +129,15 @@ class SyntheticSafetyTests(unittest.TestCase):
         calls = {node.func.id for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
         self.assertFalse(calls & {"open", "exec", "eval", "compile", "__import__", "getattr"})
 
-    def test_runtime_and_fixture_remain_quarantined_without_remote_process_apis(self):
+    def test_reviewed_runtime_boundary_stays_local_without_remote_process_apis(self):
         root = Path(__file__).resolve().parents[1]
         encrypted = root / "src/repo/diff/encrypted"
         tool = (encrypted / "tool.rs").read_text()
         module = (encrypted / "mod.rs").read_text()
         tests = (encrypted / "tests.rs").read_text()
         for source in (tool, module):
-            self.assertIn("RECOVERY_QUARANTINE_UNSAFE_SOPS_WATCHDOG", source)
-            self.assertIn("compile_error!", source)
+            self.assertNotIn("RECOVERY_QUARANTINE_UNSAFE_SOPS_WATCHDOG", source)
+            self.assertNotIn("compile_error!", source)
         for forbidden in ("stop_tree()", "ps -eo", "kill -", "watchdog=$!", "sleep {seconds}", "remote::", "remote::Request", "fn request("):
             self.assertNotIn(forbidden, tool)
         self.assertIn("pub(super) fn command(format: Format) -> Command", tool)

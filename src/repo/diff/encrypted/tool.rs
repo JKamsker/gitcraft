@@ -39,13 +39,24 @@ pub(super) fn decrypt(
     input: &str,
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
-    if !active() { return Err("Decryption cancelled.".into()); }
+    if !active() {
+        return Err("Decryption cancelled.".into());
+    }
     let out = crate::bounded_process::run_input(
-        command(format), Some(input.as_bytes().to_vec()), active, TIMEOUT,
-        MAX_BYTES as u64, 32768,
-    ).map_err(safe_failure)?;
-    if !out.status.success() { return Err(FAILED.into()); }
-    if !active() { return Err("Decryption cancelled.".into()); }
+        command(format),
+        Some(input.as_bytes().to_vec()),
+        active,
+        TIMEOUT,
+        MAX_BYTES as u64,
+        32768,
+    )
+    .map_err(safe_failure)?;
+    if !out.status.success() {
+        return Err(FAILED.into());
+    }
+    if !active() {
+        return Err("Decryption cancelled.".into());
+    }
     plaintext(out.stdout)
 }
 
@@ -75,7 +86,3 @@ pub(super) fn plaintext(bytes: Vec<u8>) -> Result<String, String> {
     }
     Ok(text)
 }
-
-
-// RECOVERY_QUARANTINE_UNSAFE_SOPS_WATCHDOG
-compile_error!("Recovery quarantine: unsafe SOPS watchdog; replace and independently review it before building or running tests.");
