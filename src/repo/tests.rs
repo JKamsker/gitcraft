@@ -384,6 +384,21 @@ error: failed to push some refs to 'origin'";
         headline(hook),
         "Push failed: the pre-push hook stopped it (exit code 1)"
     );
+    let reused = "Merge x failed: CONFLICT (content): Merge conflict in a.rs
+CONFLICT (content): Merge conflict in b.rs
+Resolved 'a.rs' using previous resolution.
+Automatic merge failed";
+    assert_eq!(
+        headline(reused),
+        "Merge x failed: conflicts in 2 files, 1 resolved as before: check it, resolve the rest \
+         in Changes"
+    );
+    let all = "Merge x failed: CONFLICT (content): Merge conflict in a.rs
+Resolved 'a.rs' using previous resolution.";
+    assert_eq!(
+        headline(all),
+        "Merge x failed: 1 file resolved as before, check it in Changes"
+    );
 }
 
 #[test]

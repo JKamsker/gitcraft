@@ -333,6 +333,8 @@ impl RepoTab {
             Action::Archaeology(act) => self.archaeology_act(act, ctx),
             Action::Dco(act) => self.dco_act(act, ctx),
             Action::Owners(act) => self.owners_act(act, ctx),
+            Action::Rerere(act) => self.rerere_act(act, ctx),
+            Action::Decisions(act) => self.decisions_act(act, ctx),
         }
     }
 
@@ -527,6 +529,14 @@ impl RepoTab {
 
     /// Writes the conflict editor's file and marks it resolved.
     fn save_conflict(&mut self, ctx: &egui::Context) {
+        // Its decisions, as they are now (see `record_decisions`).
+        if self
+            .conflict
+            .as_ref()
+            .is_some_and(|ed| !ed.saving && ed.solved().is_ok())
+        {
+            self.prepare_decisions();
+        }
         let Some(editor) = &mut self.conflict else {
             return;
         };
@@ -562,15 +572,22 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         match saved {
-            Ok(()) => self.run_prepared(
-                "Mark resolved",
-                &format!("Saved {file}, but not marked resolved"),
-                ops(&[&["--literal-pathspecs", "add", "--", &file]]),
-                Refresh::Status,
-                OpKind::plain(),
-                ctx,
-            ),
-            Err(e) => self.status = Some((e, true)),
+            Ok(()) => {
+                self.run_prepared(
+                    "Mark resolved",
+                    &format!("Saved {file}, but not marked resolved"),
+                    ops(&[&["--literal-pathspecs", "add", "--", &file]]),
+                    Refresh::Status,
+                    OpKind::plain(),
+                    ctx,
+                );
+                self.record_decisions(&file, ctx);
+            }
+            Err(e) => {
+                // Not saved: its decisions aren't kept.
+                self.decisions_pending = None;
+                self.status = Some((e, true));
+            }
         }
     }
 

@@ -470,7 +470,20 @@ pub(super) fn headline(msg: &str) -> String {
     let conflicts = body.lines().filter(|l| l.starts_with("CONFLICT")).count();
     if conflicts > 0 {
         let files = if conflicts == 1 { "file" } else { "files" };
-        return format!("{label}: conflicts in {conflicts} {files}, resolve them in Changes");
+        let them = |n: usize| if n == 1 { "it" } else { "them" };
+        return match super::conflict::rerere::reused_count(body) {
+            0 => format!("{label}: conflicts in {conflicts} {files}, resolve them in Changes"),
+            n if n >= conflicts => format!(
+                "{label}: {n} {} resolved as before, check {} in Changes",
+                if n == 1 { "file" } else { "files" },
+                them(n)
+            ),
+            n => format!(
+                "{label}: conflicts in {conflicts} {files}, {n} resolved as before: check {}, \
+                 resolve the rest in Changes",
+                them(n)
+            ),
+        };
     }
     // A hook named as what stopped it (see `git::FailedHook`) says more than git's own
     // `error: failed to push some refs` after it.

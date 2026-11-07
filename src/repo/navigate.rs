@@ -160,19 +160,32 @@ impl RepoTab {
             {
                 let (repo, path, state) =
                     (self.path.clone(), file.path.clone(), self.work.in_progress);
+                let certain = self.rerere.reused.contains(&path);
+                // Not rebuilt again when it couldn't be since the last operation.
+                let skip = self.rerere.unopenable.contains(&path);
                 spawn(&self.tx, ctx, move || {
                     let editor = conflict::ConflictEditor::open(&repo, &path, state);
-                    Msg::ConflictOpened(generation, path, editor.map(Box::new))
+                    if editor.is_some() || skip {
+                        return Msg::ConflictOpened(generation, path, editor.map(Box::new));
+                    }
+                    // Its markers gone: what stands in their place (rerere's resolution).
+                    let found = conflict::rerere::open_reused(&repo, &path, state, certain);
+                    Msg::Then(Box::new(move |tab, _| {
+                        tab.reused_opened(generation, path, found);
+                    }))
                 });
                 None
             }
             DiffKey::Work(file) if file.area == git::Area::Conflicted => {
-                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress).map(
-                    |mut ed| {
-                        ed.generation = generation;
-                        ed
-                    },
-                )
+                let editor =
+                    conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress);
+                if editor.is_none() {
+                    self.open_reused_later(generation, file.path.clone(), ctx);
+                }
+                editor.map(|mut ed| {
+                    ed.generation = generation;
+                    ed
+                })
             }
             _ => None,
         };

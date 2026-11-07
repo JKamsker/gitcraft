@@ -354,6 +354,7 @@ impl RepoTab {
                 self.take_loaded(*loaded, ctx);
                 self.read_custom_commands(ctx);
                 self.versions_after_load(ctx);
+                if self.rerere.setup.is_none() { self.read_rerere(ctx); }
             }
             Err(e) => {
                 self.explain_failure(&e, super::error_help::RELOAD, ctx);

@@ -280,6 +280,10 @@ pub struct RepoTab {
     bisect: bisect::Bisecting,
     /// The parallel bisect running, or the last one, and the answers by tree.
     parallel: parallel_bisect::Parallel,
+    /// Whether conflict resolutions are remembered here (git rerere), and which it reused.
+    rerere: conflict::rerere::Rerere,
+    /// Conflict decisions taken as a file's save started, stored once it is saved.
+    decisions_pending: Option<conflict::decisions::Pending>,
 
     commit_summary: String,
     commit_body: String,
@@ -502,6 +506,8 @@ impl RepoTab {
             keep_both: None,
             bisect: Default::default(),
             parallel: Default::default(),
+            rerere: Default::default(),
+            decisions_pending: None,
             commit_summary: String::new(),
             commit_body: String::new(),
             compose: Default::default(),

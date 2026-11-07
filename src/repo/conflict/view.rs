@@ -3,7 +3,7 @@
 
 use egui::{RichText, Sense, Stroke, Ui, vec2};
 
-use super::{Choice, ConflictEditor, Segment, render};
+use super::{Choice, ConflictEditor, Segment};
 use crate::icons;
 use crate::repo::diff::literal_path;
 use crate::repo::{Action, Refresh, RepoTab, ops, widgets};
@@ -14,10 +14,19 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         self.request_conflict_bases(ui.ctx());
         let state = self.work.in_progress;
+        let rerere = self.rerere.setup;
+        // The switch waits for what is being read or set, and for the operation running.
+        let switchable = idle && !self.rerere.busy;
         let Some(ed) = &mut self.conflict else { return };
         // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
         let idle = self.busy_op.is_none()
             && !crate::repo::external_tools::is_merging(&self.path, &ed.path);
+        // "Note why…" under each conflict from the start, whatever becomes of the read.
+        let conflicts = ed.choices.len();
+        ed.memo.drafts.resize_with(conflicts, Default::default);
+        if ed.memo.offers.is_none() && !ed.memo.reading {
+            acts.push(Action::Decisions(super::decisions::Act::Load));
+        }
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
         // While it is written (on another machine), what is saved is what is shown.
@@ -25,7 +34,8 @@ impl RepoTab {
 
         ed.header(ui, &t, idle && editable, left, acts);
         ed.history_strip(ui, &t, ((&ours_name, &theirs_name), state), acts);
-        ed.result_panel(ui, &t, editable);
+        ed.reused_banner(ui, &t, idle, acts);
+        ed.result_panel(ui, &t, editable, (rerere, switchable), acts);
         ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
 }
@@ -80,7 +90,9 @@ impl ConflictEditor {
             ("--ours", "--theirs")
         };
         // Also for a repository elsewhere: Mergiraf solves a copy of the file here.
-        let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
+        // Not for a file without markers, which Mergiraf would solve from scratch.
+        let offer_mergiraf = self.reused.is_none()
+            && crate::settings::Settings::get(ui.ctx()).mergiraf
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {
@@ -130,7 +142,15 @@ impl ConflictEditor {
     }
 
     /// Bottom: the result, editable by hand (unless being saved).
-    fn result_panel(&mut self, ui: &mut Ui, t: &Tokens, editable: bool) {
+    /// `rerere`: how rerere is set up here, and whether its switch can be used now.
+    fn result_panel(
+        &mut self,
+        ui: &mut Ui,
+        t: &Tokens,
+        editable: bool,
+        rerere: (Option<super::rerere::Setup>, bool),
+        acts: &mut Vec<Action>,
+    ) {
         egui::Panel::bottom("conflict_result")
             .resizable(true)
             .default_size(ui.available_height() * 0.42)
@@ -151,20 +171,31 @@ impl ConflictEditor {
                             .color(t.text_faint),
                     );
                     if self.manual {
-                        ui.label(RichText::new("edited by hand").color(t.warning).small())
-                            .on_hover_text(
+                        let (label, tip) = if self.reused.is_some() {
+                            (
+                                "the whole file, as it is",
+                                "It can't be matched conflict by conflict: \"Back to choices\" \
+                                 drops it and brings the conflict markers back",
+                            )
+                        } else {
+                            (
+                                "edited by hand",
                                 "Choices no longer change the result: \"Back to choices\" \
                                  applies them, and drops the edits",
-                            );
+                            )
+                        };
+                        ui.label(RichText::new(label).color(t.warning).small())
+                            .on_hover_text(tip);
                         if ui.small_button("Back to choices").clicked() {
                             self.manual = false;
-                            self.result = render(
-                                &self.segments,
-                                &self.choices,
-                                (&self.ours_label, &self.theirs_label),
-                            );
+                            self.result = self.rendered();
                         }
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        super::reused::rerere_switch(ui, rerere, acts);
+                        let has_tests = self.has_tests();
+                        super::decisions::view::run_tests_switch(ui, &mut self.memo, has_tests);
+                    });
                 });
                 egui::ScrollArea::both()
                     .id_salt("conflict_result_scroll")
@@ -198,6 +229,8 @@ impl ConflictEditor {
                 self.original.prepare(&self.segments);
                 let mut k = 0;
                 let (mut pick, mut toggle) = (None, None);
+                let mut use_offer = None;
+                let memo = &mut self.memo;
                 for seg in &self.segments {
                     let Segment::Conflict { ours, theirs, .. } = seg else {
                         continue;
@@ -212,7 +245,9 @@ impl ConflictEditor {
                                         .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
-                                if let Some(choice) = choice_buttons(ui, t, chosen, names) {
+                                let recorded = self.recorded.get(k).is_some_and(Option::is_some);
+                                if let Some(choice) = choice_buttons(ui, t, chosen, names, recorded)
+                                {
                                     pick = Some((k, choice));
                                 }
                             });
@@ -244,6 +279,25 @@ impl ConflictEditor {
                             ) {
                                 toggle = Some(k);
                             }
+                            let recorded = self.recorded.get(k).and_then(Option::as_deref);
+                            if let Some(text) = recorded {
+                                ui.add_space(4.0);
+                                let picked = chosen == Some(Choice::Recorded);
+                                super::reused::recorded_box(ui, t, k, text, picked);
+                            }
+                            let applied = chosen == Some(Choice::Recorded)
+                                && memo
+                                    .offers
+                                    .as_ref()
+                                    .and_then(|o| o.get(k))
+                                    .and_then(Option::as_ref)
+                                    .is_some_and(|o| {
+                                        Some(o.decision.resolution.as_str()) == recorded
+                                    });
+                            let state = (applied, self.manual);
+                            if let Some(p) = super::decisions::view::card(ui, t, k, memo, state) {
+                                use_offer = Some((k, p));
+                            }
                         });
                     let (sep, _) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
@@ -256,24 +310,32 @@ impl ConflictEditor {
                 if let Some(k) = toggle {
                     self.original.toggle(k);
                 }
+                match use_offer {
+                    Some((k, super::decisions::view::Pick::Use)) => self.use_offer(k),
+                    Some((k, super::decisions::view::Pick::TakeNote)) => self.take_note(k),
+                    None => {}
+                }
             });
     }
 }
 
-/// The four ways to resolve one conflict, the `chosen` one lit; returns the one clicked.
+/// The ways to resolve one conflict (the reused text too, when there is one: `recorded`), the
+/// `chosen` one lit; returns the one clicked.
 fn choice_buttons(
     ui: &mut Ui,
     t: &Tokens,
     chosen: Option<Choice>,
     (ours_name, theirs_name): (&str, &str),
+    recorded: bool,
 ) -> Option<Choice> {
     let mut clicked = None;
-    for (choice, label) in [
+    let reused = recorded.then_some((Choice::Recorded, "Reused"));
+    for (choice, label) in reused.into_iter().chain([
         (Choice::Ours, ours_name),
         (Choice::Theirs, theirs_name),
         (Choice::OursThenTheirs, "Both (ours first)"),
         (Choice::TheirsThenOurs, "Both (theirs first)"),
-    ] {
+    ]) {
         let on = chosen == Some(choice);
         let text = if on {
             RichText::new(label).color(t.accent_text)
@@ -281,7 +343,15 @@ fn choice_buttons(
             RichText::new(label)
         };
         let b = egui::Button::new(text).fill(if on { t.accent } else { t.field });
-        if ui.add(b).clicked() {
+        let response = ui.add(b);
+        let response = if choice == Choice::Recorded {
+            response.on_hover_text(
+                "The text git put in place of this conflict, as you resolved it before",
+            )
+        } else {
+            response
+        };
+        if response.clicked() {
             clicked = Some(choice);
         }
     }

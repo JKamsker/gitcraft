@@ -237,6 +237,7 @@ impl RepoTab {
             .is_some_and(|t| t.elapsed() > LONG_OP && !cancelled);
         match &result {
             Ok(_) => {
+                self.note_reused(None);
                 if label == "Commit" || label == "Amend" || label.starts_with("Continue ") {
                     self.commit_summary.clear();
                     self.commit_body.clear();
@@ -296,6 +297,7 @@ impl RepoTab {
                 }
             }
             Err(e) => {
+                self.note_reused(Some(e));
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 self.status = Some((format!("{label} failed: {e}"), true));
