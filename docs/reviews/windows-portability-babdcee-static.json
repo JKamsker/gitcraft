@@ -1,0 +1,30 @@
+{
+  "review": "Independent ordinary correctness review: Windows portability",
+  "verdict": "STATIC_REVIEW_PASS_PENDING_RUNTIME_AND_WINDOWS_CI",
+  "candidate": "babdceee232928bfbc84f98ca032dd8b4bec096e",
+  "tree": "7dab0d78808dc0fe08c88b7dbb0660e7da30a4e9",
+  "base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "scope": "Exact immutable five-file delta; full surrounding bundle construction, verify, import and cleanup paths; bounded command construction; account validation; actual Windows 82189c4 failure log.",
+  "findings": [],
+  "assessment": [
+    "All eleven recorded Windows failures have a corresponding narrow repair. Eight bundle failures share the unsupported //?/C:/ temporary argument; the other three are an absolute-path fixture assumption and illegal Windows control/quote filename characters.",
+    "Only Windows native bundle paths are converted. Unix backslashes remain literal, remote host temporary paths are unchanged, and filesystem creation/read/drop continue using native PathBuf values.",
+    "Recognized verbatim drive and UNC prefixes become normal Git drive/UNC spellings while preserving case, Unicode and path components. Generic Win32 device namespaces are rejected. Normal production input is canonicalized before the private directory is added.",
+    "Command-local -c core.longpaths=true follows optional --no-lazy-fetch and precedes bundle verify; it does not write user or repository configuration. The same practice-aware/profile-aware bounded command path remains in use.",
+    "The private BundleFile value is initialized before path conversion and writing, so conversion/write errors still drop and remove its newly created directory. Success retains the native cleanup path rather than reconstructing it from the Git argument.",
+    "Fixture replacements keep Unix control/double-quote coverage and use legal Unicode/metacharacter Windows names; structural quotePath is explicitly enabled.",
+    "New tests cover drive, UNC, Unicode, long path spelling and device rejection plus actual over260-byte filesystem creation, exact bundle bytes, Git verification, unchanged destination refs/config, and private directory cleanup. They do not replace actual Windows execution."
+  ],
+  "runtime": {
+    "executed_by_reviewer": false,
+    "reason": "Root Cargo slot hold; static review first.",
+    "required": [
+      "Frozen candidate Linux format, strict Clippy and applicable full tests, with a clean private target and fresh gitcraft compilation.",
+      "Actual Windows CI passing all eleven formerly failing tests and the added native long-path test.",
+      "Native UNC share runtime remains unavailable locally; mapping cases are static/unit coverage only."
+    ]
+  },
+  "acceptance": "No static correctness blocker found. This is not final validation or platform PASS; Linux gates and actual Windows CI remain required.",
+  "source_edits": false,
+  "notes_branch": "codex/review-portability-and-file-views"
+}
