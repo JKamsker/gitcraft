@@ -161,7 +161,7 @@ pub fn layout_banded<C: Borrow<Commit>>(commits: &[C], hints: &HashMap<String, L
     Graph { rows, width }
 }
 
-fn band_lane<'a>(lanes: &mut Vec<Option<&'a str>>, bands: &mut Vec<usize>, band: usize) -> usize {
+fn band_lane(lanes: &mut Vec<Option<&str>>, bands: &mut Vec<usize>, band: usize) -> usize {
     if let Some(i) = lanes
         .iter()
         .enumerate()

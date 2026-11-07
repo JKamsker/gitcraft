@@ -132,6 +132,45 @@ mod tests {
         })
     }
     #[test]
+    fn band_transition_inside_a_collapsed_span_has_distinct_boundary_runs() -> Result<(), String> {
+        let commits: Vec<_> = (0..8)
+            .map(|i| if i < 7 { c(i, &[i + 1]) } else { c(i, &[]) })
+            .collect();
+        let hints = commits
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                (
+                    c.hash.clone(),
+                    crate::graph::LaneHint {
+                        band: if i < 3 { 2 } else { 0 },
+                        colour: if i < 3 { 8 } else { 9 },
+                    },
+                )
+            })
+            .collect();
+        let graph = crate::graph::layout_banded(&commits, &hints);
+        let projection = Projection::build(
+            &commits,
+            &graph,
+            &BTreeSet::from([commits[0].hash.clone(), commits[7].hash.clone()]),
+            &BTreeSet::new(),
+            None,
+            &BTreeSet::new(),
+        );
+        let Row::Gap { top, bottom, .. } = &projection.rows[1] else {
+            return Err("Expected collapsed context".into());
+        };
+        let feature = graph.rows[0].col;
+        let trunk = graph.rows[7].col;
+        assert_ne!(feature, trunk);
+        assert!(top[feature].is_some());
+        assert!(bottom[trunk].is_some());
+        assert!(top[trunk].is_none());
+        assert!(bottom[feature].is_none());
+        Ok(())
+    }
+    #[test]
     fn expanding_preserves_raw_identity_and_selection_and_long_gaps_are_single_rows() {
         assert!(
             std::mem::size_of::<Row>() <= 48,
