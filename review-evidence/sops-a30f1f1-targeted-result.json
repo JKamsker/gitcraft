@@ -1,0 +1,14 @@
+{
+  "candidate": "a30f1f178099f5a38f4ae470434972ddbd2e1973",
+  "status": "TARGETED CHECK PASS; FINAL INDEPENDENT REVIEW STILL OPEN",
+  "binary_sha256_before_and_after": "249eacee81cb9ac5649aad784e7c0b5e64f54897d681e23cd0c35bd4ced6b423",
+  "independent_compile": false,
+  "registered_tests": 813,
+  "selected_sops_tests": 20,
+  "result": "20 passed, 0 failed, 0 ignored, 793 filtered; one test thread; real isolated generated-key SOPS fixture executed",
+  "logs_sha256": {
+    "sops-a30f1f1-independent-list.log": "70a642d38a513e007777852db5e73b8eb0e2cc55f1c2f67ebb87f753eb9ac77f",
+    "sops-a30f1f1-independent-targeted.log": "5be94fc437b87203a69d2a0ae25decdc66ba1c6b056cad70ee30faa40ee83024"
+  },
+  "limits": "Reused checked author binary read-only. No Cargo, external accounts, user keys, SSH/WSL fixtures, or new process controller. Further ordinary static review/edge-case assessment pending."
+}
