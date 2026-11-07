@@ -1,0 +1,78 @@
+{
+  "feature": "#32 Working Drafts",
+  "candidate": "51ea04904419b850805a8fc627f71af8b9255fb9",
+  "tree": "a88cca3e923691adfb98877c3ad79051c2ba79ca",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "reviewer": "audit_45_50 (independent; did not author Drafts)",
+  "status": "FAIL",
+  "review_kind": "complete static implementation review with independently verified supplied immutable gate evidence",
+  "findings": [
+    {
+      "id": "DRAFTS-1",
+      "severity": "P2",
+      "title": "Cancel/replacement does not cancel earlier-version readers, allowing concurrent obsolete jobs",
+      "location": {
+        "file": "src/repo/drafts.rs",
+        "line": 199
+      },
+      "evidence": [
+        "draft_reader assigns a new dialog id and starts a fresh connections::spawn thread for every request (lines199\u2013210), without cancelling an earlier reader or retaining a running guard.",
+        "The active predicate at lines208\u2013209 checks only the RepoTab-wide alive token and elapsed120s; the token remains alive while the tab is open.",
+        "Dialog Cancel/Escape closes only self.dialog (src/repo/dialogs/mod.rs:514\u2013515); replacing DraftLoading similarly leaves the shared alive token untouched.",
+        "draft_read lines215\u2013216 reject stale answers, but that happens only after old work has completed.",
+        "store::list traverses up to200 refs with multiple Git/object queries each and performs retention cleanup; remote/local operations use bounded per-command runners, but all obsolete readers can remain active simultaneously until their120-second overall deadline."
+      ],
+      "trigger": "Open Earlier versions on a slow or large repository, cancel the loading dialog, and open it again repeatedly while keeping the tab open.",
+      "actual": "Each canceled request continues running metadata queries/retention cleanup; each replacement adds another worker. Cancel stops display only. Per-request deadlines do not bound the number of simultaneous requests.",
+      "expected": "Closing/replacing a reader invalidates its own cancellation generation/token immediately; stale readers cease further work. A generation-owned running guard or coalescing policy prevents unrestricted overlap.",
+      "confirmation": "Deterministic source-level state trace; no new runtime/process/recovery experiment was executed under the current Cargo hold.",
+      "required_regression": "Use synthetic/injected readers and channels first: after Cancel/replacement, assert the old active predicate becomes false while the tab remains alive; assert stale responses cannot replace the new dialog and repeated requests have bounded active workers. No PID enumeration/signaling needed."
+    }
+  ],
+  "reviewed_paths": [
+    "README.md",
+    "src/git/command.rs",
+    "src/git/drafts/context.rs",
+    "src/git/drafts/mod.rs",
+    "src/git/drafts/restore.rs",
+    "src/git/drafts/tests.rs",
+    "src/git/mod.rs",
+    "src/manual.rs",
+    "src/remote/fs.rs",
+    "src/remote/mod.rs",
+    "src/repo/actions.rs",
+    "src/repo/apply.rs",
+    "src/repo/detail/changes.rs",
+    "src/repo/dialogs/drafts.rs",
+    "src/repo/dialogs/mod.rs",
+    "src/repo/drafts.rs",
+    "src/repo/graph_view/mod.rs",
+    "src/repo/messages.rs",
+    "src/repo/mod.rs",
+    "src/repo/operations.rs"
+  ],
+  "positive_evidence": [
+    "Opt-in repository-local toggle and pre-operation snapshot precede all checkout/rebase-moving operation steps; failures stop the operation before any step runs.",
+    "Original raw index/shared-index bytes remain read-only; private cache flattening handles split/sparse/assume-unchanged state and recovery pins original raw bytes.",
+    "Saved roots are trees under a worktree-specific hidden ref namespace, preserving separate index/work trees without creating WIP commits. Retention validates recognized versioned roots and uses old-object CAS deletion.",
+    "Recovery pins saved ref/object, HEAD/branch, exact raw index/shared cache, ignore-policy membership and current file bytes; native Git apply checks preserve unrelated hunks/index and replace hardlinked files without mutating peers.",
+    "Private empty Git config, explicit no-filter hashing, hooks/fsmonitor/signing disablement, no-lazy-fetch, raw recovery attributes, typed relative paths and bounded readers provide concrete isolation boundaries.",
+    "Changed links/special files/conflicts/limits fail closed; untracked nested repository contents and ignored untracked files are excluded. Missing promised objects do not silently download.",
+    "Practice goes through repository_command; ready Profile worker context is pinned by connections::spawn. SSH/WSL paths route through typed remote requests rather than local filesystem paths."
+  ],
+  "supplied_gate_evidence": {
+    "manifest": "/workspace/work/working-drafts-validation.json",
+    "all_source_hashes_verified": true,
+    "all_log_hashes_verified": true,
+    "all22_new_regressions_present_and_passing_in_full_log": true,
+    "full": "811 passed;0 failed;3 ignored;0 filtered;814 total",
+    "compiler_worktree": "/workspace/work/working-drafts",
+    "branch244db359_only_adds_validation_docs_logs": true
+  },
+  "limits": [
+    "No independent runtime/Cargo/OS-process/recovery experiment was run because root reserved all compiler slots; supplied gate logs were independently hash-bound and inspected instead.",
+    "Real providers, credentials, SSH/WSL hosts, Windows filesystem behavior and concurrent hostile filesystem races were not exercised.",
+    "One confirmed lifecycle blocker prevents approval; no additional definite blocker was established in this batch."
+  ],
+  "source_mutation": "None; notes only on codex/review-working-drafts in /workspace/work/review-drafts-notes"
+}
