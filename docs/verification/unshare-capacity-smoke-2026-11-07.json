@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-07",
+  "status": "tiny owned-child smoke passed; no application capacity claim",
+  "current_user": {
+    "name": "agent",
+    "uid": 1000,
+    "gid": 1000
+  },
+  "assigned_subuid_ranges": [],
+  "assigned_subgid_ranges": [],
+  "mapping_selected": "self only; map current1000 to namespace1000 count1",
+  "command": [
+    "/usr/bin/unshare",
+    "--user",
+    "--map-current-user",
+    "--pid",
+    "--fork",
+    "--",
+    "/bin/sh",
+    "-c",
+    "printf \"namespace_pid=%s\\n\" \"$$\"\nprintf \"namespace_uid=\"; id -u\nprintf \"namespace_gid=\"; id -g\nprintf \"uid_map\\n\"; cat /proc/self/uid_map\nprintf \"gid_map\\n\"; cat /proc/self/gid_map\ntest \"$$\" -eq 1 || exit 94\n(exit 23) & owned_child=$!\nwait \"$owned_child\"\nchild_status=$?\nprintf \"owned_child_status=%s\\n\" \"$child_status\"\ntest \"$child_status\" -eq 23 || exit 95\nexit 37"
+  ],
+  "exit_status": 37,
+  "namespace_pid": 1,
+  "namespace_uid": 1000,
+  "namespace_gid": 1000,
+  "observed_uid_map": "1000 1000 1",
+  "observed_gid_map": "1000 1000 1",
+  "owned_child_wait_status": 23,
+  "mounts_requested": [],
+  "host_signals_requested": false,
+  "namespace_permission_denied": false,
+  "denied_action_retries": 0,
+  "application_tests_run": 0,
+  "counts_after": {
+    "visible_processes": 31318,
+    "visible_zombies": 31302
+  },
+  "count_limitation": "No separate immediately-before unshare snapshot; after matches most recent Docker count snapshot. Do not claim a directly measured unshare zombie delta.",
+  "limitations": [
+    "Same hostUID1000; not distinct mapped hostUID.",
+    "One tiny fork/wait does not prove broad process or application capacity.",
+    "No private proc mount; fixture read only /proc/self map files.",
+    "No mount-proc, host selectors, signals, range extension, service mutation, or privileged container."
+  ],
+  "approval_or_security_rejection": "none",
+  "ci_used": false,
+  "logs": {
+    "stdout": {
+      "path": "/workspace/work/unshare-capacity-smoke.stdout.log",
+      "bytes": 158,
+      "sha256": "fa673c5d6c72eb9f81bc0693f75d9867b9d0d9b1864a20bb432503a8dbb47976"
+    },
+    "stderr": {
+      "path": "/workspace/work/unshare-capacity-smoke.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

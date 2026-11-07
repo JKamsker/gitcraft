@@ -1,0 +1,8 @@
+namespace_pid=1
+namespace_uid=1000
+namespace_gid=1000
+uid_map
+      1000       1000          1
+gid_map
+      1000       1000          1
+owned_child_status=23
