@@ -41,7 +41,33 @@ impl RepoTab {
         if self.check_history_download(&action, ctx) {
             return;
         }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.file_comparison = None;
+        }
         match action {
+            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
+            Action::RefreshFileComparison => self.load_file_comparison(ctx),
+            Action::CloseFileComparison => self.file_comparison = None,
+            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
+            Action::ComparisonCell {
+                request,
+                path,
+                column,
+            } => self.comparison_cell(request, path, column, ctx),
+            Action::ComparisonPick {
+                request,
+                boundary,
+                lines,
+                whole,
+            } => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
             Action::Keyboard(request) => self.apply_keyboard(request, ctx),
             Action::OpenActivity(page) => self.open_activity(page, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),

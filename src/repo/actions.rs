@@ -15,6 +15,25 @@ use crate::terminal::ShellSpec;
 pub(crate) enum Action {
     Keyboard(super::keyboard::Request),
     Select(usize),
+    OpenFileComparison(super::file_comparison::Page),
+    RefreshFileComparison,
+    CloseFileComparison,
+    ComparisonMove {
+        request: u64,
+        index: usize,
+    },
+    ComparisonCell {
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+    },
+    ComparisonPick {
+        request: u64,
+        boundary: usize,
+        lines: std::collections::BTreeSet<usize>,
+        whole: bool,
+    },
+    ComparisonNormalPatch,
     OpenActivity(super::activity::Page),
     ActivityCommit(String),
     CloseActivity,
@@ -341,6 +360,21 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "File migration map".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Migration),
+            ),
+            (
+                "Three-state staging lens".into(),
+                "staging".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Lens),
+            ),
+            (
+                "File versions across branches".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
             (
                 "Activity calendar".into(),
                 "history".into(),

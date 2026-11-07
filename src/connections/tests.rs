@@ -5,7 +5,10 @@ fn selected_accounts_are_data_not_shell_arguments() {
     let account = Account {
         host: "github.com".into(),
         user: "work-user".into(),
-        config_dir: "/tmp/work account".into(),
+        config_dir: std::env::temp_dir()
+            .join("work account '$(fixture) & ü")
+            .to_string_lossy()
+            .into_owned(),
     };
     assert!(account.validate().is_ok());
     for host in [

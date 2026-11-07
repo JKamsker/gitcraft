@@ -15,6 +15,7 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod file_comparison;
 mod file_text;
 mod file_view;
 mod gerrit;
@@ -168,6 +169,7 @@ pub struct RepoTab {
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     diff: Option<DiffView>,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
@@ -341,6 +343,7 @@ impl RepoTab {
             detail: None,
             detail_error: None,
             diff: None,
+            file_comparison: None,
             compare: None,
             pr_view: None,
             activity: None,
