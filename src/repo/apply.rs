@@ -17,6 +17,8 @@ impl RepoTab {
             return;
         }
         match action {
+            Action::OpenTour => self.open_tour(false, ctx),
+            Action::CloseTour => self.tour = None,
             Action::OpenActivity(page) => self.open_activity(page, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
             Action::CloseActivity => self.activity = None,

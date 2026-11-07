@@ -38,6 +38,9 @@ pub(super) struct Activity {
 }
 
 impl Activity {
+    pub(super) fn history(&self) -> Option<Arc<History>> {
+        self.history.clone()
+    }
     fn new(page: Page) -> Self {
         Self {
             page,
@@ -127,6 +130,8 @@ impl RepoTab {
             self.status = Some(("Finish or close the editor first".into(), true));
             return;
         }
+        let cached = self.tour.as_ref().and_then(|v| v.history());
+        self.tour = None;
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;
@@ -134,8 +139,10 @@ impl RepoTab {
         if let Some(view) = &mut self.activity {
             view.page = page;
         } else {
-            self.activity = Some(Activity::new(page));
-            self.analyze_activity(true, ctx);
+            let mut view = Activity::new(page);
+            view.history = cached;
+            self.activity = Some(view);
+            self.analyze_activity(false, ctx);
         }
     }
     pub(super) fn analyze_activity(&mut self, reload: bool, ctx: &egui::Context) {

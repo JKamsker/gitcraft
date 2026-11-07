@@ -670,6 +670,18 @@ pub(crate) fn activity_bytes(
     activity_bytes_with_limit(dir, args, input, active, std::time::Duration::from_secs(20))
 }
 
+/// Allowlisted public onboarding metadata; no raw configuration snapshots are exposed.
+pub(crate) fn onboarding_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    activity_mailmap_config(dir, key, false, active)
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;

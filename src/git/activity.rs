@@ -7,6 +7,7 @@ mod process;
 mod tests;
 
 pub(crate) use date::Day;
+pub(crate) use process::run;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
