@@ -270,6 +270,7 @@ impl RepoTab {
 
     /// The number of a read starting now.
     fn next_read(&mut self) -> u64 {
+        self.discard_decrypted();
         if let Some(state) = &mut self.file_comparison {
             state.invalidate();
         }

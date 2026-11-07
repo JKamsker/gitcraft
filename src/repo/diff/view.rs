@@ -49,14 +49,17 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial =
-            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
+        let partial = matches!(&view.data, Some(Ok(d)) if d.partial)
+            && idle
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
         // A stash's changes aren't a commit's to revert.
         let revert = self.stash_view.is_none();
         let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert)
             && idle
-            && !view.structural.enabled;
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -87,6 +90,26 @@ impl RepoTab {
             acts,
         );
 
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label("SOPS encrypted file");
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding").selected_text(encoding.label()).show_ui(ui, |ui| {
+                    use super::encrypted::JsonEncoding;
+                    for choice in [JsonEncoding::Ask,JsonEncoding::Document,JsonEncoding::Binary] { ui.selectable_value(&mut encoding,choice,choice.label()); }
+                });
+                if encoding != view.encrypted.json_encoding { acts.push(Action::DiffDecryptedEncoding(encoding)); }
+                if view.encrypted.enabled {
+                    if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
+                } else if ui.add_enabled(idle && !self.loading && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use local SOPS and keys. SSH/WSL supply only ciphertext. Plaintext is discarded when leaving this view.").clicked() { acts.push(Action::DiffDecrypted(true)); }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                super::encrypted::show(ui, &mut view.encrypted);
+            }
+            return;
+        }
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
             match &view.rendered {

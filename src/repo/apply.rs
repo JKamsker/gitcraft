@@ -297,6 +297,13 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffStep(delta) => {
                 // Shown in place of the lines (not fallen back to them).
@@ -544,6 +551,14 @@ impl RepoTab {
         lines: &std::collections::BTreeSet<usize>,
         ctx: &egui::Context,
     ) {
+        if self
+            .diff
+            .as_ref()
+            .is_none_or(|v| v.encrypted.enabled || v.request != v.data_request)
+        {
+            return;
+        }
+        let request = self.diff.as_ref().map(|v| v.request);
         let Some(DiffView {
             key: DiffKey::Work(file),
             data: Some(Ok(data)),
@@ -567,7 +582,15 @@ impl RepoTab {
         self.here_or_later(
             ctx,
             move || git::save_patch_for(&repo, &patch),
-            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
+            move |tab, saved, ctx| {
+                if tab.diff.as_ref().is_some_and(|v| {
+                    Some(v.request) == request
+                        && v.data_request == v.request
+                        && !v.encrypted.enabled
+                }) {
+                    tab.apply_picked(pick, &label, saved, ctx);
+                }
+            },
         );
     }
 

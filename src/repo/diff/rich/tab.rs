@@ -54,6 +54,7 @@ impl RepoTab {
 
     /// Shows diffs as `kind` (`None`: as their lines).
     pub(in crate::repo) fn show_diff_rich(&mut self, kind: Option<RichKind>, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.diff_rich = kind;
         // On for a file whose name doesn't offer it: for that file.
         if let (Some(k), Some(view)) = (kind, &self.diff)

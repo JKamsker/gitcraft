@@ -280,6 +280,7 @@ impl RepoTab {
 
     /// Shows Markdown files rendered in diffs, or as text.
     pub(super) fn show_diff_rendered(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.diff_rendered = on;
         if on {
             self.diff_rich = None;
@@ -308,6 +309,7 @@ impl RepoTab {
 
     /// Shows diffs as the whole file, or as the changes.
     pub(super) fn show_diff_as_file(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.diff_as_file = on;
         if on && let Some(view) = &mut self.diff {
             view.structural.enabled = false;

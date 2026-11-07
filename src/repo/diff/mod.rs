@@ -8,6 +8,7 @@ mod algorithm;
 mod algorithm_tests;
 mod binary;
 pub(super) mod context;
+pub(in crate::repo) mod encrypted;
 mod fold_view;
 mod image_compare;
 mod images;
@@ -121,6 +122,7 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    pub sops: bool,
     /// Hunks and lines of a commit's diff can be reverted on their own.
     pub revertable: bool,
     /// Blocks removed in one place and added in another.
@@ -227,6 +229,12 @@ pub fn load_lines(
 
 /// Reads and prepares the diff for `key`.
 pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result<DiffData, String> {
+    let recognized = encrypted::probe_checked(repo, key);
+    let sops = recognized == Some(true);
+    let opts = DiffOptions {
+        no_textconv: opts.no_textconv || recognized != Some(false),
+        ..opts
+    };
     let patch = |opts: DiffOptions| -> Result<(String, String), String> {
         Ok(match key {
             DiffKey::Commit { hash, path } => {
@@ -260,15 +268,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         done => done?,
     };
     let pickable = !opts.ignore_ws;
-    Ok(prepare(
-        repo,
-        key,
-        &path,
-        &text,
-        pickable,
-        opts.whole_file,
-        dark,
-    ))
+    let mut data = prepare(repo, key, &path, &text, pickable, opts.whole_file, dark);
+    data.sops = sops;
+    Ok(data)
 }
 
 /// The diff `text` of `path` read into lines, coloured and paired. `pickable`: hunks and lines
@@ -350,6 +352,7 @@ fn prepare(
     let weakened = weakened::by_hunk_line(text, &lines);
     DiffData {
         line_counts,
+        sops: false,
         lines,
         spans,
         changed,

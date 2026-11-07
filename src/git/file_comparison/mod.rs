@@ -327,3 +327,18 @@ pub(crate) fn matrix(
         paths: paths.into_iter().collect(),
     })
 }
+
+pub(crate) fn raw_output(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    run(repo, args, active)
+}
+pub(crate) fn raw_working(
+    repo: &Path,
+    path: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Version, String> {
+    lens::working(repo, path, active)
+}

@@ -139,6 +139,7 @@ pub(crate) struct DiffView {
     /// What the rich view keeps between frames.
     pub(super) rich_state: diff::rich::RichState,
     pub(super) structural: diff::structural::State,
+    pub(super) encrypted: diff::encrypted::State,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -159,6 +160,7 @@ pub(crate) struct DiffView {
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
+    pub(super) data_request: u64,
     /// Opened from the history of some lines: only the part of the commit's diff that changed
     /// these lines of the file (as they are in the commit).
     pub(super) lines: Option<Vec<crate::git::LineRange>>,
@@ -196,6 +198,7 @@ impl DiffView {
             rich_load: 0,
             rich_state: Default::default(),
             structural: Default::default(),
+            encrypted: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,
@@ -205,6 +208,7 @@ impl DiffView {
             revealed: Default::default(),
             auto_opened: Default::default(),
             request: 0,
+            data_request: 0,
             lines: None,
             unfolded: false,
             keep_place: None,
@@ -217,6 +221,7 @@ impl DiffView {
 
     /// Numbers a new read of this diff; from now on only its answer is shown.
     pub(super) fn next_request(&mut self) -> u64 {
+        self.encrypted.close();
         self.request = DIFF_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         self.request
     }
@@ -235,6 +240,7 @@ impl DiffView {
             (Some(Ok(data)), Some(open)) => diff::moved_view::Opened::place(data, open.block),
             _ => None,
         };
+        self.data_request = request;
         self.data = Some(result);
         // The lines may have moved.
         self.chosen.clear();
