@@ -1,10 +1,10 @@
-//! The tab's everyday git commands: checkout, push, commit, stash, creating a pull request.
+//! The tab's everyday git commands: checkout, push, commit, creating a pull request.
 
 use std::time::Instant;
 
 use super::actions::BranchRef;
 use super::messages::spawn_or;
-use super::operations::{expect_ref, stash_push_args};
+use super::operations::expect_ref;
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
 use crate::forge::{self, NewPullRequest};
 use crate::git::{self, Branch};
@@ -259,28 +259,6 @@ impl RepoTab {
             steps,
             Refresh::All,
             Undo::HeadMove { mode: "--soft" },
-            ctx,
-        );
-    }
-
-    pub(super) fn stash_push(&mut self, message: &str, ctx: &egui::Context) {
-        let mut args: Vec<&str> = stash_push_args().to_vec();
-        if !message.trim().is_empty() {
-            args.extend(["-m", message.trim()]);
-        }
-        let redo = ops(&[&args]);
-        self.run_undoable(
-            "Stash",
-            ops(&[&args]),
-            Refresh::All,
-            Undo::Custom {
-                // This stash, not one pushed since.
-                undo: [expect_ref("refs/stash")]
-                    .into_iter()
-                    .chain(ops(&[&["stash", "pop", "--index"]]))
-                    .collect(),
-                redo,
-            },
             ctx,
         );
     }

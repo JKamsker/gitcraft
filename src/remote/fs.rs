@@ -90,6 +90,46 @@ pub fn create_dir_all(path: &Path) -> io::Result<()> {
     }
 }
 
+/// Copies the file `from` to `to` (both on the same machine), keeping its modification time:
+/// a copy of git's index must stay as old as the index, or git would take files changed in the
+/// same instant as it for unchanged.
+pub fn copy_keeping_time(from: &Path, to: &Path) -> io::Result<()> {
+    match (parse(from), parse(to)) {
+        (None, None) => {
+            let modified = std::fs::metadata(from)?.modified()?;
+            std::fs::copy(from, to)?;
+            std::fs::File::options()
+                .write(true)
+                .open(to)?
+                .set_modified(modified)
+        }
+        (Some(a), Some(b)) if a.host == b.host => {
+            let script = format!("exec cp -p -- {} {}", sh_path(&a.path), sh_path(&b.path));
+            let out = run(&a, script, None)?;
+            match out.code {
+                0 => Ok(()),
+                _ => Err(failed(&out)),
+            }
+        }
+        _ => Err(io::Error::other("can't copy a file between two machines")),
+    }
+}
+
+/// Removes the file at `path`; one that isn't there is no error.
+pub fn remove_file(path: &Path) -> io::Result<()> {
+    let Some(t) = parse(path) else {
+        return match std::fs::remove_file(path) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        };
+    };
+    let out = run(&t, format!("exec rm -f -- {}", sh_path(&t.path)), None)?;
+    match out.code {
+        0 => Ok(()),
+        _ => Err(failed(&out)),
+    }
+}
+
 /// `test <flag> path`: whether it holds, or why it couldn't be asked (the machine wasn't
 /// reached), which a plain `false` would pass off as an answer.
 fn test(path: &Path, flag: &str) -> io::Result<bool> {

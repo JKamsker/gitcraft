@@ -322,6 +322,7 @@ impl RepoTab {
                     }
                     let wip_row_changed = work.is_clean() != self.work.is_clean();
                     self.work = work;
+                    self.stash_picks.keep_changed(&self.work);
                     if wip_row_changed {
                         self.rebuild(ctx);
                     } else {

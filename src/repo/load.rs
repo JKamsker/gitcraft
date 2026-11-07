@@ -364,6 +364,7 @@ impl RepoTab {
         let state = loaded.work.in_progress;
         if Self::newer(loaded.read, &mut self.work_read) {
             self.work = loaded.work;
+            self.stash_picks.keep_changed(&self.work);
         }
         self.fold_loaded(loaded.read, state);
         // The last counts of worktrees this read left uncounted (on another machine) stay

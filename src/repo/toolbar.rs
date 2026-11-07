@@ -157,7 +157,7 @@ impl RepoTab {
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
             .on_hover_text(keymap::tip(
-                "Stash all changes, untracked files included",
+                "Stash everything, staged changes, a snapshot, or picked files",
                 Command::Stash,
             ))
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Stash))

@@ -37,6 +37,7 @@ mod messages;
 mod navigate;
 mod operations;
 mod palette;
+mod partial_stash;
 mod patches;
 mod pinned_sections;
 mod pr_merge;
@@ -143,6 +144,8 @@ pub struct RepoTab {
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
+    /// The files picked to stash, and whether git here can stash only what is staged.
+    stash_picks: partial_stash::StashPicks,
     remotes: Vec<Remote>,
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
@@ -336,6 +339,7 @@ impl RepoTab {
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),
+            stash_picks: Default::default(),
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,

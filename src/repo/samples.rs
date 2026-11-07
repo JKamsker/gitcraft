@@ -2,6 +2,7 @@
 
 use super::file_view::FileTab;
 use super::reflog::{ReflogAct, Source};
+use super::partial_stash::StashRequest;
 use super::{Action, Dialog, DiffKey, DiffView, RepoTab, diff};
 
 impl RepoTab {
@@ -82,7 +83,7 @@ impl RepoTab {
                     });
                 }
                 acts.push(Action::RunRebase);
-                acts.push(Action::StashPush("sample".to_owned()));
+                acts.push(Action::Stash(StashRequest::everything("sample")));
             }
         }
         acts

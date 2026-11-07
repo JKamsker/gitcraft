@@ -344,10 +344,10 @@ pub(super) fn run_steps_counted(
     // terminal since must not be undone along with this.
     let head_before =
         matches!(kind, OpKind::Normal(Undo::HeadMove { .. }, _)).then(|| git::head(path));
-    let pushes_stash = ops.first().is_some_and(|op| {
-        let stash = stash_push_args();
-        op.len() >= stash.len() && op.iter().zip(stash).all(|(a, b)| a == b)
-    });
+    // Any `git stash push`: of everything, of some files, of what is staged.
+    let pushes_stash = ops
+        .first()
+        .is_some_and(|op| op.len() >= 2 && op[0] == "stash" && op[1] == "push");
     let stash_before = pushes_stash.then(|| git::resolve(path, "refs/stash").ok());
     // Checked before anything runs, so a refused undo changes nothing.
     if let Err(e) = check_expected(path, ops) {
@@ -434,6 +434,24 @@ pub(super) fn expect_symref(name: &str, target: &str) -> Vec<String> {
     vec![EXPECT_SYMREF.to_owned(), name.to_owned(), target.to_owned()]
 }
 
+/// Marks a step that runs no git and expects a revision to have a tree.
+const EXPECT_TREE: &str = "\u{0}expect-tree";
+
+/// A step that runs nothing, but refuses the whole operation unless the revision `rev`
+/// (`stash@{0}^2`) has the tree `tree`: unlike [`expect_ref`], what it expects stays as it was
+/// made, however often the operation is redone (a patch made from that tree is applied next).
+pub(super) fn expect_tree(rev: &str, tree: &str) -> Vec<String> {
+    vec![EXPECT_TREE.to_owned(), rev.to_owned(), tree.to_owned()]
+}
+
+/// The revision and the tree of an `expect_tree` step.
+fn expected_tree(op: &[String]) -> Option<(&str, &str)> {
+    match op {
+        [mark, rev, tree] if mark == EXPECT_TREE => Some((rev, tree)),
+        _ => None,
+    }
+}
+
 /// The ref and the commit an `expect_ref` step expects.
 fn expected_ref(op: &[String]) -> Option<(&str, &str)> {
     match op {
@@ -451,11 +469,25 @@ fn expected_symref(op: &[String]) -> Option<(&str, &str)> {
 }
 
 /// Whether `op` is a step that runs nothing, only checks.
-pub(in crate::repo) fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some() || expected_symref(op).is_some()
+pub(super) fn is_expectation(op: &[String]) -> bool {
+    expected_ref(op).is_some() || expected_symref(op).is_some() || expected_tree(op).is_some()
 }
 
 fn check_expected(path: &Path, ops: &[Vec<String>]) -> Result<(), String> {
+    for (rev, tree) in ops.iter().filter_map(|op| expected_tree(op)) {
+        let now = git::run(
+            Some(path),
+            &["rev-parse", "--verify", "-q", &format!("{rev}^{{tree}}")],
+        )
+        .map(|s| s.trim().to_owned())
+        .unwrap_or_default();
+        if now != tree {
+            return Err(format!(
+                "{rev} isn't what this made any more (it was made again since, with other \
+                 changes): going ahead would lose those"
+            ));
+        }
+    }
     for (name, target) in ops.iter().filter_map(|op| expected_symref(op)) {
         // Exit 1, nothing printed: detached.
         let now = git::run_ok_codes(Some(path), &["symbolic-ref", "-q", name], &[0, 1])
@@ -505,7 +537,7 @@ fn fill_expected(path: &Path, ops: &mut [Vec<String>]) {
     }
 }
 
-/// How the app stashes (and how `run_ops_ex` knows an operation for one).
+/// How the app stashes everything, untracked files included.
 pub(super) fn stash_push_args() -> [&'static str; 3] {
     ["stash", "push", "--include-untracked"]
 }
