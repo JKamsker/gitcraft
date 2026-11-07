@@ -183,36 +183,149 @@ fn manual_refs_optional_columns_and_compact_graph_survive_auto_sizing() {
 }
 
 #[test]
-fn description_tooltip_contains_the_whole_message_and_keeps_row_clicks() {
-    let (ctx, mut tab) = fixture(4);
+fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_selection()
+-> Result<(), String> {
+    let path = std::env::temp_dir().join(format!("gitcraft-graph-message-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&path);
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    let git = |args: &[&str]| git::run(Some(&path), args);
+    git(&["init", "-q"])?;
+    git(&["config", "user.name", "Graph test"])?;
+    git(&["config", "user.email", "graph@example.invalid"])?;
+    git(&["config", "commit.gpgSign", "false"])?;
+    git(&["commit", "--allow-empty", "-qm", "Base"])?;
+    let other = "Previous subject\n\nThe previous commit has its own full body.";
+    git(&["commit", "--allow-empty", "-qm", other])?;
+    let message = format!(
+        "{}\n\n{}\n\nFinal paragraph: TAIL THAT MUST BE VISIBLE.",
+        "Long Unicode café subject that will be elided in the graph ".repeat(3),
+        "A detailed explanation with spacing and Unicode café. ".repeat(20)
+    );
+    let message_path = path.join("message.txt");
+    std::fs::write(&message_path, &message).map_err(|e| e.to_string())?;
+    git(&[
+        "commit",
+        "--allow-empty",
+        "-q",
+        "--cleanup=verbatim",
+        "-F",
+        &message_path.to_string_lossy(),
+    ])?;
+    // Use production Git and parse_record, rather than injecting a synthetic Commit.body.
+    let commits = git::log(&path, None, 0, 10)?;
+    assert_eq!(commits[0].body.chars().count(), 400);
+    assert!(!commits[0].body.contains("TAIL THAT MUST BE VISIBLE"));
+    let first = commits[0].hash.clone();
+    let second = commits[1].hash.clone();
+    let ctx = egui::Context::default();
+    theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred(path.clone(), &ctx);
+    tab.commits = commits.into_iter().map(Arc::new).collect();
+    tab.graph = crate::graph::layout(&tab.commits);
+    tab.rebuild_graph_labels();
+    tab.selected = Some(2);
     let size = vec2(900.0, 220.0);
     frame(&ctx, &mut tab, size, vec![], 0.0);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
     let x = header_x(&shapes, "DESCRIPTION") + 30.0;
-    let point = egui::pos2(x, 26.0 + ROW_PITCH / 2.0);
-    frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 0.2);
-    frame(&ctx, &mut tab, size, vec![], 1.5);
-    let (hovered, _) = frame(&ctx, &mut tab, size, vec![], 2.0);
-    let message = format!("{}\n\n{}", tab.commits[0].summary, tab.commits[0].body);
+    let first_point = egui::pos2(x, 26.0 + ROW_PITCH / 2.0);
+    let second_point = first_point + vec2(0.0, ROW_PITCH);
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(first_point)],
+        0.2,
+    );
+    frame(&ctx, &mut tab, size, vec![], 0.65); // Start the background request.
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(second_point)],
+        0.7,
+    );
+    let wait_for = |tab: &mut RepoTab, hash: &str| -> Result<(), String> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while tab.graph_messages.message(&path, hash).is_none() {
+            tab.poll(&ctx);
+            if std::time::Instant::now() >= deadline {
+                return Err("message worker did not finish".to_owned());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        Ok(())
+    };
+    wait_for(&mut tab, &first)?;
     assert!(
-        texts(&hovered).iter().any(|s| s.galley.job.text == message),
-        "painted texts: {:?}",
-        texts(&hovered)
+        matches!(tab.graph_messages.message(&path, &first), Some(Ok(text)) if text == &message)
+    );
+    let (loading_second, _) = frame(&ctx, &mut tab, size, vec![], 1.5);
+    assert!(
+        !texts(&loading_second)
             .iter()
-            .map(|s| &s.galley.job.text)
-            .collect::<Vec<_>>()
+            .any(|s| s.galley.job.text == message),
+        "an old hover result must never appear over the next row"
+    );
+    wait_for(&mut tab, &second)?;
+    let (second_tooltip, _) = frame(&ctx, &mut tab, size, vec![], 2.0);
+    assert!(
+        texts(&second_tooltip)
+            .iter()
+            .any(|s| s.galley.job.text == other)
+    );
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(first_point)],
+        2.1,
+    );
+    frame(&ctx, &mut tab, size, vec![], 2.8);
+    let (first_tooltip, _) = frame(&ctx, &mut tab, size, vec![], 3.2);
+    assert!(
+        texts(&first_tooltip)
+            .iter()
+            .any(|s| s.galley.job.text == message)
+    );
+    assert_eq!(
+        tab.selected,
+        Some(2),
+        "hover must not change the selected commit"
     );
     let events = [true, false]
         .into_iter()
         .map(|pressed| Event::PointerButton {
-            pos: point,
+            pos: first_point,
             button: egui::PointerButton::Primary,
             pressed,
             modifiers: egui::Modifiers::NONE,
         })
         .collect();
-    let (_, acts) = frame(&ctx, &mut tab, size, events, 2.1);
+    let (_, acts) = frame(&ctx, &mut tab, size, events, 3.3);
     assert!(acts.iter().any(|a| matches!(a, Action::Select(0))));
+    drop(tab);
+    assert!(git::commit_message(&path, "--output=written").is_err());
+    std::fs::write(
+        &message_path,
+        "x".repeat(git::MAX_TOOLTIP_MESSAGE_BYTES + 1),
+    )
+    .map_err(|e| e.to_string())?;
+    git(&[
+        "commit",
+        "--allow-empty",
+        "-q",
+        "--cleanup=verbatim",
+        "-F",
+        &message_path.to_string_lossy(),
+    ])?;
+    let oversized = git(&["rev-parse", "HEAD"])?;
+    assert!(
+        git::commit_message(&path, oversized.trim()).is_err_and(|error| error.contains("256 KiB")),
+        "oversized objects must be refused before retaining full message text"
+    );
+    let _ = std::fs::remove_dir_all(&path);
+    Ok(())
 }
 
 #[test]

@@ -64,16 +64,17 @@ impl RepoTab {
         lanes: Lanes,
         viewport: &super::readability::Viewport,
         acts: &mut Vec<Action>,
-    ) -> Response {
+    ) -> (Response, Option<String>) {
         let t = Tokens::get(ui.ctx());
         let (auto_id, rect) = ui.allocate_space(vec2(ui.available_width(), ROW_PITCH));
         let Some(commit) = self.commits.get(i) else {
-            return ui.interact(rect, auto_id, Sense::click());
+            return (ui.interact(rect, auto_id, Sense::click()), None);
         };
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), Sense::click());
         let painter = ui.painter_at(rect);
+        let mut hovered_message = None;
         let is_wip = commit.hash == WIP_HASH;
         let is_match = self.search.matches.contains(&commit.hash);
         row_background(
@@ -116,8 +117,21 @@ impl RepoTab {
                     rect.bottom(),
                 ),
             );
-            if ui.rect_contains_pointer(description_rect.intersect(rect)) {
-                resp.clone().on_hover_text(full_message(commit));
+            if resp.hovered() && ui.rect_contains_pointer(description_rect.intersect(rect)) {
+                hovered_message = Some(commit.hash.clone());
+                resp.clone().on_hover_ui(|ui| {
+                    match self.graph_messages.message(&self.path, &commit.hash) {
+                        Some(Ok(message)) => {
+                            ui.label(message.as_str());
+                        }
+                        Some(Err(error)) => {
+                            ui.label(error);
+                        }
+                        None => {
+                            ui.label("Loading full commit message…");
+                        }
+                    }
+                });
             }
             trailing_columns(ui, &painter, &t, &row, viewport.now);
             if let Some(status) = ci {
@@ -126,7 +140,7 @@ impl RepoTab {
                 acts.extend(ci_status::dot(ui, id, center, &commit.hash, status));
             }
         }
-        resp
+        (resp, hovered_message)
     }
 
     /// Whether `commit` is an end of the comparison shown on the right (the changes row for
@@ -314,15 +328,6 @@ fn pill(painter: &Painter, left_center: Pos2, text: &str, color: Color32) -> f32
         color,
     );
     w
-}
-
-/// Tooltips retain the original paragraphs even when the row only has room for an ellipsis.
-fn full_message(commit: &Commit) -> String {
-    if commit.body.is_empty() {
-        commit.summary.clone()
-    } else {
-        format!("{}\n\n{}", commit.summary, commit.body)
-    }
 }
 
 fn faint_lane_label(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, label: &str) {

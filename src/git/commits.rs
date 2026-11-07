@@ -356,6 +356,44 @@ pub fn commit_detail(repo: &Path, hash: &str) -> Result<CommitDetail, String> {
     })
 }
 
+/// Maximum object and decoded message size retained for a graph tooltip.
+pub const MAX_TOOLTIP_MESSAGE_BYTES: usize = 256 * 1024;
+
+/// Read one original message without expanding every graph row's compact preview.
+/// Check object size before reading it, and cap the decoded text retained by the UI.
+pub fn commit_message(repo: &Path, hash: &str) -> Result<String, String> {
+    if !matches!(hash.len(), 40 | 64) || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Expected a full commit object ID".to_owned());
+    }
+    let commit = format!("{hash}^{{commit}}");
+    let size = run(Some(repo), &["cat-file", "-s", &commit])?
+        .trim()
+        .parse::<usize>()
+        .map_err(|_| "Invalid commit object size".to_owned())?;
+    let too_large = || {
+        "Message exceeds the 256 KiB tooltip limit; select the commit to read it in the detail pane.".to_owned()
+    };
+    if size > MAX_TOOLTIP_MESSAGE_BYTES {
+        return Err(too_large());
+    }
+    let message = run(
+        Some(repo),
+        &[
+            "show",
+            NO_SIGNATURE,
+            UTF8,
+            "-s",
+            "--format=%B",
+            END_OPTS,
+            &commit,
+        ],
+    )?;
+    if message.len() > MAX_TOOLTIP_MESSAGE_BYTES {
+        return Err(too_large());
+    }
+    Ok(message.trim_end().to_owned())
+}
+
 /// The full message of HEAD (to amend it).
 pub fn head_message(repo: &Path) -> Result<String, String> {
     run(

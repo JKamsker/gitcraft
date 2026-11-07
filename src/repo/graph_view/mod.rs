@@ -6,6 +6,7 @@ mod handles;
 mod header;
 mod lanes;
 mod menu;
+pub(super) mod message_tooltip;
 mod pills;
 mod readability;
 #[cfg(test)]
@@ -108,6 +109,7 @@ impl RepoTab {
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
         let total = self.commits.len() + usize::from(self.has_more);
+        let mut hovered_message = None;
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // show_rows includes overscan and partially clipped rows. Require the text's
             // centre to be inside the viewport with enough room for its glyphs: a label on
@@ -135,7 +137,10 @@ impl RepoTab {
                     loading_row(ui, &t);
                     continue;
                 }
-                let resp = self.commit_row(ui, i, cols, lanes, &readable, acts);
+                let (resp, hovered) = self.commit_row(ui, i, cols, lanes, &readable, acts);
+                if hovered.is_some() {
+                    hovered_message = hovered;
+                }
                 if resp.clicked() {
                     // Ctrl+click: compare the selected commit with this one.
                     let compare = ui
@@ -151,6 +156,7 @@ impl RepoTab {
         header::column_headers(ui, &t, header, &cols);
         self.column_handles(ui, header, &prefs, &cols, &settings);
         header::header_menu(&header_resp, &settings);
+        self.hover_graph_message(ui.ctx(), hovered_message.as_deref());
     }
 
     /// Up and down select the row above or below the selected one.

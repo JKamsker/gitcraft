@@ -124,6 +124,7 @@ pub struct RepoTab {
     graph: Graph,
     /// Ref names for continuous lane runs, rebuilt with the graph, never while scrolling.
     graph_labels: HashMap<usize, String>,
+    graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
     stashes: Vec<Stash>,
@@ -290,6 +291,7 @@ impl RepoTab {
                 width: 0,
             },
             graph_labels: HashMap::new(),
+            graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
             stashes: Vec::new(),
