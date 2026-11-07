@@ -403,6 +403,14 @@ mod native {
             if prefix == "refs/remotes/" && short.ends_with("/HEAD") {
                 continue;
             }
+            if prefix == "refs/heads/"
+                && let Some(remote) = reference.remote_name(gix::remote::Direction::Push)
+            {
+                let remote = text(remote.as_bstr())?;
+                if !remote.is_empty() {
+                    out.push_remotes.insert(short.to_owned(), remote);
+                }
+            }
             let raw = reference
                 .try_id()
                 .ok_or("symbolic reference requires Git")?;
@@ -570,6 +578,31 @@ mod tests {
         parity(repo.path())?;
         repo.git(&["update-ref", "-d", "refs/remotes/my/fork/main"])?;
         parity(repo.path())?;
+        Ok(())
+    }
+
+    /// Both readers resolve push settings independently of tracking tips and reopen config.
+    #[test]
+    fn native_push_remotes_match_git_and_follow_config_changes() -> Result<(), String> {
+        let repo = Repo::new("native-push-remote-parity")?;
+        repo.commit("base", &[])?;
+        repo.git(&["remote", "add", "origin", "https://github.com/up/repo.git"])?;
+        repo.git(&["remote", "add", "my/fork", "https://github.com/me/repo.git"])?;
+        parity(repo.path())?;
+        assert!(native::refs(repo.path())?.push_remotes.is_empty());
+        repo.git(&["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+        repo.git(&["branch", "--set-upstream-to", "origin/main"])?;
+        parity(repo.path())?;
+        repo.git(&["config", "remote.pushDefault", "my/fork"])?;
+        parity(repo.path())?;
+        assert_eq!(native::refs(repo.path())?.push_remotes["main"], "my/fork");
+        repo.git(&["config", "branch.main.pushRemote", "origin"])?;
+        parity(repo.path())?;
+        assert_eq!(native::refs(repo.path())?.push_remotes["main"], "origin");
+        repo.git(&["config", "--unset", "branch.main.pushRemote"])?;
+        repo.git(&["config", "--unset", "remote.pushDefault"])?;
+        parity(repo.path())?;
+        assert_eq!(native::refs(repo.path())?.push_remotes["main"], "origin");
         Ok(())
     }
     #[test]

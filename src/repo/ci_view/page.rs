@@ -3,7 +3,7 @@
 use egui::{RichText, Ui};
 
 use super::{CiAct, CiView, graph, steps};
-use crate::ci::{self, CheckState, Job, Run};
+use crate::ci::{self, CheckState, Job, Project, Run};
 use crate::forge::Forge;
 use crate::git;
 use crate::icons;
@@ -44,7 +44,12 @@ impl RepoTab {
                 ui.vertical_centered(|ui| ui.colored_label(t.danger, e));
                 return;
             }
-            Some(Ok(runs)) => runs,
+            Some(Ok(builds)) => {
+                for error in &builds.errors {
+                    ui.colored_label(t.warning, error);
+                }
+                &builds.runs
+            }
         };
         egui::ScrollArea::vertical()
             .id_salt(("ci-view", &view.sha))
@@ -54,10 +59,19 @@ impl RepoTab {
                     .inner_margin(egui::Margin::symmetric(MARGIN_X, 18))
                     .show(ui, |ui| {
                         if runs.is_empty() {
+                            let partial = view.runs.as_ref().is_some_and(|result| {
+                                result
+                                    .as_ref()
+                                    .is_ok_and(|builds| !builds.errors.is_empty())
+                            });
                             ui.label(
-                                RichText::new("No CI ran on this commit.")
-                                    .color(t.text_faint)
-                                    .italics(),
+                                RichText::new(if partial {
+                                    "Some projects could not be checked for builds."
+                                } else {
+                                    "No CI ran on this commit."
+                                })
+                                .color(t.text_faint)
+                                .italics(),
                             );
                             return;
                         }
@@ -89,11 +103,12 @@ fn page_header(ui: &mut Ui, view: &CiView, title: &str, popped: bool, acts: &mut
     });
 }
 
-fn page(ui: &mut Ui, view: &CiView, runs: &[Run], acts: &mut Vec<Action>) {
+/// Shows project-qualified runs and the selected run's jobs, actions and log.
+fn page(ui: &mut Ui, view: &CiView, runs: &[(Project, Run)], acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let now = git::now();
     if runs.len() > 1 {
-        run_picker(ui, runs, view.run, acts);
+        run_picker(ui, runs, view.project.as_ref(), view.run, acts);
         ui.add_space(14.0);
     }
     let Some(run) = view.shown_run() else {
@@ -163,26 +178,31 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[Run], acts: &mut Vec<Action>) {
 }
 
 /// A tab per run of the commit: its state, workflow and number.
-fn run_picker(ui: &mut Ui, runs: &[Run], shown: Option<u64>, acts: &mut Vec<Action>) {
+fn run_picker(
+    ui: &mut Ui,
+    runs: &[(Project, Run)],
+    project: Option<&Project>,
+    shown: Option<u64>,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal_wrapped(|ui| {
-        for run in runs {
-            let text = RichText::new(format!("    {} #{}", run.name, run.number)).color(
-                if Some(run.id) == shown {
-                    t.text
-                } else {
-                    t.text_dim
-                },
-            );
-            let resp = ui
-                .selectable_label(Some(run.id) == shown, text)
-                .on_hover_text(format!("{}\n{}", run.title, state_word(run.state)));
+        for (owner, run) in runs {
+            let selected = Some(run.id) == shown && Some(owner) == project;
+            let text = RichText::new(format!("    {} #{}", run.name, run.number))
+                .color(if selected { t.text } else { t.text_dim });
+            let resp = ui.selectable_label(selected, text).on_hover_text(format!(
+                "{}\n{}\n{}",
+                owner.path,
+                run.title,
+                state_word(run.state)
+            ));
             // A dot of the run's colour in the room left before its name.
             let dot = resp.rect.left_center() + egui::vec2(10.0, 0.0);
             ui.painter()
                 .circle_filled(dot, 3.5, state_color(&t, run.state));
             if resp.clicked() {
-                acts.push(Action::Ci(CiAct::SelectRun(run.id)));
+                acts.push(Action::Ci(CiAct::SelectRun(owner.clone(), run.id)));
             }
         }
     });
