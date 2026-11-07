@@ -109,6 +109,7 @@ impl RepoTab {
             ui.id().with("history-minimap"),
             Sense::click_and_drag(),
         );
+        response.widget_info(||egui::WidgetInfo::labeled(egui::WidgetType::Slider,true,"Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."));
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
         p.text(
@@ -233,6 +234,67 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection() {
+        use std::sync::Arc;
+        let ctx = crate::theme::test_paint::context();
+        let mut tab = RepoTab::new_deferred("/nonexistent/minimap-fixture".into(), &ctx);
+        tab.commits = (0..100)
+            .map(|i| {
+                Arc::new(crate::git::Commit {
+                    hash: format!("{i:040x}"),
+                    parents: if i < 99 {
+                        vec![format!("{:040x}", i + 1)]
+                    } else {
+                        Vec::new()
+                    },
+                    refs: if i == 50 {
+                        vec!["tag: v1".into()]
+                    } else {
+                        Vec::new()
+                    },
+                    ..Default::default()
+                })
+            })
+            .collect();
+        tab.graph = crate::graph::layout(&tab.commits);
+        tab.refs.head = tab.commits[20].hash.clone();
+        tab.search.matches.insert(tab.commits[70].hash.clone());
+        tab.selected = Some(0);
+        tab.has_more = true;
+        tab.prepare_minimap();
+        assert!(tab.history_minimap.bins[20].head);
+        assert!(tab.history_minimap.bins[50].tag);
+        assert!(tab.history_minimap.bins[70].hit);
+        let rect = Rect::from_min_size(egui::Pos2::ZERO, vec2(78.0, 400.0));
+        let point = pos2(38.0, 300.0);
+        for pressed in [true, false] {
+            let events = vec![
+                egui::Event::PointerMoved(point),
+                egui::Event::PointerButton {
+                    pos: point,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: Default::default(),
+                },
+            ];
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(rect),
+                    events,
+                    ..Default::default()
+                },
+                |ui| tab.history_minimap(ui, rect, 0.0, 300.0),
+            )
+            .drop_without_applying_deltas();
+        }
+        assert!(
+            tab.history_minimap
+                .offset
+                .is_some_and(|offset| offset > 1500.0)
+        );
+        assert_eq!(tab.selected, Some(0));
+    }
     #[test]
     fn endpoints_and_drag_anchor_respect_loaded_extent() {
         assert_eq!(bin_for(99_999, 100_000, BINS), BINS - 1);

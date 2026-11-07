@@ -19,7 +19,7 @@ fn clean(value: &str, max: usize) -> String {
 }
 impl Snapshot {
     fn new(state: &State, commits: &[Commit]) -> Self {
-        let names: BTreeSet<_> = commits.iter().map(|c| clean(&c.author, 40)).collect();
+        let names: BTreeSet<_> = commits.iter().map(|c| clean(&c.author, 256)).collect();
         let aliases: BTreeMap<_, _> = names
             .iter()
             .enumerate()
@@ -126,6 +126,7 @@ impl RepoTab {
     }
     pub(super) fn postcard_button(&mut self, ui: &mut egui::Ui) {
         if ui.button("History postcard…").clicked() {
+            ui.close();
             self.postcards.open = true;
             if self.postcards.target.is_empty() {
                 self.postcards.target = self
@@ -219,7 +220,7 @@ impl RepoTab {
             ui.separator();
             ui.label("Release name");changed|=ui.add(egui::TextEdit::singleline(&mut self.postcards.name).char_limit(80)).changed();
             ui.label("Release date (as displayed)");changed|=ui.add(egui::TextEdit::singleline(&mut self.postcards.date).char_limit(32).hint_text("YYYY-MM-DD")).changed();
-            changed|=ui.checkbox(&mut self.postcards.include_names,"Include contributors' names (.mailmap applied)").changed();
+            changed|=ui.checkbox(&mut self.postcards.include_names,"Include contributors' names (.mailmap applied; first 256 characters)").changed();
             changed|=ui.checkbox(&mut self.postcards.include_messages,"Include commit subjects (first 96 characters; no message bodies)").changed();
             changed|=ui.checkbox(&mut self.postcards.anonymize,"Anonymize names and replace all subjects with commit numbers").changed();
             ui.small("The release title, date and immutable range IDs remain visible when anonymized. Review those fields before sharing.");

@@ -31,17 +31,17 @@ pub(super) fn render(
     let height =
         (215.0 + snapshot.commits.len() as f32 * PITCH + footer_lines as f32 * 24.0) as usize;
     if height > 12000 {
-        return Err("Postcard composition exceeds 12000 pixels".into());
+        return Err("Postcard composition exceeds 12000 pixels; omit contributor names or choose a narrower range".into());
     }
     let size = vec2(WIDTH as f32, height as f32);
     let ctx = egui::Context::default();
-    let output = ctx.run(
+    let mut output = ctx.run_ui(
         egui::RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
             ..Default::default()
         },
-        |ctx| {
-            let painter = ctx.layer_painter(egui::LayerId::background());
+        |ui| {
+            let painter = ui.painter().clone();
             painter.rect_filled(Rect::from_min_size(Pos2::ZERO, size), 0.0, BG);
             painter.rect_filled(
                 Rect::from_min_size(pos2(34.0, 28.0), vec2(5.0, 62.0)),
@@ -145,15 +145,31 @@ pub(super) fn render(
         },
     );
     if !active() {
+        output.textures_delta.clear();
         return Err("Postcard rendering cancelled".into());
     }
-    let mut textures = HashMap::new();
-    for (id, delta) in output.textures_delta.set {
-        if delta.pos.is_some() {
-            return Err("Unexpected partial font atlas".into());
+    let mut textures: HashMap<egui::TextureId, std::sync::Arc<egui::ColorImage>> = HashMap::new();
+    let changes = std::mem::take(&mut output.textures_delta.set);
+    output.textures_delta.clear();
+    for (id, deltas) in changes {
+        for delta in deltas {
+            let egui::ImageData::Color(image) = delta.image;
+            if let Some([left, top]) = delta.pos {
+                let texture = std::sync::Arc::make_mut(
+                    textures.get_mut(&id).ok_or("Missing base font atlas")?,
+                );
+                if left + image.size[0] > texture.size[0] || top + image.size[1] > texture.size[1] {
+                    return Err("Invalid font atlas patch".into());
+                }
+                for y in 0..image.size[1] {
+                    let start = (top + y) * texture.size[0] + left;
+                    texture.pixels[start..start + image.size[0]]
+                        .copy_from_slice(&image.pixels[y * image.size[0]..(y + 1) * image.size[0]]);
+                }
+            } else {
+                textures.insert(id, image);
+            }
         }
-        let egui::ImageData::Color(image) = delta.image;
-        textures.insert(id, image);
     }
     let primitives = ctx.tessellate(output.shapes, output.pixels_per_point);
     let mut image = egui::ColorImage::filled([WIDTH, height], BG);

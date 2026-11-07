@@ -18,6 +18,7 @@ impl RepoTab {
         let mut collapse = false;
         let mut page = false;
         ui.horizontal_wrapped(|ui|{
+            self.branch_bands_header(ui);
             let active=self.saved_views.prefs.active.as_ref();
             egui::ComboBox::from_id_salt("graph_relation_view").selected_text(active.map_or("All history",|p|p.name.as_str())).show_ui(ui,|ui|{
                 if ui.selectable_label(active.is_none(),"All history").clicked(){choose=Some(None);}

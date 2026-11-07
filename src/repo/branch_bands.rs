@@ -118,7 +118,7 @@ impl Preferences {
 impl RepoTab {
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
-        ui.horizontal_wrapped(|ui| {
+        ui.menu_button("Graph tools…", |ui| {
             self.postcard_button(ui);
             egui::ComboBox::from_id_salt("branch-model")
                 .selected_text(self.branch_bands.model.label())
