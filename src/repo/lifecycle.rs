@@ -150,6 +150,16 @@ impl super::RepoTab {
     /// Drops what the tab read and stops watching; the commit shown is selected again once it
     /// is read afresh (see [`Self::shown_now`]).
     fn suspend(&mut self) {
+        // Cancel captures and child processes from this lifetime, and disconnect their
+        // results so an old read cannot repopulate a suspended/resumed view.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        self._jobs = crate::tasks::Scope::default();
+        self.tx = super::messages::JobSender {
+            sender,
+            cancel: self._jobs.0.clone(),
+            repo: self.path.clone(),
+        };
+        self.rx = receiver;
         self.watcher = None;
         self.poller = None;
         self.fs_rx = None;

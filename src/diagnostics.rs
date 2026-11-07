@@ -62,6 +62,26 @@ pub fn report(
             .unwrap_or("not known (no wgpu adapter)"),
     );
     line("git", git);
+    if let Some((active, queued)) = crate::tasks::counts() {
+        line(
+            "Background jobs",
+            &format!(
+                "{active}/{} active, {queued}/{} queued (peak {})",
+                crate::tasks::WORKERS,
+                crate::tasks::QUEUE_CAPACITY,
+                crate::tasks::peak_queued().unwrap_or(0)
+            ),
+        );
+    }
+    if let Some(counts) = crate::processes::counts() {
+        line(
+            "Managed processes",
+            &format!(
+                "{} active, {} queued, {} started, peak {}",
+                counts.active, counts.queued, counts.spawned, counts.peak
+            ),
+        );
+    }
     for t in tools {
         // glab can only tell by asking its server: offline reads as a failed check.
         let (yes, no) = if t.tool == "glab" {

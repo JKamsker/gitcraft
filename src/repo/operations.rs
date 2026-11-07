@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use super::messages::spawn_or;
+use super::messages::spawn_mutation;
 use super::toolbar::headline;
 use super::{Dialog, Msg, OpKind, PendingOp, Refresh, RepoTab, Undo, UndoEntry, ops};
 use crate::git;
@@ -94,7 +94,7 @@ impl RepoTab {
                 stopped: 0,
             }
         };
-        spawn_or(&self.tx, ctx, failed, move || {
+        spawn_mutation(&self.tx, ctx, failed, move || {
             // The locks there already belong to someone else: only new ones are the cancel's.
             let locks_before = if cancellable {
                 git::leftover_locks(&path)

@@ -13,6 +13,21 @@ use crate::forge::{Hosting, PullRequest};
 use crate::git::{self, Commit, CommitDetail, WorkStatus};
 use crate::settings::Settings;
 
+/// A tab's result channel and the lifetime inherited by all of its jobs.
+#[derive(Clone)]
+pub(super) struct JobSender {
+    pub(super) sender: Sender<Msg>,
+    pub(super) cancel: crate::tasks::Cancellation,
+    pub(super) repo: std::path::PathBuf,
+}
+
+impl std::ops::Deref for JobSender {
+    type Target = Sender<Msg>;
+    fn deref(&self) -> &Self::Target {
+        &self.sender
+    }
+}
+
 /// What a background job leaves to do on the UI thread, with the tab (see `RepoTab::then`).
 pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Send>;
 
@@ -132,7 +147,7 @@ pub(super) enum Msg {
 /// panic, [`Msg::JobPanicked`] comes instead: for work the tab waits for (an operation, a
 /// reload…), [`spawn_or`] says what to send then, so that the tab doesn't wait forever.
 pub(super) fn spawn(
-    tx: &Sender<Msg>,
+    tx: &JobSender,
     ctx: &egui::Context,
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
@@ -174,21 +189,88 @@ impl RepoTab {
 /// would have sent had it failed, so that whatever waits for that message (the busy
 /// operation, the loading flag…) is let go of.
 pub(super) fn spawn_or(
-    tx: &Sender<Msg>,
+    tx: &JobSender,
     ctx: &egui::Context,
+    failed: impl FnOnce(String) -> Msg + Send + 'static,
+    job: impl FnOnce() -> Msg + Send + 'static,
+) {
+    spawn_with(
+        tx,
+        ctx,
+        crate::tasks::Priority::Interactive,
+        None,
+        failed,
+        job,
+    );
+}
+
+/// Serializes a whole mutation operation across tabs of the same repository.
+pub(super) fn spawn_mutation(
+    tx: &JobSender,
+    ctx: &egui::Context,
+    failed: impl FnOnce(String) -> Msg + Send + 'static,
+    job: impl FnOnce() -> Msg + Send + 'static,
+) {
+    spawn_with(
+        tx,
+        ctx,
+        crate::tasks::Priority::Background,
+        Some(tx.repo.clone()),
+        failed,
+        job,
+    );
+}
+
+fn spawn_with(
+    tx: &JobSender,
+    ctx: &egui::Context,
+    priority: crate::tasks::Priority,
+    key: Option<std::path::PathBuf>,
     failed: impl FnOnce(String) -> Msg + Send + 'static,
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
     let tx = tx.clone();
     let ctx = ctx.clone();
-    std::thread::spawn(move || {
-        // What the job owned goes with it; a lock it held is left poisoned, which those
-        // taking it handle.
-        let msg = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job))
-            .unwrap_or_else(|payload| failed(panic_text(payload.as_ref())));
-        let _ = tx.send(msg);
-        ctx.request_repaint();
+    let rejected_tx = tx.clone();
+    let rejected_ctx = ctx.clone();
+    let failed = std::sync::Arc::new(std::sync::Mutex::new(Some(failed)));
+    let rejected = std::sync::Arc::clone(&failed);
+    let submitted = crate::tasks::pool().and_then(|pool| {
+        pool.submit(
+            tx.cancel.clone(),
+            priority,
+            key,
+            Box::new(move || {
+                // What the job owned goes with it; a lock it held is left poisoned, which those
+                // taking it handle.
+                let msg = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(job)) {
+                    Ok(msg) => msg,
+                    Err(payload) => {
+                        let Some(failed) = failed
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .take()
+                        else {
+                            return;
+                        };
+                        failed(panic_text(payload.as_ref()))
+                    }
+                };
+                let _ = tx.send(msg);
+                ctx.request_repaint();
+            }),
+        )
+        .map_err(str::to_owned)
     });
+    if let Err(error) = submitted
+        && let Some(failed) = rejected
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    {
+        let _ = rejected_tx.send(failed(error));
+        rejected_ctx.request_repaint();
+    }
 }
 
 /// What a panic said, as an error to show.
@@ -216,6 +298,9 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
+        if let Some(poller) = &mut self.poller {
+            poller.tick(ctx);
+        }
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {

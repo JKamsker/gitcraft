@@ -26,7 +26,11 @@ pub struct Link {
 }
 
 #[cfg(windows)]
+mod process_job;
+#[cfg(windows)]
 mod windows_shell;
+#[cfg(windows)]
+pub use process_job::supervise_suspended_process;
 
 /// Sets the progress the taskbar button of the window `hwnd` (its `HWND`, as a number) shows.
 /// From the window's own thread.

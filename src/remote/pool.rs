@@ -131,8 +131,12 @@ impl Pool {
     /// connected, one connection is made at a time and serves all who wait for it.
     pub(super) fn take(&self, host: &Host, lane: Lane) -> Result<Taken<'_>, String> {
         let since = Instant::now();
+        let cancel = crate::tasks::cancellation();
         let mut state = lock(&self.state);
         loop {
+            if cancel.is_cancelled() {
+                return Err("cancelled".into());
+            }
             if let Some(mut shell) = state.idle.pop() {
                 drop(state);
                 if shell.usable() {
@@ -181,7 +185,7 @@ impl Pool {
             }
             state = self
                 .freed
-                .wait_timeout(state, left)
+                .wait_timeout(state, left.min(Duration::from_millis(50)))
                 .map(|(state, _)| state)
                 .unwrap_or_else(|e| e.into_inner().0);
         }
@@ -299,4 +303,19 @@ pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
         Mutex::default()
     });
     Arc::clone(lock(pools).entry((host.clone(), lane)).or_default())
+}
+
+/// Close idle persistent shells at app exit; active jobs own and close their shells once
+/// their cancelled protocol read returns. The transport reuse policy is unchanged.
+pub(crate) fn shutdown() {
+    if let Some(pools) = POOLS.get() {
+        let all: Vec<_> = lock(pools).values().cloned().collect();
+        for pool in all {
+            let idle = std::mem::take(&mut lock(&pool.state).idle);
+            for shell in idle {
+                drop(shell);
+                pool.close_one();
+            }
+        }
+    }
 }

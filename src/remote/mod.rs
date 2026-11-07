@@ -9,6 +9,7 @@
 //!   `user@host`, `user@host:port`. `ssh://<host>/~/repo` is under the remote home.
 
 pub mod askpass;
+pub(crate) use pool::shutdown;
 mod discover;
 mod fs;
 mod pool;
@@ -27,7 +28,10 @@ pub use fs::{
 };
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
-pub use session::{LONG_FOR as NETWORK_LIMIT, stop_now, stop_script};
+#[cfg(test)]
+pub use session::stop_script;
+pub(crate) use session::streaming_command;
+pub use session::{LONG_FOR as NETWORK_LIMIT, stop_now};
 pub use session::{
     Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop, stop_process,
 };

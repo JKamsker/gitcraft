@@ -135,7 +135,10 @@ impl Shell {
                 }
                 Err(ReadError::Closed) => return Err(lost(&"the connection closed")),
                 // The user is being asked something (a password): their time, not the network's.
-                Err(ReadError::TimedOut) if super::askpass::asked_lately(CONNECT_FOR) => {
+                Err(ReadError::TimedOut)
+                    if !crate::tasks::cancellation().is_cancelled()
+                        && super::askpass::asked_lately(CONNECT_FOR) =>
+                {
                     deadline = Instant::now() + CONNECT_FOR;
                 }
                 Err(ReadError::TimedOut) => return Err(lost(&"it didn't answer in time")),
@@ -239,14 +242,24 @@ impl Shell {
 
     /// More of the output, by `deadline` if there is one.
     fn more(&mut self, deadline: Option<Instant>) -> Result<(), ReadError> {
-        let chunk = match deadline {
-            None => self.chunks.recv().map_err(|_| ReadError::Closed)?,
-            Some(at) => {
-                let left = at.saturating_duration_since(Instant::now());
-                self.chunks.recv_timeout(left).map_err(|e| match e {
-                    RecvTimeoutError::Timeout => ReadError::TimedOut,
-                    RecvTimeoutError::Disconnected => ReadError::Closed,
-                })?
+        let cancel = crate::tasks::cancellation();
+        let chunk = loop {
+            if cancel.is_cancelled() {
+                return Err(ReadError::TimedOut);
+            }
+            let left = deadline.map_or(Duration::from_millis(50), |at| {
+                at.saturating_duration_since(Instant::now())
+                    .min(Duration::from_millis(50))
+            });
+            match self.chunks.recv_timeout(left) {
+                Ok(chunk) => break chunk,
+                Err(RecvTimeoutError::Disconnected) => return Err(ReadError::Closed),
+                Err(RecvTimeoutError::Timeout)
+                    if deadline.is_some_and(|at| Instant::now() >= at) =>
+                {
+                    return Err(ReadError::TimedOut);
+                }
+                Err(RecvTimeoutError::Timeout) => {}
             }
         };
         self.pending.extend_from_slice(&chunk);

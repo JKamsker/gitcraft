@@ -154,12 +154,17 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
             trace.path().to_string_lossy().into_owned(),
         ));
     }
-    let mut cmd = local_command(dir, &extra, args);
-    let out = match &extra.stdin {
-        Some(input) => output_with_input(cmd, input),
-        None => cmd.output(),
-    }
-    .map_err(|e| format!("could not run git: {e}"))?;
+    let cmd = local_command(dir, &extra, args);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            input: extra.stdin.clone(),
+            background: extra.long || extra.tool || extra.test.is_some() || goes_over_network(args),
+            timeout: extra.timeout,
+            ..Default::default()
+        },
+    )?
+    .complete()?;
     super::doctor::hook_log::record(dir, args, out.status.success(), &out.stderr);
     let failed = !out.status.success();
     Ok(Ran {
@@ -172,7 +177,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 }
 
 /// git with `args` in `dir` on this machine, `extra` before them.
-fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
+pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
@@ -184,28 +189,6 @@ fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     }
     cmd.args(args);
     cmd
-}
-
-/// Runs `cmd` with `input` on its input, written from a thread of its own: git may answer
-/// before it has read all of it, and a full pipe both ways would wait for good.
-fn output_with_input(mut cmd: Command, input: &[u8]) -> std::io::Result<std::process::Output> {
-    use std::io::Write;
-    use std::process::Stdio;
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn()?;
-    let stdin = child.stdin.take();
-    let input = input.to_vec();
-    let writer = std::thread::spawn(move || {
-        if let Some(mut stdin) = stdin {
-            // Git that stopped reading (it failed) says why on its error output.
-            let _ = stdin.write_all(&input);
-        }
-    });
-    let out = child.wait_with_output();
-    let _ = writer.join();
-    out
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -437,36 +420,14 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
 
 /// Runs git here in `dir` with `input` on its standard input.
 fn run_here_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Ran, String> {
-    use std::io::Write;
-    use std::process::Stdio;
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| format!("could not run git: {e}"))?;
-    // Written from a thread of its own: git may fill its output before it has read it all.
-    let writer = child.stdin.take().map(|mut stdin| {
-        let input = input.to_vec();
-        std::thread::spawn(move || stdin.write_all(&input))
-    });
-    let out = child
-        .wait_with_output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    // Git stopping before it read it all (a broken pipe) says what it has to say itself.
-    if let Some(Ok(Err(e))) = writer.map(std::thread::JoinHandle::join)
-        && e.kind() != std::io::ErrorKind::BrokenPipe
-    {
-        return Err(format!("could not pass git its input: {e}"));
-    }
-    Ok(Ran {
-        code: out.status.code(),
-        status: out.status.to_string(),
-        stdout: out.stdout,
-        stderr: out.stderr,
-        failed_hook: None,
-    })
+    execute(
+        Some(dir),
+        &Extra {
+            stdin: Some(input.to_vec()),
+            ..Extra::default()
+        },
+        args,
+    )
 }
 
 /// [`run`] with variables of its own on top of what every call gets (`GIT_INDEX_FILE` for a

@@ -2,17 +2,11 @@
 //! its own (`prepare-commit-msg`), or a filter a message goes through (`interpret-trailers`).
 //! Here or on the repository's machine, as every other call.
 
-use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Child, Stdio};
-use std::sync::mpsc::Receiver;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::command::{Extra, git_cmd, remote_request, with_profile};
 use crate::remote;
-
-/// How often a call running here is looked at while it is waited for.
-const POLL: Duration = Duration::from_millis(15);
 
 /// Runs git with `args` in `dir`, `input` on its standard input, and stops it (with what it
 /// started) once `limit` has passed. Returns stdout, or what went wrong in words.
@@ -77,91 +71,31 @@ fn run_here(
     let mut cmd = git_cmd();
     with_profile(&mut cmd, args);
     cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(if input.is_some() {
-        Stdio::piped()
-    } else {
-        Stdio::null()
-    })
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped());
-    // Its own process group, so that what a hook started is stopped along with it.
-    #[cfg(unix)]
-    std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
-    let mut child = cmd.spawn().map_err(|e| format!("could not run git: {e}"))?;
-    if let (Some(mut stdin), Some(input)) = (child.stdin.take(), input) {
-        let input = input.to_vec();
-        // On a thread: a big input would otherwise wait on a full pipe nobody reads yet.
-        std::thread::spawn(move || {
-            let _ = stdin.write_all(&input);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            input: input.map(<[u8]>::to_vec),
+            timeout: Some(limit),
+            drain_for: Duration::from_millis(500),
+            ..Default::default()
+        },
+    )?;
+    if let Some(reason) = out.stopped
+        && !reason.contains("kept its output open")
+    {
+        return Err(if reason.contains("timed out") {
+            stopped(what, limit)
+        } else {
+            reason
         });
     }
-    let stdout = drain(child.stdout.take());
-    let stderr = drain(child.stderr.take());
-    let deadline = Instant::now() + limit;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() >= deadline => {
-                stop(&mut child);
-                return Err(stopped(what, limit));
-            }
-            Ok(None) => std::thread::sleep(POLL),
-            Err(e) => return Err(format!("could not wait for git: {e}")),
-        }
-    };
-    // Something git (a hook) left running in the background may hold the pipes open: what
-    // they said is waited for until the limit only (and a moment more), not until it ends.
-    let until = deadline.max(Instant::now() + GRACE);
-    let collect = |rx: Receiver<Vec<u8>>| {
-        rx.recv_timeout(until.saturating_duration_since(Instant::now()))
-            .unwrap_or_default()
-    };
-    Ok((status.code(), collect(stdout), collect(stderr)))
-}
-
-/// How long the output of a call that ended is still waited for, past its limit.
-const GRACE: Duration = Duration::from_millis(500);
-
-/// Reads all of `pipe` on a thread of its own, and sends it once it is closed.
-fn drain(pipe: Option<impl Read + Send + 'static>) -> Receiver<Vec<u8>> {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut out = Vec::new();
-        if let Some(mut pipe) = pipe {
-            let _ = pipe.read_to_end(&mut out);
-        }
-        let _ = tx.send(out);
-    });
-    rx
-}
-
-/// Stops `child` and everything it started: its process group on Unix, its process tree on
-/// Windows.
-fn stop(child: &mut Child) {
-    let pid = child.id().to_string();
-    #[cfg(unix)]
-    let _ = std::process::Command::new("kill")
-        .args(["-KILL", "--", &format!("-{pid}")])
-        .stderr(Stdio::null())
-        .status();
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let _ = std::process::Command::new("taskkill")
-            .args(["/T", "/F", "/PID", &pid])
-            .creation_flags(CREATE_NO_WINDOW)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
-    let _ = child.kill();
-    let _ = child.wait();
+    Ok((out.status.code(), out.stdout, out.stderr))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     fn scratch(name: &str) -> std::path::PathBuf {
         let dir =

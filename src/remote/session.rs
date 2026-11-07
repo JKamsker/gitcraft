@@ -268,6 +268,31 @@ pub fn stop_script(pid: u32) -> String {
     )
 }
 
+/// Prepared standalone stream for the shared asynchronous process service. Persistent
+/// shells and their protocol are deliberately unchanged.
+pub(crate) struct Streaming {
+    pub command: Command,
+    pub input: Vec<u8>,
+    pub ready: &'static str,
+    pub connected: Option<Box<dyn FnOnce() + Send>>,
+}
+
+pub(crate) fn streaming_command(host: &Host, req: &Request) -> Result<Streaming, String> {
+    super::ui_guard::off_ui_thread(&req.what())?;
+    let (command, attempt) = shell_command(host);
+    let input = format!(
+        "{MORE_PATH}\nprintf '\\n%s\\n' {READY}\n{}\n",
+        inline(req, "</dev/null")
+    )
+    .into_bytes();
+    Ok(Streaming {
+        command,
+        input,
+        ready: READY,
+        connected: attempt.map(|a| Box::new(move || a.connected()) as Box<dyn FnOnce() + Send>),
+    })
+}
+
 /// Starts `req` on `host` in a process of its own, whose output the caller reads as it comes
 /// (a long `git log`): from the command's first byte on, what a login printed skipped.
 pub fn spawn(host: &Host, req: &Request) -> Result<Child, String> {

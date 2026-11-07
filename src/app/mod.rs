@@ -949,6 +949,9 @@ fn on_path(name: &str) -> bool {
 /// Once the window closed: lets the next start be the running instance, then starts the
 /// version an update put in place, if it did.
 pub fn after_exit() {
+    crate::tasks::shutdown();
+    crate::processes::shutdown();
+    crate::remote::shutdown();
     crate::instance::shut_down();
     update::relaunch();
 }

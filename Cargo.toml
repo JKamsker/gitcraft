@@ -48,7 +48,7 @@ flate2 = "1"
 vt100 = "0.18"
 # `gitcraft mcp`: the Model Context Protocol over stdio (the official SDK), on a small runtime.
 rmcp = { version = "3.7", default-features = false, features = ["server", "transport-io"] }
-tokio = { version = "1", features = ["rt", "io-std"] }
+tokio = { version = "1", features = ["rt", "io-std", "process", "io-util", "sync", "time", "macros"] }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
