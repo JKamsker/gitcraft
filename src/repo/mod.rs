@@ -15,6 +15,8 @@ mod conflict;
 mod detail;
 mod dialogs;
 mod diff;
+mod drafts;
+mod file_comparison;
 mod file_text;
 mod file_view;
 mod gerrit;
@@ -47,6 +49,7 @@ mod terminals;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod tour;
 mod watch;
 mod watch_remote;
 pub(crate) mod widgets;
@@ -119,6 +122,7 @@ pub struct RepoTab {
     refs: Refs,
     partial_clone: bool,
     sparse_requests: u64,
+    drafts: drafts::State,
     history_requests: u64,
     history_download_allowed: bool,
     /// Commits as git listed them.
@@ -169,10 +173,12 @@ pub struct RepoTab {
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     diff: Option<DiffView>,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
     activity: Option<activity::Activity>,
+    tour: Option<tour::TourView>,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     pr_requests: u64,
@@ -304,6 +310,7 @@ impl RepoTab {
             refs: Refs::default(),
             partial_clone: false,
             sparse_requests: 0,
+            drafts: Default::default(),
             history_requests: 0,
             history_download_allowed: false,
             history: Vec::new(),
@@ -344,9 +351,11 @@ impl RepoTab {
             detail: None,
             detail_error: None,
             diff: None,
+            file_comparison: None,
             compare: None,
             pr_view: None,
             activity: None,
+            tour: None,
             ci_view: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),

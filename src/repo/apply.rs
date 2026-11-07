@@ -41,7 +41,35 @@ impl RepoTab {
         if self.check_history_download(&action, ctx) {
             return;
         }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.file_comparison = None;
+        }
         match action {
+            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
+            Action::RefreshFileComparison => self.load_file_comparison(ctx),
+            Action::CloseFileComparison => self.file_comparison = None,
+            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
+            Action::ComparisonCell {
+                request,
+                path,
+                column,
+            } => self.comparison_cell(request, path, column, ctx),
+            Action::ComparisonPick {
+                request,
+                boundary,
+                lines,
+                whole,
+            } => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::OpenTour => self.open_tour(false, ctx),
+            Action::CloseTour => self.tour = None,
             Action::Keyboard(request) => self.apply_keyboard(request, ctx),
             Action::OpenActivity(page) => self.open_activity(page, ctx),
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
@@ -111,7 +139,10 @@ impl RepoTab {
             Action::Checkout(name) => self.checkout(&name, ctx),
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
-            Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::Dialog(dialog) => {
+                self.cancel_draft_reads();
+                self.dialog = Some(dialog);
+            }
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {
@@ -133,6 +164,12 @@ impl RepoTab {
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
             Action::Reload => self.reload(ctx),
             Action::OpenSparse => self.open_sparse(ctx),
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_drafts(on, ctx),
+            Action::DraftSnapshot => self.snapshot_draft(ctx),
+            Action::DraftPreview { id, path, index } => self.preview_draft(id, path, index, ctx),
+            Action::DraftRecover { preview, hunks } => self.recover_draft(*preview, hunks, ctx),
+            Action::DraftUndo => self.undo_draft(ctx),
             Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),
@@ -231,17 +268,22 @@ impl RepoTab {
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStep(delta) => {
                 let rendered = self.diff_rendered
                     && self
                         .diff
                         .as_ref()
                         .is_some_and(|v| diff::rendered::is_markdown(v.key.path()));
-                if let Some(view) = self
-                    .diff
-                    .as_mut()
-                    .filter(|v| !self.diff_as_file && !rendered && !v.structural.enabled)
-                {
+                if let Some(view) = self.diff.as_mut().filter(|v| {
+                    !self.diff_as_file && !rendered && !v.structural.enabled && !v.encrypted.enabled
+                }) {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }
@@ -417,7 +459,7 @@ impl RepoTab {
         let (DiffKey::Work(file), Some(Ok(data))) = (&view.key, &view.data) else {
             return None;
         };
-        if view.request != view.data_request || !data.partial {
+        if view.request != view.data_request || !data.partial || view.encrypted.enabled {
             return None;
         }
         let patch = diff::partial_patch(&data.header, &data.lines, lines, pick)?;
@@ -462,6 +504,7 @@ impl RepoTab {
             view.key == prepared.key
                 && view.request == prepared.request
                 && view.data_request == view.request
+                && !view.encrypted.enabled
         });
         if self.path != prepared.path
             || self.work_read != prepared.read

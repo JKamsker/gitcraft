@@ -61,6 +61,95 @@ fn refs(repo: &Path) -> Result<String, String> {
 }
 
 #[test]
+fn windows_bundle_arguments_preserve_drive_unc_unicode_and_long_paths() -> Result<(), String> {
+    for (native, expected) in [
+        (
+            r"\\?\C:\Users\a 'ü\exchange.bundle",
+            "C:/Users/a 'ü/exchange.bundle",
+        ),
+        (
+            r"\\?\UNC\Server\Share\目录\exchange.bundle",
+            "//Server/Share/目录/exchange.bundle",
+        ),
+        (
+            r"\\?\unc\Server\Share\link\..\exchange.bundle",
+            "//Server/Share/link/../exchange.bundle",
+        ),
+        (
+            r"\\Server\Share\exchange.bundle",
+            "//Server/Share/exchange.bundle",
+        ),
+        (r"C:\Users\a\exchange.bundle", "C:/Users/a/exchange.bundle"),
+        (
+            "//?/C:/Users/a/exchange.bundle",
+            "C:/Users/a/exchange.bundle",
+        ),
+    ] {
+        assert_eq!(windows_bundle_path(native)?, expected);
+    }
+    let tail = format!("{}exchange.bundle", "deep ü/".repeat(80));
+    assert_eq!(
+        windows_bundle_path(&format!("\\\\?\\C:\\{tail}"))?,
+        format!("C:/{tail}")
+    );
+    assert_eq!(
+        windows_bundle_path(&format!("\\\\?\\UNC\\Server\\Share\\{tail}"))?,
+        format!("//Server/Share/{tail}")
+    );
+    for unsupported in [
+        r"\\?\Volume{fixture}\file",
+        r"\\.\PhysicalDrive0",
+        r"\\?\UNC\server",
+    ] {
+        assert!(windows_bundle_path(unsupported).is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn native_long_bundle_paths_verify_exact_bytes_and_cleanup_without_changing_config()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    let source = f.repo("source")?;
+    f.commit(&source, "long-path fixture")?;
+    let selected = vec![head(&source)?];
+    let bytes = export_bundle(&source, &selected, None)?;
+    let dest = f.repo("dest")?;
+    let config_before = std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?;
+    let folder = if cfg!(windows) {
+        "scratch ü ' $() &"
+    } else {
+        "scratch ü ' $() & \\?\\C:literal"
+    };
+    let mut root = f.0.join(folder);
+    for _ in 0..7 {
+        root.push("a long directory component with spaces and ü");
+    }
+    std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+    let root = std::fs::canonicalize(root).map_err(|e| e.to_string())?;
+    let temp = BundleFile::local(&root, &bytes)?;
+    let native = temp
+        .local_dir
+        .as_ref()
+        .ok_or("No native scratch directory")?;
+    let native = native.join("exchange.bundle");
+    assert!(native.as_os_str().len() > 260);
+    assert_eq!(std::fs::read(&native).map_err(|e| e.to_string())?, bytes);
+    assert!(!temp.path.starts_with("//?/"));
+    verify(&dest, &temp.path, &selected)?;
+    assert!(refs(&dest)?.is_empty());
+    assert_eq!(
+        std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?,
+        config_before
+    );
+    let private = temp.local_dir.clone().ok_or("No native cleanup path")?;
+    drop(temp);
+    assert!(!private.exists());
+    assert!(root.is_dir());
+    Ok(())
+}
+
+#[test]
 fn full_bundle_preview_is_read_only_and_import_creates_refs_without_checkout() -> Result<(), String>
 {
     let f = Fixture::new()?;

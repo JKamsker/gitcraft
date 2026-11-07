@@ -1,0 +1,15 @@
+{
+  "status": "PRESERVED MERGE; NOT COMPILED/TESTED",
+  "preflight_parent": "913d91fd6004f5d083d4835eff0b53946d781e09",
+  "green_integration_parent": "d18210503b376c77e76c6e4825e24b182b1f7eeb",
+  "integration_evidence": "localgreen19features891pass3ignored; /workspace/work/integration-state.json",
+  "conflicts": {
+    "src/git/command.rs": "Preserved full originalpinnedpush/execute_preflight functions plusfullreviewedDrafts draft_bytes; autosmerged ForecastCompletion/setup APIs retained",
+    "src/repo/dialogs/mod.rs": "Keep bothPush andDrafts enumvariants/renderarms",
+    "src/repo/operations.rs": "KeepPushpreflight intercept, then reviewedSOPS discard_decrypted beforeactualoperation; Draftscancel retained",
+    "src/settings/profiles.rs": "Preserve author_hosts and pending_setup fields/defaults, keepHostAuthor plus allPortabilityvalidation"
+  },
+  "transaction_rs_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65",
+  "transaction_binding": "Entire transaction.rs byte-identicalSTATICffc2851 includingtests. All21localproductionPASS remainapplicabletoitsprivatepayload; broadermergedhelper/featuregatespending",
+  "ci": "NoCIuse; acceptedintegrationremovespushtrigger; preservealljobs/permissions"
+}

@@ -100,6 +100,28 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   there, nor do a profile's author and signing: that machine's own git config does (the commit
   box says `· global (SSH · host)`).
 
+**Working drafts (opt in)**
+
+**Earlier versions…** in the Changes pane, the uncommitted-row menu or the palette enables
+repository-local working drafts. They save after 15 seconds of quiet and before operations
+that move the checkout, including checkout and rebase. Saved index contents and working bytes
+stay separate; no WIP commits appear in history. Choose a version, preview a file from either
+layer, then recover selected hunks. Recovery preserves the real index and other working edits,
+and first saves a safety version; **Undo last recovery…** previews that safety version.
+Closing or replacing a read cancels it; a replacement waits for the previous read to stop.
+
+Drafts include tracked changes and nonignored untracked regular files. Ignored files and
+submodule contents are excluded; changed links, special files and conflicted indexes require
+a manual backup. Staged versions contain raw Git blobs, including LFS pointers. Recovery does
+not run filters, signing tools or network helpers, and does not convert line endings.
+
+Draft trees are protected from Git garbage collection under local `refs/gitcraft/drafts/…`.
+Normal pushes skip them; mirror pushes and manual all-ref exports can include them. Keep up
+to 50 versions for 14 days. Limits are 8 MiB per file, 32 MiB of changed content, 2000 changed
+paths and 20000 index entries. Git must support `--no-lazy-fetch`; an unavailable safety
+snapshot stops a checkout-moving operation until the problem is resolved or drafts are
+disabled. Snapshots and recovery run on the repository's machine, including SSH and WSL.
+
 **Graph**
 
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.
@@ -250,6 +272,30 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   mode: turn off Syntax to stage changes or see formatting edits. Unsupported languages, parse
   errors, a missing tool or a comparison over its limits show the patch with an explanation.
   Difftastic runs where the repository is (locally, in WSL or over SSH), off the window thread.
+- SOPS-encrypted files offer **Show decrypted**. SOPS 3.10 or later runs locally on this
+  computer with its local keys, comparing the exact Git/index/working-tree sides. For SSH/WSL
+  repositories only ciphertext is fetched through the existing Git transport; decryption
+  never runs on the repository host. The view
+  distinguishes plaintext content changes from recipient/wrapped-key and other encryption
+  metadata changes, including re-encryption with unchanged content. JSON, YAML, dotenv and
+  INI are recognized; binary envelopes can be compared only when their decrypted bytes are
+  UTF-8 text. A JSON envelope with only `data` and `sops` could encode either a JSON document
+  or binary content: choose **JSON document** or **Binary envelope** explicitly for both
+  compared sides, then retry. Filenames, including across renames, never decide this case.
+  Detection refuses the ambiguous envelope before running SOPS. YAML aliases/anchors and
+  oversized or malformed documents fall back with a note.
+  - Decryption is explicit and read only. Return to **Encrypted patch / cancel** to stage;
+    staging always uses the encrypted patch, with Git text conversion disabled.
+  - Plaintext is kept in the active view and process pipes, never written to temporary files,
+    settings, logs, activity or shared diff/text-layout caches. Copying and review comments
+    are unavailable in this mode. Closing, refreshing, changing modes, starting an operation
+    or leaving the tab discards the view and cancels its job; stale answers are dropped.
+  - Each input/output side is limited to 2 MiB of UTF-8 text, 20,000 lines and 8,192 characters
+    per line; each decrypt command has a 20-second deadline. Missing tools/keys, malformed
+    documents and limit failures retain the encrypted patch. Raw tool diagnostics are hidden
+    because they can contain secrets. No keys or global SOPS configuration are changed.
+    Local key-file environment overrides should use absolute paths; the tool runs from a
+    neutral local working directory.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

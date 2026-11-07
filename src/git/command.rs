@@ -3,6 +3,11 @@
 //! environment.
 
 pub(super) mod bounded;
+mod setup;
+pub(crate) use setup::setup_clone;
+
+mod completion;
+pub(crate) use completion::{ForecastCompletion, forecast_spawn};
 
 use std::path::Path;
 use std::process::Command;
@@ -329,7 +334,7 @@ pub(crate) fn forecast_remote(
     request.long = true;
     let host = host.clone();
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
+    forecast_spawn(move || {
         let _ = tx.send(remote::exec(&host, &request));
     });
     let deadline = Instant::now() + LIMIT;
@@ -531,6 +536,89 @@ fn execute_preflight(dir: &Path, extra: &Extra, words: &[&str]) -> Result<Ran, S
             stdout: out.stdout,
             stderr: out.stderr,
         })
+    }
+}
+
+/// Draft plumbing: source index/directory overrides cannot escape the selected repository.
+/// The caller supplies explicit no-lazy-fetch and an isolated config for worktree reads.
+pub(crate) fn draft_bytes(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    input: Vec<u8>,
+    ok: &[i32],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    const REMOVE: &[&str] = &[
+        "GIT_DIR",
+        "GIT_COMMON_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ATTR_SOURCE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
+    ];
+    if !active() {
+        return Err("Draft cancelled".into());
+    }
+    let out = if let Some(target) = remote::parse(dir) {
+        let extra = Extra {
+            pre: Vec::new(),
+            env: env.to_vec(),
+        };
+        let mut request = remote_request(&target, &extra, args);
+        request.unset.extend(REMOVE.iter().map(|s| (*s).to_owned()));
+        request.stdin = Some(input);
+        let git = request.script;
+        request.script = format!(
+            "umask 077\nd=$(mktemp -d) || exit 1\ntrap 'rm -rf \"$d\"' 0\ntrap 'exit 1' HUP INT TERM PIPE\n(ulimit -f 65536 || exit 1; {git}) >\"$d/out\" 2>\"$d/err\"\nr=$?\nhead -c 65536 \"$d/err\" >&2\n[ \"$(wc -c <\"$d/out\")\" -le 33554432 ] || {{ echo 'Draft output too large' >&2; exit 125; }}\ncat \"$d/out\"\nexit \"$r\""
+        );
+        forecast_remote(&target.host, request, active)?
+    } else {
+        let mut command = repository_command(Some(dir), args)?;
+        command.args(args);
+        for name in REMOVE {
+            command.env_remove(name);
+        }
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let out = crate::bounded_process::run_input(
+            command,
+            Some(input),
+            active,
+            std::time::Duration::from_secs(15),
+            32 * 1024 * 1024,
+            64 * 1024,
+        )?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    // Ignore-rule/read errors can be warnings with exit zero. Do not mistake an
+    // incomplete exclusion/index read for a safe snapshot. Init alone emits hints.
+    if ok.contains(&out.code)
+        && (out.stderr.is_empty() || after_options(args).first() == Some(&"init"))
+    {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Draft Git failed ({}): {}",
+            out.code,
+            String::from_utf8_lossy(&out.stderr[..out.stderr.len().min(65536)]).trim()
+        ))
     }
 }
 
@@ -883,6 +971,79 @@ pub(crate) fn activity_bytes(
     activity_bytes_with_limit(dir, args, input, active, std::time::Duration::from_secs(20))
 }
 
+/// Allowlisted public onboarding metadata; no raw configuration snapshots are exposed.
+pub(crate) fn onboarding_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    activity_mailmap_config(dir, key, false, active)
+}
+
+/// Only allowlisted local author fields are included in setup exports.
+pub(crate) fn onboarding_local_config(
+    dir: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    let bytes = activity_bytes_with_codes(
+        dir,
+        &["config", "--local", "--null", "--get", key],
+        None,
+        active,
+        std::time::Duration::from_secs(20),
+        &[0, 1],
+    )?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let bytes = bytes
+        .strip_suffix(&[0])
+        .ok_or("Invalid local identity response")?;
+    String::from_utf8(bytes.to_vec())
+        .map(Some)
+        .map_err(|_| "Local identity is not UTF-8".into())
+}
+/// Checkout/worktree/config steps never read profile/system command configuration or
+/// inherited Git routing. Only newly created, receipt-verified clones reach this helper.
+pub(crate) fn setup_run(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    if crate::remote::is_remote(repo) {
+        return Err("Setup restoration targets local folders only".into());
+    }
+    let mut cmd = practice_command(repo);
+    cmd.args([
+        "--no-lazy-fetch",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        "protocol.file.allow=never",
+    ])
+    .args(args);
+    let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(120))?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(format!(
+            "Setup step failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -1155,6 +1316,84 @@ mod practice_tests {
                 Some(std::ffi::OsStr::new(value)),
                 "{name}"
             );
+        }
+    }
+}
+
+/// Snapshot readers share the practice-aware builder and the reviewed bounded process guard.
+pub(super) fn comparison_output(
+    repo: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    const MAX: usize = 8 * 1024 * 1024;
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    // Attributes may themselves live in promised blobs. Enforce this on every
+    // raw-view command, including metadata/config reads and alternate-index writes,
+    // rather than relying on individual callers to remember the global option.
+    let guarded_args: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    let args = guarded_args.as_slice();
+    let out = if let Some(target) = remote::parse(repo) {
+        let mut request = bounded::request(&target, args, Vec::new(), MAX);
+        request
+            .env
+            .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
+        comparison_remote(&target.host, request, active)?
+    } else {
+        let mut cmd = repository_command(Some(repo), args)?;
+        cmd.args(args);
+        for (key, value) in env {
+            cmd.env(key, value);
+        }
+        let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(20))
+            .map_err(|e| {
+                e.replace("Forecast", "Comparison")
+                    .replace("forecast", "comparison")
+            })?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if out.stdout.len() > MAX || out.stderr.len() > 64 * 1024 {
+        return Err(
+            "Comparison output exceeds 8 MiB (64 KiB for errors); choose fewer files".into(),
+        );
+    }
+    Ok(out)
+}
+
+pub(super) fn comparison_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    use std::time::{Duration, Instant};
+    request.timeout = Some(Duration::from_secs(20));
+    request.long = true;
+    let host = host.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    crate::connections::spawn(move || {
+        let _ = tx.send(remote::exec(&host, &request));
+    });
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if !active() {
+            return Err("Comparison cancelled".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("Comparison timed out".into());
+        }
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(result) => return result,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (),
+            Err(_) => return Err("Comparison worker stopped".into()),
         }
     }
 }

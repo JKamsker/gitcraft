@@ -38,6 +38,26 @@ impl Day {
             .and_then(Self::parse)
             .ok_or_else(|| "Git returned an unsupported calendar date".into())
     }
+    pub fn from_unix_days(days: i64) -> Option<Self> {
+        let z = days.checked_add(719468)?;
+        let era = z.div_euclid(146097);
+        let doe = z - era * 146097;
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        let year = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let day = doy - (153 * mp + 2) / 5 + 1;
+        let month = mp + if mp < 10 { 3 } else { -9 };
+        let year = year + i64::from(month <= 2);
+        if !(1..=9999).contains(&year) {
+            return None;
+        }
+        Some(Self {
+            year: year as i32,
+            month: month as u32,
+            day: day as u32,
+        })
+    }
     pub fn month_days(self) -> u32 {
         match self.month {
             4 | 6 | 9 | 11 => 30,

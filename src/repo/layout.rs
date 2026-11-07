@@ -14,6 +14,9 @@ impl RepoTab {
         // Shown: its first read can't wait any more.
         self.start_deferred(&ctx);
         self.poll(&ctx);
+        if self.conflict.is_some() || self.rebase.is_some() {
+            self.discard_decrypted();
+        }
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()
@@ -52,7 +55,9 @@ impl RepoTab {
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
                 let pane_rect = ui.max_rect().intersect(ui.clip_rect());
-                if self.conflict.is_some() {
+                if self.file_comparison.is_some() {
+                    self.file_comparison_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
@@ -64,12 +69,16 @@ impl RepoTab {
                     self.ci_view_ui(ui, &mut acts);
                 } else if self.pr_view.is_some() {
                     self.pr_view_ui(ui, &mut acts);
+                } else if self.tour.is_some() {
+                    self.tour_view(ui, &mut acts);
                 } else if self.activity.is_some() {
                     self.activity_view(ui, &mut acts);
                 } else {
                     self.graph_view(ui, &mut acts);
                 }
-                self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
+                if self.file_comparison.is_none() {
+                    self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
+                }
             });
 
         self.dialogs(&ctx, &mut acts);
@@ -130,12 +139,16 @@ impl RepoTab {
                     i.modifiers.command && i.key_pressed(Key::F),
                 )
             });
-            if esc && self.diff.is_some() && self.line_comment_open() {
+            if esc && self.file_comparison.is_some() {
+                acts.push(Action::CloseFileComparison);
+            } else if esc && self.diff.is_some() && self.line_comment_open() {
                 acts.push(Action::Pr(pr_review::PrAct::CloseLine));
             } else if esc && self.diff.is_some() {
                 acts.push(Action::CloseDiff);
             } else if esc && self.rebase.is_some() {
                 acts.push(Action::CloseRebase);
+            } else if esc && self.tour.is_some() {
+                acts.push(Action::CloseTour);
             } else if esc && self.activity.is_some() {
                 acts.push(Action::CloseActivity);
             } else if esc && self.file_view.is_some() {

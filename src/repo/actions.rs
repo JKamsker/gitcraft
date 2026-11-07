@@ -15,9 +15,30 @@ use crate::terminal::ShellSpec;
 pub(crate) enum Action {
     Keyboard(super::keyboard::Request),
     Select(usize),
+    OpenFileComparison(super::file_comparison::Page),
+    RefreshFileComparison,
+    CloseFileComparison,
+    ComparisonMove {
+        request: u64,
+        index: usize,
+    },
+    ComparisonCell {
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+    },
+    ComparisonPick {
+        request: u64,
+        boundary: usize,
+        lines: std::collections::BTreeSet<usize>,
+        whole: bool,
+    },
+    ComparisonNormalPatch,
     OpenActivity(super::activity::Page),
     ActivityCommit(String),
     CloseActivity,
+    OpenTour,
+    CloseTour,
     SelectHash(String),
     SelectStash(usize),
     OpenDiff(DiffKey),
@@ -71,6 +92,19 @@ pub(crate) enum Action {
     ReloadPreflight(Box<crate::push_preflight::Plan>),
     Reload,
     OpenSparse,
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftPreview {
+        id: git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
+    DraftUndo,
     AllowHistoryDownload(Box<Action>),
     SetSparse {
         before: Box<git::SparseState>,
@@ -131,6 +165,8 @@ pub(crate) enum Action {
     DiffRendered(bool),
     /// Read syntax changes through Difftastic; staging stays in the patch.
     DiffStructural(bool),
+    DiffDecrypted(bool),
+    DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// The commit pane lists every file of the commit, or only those it changed.
@@ -344,6 +380,21 @@ impl RepoTab {
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
             (
+                "File migration map".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Migration),
+            ),
+            (
+                "Three-state staging lens".into(),
+                "staging".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Lens),
+            ),
+            (
+                "File versions across branches".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
+            (
                 "Activity calendar".into(),
                 "history".into(),
                 Action::OpenActivity(super::activity::Page::Calendar),
@@ -371,11 +422,21 @@ impl RepoTab {
                 Action::OpenSparse,
             ),
         ];
+        items.push((
+            "A tour of this repository".into(),
+            "setup and history".into(),
+            Action::OpenTour,
+        ));
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Earlier versions of working changes…".into(),
+                "working drafts".into(),
+                Action::EarlierVersions,
+            ),
             (
                 "Export Git bundle…".into(),
                 "offline backup".into(),

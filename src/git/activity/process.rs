@@ -1,5 +1,5 @@
 use std::path::Path;
-pub(super) fn run(
+pub(crate) fn run(
     repo: &Path,
     args: &[&str],
     input: Option<&[u8]>,

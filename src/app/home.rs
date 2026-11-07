@@ -98,6 +98,14 @@ impl App {
                         self.practice_open = true;
                     }
 
+                    ui.horizontal(|ui| {
+                        if ui.button("Export setup…").clicked() {
+                            self.show_setup(false, ui.ctx());
+                        }
+                        if ui.button("Import setup…").clicked() {
+                            self.show_setup(true, ui.ctx());
+                        }
+                    });
                     if let Some(err) = &self.error {
                         ui.add_space(12.0);
                         ui.colored_label(t.danger, err);
