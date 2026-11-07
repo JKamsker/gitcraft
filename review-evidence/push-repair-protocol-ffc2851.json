@@ -1,0 +1,55 @@
+{
+  "review": "Independent narrow static cold-index comparison correction review",
+  "verdict": "PASS_STATIC_ONLY",
+  "candidate": "ffc2851a9e5077443d0ec9a4f32654886e3435de",
+  "tree": "eb23031168f9ca3875ef76638788137dd8b5eafe",
+  "transaction_rs_sha256": "198e08476c1091d1a452926936d02b5ea4ac5346a7237bd1467ea08aa8df2f65",
+  "scope": "Only narrow delta fromce822185, preserved diagnostic source/log and previous production failure. Ordinary correctness; no tests, Cargo, changed production protocol or CI executed by reviewer.",
+  "findings": [],
+  "static_assessment": [
+    "The only executable production changes replace three fresh private-index diff-files --quiet comparisons with GIT_OPTIONAL_LOCKS=0 git diff --quiet. The explicit GIT_INDEX_FILE, core.fsmonitor=false, core.trustctime=true, core.ignoreStat=false, --no-ext-diff, --no-textconv and --ignore-submodules=none boundaries remain.",
+    "Porcelain diff performs the content-aware refresh needed for stat-unpopulated index entries; optional locks disabled prevents persisting a refreshed index. Each before/after/committed comparison still uses its distinct owned private index rather than the actual source index.",
+    "No native HEAD transaction, exact branch/OID input guard, original-hook relay, raw actual-index/shared-dependency comparison, affected-path check, checkout, ACK, cleanup, profile/Practice routing or remote behavior changes.",
+    "The recording fake Git accepts diff in addition to diff-files, preserving its explicit work-change refusal. Real Gate2 fixture code is unchanged from the reviewed preserved plan.",
+    "Prior ownership/capability/split-index static review conclusions remain bound to unchanged production paths; remote repair remains interim fail-closed."
+  ],
+  "diagnostic_evidence_checked": {
+    "diagnostic_log_sha256": "2fd6882043eeab8c56b3fe517948f2db4059663e1543e81eae936aeb80a92899",
+    "diagnostic_log_hash_match": true,
+    "diagnostic_source": "work/preflight-gate2/cold-index-diagnostic.rs inspected: exact approved bounded_process import, pinned Git, env_clear/private config, GIT_OPTIONAL_LOCKS0, owned copy and dummy same-length change; no new process controller.",
+    "observed_controls": "Original clean and copied clean: plumbing quiet exit1 with empty patch, porcelain quiet exit0. Copied real same-length byte change: both quiet exit1, porcelain patch contains actual change. Original raw index equals saved snapshot and source index/work bytes remain unchanged.",
+    "prior_actual_production": "All23 artifact hashes in production-first-attempt/result.json match. Previous production scratch proof and original relay succeeded, then refusal preceded prepared ACK/checkout; before/after user state identical and evidence retained. This remains a prior-source failed case, not a successful revised repair.",
+    "limit": "Standalone controls establish the command distinction; they do not execute the revised production wrapper or complete Gate2."
+  },
+  "next_recording_gate": {
+    "decision": "Root may authorize source-bound compiler checks and recording repeats after preserved plan. No real protocol until root accepts recording results.",
+    "tests": [
+      "rotated_split_index_dependency_is_resolved_from_the_saved_index",
+      "synthetic_capability_versions_refuse_before_user_dispatch",
+      "missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+      "synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+      "recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes",
+      "recording_pre_hook_identity_guards_prevent_relay_and_checkout"
+    ],
+    "acceptance": "All six selected tests pass on exact compiled source; bad-input/HEAD guard scenarios retain zero original relay/checkout; recording work-change still refuses under diff. Preserve source/binary/log hashes and counts, commit/push/remoteverify before next gate. Compiler/test-only followups require explicit production-source binding; production logic changes require static re-review."
+  },
+  "owned_gate2_replay": {
+    "decision": "After recording PASS and root acceptance, root may authorize all21 existing production-plan cases with a fresh exclusively created root per case. Do not rerun broad default tests or CI at this gate.",
+    "cases": ["files-sha1", "files-sha256", "reftable-sha1", "reftable-sha256", "prelock-switch-head", "prelock-detach-head", "switch-head", "detach-head", "reftable-switch-head", "reftable-detach-head", "held-ref-lock", "veto", "index-change", "work-change", "checkout-failure", "committed-failure", "timeout", "split-index", "old-git", "missing-ack", "full-fix"],
+    "containment": "Same explicit ignored owned-local fixture, env_clear/private HOME/XDG/Git config/TMPDIR, pinned recorded Git2.52.0 and old2.47.3, existing approved bounded runner and exclusively owned locks. No user repositories, keys, credential environment, live hosts, network, new PID selectors/watchdogs/signals or unrelated lock cleanup. Preserve fixture/compiler/test plan before execution.",
+    "required_results": [
+      "All four backend/object-format actual production repairs succeed with expected symbolic HEAD/ref/index/work state and exact nonempty ACKs; original hook args/stdin/config preserved.",
+      "Pre-lock wrong target/detach and prepared-hook attempted switch/detach refuse with correct backend lock/guard evidence, preserve external state and prevent unintended checkout/relay.",
+      "Held lock/veto/index/work mutation and missing ACK refuse; changed working bytes remain detected by the porcelain private-index command. Exact before/after raw index/shared/work bytes and modes are recorded.",
+      "Split-index rotation uses the saved immutable index's correct dependency; failure/timeout retain actionable coherent evidence and later edits, with actual ref outcome reported accurately.",
+      "Old Git safe refusal and full production scan/fix success are demonstrated, rather than inferred from command-level or refs-only diagnostics."
+    ],
+    "preservation": "Commit/push/remoteverify each completed validation unit and report exact source/binary/log hashes. A first failure stops broader claims and returns to diagnosis/review; root owns any followup release."
+  },
+  "limits": [
+    "Static PASS permits the next reviewed validation sequence; no successful revised-production runtime result, independent compile or feature PASS is claimed.",
+    "State JSON contains legacy old head/gate fields; immutable Git candidate/tree and checked source SHA above are the binding for this review.",
+    "Remote completion-aware mutation/outcome support remains OPEN and is not solved by counters/markers. Existing remote refusal remains an interim scope restriction.",
+    "Full feature, auth retry/deletion journal/default-port and final combined local/adversarial gates remain separate. CI remains deferred by user instruction. No PR."
+  ]
+}
