@@ -4,6 +4,10 @@ use egui::{Color32, FontId, Pos2, Rect, Stroke, pos2, vec2};
 use std::collections::HashMap;
 use std::io::Cursor;
 const WIDTH: usize = 1280;
+// Row count alone does not bound lanes: even one merge can name parents
+// outside the selected range. Together with the 200-row limit this caps
+// the linear lane scans in graph::layout and the edges painted below.
+const MAX_PARENT_EDGES: usize = 1024;
 const PITCH: f32 = 27.0;
 const BG: Color32 = Color32::from_rgb(21, 27, 39);
 const TEXT: Color32 = Color32::from_rgb(239, 242, 249);
@@ -26,7 +30,7 @@ pub(super) fn render(
     if !active() {
         return Err("Postcard rendering cancelled".into());
     }
-    let graph = crate::graph::layout(&snapshot.commits);
+    let graph = bounded_graph(&snapshot.commits, MAX_PARENT_EDGES, active)?;
     let (graph_width, spacing) = graph_geometry(graph.width);
     let contributors = snapshot.contributors.join(" · ");
     let footer_lines = contributors.chars().count().div_ceil(70).max(1);
@@ -212,6 +216,32 @@ pub(super) fn render(
     }
     Ok((image, png.into_inner()))
 }
+
+fn bounded_graph(
+    commits: &[crate::git::Commit],
+    edge_limit: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<crate::graph::Graph, String> {
+    if commits.len() > crate::git::postcards::LIMIT {
+        return Err("Invalid postcard size".into());
+    }
+    let mut remaining = edge_limit;
+    for commit in commits {
+        if !active() {
+            return Err("Postcard rendering cancelled".into());
+        }
+        remaining = remaining.checked_sub(commit.parents.len()).ok_or_else(|| {
+            format!("Postcard graph exceeds {edge_limit} parent edges; choose a range with fewer merge parents")
+        })?;
+    }
+    // At most rows + edges lanes can be opened. Layout's non-interruptible
+    // section is therefore bounded even when none of the parents is a row.
+    let graph = crate::graph::layout(commits);
+    if !active() {
+        return Err("Postcard rendering cancelled".into());
+    }
+    Ok(graph)
+}
 fn graph_geometry(lanes: usize) -> (f32, f32) {
     let columns = lanes.saturating_sub(1).max(1) as f32;
     let spacing = 13.0f32.min(500.0 / columns);
@@ -310,6 +340,41 @@ fn raster(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn graph_budget_counts_excluded_and_repeated_parents_across_rows() {
+        let commit = |hash: &str| crate::git::Commit {
+            hash: hash.into(),
+            parents: vec!["excluded-a".into(), "excluded-b".into()],
+            ..Default::default()
+        };
+        let commits = [commit("first"), commit("second")];
+        assert!(bounded_graph(&commits, 4, &|| true).is_ok());
+        assert!(
+            bounded_graph(&commits, 3, &|| true)
+                .err()
+                .unwrap()
+                .contains("parent edges")
+        );
+        let oversized = [crate::git::Commit {
+            hash: "merge".into(),
+            parents: (0..=MAX_PARENT_EDGES)
+                .map(|i| format!("excluded-{i}"))
+                .collect(),
+            ..Default::default()
+        }];
+        assert!(bounded_graph(&oversized, MAX_PARENT_EDGES, &|| true).is_err());
+        // Cancellation is checked through preflight and after bounded layout,
+        // before any font, image, or PNG composition is allocated.
+        for cancel_at in 1..=3 {
+            let calls = std::cell::Cell::new(0);
+            let result = bounded_graph(&commits, 4, &|| {
+                calls.set(calls.get() + 1);
+                calls.get() < cancel_at
+            });
+            assert!(result.err().unwrap().contains("cancelled"));
+            assert_eq!(calls.get(), cancel_at);
+        }
+    }
     #[test]
     fn dense_octopus_postcards_paint_every_commit_inside_the_graph() -> Result<(), String> {
         for parents in [32, 64] {
