@@ -258,6 +258,7 @@ impl RepoTab {
     /// Parks `view`, the worktree this tab just moved away from, and lets go of what isn't worth
     /// keeping any more.
     pub(crate) fn park(&mut self, mut view: Box<RepoTab>) {
+        view.cancel_draft_reads();
         // One on another machine stops being asked every few seconds while it isn't shown
         // (a dozen parked views would keep the shells there busy); it is looked at again on
         // coming back.

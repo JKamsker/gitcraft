@@ -137,7 +137,10 @@ impl RepoTab {
             Action::Checkout(name) => self.checkout(&name, ctx),
             Action::CheckoutPull(name) => self.checkout_pull(&name, ctx),
             Action::CheckoutRemote(name) => self.checkout_remote(&name, ctx),
-            Action::Dialog(dialog) => self.dialog = Some(dialog),
+            Action::Dialog(dialog) => {
+                self.cancel_draft_reads();
+                self.dialog = Some(dialog);
+            }
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Fetch => {
@@ -155,6 +158,12 @@ impl RepoTab {
             Action::Push => self.push(ctx),
             Action::Reload => self.reload(ctx),
             Action::OpenSparse => self.open_sparse(ctx),
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_drafts(on, ctx),
+            Action::DraftSnapshot => self.snapshot_draft(ctx),
+            Action::DraftPreview { id, path, index } => self.preview_draft(id, path, index, ctx),
+            Action::DraftRecover { preview, hunks } => self.recover_draft(*preview, hunks, ctx),
+            Action::DraftUndo => self.undo_draft(ctx),
             Action::SetSparse { before, folders } => self.set_sparse(*before, folders, ctx),
             Action::LoadMore => self.load_more(ctx),
             Action::Undo => self.undo(ctx),

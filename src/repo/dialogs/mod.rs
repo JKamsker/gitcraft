@@ -3,6 +3,7 @@
 mod branch;
 mod bundles;
 mod confirm;
+mod drafts;
 mod gerrit;
 mod remote;
 mod upstream;
@@ -17,6 +18,17 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    DraftLoading(u64),
+    DraftHistory {
+        on: bool,
+        versions: Vec<crate::git::drafts::Draft>,
+        error: Option<String>,
+        index: bool,
+    },
+    DraftRecovery {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        selected: std::collections::BTreeSet<usize>,
+    },
     GerritReview {
         remote: String,
         head: String,
@@ -291,6 +303,8 @@ pub(super) enum Outcome {
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        self.sync_draft_reader();
+        let draft_reader_waiting = self.draft_reader_waiting();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -310,6 +324,7 @@ impl RepoTab {
         let remote_names: Vec<&str> = self.remotes.iter().map(|r| r.name.as_str()).collect();
         let remote_branches = &self.refs.remotes;
         let idle = self.busy_op.is_none();
+        let draft_undo = self.drafts.undo.is_some();
         // What a new branch's undo checks out again.
         let previous = self
             .refs
@@ -320,6 +335,13 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::DraftLoading(_) => {
+                    ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());
+                    if draft_reader_waiting { ui.label("Waiting for the previous read to stop…"); }
+                    if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}
+                }
+                Dialog::DraftHistory { on, versions, error, index } => drafts::history(ui,on,versions,error.as_deref(),index,idle,draft_undo),
+                Dialog::DraftRecovery { preview, selected } => drafts::recovery(ui,preview,selected,idle),
                 Dialog::GerritReview {
                     remote,
                     head,
@@ -490,10 +512,10 @@ impl RepoTab {
         match response.inner {
             Outcome::Done(action) => {
                 acts.push(action);
-                self.dialog = None;
+                self.dismiss_dialog();
             }
-            Outcome::Cancel => self.dialog = None,
-            Outcome::Open if response.should_close() => self.dialog = None,
+            Outcome::Cancel => self.dismiss_dialog(),
+            Outcome::Open if response.should_close() => self.dismiss_dialog(),
             Outcome::Open => {}
             Outcome::Suggest => dialog.suggest_path(),
         }

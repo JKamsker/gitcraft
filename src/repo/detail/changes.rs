@@ -14,6 +14,30 @@ impl RepoTab {
     pub(super) fn changes_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
+        ui.horizontal(|ui| {
+            if ui.button("Earlier versions…").clicked() {
+                acts.push(Action::EarlierVersions);
+            }
+            ui.label(
+                egui::RichText::new(if self.drafts.enabled {
+                    "Drafts on"
+                } else {
+                    "Drafts off"
+                })
+                .small()
+                .color(t.text_faint),
+            );
+        });
+        if let Some(error) = &self.drafts.error {
+            ui.colored_label(
+                t.warning,
+                format!(
+                    "Working draft unavailable: {}",
+                    error.chars().take(160).collect::<String>()
+                ),
+            )
+            .on_hover_text(error);
+        }
 
         // The commit box stays at the bottom.
         egui::Panel::bottom("commit_box")

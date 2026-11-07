@@ -86,6 +86,19 @@ pub(crate) enum Action {
     Push,
     Reload,
     OpenSparse,
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftPreview {
+        id: git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
+    DraftUndo,
     AllowHistoryDownload(Box<Action>),
     SetSparse {
         before: Box<git::SparseState>,
@@ -408,6 +421,11 @@ impl RepoTab {
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
+            (
+                "Earlier versions of working changes…".into(),
+                "working drafts".into(),
+                Action::EarlierVersions,
+            ),
             (
                 "Export Git bundle…".into(),
                 "offline backup".into(),
