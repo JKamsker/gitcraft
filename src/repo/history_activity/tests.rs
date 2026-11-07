@@ -56,6 +56,8 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     use egui_kittest::{Harness, kittest::Queryable};
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/nonexistent/activity-ui".into(), &ctx);
+    // The fixture supplies an already loaded view; sleeping tabs must not run its readers.
+    tab.life.phase = crate::repo::lifecycle::Phase::Live;
     let first = Day::parse("2026-01-01").ok_or("date")?;
     let last = Day::parse("2026-01-03").ok_or("date")?;
     let records = [(first, "first", "a"), (last, "later", "b")]
