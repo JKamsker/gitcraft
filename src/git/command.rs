@@ -386,6 +386,10 @@ pub(crate) fn draft_bytes(
         "GIT_GLOB_PATHSPECS",
         "GIT_NOGLOB_PATHSPECS",
         "GIT_ICASE_PATHSPECS",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SUPER_PREFIX",
     ];
     if !active() {
         return Err("Draft cancelled".into());
@@ -426,7 +430,11 @@ pub(crate) fn draft_bytes(
             stderr: out.stderr,
         }
     };
-    if ok.contains(&out.code) {
+    // Ignore-rule/read errors can be warnings with exit zero. Do not mistake an
+    // incomplete exclusion/index read for a safe snapshot. Init alone emits hints.
+    if ok.contains(&out.code)
+        && (out.stderr.is_empty() || after_options(args).first() == Some(&"init"))
+    {
         Ok(out.stdout)
     } else {
         Err(format!(

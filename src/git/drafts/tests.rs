@@ -696,3 +696,71 @@ fn unchanged_large_tracked_files_are_not_copied_as_working_changes() -> Result<(
     );
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn typed_remote_reader_quotes_paths_and_never_confuses_links_with_missing_files()
+-> Result<(), String> {
+    use std::process::Command;
+    let f = Fixture::new()?;
+    let root = f.0.join("space ' quote $(touch trap) ü");
+    std::fs::create_dir(&root).map_err(|e| e.to_string())?;
+    std::fs::write(root.join("literal ' $x ü"), b"bytes\0raw").map_err(|e| e.to_string())?;
+    let read = |rel: &str, limit| -> Result<std::process::Output, String> {
+        Command::new("sh")
+            .arg("-c")
+            .arg(read_script(root.to_str().ok_or("utf8")?, rel, limit)?)
+            .output()
+            .map_err(|e| e.to_string())
+    };
+    let out = read("literal ' $x ü", 20)?;
+    assert!(out.status.success(), "{:?}", out.stderr);
+    assert_eq!(out.stdout, b"F100644\nbytes\0raw");
+    assert_eq!(read("absent/folder/file", 20)?.stdout, b"M\n");
+    assert!(!read("literal ' $x ü", 2)?.stdout.ends_with(b"bytes\0raw"));
+    std::os::unix::fs::symlink("absent", root.join("link")).map_err(|e| e.to_string())?;
+    assert!(!read("link/file", 20)?.status.success());
+    assert!(!read("link", 20)?.status.success());
+    assert!(missing_inside(&root, "link/file").is_err());
+    assert!(missing_inside(&root, "absent/file").is_ok());
+    assert!(!f.0.join("trap").exists());
+    Ok(())
+}
+
+#[test]
+fn nested_untracked_repositories_are_excluded_without_hiding_outer_changes() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("file", b"base\n")?;
+    f.commit()?;
+    f.write("nested/private", b"separate repository content")?;
+    git::run(Some(&f.0.join("nested")), &["init", "-q"])?;
+    f.write("outer", b"saved outer bytes")?;
+    let saved = capture(&f.0, "Pause", &|| true)?.ok_or("No draft")?;
+    assert!(saved.metadata.files.iter().any(|file| file.path == "outer"));
+    assert!(
+        !saved
+            .metadata
+            .files
+            .iter()
+            .any(|file| file.path.starts_with("nested"))
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn missing_paths_below_symlinks_fail_closed_and_do_not_publish_deletions() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("directory/file", b"tracked bytes")?;
+    f.commit()?;
+    std::fs::remove_dir_all(f.0.join("directory")).map_err(|e| e.to_string())?;
+    std::os::unix::fs::symlink("absent", f.0.join("directory")).map_err(|e| e.to_string())?;
+    let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
+    assert!(capture(&f.0, "Pause", &|| true).is_err());
+    assert!(git::run(Some(&f.0), &["for-each-ref", PREFIX])?.is_empty());
+    assert_eq!(
+        std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+        index
+    );
+    Ok(())
+}

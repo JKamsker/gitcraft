@@ -117,7 +117,7 @@ fn capture_preserving(
     cached_index(&ctx, &before, &active)?;
     let initial_changes = changed(&ctx, &before, &index_tree, &active)?;
     let mut candidates = initial_changes.clone();
-    let untracked = paths(ctx.source(
+    let untracked = untracked_paths(ctx.source(
         &["ls-files", "--others", "--exclude-standard", "-z"],
         vec![],
         &[0],
@@ -207,7 +207,7 @@ fn capture_preserving(
     tree(&ctx, &before.index, &active)?;
     cached_index(&ctx, &before, &active)?;
     if changed(&ctx, &before, &index_tree, &active)? != initial_changes
-        || paths(ctx.source(
+        || untracked_paths(ctx.source(
             &["ls-files", "--others", "--exclude-standard", "-z"],
             vec![],
             &[0],
@@ -385,12 +385,7 @@ fn internal_file(
     const LIMIT: u64 = 32 * 1024 * 1024;
     if let Some(target) = remote::parse(&ctx.repo) {
         let (parent, name) = path.rsplit_once('/').ok_or("Invalid Git metadata path")?;
-        let file = remote::sh_quote(path);
-        let read =
-            remote::read_within_script(parent, name, LIMIT).ok_or("Invalid Git metadata path")?;
-        let script = format!(
-            "if [ ! -e {file} ] && [ ! -L {file} ]; then printf M; exit 0; fi\nprintf F\n{read}"
-        );
+        let script = read_script(parent, name, LIMIT)?;
         let out = git::forecast_remote(
             &target.host,
             remote::Request {
@@ -399,14 +394,15 @@ fn internal_file(
             },
             active,
         )?;
-        if out.code == 0 && out.stdout == b"M" {
+        if out.code == 0 && out.stdout == b"M\n" {
             return Ok(None);
         }
         if out.code == 0
-            && out.stdout.first() == Some(&b'F')
-            && out.stdout.len() as u64 <= LIMIT + 1
+            && out.stdout.len() >= 8
+            && matches!(&out.stdout[..8], b"F100644\n" | b"F100755\n")
+            && out.stdout.len() as u64 <= LIMIT + 8
         {
-            return Ok(Some(out.stdout[1..].to_vec()));
+            return Ok(Some(out.stdout[8..].to_vec()));
         }
         return Err("Cannot read a regular index/cache file within 32 MiB".into());
     }
@@ -567,6 +563,96 @@ fn paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
         })
         .collect()
 }
+// Native ls-files lists an untracked nested working repository as a directory
+// marker. Exclude its contents, rather than descending into another repository.
+fn untracked_paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
+    let mut result = BTreeSet::new();
+    for name in bytes.split(|b| *b == 0).filter(|s| !s.is_empty()) {
+        let name = std::str::from_utf8(name).map_err(|_| "Draft paths must be UTF-8")?;
+        if let Some(directory) = name.strip_suffix('/') {
+            valid_path(directory)?;
+        } else {
+            valid_path(name)?;
+            result.insert(name.to_owned());
+        }
+    }
+    Ok(result)
+}
+
+/// Missing is a distinct, verified result, not a failed read through a link or
+/// unsearchable parent. The final read still opens and verifies its own handle.
+fn read_script(root: &str, rel: &str, limit: u64) -> Result<String, String> {
+    valid_path(rel)?;
+    let names: Vec<_> = rel.split('/').collect();
+    let mut script = format!(
+        "cd -P -- {} || exit 1\nroot=$(pwd -P) || exit 1\n[ \"$root\" = / ] && root=\n",
+        remote::sh_path(root)
+    );
+    let mut at = String::new();
+    for (i, name) in names.iter().enumerate() {
+        let q = remote::sh_quote(name);
+        script.push_str(&format!("[ -x . ] || exit 1\n[ -L {q} ] && exit 1\nif [ ! -e {q} ]; then printf 'M\\n'; exit 0; fi\n"));
+        if i + 1 < names.len() {
+            at.push('/');
+            at.push_str(name);
+            script.push_str(&format!(
+                "cd -P -- {q} || exit 1\n[ \"$(pwd -P)\" = \"$root\"{} ] || exit 1\n",
+                remote::sh_quote(&at)
+            ));
+        } else {
+            script.push_str(&format!(
+                "if [ -x {q} ]; then printf 'F100755\\n'; else printf 'F100644\\n'; fi\n"
+            ));
+        }
+    }
+    script.push_str(&remote::read_within_script(root, rel, limit).ok_or("Unsafe draft path")?);
+    Ok(script)
+}
+
+#[cfg(unix)]
+fn missing_inside(root: &Path, rel: &str) -> Result<(), String> {
+    use rustix::fs::{AtFlags, Mode, OFlags, open, openat, statat};
+    let names: Vec<_> = rel.split('/').collect();
+    let (last, folders) = names.split_last().ok_or("Invalid draft path")?;
+    let flags = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW;
+    let mut dir = open(root, flags - OFlags::NOFOLLOW, Mode::empty()).map_err(|e| e.to_string())?;
+    for folder in folders {
+        match openat(&dir, *folder, flags, Mode::empty()) {
+            Ok(next) => dir = next,
+            Err(rustix::io::Errno::NOENT) => return Ok(()),
+            Err(e) => return Err(format!("Cannot verify missing draft path: {e}")),
+        }
+    }
+    match statat(&dir, *last, AtFlags::SYMLINK_NOFOLLOW) {
+        Err(rustix::io::Errno::NOENT) => Ok(()),
+        _ => Err("Draft path changed or cannot be safely read".into()),
+    }
+}
+#[cfg(not(unix))]
+fn missing_inside(root: &Path, rel: &str) -> Result<(), String> {
+    let mut path = root.to_path_buf();
+    for component in rel.split('/') {
+        path.push(component);
+        match std::fs::symlink_metadata(&path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e.to_string()),
+            Ok(meta) => {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::fs::MetadataExt;
+                    if meta.file_attributes() & 0x400 != 0 {
+                        return Err("Draft path crosses a reparse point".into());
+                    }
+                }
+                if meta.file_type().is_symlink() || !meta.is_dir() {
+                    return Err("Draft path changed or crosses a link".into());
+                }
+            }
+        }
+    }
+    Err("Draft path changed; retry after a pause".into())
+}
+
 fn valid_path(path: &str) -> Result<(), String> {
     if path.is_empty()
         || path.len() > 4096
@@ -598,12 +684,7 @@ fn read_file(
         return Err("Draft cancelled".into());
     }
     if let Some(target) = remote::parse(&ctx.repo) {
-        let file = remote::sh_quote(&format!("{}/{path}", ctx.worktree));
-        let read = remote::read_within_script(&ctx.worktree, path, FILE_LIMIT as u64)
-            .ok_or("Unsafe draft path")?;
-        let script = format!(
-            "if [ ! -e {file} ] && [ ! -L {file} ]; then printf 'M\\n'; exit 0; fi\nif [ -x {file} ]; then printf 'F100755\\n'; else printf 'F100644\\n'; fi\n{read}"
-        );
+        let script = read_script(&ctx.worktree, path, FILE_LIMIT as u64)?;
         let out = git::forecast_remote(
             &target.host,
             remote::Request {
@@ -633,7 +714,9 @@ fn read_file(
     let root = Path::new(&ctx.worktree);
     let meta = match std::fs::symlink_metadata(root.join(path)) {
         Ok(m) => m,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return missing_inside(root, path).map(|()| None);
+        }
         Err(e) => return Err(e.to_string()),
     };
     if !meta.is_file() || meta.file_type().is_symlink() {
