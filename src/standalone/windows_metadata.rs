@@ -1,4 +1,4 @@
-//! A recording-testable Windows metadata protocol using managed, shipped OS APIs only.
+//! A recording-testable bounded full native Windows security-descriptor protocol.
 //! Real execution requires the independent static protocol review before Windows fixtures.
 use base64::Engine;
 use std::{path::Path, process::Command};
@@ -16,19 +16,59 @@ try {
   Microsoft.PowerShell.Management\Get-Item -LiteralPath $source -Stream '*' -ErrorAction Stop | Microsoft.PowerShell.Core\ForEach-Object {
     if ($_.Stream -ne ':$DATA' -and $_.Stream -ne '$DATA' -and $_.Stream -ne '::$DATA') { throw 'Named data streams cannot be preserved with the bounded save protocol' }
   }
-  $sections = [Security.AccessControl.AccessControlSections]::Access -bor [Security.AccessControl.AccessControlSections]::Owner -bor [Security.AccessControl.AccessControlSections]::Group
-  $security = [IO.File]::GetAccessControl($source, $sections)
-  $descriptor = $security.GetSecurityDescriptorSddlForm($sections)
-  if ($descriptor.Length -gt 1048576) { throw 'Access metadata exceeds 1 MiB' }
+  # Request every applicable native component explicitly. Managed FileSecurity's
+  # Access/Owner/Group subset cannot establish mandatory-label or SACL equality.
+  Microsoft.PowerShell.Core\Import-Module ([IO.Path]::Combine($PSHOME, 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1')) -ErrorAction Stop
+  Microsoft.PowerShell.Utility\Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+public static class GitcraftNativePolicy {
+  // OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER.
+  public const uint AllPolicy = 0x000001ff;
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+  static extern uint GetNamedSecurityInfo(string path, uint type, uint info, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+  static extern uint SetNamedSecurityInfo(string path, uint type, uint info, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+  [DllImport("advapi32.dll")] static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
+  [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
+  static void Check(uint error) {
+    if (error != 0) throw new InvalidOperationException("Full Windows policy unavailable (native error " + error + "); SACL/audit access may require SeSecurityPrivilege. Original must remain unchanged.");
+  }
+  static byte[] Canonical(IntPtr descriptor) {
+    uint length = GetSecurityDescriptorLength(descriptor);
+    if (length == 0 || length > 1048576) throw new InvalidOperationException("Full native descriptor exceeds 1 MiB");
+    byte[] raw = new byte[length]; Marshal.Copy(descriptor,raw,0,(int)length);
+    RawSecurityDescriptor parsed = new RawSecurityDescriptor(raw,0);
+    byte[] normalized = new byte[parsed.BinaryLength]; parsed.GetBinaryForm(normalized,0);
+    return normalized;
+  }
+  public static byte[] Read(string path) {
+    IntPtr owner,group,dacl,sacl,descriptor=IntPtr.Zero;
+    try { Check(GetNamedSecurityInfo(path,1,AllPolicy,out owner,out group,out dacl,out sacl,out descriptor)); return Canonical(descriptor); }
+    finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
+  }
+  public static void Copy(string source,string target) {
+    IntPtr owner,group,dacl,sacl,descriptor=IntPtr.Zero;
+    try {
+      Check(GetNamedSecurityInfo(source,1,AllPolicy,out owner,out group,out dacl,out sacl,out descriptor));
+      byte[] before=Canonical(descriptor);
+      RawSecurityDescriptor parsed=new RawSecurityDescriptor(before,0);
+      uint protection = (parsed.ControlFlags & ControlFlags.DiscretionaryAclProtected) != 0 ? 0x80000000u : 0x20000000u;
+      protection |= (parsed.ControlFlags & ControlFlags.SystemAclProtected) != 0 ? 0x40000000u : 0x10000000u;
+      Check(SetNamedSecurityInfo(target,1,AllPolicy|protection,owner,group,dacl,sacl));
+      if (!Convert.ToBase64String(before).Equals(Convert.ToBase64String(Read(target)),StringComparison.Ordinal)) throw new InvalidOperationException("Full native policy differs after copy");
+      if (!Convert.ToBase64String(before).Equals(Convert.ToBase64String(Read(source)),StringComparison.Ordinal)) throw new InvalidOperationException("Source policy changed during copy");
+    } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
+  }
+}
+'@ -ErrorAction Stop
+  $descriptor = [GitcraftNativePolicy]::Read($source)
   if ($snapshot) {
-    [Console]::Out.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($descriptor)))
+    [Console]::Out.WriteLine([Convert]::ToBase64String($descriptor))
     exit 0
   }
-  $copy = [Security.AccessControl.FileSecurity]::new()
-  $copy.SetSecurityDescriptorSddlForm($descriptor, $sections)
-  [IO.File]::SetAccessControl($target, $copy)
-  $after = [IO.File]::GetAccessControl($target, $sections).GetSecurityDescriptorSddlForm($sections)
-  if ($descriptor -cne $after) { throw 'Exact access-rule preservation is unavailable' }
+  [GitcraftNativePolicy]::Copy($source, $target)
   [Console]::Out.WriteLine('gitcraft-acl-v1-ok')
   exit 0
 } catch {
@@ -161,8 +201,15 @@ mod tests {
             env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SNAPSHOT")),
             Some(&None)
         );
+        assert!(SCRIPT.contains("AllPolicy = 0x000001ff"));
+        assert!(SCRIPT.contains("SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER"));
+        assert!(SCRIPT.contains("GetNamedSecurityInfo(path,1,AllPolicy"));
+        assert!(SCRIPT.contains("SetNamedSecurityInfo(target,1,AllPolicy|protection"));
+        assert!(SCRIPT.contains("SeSecurityPrivilege"));
+        assert!(!SCRIPT.contains("[IO.File]::GetAccessControl"));
+        assert!(SCRIPT.contains("length > 1048576"));
         assert!(SCRIPT.contains("if ($snapshot)"));
-        assert!(SCRIPT.find("if ($snapshot)") < SCRIPT.find("[IO.File]::SetAccessControl"));
+        assert!(SCRIPT.find("if ($snapshot)") < SCRIPT.rfind("[GitcraftNativePolicy]::Copy"));
         Ok(())
     }
 }
