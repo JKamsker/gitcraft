@@ -230,7 +230,23 @@ pub(super) fn files<'a, T>(
     selected: &impl Fn(&&'a T) -> bool,
     row: &mut impl FnMut(&mut Ui, Option<f32>, &'a T),
 ) {
+    let reveal_id = id.with("keyboard-reveal");
+    let reveal = ui.data_mut(|d| {
+        let path = d.get_temp::<String>(reveal_id);
+        d.remove::<String>(reveal_id);
+        path
+    });
     if !Settings::get(ui.ctx()).files_as_tree {
+        if let Some(target) = &reveal
+            && let Some(i) = files.iter().position(|file| path(file) == target)
+        {
+            let pitch = widgets::ROW_H + ui.spacing().item_spacing.y;
+            let rect = Rect::from_min_size(
+                ui.cursor().min + vec2(0.0, i as f32 * pitch),
+                vec2(ui.available_width(), widgets::ROW_H),
+            );
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
         // A commit can change tens of thousands of files: only the rows in sight are drawn.
         // While a menu is open (perhaps one of a row out of sight, which must go on being
         // shown), row by row.
@@ -275,6 +291,37 @@ pub(super) fn files<'a, T>(
         left: 18.0,
         leaf_h: Some(widgets::ROW_H),
     };
+    if let Some(target) = &reveal {
+        let mut y = ui.cursor().top();
+        let mut levels = vec![tree.iter()];
+        while let Some(level) = levels.last_mut() {
+            match level.next() {
+                Some(Node::Leaf { item, .. }) => {
+                    if path(item) == target {
+                        let rect = Rect::from_min_size(
+                            pos2(ui.cursor().left(), y),
+                            vec2(ui.available_width(), widgets::ROW_H),
+                        );
+                        ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                        break;
+                    }
+                    y += widgets::ROW_H + ui.spacing().item_spacing.y;
+                }
+                Some(Node::Folder(folder)) => {
+                    y += ROW_H + ui.spacing().item_spacing.y;
+                    let saved = ui
+                        .data_mut(|d| d.get_persisted::<bool>(id.with(folder.path)))
+                        .unwrap_or(false);
+                    if saved != start_open {
+                        levels.push(folder.children.iter());
+                    }
+                }
+                None => {
+                    levels.pop();
+                }
+            }
+        }
+    }
     let key = |f: &&'a T| file_key(path(f));
     show(ui, &tree, &view, selected, &key, &mut |ui, leaf, f| {
         row(ui, Some(leaf.indent), f);

@@ -30,7 +30,7 @@ pub(in crate::git) fn local(
     timeout: Duration,
 ) -> Result<Vec<u8>, String> {
     // Binary bundle streams must use the same practice/profile context as other Git calls.
-    let mut cmd = super::repository_command(Some(repo), args);
+    let mut cmd = super::repository_command(Some(repo), args)?;
     cmd.args(args);
     #[cfg(unix)]
     {

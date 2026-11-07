@@ -47,8 +47,8 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
   closed one). Open tabs, recents, theme and settings are remembered.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
-  its own open tabs, recent repositories, theme, git author and commit signing (Settings →
-  Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
+  its own open tabs, recent repositories, theme, git author, commit signing, SSH key and forge
+  accounts (Settings → Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
   other one's (refused while a tab has unfinished work).
 - Changes made elsewhere (editor, terminal) show up by themselves: the folder is watched.
 - Repositories on another machine, in a WSL distribution or over SSH: the window stays here and
@@ -129,6 +129,13 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   are offscreen. Long summaries end in an ellipsis; hover the description to read its original
   message, loaded in the background. Messages over the 256 KiB tooltip limit open in the detail
   pane by selecting the commit.
+- Ctrl+Alt+1/2/3 (Cmd+Alt on macOS) focuses the sidebar, graph or diff, and detail pane;
+  an outline shows the active pane. In the detail pane, j/k selects files in display order,
+  opening their folders and scrolling them into view; Space stages or unstages, Enter opens
+  the diff. Conflicted files require the explicit Resolve/Mark resolved controls. In a text
+  diff, F7/Shift+F7 picks the next/previous change; S/U acts on the current hunk and D asks
+  before discarding it (Ctrl+Z restores it). These keys stay with text fields, terminals,
+  menus and dialogs while those have focus. Held action keys do not repeat operations.
 - Drag the column borders in the header to resize. Right-click the header to pick the columns,
   make the graph column compact (lanes closer together), or _Reset columns_ to their first
   widths.
@@ -311,10 +318,45 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   config's `gpg.format`, `user.signingkey`, `gpg.program` (`gpg.ssh.program`, `gpg.x509.program`),
   `commit.gpgSign` and `tag.gpgSign`, shown as they are set and written back there; git does
   the signing as usual. A profile can sign its own way instead (Settings → Profile).
-- How a profile's git author and signing reach git: gitcraft writes them to a config file of the
+- Settings → Profile → **Profile's connections** chooses an SSH private key and named GitHub,
+  GitLab and Forgejo/Gitea accounts. Empty account names preserve the CLI's normal behavior.
+  **Check account** checks the selected GitHub/GitLab user in the background. No global CLI
+  account is switched, and tokens are never saved in gitcraft's settings or generated config.
+  - GitHub: select an existing `gh` username and server. Requires a `gh` version supporting
+    `auth token --user` (multi-account support, gh 2.40 or later). An optional account config
+    folder is passed as `GH_CONFIG_DIR`.
+  - GitLab: enter the expected `glab` username and server. `glab` has one account per host in a
+    config folder; for two accounts on the same server choose separate folders and sign in
+    with `GLAB_CONFIG_DIR` set accordingly. The token's actual owner is checked before use;
+    a mismatch stops the operation. A host-wide OS keyring slot cannot hold two accounts at
+    once; use the CLI's supported separate configuration/file-storage setup for that case.
+    OAuth sessions refresh only through that selected CLI configuration after its stored
+    login name matches. Gitcraft re-reads the refreshed access token, verifies its owner,
+    and pins that exact token for the operation; expiry during an operation fails rather
+    than refreshing into another identity. A missing stored login name requires CLI sign-in.
+  - Forgejo/Gitea: enter the login **name** from `tea login add --name …`. It is bound to that
+    login's HTTPS server; a missing/refused login does not fall back to another identity.
+  - HTTPS Git pushes use the same selected accounts through host-scoped credential helpers.
+    Helpers resolve credentials only when Git asks for that HTTPS server, and never store
+    them. CLI errors and unsupported versions fail without exposing token output.
+  - The SSH private key is separate from the signing key. `core.sshCommand` uses a helper that selects it
+    with `IdentitiesOnly=yes`, checks the effective host configuration and refuses additional
+    `IdentityFile` entries instead of falling back to another account. Proxy and host options
+    remain in use. Equivalent tilde and SSH token paths are expanded by OpenSSH itself.
+    The generated profile sets `ssh.variant=auto` so an inherited PuTTY configuration cannot
+    change the wrapper's port arguments; repository-local transports are still detected by
+    Git, and a repository's explicit `ssh.variant` still wins. Ambiguous/control-character
+    identity paths are refused before starting the transport. If a repository explicitly
+    selects a PuTTY variant while retaining this OpenSSH helper, incompatible options are
+    refused before probing or connecting; use `ssh.variant=auto`/`ssh`, or that repository's
+    own matching PuTTY command.
+  - Background jobs retain the initiating profile's account choices and an immutable config
+    snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
+    that machine's own credentials; forge commands run here with this profile's account.
+- How a profile's git author, signing and connection choices reach git: gitcraft writes them to a config file of the
   profile's (in its data folder, `profiles/<id>.gitconfig`) that includes your own global config
-  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at it
-  (git 2.32 or later). So the profile wins over `~/.gitconfig`, and a repository's own config
+  first and then sets the profile's values, and runs git with `GIT_CONFIG_GLOBAL` pointing at a leased immutable copy
+  (git 2.32 or later), so an in-flight operation keeps its original profile. So the profile wins over `~/.gitconfig`, and a repository's own config
   (`git config --local`, `--worktree`) wins over the profile, as it does over `~/.gitconfig`.
   `git config --global` from gitcraft still reads and writes your own file. The built-in
   terminal keeps your own config.

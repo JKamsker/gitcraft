@@ -72,6 +72,9 @@ pub enum Dialog {
         base_label: String,
         focus: bool,
     },
+    KeyboardDiscard {
+        request: super::keyboard::Request,
+    },
     Confirm {
         title: String,
         body: String,
@@ -452,6 +455,15 @@ impl RepoTab {
                     draft,
                     focus,
                 } => remote::create_pr(ui, noun, branch, base, title, body, draft, focus),
+                Dialog::KeyboardDiscard { request } => {
+                    let mut alternative = false;
+                    match confirm::confirm(ui, "Discard this hunk?",
+                        "This removes the current hunk from the working tree. Ctrl+Z restores it.",
+                        "Discard hunk", &[], &None, &mut alternative, Refresh::Status, &Undo::None) {
+                        Outcome::Done(_) => Outcome::Done(Action::Keyboard(request.clone())),
+                        outcome => outcome,
+                    }
+                }
                 Dialog::Confirm {
                     title,
                     body,

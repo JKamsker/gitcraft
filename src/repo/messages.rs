@@ -179,7 +179,7 @@ pub(super) fn spawn_or(
 ) {
     let tx = tx.clone();
     let ctx = ctx.clone();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         // What the job owned goes with it; a lock it held is left poisoned, which those
         // taking it handle.
         let msg = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job))
@@ -319,6 +319,9 @@ impl RepoTab {
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => match result {
                 Ok(work) => {
+                    if read >= self.work_pending {
+                        self.work_pending = 0;
+                    }
                     self.work_read = read;
                     // This worktree's count of changes, as the worktree list shows it.
                     let changes = work.changed_files();

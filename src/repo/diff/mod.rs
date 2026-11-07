@@ -85,10 +85,36 @@ pub struct DiffData {
     pub(super) uncut: std::collections::HashMap<usize, String>,
     /// The runs of changed rows and the changes they make, unified and side by side: worked
     /// out the first time they are needed, not every frame.
+    hunks: [std::sync::OnceLock<Vec<(usize, usize)>>; 2],
     map: [std::sync::OnceLock<(map::ChangeRuns, Vec<std::ops::Range<usize>>)>; 2],
 }
 
 impl DiffData {
+    pub(in crate::repo) fn hunk_at(&self, split: bool, row: usize) -> Option<usize> {
+        let headers = self.hunks[usize::from(split)].get_or_init(|| {
+            if split {
+                self.split
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(row, (left, right))| {
+                        let i = left.or(*right)?;
+                        (self.lines[i].kind == Kind::Hunk).then_some((row, i))
+                    })
+                    .collect()
+            } else {
+                self.lines
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, line)| (line.kind == Kind::Hunk).then_some((i, i)))
+                    .collect()
+            }
+        });
+        let at = headers
+            .partition_point(|(start, _)| *start <= row)
+            .saturating_sub(1);
+        headers.get(at).map(|(_, header)| *header)
+    }
+
     /// Whether the lines show side by side when that's the setting (`split`): a new file takes
     /// the whole width, rather than half of it next to an empty old side.
     pub(in crate::repo::diff) fn shows_split(&self, split: bool) -> bool {
@@ -195,6 +221,7 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         longest,
         uncut,
         map: Default::default(),
+        hunks: Default::default(),
     })
 }
 
