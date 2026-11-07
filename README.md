@@ -103,6 +103,21 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
 **Graph**
 
 - Every branch, coloured lanes, ↑/↓ to move. History loads 1500 commits at a time as you scroll.
+- _Activity_ in the toolbar (or _Activity calendar_ / _Contributor statistics_ in Ctrl+P)
+  opens a day/month calendar and author statistics. Click a day, drag across days, choose a
+  month, or enter an inclusive date range; choose author or committer dates. Click a listed
+  commit to open its detail, and an author to see their commits. Days use each timestamp’s
+  recorded timezone. Authors are resolved together against one consistent Git mailmap;
+  unavailable configured map sources stop analysis without fetching. Statistics show commits,
+  distinct paths, active days and the first/last activity in the selected period. Each reachable
+  commit counts once across local/remote branches, tags and HEAD; stash and app-only refs
+  are excluded. Renames touch both paths and merges compare files against their first parent.
+  Analysis runs in the background with Cancel and Refresh. Coverage says when history is
+  shallow or partial: initially 5,000 commits, _Scan more history_ up to 100,000, with a
+  64 MiB snapshot limit and a 16 MiB page limit. Date filtering uses the scanned history,
+  including backdated authors. File counts read trees, not file contents. Analysis requires
+  Git with `--no-lazy-fetch` support and never downloads missing objects; missing trees or
+  metadata are reported as errors. Refresh takes a new reference snapshot; it does not fetch.
 - Branch and tag pills in their own column left of the graph, on each branch's tip only, joined
   to their commit: white text, a laptop icon when the branch is local, a cloud when a remote has
   it at that commit (`x` and `origin/x` make one pill), a pull-request icon when one is open,

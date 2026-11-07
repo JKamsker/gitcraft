@@ -43,6 +43,9 @@ impl RepoTab {
         }
         match action {
             Action::Keyboard(request) => self.apply_keyboard(request, ctx),
+            Action::OpenActivity(page) => self.open_activity(page, ctx),
+            Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
+            Action::CloseActivity => self.activity = None,
             Action::AllowHistoryDownload(action) => {
                 self.history_download_allowed = true;
                 self.apply(*action, ctx);

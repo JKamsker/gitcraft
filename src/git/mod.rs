@@ -2,6 +2,7 @@
 //! gitcraft behaves exactly like the user's own git (config, credentials, hooks).
 
 mod bundles;
+pub(crate) mod activity;
 mod clone_options;
 mod command;
 mod commits;

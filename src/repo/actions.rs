@@ -15,6 +15,9 @@ use crate::terminal::ShellSpec;
 pub(crate) enum Action {
     Keyboard(super::keyboard::Request),
     Select(usize),
+    OpenActivity(super::activity::Page),
+    ActivityCommit(String),
+    CloseActivity,
     SelectHash(String),
     SelectStash(usize),
     OpenDiff(DiffKey),
@@ -336,6 +339,16 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "Activity calendar".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Calendar),
+            ),
+            (
+                "Contributor statistics".into(),
+                "history".into(),
+                Action::OpenActivity(super::activity::Page::Contributors),
+            ),
             ("Fetch".into(), "remote".into(), Action::Fetch),
             ("Pull".into(), "remote".into(), Action::Pull),
             (

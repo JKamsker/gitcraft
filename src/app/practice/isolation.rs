@@ -76,6 +76,45 @@ fn exercise_app(root: &Path) -> Result<(), String> {
     assert!(git::run(Some(&path), &["config", "--get", "practice.profile"]).is_err());
     assert!(git::run(Some(&path), &["config", "--get", "practice.injected"]).is_err());
     assert_eq!(git::identity(&path).email, "practice@example.invalid");
+    // New shared activity transport must use the same practice-aware command builder.
+    let activity = git::activity::read(
+        &path,
+        100,
+        &|| true,
+        &std::sync::atomic::AtomicUsize::new(0),
+    )?;
+    assert!(!activity.commits.is_empty());
+    assert!(
+        activity
+            .commits
+            .iter()
+            .all(|c| c.email == "practice@example.invalid" && c.subject != "Caller history")
+    );
+    use egui_kittest::kittest::Queryable as _;
+    let active = harness.state().active;
+    let action = match harness.state().tabs.get(active) {
+        Some(Tab::Repo(tab)) => tab
+            .palette_items()
+            .into_iter()
+            .find(|(label, _, _)| label == "Activity calendar")
+            .map(|(_, _, action)| action),
+        _ => None,
+    }
+    .ok_or("No activity command")?;
+    apply(&mut harness, action)?;
+    let until = Instant::now() + Duration::from_secs(5);
+    let label = format!("{} unique commits", activity.commits.len());
+    loop {
+        harness.step();
+        if harness.query_by_label_contains(&label).is_some() {
+            break;
+        }
+        if Instant::now() >= until {
+            return Err("Practice activity did not show its own history".into());
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    apply(&mut harness, Action::CloseActivity)?;
     // Streaming/piped history is a separate spawn route from ordinary reads/mutations.
     let mut stream = git::LogStream::start(&path, None, 0)?;
     assert!(

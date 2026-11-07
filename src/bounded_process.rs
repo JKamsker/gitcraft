@@ -1,7 +1,7 @@
 //! Automatic forecasts must stop waiting when their editor disappears or their deadline
 //! expires, including when a descendant holds an output pipe open after its parent exits.
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -10,7 +10,17 @@ const POLL: Duration = Duration::from_millis(20);
 const MAX_OUTPUT: u64 = 16 * 1024 * 1024;
 
 pub(crate) fn run(
+    command: Command,
+    active: &dyn Fn() -> bool,
+    limit: Duration,
+) -> Result<Output, String> {
+    run_with_input(command, None, active, limit)
+}
+
+/// The same deadline, cancellation and output caps, also while passing bounded input.
+pub(crate) fn run_with_input(
     mut command: Command,
+    input: Option<Vec<u8>>,
     active: &dyn Fn() -> bool,
     limit: Duration,
 ) -> Result<Output, String> {
@@ -23,7 +33,11 @@ pub(crate) fn run(
         command.process_group(0);
     }
     command
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = Running(
@@ -32,6 +46,19 @@ pub(crate) fn run(
             .map_err(|e| format!("Could not start forecast command: {e}"))?,
         false,
     );
+    let input = input.map(|bytes| {
+        let stdin = child.0.stdin.take();
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let result = stdin
+                .ok_or("No command stdin".to_owned())
+                .and_then(|mut stdin| stdin.write_all(&bytes).map_err(|e| e.to_string()))
+                .map(|_| Vec::new());
+            let _ = tx.send(result);
+        });
+        rx
+    });
+    let mut written = input.is_none();
     let stdout = drain(child.0.stdout.take().ok_or("No forecast stdout")?);
     let stderr = drain(child.0.stderr.take().ok_or("No forecast stderr")?);
     let deadline = Instant::now() + limit;
@@ -43,6 +70,9 @@ pub(crate) fn run(
         if Instant::now() >= deadline {
             return Err("Forecast command timed out".into());
         }
+        if !written && let Some(input) = &input {
+            written = receive(input)?.is_some();
+        }
         if out.is_none() {
             out = receive(&stdout)?;
         }
@@ -52,7 +82,8 @@ pub(crate) fn run(
         if status.is_none() {
             status = child.0.try_wait().map_err(|e| e.to_string())?;
         }
-        if status.is_some()
+        if written
+            && status.is_some()
             && out.is_some()
             && err.is_some()
             && let (Some(status), Some(stdout), Some(stderr)) = (status, out.take(), err.take())
@@ -142,6 +173,29 @@ mod tests {
     use super::*;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn bounded_input_is_delivered_and_a_blocked_writer_is_cancelled() {
+        let mut cat = Command::new("cat");
+        let result = run_with_input(
+            cat,
+            Some(b"history tips\n".to_vec()),
+            &|| true,
+            Duration::from_secs(2),
+        );
+        assert!(result.is_ok_and(|o| o.status.success() && o.stdout == b"history tips\n"));
+        cat = Command::new("sh");
+        cat.args(["-c", "sleep 30"]);
+        let start = Instant::now();
+        let result = run_with_input(
+            cat,
+            Some(vec![b'x'; 1024 * 1024]),
+            &|| start.elapsed() < Duration::from_millis(100),
+            Duration::from_secs(30),
+        );
+        assert!(result.is_err_and(|e| e.contains("cancelled")));
+        assert!(start.elapsed() < Duration::from_secs(2));
+    }
 
     #[test]
     fn stalled_commands_and_descendant_pipes_obey_deadlines_and_cancellation() {
