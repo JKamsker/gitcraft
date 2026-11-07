@@ -55,7 +55,11 @@ fn a_lock_explained_removed_and_the_file_staged() -> Result<(), String> {
                 move |ui, tab: &mut RepoTab| {
                     if !std::mem::replace(&mut styled, true) {
                         crate::theme::install_fonts(ui.ctx());
-                        crate::theme::apply(ui.ctx(), crate::theme::ThemeKind::Dark);
+                        crate::theme::apply(
+                            ui.ctx(),
+                            &crate::theme::ThemeId::default(),
+                            &crate::theme::Tweaks::default(),
+                        );
                         return;
                     }
                     tab.ui(ui);
