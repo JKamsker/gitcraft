@@ -219,9 +219,7 @@ fn migration(
                 );
                 let (rect, response) = ui
                     .allocate_exact_size(vec2(ui.available_width().max(600.), 54.), Sense::click());
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label)
-                });
+                crate::a11y::a11y(&response, egui::WidgetType::Button, &label);
                 let p = ui.painter();
                 p.rect_filled(
                     rect,
@@ -368,13 +366,7 @@ fn matrix(
                                             },
                                         ),
                                     );
-                                response.widget_info(|| {
-                                    egui::WidgetInfo::labeled(
-                                        egui::WidgetType::Button,
-                                        true,
-                                        &label,
-                                    )
-                                });
+                                crate::a11y::a11y(&response, egui::WidgetType::Button, &label);
                                 let clicked = response.clicked();
                                 response.on_hover_text(format!("{label}\nPinned {}", c.oid));
                                 if clicked {
@@ -499,7 +491,7 @@ fn boundary_button(
         && !row.changes[side].is_empty()
         && (part.old_mode == part.new_mode || part.old_mode.is_none() || part.new_mode.is_none());
     let response = ui.add_enabled(enabled, egui::Button::new(text).min_size(vec2(64., 20.)));
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, &label));
+    crate::a11y::a11y(&response, egui::WidgetType::Button, &label);
     if response.clicked() {
         acts.push(Action::ComparisonPick {
             request: state.data_request,
