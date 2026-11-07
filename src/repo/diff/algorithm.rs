@@ -2,6 +2,7 @@
 //! to git for each diff read (the repository's config is never written), and switched without
 //! losing one's place.
 
+use crate::a11y::Named;
 use egui::Ui;
 
 use super::place::place_at;
@@ -32,7 +33,7 @@ pub(in crate::repo) fn keep_algorithm(
 
 /// What the drop-down shows for a file type that uses `algorithm` (`None`: git's default).
 fn shown_label(algorithm: Option<DiffAlgorithm>) -> &'static str {
-    algorithm.map_or("Algorithm", DiffAlgorithm::label)
+    algorithm.map_or("Default", DiffAlgorithm::label)
 }
 
 /// The algorithm drop-down of the diff header for the file at `path`, with a spinner beside it
@@ -55,22 +56,25 @@ pub(in crate::repo) fn algorithm_menu(
         None => format!("files named {name}"),
     };
     let mut picked = current;
-    egui::ComboBox::from_id_salt(("diff-algorithm", path))
-        .selected_text(shown_label(current))
-        .width(92.0)
-        .show_ui(ui, |ui| {
-            ui.selectable_value(&mut picked, None, "Default")
-                .on_hover_text("What your git config says (diff.algorithm), else Myers");
-            for a in DiffAlgorithm::ALL {
-                ui.selectable_value(&mut picked, Some(a), a.label())
-                    .on_hover_text(a.about());
-            }
-        })
-        .response
-        .on_hover_text(format!(
-            "Diff algorithm: how the lines of both sides are paired. Kept for {kept_for}; \
-             the repository's config is left as it is."
-        ));
+    let tip = format!(
+        "Diff algorithm: {}\nKept for {kept_for}; the repository's config is left as it is.",
+        shown_label(current),
+    );
+    // Use egui's submenu-aware menu button: a second root popup would close the
+    // responsive overflow menu and make its algorithm choices disappear.
+    let tint = crate::theme::Tokens::get(ui.ctx()).icon;
+    ui.menu_image_button(crate::icons::image("code", 14.0, tint), |ui| {
+        ui.label(format!("Algorithm for {kept_for}"));
+        ui.selectable_value(&mut picked, None, "Default")
+            .on_hover_text("What your git config says (diff.algorithm), else Myers");
+        for a in DiffAlgorithm::ALL {
+            ui.selectable_value(&mut picked, Some(a), a.label())
+                .on_hover_text(a.about());
+        }
+    })
+    .response
+    .named(&tip)
+    .on_hover_text(tip);
     if repairing {
         // Laid out right to left: beside the drop-down, on its left.
         ui.add(crate::spinner::Spinner::new().size(12.0))

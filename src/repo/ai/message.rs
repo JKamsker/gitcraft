@@ -43,11 +43,9 @@ impl RepoTab {
         } else {
             "Have an AI tool you have installed write the message".to_owned()
         };
-        let resp = ui
-            .add_enabled_ui(editable && !busy, |ui| {
-                icons::small_button(ui, "sparkles", &tip)
-            })
-            .inner;
+        let resp = ui.add_enabled(editable && !busy, |ui: &mut Ui| {
+            icons::small_button(ui, "sparkles", &tip)
+        });
         if resp.clicked() && settings.enabled() {
             self.start_message(ui.ctx());
         }

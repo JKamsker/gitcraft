@@ -32,42 +32,73 @@ pub(super) fn section(
         .data_mut(|d| d.get_persisted::<bool>(id))
         .unwrap_or(open_at_first);
     ui.add_space(4.0);
+    let has_refresh = refresh.is_some();
     let header = ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 6.0;
-        let chevron = if open {
-            "chevron-down"
-        } else {
-            "chevron-right"
-        };
-        icons::inline(ui, chevron, 12.0, t.text_faint);
-        ui.label(
-            RichText::new(title.to_uppercase())
-                .font(theme::semibold(10.5))
-                .color(t.text_faint),
-        );
-        match summary {
-            Summary::Loading => {
-                ui.add(crate::spinner::Spinner::new().size(10.0));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            if let Some((tip, refreshed)) = refresh
+                && icons::small_button(ui, "refresh-cw", tip).clicked()
+            {
+                *refreshed = true;
             }
-            Summary::Text(text, color) => {
-                ui.add(egui::Label::new(RichText::new(text).color(color).small()).truncate());
-            }
-        }
-        if let Some((tip, refreshed)) = refresh {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::small_button(ui, "refresh-cw", tip).clicked() {
-                    *refreshed = true;
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                icons::inline(
+                    ui,
+                    if open {
+                        "chevron-down"
+                    } else {
+                        "chevron-right"
+                    },
+                    12.0,
+                    t.text_faint,
+                );
+                let compact = ui.available_width() < 220.0;
+                if !compact {
+                    ui.label(
+                        RichText::new(title.to_uppercase())
+                            .font(theme::semibold(10.5))
+                            .color(t.text_faint),
+                    );
+                }
+                match summary {
+                    Summary::Loading => {
+                        if compact {
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(title.to_uppercase())
+                                        .font(theme::semibold(10.5))
+                                        .color(t.text_faint),
+                                )
+                                .truncate(),
+                            );
+                        }
+                        if ui.available_width() >= 10.0 {
+                            ui.add(crate::spinner::Spinner::new().size(10.0));
+                        }
+                    }
+                    Summary::Text(text, color) => {
+                        let shown = if compact {
+                            format!("{} · {text}", title.to_uppercase())
+                        } else {
+                            text.clone()
+                        };
+                        ui.add(
+                            egui::Label::new(RichText::new(shown).color(color).small()).truncate(),
+                        )
+                        .on_hover_text(text);
+                    }
                 }
             });
-        }
+        });
     });
     // The whole row folds and unfolds, but for the button on it.
     let row = header.response.rect;
     let fold = ui.interact(
-        row.with_max_x(row.right() - 24.0),
+        row.with_max_x(row.right() - if has_refresh { 26.0 } else { 0.0 }),
         id.with("header"),
         Sense::click(),
     );
+    crate::a11y::a11y_selected(&fold, title, open);
     if fold.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -150,5 +181,56 @@ mod tests {
         let id = egui::Id::new(("commit-extras-open", "Test"));
         ctx.data_mut(|d| d.insert_persisted(id, false));
         assert!(!drawn_open(true));
+    }
+}
+
+#[cfg(test)]
+mod responsive_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn responsive_extras_summary_reserves_refresh_and_preserves_fold_action() {
+        for width in [240.0, 420.0, 800.0] {
+            for scale in [1.0, 1.25, 1.5] {
+                let mut styled = false;
+                let mut h = Harness::builder().with_size([width / scale, 180.0]).with_pixels_per_point(scale)
+                    .build_ui_state(move |ui, refreshed: &mut bool| {
+                        if !styled { crate::theme::install_fonts(ui.ctx());
+                crate::theme::apply(ui.ctx(), &crate::theme::ThemeId::default(), &crate::theme::Tweaks::default()); egui_extras::install_image_loaders(ui.ctx()); styled = true;
+                    return; }
+                        egui::CentralPanel::default().show(ui, |ui| {
+                            section(ui, "Contained in", Summary::Text("9 branches · 2 tags · first tag v0.3.5-dev.28-with-a-long-name".into(), egui::Color32::WHITE), false,
+                                Some(("Read again", refreshed)), |ui| { ui.label("Expanded branches"); });
+                        });
+                    }, false);
+                h.step();
+                let refresh = h.get_by_label("Read again").rect();
+                let summary = h
+                    .get_by_label_contains(
+                        "9 branches · 2 tags · first tag v0.3.5-dev.28-with-a-long-name",
+                    )
+                    .rect();
+                assert!(
+                    summary.right() <= refresh.left(),
+                    "summary crosses refresh at {width}/{scale}: {summary:?} / {refresh:?}"
+                );
+                h.get_by_label("Read again").click();
+                h.step();
+                assert!(*h.state());
+                assert!(
+                    h.query_by_label("Expanded branches").is_none(),
+                    "refresh toggled section"
+                );
+                h.get_by_label("Contained in").focus();
+                h.key_press(egui::Key::Enter);
+                h.step();
+                assert!(h.query_by_label("Expanded branches").is_some());
+                crate::repo::detail::responsive_tests::evidence(
+                    &mut h,
+                    &format!("extras-{width}-{scale}"),
+                );
+            }
+        }
     }
 }
