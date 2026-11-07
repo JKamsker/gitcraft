@@ -95,6 +95,7 @@ pub(crate) enum BakeAct {
     BuildAll,
     /// Shows the commit _Assemble_ made in the graph.
     ShowMade,
+    Output(usize),
 }
 
 impl Bakeoff {
@@ -130,6 +131,24 @@ impl Bakeoff {
 impl RepoTab {
     pub(crate) fn bake_act(&mut self, act: BakeAct, ctx: &egui::Context) {
         match act {
+            BakeAct::Output(n) => {
+                if let Some(path) = self
+                    .bakeoff
+                    .view
+                    .as_ref()
+                    .and_then(|v| v.statuses.get(n))
+                    .and_then(|s| s.as_ref())
+                {
+                    let log = crate::remote::resolve(
+                        path.parent().unwrap_or(&self.path),
+                        &format!(
+                            "{}.log",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ),
+                    );
+                    self.apply(super::Action::OpenInEditor(log), ctx);
+                }
+            }
             BakeAct::OpenPicker => self.bakeoff.picker = Some(Picker::new(self)),
             BakeAct::ClosePicker => self.bakeoff.picker = None,
             BakeAct::Compare(attempts) => {
@@ -225,6 +244,8 @@ impl RepoTab {
             return;
         };
         view.comparison = None;
+        view.builds.fill(None);
+        view.statuses.fill(None);
         view.file = None;
         view.request += 1;
         let request = view.request;
@@ -357,9 +378,18 @@ impl RepoTab {
             return;
         };
         let command = view.build_command.trim().to_owned();
-        let Some(worktree) = view.attempts.get(n).and_then(|a| a.worktree.clone()) else {
+        let Some(Ok(comparison)) = &view.comparison else {
             return;
         };
+        let Some(compared) = comparison.attempts.get(n) else {
+            return;
+        };
+        if view.builds.get(n) == Some(&Some(Built::Running)) {
+            return;
+        }
+        let tree = compared.tree.clone();
+        let base = comparison.base.clone();
+        let request = view.request;
         if command.is_empty() {
             view.note = Some((
                 "Type the command that builds the project first".to_owned(),
@@ -377,22 +407,30 @@ impl RepoTab {
         }
         let repo = self.path.clone();
         let remembered = command.clone();
-        let wt = worktree.clone();
         self.then(
             ctx,
-            move || -> Result<PathBuf, String> {
+            move || -> Result<(PathBuf, PathBuf), String> {
                 let _ = crate::agent::write_json(&repo, build::COMMAND_FILE, &remembered);
-                let status = build::status_file(&repo, &wt)?;
+                let worktree = build::workspace(&repo, &tree, &base)?;
+                let status = build::status_file(&repo, &worktree)?;
                 // An earlier build's status isn't this one's.
                 if let Some(dir) = status.parent() {
                     let _ = crate::remote::create_dir_all(dir);
                 }
                 crate::remote::write(&status, b"")
                     .map_err(|e| format!("could not prepare the build's status file: {e}"))?;
-                Ok(status)
+                Ok((worktree, status))
             },
             move |tab, status, ctx| match status {
-                Ok(status) => {
+                Ok((worktree, status)) => {
+                    if tab
+                        .bakeoff
+                        .view
+                        .as_ref()
+                        .is_none_or(|v| v.request != request)
+                    {
+                        return;
+                    }
                     let there = build::for_sh(&status);
                     if let Some(view) = &mut tab.bakeoff.view
                         && let Some(slot) = view.statuses.get_mut(n)

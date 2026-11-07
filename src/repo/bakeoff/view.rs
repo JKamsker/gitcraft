@@ -104,16 +104,15 @@ fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>
                 .desired_width(280.0),
         )
         .on_hover_text("Kept for the repository");
-        let can = !view.build_command.trim().is_empty()
-            && view.attempts.iter().any(|a| a.worktree.is_some());
+        let can = !view.build_command.trim().is_empty() && matches!(view.comparison, Some(Ok(_)));
         let why = if view.build_command.trim().is_empty() {
             "Type the command that builds the project"
         } else {
-            "Only attempts with a worktree can be built"
+            "Compare the attempts first"
         };
         if ui
             .add_enabled(can, egui::Button::new("Build all"))
-            .on_hover_text("Runs it in a terminal in each attempt's worktree")
+            .on_hover_text("Explicitly runs this command on each compared snapshot in a fresh detached worktree. No setup recipe runs. Workspaces remain in Worktrees for inspection and removal.")
             .on_disabled_hover_text(why)
             .clicked()
         {
@@ -205,7 +204,19 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
             ui.label(RichText::new("Builds").color(t.text_dim));
             for (i, a) in view.attempts.iter().enumerate() {
                 let built = view.builds.get(i).copied().flatten();
-                build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                ui.vertical(|ui| {
+                    build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                    if view.statuses.get(i).is_some_and(Option::is_some)
+                        && ui
+                            .small_button("Build output…")
+                            .on_hover_text(
+                                "Open this run's complete saved output in the configured editor",
+                            )
+                            .clicked()
+                    {
+                        *act = Some(BakeAct::Output(i));
+                    }
+                });
             }
             ui.end_row();
         });
@@ -214,7 +225,7 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
 fn build_cell(
     ui: &mut Ui,
     built: Option<Built>,
-    has_worktree: bool,
+    _has_worktree: bool,
     i: usize,
     t: &Tokens,
     act: &mut Option<BakeAct>,
@@ -233,17 +244,11 @@ fn build_cell(
                 ui.colored_label(t.danger, format!("✘ fails ({code})"))
                     .on_hover_text("Its output is in the terminal tab");
             }
-            None if has_worktree => {
+            None => {
                 ui.label(RichText::new("not built").color(t.text_faint));
             }
-            None => {
-                ui.label(RichText::new("a branch: no worktree to build in").color(t.text_faint))
-                    .on_hover_text(
-                        "Add a worktree for it (WORKTREES +), then pick it with Other attempts…",
-                    );
-            }
         }
-        if has_worktree {
+        if built != Some(Built::Running) {
             let (label, tip) = match built {
                 Some(Built::Running) => (
                     "Build again",
@@ -252,7 +257,7 @@ fn build_cell(
                 Some(_) => ("Build again", "Runs the build command again"),
                 None => (
                     "Build",
-                    "Runs the build command in a terminal of its worktree",
+                    "Runs your command on the exact compared snapshot in a fresh detached worktree",
                 ),
             };
             if ui.small_button(label).on_hover_text(tip).clicked() {

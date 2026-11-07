@@ -55,13 +55,15 @@ pub(crate) fn script(command: &str, status: &str) -> String {
         "mkdir -p -- {dir} && rm -f -- {status}\n\
          gitcraft_say 'building (bake-off):'\n\
          printf '%s\\n' \"$gitcraft_build\" | sed 's/^/  $ /'\n\
-         sh -e -c \"$gitcraft_build\"\n\
+         sh -e -c \"$gitcraft_build\" > {log} 2>&1\n\
          gitcraft_code=$?\n\
+         cat -- {log}\n\
          printf '%s\\n' \"$gitcraft_code\" > {status}\n\
          if [ \"$gitcraft_code\" = 0 ]; then gitcraft_say 'it builds'; \
          else gitcraft_say \"the build failed (exit status $gitcraft_code)\"; fi",
         dir = sh::quote(dir),
         status = sh::quote(status),
+        log = sh::quote(&format!("{status}.log")),
     ));
     s
 }
@@ -72,5 +74,90 @@ pub(crate) fn read_status(text: Option<&str>) -> Built {
         Some(Ok(0)) => Built::Passed,
         Some(Ok(code)) => Built::Failed(code),
         _ => Built::Running,
+    }
+}
+
+/// Build an immutable compared tree, including uncommitted worktree attempts. No source
+/// checkout/index/ref is moved. The workspace remains registered for inspection/removal
+/// through Worktrees; automatic forced cleanup could delete a user's later edits.
+pub(crate) fn workspace(repo: &Path, tree: &str, base: &str) -> Result<PathBuf, String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    if ![tree, base]
+        .iter()
+        .all(|s| matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        return Err("Build needs immutable compared object IDs".into());
+    }
+    let commit = crate::git::run(
+        Some(repo),
+        &[
+            "-c",
+            "commit.gpgSign=false",
+            "-c",
+            "user.name=gitcraft bake-off",
+            "-c",
+            "user.email=bakeoff@localhost",
+            "commit-tree",
+            tree,
+            "-p",
+            base,
+            "-m",
+            "Disposable bake-off snapshot",
+        ],
+    )?
+    .trim()
+    .to_owned();
+    let path = crate::agent::repo_file(
+        repo,
+        &format!(
+            "bakeoff/workspaces/{}-{}-{}",
+            crate::git::now(),
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ),
+    )?;
+    // Git refuses an occupied directory. Do not remove or adopt it on failure.
+    crate::git::run(
+        Some(repo),
+        &[
+            "-c",
+            "core.hooksPath=",
+            "worktree",
+            "add",
+            "--detach",
+            "--",
+            &crate::remote::git_path(&path),
+            &commit,
+        ],
+    )?;
+    Ok(path)
+}
+
+#[cfg(test)]
+mod workspace_tests {
+    use super::*;
+    #[test]
+    fn snapshots_are_independent_and_source_index_and_branch_stay_unchanged() -> Result<(), String>
+    {
+        let r = crate::git::fixture::Repo::new("bakeoff-snapshot")?;
+        let base = r.commit("base", &[("file", Some("base\n"))])?;
+        r.git(&["branch", "attempt"])?;
+        let tree = r.git(&["rev-parse", "HEAD^{tree}"])?;
+        std::fs::write(r.path().join("later"), "keep").map_err(|e| e.to_string())?;
+        r.git(&["add", "later"])?;
+        let index = std::fs::read(r.path().join(".git/index")).map_err(|e| e.to_string())?;
+        let a = workspace(r.path(), tree.trim(), &base)?;
+        let b = workspace(r.path(), tree.trim(), &base)?;
+        assert_ne!(a, b);
+        assert_eq!(crate::git::run(Some(&a), &["show", "HEAD:file"])?, "base\n");
+        assert!(!a.join("later").exists());
+        assert_eq!(std::fs::read(r.path().join(".git/index")).unwrap(), index);
+        assert_eq!(r.git(&["rev-parse", "attempt"])?.trim(), base);
+        assert!(workspace(r.path(), "HEAD", &base).is_err());
+        // These owned fixtures are clean: ordinary removal refuses dirty workspaces.
+        r.git(&["worktree", "remove", &a.to_string_lossy()])?;
+        r.git(&["worktree", "remove", &b.to_string_lossy()])?;
+        Ok(())
     }
 }
