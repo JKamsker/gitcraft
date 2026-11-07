@@ -1,0 +1,47 @@
+{
+  "candidate": "9bb73a3256573a68f665f09cc390def05ba2f139",
+  "tree": "36df8a02e1ce88ad5b78cda5cec4770d39664b2b",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "status": "WIP static review complete; runtime focused rerun pending",
+  "manifest_sha256": "f4fdc7c923778376897450dd639c17637f41e8d7a16caada073cbde2f019ba55",
+  "source_files_verified": 350,
+  "all_manifest_sources_equal_candidate": true,
+  "gate_logs_verified": 4,
+  "feature_names_executed_in_author_full": 28,
+  "author_summary": {
+    "library_passed": 842,
+    "executable_integration_passed": 3,
+    "aggregate_passed": 845,
+    "ignored": 3,
+    "failures": 0,
+    "filtered": 0,
+    "new_feature_tests_passed": 28
+  },
+  "artifacts": {
+    "target/debug/deps/standalone_cli-f55959dae1e687f5": {
+      "sha256": "c83848b73c725dfaa441c9dcbd10031e902f82fefe6ea5b6c7a54b2ba60dba88",
+      "depfile_sha256": "76e372743aeb3b00664971c7383a32f169abcb0dff6e2da6d5eadfac161a759c"
+    },
+    "target/debug/gitcraft": {
+      "sha256": "1ad5f55cfea7e25118428a862764fd827ff7e789e5ea3e1eda287bc2ef65539d",
+      "depfile_sha256": null
+    },
+    "target/debug/deps/gitcraft-cdb92a3e5c63a8e6": {
+      "sha256": "5732349bfc9d2958aeb94dfee44b8b922fa2ed01371942fe0e366743aa2edc3a",
+      "depfile_sha256": "a0c501a609930c0676a341e73d454c107a4e46f91975c4170256a723f90e9315"
+    },
+    "target/debug/deps/gitcraft-762977eb2acd9c77": {
+      "sha256": "ac13d18072200a59f81fb4e73e3ad7d78b7b5e3757552d78cf28d21ae6265768",
+      "depfile_sha256": "783590c372ea956ccbab98f588d676c0ab24b995d6910543412595de8c2af52e"
+    }
+  },
+  "library_list_summary": "845 tests, 0 benchmarks",
+  "source_evidence_head": "f1ee4f33cea9f0b3efdd9c9f38e5afc4ea976083",
+  "static_native_protocol": "PASS: constant PowerShell read mode exits before write; literal owned-temp icacls argv only, no recursion/shell; no native execution",
+  "limits": [
+    "no fresh compilation",
+    "Linux runtime only",
+    "native Windows/macOS unexecuted",
+    "no CI"
+  ]
+}
