@@ -1,0 +1,15 @@
+{
+  "compiled_source_commit": "7347ecc33ed9c5e0fc6be1a6188b560bea121518",
+  "application_source_tree": "a31b21aa0e128d72cf583e8045dcf7d949f23544",
+  "production_static_pass": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "production_prefix_sha256": "37b090eaaa01d28c9183a24f51fe4cb71e6f06ebde06e2f0f3207dad83e4bb60",
+  "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "binary_sha256": "dacfe9f866c2907a35c2a3f3b73ad2cd6cb0feb45a6eaf814b8b2a83859e0981",
+  "checks": "Private INCR0/jobs2 fmtcheck/strictClippyalltargets/no-run PASS; worktree /workspace/work/push-preflight",
+  "log_sha256": {
+    "production-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "production-clippy.log": "e8d1272a7be9f941f925e012562cee07fb7f7580052b5a93823bfa2b17cfd521",
+    "production-compiler.log": "5b9ecd3483e8626673b0edfa86f86063e728fe5df1b2deb3f151940c84754ee1"
+  },
+  "runtime": "NOT EXECUTED;21ownedlocalcasesauthorized; recordedsixPASSacceptedroot"
+}
