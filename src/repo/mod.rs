@@ -20,6 +20,7 @@ mod conflict;
 mod conflict_check;
 pub(crate) mod custom_commands;
 mod detached;
+mod dco;
 mod detail;
 mod dialogs;
 mod diff;
@@ -180,6 +181,8 @@ pub struct RepoTab {
     ci: ci_status::CiStatuses,
     /// The _weakens checks_ scans of the file lists shown.
     weakened: weakened_marks::WeakenedMarks,
+    /// Whether commits are signed off (DCO), and the sign-offs of the pull request shown.
+    dco: dco::Dco,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -391,6 +394,7 @@ impl RepoTab {
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
             weakened: Default::default(),
+            dco: dco::Dco::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,

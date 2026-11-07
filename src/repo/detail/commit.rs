@@ -93,6 +93,7 @@ impl RepoTab {
                         super::compose::issue_links::links_row(ui, &detail.message, &issue_rules);
                         ui.add_space(12.0);
                         author_line(ui, detail);
+                        self.dco.commit_note(ui, detail);
                         ui.add_space(10.0);
                         meta_grid(ui, acts, detail, builds);
                         if stash.is_none() {

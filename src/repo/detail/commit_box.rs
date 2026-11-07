@@ -43,6 +43,7 @@ impl RepoTab {
                     self.fold_picker(ui, amending, acts);
                 }
                 self.ai_message_button(ui, !rebasing);
+                self.dco.toggle(ui, !rebasing, acts);
             });
         });
         self.amend = amending;

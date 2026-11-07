@@ -26,6 +26,7 @@ impl RepoTab {
         }
         self.publish_custom_commands(&ctx);
         let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        self.dco_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
 

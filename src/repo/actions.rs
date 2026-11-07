@@ -250,6 +250,8 @@ pub(crate) enum Action {
     Bisect(super::bisect::BisectAct),
     /// Start, cancel or close a parallel bisect.
     ParallelBisect(super::parallel_bisect::ParallelAct),
+    /// Something about DCO sign-offs.
+    Dco(super::dco::DcoAct),
 }
 
 /// Compares two branches, given to git by their full refs (a tag of the same name is not
