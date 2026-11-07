@@ -64,6 +64,8 @@ impl RepoTab {
                         lines: diff::hunk_changes(&data.lines, 0),
                     });
                 }
+                acts.push(Action::DiffStructural(true));
+                acts.push(Action::DiffStructural(false));
                 acts.push(Action::RunRebase);
                 acts.push(Action::StashPush("sample".to_owned()));
             }

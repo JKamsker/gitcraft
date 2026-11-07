@@ -13,6 +13,7 @@ mod patch;
 pub(super) mod rendered;
 mod rows;
 mod select;
+pub(in crate::repo) mod structural;
 #[cfg(test)]
 mod tests;
 mod view;
