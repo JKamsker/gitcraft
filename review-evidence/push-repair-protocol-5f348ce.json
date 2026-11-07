@@ -1,0 +1,56 @@
+{
+  "review": "Independent static native symbolic-HEAD repair protocol re-review",
+  "verdict": "PASS_STATIC_ONLY",
+  "candidate": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "tree": "35b8a78aef1712be518a71452d087ad22845628b",
+  "transaction_rs_sha256": "40e6ede340b6e7fb91ce79617884bd56ef2656da73590973acfe9d23c5ecb83a",
+  "scope": "Narrow production correction from097c00f plus prior guarded snapshot/relay/retention scope and preserved refs-only diagnostic evidence. No changed-production compilation/runtime, recording execution, CI or whole-feature approval by reviewer.",
+  "findings": [],
+  "static_assessment": [
+    "Native transaction now update HEAD new old, without option no-deref, explicit branch update or duplicate symref-verify. Git dereferences HEAD and owns the native HEAD/referent operation; this avoids the duplicate implicit HEAD registration that safely refused the previous scratch proof.",
+    "Branch identity remains bound into private script, proof and recovery metadata despite removing the unused Hook branch field. A pre-lock same-tip HEAD switch cannot qualify solely through matching OIDs: prepared stdin must contain exactly one intended branch/old/new tuple, with no other/extra fields, and symbolic HEAD must match before the original hook runs.",
+    "Symbolic HEAD and old OID are checked again after the original prepared hook, before raw index/dependency/stat-cold work checks and checkout. Existing checks after checkout and after original committed hook remain unchanged.",
+    "Scratch capability proof uses this same native HEAD update and requires exact branch-only native prepared input, prepared/committed ACKs and actual final HEAD target/new OID. Unsupported versions/backends still refuse before user-ref dispatch.",
+    "Immutable saved-index/dependency selection, Practice/profile routing, original hook argv/stdin/config restoration, exact user ACKs, local uncertainty retention and remote fail-closed entry points remain intact.",
+    "The earlier490a9e7 HookScript grouping preserves identical values and immediately destructures them; inspection found no separate protocol behavior in that compiler-only fix.",
+    "Added owned fixture module is cfg(test,unix); its real protocol entry is ignored by default and requires explicit case/root selection in an env-cleared child. No production PID selector, signal controller or remote runner is introduced."
+  ],
+  "inspected_prior_evidence": {
+    "gate1": "All five preserved recording log hashes match490a9e7 results. These are prior-source checks; they must be repeated for corrected production source.",
+    "initial_gate2": "Previous actual scratch transaction safely refused duplicate HEAD registration before user mutation; this is failure evidence for the prior protocol, not success evidence for this correction.",
+    "native_diagnostics": "Seven refs-only cases preserved at097c00f; all95 per-file hashes match results.json. Four files/reftable x sha1/sha256 native updates succeeded. Files-backend nested symbolic switch and detach refused on owned HEAD.lock. Pre-lock same-tip other-branch switch refused with identical complete before/after snapshots. Every case preserves index/work bytes and recorded modes.",
+    "diagnostic_limit": "Refs-only diagnostics do not execute repaired checkout or the changed production wrapper. Nested HEAD-lock cases are files-backend diagnostics; do not generalize literal HEAD.lock filenames to reftable locking."
+  },
+  "required_recording_repeat": {
+    "decision": "Root may release recording-only checks after compiler/binary/source binding and preserved plan. No real protocol execution until root accepts these results.",
+    "minimum": [
+      "rotated_split_index_dependency_is_resolved_from_the_saved_index",
+      "synthetic_capability_versions_refuse_before_user_dispatch",
+      "missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+      "synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+      "recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes"
+    ],
+    "new_guard_cases": "Also record wrong target, wrong old/new OIDs, duplicate/extra input and already-wrong symbolic HEAD. Assert refusal before any original prepared-hook invocation or checkout. These can be test-only variants using supplied recording Git, owned temp files and no real repository/ref transaction.",
+    "preservation": "Save exact compiled-source/binary/log hashes and counts; commit/push/remoteverify before next gate. Any compiler-only/test-only followup must be preserved and explicitly rebound; any production protocol change needs static re-review."
+  },
+  "owned_gate2_release_conditions": {
+    "decision": "After recording repeat passes and root accepts evidence, root may authorize the following owned local cases under the previously accepted containment conditions, without a new broad planning loop.",
+    "containment": "Explicit selected ignored test only; exclusive new temp root, env_clear/private HOME/XDG/Git config/TMPDIR, explicit recorded Git executable/version/hash, no user keys/config/remotes/live hosts. Use existing approved bounded owned-child helper only, with preserved fixture source/plan before execution; no new watchdog/PID selectors/signals and no removal of unrelated locks.",
+    "cases": [
+      "Actual production scratch proof plus Hook execute success across files/reftable x sha1/sha256 claimed supported; verify final expected branch/symbolic HEAD/index/worktree, original hook argv/stdin/config and all nonempty exact ACKs. A backend refusal remains safe-refusal evidence, not repair success.",
+      "Actual changed-production pre-lock same-tip other-branch and detached HEAD cases must refuse before original prepared hook/checkout and preserve external HEAD plus both refs/index/worktree.",
+      "Original prepared hook attempts to switch/detach HEAD must be blocked by the actual native transaction lock or refused with preserved edits, before checkout. For reftable use backend-appropriate lock/refusal evidence rather than asserting a files-backend HEAD.lock pathname.",
+      "Held target ref lock, original policy veto, index replacement and working-byte mutation; snapshots must prove refusal/preserved external changes and no automatic rollback.",
+      "Saved split-index/dependency rotation and missing dependency cases must establish that real Git GIT_INDEX_FILE resolves the immutable saved index's dependency; retain a coherent pair after later failure.",
+      "Checkout failure, original committed-hook failure and bounded timeout must retain actionable owned index/dependency/old-new IDs/update/ACK evidence. Record actual committed or uncommitted ref outcome; retain concurrent edits and do not restore automatically.",
+      "Unsupported old Git, missing capability/ACK and backend refusal before user mutation; successful full scan/fix and existing undo journal integration remain necessary beyond direct Hook cases."
+    ],
+    "acceptance": "Record exact before/after refs, symbolic HEAD, index/dependency/work bytes and modes, process outcome, original relay records and retained evidence. Commit/push/verify each completed validation unit. Root assesses failures before broader feature tests."
+  },
+  "limits": [
+    "Status JSON retains legacy top-level head/tree fields; review binds immutable Git candidate/tree and checked transaction SHA above, plus its latest_head fields. Do not treat old application gates as results on this production correction.",
+    "No reviewer test/compile/protocol execution or CI access; source is STATIC only.",
+    "Remote automatic repair remains OPEN/interim fail-closed. Existing completion counters do not establish per-request mutation dispatch/outcome ownership.",
+    "Default-port/auth retry/deletion undo-redo/full-feature and final combined local gates/adversarial review remain open. No final feature PASS or PR approval."
+  ]
+}
