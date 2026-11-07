@@ -408,6 +408,40 @@ pub(crate) fn white_text_fill(color: Color32) -> Color32 {
     aa_foreground(color, &[Color32::WHITE])
 }
 
+/// The strongest requested tint that leaves its labels readable after compositing.
+pub(crate) fn readable_tint(
+    color: Color32,
+    opacity: f32,
+    backgrounds: &[Color32],
+    foregrounds: &[Color32],
+) -> Color32 {
+    let tint = |alpha: u8| color.gamma_multiply(alpha as f32 / 255.0);
+    let readable = |alpha, minimum| {
+        backgrounds.iter().all(|bg| {
+            let bg = over(tint(alpha), *bg);
+            foregrounds.iter().all(|fg| contrast(*fg, bg) >= minimum)
+        })
+    };
+    let requested = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+    // Custom palettes that already fall below AA retain their chosen treatment.
+    if !readable(0, 4.5) {
+        return tint(requested);
+    }
+    if !readable(0, 4.55) {
+        return Color32::TRANSPARENT;
+    }
+    let (mut low, mut high) = (0_u16, requested as u16);
+    while low < high {
+        let mid = (low + high).div_ceil(2);
+        if readable(mid as u8, 4.55) {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    tint(low as u8)
+}
+
 /// White or near-black, whichever reads better on `bg`.
 pub fn readable_on(bg: Color32) -> Color32 {
     let ink = Color32::from_rgb(22, 22, 26);

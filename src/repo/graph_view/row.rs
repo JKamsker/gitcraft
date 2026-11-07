@@ -76,7 +76,7 @@ impl RepoTab {
         let painter = ui.painter_at(rect);
         let is_wip = commit.hash == WIP_HASH;
         let is_match = self.search.matches.contains(&commit.hash);
-        row_background(
+        let background = row_background(
             &painter,
             &t,
             rect,
@@ -102,7 +102,7 @@ impl RepoTab {
         let resp = self.refs_cell(ui, &painter, &row, resp, acts);
         self.graph_cell(ui, &painter, &row, lanes.shown);
         if is_wip {
-            self.wip_description(&painter, &t, &row);
+            self.wip_description(&painter, &t, &row, background);
         } else {
             let ci = self.ci_status(&commit.hash);
             description(ui, &painter, &t, &row, is_match, ci.is_some());
@@ -130,7 +130,7 @@ impl RepoTab {
     }
 
     /// The changes row's description: how many files are conflicted, staged and unstaged.
-    fn wip_description(&self, painter: &Painter, t: &Tokens, row: &Row) {
+    fn wip_description(&self, painter: &Painter, t: &Tokens, row: &Row, background: Color32) {
         let mid = row.mid();
         let mut x = row.gx + row.cols.graph + 6.0;
         let font = theme::medium(12.5);
@@ -153,7 +153,14 @@ impl RepoTab {
             (self.work.unstaged.len(), "unstaged", t.warning),
         ] {
             if n > 0 {
-                x += pill(painter, pos2(x, mid), &format!("{n} {label}"), color) + 6.0;
+                x += pill(
+                    painter,
+                    t,
+                    pos2(x, mid),
+                    &format!("{n} {label}"),
+                    color,
+                    background,
+                ) + 6.0;
             }
         }
     }
@@ -168,16 +175,22 @@ fn row_background(
     hovered: bool,
     is_match: bool,
     compared: bool,
-) {
+) -> Color32 {
     // The row's own band, without the gap.
     let band = rect.shrink2(vec2(0.0, ROW_GAP / 2.0));
-    if selected {
+    let background = if selected {
         painter.rect_filled(band, 0.0, t.row_selected);
+        t.row_selected
     } else if hovered {
         painter.rect_filled(band, 0.0, t.hover);
+        t.hover
     } else if is_match {
-        painter.rect_filled(band, 0.0, t.warning.gamma_multiply(0.10));
-    }
+        let tint = t.match_tint();
+        painter.rect_filled(band, 0.0, tint);
+        theme::palette::over(tint, t.dock)
+    } else {
+        t.dock
+    };
     if is_match {
         painter.rect_filled(
             Rect::from_min_size(band.min, vec2(3.0, ROW_H)),
@@ -193,9 +206,10 @@ fn row_background(
             egui::StrokeKind::Inside,
         );
     }
+    background
 }
 
-/// The summary, then the rest of the message faded, cut with an ellipsis.
+/// The summary, then the rest of the message in the faint text colour, cut with an ellipsis.
 /// `dot`: room is left at the end for the build status.
 fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool, dot: bool) {
     let (rect, mid) = (row.rect, row.mid());
@@ -221,7 +235,7 @@ fn description(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, is_match: bool
     if !row.commit.body.is_empty() && room > 24.0 {
         let mut job = egui::text::LayoutJob::single_section(
             row.commit.body.clone(),
-            egui::TextFormat::simple(FontId::proportional(12.5), t.text.gamma_multiply(0.5)),
+            egui::TextFormat::simple(FontId::proportional(12.5), t.text_faint),
         );
         job.wrap = egui::text::TextWrapping::truncate_at_width(room);
         let galley = ui.fonts_mut(|f| f.layout_job(job));
@@ -289,15 +303,113 @@ fn trailing_columns(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, now: i64)
 }
 
 /// A small rounded count label; returns its width.
-fn pill(painter: &Painter, left_center: Pos2, text: &str, color: Color32) -> f32 {
+fn pill(
+    painter: &Painter,
+    t: &Tokens,
+    left_center: Pos2,
+    text: &str,
+    color: Color32,
+    background: Color32,
+) -> f32 {
     let galley = painter.layout_no_wrap(text.to_owned(), theme::medium(11.0), color);
     let w = galley.size().x + 12.0;
     let r = Rect::from_min_size(pos2(left_center.x, left_center.y - 9.0), vec2(w, 18.0));
-    painter.rect_filled(r, CornerRadius::same(9), color.gamma_multiply(0.18));
+    painter.rect_filled(
+        r,
+        CornerRadius::same(9),
+        t.text_tint(color, 0.18, background),
+    );
     painter.galley(
         pos2(r.left() + 6.0, r.center().y - galley.size().y / 2.0),
         galley,
         color,
     );
     w
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn painted_graph_bodies_and_wip_chips_meet_aa_in_combined_row_states() {
+        let ctx = theme::test_paint::context();
+        for builtin in theme::catalog::BUILTIN {
+            let t = builtin.palette().tokens();
+            theme::set_tokens(&ctx, t);
+            let mut tab = RepoTab::new_deferred("/nonexistent/contrast-paint".into(), &ctx);
+            let file = git::StatusFile {
+                path: "file".into(),
+                old_path: None,
+                code: 'M',
+                area: git::Area::Unstaged,
+            };
+            tab.work.unstaged.push(file.clone());
+            tab.work.staged.push(file.clone());
+            tab.work.conflicted.push(file);
+            let commit = Commit {
+                summary: "Subject".into(),
+                body: "faintbody".into(),
+                ..Default::default()
+            };
+            for state in 0..4 {
+                let mut output = ctx.run_ui(Default::default(), |ctx| {
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::new().fill(t.dock))
+                        .show(ctx, |ui| {
+                            let painter = ui.painter();
+                            let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(700.0, ROW_PITCH));
+                            let mut row = Row {
+                                i: 0,
+                                commit: &commit,
+                                rect,
+                                cols: Cols {
+                                    refs: 0.0,
+                                    graph: 0.0,
+                                    hash: 0.0,
+                                    author: 0.0,
+                                    when: 0.0,
+                                    date: 0.0,
+                                    push: 0.0,
+                                },
+                                gx: 0.0,
+                                lane_w: 0.0,
+                                node_x: None,
+                                color: t.accent,
+                            };
+                            row_background(
+                                painter,
+                                &t,
+                                row.rect,
+                                state == 2,
+                                state == 1,
+                                state == 3,
+                                false,
+                            );
+                            description(ui, painter, &t, &row, state == 3, false);
+                            row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
+                            let background = row_background(
+                                painter,
+                                &t,
+                                row.rect,
+                                state == 2,
+                                state == 1,
+                                state == 3,
+                                false,
+                            );
+                            tab.wip_description(painter, &t, &row, background);
+                        });
+                });
+                output.textures_delta.clear();
+                for label in ["faintbody", "1 conflict", "1 staged", "1 unstaged"] {
+                    theme::test_paint::assert_text_aa(
+                        &output.shapes,
+                        t.dock,
+                        label,
+                        &format!("{} state {state}", builtin.name),
+                    );
+                }
+            }
+        }
+    }
 }

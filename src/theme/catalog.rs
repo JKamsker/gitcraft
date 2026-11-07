@@ -961,8 +961,10 @@ mod tests {
                 ("warning chip", t.warning),
                 ("success chip", t.success),
             ] {
-                for (surface, bg) in &surfaces[..4] {
-                    check(name, fg, surface, over(fg.gamma_multiply(0.18), *bg));
+                for (surface, bg) in surfaces.iter().filter(|(name, _)| *name != "pressed") {
+                    for opacity in [0.18, 0.22] {
+                        check(name, fg, surface, over(t.text_tint(fg, opacity, *bg), *bg));
+                    }
                 }
             }
             check("button label", t.accent_text, "accent", t.accent);

@@ -9,6 +9,8 @@
 pub mod catalog;
 pub mod files;
 pub mod palette;
+#[cfg(test)]
+pub(crate) mod test_paint;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -439,6 +441,29 @@ impl Default for Tokens {
 }
 
 impl Tokens {
+    /// Tint behind small status text, capped so the composited row still meets AA.
+    pub(crate) fn text_tint(&self, color: Color32, opacity: f32, background: Color32) -> Color32 {
+        palette::readable_tint(color, opacity, &[background], &[color])
+    }
+
+    /// Search-match shading shares a row with every kind of metadata and status label.
+    pub(crate) fn match_tint(&self) -> Color32 {
+        palette::readable_tint(
+            self.warning,
+            0.10,
+            &[self.dock],
+            &[
+                self.text,
+                self.text_dim,
+                self.text_faint,
+                self.accent_fg,
+                self.danger,
+                self.warning,
+                self.success,
+            ],
+        )
+    }
+
     pub fn dark(&self) -> bool {
         self.dark
     }
@@ -628,6 +653,9 @@ pub fn set_tokens(ctx: &egui::Context, t: Tokens) {
     v.faint_bg_color = t.card;
     v.code_bg_color = t.field;
     v.override_text_color = Some(t.text);
+    // egui otherwise fades placeholders to 60%, bypassing the checked faint token.
+    v.weak_text_color = Some(t.text_faint);
+    v.weak_text_alpha = 1.0;
     v.hyperlink_color = t.accent_fg;
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;

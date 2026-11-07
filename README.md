@@ -254,10 +254,12 @@ so your config, credentials and hooks apply as usual.
     (Dark, Light), One Dark and One Light, GitHub (Dark, Light), Ayu (Dark, Mirage, Light),
     Monokai, Monokai Pro, Night Owl, Material Palenight, Tomorrow Night, Horizon and
     SynthWave '84. A theme colours everything: panels, text, the graph's lanes and pills, diffs
-    and the terminal's 16 colours. Built-in small text, hints, status labels and primary-button
-    labels meet WCAG AA (4.5:1) on their UI backgrounds; tests check every palette. Accent text
-    is separate from the button fill so both remain readable. Imported themes and custom
-    colours keep their author's choices.
+    and the terminal's 16 colours. WCAG AA checks (4.5:1) cover built-in text colours on their
+    panel and row backgrounds, text-field hints, graph descriptions and status badges. Button
+    and branch-pill labels are checked against their fills. Accent text is separate from the
+    button fill so both remain readable. Status tints adapt to the
+    selected or hovered background. Imported themes and custom colour values keep their
+    author's choices; derived pill shading can change to keep white labels readable.
   - A gallery of thumbnails; pointing at one shows the whole window in it before choosing.
   - _Follow VS Code_: the interface takes the workbench colours of the theme VS Code (or
     Insiders, VSCodium) is using, and changes with it.
