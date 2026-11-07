@@ -83,6 +83,7 @@ fn actual_dossier_controls_trace_versions_open_the_pinned_file_and_escape_closes
     crate::theme::install_fonts(&ctx);
     let mut tab = RepoTab::new_deferred(r.0.clone(), &ctx);
     tab.deferred = false;
+    tab.history_gen = 1;
     tab.refs = crate::git::refs(&r.0)?;
     tab.history = crate::git::log(&r.0, None, 0, 10)?
         .into_iter()

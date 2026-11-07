@@ -174,6 +174,12 @@ fn previous_line(
         return Err("File has over20000 lines".into());
     }
     let target = normal(now.get(line - 1).ok_or("Invalid current line")?);
+    if current == parent {
+        return Ok(Some((
+            line,
+            "Identical raw file version; exact line position",
+        )));
+    }
     let old_normal: Vec<_> = old.iter().map(|text| normal(text)).collect();
     let equal: Vec<_> = old_normal
         .iter()
@@ -213,7 +219,7 @@ fn previous_line(
     }
     let a = right.0 - left.0;
     let b = right.1 - left.1;
-    if a == b && a <= 40 && at >= left.0 && at < right.0 {
+    if a == 1 && b == 1 && at >= left.0 && at < right.0 {
         let candidate = left.1 + (at - left.0);
         if equal.is_empty() || equal.contains(&candidate) {
             return Ok(Some((
@@ -784,6 +790,11 @@ mod tests {
         assert_eq!(quoted_path("\"caf\\303\\251\\tline\"")?, "café\tline");
         assert!(quoted_path("\"truncated\\3\"").is_err());
         assert_eq!(previous_line("x\ny\nx\n", "x\nz\nz\nx\n", 2)?, None);
+        assert_eq!(previous_line("red\nred\n", "blue\nblue\n", 1)?, None);
+        assert_eq!(
+            previous_line("x\nx\n", "x\nx\n", 2)?.map(|(line, _)| line),
+            Some(2)
+        );
         assert!(!path_ok("../x"));
         assert!(!path_ok(".git/config"));
         assert!(path_ok("-f ü '$(literal)"));
