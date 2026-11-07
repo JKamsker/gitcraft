@@ -453,5 +453,30 @@ mod tests {
         assert!(tab.graph_description(4).contains("divergence"));
         tab.selected = Some(0);
         assert_eq!(tab.graph_walk(Direction::Parent, &ctx), Some(3));
+
+        use egui_kittest::{
+            Harness,
+            kittest::{NodeT, Queryable},
+        };
+        tab.rebuild_graph_labels();
+        let mut harness = Harness::builder().with_size([900.0, 600.0]).build_ui_state(
+            |ui, tab: &mut RepoTab| {
+                crate::settings::Settings {
+                    graph_lane_walk: true,
+                    ..Default::default()
+                }
+                .set(ui.ctx());
+                tab.graph_view(ui, &mut Vec::new());
+            },
+            tab,
+        );
+        harness.step();
+        let label = harness
+            .get_by_label_contains("commit merge")
+            .accesskit_node()
+            .label()
+            .unwrap_or_default();
+        assert!(label.starts_with("commit merge"), "{label}");
+        assert!(label.contains("merge; 2 parents"), "{label}");
     }
 }

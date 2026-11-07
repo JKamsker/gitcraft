@@ -89,16 +89,15 @@ impl RepoTab {
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
         let label = || {
-            format!(
-                "{}. {}{}",
-                self.graph_description(i),
-                if self.graph_motion.new_commit(&commit.hash) {
-                    "Newly received commit. "
-                } else {
-                    ""
-                },
-                self.row_label(commit, viewport.now)
-            )
+            let mut label = self.row_label(commit, viewport.now);
+            if crate::settings::Settings::get(ui.ctx()).graph_lane_walk {
+                label.push_str(". ");
+                label.push_str(&self.graph_description(i));
+            }
+            if self.graph_motion.new_commit(&commit.hash) {
+                label.push_str(". Newly received commit");
+            }
+            label
         };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
