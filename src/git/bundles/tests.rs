@@ -353,11 +353,16 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
     let config = std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?;
     let shallow = std::fs::read(dest.join(".git/shallow")).map_err(|e| e.to_string())?;
     let preview = inspect_bundle(&dest, bytes)?;
+    let supports_no_lazy = no_lazy_fetch(&dest).is_ok();
     assert!(
         preview
             .verification_error
             .as_ref()
-            .is_some_and(|e| e.contains(&base)),
+            .is_some_and(|e| if supports_no_lazy {
+                e.contains(&base)
+            } else {
+                e.contains("Upgrade Git")
+            }),
         "{:?}",
         preview.verification_error
     );
@@ -384,6 +389,9 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
         "tip"
     );
     assert!(!marker.exists());
+    if !supports_no_lazy {
+        return Ok(());
+    }
     // Positive control: this same prerequisite is fetchable, and ordinary native verify
     // really does contact our upload-pack helper and mutate this fixture's object store.
     run(
@@ -577,5 +585,37 @@ fn malformed_headers_and_untrusted_refs_are_rejected_without_unpacking() -> Resu
         assert!(inspect_bundle(&dest, bad.into_bytes()).is_err(), "{name}");
     }
     assert!(refs(&dest)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn unicode_whitespace_refs_and_legacy_prerequisite_subjects_are_preserved() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let source = f.repo("unicode-refs")?;
+    let oid = f.commit(&source, "one")?;
+    let name = "refs/heads/nonbreaking\u{a0}space";
+    run(Some(&source), &["update-ref", name, &oid])?;
+    let selected = bundle_refs(&source)?
+        .into_iter()
+        .find(|r| r.name == name)
+        .ok_or("Unicode whitespace ref missing")?;
+    let bytes = export_bundle(&source, &[selected], None)?;
+    assert_eq!(header(&bytes)?.0[0].name, name);
+    let sample = [
+        format!("# v2 git bundle\n-{oid} legacy ").into_bytes(),
+        vec![0xe9],
+        format!("\n{oid} HEAD\n\nPACK").into_bytes(),
+    ]
+    .concat();
+    let (_, prerequisites) = header(&sample)?;
+    assert_eq!(prerequisites[0].oid, oid);
+    assert!(prerequisites[0].name.starts_with("legacy "));
+    let bad_ref = [
+        format!("# v2 git bundle\n{oid} refs/heads/").into_bytes(),
+        vec![0xe9],
+        b"\n\nPACK".to_vec(),
+    ]
+    .concat();
+    assert!(header(&bad_ref).is_err());
     Ok(())
 }

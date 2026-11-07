@@ -22,6 +22,10 @@ pub(in crate::repo) struct State {
 }
 
 impl State {
+    pub(in crate::repo) fn shows_patch(&self) -> bool {
+        !self.enabled || matches!(self.result, Some(Err(_)))
+    }
+
     /// Finish only our outstanding job. A refresh during it schedules one new reading,
     /// coalescing rapid working-tree changes rather than starting many difft processes.
     pub fn arrived(

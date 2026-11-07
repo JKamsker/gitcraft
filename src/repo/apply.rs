@@ -280,11 +280,9 @@ impl RepoTab {
                     });
                 let rendered =
                     self.diff_rendered && self.diff.as_ref().is_some_and(|v| v.key.renders());
-                if let Some(view) = self
-                    .diff
-                    .as_mut()
-                    .filter(|v| !self.diff_as_file && !rendered && !rich && !v.structural.enabled)
-                {
+                if let Some(view) = self.diff.as_mut().filter(|v| {
+                    !self.diff_as_file && !rendered && !rich && v.structural.shows_patch()
+                }) {
                     view.step_change(Settings::get(ctx).diff_split, delta);
                 }
             }

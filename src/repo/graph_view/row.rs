@@ -192,26 +192,15 @@ impl RepoTab {
                     rect.bottom(),
                 ),
             );
-            if resp.hovered() && ui.rect_contains_pointer(description_rect.intersect(rect)) {
+            if super::message_tooltip::show(
+                ui,
+                &resp,
+                description_rect.intersect(rect),
+                &self.path,
+                &commit.hash,
+                self.graph_messages.message(&self.path, &commit.hash),
+            ) {
                 hovered_message = Some(commit.hash.clone());
-                resp.clone().on_hover_ui(|ui| {
-                    match self.graph_messages.message(&self.path, &commit.hash) {
-                        Some(Ok(message)) => {
-                            egui::ScrollArea::vertical()
-                                .id_salt(("full-commit-message", &commit.hash))
-                                .max_height((ui.ctx().content_rect().height() * 0.6).max(60.0))
-                                .show(ui, |ui| {
-                                    ui.label(message.as_str());
-                                });
-                        }
-                        Some(Err(error)) => {
-                            ui.label(error);
-                        }
-                        None => {
-                            ui.label("Loading full commit message…");
-                        }
-                    }
-                });
             }
             trailing_columns(ui, &painter, &t, &row, viewport.now);
             if let Some(status) = ci {

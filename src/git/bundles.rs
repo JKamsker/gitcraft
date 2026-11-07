@@ -41,7 +41,7 @@ pub fn bundle_refs(repo: &Path) -> Result<Vec<BundleRef>, String> {
     let out = std::str::from_utf8(&out).map_err(|_| "Repository refs are not UTF-8")?;
     let mut refs = Vec::new();
     for line in out.lines() {
-        let words: Vec<_> = line.split_whitespace().collect();
+        let words: Vec<_> = line.split_ascii_whitespace().collect();
         if let [oid, name] = words.as_slice() {
             refs.push(BundleRef {
                 name: (*name).into(),
@@ -93,16 +93,33 @@ pub fn export_bundle(
             ));
         }
     }
+    let no_lazy = no_lazy_fetch(repo)?;
     let base = base
         .filter(|s| !s.trim().is_empty())
-        .map(|s| super::resolve(repo, s.trim()))
+        .map(|s| {
+            let rev = format!("{}^{{commit}}", s.trim());
+            let args: Vec<_> = no_lazy
+                .iter()
+                .copied()
+                .chain(["rev-parse", "--verify", "--end-of-options", &rev])
+                .collect();
+            bounded::run(repo, &args, vec![], HEADER_LIMIT).and_then(|out| {
+                String::from_utf8(out)
+                    .map(|s| s.trim().to_owned())
+                    .map_err(|_| "Base object ID is not UTF-8".to_owned())
+            })
+        })
         .transpose()?;
-    let mut args = vec![
-        "bundle".to_owned(),
-        "create".into(),
-        "--version=3".into(),
-        "-".into(),
-    ];
+    let mut args: Vec<String> = no_lazy
+        .iter()
+        .map(|s| (*s).to_owned())
+        .chain([
+            "bundle".to_owned(),
+            "create".into(),
+            "--version=3".into(),
+            "-".into(),
+        ])
+        .collect();
     args.extend(refs.iter().map(|r| r.name.clone()));
     if let Some(base) = base {
         args.push(format!("^{base}"));
@@ -268,7 +285,7 @@ fn no_lazy_compatibility(
                 .any(|line| line.trim() == "unknown option: --no-lazy-fetch") =>
         {
             if !configured()?.trim().is_empty() {
-                return Err("This Git cannot disable lazy fetching in a repository with promisor/partial-clone configuration. Upgrade Git before inspecting or importing this bundle; prerequisite commits will not be fetched automatically.".into());
+                return Err("This Git cannot disable lazy fetching in a repository with promisor/partial-clone configuration. Upgrade Git before inspecting or exporting bundles; missing objects will not be fetched automatically.".into());
             }
             Ok(Vec::new())
         }
@@ -312,7 +329,7 @@ fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
         return Err("Bundle exceeds 128 MiB".into());
     }
     let mut pos = 0;
-    let mut next = || -> Result<&str, String> {
+    let mut next = || -> Result<std::borrow::Cow<'_, str>, String> {
         let end = bytes
             .get(pos..)
             .and_then(|b| b.iter().position(|c| *c == b'\n'))
@@ -321,13 +338,19 @@ fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
         if end > HEADER_LIMIT {
             return Err("Bundle header exceeds 1 MiB".into());
         }
-        let line =
-            std::str::from_utf8(&bytes[pos..end]).map_err(|_| "Bundle header is not UTF-8")?;
+        let line = &bytes[pos..end];
         pos = end + 1;
-        Ok(line)
+        if line.starts_with(b"-") {
+            // Subjects can come from legacy-encoded commits; the OID is still validated.
+            Ok(String::from_utf8_lossy(line))
+        } else {
+            std::str::from_utf8(line)
+                .map(std::borrow::Cow::Borrowed)
+                .map_err(|_| "Bundle ref/header is not UTF-8".to_owned())
+        }
     };
     let version = next()?;
-    if !matches!(version, "# v2 git bundle" | "# v3 git bundle") {
+    if !matches!(version.as_ref(), "# v2 git bundle" | "# v3 git bundle") {
         return Err("Not a supported Git v2/v3 bundle".into());
     }
     let (mut refs, mut prerequisites) = (Vec::new(), Vec::new());

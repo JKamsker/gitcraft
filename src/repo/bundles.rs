@@ -141,6 +141,12 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         self.busy_op = None;
+        let ok = result.is_ok();
+        let recorded = result
+            .as_ref()
+            .map(|()| String::new())
+            .map_err(Clone::clone);
+        self.log_activity(&label, &recorded, false, false, Vec::new());
         self.op_started = None;
         // Untrusted prerequisite descriptions are never interpreted as an authentication
         // request or used to retry a previous operation.
@@ -152,6 +158,8 @@ impl RepoTab {
             Refresh::All => self.reload(ctx),
             Refresh::Status => self.reload_status(ctx),
         }
+        self.after_op(ok, false, ctx);
+        self.link_status();
     }
 }
 

@@ -399,7 +399,7 @@ impl RepoTab {
                         path,
                         rev,
                         ignorable,
-                        Some(&view.key),
+                        (!view.structural.enabled).then_some(&view.key),
                         &links,
                         acts,
                         |ui, acts| {
@@ -433,6 +433,7 @@ impl RepoTab {
                         if let DiffKey::Commit { hash, path } = &view.key
                             && view.lines.is_none()
                             && self.stash_view.is_none()
+                            && !view.structural.enabled
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
@@ -443,7 +444,7 @@ impl RepoTab {
                             ui.add_space(4.0);
                         }
                         // A folded diff shows no lines to arrange.
-                        if !as_file && !rendered && !folded && !view.structural.enabled {
+                        if !as_file && !rendered && !folded && view.structural.shows_patch() {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
                             if view.lines.is_none() {

@@ -317,6 +317,7 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
         size,
         vec![Event::MouseWheel {
             unit: egui::MouseWheelUnit::Point,
+            phase: egui::TouchPhase::Move,
             delta: vec2(0.0, -4000.0),
             modifiers: egui::Modifiers::NONE,
         }],

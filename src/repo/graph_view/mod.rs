@@ -192,6 +192,7 @@ impl RepoTab {
         if first_steps.is_some() {
             scroll = scroll.max_height(total as f32 * ROW_PITCH);
         }
+        self.test_lane_frame(&settings, ui.ctx());
         let mut hovered_message = None;
         let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
             // show_rows includes overscan and partially clipped rows. Require the text's
@@ -278,7 +279,6 @@ impl RepoTab {
         self.want_remerge_badges(&shown_merges, ui.ctx());
         let graph_label = crate::repo::graph_order::header_label(self.log_order);
         header::column_headers(ui, &t, header, &cols, &graph_label);
-        self.test_lane_frame(&settings, ui.ctx());
         if self.test_lane.visible {
             self.test_lane_header(ui, header, &cols, acts);
         }

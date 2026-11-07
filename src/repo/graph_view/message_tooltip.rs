@@ -113,6 +113,66 @@ impl RepoTab {
     }
 }
 
+#[derive(Clone)]
+struct OpenMessage {
+    since: f64,
+    rect: Option<egui::Rect>,
+}
+
+/// Retain ownership while the pointer moves into the message and while it scrolls.
+/// Ordinary hover tooltips close on wheel events, even with an internal ScrollArea.
+pub(super) fn show(
+    ui: &mut egui::Ui,
+    response: &egui::Response,
+    description: egui::Rect,
+    path: &Path,
+    hash: &str,
+    message: Option<&Result<String, String>>,
+) -> bool {
+    let id = response.id.with(("full-message-popup", path, hash));
+    let now = ui.input(|i| i.time);
+    let pointer = ui.input(|i| i.pointer.hover_pos());
+    let anchor_hovered = response.hovered() && ui.rect_contains_pointer(description);
+    let mut state = ui.data(|d| d.get_temp::<OpenMessage>(id));
+    let over_popup = state
+        .as_ref()
+        .and_then(|s| s.rect)
+        .is_some_and(|r| pointer.is_some_and(|p| r.expand(6.0).contains(p)));
+    if (!anchor_hovered && !over_popup) || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        ui.data_mut(|d| d.remove::<OpenMessage>(id));
+        return false;
+    }
+    let state = state.get_or_insert(OpenMessage {
+        since: now,
+        rect: None,
+    });
+    let delay = f64::from(ui.style().interaction.tooltip_delay).max(HOVER_DELAY);
+    if now - state.since >= delay {
+        let width = (ui.ctx().content_rect().width() - 24.0).clamp(100.0, 480.0);
+        if let Some(shown) = egui::Tooltip::for_widget(response).width(width).show(|ui| {
+            egui::ScrollArea::vertical()
+                .id_salt(("full-commit-message", path, hash))
+                .max_height((ui.ctx().content_rect().height() * 0.6).max(60.0))
+                .show(ui, |ui| {
+                    ui.label(match message {
+                        Some(Ok(message)) => message.as_str(),
+                        Some(Err(error)) => error.as_str(),
+                        None => "Loading full commit message…",
+                    });
+                });
+        }) {
+            state.rect = Some(shown.response.rect);
+        }
+    } else {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs_f64(
+                (delay - (now - state.since)).max(0.001),
+            ));
+    }
+    ui.data_mut(|d| d.insert_temp(id, state.clone()));
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
