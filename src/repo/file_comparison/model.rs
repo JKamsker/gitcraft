@@ -15,6 +15,13 @@ pub(super) struct Boundary {
     pub reason: Option<String>,
 }
 impl Boundary {
+    pub fn writable(&self) -> bool {
+        self.reason.is_none()
+            && (self.old_mode.is_some() || self.new_mode.is_some())
+            && [self.old_mode.as_deref(), self.new_mode.as_deref()]
+                .into_iter()
+                .all(|mode| matches!(mode, None | Some("100644" | "100755" | "120000")))
+    }
     pub fn changed(&self) -> BTreeSet<usize> {
         self.lines
             .iter()
@@ -23,7 +30,7 @@ impl Boundary {
             .collect()
     }
     pub fn patch(&self, path: &str, pick: Pick, chosen: &BTreeSet<usize>) -> Option<String> {
-        if self.reason.is_some() || chosen.is_empty() {
+        if !self.writable() || chosen.is_empty() || !chosen.is_subset(&self.changed()) {
             return None;
         }
         let whole = *chosen == self.changed();
@@ -145,9 +152,10 @@ pub(super) fn boundary(
             return Err("Git could not align these raw versions".into());
         }
         let text = String::from_utf8(output.stdout).map_err(|_| "The raw patch is not UTF-8")?;
-        text.find("@@ ")
-            .map(|i| text[i..].to_owned())
-            .unwrap_or_default()
+        let start = text.find("@@ ").ok_or(
+            "Git could not produce a raw text patch for these differing bytes; use the normal patch view",
+        )?;
+        text[start..].to_owned()
     };
     let full = format!("{header}{body}");
     let lines = diff::parse(&full);

@@ -407,7 +407,7 @@ fn lens(
             let part = &lens.boundaries[i];
             let changed = snapshot.versions[i].bytes != snapshot.versions[i + 1].bytes
                 || snapshot.versions[i].mode != snapshot.versions[i + 1].mode;
-            let enabled = allowed && part.reason.is_none() && changed;
+            let enabled = allowed && part.writable() && changed;
             if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
                 acts.push(Action::ComparisonPick {
                     request: state.data_request,

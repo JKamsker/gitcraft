@@ -70,6 +70,12 @@ fn verify_patch(path: &str, patch: &str) -> Result<(), String> {
     Ok(())
 }
 fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
+    if lens.versions.iter().any(|v| {
+        v.warning.is_some()
+            || !matches!(v.mode.as_deref(), None | Some("100644" | "100755" | "120000"))
+    }) {
+        return Err("This file type is read-only in the staging lens".into());
+    }
     if lens.staging_warning.is_some() {
         return Err("Use normal Git staging for files with conversions".into());
     }

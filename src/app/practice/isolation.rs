@@ -141,6 +141,72 @@ fn exercise_app(root: &Path) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(5));
     }
     apply(&mut harness, Action::CloseActivity)?;
+    // File-comparison raw readers and the guarded alternate-index transaction must
+    // also choose Practice before consulting this deliberately broken profile.
+    let original = git::run_bytes(Some(&path), &["show", "HEAD:greeting.txt"])?;
+    let changed = b"A staging lens practice edit.\n";
+    std::fs::write(path.join("greeting.txt"), changed).map_err(|e| e.to_string())?;
+    let spec = git::file_comparison::LensSpec {
+        path: "greeting.txt".into(),
+        previous: None,
+    };
+    let lens = git::file_comparison::read_lens(&path, &spec, &|| true)?;
+    assert_eq!(lens.versions[0].bytes, original);
+    assert_eq!(lens.versions[2].bytes, changed);
+    let matrix = git::file_comparison::matrix(
+        &path,
+        &["HEAD".into(), "refs/heads/main".into()],
+        "",
+        &|| true,
+    )?;
+    for column in &matrix.columns {
+        let entry = column.files.get(b"greeting.txt".as_slice()).ok_or("Practice matrix file")?;
+        assert_eq!(git::file_comparison::blob(&path, Some(entry), &|| true)?.bytes, original);
+    }
+    assert!(git::file_comparison::read_migration(
+        &path,
+        &git::file_comparison::MigrationSource::Staged,
+        &|| true,
+    )?.moves.is_empty());
+    let active = harness.state().active;
+    let action = match harness.state().tabs.get(active) {
+        Some(Tab::Repo(tab)) => tab.palette_items().into_iter()
+            .find(|(label, _, _)| label == "Three-state staging lens")
+            .map(|(_, _, action)| action),
+        _ => None,
+    }.ok_or("No staging lens command")?;
+    apply(&mut harness, action)?;
+    for (label, expected) in [
+        ("Stage lens row 1", changed.as_slice()),
+        ("Unstage lens row 1", original.as_slice()),
+    ] {
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            harness.step();
+            if let Some(button) = harness.query_by_label(label) {
+                button.click();
+                break;
+            }
+            if Instant::now() >= until {
+                return Err(format!("Practice lens did not expose {label}"));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        loop {
+            harness.step();
+            let settled = matches!(harness.state().tabs.get(active), Some(Tab::Repo(tab)) if tab.settled());
+            if settled && git::run_bytes(Some(&path), &["show", ":0:greeting.txt"])? == expected {
+                break;
+            }
+            if Instant::now() >= until {
+                return Err(format!("Practice lens did not complete {label}"));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(std::fs::read(path.join("greeting.txt")).map_err(|e| e.to_string())?, changed);
+    }
+    apply(&mut harness, Action::CloseFileComparison)?;
+    std::fs::write(path.join("greeting.txt"), original).map_err(|e| e.to_string())?;
     // Streaming/piped history is a separate spawn route from ordinary reads/mutations.
     let mut stream = git::LogStream::start(&path, None, 0)?;
     assert!(

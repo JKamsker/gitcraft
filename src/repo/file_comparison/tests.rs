@@ -331,3 +331,28 @@ fn opening_snapshot_views_drops_diff_reading_modes_and_selections() -> Result<()
     assert!(tab.file_comparison.is_some());
     Ok(())
 }
+
+#[test]
+fn malformed_line_ids_and_submodule_boundaries_are_read_only() -> Result<(), String> {
+    let r = Repo::new()?;
+    r.write("a", "base\n")?;
+    r.commit()?;
+    r.write("a", "edit\n")?;
+    let mut h = harness(&r, Page::Lens)?;
+    settle(&mut h)?;
+    let request = h.state().0.file_comparison.as_ref().ok_or("state")?.data_request;
+    let ctx = h.ctx.clone();
+    h.state_mut().0.comparison_pick(request, 1, [usize::MAX].into(), false, &ctx);
+    assert!(h.state().0.busy_op.is_none());
+    assert_eq!(r.git(&["show", ":0:a"])?, "base");
+    let mut part = read(&r, "a")?.boundaries[1].clone();
+    part.old_mode = Some("160000".into());
+    assert!(!part.writable());
+    assert!(part.patch("a", Pick::Stage, &part.changed()).is_none());
+    let mut snapshot = r.lens("a")?;
+    snapshot.versions[0].mode = Some("160000".into());
+    assert!(files::apply_lens_patch(&r.0, &snapshot, &part.full, false)
+        .is_err_and(|e| e.contains("read-only")));
+    assert_eq!(r.git(&["show", ":0:a"])?, "base");
+    Ok(())
+}

@@ -351,10 +351,13 @@ impl RepoTab {
         let Data::Lens(lens) = data.as_ref() else {
             return;
         };
-        let Some(part) = lens.boundaries.get(boundary).filter(|p| p.reason.is_none()) else {
+        let Some(part) = lens.boundaries.get(boundary).filter(|p| p.writable()) else {
             return;
         };
-        if lens.snapshot.staging_warning.is_some() {
+        if lens.snapshot.staging_warning.is_some()
+            || (!whole && !lines.is_subset(&part.changed()))
+            || (whole && part.old_mode == part.new_mode && part.changed().is_empty())
+        {
             return;
         }
         let pick = if boundary == 0 {
