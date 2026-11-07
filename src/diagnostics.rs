@@ -32,7 +32,11 @@ pub fn collect(facts: &Facts) -> String {
     let tools: Vec<crate::forge::ToolReport> = std::thread::scope(|scope| {
         let asked: Vec<_> = ["gh", "glab", "tea"]
             .into_iter()
-            .map(|tool| scope.spawn(move || crate::forge::tool_report(tool)))
+            .map(|tool| {
+                scope.spawn(crate::connections::inherit(move || {
+                    crate::forge::tool_report(tool)
+                }))
+            })
             .collect();
         asked.into_iter().filter_map(|t| t.join().ok()).collect()
     });
