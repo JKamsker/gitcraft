@@ -441,7 +441,11 @@ fn fake_ssh_inspection_and_independence_pin_paths_with_hostile_environment() -> 
         assert_eq!(data.topology.stores.len(), 2);
         assert_eq!(data.object.as_ref().ok_or("no remote object")?.size, 15);
         assert!(data.independence.is_none());
-        assert!(data.notes.iter().any(|s| s.contains("ownership handles")));
+        assert!(
+            data.notes
+                .iter()
+                .any(|s| s.contains("Read-only inspection remains"))
+        );
         assert!(path.join(".git/objects/info/alternates").exists());
         assert!(!path.join("ESCAPED").exists());
         return Ok(());

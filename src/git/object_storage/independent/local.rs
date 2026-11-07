@@ -268,7 +268,7 @@ pub(crate) fn make_with_checkpoints(
     if let Err(error) = owner.detach(&backup_name) {
         let restored = owner.restore(&backup_name);
         return Err(format!(
-            "Guarded alternate removal failed: {error}. Create-only recovery: {restored:?}. Recovery directory: {}",
+            "Guarded alternate removal failed: {error}. Create-only recovery: {restored:?}. Recovery backup location (if created): {}",
             owner.recovery_path(&backup_name).display()
         ));
     }

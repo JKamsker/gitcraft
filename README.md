@@ -641,7 +641,8 @@ Making a clone independent currently requires a Linux-local conventional clone.
 The action retains actual directory/file handles from the repository's ancestors
 through `.git/objects/info` and `pack`; it stages and verifies the copy before
 installing through those handles. Alternate removal is a create-only guarded rename,
-and recovery links the retained actual file without overwriting newer metadata.
+and recovery publishes captured bytes through the held info directory without
+overwriting newer metadata.
 SSH, WSL and other platforms retain read-only inspection and explain why this action
 is unavailable. Private `objects/gitcraft-independent-stage-*` directories are kept
 as recovery evidence; successfully installed packs share their file data with that stage.
