@@ -39,6 +39,7 @@ pub(crate) mod pull;
 mod quick_edit;
 mod rebase;
 mod rewrite;
+mod saved_views;
 #[cfg(test)]
 mod samples;
 mod sidebar;
@@ -121,6 +122,7 @@ pub struct RepoTab {
     partial_clone: bool,
     sparse_requests: u64,
     drafts: drafts::State,
+    saved_views: saved_views::State,
     history_requests: u64,
     history_download_allowed: bool,
     /// Commits as git listed them.
@@ -306,6 +308,7 @@ impl RepoTab {
             partial_clone: false,
             sparse_requests: 0,
             drafts: Default::default(),
+            saved_views: Default::default(),
             history_requests: 0,
             history_download_allowed: false,
             history: Vec::new(),

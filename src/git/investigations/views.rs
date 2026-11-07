@@ -158,14 +158,14 @@ pub(crate) fn query(
         let (commits,limited,explanation)=match &preset.kind{
             Kind::MyUnpushed=>{
                 let (ids,limited)=walk(&reader,&scope.tips,&scope.remotes,&[])?;
-                (mine(&reader,&ids,&scope.email,None)?,limited,format!("Commits authored as{} that are absent from every pinned remote-tracking branch",scope.email))
+                (mine(&reader,&ids,&scope.email,None)?,limited,format!("Commits authored as {} that are absent from every pinned remote-tracking branch",scope.email))
             }
             Kind::RecentAncestors=>{
                 let (ids,mut limited)=walk(&reader,&scope.tips,&[],&[])?;
                 let cutoff=scope.now.saturating_sub(i64::from(preset.days)*86400);
                 let mine=mine(&reader,&ids,&scope.email,Some(cutoff))?;
                 let tips:Vec<_>=mine.into_iter().collect();let (ancestors,more)=walk(&reader,&tips,&[],&[])?;limited|=more;
-                (ancestors,limited,format!("My last{}days (author email{}) and their ancestors, within the visible graph scope",preset.days,scope.email))
+                (ancestors,limited,format!("My last {} days (author email {}) and their ancestors, within the visible graph scope",preset.days,scope.email))
             }
             Kind::Descendants{anchor}=>{
                 let (mut ids,limited)=walk(&reader,&scope.tips,std::slice::from_ref(anchor),&["--ancestry-path"])?;ids.insert(anchor.clone());
@@ -175,7 +175,7 @@ pub(crate) fn query(
                 let (actual,target)=scope.default_branch.as_ref().ok_or("No default branch is available; choose a branch for this view")?;
                 if actual!=branch{return Err("The selected default branch changed; update this view".into());}
                 let (ids,limited)=walk(&reader,std::slice::from_ref(target),&[],&["--first-parent","--merges"])?;
-                (ids,limited,format!("Merge commits on the first-parent history of{branch}"))
+                (ids,limited,format!("Merge commits on the first-parent history of {branch}"))
             }
         };
         if !reader.active(){return Err("Saved graph view cancelled".into());}
