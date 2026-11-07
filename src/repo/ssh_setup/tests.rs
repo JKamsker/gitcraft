@@ -479,3 +479,38 @@ fn opening_setup_ui_exposes_each_step_without_running_tools_or_changing_profiles
         Ok(())
     })
 }
+
+#[test]
+fn invalid_locations_and_unselected_local_upload_paths_refuse_before_any_io() -> Result<(), String>
+{
+    for path in [
+        "ssh://-bad-host/repo",
+        "ssh:missing-host",
+        "wsl://-bad/repo",
+        "wsl:///repo",
+        "https://unsupported.example/repo",
+    ] {
+        assert!(Machine::of(std::path::Path::new(path)).is_err());
+    }
+    let remote = Machine::of(std::path::Path::new("ssh://fixture-host/~/repo"))?;
+    assert!(!remote.is_local());
+    let fixture = Fixture::new()?;
+    let local = Machine::of(&fixture.0)?;
+    for key in [
+        "",
+        "relative-key",
+        "../other-key",
+        "ssh://host/key",
+        "/fixture/key.pub",
+    ] {
+        assert!(public_companion(&local, key).is_err());
+    }
+    let selected = fixture.0.join("chosen-key").to_string_lossy().into_owned();
+    assert_eq!(
+        public_companion(&local, &selected)?,
+        PathBuf::from(format!("{selected}.pub"))
+    );
+    assert!(public_companion(&remote, "~/chosen-key").is_err());
+    assert_eq!(fixture.0.read_dir().map_err(|e| e.to_string())?.count(), 0);
+    Ok(())
+}

@@ -12,13 +12,22 @@ pub(super) enum Machine {
     Remote(Target),
 }
 impl Machine {
-    pub fn of(repo: &Path) -> Self {
-        match crate::remote::parse(repo) {
-            Some(target) => Self::Remote(target),
-            None => Self::Local {
-                windows: cfg!(windows),
-            },
+    pub fn of(repo: &Path) -> Result<Self, String> {
+        if let Some(target) = crate::remote::parse(repo) {
+            return Ok(Self::Remote(target));
         }
+        let path = repo.to_string_lossy();
+        if path.starts_with("ssh:")
+            || path.starts_with("wsl:")
+            || path
+                .split_once("://")
+                .is_some_and(|(scheme, _)| !scheme.contains(['/', '\\']))
+        {
+            return Err("The repository machine is invalid or unsupported. Reopen the correct local/SSH/WSL repository before setting up its keys.".into());
+        }
+        Ok(Self::Local {
+            windows: cfg!(windows),
+        })
     }
     pub fn label(&self) -> String {
         match self {
