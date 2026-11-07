@@ -243,8 +243,11 @@ fn locks_in_the_tab() -> Result<(), String> {
     git::run(Some(&dir), &["commit", "-qm", "mine", "--", "mine.psd"])?;
     git::run(Some(&dir), &["push", "-q", "--no-verify", "origin", "main"])?;
     tab.reload_status(&ctx);
-    let before = tab.work_read;
-    wait(&mut tab, &ctx, |t| t.work_read != before);
+    let read = tab.reads;
+    assert!(
+        wait(&mut tab, &ctx, |t| t.work_read >= read),
+        "the status requested after the push was not read"
+    );
     tab.locks_after_push("Push tag v1", &ctx);
     tab.locks_after_push("Push", &ctx);
     let offered = wait(&mut tab, &ctx, |t| idle(t) && !t.lfs_locks.offer.is_empty());

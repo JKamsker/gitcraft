@@ -2,7 +2,7 @@
 //! the repository, and undoing it.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::{DragBranch, DragCommit, DragItem, DropTarget, Offer};
 use crate::git;
@@ -50,15 +50,21 @@ fn subjects(dir: &Path) -> Vec<String> {
         .collect()
 }
 
-/// Polls `tab` until `done`, or gives up after a few seconds.
+/// Polls until the requested state arrives. Slow Git commands must not leave
+/// the test inspecting a rewrite that is still running.
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
-    for _ in 0..600 {
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(30) {
         tab.poll(ctx);
         if done(tab) {
             return;
         }
         std::thread::sleep(Duration::from_millis(10));
     }
+    panic!(
+        "drop action did not finish: loading={}, busy={:?}, status={:?}",
+        tab.loading, tab.busy_op, tab.status
+    );
 }
 
 /// Polls until nothing runs and the reload after it is in.
@@ -381,7 +387,7 @@ fn a_commit_dropped_on_another_of_the_branch_is_squashed_into_it() {
         "both messages kept"
     );
     assert_eq!(files.lines().collect::<Vec<_>>(), ["a.txt", "c.txt"]);
-    assert_eq!(fixed, ["a", "base"]);
+    assert_eq!(fixed, ["a", "base"], "fixup status: {:?}", tab.status);
     assert_eq!(
         fixed_message.split_whitespace().collect::<Vec<_>>(),
         ["a", "c"]
