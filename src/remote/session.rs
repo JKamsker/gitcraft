@@ -142,6 +142,80 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     }
 }
 
+/// A dedicated pipe-only command for private views. Unlike `exec`, this never frames
+/// output through the persistent shell's temporary files. Input stays on stdin; the
+/// application deadline/cancellation closes the transport and its local descendants.
+pub(crate) fn private_output(
+    host: &Host,
+    req: &Request,
+    active: &dyn Fn() -> bool,
+    max: u64,
+) -> Result<Output, String> {
+    super::ui_guard::off_ui_thread("private comparison")?;
+    let marker = format!("__GITCRAFT_PRIVATE_{}__\n", nonce());
+    let script = private_script(req, &marker);
+    let (mut command, attempt) = private_transport_command(host);
+    command.args(private_args(host, &script));
+    crate::shell_path::apply(&mut command);
+    let out = crate::bounded_process::run_input(
+        command,
+        req.stdin.clone(),
+        active,
+        req.time_limit(),
+        max.saturating_add(4096),
+        32768,
+    )?;
+    let start = out
+        .stdout
+        .windows(marker.len())
+        .position(|s| s == marker.as_bytes())
+        .ok_or("Private comparison transport did not start")?
+        + marker.len();
+    if let Some(attempt) = attempt {
+        attempt.connected();
+    }
+    let stdout = out.stdout[start..].to_vec();
+    if stdout.len() as u64 > max {
+        return Err("Private comparison output exceeded its limit".into());
+    }
+    Ok(Output {
+        code: out.status.code().unwrap_or(-1),
+        stdout,
+        stderr: out.stderr,
+    })
+}
+
+#[cfg(test)]
+thread_local! { static PRIVATE_TRANSPORT: std::cell::RefCell<Option<std::path::PathBuf>> = const { std::cell::RefCell::new(None) }; }
+
+fn private_transport_command(host: &Host) -> (Command, Option<super::askpass::Attempt>) {
+    #[cfg(test)]
+    if let Some(program) = PRIVATE_TRANSPORT.with(|p| p.borrow().clone()) {
+        let mut command = Command::new(program);
+        command.arg("sh");
+        return (command, None);
+    }
+    shell_command(host)
+}
+
+fn private_script(req: &Request, marker: &str) -> String {
+    format!(
+        "{MORE_PATH}\nprintf '%s' {}\n{}",
+        sh_quote(marker),
+        inline(req, "")
+    )
+}
+
+fn private_args(host: &Host, script: &str) -> [String; 2] {
+    [
+        "-c".to_owned(),
+        match host {
+            Host::Ssh(_) => sh_quote(script),
+            Host::Wsl(_) => script.to_owned(),
+        },
+    ]
+}
+
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
 /// processes are listed first, as one stopped leaves what it started to another parent.
@@ -455,6 +529,96 @@ pub(super) fn parse_header(line: &str, nonce: &str) -> Option<(i32, usize, usize
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn private_transport_streams_over_ssh_and_wsl_quoting_without_creating_output_files()
+    -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("gitcraft-private 'stream' ü-{}", nonce()));
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let program = dir.join("transport");
+        for host in [
+            Host::Ssh("fixture.invalid".into()),
+            Host::Wsl("fixture distro".into()),
+        ] {
+            let exec = if matches!(host, Host::Ssh(_)) {
+                "exec sh -c \"$*\""
+            } else {
+                "exec \"$@\""
+            };
+            std::fs::write(
+                &program,
+                format!("#!/bin/sh\nprintf 'login banner\\n'\n{exec}\n"),
+            )
+            .map_err(|e| e.to_string())?;
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| e.to_string())?;
+            PRIVATE_TRANSPORT.with(|p| *p.borrow_mut() = Some(program.clone()));
+            let request = Request {
+                cwd: Some(dir.to_string_lossy().into_owned()),
+                script: "exec cat".into(),
+                stdin: Some(b"fixture-private-pipe-only\n".to_vec()),
+                timeout: Some(Duration::from_secs(2)),
+                ..Default::default()
+            };
+            let output = private_output(&host, &request, &|| true, 1024)?;
+            assert_eq!(output.stdout, b"fixture-private-pipe-only\n");
+            assert_eq!(output.code, 0);
+            let script = private_script(&request, "MARKER\n");
+            assert!(
+                !script.contains("mktemp")
+                    && !script.contains("$T/out")
+                    && !script.contains("fixture-private-pipe-only")
+            );
+            assert!(!format!("{request:?}").contains("fixture-private-pipe-only"));
+            let entries = std::fs::read_dir(&dir)
+                .map_err(|e| e.to_string())?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?;
+            assert_eq!(entries.len(), 1); // only the pre-existing fixture transport
+            let request = Request {
+                script: "head -c 1050 /dev/zero".into(),
+                stdin: None,
+                ..request
+            };
+            assert!(
+                private_output(&host, &request, &|| true, 1024)
+                    .is_err_and(|e| e.contains("exceeded"))
+            );
+            let request = Request {
+                script: "sleep 30".into(),
+                timeout: Some(Duration::from_millis(100)),
+                ..request
+            };
+            let start = Instant::now();
+            assert!(
+                private_output(&host, &request, &|| true, 1024)
+                    .is_err_and(|e| e.contains("timed out"))
+            );
+            assert!(start.elapsed() < Duration::from_secs(2));
+        }
+        PRIVATE_TRANSPORT.with(|p| *p.borrow_mut() = None);
+        let _ = std::fs::remove_dir_all(dir);
+        Ok(())
+    }
+
+    #[test]
+    fn private_transport_refuses_ui_thread_before_starting_a_process() {
+        let result = std::thread::spawn(|| {
+            super::super::mark_ui_thread();
+            let error = private_output(
+                &Host::Ssh("fixture.invalid".into()),
+                &Request::default(),
+                &|| true,
+                1024,
+            );
+            (error.is_err(), super::super::refused_on_ui_thread())
+        })
+        .join()
+        .ok();
+        assert_eq!(result, Some((true, 1)));
+    }
 
     #[test]
     fn headers_read_with_padded_numbers_for_their_command_only() {

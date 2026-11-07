@@ -539,6 +539,14 @@ impl eframe::App for App {
             self.close_current_worktree(&ctx);
         }
 
+        // Decrypted data is view-owned, including views parked behind another tab.
+        for (i, tab) in self.tabs.iter_mut().enumerate() {
+            if i != self.active
+                && let Tab::Repo(repo) = tab
+            {
+                repo.discard_decrypted();
+            }
+        }
         self.active_tab_ui(ui, &t);
         self.clone_dialog(&ctx);
         self.remote_dialog(&ctx);

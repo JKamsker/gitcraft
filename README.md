@@ -250,6 +250,22 @@ Glossary tips stay out of the way while typing, scrolling or dragging.
   mode: turn off Syntax to stage changes or see formatting edits. Unsupported languages, parse
   errors, a missing tool or a comparison over its limits show the patch with an explanation.
   Difftastic runs where the repository is (locally, in WSL or over SSH), off the window thread.
+- SOPS-encrypted files offer **Show decrypted**. SOPS 3.10 or later runs on the repository's
+  machine with that user's keys, comparing the exact Git/index/working-tree sides. The view
+  distinguishes plaintext content changes from recipient/wrapped-key and other encryption
+  metadata changes, including re-encryption with unchanged content. JSON, YAML, dotenv and
+  INI are recognized; binary envelopes can be compared only when their decrypted bytes are
+  UTF-8 text. YAML aliases/anchors and oversized or malformed documents fall back with a note.
+  - Decryption is explicit and read only. Return to **Encrypted patch / cancel** to stage;
+    staging always uses the encrypted patch, with Git text conversion disabled.
+  - Plaintext is kept in the active view and process pipes, never written to temporary files,
+    settings, logs, activity or shared diff/text-layout caches. Copying and review comments
+    are unavailable in this mode. Closing, refreshing, changing modes, starting an operation
+    or leaving the tab discards the view and cancels its job; stale answers are dropped.
+  - Each input/output side is limited to 2 MiB of UTF-8 text, 20,000 lines and 8,192 characters
+    per line; each decrypt command has a 20-second deadline. Missing tools/keys, malformed
+    documents and limit failures retain the encrypted patch. Raw tool diagnostics are hidden
+    because they can contain secrets. No keys or global SOPS configuration are changed.
 - A file kept in Git LFS shows as its LFS objects before and after, with their sizes, rather
   than the text of the pointer git stores. With git-lfs installed, the palette (Ctrl+P) of a
   repository that uses LFS has _LFS: Fetch_ and _LFS: Pull_.

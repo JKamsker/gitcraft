@@ -36,6 +36,7 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
+        self.discard_decrypted();
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         self.note_checkout_move(&ops, ctx);

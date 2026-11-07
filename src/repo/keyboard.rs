@@ -373,6 +373,7 @@ impl RepoTab {
             return;
         };
         if view.data_request != view.request
+            || view.encrypted.enabled
             || !data.partial
             || !matches!(file.area, Area::Staged | Area::Unstaged)
         {
@@ -492,6 +493,7 @@ impl RepoTab {
                     || !matches!(&view.data, Some(Ok(d)) if d.partial)
                     || self.diff_as_file
                     || view.structural.enabled
+                    || view.encrypted.enabled
                     || self.diff_ignore_ws
                     || self.conflict.is_some()
                     || self.rebase.is_some()
