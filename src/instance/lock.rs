@@ -61,6 +61,21 @@ fn open(path: &Path) -> std::io::Result<File> {
 mod tests {
     use super::*;
 
+    // fork can share the open file description until the child execs, like this duplicate.
+    #[cfg(unix)]
+    #[test]
+    fn dropping_the_holder_releases_a_lock_still_shared_with_a_child() -> Result<(), String> {
+        let dir = super::super::temp_dir("lock-shared-child");
+        let Lock::Held(first) = try_take(&dir) else {
+            return Err("the first take failed".to_owned());
+        };
+        let inherited = first._file.try_clone().map_err(|e| e.to_string())?;
+        drop(first);
+        assert!(matches!(try_take(&dir), Lock::Held(_)));
+        drop(inherited);
+        std::fs::remove_dir_all(dir).map_err(|e| e.to_string())
+    }
+
     #[test]
     fn one_holder_at_a_time_and_free_once_dropped() -> Result<(), String> {
         let dir = super::super::temp_dir("lock");
