@@ -8,10 +8,15 @@ use super::{
     Dialog, DiffKey, Refresh, RepoTab, Undo, branch_visibility, ci_view, diff, file_view, ops, pr_review, quick_edit, reflog, drag_drop,
 };
 use crate::git::{self, InProgress};
+use crate::keymap::{Command, label, written};
 use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
+    Key(crate::keymap::Command),
+    /// Show the changes and put the cursor in the commit summary.
+    FocusCommit,
     Select(usize),
     SelectHash(String),
     SelectStash(usize),
@@ -360,9 +365,9 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
-            ("Fetch".into(), "remote".into(), Action::Fetch),
-            ("Pull".into(), "remote".into(), Action::Pull),
-            ("Push".into(), "remote".into(), Action::Push),
+            ("Fetch".into(), label(Command::Fetch), Action::Fetch),
+            ("Pull".into(), label(Command::Pull), Action::Pull),
+            ("Push".into(), label(Command::Push), Action::Push),
             (
                 "Sync (pull, then push)".into(),
                 "remote".into(),
@@ -374,16 +379,26 @@ impl RepoTab {
         );
         items.extend([
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
-            ("Undo".into(), "Ctrl+Z".into(), Action::Undo),
-            ("Redo".into(), "Ctrl+Y".into(), Action::Redo),
+            ("Undo".into(), written("Cmd+Z"), Action::Undo),
+            ("Redo".into(), written("Cmd+Y"), Action::Redo),
             (
                 "Stash changes".into(),
-                "stash".into(),
+                label(Command::Stash),
                 Action::Dialog(Dialog::stash()),
             ),
             (
+                "Stage all changes".into(),
+                label(Command::StageAll),
+                Action::Key(Command::StageAll),
+            ),
+            (
+                "Commit".into(),
+                label(Command::Commit),
+                Action::Key(Command::Commit),
+            ),
+            (
                 "Search commits".into(),
-                "Ctrl+F".into(),
+                written("Cmd+F"),
                 Action::ToggleSearch,
             ),
             (
@@ -398,7 +413,7 @@ impl RepoTab {
             ),
             (
                 "Toggle terminal".into(),
-                "terminal".into(),
+                label(Command::Terminal),
                 Action::ToggleTerminal,
             ),
             (
@@ -409,7 +424,7 @@ impl RepoTab {
                     cwd: None,
                 },
             ),
-            ("Reload".into(), "F5".into(), Action::Reload),
+            ("Reload".into(), label(Command::Reload), Action::Reload),
             (
                 reveal_label().into(),
                 "folder".into(),
@@ -464,7 +479,7 @@ impl RepoTab {
         if !self.refs.head.is_empty() {
             items.push((
                 "Create branch".into(),
-                "branch".into(),
+                label(Command::NewBranch),
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push((

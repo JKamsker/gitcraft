@@ -10,6 +10,7 @@ use egui::{Color32, Galley, Rect, Sense, Ui, pos2, vec2};
 
 use super::{App, Tab};
 use crate::icons;
+use crate::keymap::{self, Command};
 use crate::repo::worktree_tab::{self, Chip};
 use crate::tab_look::TabLook;
 use crate::theme::{self, Tokens};
@@ -99,7 +100,7 @@ impl App {
             ui.spacing_mut().item_spacing.x = GAP;
             self.tabs_row(ui, &t, &mut actions);
             ui.add_space(4.0);
-            if icons::small_button(ui, "plus", "New tab (Ctrl+T)").clicked() {
+            if icons::small_button(ui, "plus", &keymap::tip("New tab", Command::NewTab)).clicked() {
                 actions.add = true;
             }
 
@@ -235,10 +236,17 @@ impl App {
     fn bar_buttons(&mut self, ui: &mut Ui, t: &Tokens) {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 6.0;
-        if icons::bar_button(ui, "settings", "Settings").clicked() {
+        if icons::bar_button(ui, "settings", &keymap::tip("Settings", Command::Settings)).clicked()
+        {
             self.open_settings();
         }
-        if icons::bar_button(ui, "command", "Command palette (Ctrl+P)").clicked() {
+        if icons::bar_button(
+            ui,
+            "command",
+            &keymap::tip("Command palette", Command::Palette),
+        )
+        .clicked()
+        {
             self.open_palette();
         }
         let resp = icons::bar_button(ui, "palette", "Theme");

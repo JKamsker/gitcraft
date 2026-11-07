@@ -76,6 +76,8 @@ impl RepoTab {
             Action::Dialog(dialog) => self.open_dialog(dialog, ctx),
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
+            Action::Key(command) => self.run_key(command, ctx),
+            Action::FocusCommit => self.focus_commit(ctx),
             Action::Fetch => {
                 self.last_fetch = Instant::now();
                 self.run_ops(

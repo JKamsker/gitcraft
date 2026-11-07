@@ -6,6 +6,7 @@ use egui::{Key, Ui};
 use super::{Action, RepoTab, pr_review, widgets};
 use crate::a11y::Named;
 use crate::icons;
+use crate::keymap;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
@@ -114,22 +115,34 @@ impl RepoTab {
         });
     }
 
-    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches (in the
-    /// diff, file or blame shown, else the commits), F7 and Shift+F7 (or Alt+↓ / Alt+↑) go to
-    /// the next and previous change of a diff.
-    fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+    /// Escape closes the innermost view; Ctrl+Z / Ctrl+Y undo and redo, Ctrl+F searches, F7 and
+    /// Shift+F7 (or Alt+↓ / Alt+↑) go to the next and previous change of a diff; the keys of
+    /// [`crate::keymap`] fetch, pull, push, stash, branch, stage, commit and open the terminal.
+    /// None of them while a dialog, a text field or the terminal has the keyboard.
+    pub(super) fn shortcuts(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         let free_keys =
             self.dialog.is_none() && !self.keys_blocked && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
+            let commands = ctx.input(|i| keymap::pressed(i, keymap::Scope::Repository));
+            // While a commit's message is being edited, Ctrl+Enter saves it (the editor takes
+            // the key also when nothing has the focus): it doesn't commit the changes too.
+            let rewording = self.reword.is_some();
+            acts.extend(
+                commands
+                    .into_iter()
+                    .filter(|&c| !(rewording && c == keymap::Command::Commit))
+                    .map(Action::Key),
+            );
             let (esc, undo, redo, find) = ctx.input(|i| {
                 (
                     i.key_pressed(Key::Escape),
                     i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::Z),
                     i.modifiers.command
                         && (i.key_pressed(Key::Y) || (i.modifiers.shift && i.key_pressed(Key::Z))),
-                    i.modifiers.command && i.key_pressed(Key::F),
+                    // Not with Shift: Ctrl+Shift+F fetches.
+                    i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F),
                 )
             });
             if esc && self.close_drop_menu() {
@@ -168,7 +181,9 @@ impl RepoTab {
                 self.search.open = true;
                 self.search.focus = true;
             }
-        } else if self.search.open && ctx.input(|i| i.modifiers.command && i.key_pressed(Key::F)) {
+        } else if self.search.open
+            && ctx.input(|i| i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F))
+        {
             self.search.focus = true;
         }
     }

@@ -3,6 +3,7 @@
 use egui::Ui;
 
 use crate::git::Branch;
+use crate::menu_item::MenuItem;
 use crate::repo::operations::{expect_ref, expect_ref_at};
 use crate::repo::{Action, Dialog, RepoTab, Undo, ops};
 
@@ -21,16 +22,30 @@ impl RepoTab {
         } else {
             "Can't delete the checked-out branch"
         };
-        let can = !b.is_head && !elsewhere && idle;
+        let refused = (b.is_head || elsewhere).then_some(why);
         let local_ref = format!("refs/heads/{}", b.name);
         // Only while the branch is where the menu saw it: commits made on it since (in the
         // terminal, while the dialog is open) are not what was asked to be deleted, nor what
         // undoing would bring back.
         let at_seen = || vec![expect_ref_at(&format!("refs/heads/{}", b.name), &b.target)];
         let guarded = |steps: Vec<Vec<String>>| [at_seen(), steps].concat();
-        if ui
-            .add_enabled(can, egui::Button::new("Delete…"))
-            .on_disabled_hover_text(why)
+        // Where the upstream is, on the remote and here.
+        let upstream = (!b.upstream_gone())
+            .then(|| self.split_upstream(&b.upstream))
+            .flatten()
+            .zip(
+                self.refs
+                    .remotes
+                    .iter()
+                    .flat_map(|(_, bs)| bs)
+                    .find(|r| r.name == b.upstream),
+            );
+        if MenuItem::new("Delete…")
+            .enabled(idle)
+            .refused(refused)
+            // The entry below, for the remote too, says the same reason.
+            .explained_below(upstream.is_some())
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(
@@ -51,27 +66,14 @@ impl RepoTab {
                 .preview_of(self.delete_preview(&[&b.target], vec![local_ref.clone()])),
             ));
         }
-        // Where the upstream is, on the remote and here.
-        let upstream = (!b.upstream_gone())
-            .then(|| self.split_upstream(&b.upstream))
-            .flatten()
-            .zip(
-                self.refs
-                    .remotes
-                    .iter()
-                    .flat_map(|(_, bs)| bs)
-                    .find(|r| r.name == b.upstream),
-            );
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };
-        if ui
-            .add_enabled(
-                can,
-                egui::Button::new(format!("Delete locally and on {remote}…")),
-            )
+        if MenuItem::new(format!("Delete locally and on {remote}…"))
+            .enabled(idle)
+            .refused(refused)
+            .show(ui)
             .on_hover_text(format!("Also delete {} from {remote}", b.upstream))
-            .on_disabled_hover_text(why)
             .clicked()
         {
             let remote_ref = format!("refs/heads/{name}");

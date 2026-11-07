@@ -21,10 +21,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, Ui};
+use egui::Ui;
 use serde::{Deserialize, Serialize};
 
 use crate::git;
+use crate::keymap;
 use crate::repo::{OpenRequest, RepoTab};
 use crate::settings::Settings;
 use crate::tab_look::TabLook;
@@ -386,56 +387,67 @@ impl App {
             || self.palette.is_some()
             || self.manual_open
             || crate::a11y::keyboard_taken(ctx);
-        let (new_tab, reopen, close, refresh, focused, palette, manual, settings) =
-            ctx.input(|i| {
-                let t = i.modifiers.command && i.key_pressed(Key::T);
-                (
-                    t && !i.modifiers.shift,
-                    t && i.modifiers.shift,
-                    i.modifiers.command && i.key_pressed(Key::W),
-                    i.key_pressed(Key::F5),
-                    i.focused,
-                    i.modifiers.command && i.key_pressed(Key::P),
-                    i.key_pressed(Key::F1),
-                    i.modifiers.command && i.key_pressed(Key::Comma),
-                )
-            });
-        if settings && !modal_open {
-            self.open_settings();
-        }
-        // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some()
-            || self.remote_form.is_some()
-            || self.teleport.is_some()
-            || self.askpass_open();
-        if manual && !asking && self.palette.is_none() {
-            self.manual_open = !self.manual_open;
-        }
-        if palette && !asking {
-            if self.palette.is_some() {
-                self.palette = None;
-            } else {
-                self.open_palette();
-            }
-        }
-        if new_tab && !modal_open {
-            self.new_tab();
-        }
-        if reopen && !modal_open {
-            self.reopen_closed_tab(ctx);
-        }
-        if close && !modal_open {
-            self.close_tab(self.active, ctx);
+        let (commands, focused) =
+            ctx.input(|i| (keymap::pressed(i, keymap::Scope::Window), i.focused));
+        let mut refresh = false;
+        for command in commands {
+            refresh |= self.window_command(command, modal_open, ctx);
         }
         // Coming back to the window (e.g. after using git elsewhere) refreshes the open repo.
         let regained = focused && !self.was_focused;
         self.was_focused = focused;
         if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
-            && ((refresh && !modal_open) || regained)
+            && (refresh || regained)
         {
             r.refresh(ctx);
         }
         focused
+    }
+
+    /// Does what the key of `command` does; `modal_open`: a dialog, the palette, the manual or a
+    /// text field has the keyboard. Returns whether the open repository is to be read again.
+    fn window_command(
+        &mut self,
+        command: keymap::Command,
+        modal_open: bool,
+        ctx: &egui::Context,
+    ) -> bool {
+        use keymap::Command;
+        // Not over a dialog that asks something (the clone, the remote one, ssh's question).
+        let asking = self.clone_form.is_some() || self.remote_form.is_some() || self.teleport.is_some() || self.askpass_open();
+        match command {
+            Command::Manual if !asking && self.palette.is_none() => {
+                self.manual_open = !self.manual_open;
+            }
+            Command::Palette if !asking => {
+                if self.palette.is_some() {
+                    self.palette = None;
+                } else {
+                    self.open_palette();
+                }
+            }
+            Command::Manual | Command::Palette => {}
+            _ if modal_open => {}
+            Command::Settings => self.open_settings(),
+            Command::NewTab => self.new_tab(),
+            Command::ReopenTab => self.reopen_closed_tab(ctx),
+            Command::CloseTab => self.close_tab(self.active, ctx),
+            Command::NextTab => self.step_tab(1),
+            Command::PreviousTab => self.step_tab(-1),
+            Command::GoToTab(place) => self.go_to_tab(usize::from(place)),
+            Command::LastTab => self.go_to_last_tab(),
+            Command::Reload => return true,
+            // A repository tab's keys are its own.
+            Command::Fetch
+            | Command::Pull
+            | Command::Push
+            | Command::Stash
+            | Command::NewBranch
+            | Command::Terminal
+            | Command::StageAll
+            | Command::Commit => {}
+        }
+        false
     }
 
     /// The active tab's page under the strip.

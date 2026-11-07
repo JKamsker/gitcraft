@@ -829,16 +829,15 @@ impl Settings {
             }
             Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Shortcuts => {
-                for (group, keys) in crate::manual::SHORTCUTS {
+                for (group, keys) in crate::manual::shortcut_groups() {
                     section(ui, f, group, None, |card| {
                         card.compact();
-                        for (combo, what) in *keys {
-                            let combo = combo.replace("Cmd", crate::manual::command());
+                        for (combo, what) in &keys {
                             card.full(&format!("{combo} {what} keys keyboard"), |ui| {
                                 ui.horizontal(|ui| {
                                     let width = layout::label_width(ui);
                                     let start = ui.cursor().left();
-                                    crate::manual::key_combo(ui, &combo);
+                                    crate::manual::key_combo(ui, combo);
                                     let used = ui.cursor().left() - start;
                                     ui.add_space((width + 8.0 - used).max(8.0));
                                     ui.label(RichText::new(*what).color(t.text_dim));

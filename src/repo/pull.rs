@@ -45,7 +45,8 @@ impl PullMode {
             PullMode::Rebase => "Rebase the current branch onto its upstream",
         };
         format!(
-            "{what} (git {})\nRight-click or the arrow to choose",
+            "{}\ngit {}\nRight-click or the arrow to choose",
+            crate::keymap::tip(what, crate::keymap::Command::Pull),
             self.args().join(" ")
         )
     }
@@ -79,7 +80,13 @@ pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
         }
     }
     ui.separator();
-    if ui.button("Fetch all").clicked() {
+    if ui
+        .add(
+            egui::Button::new("Fetch all")
+                .shortcut_text(crate::keymap::label(crate::keymap::Command::Fetch)),
+        )
+        .clicked()
+    {
         acts.push(Action::Fetch);
     }
 }

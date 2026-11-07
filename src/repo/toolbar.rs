@@ -10,6 +10,8 @@ use super::pull::pull_menu;
 use super::{Action, Dialog, RepoTab, ci_status, widgets};
 use crate::a11y::Named;
 use crate::icons;
+use crate::keymap::{self, Command};
+use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
@@ -26,7 +28,7 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             if icons::tool_button(ui, "refresh-cw", "", !self.loading)
                 .named("Reload (F5)")
-                .on_hover_text("Reload (F5)")
+                .on_hover_text(keymap::tip("Reload", Command::Reload))
                 .clicked()
             {
                 acts.push(Action::Reload);
@@ -43,7 +45,7 @@ impl RepoTab {
     /// Undo and redo, with what they'd undo or redo as tooltips.
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let undo_tip = match self.undo_stack.last() {
-            Some(e) => format!("Undo {} (Ctrl+Z)", e.label),
+            Some(e) => format!("Undo {} ({})", e.label, keymap::written("Cmd+Z")),
             None => "Nothing to undo".to_owned(),
         };
         if icons::tool_button(ui, "undo-2", "", idle && !self.undo_stack.is_empty())
@@ -55,7 +57,7 @@ impl RepoTab {
             acts.push(Action::Undo);
         }
         let redo_tip = match self.redo_stack.last() {
-            Some(e) => format!("Redo {} (Ctrl+Y)", e.label),
+            Some(e) => format!("Redo {} ({})", e.label, keymap::written("Cmd+Y")),
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && !self.redo_stack.is_empty())
@@ -72,11 +74,16 @@ impl RepoTab {
     fn remote_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let has_remote = !self.remotes.is_empty();
         let fetched = format!(
-            "Fetch all remotes (git fetch --all --prune)\nLast fetched {} ago",
+            "{}\nLast fetched {} ago",
+            keymap::tip(
+                "Fetch all remotes (git fetch --all --prune)",
+                Command::Fetch
+            ),
             short_duration(self.last_fetch.elapsed())
         );
         if icons::tool_button(ui, "cloud-download", "Fetch", idle && has_remote)
             .on_hover_text(fetched)
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Fetch))
             .clicked()
         {
             acts.push(Action::Fetch);
@@ -92,7 +99,8 @@ impl RepoTab {
         let pull =
             icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, idle && has_remote)
                 .named(|| behind_ahead("Pull", behind, "behind"))
-                .on_hover_text(mode.tip());
+                .on_hover_text(mode.tip())
+                .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Pull));
         if pull.clicked() {
             acts.push(Action::Pull);
         }
@@ -107,7 +115,11 @@ impl RepoTab {
             .show(|ui| pull_menu(ui, acts));
         if icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, idle && has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
-            .on_hover_text("Push the current branch (publishes it if it has no upstream yet)")
+            .on_hover_text(keymap::tip(
+                "Push the current branch (publishes it if it has no upstream yet)",
+                Command::Push,
+            ))
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Push))
             .clicked()
         {
             acts.push(Action::Push);
@@ -125,25 +137,37 @@ impl RepoTab {
         }
     }
 
+    /// Why the greyed-out button of `command` can't be used now: what its key would say.
+    fn why_not(&self, ui: &mut Ui, command: Command) {
+        if let Err(why) = self.key_action(command) {
+            ui.label(why);
+        }
+    }
+
     /// Branch, stash, terminal, search and the folder menu.
     fn repo_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let head = self.refs.head.clone();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
-            .on_hover_text("Create a branch at HEAD")
+            .on_hover_text(keymap::tip("Create a branch at HEAD", Command::NewBranch))
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::NewBranch))
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
-            .on_hover_text("Stash all changes, untracked files included")
-            .on_disabled_hover_text("No changes to stash")
+            .on_hover_text(keymap::tip(
+                "Stash all changes, untracked files included",
+                Command::Stash,
+            ))
+            .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Stash))
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash()));
         }
-        let terminal = icons::tool_button(ui, "square-terminal", "Terminal", true)
-            .on_hover_text("Terminal in the repository folder");
+        let terminal = icons::tool_button(ui, "square-terminal", "Terminal", true).on_hover_text(
+            keymap::tip("Terminal in the repository folder", Command::Terminal),
+        );
         if self.terminal_open {
             widgets::active_underline(ui, terminal.rect, t.accent);
         }
@@ -151,8 +175,8 @@ impl RepoTab {
             acts.push(Action::ToggleTerminal);
         }
         let search = icons::tool_button(ui, "search", "", true)
-            .named("Search commits (Ctrl+F)")
-            .on_hover_text("Search commits (Ctrl+F)");
+            .named("Search commits")
+            .on_hover_text(format!("Search commits ({})", keymap::written("Cmd+F")));
         if self.search.open {
             widgets::active_underline(ui, search.rect, t.accent);
         }
@@ -166,9 +190,9 @@ impl RepoTab {
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
-                let browser = ui
-                    .add_enabled(page.is_some(), egui::Button::new("Open in browser"))
-                    .on_disabled_hover_text("No remote with a web page");
+                let browser = MenuItem::new("Open in browser")
+                    .refused(page.is_none().then_some("No remote with a web page"))
+                    .show(ui);
                 if let Some(url) = &page {
                     let browser = browser.on_hover_text(url);
                     if browser.clicked() {
@@ -177,17 +201,18 @@ impl RepoTab {
                 }
                 // Over SSH, nothing of this machine can open the folder.
                 let here = crate::remote::openable_here(&self.path);
-                let why = here.as_ref().err().cloned().unwrap_or_default();
-                if ui
-                    .add_enabled(here.is_ok(), egui::Button::new(reveal_label()))
-                    .on_disabled_hover_text(&why)
+                let why = here.as_ref().err().map(String::as_str);
+                if MenuItem::new(reveal_label())
+                    .refused(why)
+                    .explained_below(true)
+                    .show(ui)
                     .clicked()
                 {
                     acts.push(Action::OpenPath(PathBuf::new()));
                 }
-                if ui
-                    .add_enabled(here.is_ok(), egui::Button::new("Open in editor"))
-                    .on_disabled_hover_text(&why)
+                if MenuItem::new("Open in editor")
+                    .refused(why)
+                    .show(ui)
                     .clicked()
                 {
                     acts.push(Action::OpenInEditor(PathBuf::new()));

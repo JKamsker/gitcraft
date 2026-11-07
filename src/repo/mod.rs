@@ -29,6 +29,7 @@ mod find;
 pub(crate) mod graph_view;
 pub(crate) mod highlight;
 mod keep_submodules;
+mod keys;
 mod layout;
 mod load;
 mod messages;
@@ -240,6 +241,9 @@ pub struct RepoTab {
     focus_branch_filter: bool,
     /// Jump to the changes row on the next rebuild (after an operation left conflicts).
     focus_wip: bool,
+    /// Put the cursor in the commit summary on the next frame (the commit key, with no
+    /// summary written yet).
+    focus_commit_summary: bool,
     last_fetch: Instant,
 
     terminals: Vec<Terminal>,
@@ -391,6 +395,7 @@ impl RepoTab {
             sidebar_reveal: None,
             focus_branch_filter: false,
             focus_wip: false,
+            focus_commit_summary: false,
             last_fetch: Instant::now(),
             terminals: Vec::new(),
             active_terminal: 0,

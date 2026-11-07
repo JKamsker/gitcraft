@@ -13,7 +13,13 @@ so your config, credentials and hooks apply as usual.
 - Start page: checks that `git` is installed; open, create (`git init`) or clone a repository;
   recent repositories.
 - Browser-like tabs, one per repository (Ctrl+T, Ctrl+W, middle-click; Ctrl+Shift+T reopens a
-  closed one). Open tabs, recents, theme and settings are remembered.
+  closed one; Ctrl+Tab / Ctrl+Shift+Tab go round them, also on macOS; Ctrl+1 … 8 and Ctrl+9 for
+  the last pick one, Cmd on macOS). Open tabs, recents, theme and settings are remembered.
+- Keys for the main actions of a repository tab: Fetch (Ctrl+Shift+F), Pull (Ctrl+Shift+L), Push
+  (Ctrl+Shift+K), Stash (Ctrl+Shift+S), New branch (Ctrl+B), Terminal (Ctrl+J), Stage all
+  (Ctrl+Shift+A) and Commit (Ctrl+Enter). Cmd on macOS. None of them fires while a text field or
+  the terminal has the keyboard (Ctrl+Enter in the commit message still commits). The toolbar's tooltips, the palette and the context menus show
+  each key, and a greyed-out menu entry says why under it.
 - Profiles, as in GitKraken: switch between them from the title bar (or the palette). Each has
   its own open tabs, recent repositories, theme, git author and commit signing (Settings →
   Profile); the other settings pages are shared. Switching closes this profile's tabs and opens the
@@ -192,7 +198,8 @@ so your config, credentials and hooks apply as usual.
 - Part of a file: _Stage hunk_, _Discard hunk_ and _Unstage hunk_ on each hunk of its diff, or
   click the changed lines you want (Shift+click for a range) and stage, unstage or discard only
   those. Discarding can be undone with Ctrl+Z.
-- Commit box (Ctrl+Enter; with nothing staged it stages everything), _Amend last commit_
+- Commit box (Ctrl+Enter, from anywhere in the tab: with no summary yet it goes to the summary;
+  with nothing staged it stages everything), _Amend last commit_
   (warns when the commit is already pushed), the identity you commit as (and whether it is the
   repository's own, the profile's or the global one), and saved identities or profile authors
   to switch a repository to; _Use the profile's author_ takes the repository's own out again.
@@ -601,6 +608,9 @@ was made this way, on a demo repository.
 | `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
 | `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |
 | `src/manual.rs`          | the manual (F1): features and keyboard shortcuts                                   |
+| `src/keymap.rs`          | the keys of the main actions and tabs, read by handlers, manual, tooltips, menus   |
+| `src/menu_item.rs`       | a menu entry with its key on the right and why it is greyed out under it           |
+| `src/repo/keys.rs`       | what a repository tab's keys do, or why they can't now                             |
 | `src/a11y/`              | keyboard focus ring, screen-reader names of painted widgets, reduced motion        |
 | `src/theme/`             | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files         |
 | `src/icons.rs`           | embedded Lucide SVG icons, tinted                                                  |

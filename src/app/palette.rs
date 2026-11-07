@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use egui::{Align2, Key, RichText, Sense, Stroke, Ui, pos2, vec2};
 
 use super::{App, Tab};
+use crate::keymap::{self, Command};
 use crate::repo::Action;
 use crate::theme::{self, ThemeId, Tokens};
 
@@ -66,7 +67,7 @@ impl App {
         let mut list = vec![
             (
                 "New tab".to_owned(),
-                "Ctrl+T".to_owned(),
+                keymap::label(Command::NewTab),
                 Entry::App(AppCommand::NewTab),
             ),
             (
@@ -96,12 +97,12 @@ impl App {
             ),
             (
                 "Settings".to_owned(),
-                "app".to_owned(),
+                keymap::label(Command::Settings),
                 Entry::App(AppCommand::Settings),
             ),
             (
                 "Manual and keyboard shortcuts".to_owned(),
-                "F1".to_owned(),
+                keymap::label(Command::Manual),
                 Entry::App(AppCommand::Manual),
             ),
         ];
@@ -110,7 +111,7 @@ impl App {
                 1,
                 (
                     "Reopen closed tab".to_owned(),
-                    "Ctrl+Shift+T".to_owned(),
+                    keymap::label(Command::ReopenTab),
                     Entry::App(AppCommand::ReopenTab),
                 ),
             );
@@ -350,12 +351,18 @@ fn palette_row(
         egui::FontId::proportional(13.0),
         t.text,
     );
+    // Keys read like keys, a category like a word.
+    let (font, color) = if keymap::is_keys(hint) {
+        (theme::mono(11.0), t.text_dim)
+    } else {
+        (egui::FontId::proportional(11.0), t.text_faint)
+    };
     ui.painter().text(
         pos2(rect.right() - 10.0, rect.center().y),
         Align2::RIGHT_CENTER,
         hint,
-        egui::FontId::proportional(11.0),
-        t.text_faint,
+        font,
+        color,
     );
     r.clicked()
 }

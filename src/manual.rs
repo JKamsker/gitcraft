@@ -2,6 +2,7 @@
 
 use egui::{RichText, Ui};
 
+use crate::keymap;
 use crate::theme::{self, Tokens};
 
 /// Ctrl, or Cmd on macOS, as the shortcuts are written.
@@ -23,6 +24,8 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Right-click a tab to give it its own icon and highlight colour.",
             "Drag a tab along the strip to reorder the tabs.",
             "What you type is kept, per repository, if gitcraft crashes or is closed: the commit message, unsent pull-request comments, reviews and replies, and an interactive rebase being set up come back when the repository is opened again. Each goes once committed, sent or started, or when you empty or cancel it. After a crash, gitcraft says so when it starts again. Nothing typed into a password or sign-in prompt is kept.",
+            "The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
+            "A greyed-out menu entry says why under it.",
             "Remote on the start page opens a repository in WSL or over SSH: git runs there, this window shows it. Browse… lists that machine's folders, its repositories marked. The toolbar names the machine; the terminal opens a shell there. What ssh asks (a password, a passphrase, a new host key) is asked in this window; Remember connection keeps a password encrypted in the system's credential store, and Forget saved SSH sign-ins (Ctrl+P) removes them.",
             "Right-click a tab and choose Teleport to… (or Ctrl+P, Teleport to another machine…) to carry its work to this machine, a WSL distribution or an SSH host: the branch, the staged and unstaged changes and the untracked files arrive in a new worktree there, and a tab opens on it. It goes in a clone of the same project found there, another repository there, a clone made first or a new repository made from what is sent; nothing here is changed. No push or forge is needed.",
         ],
@@ -129,24 +132,12 @@ const FEATURES: &[(&str, &[&str])] = &[
     ),
 ];
 
-/// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
+/// Keyboard and mouse shortcuts of the views, besides the main actions' keys in
+/// [`crate::keymap`]: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
 pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
-        "Window",
-        &[
-            ("Cmd+T", "New tab"),
-            ("Cmd+W", "Close the tab (or middle-click it)"),
-            ("Cmd+Shift+T", "Reopen the tab closed last"),
-            ("Cmd+P", "Command palette: every action and branch"),
-            ("Cmd+,", "Settings"),
-            ("F5", "Reload the repository"),
-            ("F1", "This manual"),
-            ("Tab / Shift+Tab", "Next / previous button, row or field"),
-            (
-                "Enter / Space",
-                "Click the button or row that has the keyboard",
-            ),
-        ],
+        "Keyboard navigation",
+        &[("Tab / Shift+Tab", "Next / previous button, row or field"), ("Enter / Space", "Click the focused button or row")],
     ),
     (
         "Graph",
@@ -167,10 +158,7 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Changes",
         &[
-            (
-                "Cmd+Enter",
-                "Commit (from the message fields), or save a note",
-            ),
+            ("Cmd+Enter", "Save a note, or commit from the message fields"),
             (
                 "Click / Shift+click",
                 "Pick lines in a diff, or a range of them",
@@ -217,6 +205,29 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     ),
 ];
 
+/// Every group of shortcuts, as the manual and Settings → Keyboard shortcuts list them: the
+/// window's and a repository tab's keys from [`crate::keymap`], then the views' own. Each row:
+/// the keys as [`key_combo`] draws them (Ctrl or Cmd already written), what they do.
+pub(crate) fn shortcut_groups() -> Vec<(&'static str, Vec<(String, &'static str)>)> {
+    let from_keymap = |rows: &[keymap::Row]| {
+        rows.iter()
+            .map(|r| (keymap::row_keys(r), r.what))
+            .collect::<Vec<_>>()
+    };
+    let mut groups = vec![
+        ("Window", from_keymap(keymap::WINDOW_ROWS)),
+        ("Repository", from_keymap(keymap::REPOSITORY_ROWS)),
+    ];
+    groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
+        let keys = keys
+            .iter()
+            .map(|(combo, what)| (keymap::written(combo), *what))
+            .collect();
+        (*title, keys)
+    }));
+    groups
+}
+
 /// Draws the manual's contents.
 pub fn ui(ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
@@ -249,15 +260,15 @@ pub fn ui(ui: &mut Ui) {
 
     ui.add_space(8.0);
     ui.separator();
-    for (title, keys) in SHORTCUTS {
+    for (title, keys) in shortcut_groups() {
         heading(ui, &format!("{title} shortcuts"));
-        egui::Grid::new(("manual_keys", *title))
+        egui::Grid::new(("manual_keys", title))
             .num_columns(2)
             .spacing([16.0, 6.0])
             .min_col_width(170.0)
             .show(ui, |ui| {
-                for (combo, what) in *keys {
-                    ui.horizontal(|ui| key_combo(ui, &combo.replace("Cmd", command())));
+                for (combo, what) in &keys {
+                    ui.horizontal(|ui| key_combo(ui, combo));
                     ui.label(RichText::new(*what).color(t.text_dim));
                     ui.end_row();
                 }

@@ -5,6 +5,7 @@ use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 use super::ROW_H;
 use crate::git::{Submodule, SubmoduleState};
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::keep_submodules::{update_all, update_one};
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{Action, RepoTab, reveal_label, short, widgets};
@@ -66,9 +67,9 @@ impl RepoTab {
             acts.push(update_one(&sub.path));
         }
         let folder = crate::remote::join(&self.path, &sub.path);
-        if ui
-            .add_enabled(cloned, egui::Button::new("Open in a new tab"))
-            .on_disabled_hover_text("Update it first to clone it")
+        if MenuItem::new("Open in a new tab")
+            .refused((!cloned).then_some("Update it first to clone it"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::OpenTab(folder.clone()));

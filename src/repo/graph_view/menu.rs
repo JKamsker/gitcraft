@@ -6,6 +6,7 @@ use super::badge::{BadgeKind, badges};
 use super::compare_items;
 use crate::forge::links::Target;
 use crate::git;
+use crate::menu_item::MenuItem;
 use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
 use crate::repo::conflict_check::Op;
 use crate::repo::operations::{expect_ref_at, expect_symref};
@@ -101,10 +102,10 @@ impl RepoTab {
         rewrite_items(ui, &rewrite, idle, is_head, acts);
         ui.separator();
         let merge = commit.parents.len() > 1;
-        if ui
-            .add_enabled(!merge, egui::Button::new("Create patch from commit…"))
+        if MenuItem::new("Create patch from commit…")
+            .refused(merge.then_some("A merge commit makes no patch"))
+            .show(ui)
             .on_hover_text("Save it as a file for git am (git format-patch)")
-            .on_disabled_hover_text("A merge commit makes no patch")
             .clicked()
         {
             acts.push(Action::SavePatch {
@@ -257,7 +258,12 @@ impl RepoTab {
         if !here.is_empty() {
             ui.separator();
         }
-        if ui.button("Create branch here…").clicked() {
+        // At HEAD, the new-branch key does the same.
+        let mut create = MenuItem::new("Create branch here…");
+        if is_head {
+            create = create.keys(crate::keymap::Command::NewBranch);
+        }
+        if create.show(ui).clicked() {
             acts.push(Action::Dialog(Dialog::create_branch(hash, short)));
         }
         if ui.button("Create tag here…").clicked() {
