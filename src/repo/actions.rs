@@ -116,6 +116,10 @@ pub(crate) enum Action {
     Pull,
     PullWith(PullMode),
     Push,
+    SubmitPreflight(Box<crate::push_preflight::Plan>),
+    FixPreflight(Box<crate::push_preflight::Plan>, String),
+    PreflightMessages(Box<crate::push_preflight::Plan>),
+    ReloadPreflight(Box<crate::push_preflight::Plan>),
     /// Pull, then push the checked-out branch.
     Sync,
     /// A button of the banner after a refused push.

@@ -79,6 +79,12 @@ impl RepoTab {
         let control =
             git::OpControl::scoped(move || repaint.request_repaint(), self.tx.cancel.child());
         let network = ops.iter().any(|op| {
+            if op
+                .first()
+                .is_some_and(|s| s == crate::push_preflight::APPROVED)
+            {
+                return true;
+            }
             let args: Vec<&str> = op.iter().map(String::as_str).collect();
             git::goes_over_network(&args)
         });

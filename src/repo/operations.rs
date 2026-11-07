@@ -53,6 +53,47 @@ impl RepoTab {
             }
             return;
         }
+        if crate::push_preflight::has_push(&ops) {
+            if let Some(at) = ops
+                .iter()
+                .position(|s| crate::push_preflight::has_push(std::slice::from_ref(s)))
+                && at > 0
+                && ops[..at]
+                    .iter()
+                    .all(|s| is_expectation(s) || s.first().is_some_and(|s| s == "tag"))
+                && ops[..at]
+                    .iter()
+                    .any(|s| s.first().is_some_and(|s| s == "tag"))
+            {
+                let follow = PendingOp {
+                    label: format!("Push after {label}"),
+                    ops: ops[at..].to_vec(),
+                    refresh,
+                    kind: OpKind::plain(),
+                    quiet,
+                };
+                self.preflight_after = Some((label.to_owned(), follow));
+                self.run_ops_ex(label, ops[..at].to_vec(), refresh, kind, quiet, ctx);
+                return;
+            }
+            self.preflight_pending = Some(PendingOp {
+                label: label.to_owned(),
+                ops: ops.clone(),
+                refresh,
+                kind,
+                quiet,
+            });
+            self.preflight_timeline = if matches!(
+                self.preflight_pending.as_ref().map(|p| &p.kind),
+                Some(OpKind::Undo(_) | OpKind::Redo(_))
+            ) {
+                Some(self.timeline.current)
+            } else {
+                None
+            };
+            self.begin_push_preflight(ops, ctx);
+            return;
+        }
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);
@@ -298,6 +339,18 @@ impl RepoTab {
         self.after_op(result.is_ok(), quiet, ctx);
         self.link_status();
         self.after_worktree_add(&label, result.is_ok(), ctx);
+        if let Some((_, pending)) = self.preflight_after.take_if(|(after, _)| after == &label)
+            && result.is_ok()
+        {
+            self.run_ops_ex(
+                &pending.label,
+                pending.ops,
+                pending.refresh,
+                pending.kind,
+                pending.quiet,
+                ctx,
+            );
+        }
     }
 }
 
@@ -434,6 +487,12 @@ pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
 /// transfers. Not `remote add` / `rename` / `set-url` / `remove`, which only write the config,
 /// nor `submodule update`, which reaches one only when a commit is missing (and then says so).
 pub(super) fn reaches_a_remote(op: &[String]) -> bool {
+    if op
+        .first()
+        .is_some_and(|s| s == crate::push_preflight::APPROVED)
+    {
+        return true;
+    }
     let mut words = op.iter().map(String::as_str);
     // Past the options before the subcommand (`-c x=y`).
     let sub = loop {
@@ -561,6 +620,18 @@ pub(super) fn run_steps_counted(
                 let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
                 return run_step(path, &args, creds, quiet, control);
             }
+            if let [mark, id] = op.as_slice()
+                && mark == crate::push_preflight::APPROVED
+            {
+                let plan = crate::push_preflight::registered(id)?;
+                return crate::push_preflight::execute_controlled(path, &plan, creds, control);
+            }
+            if let [mark, id, fix] = op.as_slice()
+                && mark == crate::push_preflight::FIX
+            {
+                let plan = crate::push_preflight::registered(id)?;
+                return crate::push_preflight::fix(path, &plan, fix);
+            }
             run_step(path, &args, creds, quiet, control)
         })();
         if result.is_err() {
@@ -621,7 +692,7 @@ pub(super) fn expect_ref(name: &str) -> Vec<String> {
 }
 
 /// A step that runs nothing, but refuses the whole operation unless `name` is at `commit`.
-pub(super) fn expect_ref_at(name: &str, commit: &str) -> Vec<String> {
+pub(crate) fn expect_ref_at(name: &str, commit: &str) -> Vec<String> {
     vec![EXPECT.to_owned(), name.to_owned(), commit.to_owned()]
 }
 

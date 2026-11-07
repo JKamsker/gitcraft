@@ -76,7 +76,7 @@ mod nav_history;
 mod navigate;
 mod navigation;
 mod offline;
-mod operations;
+pub(crate) mod operations;
 mod owners;
 mod package;
 mod palette;
@@ -92,6 +92,7 @@ mod pr_view;
 mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
 mod reflog;
@@ -327,6 +328,9 @@ pub struct RepoTab {
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
     /// refused push.
     push_flow: push::PushFlow,
+    preflight_pending: Option<PendingOp>,
+    preflight_after: Option<(String, PendingOp)>,
+    preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
     /// The last operation started, to run again after signing in.
@@ -623,6 +627,9 @@ impl RepoTab {
             package: None,
             reword: None,
             push_flow: Default::default(),
+            preflight_pending: None,
+            preflight_after: None,
+            preflight_timeline: None,
             credentials: None,
             last_op: None,
             error_card: None,

@@ -379,3 +379,6 @@ pub fn clone_with(
 }
 
 pub(crate) mod drafts;
+
+mod push_hooks;
+pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};

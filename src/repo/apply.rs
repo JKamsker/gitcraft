@@ -39,6 +39,10 @@ impl RepoTab {
             return;
         };
         match action {
+            Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
+            Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
+            Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
+            Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
