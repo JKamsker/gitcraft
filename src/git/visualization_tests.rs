@@ -103,3 +103,38 @@ fn atlas_growth_and_postcard_read_a_real_pinned_release_without_mutation() -> Re
     assert_eq!(repo.git(&["status", "--porcelain=v1"])?, before);
     Ok(())
 }
+
+#[test]
+fn atlas_side_branch_history_and_captured_head_survive_concurrent_checkout() -> Result<(), String> {
+    let repo = Repo::new()?;
+    std::fs::write(repo.0.join("base"), "base").map_err(|e| e.to_string())?;
+    let base = repo.commit("base")?;
+    let main = repo.git(&["branch", "--show-current"])?;
+    repo.git(&["checkout", "-qb", "side"])?;
+    std::fs::write(repo.0.join("side-only"), "side").map_err(|e| e.to_string())?;
+    let side = repo.commit("side adds file")?;
+    repo.git(&["checkout", "-q", &main])?;
+    let atlas = atlas::read_observing(&repo.0, 100, Query::default(), &|| true, || {
+        repo.git(&["checkout", "-q", "side"])
+            .expect("checkout after capture");
+    })?;
+    assert_eq!(atlas.head, base);
+    assert_eq!(atlas.history.commits.len(), 2);
+    let hotspot = atlas
+        .nodes
+        .iter()
+        .find(|n| n.path == b"side-only" && !n.directory)
+        .ok_or("side hotspot")?;
+    assert_eq!(hotspot.bytes, 0); // sizes belong to captured main, not new HEAD
+    assert_eq!(hotspot.revision.as_deref(), Some(side.as_str()));
+    let log = repo.git(&[
+        "log",
+        "--follow",
+        "--format=%s",
+        hotspot.revision.as_deref().ok_or("revision")?,
+        "--",
+        "side-only",
+    ])?;
+    assert_eq!(log, "side adds file");
+    Ok(())
+}

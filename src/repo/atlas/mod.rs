@@ -135,6 +135,7 @@ impl RepoTab {
             });
             let node = &data.nodes[view.zoom];
             if node.children.is_empty() { ui.label("No files in this snapshot."); return; }
+            ui.small("Files and historical folders at the same path are separate hotspots. File history uses HEAD for current files or an observed change revision for historical files. Long contributor labels are shortened; numbered identities remain separate.");
             // Bound painter and AccessKit work even for a flat tree with 100,000 files.
             let pages = node.children.len().div_ceil(300);
             view.page = view.page.min(pages.saturating_sub(1));
@@ -149,12 +150,12 @@ impl RepoTab {
                 let id = ids[at]; let n = &data.nodes[id]; let rect = rect.shrink(1.5);
                 let label = String::from_utf8_lossy(&n.path);
                 let response = ui.interact(rect, ui.id().with(("atlas-node", id)), egui::Sense::click());
-                let fill = if view.colour == Colour::Churn { t.accent.gamma_multiply(0.15 + 0.85 * n.changes as f32 / max) } else { let hash = n.contributor.bytes().fold(0usize,|h,b|h.wrapping_mul(31).wrapping_add(b as usize)); t.lane(hash).gamma_multiply(0.7) };
+                let fill = if view.colour == Colour::Churn { t.accent.gamma_multiply(0.15 + 0.85 * n.changes as f32 / max) } else { t.lane(n.contributor_key).gamma_multiply(0.7) };
                 ui.painter().rect_filled(rect,3.0,fill);
-                crate::a11y::a11y(&response, egui::WidgetType::Button, format!("{label}, {} bytes, {} changes, most frequent contributor: {}. {}", n.bytes,n.changes,n.contributor,if n.children.is_empty() {"Open file history"} else {"Zoom into folder"}));
+                crate::a11y::a11y(&response, egui::WidgetType::Button, format!("{label} ({}), {} bytes, {} changes, most frequent contributor: {}. {}", if n.directory {"folder"} else {"file"}, n.bytes,n.changes,n.contributor,if !n.directory {"Open file history at the pinned revision"} else {"Zoom into folder"}));
                 if rect.width() > 42.0 && rect.height() > 22.0 { ui.painter().with_clip_rect(rect.shrink(3.0)).text(rect.left_top()+vec2(4.0,4.0),egui::Align2::LEFT_TOP,n.path.rsplit(|b| *b==b'/').next().map(String::from_utf8_lossy).unwrap_or_default(),egui::FontId::proportional(12.0),t.text); }
-                let clicked = response.clicked(); response.on_hover_text(format!("{label}\n{} bytes · {} changes\nMost frequent contributor: {}",n.bytes,n.changes,if n.contributor.is_empty() {"No changes in selected period"} else {&n.contributor}));
-                if clicked { if n.children.is_empty() { match String::from_utf8(n.path.clone()) { Ok(path) => file = Some((path,data.head.clone())), Err(_) => view.error = Some("This filename is not UTF-8; file-history navigation cannot represent it. Its bytes remain distinct in the atlas.".into()) } } else { view.zoom = id; view.page=0; } }
+                let clicked = response.clicked(); response.on_hover_text(format!("{label}\n{} bytes · {} changes\nMost frequent contributor: {}",n.bytes,n.changes,if n.contributor.is_empty() {"No changes in selected period"} else {n.contributor.as_ref()}));
+                if clicked { if !n.directory { match String::from_utf8(n.path.clone()) { Ok(path) => file = n.revision.as_ref().map(|rev| (path,rev.to_string())), Err(_) => view.error = Some("This filename is not UTF-8; file-history navigation cannot represent it. Its bytes remain distinct in the atlas.".into()) } } else { view.zoom = id; view.page=0; } }
             }
         });
         if let Some((path, head)) = file {
@@ -204,6 +205,71 @@ fn partition(rect: Rect, weights: &[f64], start: usize, out: &mut Vec<(usize, Re
 mod tests {
     use super::*;
     #[test]
+    fn overlapping_file_and_historical_folder_both_remain_reachable() -> Result<(), String> {
+        use egui_kittest::{Harness, kittest::Queryable};
+        for folder in [false, true] {
+            let ctx = egui::Context::default();
+            let mut tab = RepoTab::new_deferred("/nonexistent/atlas-overlap".into(), &ctx);
+            tab.atlas = Some(State {
+                size: Size::Changes,
+                data: Some(Atlas {
+                    head: "head".into(),
+                    history: std::sync::Arc::new(crate::git::activity::History::default()),
+                    selected: 2,
+                    query: Query::default(),
+                    nodes: vec![
+                        atlas::Node {
+                            directory: true,
+                            children: vec![1, 2],
+                            ..Default::default()
+                        },
+                        atlas::Node {
+                            path: b"a".to_vec(),
+                            bytes: 100,
+                            changes: 1,
+                            revision: Some("head".into()),
+                            ..Default::default()
+                        },
+                        atlas::Node {
+                            path: b"a".to_vec(),
+                            directory: true,
+                            children: vec![3],
+                            changes: 1,
+                            ..Default::default()
+                        },
+                        atlas::Node {
+                            path: b"a/old".to_vec(),
+                            changes: 1,
+                            revision: Some("side".into()),
+                            ..Default::default()
+                        },
+                    ],
+                }),
+                ..Default::default()
+            });
+            let mut harness = Harness::builder()
+                .with_size(vec2(1200.0, 900.0))
+                .build_ui_state(|ui, tab: &mut RepoTab| tab.atlas_window(ui.ctx()), tab);
+            harness.run();
+            harness
+                .get_by_label_contains(if folder { "a (folder)" } else { "a (file)" })
+                .click();
+            harness.run();
+            if folder {
+                assert_eq!(harness.state().atlas.as_ref().ok_or("folder")?.zoom, 2);
+                harness.get_by_label_contains("a/old (file)").click();
+                harness.run();
+            }
+            let file = harness.state().file_view.as_ref().ok_or("file history")?;
+            assert_eq!(file.path, if folder { "a/old" } else { "a" });
+            assert_eq!(
+                file.rev.as_deref(),
+                Some(if folder { "side" } else { "head" })
+            );
+        }
+        Ok(())
+    }
+    #[test]
     fn treemap_covers_area_once_and_keeps_weights() {
         let rect = Rect::from_min_size(egui::Pos2::ZERO, vec2(100.0, 100.0));
         let mut out = Vec::new();
@@ -228,11 +294,13 @@ mod tests {
             atlas::Node {
                 path: b"src".to_vec(),
                 children: vec![2],
+                directory: true,
                 bytes: 4,
                 ..Default::default()
             },
             atlas::Node {
                 path: b"src/a".to_vec(),
+                revision: Some("a".repeat(40).into()),
                 bytes: 4,
                 ..Default::default()
             },
@@ -251,10 +319,14 @@ mod tests {
             .with_size(vec2(1200.0, 900.0))
             .build_ui_state(|ui, tab: &mut RepoTab| tab.atlas_window(ui.ctx()), tab);
         harness.run();
-        harness.get_by_label_contains("src, 4 bytes").click();
+        harness
+            .get_by_label_contains("src (folder), 4 bytes")
+            .click();
         harness.run();
         assert_eq!(harness.state().atlas.as_ref().ok_or("atlas")?.zoom, 1);
-        harness.get_by_label_contains("src/a, 4 bytes").click();
+        harness
+            .get_by_label_contains("src/a (file), 4 bytes")
+            .click();
         harness.run();
         assert!(harness.state().atlas.is_none());
         let file = harness.state().file_view.as_ref().ok_or("file history")?;
