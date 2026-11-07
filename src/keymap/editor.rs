@@ -9,7 +9,8 @@ struct Editing {
 }
 
 pub(crate) fn capturing(ctx: &egui::Context) -> bool {
-    ctx.data(|d| d.get_temp::<Option<Editing>>(Id::new(("key-binding-editor", ctx.viewport_id()))))
+    let key = Id::new(("key-binding-editor", ctx.viewport_id()));
+    ctx.data(|d| d.get_temp::<Option<Editing>>(key))
         .flatten()
         .is_some()
 }

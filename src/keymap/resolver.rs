@@ -21,10 +21,11 @@ fn id(ctx: &Context, _scope: Scope) -> Id {
 }
 
 pub(crate) fn cancel(ctx: &Context, scope: Scope) {
+    let key = id(ctx, scope);
     ctx.data_mut(|d| {
-        if let Some(mut r) = d.get_temp::<Resolver>(id(ctx, scope)) {
+        if let Some(mut r) = d.get_temp::<Resolver>(key) {
             r.prefix.clear();
-            d.insert_temp(id(ctx, scope), r);
+            d.insert_temp(key, r);
         }
     });
 }
