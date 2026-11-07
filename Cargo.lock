@@ -1712,6 +1712,8 @@ dependencies = [
  "miniz_oxide 0.8.9",
  "notify",
  "notify-rust",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
  "open",
  "portable-pty",
  "pulldown-cmark",

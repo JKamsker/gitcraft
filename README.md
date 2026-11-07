@@ -1252,9 +1252,9 @@ so your config, credentials and hooks apply as usual.
   date, editor command, external diff and merge tools, default shell and terminal font size, saved identities, custom commands,
   SSH sign-ins, agents, the AI tool and its prompts, and every keyboard shortcut. Ctrl+F searches all pages at once (Esc clears it); Alt+↑ /
   Alt+↓ go through the pages.
-- Tabs in the title bar (Windows, Settings → Appearance): the tab strip takes the place of the
-  system's title bar, as in a browser. Drag the space next to the tabs to move the window (it
-  snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
+- Tabs in the title bar (Windows and macOS, Settings → Appearance): the tab strip takes the
+  place of the system's title bar, as in a browser. Drag the space next to the tabs to move the
+  window (it snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
   close sit at the end of the strip, drawn as Windows 11 draws them, and the window's edges
   resize it.
 - The settings, command palette, theme and manual buttons sit in the title bar, or in the footer
@@ -1502,7 +1502,7 @@ was made this way, on a demo repository.
 | `src/agent/handoff.rs` | hand-off: the messages typed into an agent's terminal (notes, conflicts, CI logs, threads), the notes tray |
 | `src/agent/bakeoff/` | bake-off: comparing attempts, new dependencies, hunks, assembling a branch, builds |
 | `src/repo/bakeoff/` | the bake-off page and its attempt picker |
-| `src/app/title_bar.rs`   | Windows: the tab strip as the title bar (moving, caption buttons, resizing)       |
+| `src/app/title_bar.rs`   | Windows and macOS: the tab strip as the title bar (moving, caption buttons, resizing) |
 | `src/settings/`          | user settings, profiles, the settings pages, the theme gallery and the previews    |
 | `src/ai/`                | AI commit messages and reviews: the prompt and diff cut to size, finding and running the tool on the repository's machine |
 | `src/repo/ai/`           | the commit box's AI button and the branch review panel                             |

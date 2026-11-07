@@ -57,6 +57,11 @@ yaml-rust2 = "0.13.0"
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Keep native rounded corners while drawing the tabs over a transparent title bar.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).

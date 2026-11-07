@@ -44,13 +44,12 @@ fn main() -> eframe::Result {
     }
     app::warm_up();
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
+        viewport: app::window_viewport()
             .with_title("GitCraft")
             // Matches gitcraft.desktop, so Linux desktops show its icon and group its windows.
             .with_app_id("gitcraft")
             .with_inner_size([1400.0, 860.0])
             .with_min_inner_size([800.0, 500.0])
-            .with_decorations(app::window_decorated())
             .with_icon(app::window_icon()),
         // Runs after eframe restored the last session's size and position.
         window_builder: Some(Box::new(|builder| {
