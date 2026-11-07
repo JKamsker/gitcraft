@@ -519,11 +519,10 @@ fn exchange_harness(
     h
 }
 
-fn painted(h: &egui_kittest::Harness<RepoTab>) -> PaintedColumns {
-    let Some(geometry) = h.ctx.data(|d| d.get_temp(painted_columns_id())) else {
-        panic!("production graph renderer did not record its column geometry");
-    };
-    geometry
+fn painted(h: &egui_kittest::Harness<RepoTab>) -> Result<PaintedColumns, String> {
+    h.ctx
+        .data(|d| d.get_temp(painted_columns_id()))
+        .ok_or_else(|| "production graph renderer did not record its column geometry".to_owned())
 }
 
 fn raw_width(settings: &Settings, bar: Bar) -> f32 {
@@ -547,11 +546,15 @@ fn pointer_button(h: &mut egui_kittest::Harness<RepoTab>, pos: egui::Pos2, press
     h.run_steps(2);
 }
 
-fn press_divider(h: &mut egui_kittest::Harness<RepoTab>, bar: Bar, offset: f32) -> egui::Pos2 {
+fn press_divider(
+    h: &mut egui_kittest::Harness<RepoTab>,
+    bar: Bar,
+    offset: f32,
+) -> Result<egui::Pos2, String> {
     // Separate gestures, including consecutive Graph gestures, are not double-clicks.
     h.event(egui::Event::PointerGone);
     h.run_steps(4);
-    let geometry = painted(h);
+    let geometry = painted(h)?;
     let pos = egui::pos2(
         geometry.cols.border(geometry.header, bar) + offset,
         geometry.header.center().y,
@@ -559,7 +562,7 @@ fn press_divider(h: &mut egui_kittest::Harness<RepoTab>, bar: Bar, offset: f32) 
     h.event(egui::Event::PointerMoved(pos));
     h.step();
     pointer_button(h, pos, true);
-    pos
+    Ok(pos)
 }
 
 fn pointer_delta(
@@ -579,11 +582,16 @@ fn pointer_delta(
     point
 }
 
-fn release_exchange(h: &mut egui_kittest::Harness<RepoTab>, bar: Bar, change: f32) {
-    let press = press_divider(h, bar, 0.0);
+fn release_exchange(
+    h: &mut egui_kittest::Harness<RepoTab>,
+    bar: Bar,
+    change: f32,
+) -> Result<(), String> {
+    let press = press_divider(h, bar, 0.0)?;
     let end = pointer_delta(h, press, bar, change);
     pointer_button(h, end, false);
     h.run_steps(2);
+    Ok(())
 }
 
 fn exchange_settings() -> Settings {
@@ -602,46 +610,48 @@ fn exchange_settings() -> Settings {
 }
 
 #[test]
-fn compressed_graph_growth_after_author_shrink_uses_description_not_refs() {
+fn compressed_graph_growth_after_author_shrink_uses_description_not_refs() -> Result<(), String> {
     let mut h = exchange_harness(&exchange_settings(), 760.0, false);
-    assert_eq!(painted(&h).cols.refs, 180.0);
-    release_exchange(&mut h, Bar::Author, -130.0);
-    let start = painted(&h);
+    assert_eq!(painted(&h)?.cols.refs, 180.0);
+    release_exchange(&mut h, Bar::Author, -130.0)?;
+    let start = painted(&h)?;
     assert_eq!(start.cols.author, 150.0);
     assert_eq!(start.cols.description(start.header).width(), 270.0);
-    release_exchange(&mut h, Bar::Graph, 10.0);
-    let after = painted(&h);
+    release_exchange(&mut h, Bar::Graph, 10.0)?;
+    let after = painted(&h)?;
     eprintln!("Graph sequential exchange: {start:?} -> {after:?}");
     assert_eq!(after.cols.graph, 70.0);
     assert_eq!(after.cols.refs, 180.0);
     assert_eq!(after.cols.author, 150.0);
     assert_eq!(after.cols.description(after.header).width(), 260.0);
     assert_eq!(Settings::get(&h.ctx).refs_width, 280.0);
+    Ok(())
 }
 
 #[test]
-fn compressed_commit_growth_after_date_shrink_uses_description_not_author() {
+fn compressed_commit_growth_after_date_shrink_uses_description_not_author() -> Result<(), String> {
     let settings = Settings {
         show_hash: true,
         show_date: true,
         ..exchange_settings()
     };
     let mut h = exchange_harness(&settings, 600.0, false);
-    release_exchange(&mut h, Bar::Date, -20.0);
-    let start = painted(&h);
+    release_exchange(&mut h, Bar::Date, -20.0)?;
+    let start = painted(&h)?;
     assert_eq!(start.cols.hash, 50.0);
     assert_eq!(start.cols.author, 80.0);
     assert_eq!(start.cols.date, 80.0);
     assert_eq!(start.cols.description(start.header).width(), 160.0);
     // A negative pointer displacement grows a trailing column.
-    release_exchange(&mut h, Bar::Hash, 10.0);
-    let after = painted(&h);
+    release_exchange(&mut h, Bar::Hash, 10.0)?;
+    let after = painted(&h)?;
     eprintln!("Commit sequential exchange: {start:?} -> {after:?}");
     assert_eq!(after.cols.hash, 60.0);
     assert_eq!(after.cols.author, 80.0);
     assert_eq!(after.cols.date, 80.0);
     assert_eq!(after.cols.description(after.header).width(), 150.0);
     assert_eq!(Settings::get(&h.ctx).author_width, 280.0);
+    Ok(())
 }
 
 fn assert_exchange(
@@ -650,8 +660,8 @@ fn assert_exchange(
     saved: &Settings,
     bar: Bar,
     change: f32,
-) {
-    let after = painted(h);
+) -> Result<(), String> {
+    let after = painted(h)?;
     let description = start.cols.description(start.header).width();
     let max = (start.cols.width(bar) + description - crate::repo::columns::MIN_DESCRIPTION_W)
         .min(bar.max());
@@ -703,18 +713,21 @@ fn assert_exchange(
         (Bar::When, "WHEN"),
         (Bar::Date, "DATE"),
     ] {
-        let Some((clip, _, _)) = texts.iter().find(|(_, text, _)| text == label) else {
-            panic!("production renderer did not paint the {label} header");
-        };
+        let (clip, _, _) = texts
+            .iter()
+            .find(|(_, text, _)| text == label)
+            .ok_or_else(|| format!("production renderer did not paint the {label} header"))?;
         assert!(
             (clip.width() + 12.0 - after.cols.width(other)).abs() <= 1.1 / now.ui_scale,
             "{other:?} clip {clip:?}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto_fit() {
+fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto_fit()
+-> Result<(), String> {
     for width in [600.0, 760.0, 1000.0, 1800.0] {
         for auto in [false, true] {
             for scale in [1.0, 1.25, 1.5] {
@@ -728,10 +741,10 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         ..exchange_settings()
                     };
                     let mut h = exchange_harness(&settings, width, auto);
-                    assert!((painted(&h).header.width() - width).abs() < 0.1);
+                    assert!((painted(&h)?.header.width() - width).abs() < 0.1);
                     if auto {
                         assert_ne!(
-                            painted(&h).prefs.refs,
+                            painted(&h)?.prefs.refs,
                             settings.refs_width,
                             "fixture must exercise readable_viewport's actual auto width"
                         );
@@ -746,28 +759,28 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         Bar::Date,
                         Bar::Refs,
                     ] {
-                        let geometry = painted(&h);
-                        let Some(donor) = Bar::ALL
+                        let geometry = painted(&h)?;
+                        let donor = Bar::ALL
                             .into_iter()
                             .filter(|&other| other != bar && other != Bar::Refs)
                             .max_by(|&a, &b| {
                                 (geometry.cols.width(a) - a.min())
                                     .total_cmp(&(geometry.cols.width(b) - b.min()))
                             })
-                        else {
-                            panic!("each divider must have a visible sibling donor");
-                        };
+                            .ok_or_else(|| {
+                                "each divider must have a visible sibling donor".to_owned()
+                            })?;
                         let donation = (geometry.cols.width(donor) - donor.min()).min(30.0);
                         assert!(donation >= 10.0);
-                        release_exchange(&mut h, donor, -donation);
-                        let start = painted(&h);
+                        release_exchange(&mut h, donor, -donation)?;
+                        let start = painted(&h)?;
                         let saved = Settings::get(&h.ctx);
                         let grow = (start.cols.description(start.header).width()
                             - crate::repo::columns::MIN_DESCRIPTION_W)
                             .min(bar.max() - start.cols.width(bar));
                         let shrink = start.cols.width(bar) - bar.min();
                         let preferred_delta = start.prefs.width(bar) - start.cols.width(bar);
-                        let press = press_divider(&mut h, bar, offset);
+                        let press = press_divider(&mut h, bar, offset)?;
                         for change in [
                             10.0,
                             preferred_delta - 1.0,
@@ -786,16 +799,17 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                             0.0,
                         ] {
                             pointer_delta(&mut h, press, bar, change);
-                            assert_exchange(&h, start, &saved, bar, change);
+                            assert_exchange(&h, start, &saved, bar, change)?;
                         }
                         let end = pointer_delta(&mut h, press, bar, 10.0);
                         pointer_button(&mut h, end, false);
-                        assert_exchange(&h, start, &saved, bar, 10.0);
+                        assert_exchange(&h, start, &saved, bar, 10.0)?;
                     }
                 }
             }
         }
     }
+    Ok(())
 }
 
 #[test]
@@ -808,16 +822,16 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
             ..exchange_settings()
         };
         let mut h = exchange_harness(&settings, 760.0, auto);
-        release_exchange(&mut h, Bar::Author, -80.0);
-        release_exchange(&mut h, Bar::Graph, 10.0);
+        release_exchange(&mut h, Bar::Author, -80.0)?;
+        release_exchange(&mut h, Bar::Graph, 10.0)?;
         let saved = Settings::get(&h.ctx);
-        let original = painted(&h);
+        let original = painted(&h)?;
         assert!(saved.description_space.compression.is_some());
         let encoded = ron::to_string(&saved).map_err(|e| e.to_string())?;
         let restored: Settings = ron::from_str(&encoded).map_err(|e| e.to_string())?;
         assert_eq!(restored, saved);
         let mut restarted = exchange_harness(&restored, 760.0, auto);
-        assert_eq!(painted(&restarted).cols, original.cols);
+        assert_eq!(painted(&restarted)?.cols, original.cols);
         // Each metadata visibility toggle is reversible without changing saved preferences
         // or the persisted allocation. A restart while hidden follows the same policy.
         for bar in [Bar::Hash, Bar::Author, Bar::When, Bar::Date] {
@@ -831,15 +845,15 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
             }
             hidden.put_for_test(&restarted.ctx);
             restarted.run_steps(3);
-            assert_eq!(painted(&restarted).cols.width(bar), 0.0);
+            assert_eq!(painted(&restarted)?.cols.width(bar), 0.0);
             assert_eq!(Settings::get(&restarted.ctx), hidden);
             let encoded = ron::to_string(&hidden).map_err(|e| e.to_string())?;
             let restored: Settings = ron::from_str(&encoded).map_err(|e| e.to_string())?;
             let hidden_restart = exchange_harness(&restored, 760.0, auto);
-            assert_eq!(painted(&hidden_restart).cols, painted(&restarted).cols);
+            assert_eq!(painted(&hidden_restart)?.cols, painted(&restarted)?.cols);
             saved.put_for_test(&restarted.ctx);
             restarted.run_steps(3);
-            assert_eq!(painted(&restarted).cols, original.cols);
+            assert_eq!(painted(&restarted)?.cols, original.cols);
         }
         let mut visits = std::collections::HashMap::new();
         for width in [
@@ -847,7 +861,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
         ] {
             restarted.set_size(vec2(width as f32 + 16.0, 540.0));
             restarted.run_steps(4);
-            let geometry = painted(&restarted);
+            let geometry = painted(&restarted)?;
             assert_eq!(Settings::get(&restarted.ctx), saved);
             if let Some(previous) = visits.insert(width, geometry.cols) {
                 assert_eq!(geometry.cols, previous);
@@ -867,16 +881,16 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
                 assert_eq!(geometry.cols.description(geometry.header).width(), 140.0);
             }
         }
-        assert_eq!(painted(&restarted).cols, original.cols);
+        assert_eq!(painted(&restarted)?.cols, original.cols);
         restarted.set_size(vec2(516.0, 540.0));
         restarted.run_steps(3);
-        let blocked = painted(&restarted);
+        let blocked = painted(&restarted)?;
         assert_eq!(blocked.cols.description(blocked.header).width(), 140.0);
         for bar in Bar::ALL {
-            let press = press_divider(&mut restarted, bar, 4.0);
+            let press = press_divider(&mut restarted, bar, 4.0)?;
             for change in [10.0, 5000.0, -10.0, -5000.0, 0.0] {
                 pointer_delta(&mut restarted, press, bar, change);
-                assert_exchange(&restarted, blocked, &saved, bar, change);
+                assert_exchange(&restarted, blocked, &saved, bar, change)?;
             }
             pointer_button(&mut restarted, press, false);
         }
@@ -891,28 +905,29 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
 }
 
 #[test]
-fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() {
+fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() -> Result<(), String>
+{
     let settings = Settings {
         auto_refs_width: true,
         graph_width: 0.0,
         ..exchange_settings()
     };
     let mut h = exchange_harness(&settings, 760.0, true);
-    let initial = painted(&h);
+    let initial = painted(&h)?;
     assert_ne!(initial.prefs.refs, settings.refs_width);
-    release_exchange(&mut h, Bar::Author, -80.0);
-    let start = painted(&h);
+    release_exchange(&mut h, Bar::Author, -80.0)?;
+    let start = painted(&h)?;
     let saved = Settings::get(&h.ctx);
     assert!(saved.fit_visible_refs());
     assert_eq!(saved.graph_width, 0.0);
-    let press = press_divider(&mut h, Bar::Graph, -4.0);
+    let press = press_divider(&mut h, Bar::Graph, -4.0)?;
     for change in [10.0, 5000.0, 10.0, 0.0] {
         pointer_delta(&mut h, press, Bar::Graph, change);
         let now = Settings::get(&h.ctx);
         if change == 0.0 {
             assert_eq!(now.graph_width, 0.0);
             assert_eq!(now.description_space, saved.description_space);
-            assert_eq!(painted(&h).cols, start.cols);
+            assert_eq!(painted(&h)?.cols, start.cols);
         } else {
             assert!(now.graph_width > 0.0);
         }
@@ -929,10 +944,10 @@ fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() {
         assert_eq!(Settings::get(&h.ctx).graph_width, 0.0);
         assert!(Settings::get(&h.ctx).fit_visible_refs());
         if name == "a" {
-            assert_eq!(painted(&h).prefs.refs, initial.prefs.refs);
-            assert_eq!(painted(&h).cols, start.cols);
+            assert_eq!(painted(&h)?.prefs.refs, initial.prefs.refs);
+            assert_eq!(painted(&h)?.cols, start.cols);
         } else {
-            assert!(painted(&h).prefs.refs > initial.prefs.refs);
+            assert!(painted(&h)?.prefs.refs > initial.prefs.refs);
         }
     }
     // A lane-fit change also remains automatic and is reversible with the same reservation.
@@ -940,8 +955,9 @@ fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() {
     h.state_mut().graph.width = 1;
     h.run_steps(3);
     assert_eq!(Settings::get(&h.ctx).graph_width, 0.0);
-    assert!(painted(&h).prefs.graph < start.prefs.graph);
+    assert!(painted(&h)?.prefs.graph < start.prefs.graph);
     h.state_mut().graph.width = width;
     h.run_steps(3);
-    assert_eq!(painted(&h).cols, start.cols);
+    assert_eq!(painted(&h)?.cols, start.cols);
+    Ok(())
 }
