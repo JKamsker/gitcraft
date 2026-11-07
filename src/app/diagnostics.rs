@@ -49,10 +49,22 @@ impl App {
         };
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        crate::connections::spawn(move || {
-            let _ = tx.send(diagnostics::collect(&facts));
-            ctx.request_repaint();
+        let result = crate::tasks::pool().and_then(|pool| {
+            pool.submit(
+                crate::tasks::Cancellation::default(),
+                crate::tasks::Priority::Interactive,
+                None,
+                Box::new(move || {
+                    let _ = tx.send(diagnostics::collect(&facts));
+                    ctx.request_repaint();
+                }),
+            )
+            .map_err(str::to_owned)
         });
+        if let Err(error) = result {
+            self.report(error);
+            return;
+        }
         self.diagnostics = Some(rx);
         self.toasts.push(Toast::new(
             "Collecting diagnostics (asking git, gh, glab, tea)…".to_owned(),
@@ -67,10 +79,11 @@ impl App {
         };
         match rx.try_recv() {
             Ok(text) => {
+                ctx.open_url(egui::OpenUrl::new_tab(diagnostics::issue_url(&text)));
                 ctx.copy_text(text);
                 self.diagnostics = None;
                 self.toasts.push(Toast::new(
-                    "Diagnostics copied: check them, then paste them into the issue you report."
+                    "Diagnostics copied and a prefilled issue opened. Review the contents before submitting."
                         .to_owned(),
                     false,
                 ));

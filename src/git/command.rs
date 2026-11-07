@@ -940,6 +940,7 @@ impl Recorded {
         creds: Option<&Credentials>,
         started: std::time::Instant,
     ) -> Self {
+        crate::diagnostics::crash::operation(args, code, started.elapsed());
         let password = creds.map(|c| c.password.as_str());
         Self {
             args: args.iter().map(|a| super::redact(a, password)).collect(),

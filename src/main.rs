@@ -47,6 +47,7 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    app::install_panic_log();
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: app::window_viewport()

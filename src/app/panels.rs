@@ -119,7 +119,7 @@ impl App {
                         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
                             close = true;
                         }
-                        let tip = "Copies what a bug report needs: versions, system, graphics, \
+                        let tip = "Copies diagnostics and opens a prefilled issue for review: versions, system, graphics, \
                                    git, gh, glab and tea (signed in or not, never a token), and \
                                    the git settings in effect (no name or email)";
                         if ui

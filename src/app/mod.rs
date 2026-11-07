@@ -991,3 +991,8 @@ pub(crate) fn strip_verbatim(path: PathBuf) -> PathBuf {
         _ => path,
     }
 }
+
+/// Installs the persistent local panic log before the application window is created.
+pub fn install_panic_log() {
+    crate::diagnostics::crash::install();
+}
