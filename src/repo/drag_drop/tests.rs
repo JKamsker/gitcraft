@@ -54,17 +54,20 @@ fn subjects(dir: &Path) -> Vec<String> {
 /// the test inspecting a rewrite that is still running.
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(30) {
+    loop {
         tab.poll(ctx);
         if done(tab) {
             return;
         }
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "drop action did not finish: loading={}, busy={:?}, status={:?}",
+            tab.loading,
+            tab.busy_op,
+            tab.status
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
-    panic!(
-        "drop action did not finish: loading={}, busy={:?}, status={:?}",
-        tab.loading, tab.busy_op, tab.status
-    );
 }
 
 /// Polls until nothing runs and the reload after it is in.
