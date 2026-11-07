@@ -163,6 +163,8 @@ pub(crate) enum Action {
     LfsLocks(super::lfs_locks::LockAct),
     /// The conflict editor's history of the file on each side.
     Archaeology(super::conflict::archaeology::Act),
+    /// Something done with the Git LFS storage.
+    LfsStorage(super::lfs_storage::StorageAct),
     /// Let Mergiraf solve what it can of the open conflict.
     SolveWithMergiraf,
     /// Preview keeping both versions of a conflicted file that can't be merged.
@@ -525,6 +527,11 @@ impl RepoTab {
                 "LFS: Locks…".into(),
                 "remote".into(),
                 Action::LfsLocks(super::lfs_locks::LockAct::OpenPanel),
+            ));
+            items.push((
+                "LFS: Storage…".into(),
+                "remote".into(),
+                Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {

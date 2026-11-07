@@ -30,6 +30,9 @@ pub(crate) mod lfs_test_server;
 mod locks;
 pub mod progress;
 mod redact;
+#[cfg(test)]
+pub(crate) mod lfs_fixtures;
+mod lfs_storage;
 mod refs;
 pub mod simulate;
 pub mod search_query;
@@ -63,6 +66,7 @@ pub use self::log_order::*;
 pub use self::lfs_locks::*;
 pub use self::locks::*;
 pub use self::redact::redact;
+pub use self::lfs_storage::*;
 pub use self::refs::*;
 pub use self::signature::*;
 pub use self::stash::*;

@@ -313,6 +313,7 @@ impl RepoTab {
             Action::Bisect(act) => self.bisect_act(act, ctx),
             Action::ParallelBisect(act) => self.parallel_act(act, ctx),
             Action::Guide(act) => self.guide_act(act, ctx),
+            Action::LfsStorage(act) => self.apply_storage_act(act, ctx),
             Action::SaveConflict => self.save_conflict(ctx),
             Action::KeepBoth(path) => self.keep_both(path, ctx),
             Action::Archaeology(act) => self.archaeology_act(act, ctx),

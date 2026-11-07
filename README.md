@@ -411,6 +411,16 @@ so your config, credentials and hooks apply as usual.
   gitcraft offers to give back your locks on the files it carried that have no changes left.
   Locks are read when the tab opens and every few minutes while background fetching is on
   (Settings), and whenever the panel opens.
+- LFS storage: _LFS: Storage…_ in the palette of a repository that uses LFS says how much disk
+  the local LFS objects take, lists the files of the checkout that are only their pointer on
+  disk (never downloaded, or fetched but not checked out) with _Download_ for each or all, sets
+  which folders git-lfs downloads on fetch, pull and checkout (`lfs.fetchinclude` /
+  `lfs.fetchexclude`, for this repository only; what a committed `.lfsconfig` sets is shown),
+  and prunes old objects after showing what that frees, asking twice. In _View all files_ of
+  the checked-out commit, a cloud marks the files that are only pointers (not on files that
+  commit changed, whose stats take that place). The menu of a file of the checkout has _LFS:
+  Download_ for such a file, _LFS: Fetch only <folder>_ for a file in LFS, and _Track \*.ext in
+  LFS_ for one whose type isn't (which writes `.gitattributes`).
 - The arrows in a diff's header (F7 / Shift+F7, or Alt+↓ / Alt+↑) jump to the next and previous
   change. The strip beside the scrollbar marks where the changes are, removals red and additions
   green; click a mark to jump to its change, or anywhere else on the strip to scroll there.

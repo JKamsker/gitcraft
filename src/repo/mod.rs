@@ -49,6 +49,7 @@ mod keys;
 mod layout;
 mod lfs_locks;
 mod lifecycle;
+mod lfs_storage;
 mod load;
 mod messages;
 mod nav_history;
@@ -180,6 +181,8 @@ pub struct RepoTab {
     lfs: bool,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
+    /// What it keeps in LFS on disk, and what is only pointers.
+    lfs_storage: lfs_storage::StorageState,
     identity: Identity,
     /// Where `origin` is hosted, when it's on a forge gitcraft knows.
     hosting: Option<Hosting>,
@@ -424,6 +427,7 @@ impl RepoTab {
             submodules: Vec::new(),
             lfs: false,
             lfs_locks: Default::default(),
+            lfs_storage: Default::default(),
             identity: Identity::default(),
             hosting: None,
             prs: Vec::new(),
