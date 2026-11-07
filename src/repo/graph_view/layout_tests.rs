@@ -398,6 +398,8 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
                     .unwrap()
                     .0
             };
+            let viewport = h.ctx.content_rect().size();
+            assert!((viewport.x - width as f32).abs() < 0.1);
             let before_graph = find(&h, "GRAPH");
             let before_desc = find(&h, "DESCRIPTION");
             let press = egui::pos2(before_graph.left() - 6.0, before_graph.center().y);
@@ -452,12 +454,12 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
             }
             // Shrink far enough to consume Description's exchange first, then expand. The
             // saved reservation is an explicit preference, never overwritten by a viewport.
-            h.set_size(vec2(380.0 * scale, 540.0 * scale));
+            h.set_size(vec2(380.0, viewport.y));
             for _ in 0..5 {
                 h.step();
             }
             assert_eq!(Settings::get(&h.ctx), saved);
-            h.set_size(vec2(width as f32 * scale, 540.0 * scale));
+            h.set_size(viewport);
             for _ in 0..5 {
                 h.step();
             }
