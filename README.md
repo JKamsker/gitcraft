@@ -625,3 +625,14 @@ pack offsets and delta ancestry. Follow a tree entry or delta base to inspect it
 Reads run on the repository machine (including SSH/WSL), use bounded responses,
 and disable lazy fetching. Missing objects and unsupported Git capabilities are
 reported explicitly; this view requires Git 2.45 or newer.
+
+The same inspector's **Shared and borrowed objects** section lists linked worktrees,
+common ownership, recursive alternate donors and broken donor paths. Its explicit
+**Make this clone independent** action copies objects required by refs, reflogs and
+the index into a self-contained pack, verifies coverage, guards the prepared snapshot,
+and removes the borrowing link only with a successful final connectivity proof.
+Stop other Git writers before confirming. Donors are never changed. A retained
+`objects/info/alternates.gitcraft-backup-*` file records the original link; a failed
+final proof restores borrowing or reports that backup's exact recovery path.
+Incomplete/promisor repositories, HTTP/cyclic/malformed alternates, linked worktrees,
+symlinked store metadata and packs beyond the bounded copy size are refused safely.

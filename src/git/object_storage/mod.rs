@@ -1,5 +1,7 @@
 //! Read-only object representations. Git runs on the repository machine, without lazy fetch.
 mod files;
+mod topology;
+pub(crate) mod independent;
 #[cfg(test)]
 mod tests;
 
@@ -54,6 +56,8 @@ pub(crate) struct Inspection {
     pub representations: Vec<Representation>,
     pub entries: Vec<Entry>,
     pub notes: Vec<String>,
+    pub topology: topology::Topology,
+    pub independence: Option<independent::Snapshot>,
 }
 
 pub(super) fn bytes(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<Vec<u8>, String> {
@@ -114,13 +118,14 @@ pub(super) fn pack_rows(output: &str) -> Result<BTreeMap<String, Packed>, String
     }
     Ok(rows)
 }
-fn representations(repo: &Path, store: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Vec<Representation>, String> {
+fn representations(repo: &Path, store: &Path, oid: &str, budget: &mut usize, active: &dyn Fn() -> bool) -> Result<Vec<Representation>, String> {
     let mut found = Vec::new();
     let loose = remote::join(store, &format!("{}/{}", &oid[..2], &oid[2..]));
     if let Some(size) = files::size(&loose, active)? {
         found.push(Representation { path: loose, loose_bytes: Some(size), chain: Vec::new() });
     }
-    let packs = files::packs(store, MAX_PACKS, active)?;
+    let packs = files::packs(store, *budget, active)?;
+    *budget -= packs.len();
     for pack in packs {
         if !active() { return Err("Object inspection cancelled".into()); }
         let printed = remote::git_path(&pack);
@@ -172,12 +177,19 @@ pub(crate) fn inspect(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Re
     let objects = remote::resolve(repo, &line(repo, &["rev-parse", "--path-format=absolute", "--git-path", "objects"], active)?);
     let object = metadata(repo, &oid, active)?;
     let entries = match &object { Some(o) => entries(repo, o, active)?, None => Vec::new() };
-    let representations = representations(repo, &objects, &oid, active)?;
-    let mut notes = Vec::new();
+    let topology = topology::read(repo, &objects, active)?;
+    let mut representations = Vec::new();
+    let mut budget = MAX_PACKS;
+    for store in topology.stores.iter().filter(|s| s.available) {
+        representations.extend(self::representations(repo, &store.path, &oid, &mut budget, active)?);
+    }
+    let mut notes = topology.warnings.clone();
+    if topology.promisor { notes.push("Promisor/partial-clone configuration is present. Missing objects are not fetched, and independence is unavailable until the repository is complete.".into()); }
+    let independence = independent::prepare(repo, &objects, &topology, active).map_err(|e| notes.push(e)).ok();
     let missing = object.is_none().then(|| format!("{oid} is missing from the available object stores. No download was attempted; a promisor configuration alone does not prove that this particular object is promised."));
     if object.is_some() && representations.is_empty() { notes.push("Git can read this object, but no representation was found in the primary store. It may be borrowed from an alternate; inspect shared and borrowed objects.".into()); }
     let snapshot = comparison_output(repo, &["rev-parse", "--verify", "HEAD"], &[], active)?;
     if snapshot.code != 0 { notes.push("HEAD is unborn or unavailable. Object inspection still uses the immutable resolved object ID.".into()); }
     if resolve(repo, query, active)? != oid { return Err("The revision changed while inspecting. Inspect again.".into()); }
-    Ok(Inspection { query: query.into(), format, git_dir, common_dir, objects, object, missing, representations, entries, notes })
+    Ok(Inspection { query: query.into(), format, git_dir, common_dir, objects, object, missing, representations, entries, notes, topology, independence })
 }

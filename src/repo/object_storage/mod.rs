@@ -15,6 +15,7 @@ pub struct State {
     file: String,
     loading: bool,
     result: Option<Result<storage::Inspection, String>>,
+    independence_ack: bool,
 }
 impl RepoTab {
     pub(super) fn open_object_storage(&mut self, query: Option<String>, ctx: &egui::Context) {
@@ -28,7 +29,7 @@ impl RepoTab {
         if let Some(Dialog::ObjectStorage(old)) = &self.dialog { old.generation.store(0, Ordering::Relaxed); }
         self.dialog = Some(Dialog::ObjectStorage(Box::new(State {
             request, generation, path: path.clone(), profile: profile.clone(), read,
-            query: query.clone(), file: String::new(), loading: true, result: None,
+            query: query.clone(), file: String::new(), loading: true, result: None, independence_ack: false,
         })));
         self.then(ctx, move || {
             storage::inspect(&path, &query, &|| weak.upgrade().is_some_and(|g| g.load(Ordering::Relaxed) == request))
@@ -37,6 +38,21 @@ impl RepoTab {
             if state.request != request || tab.path != state.path || tab.reads != read || connections::current() != profile { return; }
             state.loading = false;
             state.result = Some(result);
+        });
+    }
+    pub(super) fn make_object_storage_independent(&mut self, snapshot: Box<storage::independent::Snapshot>, ctx: &egui::Context) {
+        if self.busy_op.is_some() { return; }
+        if snapshot.repo != self.path { self.status = Some(("Repository changed; prepare independence again.".into(), true)); return; }
+        let repo = self.path.clone();
+        let profile = connections::current();
+        self.last_op = None;
+        self.busy_op = Some("Copying and verifying borrowed objects".into());
+        self.op_started = Some(std::time::Instant::now());
+        self.then(ctx, move || storage::independent::make_independent(&snapshot, &|| true), move |tab, result, ctx| {
+            tab.busy_op = None;
+            tab.op_started = None;
+            tab.status = Some(match result { Ok(message) => (message, false), Err(error) => (format!("Make clone independent failed: {error}"), true) });
+            if tab.path == repo && connections::current() == profile { tab.reload(ctx); }
         });
     }
     pub(super) fn sync_object_storage(&mut self) {
@@ -76,6 +92,22 @@ pub(super) fn dialog(ui: &mut egui::Ui, state: &mut State) -> super::dialogs::Ou
                 ui.label(format!("Git directory: {}", data.git_dir));
                 ui.label(format!("Common directory: {}", data.common_dir));
                 ui.label(format!("Primary objects: {}", crate::remote::display(&data.objects)));
+                ui.separator();
+                ui.strong("Shared and borrowed objects");
+                ui.label("Linked worktrees below share the common Git directory and its object ownership:");
+                ui.monospace(&data.topology.worktrees);
+                for store in &data.topology.stores {
+                    let owner = store.donor_of.as_ref().map(|p| format!("Donor for {}", crate::remote::display(p))).unwrap_or_else(|| "Primary object store".into());
+                    ui.label(format!("{owner}: {} · {}", crate::remote::display(&store.path), if store.available { "available" } else { "MISSING / unavailable" }));
+                    if let Some(error) = &store.error { ui.colored_label(ui.visuals().warn_fg_color, error); }
+                }
+                ui.label("Objects shown in a donor's loose file or pack are borrowed: deleting or pruning that donor may make this repository unreadable. A linked worktree shares objects rather than owning a separate clone.");
+                if let Some(snapshot) = &data.independence {
+                    ui.label("Make independent copies every object needed by refs, reflogs and the index into a self-contained local pack. Only after coverage and connectivity proofs succeed is the primary alternate link removed. Donors stay untouched; an alternate backup is retained. Copies are limited to 128 MiB per pack.");
+                    ui.checkbox(&mut state.independence_ack, "I have stopped other Git writers for this clone and want to remove its borrowing link.");
+                    if ui.add_enabled(state.independence_ack && !state.loading, egui::Button::new("Make this clone independent")).clicked() { outcome = Outcome::Done(Action::MakeObjectStorageIndependent(Box::new(snapshot.clone()))); }
+                }
+                ui.separator();
                 if let Some(object) = &data.object {
                     ui.monospace(&object.oid);
                     ui.label(format!("{} · {} logical bytes · {} bytes in Git's selected representation", object.kind, object.size, object.disk));

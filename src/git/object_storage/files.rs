@@ -52,3 +52,21 @@ pub(super) fn packs(store: &Path, max: usize, active: &dyn Fn() -> bool) -> Resu
         Ok(remote::join(&directory, &name))
     }).collect()
 }
+
+pub(super) fn read(path: &Path, cap: usize, active: &dyn Fn() -> bool) -> Result<Option<Vec<u8>>, String> {
+    if let Some(out) = remote_read(path, |p| format!("if [ ! -e {p} ]; then printf 'M'; elif [ -f {p} ]; then printf 'F'; head -c {} -- {p}; else echo 'not a regular file' >&2; exit 1; fi", cap+1), cap+2, active)? {
+        return match out.first() { Some(b'M') => Ok(None), Some(b'F') if out.len() <= cap+1 => Ok(Some(out[1..].to_vec())), _ => Err("Object-store file exceeds its read limit".into()) };
+    }
+    use std::io::Read;
+    if !active() { return Err("Object inspection cancelled".into()); }
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    if !file.metadata().map_err(|e| e.to_string())?.is_file() { return Err("Not a regular object-store file".into()); }
+    let mut out = Vec::new();
+    file.take(cap as u64+1).read_to_end(&mut out).map_err(|e| e.to_string())?;
+    if out.len() > cap { return Err("Object-store file exceeds its read limit".into()); }
+    Ok(Some(out))
+}

@@ -35,6 +35,10 @@ impl RepoTab {
                     acts.push(Action::OpenObjectStorage);
                     ui.close();
                 }
+                if ui.button("Shared and borrowed objects…").clicked() {
+                    acts.push(Action::OpenObjectStorage);
+                    ui.close();
+                }
                 for (label, page) in [
                     (
                         "File migration map",

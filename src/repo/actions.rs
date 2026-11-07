@@ -193,6 +193,7 @@ pub(crate) enum Action {
     ApplyPatch,
     OpenObjectStorage,
     InspectObject(String),
+    MakeObjectStorageIndependent(Box<git::object_storage::independent::Snapshot>),
     OpenBundleExport,
     OpenBundleImport,
     ExportBundle {
@@ -423,6 +424,7 @@ impl RepoTab {
         );
         items.extend([
             ("How an object is stored…".into(), "objects packs delta file version".into(), Action::OpenObjectStorage),
+            ("Shared and borrowed objects…".into(), "alternates donors independent".into(), Action::OpenObjectStorage),
             ("Apply patch…".into(), "patch".into(), Action::ApplyPatch),
             (
                 "Earlier versions of working changes…".into(),
