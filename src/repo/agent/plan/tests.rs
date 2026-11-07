@@ -19,6 +19,8 @@ fn repo(name: &str) -> PathBuf {
         &["config", "user.name", "t"],
         &["config", "user.email", "t@t"],
         &["config", "commit.gpgsign", "false"],
+        // Files come back as written, whatever the system's line-ending conversion (Windows).
+        &["config", "core.autocrlf", "false"],
     ] {
         assert!(git::run(Some(&dir), args).is_ok());
     }
