@@ -1,19 +1,19 @@
 //! Independence requires held filesystem ownership, rather than shell path checks.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 mod local;
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, any(target_os = "linux", windows)))]
 pub(super) use local::make_with_checkpoints;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 pub(super) use local::prepare;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 pub(crate) use local::{Snapshot, make_independent};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", windows)))]
 #[derive(Clone, Debug)]
 pub(crate) struct Snapshot {
     pub repo: std::path::PathBuf,
 }
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", windows)))]
 pub(super) fn prepare(
     _repo: &std::path::Path,
     _primary: &std::path::Path,
@@ -22,7 +22,7 @@ pub(super) fn prepare(
 ) -> Result<Snapshot, String> {
     Err("Make independent requires Linux-local held directory/file handles. Read-only inspection remains available on this platform.".into())
 }
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", windows)))]
 pub(crate) fn make_independent(
     _snapshot: &Snapshot,
     _active: &dyn Fn() -> bool,

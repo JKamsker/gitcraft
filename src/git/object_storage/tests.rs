@@ -752,3 +752,67 @@ mod fixed_ownership {
         Ok(())
     }
 }
+
+#[cfg(windows)]
+mod native_windows_ownership {
+    use super::*;
+    #[test]
+    fn native_held_ancestors_and_alternate_exclude_replacement_and_writers() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        let alt = borrower.join(".git/objects/info/alternates");
+        assert!(std::fs::rename(borrower.join(".git"), borrower.join("replacement-git")).is_err());
+        assert!(std::fs::rename(&borrower, f.0.join("replacement-root")).is_err());
+        assert!(std::fs::remove_file(&alt).is_err());
+        assert!(std::fs::OpenOptions::new().write(true).open(&alt).is_err());
+        drop(plan);
+        Ok(())
+    }
+    #[test]
+    fn native_independence_clears_only_the_exclusively_held_alternate() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (donor, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        independent::make_independent(&plan, &|| true)?;
+        assert!(
+            std::fs::read(borrower.join(".git/objects/info/alternates"))
+                .map_err(|e| e.to_string())?
+                .is_empty()
+        );
+        std::fs::rename(&donor, f.0.join("removed donor")).map_err(|e| e.to_string())?;
+        assert_eq!(
+            Fixture::git(&borrower, &["show", "HEAD:file ' $(touch ESCAPED).txt"])?,
+            "borrowed bytes"
+        );
+        Fixture::git(&borrower, &["fsck", "--full", "--no-dangling"])?;
+        drop(plan);
+        Ok(())
+    }
+    #[test]
+    fn native_failed_proof_recovers_the_same_exclusively_owned_file() -> Result<(), String> {
+        let f = Fixture::new()?;
+        let (_, borrower) = f.borrowing()?;
+        let plan = inspect(&borrower, "HEAD", &|| true)?
+            .independence
+            .ok_or("no native plan")?;
+        let alt = borrower.join(".git/objects/info/alternates");
+        let before = std::fs::read(&alt).map_err(|e| e.to_string())?;
+        let result = independent::make_with_checkpoints(&plan, &|| true, &mut |phase| {
+            if phase == "detached" {
+                assert!(std::fs::read(&alt).map_err(|e| e.to_string())?.is_empty());
+                assert!(std::fs::remove_file(&alt).is_err());
+                return Err("owned native fixture stops final proof".into());
+            }
+            Ok(())
+        });
+        assert!(result.is_err_and(|e| e.contains("Borrowing was restored")));
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, before);
+        drop(plan);
+        Ok(())
+    }
+}

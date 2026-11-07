@@ -103,7 +103,7 @@ fn open_inside(root: &Path, names: &[&str], max: u64) -> Option<std::fs::File> {
 /// says (`GetFinalPathNameByHandleW`); nothing when it can't say.
 #[cfg(windows)]
 #[allow(unsafe_code)]
-fn final_path(file: &std::fs::File) -> Option<std::path::PathBuf> {
+pub(crate) fn final_path(file: &std::fs::File) -> Option<std::path::PathBuf> {
     use std::os::windows::ffi::OsStringExt;
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{

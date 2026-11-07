@@ -7,7 +7,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(target_os = "linux")]
 #[path = "held.rs"]
+mod held;
+#[cfg(windows)]
+#[path = "held_windows.rs"]
 mod held;
 use held::{Ownership, Stage};
 
