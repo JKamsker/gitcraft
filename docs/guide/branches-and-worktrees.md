@@ -55,6 +55,15 @@ The left panel: local and remote branches, stacked branches, worktrees, submodul
 - Worktrees: a yellow dot in place of the folder icon marks the others with uncommitted changes,
   here and in the switcher. Add (existing or new branch), open in the same tab (the tab then shows the branch, a searchable switcher and a button to close the worktree, and what you left keeps running; can be turned off in Settings) or a new one, open a terminal there, lock, remove,
   prune.
+- Add worktree has a **Default worktrees root**, saved for this repository when you add.
+  By default it is a sibling folder, `../<repo>.wt/`; branch names keep their subfolders:
+  `feat/awesome-stuff` in `gitcraft` goes to `../gitcraft.wt/feat/awesome-stuff`.
+  Type or browse for another root, or choose **Inside repository** for `.worktrees/`.
+  Relative roots are resolved from the main checkout, and the setting is shared by all its
+  worktrees, including worktrees created for pull requests, issues and agent tasks.
+  Roots inside a checkout are ignored through Git's local `info/exclude`, without changing
+  the repository's `.gitignore`. The final **Worktree folder** can still be overridden for
+  an individual worktree; **Use branch folder** restores the suggestion.
 - Collision matrix (a worktree's menu → _Collision matrix…_): for branches worked on side by side,
   by agents in worktrees or otherwise, every pair is merged in memory (`git merge-tree`, git 2.38
   or later: nothing is checked out, no branch moves) and each with the branch they land on. The
