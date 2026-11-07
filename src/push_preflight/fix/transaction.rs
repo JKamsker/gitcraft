@@ -16,7 +16,7 @@ pub(super) struct Hook {
     capability_acknowledged: bool,
 }
 
-fn supported_version(text: &[u8]) -> bool {
+pub(super) fn supported_version(text: &[u8]) -> bool {
     let Some(version) = std::str::from_utf8(text)
         .ok()
         .and_then(|text| text.strip_prefix("git version "))
@@ -35,7 +35,7 @@ fn supported_version(text: &[u8]) -> bool {
     parsed.is_some_and(|version| version >= (2, 50, 0))
 }
 
-fn path_line(bytes: Vec<u8>) -> Result<String, String> {
+pub(super) fn path_line(bytes: Vec<u8>) -> Result<String, String> {
     let text = String::from_utf8(bytes).map_err(|_| "Safe repair requires UTF-8 metadata paths")?;
     let text = text.strip_suffix('\n').unwrap_or(&text);
     if text.is_empty() || text.chars().any(char::is_control) {
@@ -526,19 +526,19 @@ impl Drop for Hook {
     }
 }
 
-struct HookScript<'a> {
-    original: &'a str,
-    branch: &'a str,
-    old: &'a str,
-    new: &'a str,
-    index: &'a str,
-    shared: Option<&'a str>,
-    affected: &'a [String],
-    proof: &'a str,
-    needs_checkout: bool,
+pub(super) struct HookScript<'a> {
+    pub(super) original: &'a str,
+    pub(super) branch: &'a str,
+    pub(super) old: &'a str,
+    pub(super) new: &'a str,
+    pub(super) index: &'a str,
+    pub(super) shared: Option<&'a str>,
+    pub(super) affected: &'a [String],
+    pub(super) proof: &'a str,
+    pub(super) needs_checkout: bool,
 }
 
-fn script(args: HookScript<'_>) -> String {
+pub(super) fn script(args: HookScript<'_>) -> String {
     let HookScript {
         original,
         branch,

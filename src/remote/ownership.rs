@@ -83,7 +83,7 @@ impl OwnedDispatch {
     pub(super) fn context_error(&self) -> Option<String> {
         self.context.error.clone()
     }
-    pub(super) fn run<T>(&self, job: impl FnOnce() -> T) -> T {
+    pub(crate) fn run<T>(&self, job: impl FnOnce() -> T) -> T {
         self.context.run(|| self.completion.track(job))
     }
 }

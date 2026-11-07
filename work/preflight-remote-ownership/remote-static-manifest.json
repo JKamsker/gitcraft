@@ -1,0 +1,41 @@
+{
+  "status": "FROZEN WIP REMOTE PATH; STATIC REVIEW REQUIRED BEFORE RECORDING/PROTOCOL EXECUTION",
+  "base_green": "1c6d1611ead6f39b0ab60947a08af504cfa4aa19 local926pass3ignore929names",
+  "foundation": "886c05c80cbdf4ecbb4f0cdfe214ed26b9c09147",
+  "entrypoints": [
+    "repo::push_preflight::fix_preflight -> normalexistingconfirmedoperation",
+    "push_preflight::fix -> remote_repair::available/execute forrewrite ornativefetchedtargetmerge",
+    "git::owned_repair_host -> remote::exec_owned -> exec_mode SomeOwnedDispatch -> actualpresendgate",
+    "remote_repair.sh -> ownedguard/snapshot/coherentdependency/nativecapability -> reusedlocalreferencehook -> terminalreceipt -> releaseguard; clientcleanupuniquedironlyonexactsuccessfulreply"
+  ],
+  "ownership": [
+    "OwnedDispatch Contextsnapshot+ForecastCompletion.track beforepoolqueue/connect throughactualexec return",
+    "OnlyNotSent retry; lost/deadline Unknown, no legacyasyncps/stop path, no new controller/PID/signal",
+    "No callerforecast15swaiter forfinalmutator; synchronousexistingbackgroundoperation waitsactualtransportresult",
+    "Unknown retains perreporegistry (max64)+capturedContextlease anddurablehostguard/recovery; subsequentautomaticrepairqueriesownedterminalreceipt andotherwiseblocksreplacement",
+    "Hostguardexclusiveperworktreeindexparent; randomuniqueclientnonceD mkdir0700; onlyreleaseguardafterforegroundnativeGitreturnedandterminalreceiptwritten; no markerabsencecleanup",
+    "Savedindexmax64MiB anddependencyresolvedfromsavedGIT_INDEX_FILE thencomparedobservedpath; rotationrefusesbeforemutation; sharedcopybounded",
+    "LocalwrapperbodyBYTEIDENTICALgreen/staticffc; sameoriginalhookstdin/args/config, exacttarget/HEADbeforeafter, rawindex/shared/coldcontentchecks, nativeupdateHEAD and3mandatoryACK",
+    "NativefetchedtargetmergeusesnormalGitmerge/hostcompletionreceipt+recovery; conflict/error retainsartifactsnoautomaticrollback",
+    "CleanupseparaterequestonlycompleteduniqueD, checksnonce, neverremovessharedguard orfutureowner; cleanupUnknowndoesnotmakerepairuncertainagain"
+  ],
+  "changedfiles": {
+    "src/remote/ownership.rs": "8b6dfff138e43f4fc99e39a2a4a4b414d38d8d663b0d96864cdaee0b41929121",
+    "src/remote/session.rs": "ab051b396a543d4c700cc02526bba1e640da6ae797fde6b0a1d533f43fabb2de",
+    "src/remote/mod.rs": "8c29ce4ed021e52f04be300cefb851233f72dbc22cc846d25ea75229a33ce67a",
+    "src/git/command/completion.rs": "927274521a75e4485d003c71306c826004f1bc1fef5ba8a4c6d6a39bc0e7c4c3",
+    "src/git/command.rs": "d1e423f120b0f238b96ee899dc4861ae1b5d1da822b18e7ebb1365af047f27c8",
+    "src/push_preflight/fix.rs": "dd4dab6fde9f2281df28fcad3b476c49bf3535da452632e19bbf3cb4b60307fb",
+    "src/push_preflight/fix/transaction.rs": "b67fe254e083400d7e75b935b7fb7f4265f1a876729ad966bf34aa3a84eba6df",
+    "src/push_preflight/fix/remote_repair.rs": "6edf9c52a5953f52a3a2dd71a4f673e24f0d139a3a02da048f09d66f48384dca",
+    "src/push_preflight/fix/remote_repair.sh": "6b157c7d9db787c20d0a934c89bd61a98b59b871732fe4b2e9a018646e4fddf1",
+    "src/repo/push_preflight.rs": "4875c234d72938f06b4c05d00c8c9417536ef81478550302667d14b47e6c78d2"
+  },
+  "local_script_body_sha256": "89c4d6d0090724d39b4607d78deeb6debde500ac3921cdff842fdfa0b944acdb",
+  "recording_before_runtime": [
+    "SixpureOwnedDispatch/classification/contextscope tests inremote/ownership.rs; fakefailurematrixasserts0legacyStopCommands",
+    "Owned-scriptrecording shouldprove guard/nonce/outcome/cleanup authority, queuedcancelbeforepresend, Unknownretention/noretry, terminalreceiptresolution; no liveSSH/WSL/userrepos/controllers",
+    "OnlyafterindependentSTATICPASS: exactcompiledownedlocalexecutionofremotehostscript/faketransport withsuccess/lock/veto/lateoutcome/marker/receiptcontrolsrequiredbynewcontract; old21localprotocolcasesalreadyPASSunchanged, notnewmatrixrepeat"
+  ],
+  "execution": "No compiler/recording/remoteprotocol/runtime/CI onthisnewsource. Sourceonlyreview next; standalonelegacy/localgatesremainbound1c6d161, notclaimedasnewremotevalidation."
+}

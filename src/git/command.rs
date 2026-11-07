@@ -1439,3 +1439,44 @@ mod profile_connection_tests {
         });
     }
 }
+
+/// Explicit remote repair waits for the actual transport call, including queue/connect.
+/// Unknown does not stop/retry/clean up a host mutation through the legacy controller.
+pub(crate) fn owned_repair_host(
+    dir: &Path,
+    script: &str,
+    input: Vec<u8>,
+    env: &[(&'static str, String)],
+    owner: &remote::OwnedDispatch,
+) -> Result<remote::Output, remote::OwnedFailure> {
+    let target = remote::parse(dir)
+        .ok_or_else(|| remote::OwnedFailure::NotDispatched("Expected remote repository".into()))?;
+    let mut request = remote_request(&target, &Extra::default(), &[]);
+    request.script = script.to_owned();
+    request.stdin = Some(input);
+    request.long = true;
+    request.timeout = Some(std::time::Duration::from_secs(15));
+    request.env.push(("GIT_NO_LAZY_FETCH".into(), "1".into()));
+    request.env.extend(
+        env.iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone())),
+    );
+    request.unset.extend(
+        [
+            "GIT_DIR",
+            "GIT_COMMON_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_NAMESPACE",
+            "GIT_SHALLOW_FILE",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_CONFIG",
+            "GIT_CONFIG_COUNT",
+            "GIT_ATTR_SOURCE",
+        ]
+        .map(str::to_owned),
+    );
+    remote::exec_owned(&target.host, &request, owner, &|| true)
+}

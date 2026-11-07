@@ -1,3 +1,4 @@
+mod remote_repair;
 mod transaction;
 
 use super::*;
@@ -55,10 +56,8 @@ impl Drop for Files {
 }
 
 pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String> {
-    // INTERIM fail-closed limitation: no remote repair request may survive its caller's
-    // timeout. Read-only preview and reviewed pushes use their existing paths.
     if crate::remote::is_remote(repo) {
-        return Err("Automatic remote history repair is temporarily unavailable: this transport cannot prove owned completion. Preview and reviewed push remain available; perform an explicitly supervised repair on the repository host instead.".into());
+        remote_repair::available(repo)?;
     }
     check(repo, plan)?;
     if plan.branch != plan.checkout || !plan.branch.starts_with("refs/heads/") {
@@ -78,6 +77,12 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     }
     if kind == "remote" {
         let base = plan.base.as_deref().ok_or("Fetch the target first")?;
+        if crate::remote::is_remote(repo) {
+            remote_repair::execute(repo, &plan.branch, &plan.head, &plan.head, Some(base))?;
+            return Ok(
+                "Merged the fetched target; reopen preflight. Ctrl+Z undoes this merge.".into(),
+            );
+        }
         return git::run(Some(repo),&["merge","--no-edit","--no-autostash",base]).map(|_|"Merged the fetched target; reopen preflight. Ctrl+Z undoes this merge.".into()).map_err(|_|"The merge needs attention. Resolve conflicts or abort it before reopening preflight.".into());
     }
     if !["author", "sign", "secrets", "lfs"].contains(&kind) {
@@ -90,7 +95,9 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     let index = format!("{}.index", files.write("index-name", "")?);
     let env = vec![("GIT_INDEX_FILE", index)];
     let run = |args: &[&str], extra: &[(&'static str, String)]| -> Result<String, String> {
-        git::forecast_run(repo,args,extra,&[0],&||true).map_err(|_|"History rewrite failed before the branch was updated; check signing availability or missing local objects.".into())
+        let mut isolated = extra.to_vec();
+        isolated.push(("GIT_NO_LAZY_FETCH", "1".into()));
+        git::forecast_run(repo,args,&isolated,&[0],&||true).map_err(|_|"History rewrite failed before the branch was updated; check signing availability or missing local objects.".into())
     };
     let remove: BTreeSet<_> = plan
         .findings
@@ -306,6 +313,10 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     check(repo, plan)?;
     // Metadata-only repairs also need HEAD ownership so the existing undo journal
     // cannot bind a different checkout after an original reference hook runs.
-    transaction::Hook::new(repo, &plan.branch, &plan.head, new)?.execute(repo)?;
+    if crate::remote::is_remote(repo) {
+        remote_repair::execute(repo, &plan.branch, &plan.head, new, None)?;
+    } else {
+        transaction::Hook::new(repo, &plan.branch, &plan.head, new)?.execute(repo)?;
+    }
     Ok("Outgoing history fixed. Reopen preflight to verify it; Ctrl+Z restores the previous history.".into())
 }
