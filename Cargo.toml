@@ -87,6 +87,10 @@ assets = [
 [package.metadata.generate-rpm.requires]
 git = "*"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Safe native ACL snapshots; target-specific, no bindgen or native helper process.
+exacl = { version = "=0.13.0", default-features = false }
+
 [build-dependencies]
 # Icon and version info for gitcraft.exe; build.rs only uses it when targeting Windows.
 winresource = "0.1"

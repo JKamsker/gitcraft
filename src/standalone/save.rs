@@ -622,4 +622,174 @@ mod tests {
         }
         Ok(())
     }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn native_mac_acl_clone_preserves_policy_and_acl_only_drift_refuses_success()
+    -> Result<(), String> {
+        use std::os::unix::fs::MetadataExt;
+        let temp = crate::git::file_comparison::Scratch::new()?;
+        let path = temp.0.join("native-acl");
+        write(&path, b"original")?;
+        let uid = std::fs::metadata(&path)
+            .map_err(|e| e.to_string())?
+            .uid()
+            .to_string();
+        let initial = vec![exacl::AclEntry::allow_user(&uid, exacl::Perm::READ, None)];
+        exacl::setfacl(&[&path], &initial, None).map_err(|e| e.to_string())?;
+        let expected =
+            exacl::getfacl(&path, exacl::AclOption::SYMLINK_ACL).map_err(|e| e.to_string())?;
+        let saved = Output::capture(&path, &[])?.save(b"new result", &[])?;
+        assert_eq!(read(&path)?, b"new result");
+        assert_eq!(
+            exacl::getfacl(&path, exacl::AclOption::SYMLINK_ACL).map_err(|e| e.to_string())?,
+            expected
+        );
+        assert_eq!(
+            read(&saved.previous.ok_or("No retained original")?)?,
+            b"original"
+        );
+        for phase in [
+            Phase::BeforeMove,
+            Phase::AfterMove,
+            Phase::BeforeInstall,
+            Phase::AfterInstall,
+        ] {
+            write(&path, b"original")?;
+            exacl::setfacl(&[&path], &initial, None).map_err(|e| e.to_string())?;
+            let output = Output::capture(&path, &[])?;
+            let source_metadata = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+            let changed = vec![exacl::AclEntry::allow_user(
+                &uid,
+                exacl::Perm::empty(),
+                None,
+            )];
+            let mut hook_error = None;
+            let result = output.save_with(b"candidate", &[], &mut |at| {
+                if at == phase {
+                    let target = if matches!(phase, Phase::BeforeMove) {
+                        Ok(path.clone())
+                    } else {
+                        std::fs::read_dir(&temp.0)
+                            .map_err(|e| e.to_string())
+                            .and_then(|entries| {
+                                entries
+                                    .filter_map(Result::ok)
+                                    .map(|e| e.path().join("previous"))
+                                    .find(|p| {
+                                        std::fs::metadata(p).is_ok_and(|m| {
+                                            m.dev() == source_metadata.dev()
+                                                && m.ino() == source_metadata.ino()
+                                        })
+                                    })
+                                    .ok_or("No displaced source".into())
+                            })
+                    };
+                    match target.and_then(|target| {
+                        exacl::setfacl(&[target], &changed, None).map_err(|e| e.to_string())
+                    }) {
+                        Ok(()) => {}
+                        Err(e) => hook_error = Some(e),
+                    }
+                }
+            });
+            if let Some(e) = hook_error {
+                return Err(e);
+            }
+            assert!(
+                result.is_err(),
+                "{phase:?} must reject descriptor-only drift"
+            );
+            if phase != Phase::AfterInstall {
+                assert_eq!(read(&path)?, b"original");
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_windows_dacl_only_tightening_at_save_boundaries_never_reports_success()
+    -> Result<(), String> {
+        let program = PathBuf::from(std::env::var_os("SystemRoot").ok_or("No SystemRoot")?)
+            .join("System32/icacls.exe");
+        if !program.is_absolute() {
+            return Err("Fixture requires absolute SystemRoot".into());
+        }
+        let change = |path: &Path, grant: bool| -> Result<(), String> {
+            let command =
+                super::super::windows_metadata::fixture_acl_command(&program, path, grant);
+            let out = crate::bounded_process::run_input(
+                command,
+                None,
+                &|| true,
+                std::time::Duration::from_secs(20),
+                4096,
+                4096,
+            )?;
+            if !out.status.success() {
+                return Err(format!(
+                    "Owned DACL fixture failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                ));
+            }
+            Ok(())
+        };
+        let temp = crate::git::file_comparison::Scratch::new()?;
+        for phase in [
+            Phase::BeforeMove,
+            Phase::AfterMove,
+            Phase::BeforeInstall,
+            Phase::AfterInstall,
+        ] {
+            let path = temp.0.join(format!("dacl-{phase:?}"));
+            write(&path, b"original")?;
+            change(&path, true)?;
+            let output = Output::capture(&path, &[])?;
+            let original = output.original.as_ref().ok_or("No output")?;
+            let identity = original.handle.as_ref().ok_or("No output identity")?;
+            let original_stamp = original.stamp.clone();
+            let mut hook_error = None;
+            let result = output.save_with(b"candidate", &[], &mut |at| {
+                if at == phase {
+                    let target = if phase == Phase::BeforeMove {
+                        Ok(path.clone())
+                    } else {
+                        std::fs::read_dir(&temp.0)
+                            .map_err(|e| e.to_string())
+                            .and_then(|entries| {
+                                entries
+                                    .filter_map(Result::ok)
+                                    .map(|e| e.path().join("previous"))
+                                    .find(|p| {
+                                        same_file::Handle::from_path(p)
+                                            .is_ok_and(|h| &h == identity.as_ref())
+                                    })
+                                    .ok_or("No displaced source".into())
+                            })
+                    };
+                    if let Err(e) = target.and_then(|target| change(&target, false)) {
+                        hook_error = Some(e);
+                    }
+                }
+            });
+            if let Some(e) = hook_error {
+                return Err(e);
+            }
+            assert!(
+                result.is_err(),
+                "{phase:?} must reject DACL-only tightening"
+            );
+            assert_eq!(
+                Some(super::super::files::Stamp::new(
+                    &identity.as_file().metadata().map_err(|e| e.to_string())?
+                )),
+                original_stamp,
+                "DACL fixture must preserve ordinary guarded file fields"
+            );
+            if phase != Phase::AfterInstall {
+                assert_eq!(read(&path)?, b"original");
+            }
+        }
+        Ok(())
+    }
 }

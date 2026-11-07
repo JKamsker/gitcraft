@@ -23,6 +23,8 @@ pub(super) struct Stamp {
     uid: u32,
     #[cfg(unix)]
     gid: u32,
+    #[cfg(target_os = "macos")]
+    flags: u32,
     #[cfg(windows)]
     attributes: u32,
 }
@@ -47,11 +49,17 @@ impl Stamp {
             uid: metadata.uid(),
             #[cfg(unix)]
             gid: metadata.gid(),
+            #[cfg(target_os = "macos")]
+            flags: std::os::macos::fs::MetadataExt::st_flags(metadata),
             #[cfg(windows)]
             attributes: metadata.file_attributes(),
         }
     }
     pub fn replacement_matches(&self, original: &Self) -> bool {
+        #[cfg(target_os = "macos")]
+        if self.flags != original.flags {
+            return false;
+        }
         #[cfg(unix)]
         {
             self.uid == original.uid

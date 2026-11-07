@@ -51,10 +51,25 @@ pub(super) fn candidate(
             .rewrite_owned(OsStr::new("replacement"), bytes, original)
             .map_err(|e| e.to_string());
     }
-    #[cfg(target_vendor = "apple")]
+    #[cfg(target_os = "macos")]
     if let Some(original) = original {
-        let _ = original;
-        return Err("Safe concurrent native ACL verification is unavailable on this platform; the existing output was not changed".into());
+        let source = original
+            .handle
+            .as_ref()
+            .ok_or("No source identity")?
+            .as_file();
+        rustix::fs::fclonefileat(
+            source,
+            dir.file(),
+            "replacement",
+            rustix::fs::CloneFlags::NOOWNERCOPY,
+        )
+        .map_err(|e| format!("This filesystem cannot safely clone output ACL/metadata: {e}"))?;
+        let file = dir
+            .rewrite_owned(OsStr::new("replacement"), bytes, original)
+            .map_err(|e| e.to_string())?;
+        unix_mode(&file, source)?;
+        return Ok(file);
     }
     #[cfg(not(windows))]
     let _ = (parent, name);
@@ -71,7 +86,7 @@ pub(super) fn candidate(
         unix_mode(&file, source)?;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         copy_xattrs(source, &file)?;
-        #[cfg(not(any(target_os="linux",target_os="android",windows,target_vendor="apple")))]
+        #[cfg(not(any(target_os="linux",target_os="android",windows,target_os="macos")))]
         return Err("Safe preservation of this platform's access metadata is unavailable; the original output was not changed".into());
         #[cfg(windows)]
         let _ = source;

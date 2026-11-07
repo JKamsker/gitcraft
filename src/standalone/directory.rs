@@ -15,6 +15,10 @@ pub(super) struct Directory {
     _ancestors: Vec<File>,
 }
 impl Directory {
+    #[cfg(target_os = "macos")]
+    pub fn file(&self) -> &File {
+        self.handle.as_file()
+    }
     #[cfg(windows)]
     pub fn stable_source(&self, name: &OsStr) -> io::Result<File> {
         use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -30,7 +34,7 @@ impl Directory {
         }
         Ok(file)
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     pub fn rewrite_owned(
         &self,
         name: &OsStr,
