@@ -1,0 +1,12 @@
+{
+  "application_candidate": "8011a392fafe8a7e4d5964c809b83c1ff88b9769",
+  "scope": "Owned local-shell command-level reproduction of8011 remote_script after simulated final identity verification. No app runtime/Cargo/native remote host.",
+  "exit_code": 0,
+  "stdout": "created\n",
+  "stderr": "",
+  "selected_root_replaced_by_symlink": true,
+  "new_file_created_in_unrelated_fixture": true,
+  "original_root_untouched": true,
+  "exact_remote_script_shape": "umask 077\ncd -P -- /tmp/gitcraft-root-guard-review-jywix5ii/selected || exit 1\nrecovery_root=$(pwd -P) || exit 1\n[ \"$recovery_root\" = / ] && recovery_root=\nrecovery_metadata=$(cd -P -- /tmp/gitcraft-root-guard-review-jywix5ii/selected/.git && pwd -P) || exit 1\n[ \"$recovery_metadata\" = / ] && recovery_metadata=\n[ \"$recovery_root\" != \"$recovery_metadata\" ] || exit 1\n[ ! -e recovered.txt ] && [ ! -L recovered.txt ] || exit 10\nrecovery_tmp=$(mktemp -d -- /tmp/gitcraft-root-guard-review-jywix5ii/selected/.git/gitcraft-content-recovery.XXXXXXXX) || exit 1\ntrap 'rm -rf -- \"$recovery_tmp\"' 0\ntrap 'exit 1' HUP INT TERM PIPE\ncat >\"$recovery_tmp/blob\" || exit 1\nln -T -- \"$recovery_tmp/blob\" recovered.txt || exit 1\nprintf 'created\\n'\n",
+  "temp_fixture_deleted_after_capture": true
+}
