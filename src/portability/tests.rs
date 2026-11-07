@@ -374,3 +374,83 @@ fn practice_export_and_local_restore_isolate_hostile_git_environment_and_profile
     assert!(!marker.exists());
     Ok(())
 }
+
+#[test]
+fn locked_worktree_retry_completes_after_a_later_missing_branch_without_relocking()
+-> Result<(), String> {
+    let fixture = Fixture::new()?;
+    let parent = fixture.parent()?;
+    let mut r = fixture.definition()?;
+    r.name = "locked-retry".into();
+    crate::git::practice_run(&fixture.repo, &["branch", "feature", "HEAD"])?;
+    let commit = r.commit.clone().ok_or("No fixture commit")?;
+    r.worktrees = vec![
+        Worktree {
+            name: "feature".into(),
+            previous_path: "/old/feature".into(),
+            branch: Some("feature".into()),
+            commit: commit.clone(),
+            was_locked: true,
+        },
+        Worktree {
+            name: "later".into(),
+            previous_path: "/old/later".into(),
+            branch: Some("later".into()),
+            commit,
+            was_locked: false,
+        },
+    ];
+    let failed = restore(&r, &parent, Some(&fixture.repo), None, &|| true);
+    assert!(!failed.complete);
+    assert!(
+        failed
+            .messages
+            .join(" ")
+            .contains("Branch later is missing")
+    );
+    let receipt = failed.receipt.ok_or("Missing partial locked receipt")?;
+    let locks = crate::git::setup_run(
+        &receipt.root,
+        &["worktree", "list", "--porcelain", "-z"],
+        &|| true,
+    )?;
+    assert!(locks.split(|b| *b == 0).any(|field| field == b"locked"));
+    crate::git::setup_run(&receipt.root, &["branch", "later", "HEAD"], &|| true)?;
+    let done = restore(&r, &parent, Some(&fixture.repo), Some(receipt), &|| true);
+    assert!(done.complete, "{:?}", done.messages);
+    Ok(())
+}
+
+#[test]
+fn worktree_lock_detection_uses_directory_identity_for_native_and_git_spellings()
+-> Result<(), String> {
+    let fixture = Fixture::new()?;
+    let directory = fixture.root.join("locked");
+    std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
+    #[cfg(not(windows))]
+    let alias = directory.join("..").join("locked");
+    let canonical = directory.canonicalize().map_err(|e| e.to_string())?;
+    // On Windows this is the real Git-style C:/... form against Rust's canonical
+    // \\?\C:\... path; other platforms exercise an equally nonidentical alias.
+    #[cfg(windows)]
+    let git_path = {
+        let text = canonical.to_string_lossy().replace('\\', "/");
+        if let Some(rest) = text.strip_prefix("//?/UNC/") {
+            format!("//{rest}")
+        } else {
+            text.strip_prefix("//?/").unwrap_or(&text).to_owned()
+        }
+    };
+    #[cfg(not(windows))]
+    let git_path = alias.to_string_lossy().into_owned();
+    let record = format!(
+        "worktree {git_path}\0HEAD {}\0locked imported\0\0",
+        "a".repeat(40)
+    );
+    assert!(restore::worktree_is_locked(record.as_bytes(), &canonical)?);
+    assert!(!restore::worktree_is_locked(
+        record.as_bytes(),
+        &fixture.repo
+    )?);
+    Ok(())
+}

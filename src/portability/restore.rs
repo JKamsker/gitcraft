@@ -102,6 +102,23 @@ fn branch_ref(
     ))
 }
 
+pub(super) fn worktree_is_locked(list: &[u8], path: &Path) -> Result<bool, String> {
+    // Git prints C:/... while Rust canonical paths may be \\?\C:\... . Compare the
+    // actual local directory identity, also handling UNC paths and directory aliases.
+    let same = crate::remote::is_same_dir_as(path);
+    let mut here = false;
+    let mut locked = false;
+    for field in list.split(|b| *b == 0) {
+        if let Some(p) = field.strip_prefix(b"worktree ") {
+            let p = std::str::from_utf8(p).map_err(|_| "Worktree path is not UTF-8")?;
+            here = same(Path::new(p));
+        } else if here && (field == b"locked" || field.starts_with(b"locked ")) {
+            locked = true;
+        }
+    }
+    Ok(locked)
+}
+
 /// Local sources are selected by the current-machine folder picker, never deserialized from
 /// the setup file. Network clones use the initiating ready profile, captured by the caller.
 pub(crate) fn restore(
@@ -393,16 +410,7 @@ pub(crate) fn restore(
                     // The preceding add is retained even when cancellation interrupts locking.
                     let list =
                         git::setup_run(repo, &["worktree", "list", "--porcelain", "-z"], active)?;
-                    let mut here = false;
-                    let mut locked = false;
-                    for field in list.split(|b| *b == 0) {
-                        if let Some(p) = field.strip_prefix(b"worktree ") {
-                            here = p == path.as_os_str().to_string_lossy().as_bytes();
-                        } else if here && (field == b"locked" || field.starts_with(b"locked ")) {
-                            locked = true;
-                        }
-                    }
-                    if !locked {
+                    if !worktree_is_locked(&list, &path)? {
                         git::setup_run(
                             repo,
                             &["worktree", "lock", "--", &path.to_string_lossy()],

@@ -3,6 +3,8 @@
 //! environment.
 
 pub(super) mod bounded;
+mod setup;
+pub(crate) use setup::setup_clone;
 
 use std::path::Path;
 use std::process::Command;
@@ -703,72 +705,6 @@ pub(crate) fn onboarding_local_config(
     String::from_utf8(bytes.to_vec())
         .map(Some)
         .map_err(|_| "Local identity is not UTF-8".into())
-}
-/// Initial network clone uses the initiating ready profile's local authentication setup.
-pub(crate) fn setup_clone(
-    parent: &Path,
-    source: &str,
-    destination: &Path,
-    remote: &str,
-    local: bool,
-    active: &dyn Fn() -> bool,
-) -> Result<(), String> {
-    if crate::remote::is_remote(parent) {
-        return Err("Setup clones target local folders only".into());
-    }
-    // Explicit current-machine folder clones never consult profile/global URL rewrites,
-    // SSH commands, credential helpers or filters. Network clones retain the ready profile.
-    let mut cmd = if local {
-        practice_command(parent)
-    } else {
-        repository_command(Some(parent), &[])?
-    };
-    for name in [
-        "GIT_DIR",
-        "GIT_COMMON_DIR",
-        "GIT_WORK_TREE",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_CONFIG_PARAMETERS",
-        "GIT_CONFIG",
-        "GIT_NAMESPACE",
-        "GIT_SHALLOW_FILE",
-        "GIT_TEMPLATE_DIR",
-    ] {
-        cmd.env_remove(name);
-    }
-    cmd.env("GIT_CONFIG_COUNT", "0")
-        .env("GIT_NO_LAZY_FETCH", "1")
-        .args([
-            "--no-lazy-fetch",
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "init.templateDir=",
-            "-c",
-            "protocol.ext.allow=never",
-            "-c",
-            if local {
-                "protocol.file.allow=always"
-            } else {
-                "protocol.file.allow=never"
-            },
-            "clone",
-            "--no-checkout",
-            "--template=",
-            "--origin",
-            remote,
-            "--",
-            source,
-        ])
-        .arg(destination);
-    let out = crate::bounded_process::run(cmd, active, std::time::Duration::from_secs(1800))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err("The selected source could not be cloned; check this machine's authentication and use a new destination for retry".into())
-    }
 }
 /// Checkout/worktree/config steps never read profile/system command configuration or
 /// inherited Git routing. Only newly created, receipt-verified clones reach this helper.
