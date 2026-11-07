@@ -41,6 +41,20 @@ fn click(h: &mut egui_kittest::Harness<'_, App>, label: &str) {
 #[test]
 fn export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup()
 -> Result<(), String> {
+    // A real App activation intentionally updates the process-global profile context.
+    // Keep its synthetic signing policy out of unrelated parallel Git fixtures.
+    const CHILD: &str = "GITCRAFT_SETUP_ROUND_TRIP_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output=std::process::Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","app::setup::tests::export_import_ui_round_trip_preserves_active_profile_and_requires_local_setup","--nocapture"]).env(CHILD,"1").output().map_err(|e|e.to_string())?;
+        if !output.status.success() {
+            return Err(format!(
+                "Isolated setup UI fixture failed: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        return Ok(());
+    }
     let repo = crate::practice::create(crate::practice::Scenario::Published)?;
     let root = repo.parent().ok_or("root")?.to_owned();
     let mut h = egui_kittest::Harness::builder()
