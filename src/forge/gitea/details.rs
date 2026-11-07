@@ -143,6 +143,7 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
         review_features: Default::default(),
         merge_blocker: None,
         connection_binding: None,
+        review_revision: None,
         pr_id: pr
             .get("id")
             .and_then(Value::as_u64)

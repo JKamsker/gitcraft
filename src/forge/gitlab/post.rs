@@ -44,6 +44,7 @@ impl GitLabTarget {
             || at(&mr, "/sha") != self.details.head_oid
             || at(&mr, "/diff_refs/head_sha") != self.details.head_oid
             || at(&mr, "/diff_refs/base_sha") != self.details.base_oid
+            || mr.get("diff_refs").map(Value::to_string) != self.details.extras.review_revision
         {
             return Err("The merge request changed. Reload before sending.".into());
         }

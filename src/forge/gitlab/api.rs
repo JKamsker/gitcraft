@@ -62,12 +62,18 @@ impl Api {
     }
     pub fn all(&self, endpoint: &str) -> Result<Vec<Value>, String> {
         let mut out = Vec::new();
-        for page in 1..=10 {
+        for page in 1..=11 {
             let sep = if endpoint.contains('?') { '&' } else { '?' };
             let v = self.get(&format!("{endpoint}{sep}per_page=100&page={page}"))?;
             let items = v
                 .as_array()
                 .ok_or("GitLab returned an invalid paged response")?;
+            if out.len() + items.len() > 1000 {
+                return Err(
+                    "GitLab returned more than 1,000 items; open the complete discussion on GitLab"
+                        .into(),
+                );
+            }
             out.extend(items.iter().cloned());
             if items.len() < 100 {
                 return Ok(out);

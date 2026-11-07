@@ -60,6 +60,8 @@ pub struct PrExtras {
     pub merge_blocker: Option<String>,
     /// Immutable public Profile context that read the page (no token values).
     pub connection_binding: Option<u64>,
+    /// Provider-native immutable diff/version metadata, never authentication.
+    pub review_revision: Option<String>,
     pub viewer: Option<String>,
     pub permission: String,
     pub merge_allowed: bool,

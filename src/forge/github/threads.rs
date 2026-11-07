@@ -124,6 +124,7 @@ pub(crate) fn parse(json: &str) -> Result<(PrExtras, Option<String>), String> {
         review_features: Default::default(),
         merge_blocker: None,
         connection_binding: None,
+        review_revision: None,
         pr_id: at(pr, "/id").to_owned(),
         viewer: (!viewer.is_empty()).then(|| viewer.to_owned()),
         permission: at(repository, "/viewerPermission").to_owned(),

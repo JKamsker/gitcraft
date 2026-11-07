@@ -179,6 +179,7 @@ pub(super) fn assemble(
         },
         merge_blocker: blocker(mr, project, approvals),
         connection_binding: Some(crate::pr_threads::connection_binding()),
+        review_revision: mr.get("diff_refs").map(Value::to_string),
         merge_allowed: policy_known && at(project, "/squash_option") != "always",
         squash_allowed: policy_known
             && matches!(
@@ -209,7 +210,7 @@ pub(super) fn assemble(
                 continue;
             };
             if first.get("position").is_some_and(Value::is_object) {
-                if let Some(t) = thread(d, head, who, can_resolve, at(mr, "/state") == "opened") {
+                if let Some(t) = thread(d, mr, who, can_resolve, at(mr, "/state") == "opened") {
                     extras.threads.push(t);
                 }
             } else {
@@ -356,7 +357,9 @@ fn thread(d: &Value, head: &str, viewer: &str, can_resolve: bool, open: bool) ->
         line: new.or(old),
         start_line: None,
         side,
-        outdated: at(p, "/head_sha") != head,
+        outdated: ["head_sha", "base_sha", "start_sha"]
+            .iter()
+            .any(|k| at(p, &format!("/{k}")) != at(mr, &format!("/diff_refs/{k}"))),
         resolved,
         can_resolve: resolvable && can_resolve && !resolved,
         can_unresolve: resolvable && can_resolve && resolved,

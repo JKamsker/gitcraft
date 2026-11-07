@@ -190,11 +190,15 @@ mod tests {
         let mut h = egui_kittest::Harness::builder()
             .with_size([1000.0, 500.0])
             .build_ui_state(
-                |ui, state: &mut (PrDraft, PrExtras, Vec<Action>)| {
-                    let (draft, extras, actions) = state;
+                |ui, state: &mut (PrDraft, PrExtras, Vec<Action>, bool)| {
+                    let (draft, extras, actions, fonts) = state;
+                    if !*fonts {
+                        crate::theme::install_fonts(ui.ctx());
+                        *fonts = true;
+                    }
                     review_box(ui, draft, extras, false, true, actions);
                 },
-                (PrDraft::default(), extras, Vec::new()),
+                (PrDraft::default(), extras, Vec::new(), false),
             );
         h.run();
         assert!(h.state().2.is_empty());

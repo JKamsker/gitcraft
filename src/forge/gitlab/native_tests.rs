@@ -10,7 +10,7 @@ fn project() -> Value {
     json!({"id":8,"path_with_namespace":"group/sub/repo","merge_method":"merge","squash_option":"default_off","permissions":{"project_access":{"access_level":30}}})
 }
 fn discussion() -> Value {
-    json!({"id":"thread-with-a-removed-line","notes":[{"id":11,"body":"Why remove this?","author":{"username":"reviewer"},"resolvable":true,"resolved":false,"position":{"head_sha":"a".repeat(40),"old_path":"old name.rs","new_path":"new name.rs","old_line":2,"new_line":null},"created_at":"2026-11-01T01:00:00Z"},{"id":12,"body":"A reply","author":{"username":"author"}}]})
+    json!({"id":"thread-with-a-removed-line","notes":[{"id":11,"body":"Why remove this?","author":{"username":"reviewer"},"resolvable":true,"resolved":false,"position":{"head_sha":"a".repeat(40),"base_sha":"b".repeat(40),"start_sha":"c".repeat(40),"old_path":"old name.rs","new_path":"new name.rs","old_line":2,"new_line":null},"created_at":"2026-11-01T01:00:00Z"},{"id":12,"body":"A reply","author":{"username":"author"}}]})
 }
 fn diff() -> Value {
     json!({"old_path":"old name.rs","new_path":"new name.rs","diff":"@@ -1,3 +1,3 @@\n context\n-old\n+new\n tail\n"})
@@ -65,6 +65,7 @@ fn discussions_keep_removed_lines_replies_resolution_and_native_capabilities() -
     assert_eq!(t.comments.len(), 2);
     assert!(t.can_resolve);
     assert!(t.can_reply);
+    assert!(!t.outdated);
     assert!(!d.extras.review_features.pending);
     assert!(!d.extras.review_features.request_changes);
     assert!(!d.extras.review_features.approve);
@@ -335,7 +336,7 @@ print(json.dumps(result))
     }
     #[test]
     fn stale_head_account_repository_and_profile_cannot_send_a_write() -> Result<(), String> {
-        for changed in ["head", "viewer", "remote", "profile"] {
+        for changed in ["head", "start", "base", "viewer", "remote", "profile"] {
             let f = Fixture::new()?;
             f.run(|api| {
                 let d = details::read(api, 7)?;
@@ -345,6 +346,8 @@ print(json.dumps(result))
                 match changed {
                     "head" => fixture["mr"]["sha"] = json!("d".repeat(40)),
                     "viewer" => fixture["viewer"]["username"] = json!("personal"),
+                    "start" => fixture["mr"]["diff_refs"]["start_sha"] = json!("d".repeat(40)),
+                    "base" => fixture["mr"]["diff_refs"]["base_sha"] = json!("d".repeat(40)),
                     "remote" => f.git(&[
                         "remote",
                         "set-url",
