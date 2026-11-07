@@ -435,6 +435,7 @@ fn internal_file(
 fn private_index_file(
     ctx: &Context,
     name: &str,
+    source_path: &str,
     bytes: &[u8],
     active: &dyn Fn() -> bool,
 ) -> Result<(), String> {
@@ -443,7 +444,11 @@ fn private_index_file(
         let out = git::forecast_remote(
             &target.host,
             remote::Request {
-                script: format!("umask 077; cat > {}", remote::sh_path(&target.path)),
+                script: format!(
+                    "umask 077; cat > {target} && test -f {source} && test ! -L {source} && touch -r {source} {target}",
+                    target = remote::sh_path(&target.path),
+                    source = remote::sh_path(source_path),
+                ),
                 stdin: Some(bytes.to_vec()),
                 ..Default::default()
             },
@@ -453,23 +458,35 @@ fn private_index_file(
             return Err("Cannot copy the private index cache".into());
         }
     } else {
-        std::fs::write(path, bytes).map_err(|e| e.to_string())?;
+        let metadata = std::fs::symlink_metadata(source_path).map_err(|e| e.to_string())?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err("Index/cache links and special files are not supported".into());
+        }
+        let modified = metadata.modified().map_err(|e| e.to_string())?;
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .and_then(|file| file.set_times(std::fs::FileTimes::new().set_modified(modified)))
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Result<(), String> {
     if !state.cache.is_empty() {
-        private_index_file(ctx, "index", &state.cache, active)?;
+        private_index_file(ctx, "index", &ctx.index_file, &state.cache, active)?;
     } else if !state.raw.is_empty() {
         return Err("Index disappeared while preparing the draft".into());
     }
     if let Some((name, bytes)) = &state.shared {
-        private_index_file(ctx, name, bytes, active)?;
+        private_index_file(ctx, name, &ctx.shared_file, bytes, active)?;
     }
     if ctx.run(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)? != state.raw {
         return Err("Index moved while copying its private stat cache".into());
     }
+    // Preserve the source index's mtime when copying: advancing it makes Git skip
+    // its racy-stat content check for same-size edits made in the original tick.
     // The source cache is immutable. Drop daemon/UC state and materialize any split
     // index only in the private copy before asking about working changes.
     ctx.run(
