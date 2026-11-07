@@ -14,6 +14,8 @@ use crate::git::Commit;
 pub struct Row {
     /// Column of the commit's dot.
     pub col: usize,
+    /// Identity of this continuous lane run, distinct when a column is reused.
+    pub origin: usize,
     /// Lanes drawn straight through the row, top to bottom.
     pub through: Arc<[usize]>,
     /// Lanes that come from the top edge into the dot (children of this commit).
@@ -41,9 +43,11 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
     let followed = if first_parent { 1 } else { usize::MAX };
     let mut lanes: Vec<Option<&str>> = Vec::new();
     let mut rows: Vec<Row> = Vec::with_capacity(commits.len());
+    let mut origins = Vec::new();
+    let mut next_origin = 0;
     let mut width = 0;
 
-    for commit in commits {
+    for (row_index, commit) in commits.iter().enumerate() {
         let commit: &Commit = commit.borrow();
         let hash = commit.hash.as_str();
         let incoming: Vec<usize> = (0..lanes.len())
@@ -53,6 +57,12 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
             Some(&c) => c,
             None => free_lane(&mut lanes),
         };
+        origins.resize(lanes.len(), row_index);
+        if incoming.is_empty() {
+            origins[col] = next_origin;
+            next_origin += 1;
+        }
+        let origin = origins[col];
         let through = (0..lanes.len()).filter(|&i| lanes[i].is_some() && lanes[i] != Some(hash));
         // Along a branch, the other lanes usually pass through many consecutive rows
         // unchanged. Share that immutable list instead of allocating a copy for each row.
@@ -79,6 +89,9 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
             } else {
                 let lane = free_lane(&mut lanes);
                 lanes[lane] = Some(parent);
+                origins.resize(lanes.len(), row_index);
+                origins[lane] = next_origin;
+                next_origin += 1;
                 outgoing.push(lane);
             }
         }
@@ -89,6 +102,7 @@ pub fn layout_with<C: Borrow<Commit>>(commits: &[C], first_parent: bool) -> Grap
         width = width.max(lanes.len()).max(col + 1);
         rows.push(Row {
             col,
+            origin,
             through,
             incoming: incoming.into_boxed_slice(),
             outgoing: outgoing.into_boxed_slice(),
@@ -163,6 +177,22 @@ mod tests {
         assert!(g.rows[2].outgoing.is_empty());
         // Laid out with every parent, the same rows would leave lanes waiting for good.
         assert!(layout(&commits).width > 1);
+    }
+
+    #[test]
+    fn lane_names_follow_first_parent_runs_without_leaking_into_reused_columns() {
+        let g = layout(&[
+            c("merge", &["main", "feature"]),
+            c("feature", &["base"]),
+            c("main", &["base"]),
+            c("base", &[]),
+            c("unrelated", &[]),
+        ]);
+        assert_eq!(g.rows[0].origin, g.rows[2].origin);
+        assert_eq!(g.rows[2].origin, g.rows[3].origin);
+        assert_ne!(g.rows[1].origin, g.rows[0].origin);
+        assert_eq!(g.rows[4].col, g.rows[0].col);
+        assert_ne!(g.rows[4].origin, g.rows[0].origin);
     }
 
     #[test]

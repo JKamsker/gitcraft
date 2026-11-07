@@ -184,7 +184,7 @@ fn switcher_row(ui: &mut Ui, wt: &Worktree, work: Option<&str>) -> Response {
     let tag = work.or(wt.main.then_some("main"));
     if let Some(tag) = tag {
         let color = if work.is_some() {
-            t.accent
+            t.accent_fg
         } else {
             t.text_faint
         };

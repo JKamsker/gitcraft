@@ -37,6 +37,9 @@ impl RepoTab {
         }
         // A diff shows whenever there is one: on its own, or beside its file's history.
         if let Some(diff) = &self.diff {
+            if !diff.structural.shows_patch() {
+                return None;
+            }
             let path = match &diff.key {
                 DiffKey::Commit { path, .. }
                 | DiffKey::Range { path, .. }

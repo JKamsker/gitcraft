@@ -27,9 +27,13 @@ impl RepoTab {
             }
             // HEAD as the last read saw it: a commit made since (in the terminal) is not the
             // one whose message this is, and must not get it.
+            let mut steps = ops(&[&amend]);
+            if self.gerrit.is_some() {
+                steps[0].insert(0, crate::gerrit::AMEND.to_owned());
+            }
             let guarded = [self.same_branch(), expect_ref_at("HEAD", &hash)]
                 .into_iter()
-                .chain(ops(&[&amend]))
+                .chain(steps)
                 .collect();
             self.run_undoable(
                 &format!("Edit the message of {}", short(&hash)),

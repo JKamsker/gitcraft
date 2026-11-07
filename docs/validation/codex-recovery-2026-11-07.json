@@ -1,0 +1,470 @@
+{
+  "base": "d82b2586aa073d23bc031717576d883d02bd187c",
+  "application_candidate": "6489f81d180e5a53ea73fbe8fd0861fae20eea45",
+  "candidate_tree": "507661d2fada3a255a30823a6be6f95d5cc78d9e",
+  "checkpoint_before_history_assembly": "0963b41fe1499859e3e17a2a1debeb775c7ab10a",
+  "tree_identical_after_history_assembly": true,
+  "source_consolidation": "ab68bdedd387236c03f26f839572860d405a2f7f",
+  "source_recovery": "c88eb285962ce885c5682430cf568640f959a6c9",
+  "features": [
+    {
+      "branch": "codex/gerrit-review",
+      "source_sha": "c08ff3bf079397e9f8e4e500828a16b192c73d4b",
+      "source_integration_delta": "90d2521d6b0353d32019958bba4169153af34d5f",
+      "final_feature_commit": "43ee866c6ee69f914b477f74fc9b5dfc90d0d468",
+      "adaptation": "Gerrit review submission, amendments and change links; retained current operation guards and fixed review findings."
+    },
+    {
+      "branch": "codex/contrast-aa",
+      "source_sha": "1a77cfd99d2f72b002d95780f423f0b9ec8fa5dc",
+      "source_integration_delta": "419ade0f5ab4e3fc33b6d1d69f3cd27733c372fc",
+      "final_feature_commit": "697ae7ab16e91b4392d49d24c20821459c854760",
+      "adaptation": "Contrast across built-in themes and painted graph/file states; preserved current blame and row controls."
+    },
+    {
+      "branch": "codex/structural-refactor-diff",
+      "source_sha": "c4971a83711973d4f1c29ab6b5d420a03eba2e86",
+      "source_integration_delta": "234000a3c4129371b95f930a24eca72867f34c0a",
+      "final_feature_commit": "5f58cb5a482ca23503fa7534e752af069a53dcb7",
+      "adaptation": "Read-only Difftastic comparison, existing diff modes retained, stale requests isolated."
+    },
+    {
+      "branch": "codex/graph-readability",
+      "source_sha": "05d818add970e0b081166c71255048f4673e5390",
+      "source_integration_delta": "14bcdd22c68d4e4461f59f86318a1ef9dcd68eb2",
+      "final_feature_commit": "25854b0a1093975ccaca7dd315a8cd696978a33a",
+      "adaptation": "Adaptive ref widths, lane labels and full-message tooltips; current graph overlays and interactions retained."
+    },
+    {
+      "branch": "codex/git-bundles",
+      "source_sha": "6625a2c2d62e422964017fce1bffd0de1952c980",
+      "source_integration_delta": "a1753109f2adf62602346e9c584d2d42ed4dbaf6",
+      "final_feature_commit": "fb88026a6c86571eb59fa05086153f4300abd582",
+      "adaptation": "Bounded export/preview and atomic import, plus accepted ab68bde bundle fixes; current Git profile environment retained."
+    }
+  ],
+  "branch_inventory": [
+    {
+      "branch": "codex/clone-options",
+      "sha": "c70f104aff780d798ffd9eb3318edf7f1786dce4",
+      "decision": "deferred: passive history readers bypass download consent"
+    },
+    {
+      "branch": "codex/content-recovery",
+      "sha": "0db1e04dbf1e1902894790b35e07af62a5799d6b",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/contrast-aa",
+      "sha": "1a77cfd99d2f72b002d95780f423f0b9ec8fa5dc",
+      "decision": "integrated with adaptations"
+    },
+    {
+      "branch": "codex/encrypted-diffs",
+      "sha": "60cb5790cd478a0b1811ee4a705fd758a0b61a14",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/file-comparison-views",
+      "sha": "cdd45af340b433b125f29e2347705cf2335053c3",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/forge-providers",
+      "sha": "fcb2110609d05af7e01a7729f132ac06e86adf48",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/gerrit-review",
+      "sha": "c08ff3bf079397e9f8e4e500828a16b192c73d4b",
+      "decision": "integrated with adaptations"
+    },
+    {
+      "branch": "codex/git-bundles",
+      "sha": "6625a2c2d62e422964017fce1bffd0de1952c980",
+      "decision": "integrated with adaptations"
+    },
+    {
+      "branch": "codex/gitlab-mr-cut",
+      "sha": "0e08eb181e8465f219ef9cce3e0f718f60954232",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/graph-features",
+      "sha": "46c8341b2d441aa4c0eab4548d655db7ca1fd7df",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/graph-readability",
+      "sha": "05d818add970e0b081166c71255048f4673e5390",
+      "decision": "integrated with adaptations"
+    },
+    {
+      "branch": "codex/history-activity",
+      "sha": "e65a65bf217a4a0eeb8f46297fd16f96de868584",
+      "decision": "deferred: overlap with current dev requires a separate delta review"
+    },
+    {
+      "branch": "codex/history-investigations",
+      "sha": "4c8f319f27489322945e5766f626f2a4433d1c01",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/init-reaping-plan",
+      "sha": "63fa52bb933d801dd00e1d329b85e8d9a63f5018",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/integration-ssh-content-views-evidence",
+      "sha": "59b48a24228119005776aa74802862c493202583",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/integration-standalone",
+      "sha": "396b02e0747cb6c9e198f695bd3a0c0bbca08a31",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/keyboard-staging",
+      "sha": "34b1564e668adc08db73f3355fa3d4c66a542cb2",
+      "decision": "deferred: overlap with current dev requires a separate delta review"
+    },
+    {
+      "branch": "codex/motion-audio",
+      "sha": "8084aaed8ba55c545ececf4d72852cad0f760c36",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/object-storage",
+      "sha": "5d441ee3c40dc3bc942d429781617189b8c2d52f",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/object-storage-protocol-evidence",
+      "sha": "e0ccb666e4d61440b5626d43659469a078137162",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/onboarding-portability",
+      "sha": "76500e5c1c1e75a352d583c0da9c26a1734d54fb",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/owned-remote-transport",
+      "sha": "41ee79e2f7274f94d38937622898caf3e57a5fa6",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/practice-repositories",
+      "sha": "bdd0ebd67a43ca6b7327cd4393d11a41b155f639",
+      "decision": "deferred: isolation must cover current dev Git execution routes"
+    },
+    {
+      "branch": "codex/process-test-containment",
+      "sha": "aab2a257b8598f6718431b40cd1058d9a273bd2c",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/profile-connections",
+      "sha": "0854fa158cd7c9857db317378f586f3eebb91457",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/push-preflight",
+      "sha": "e9f49ab59890f3b58032252de69dceac399a7e2d",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/recovery-sops-pre-watchdog-80852d3",
+      "sha": "80852d3ae5970bfb3e4d24ed9f8499f48db4fae6",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/remaining-features",
+      "sha": "ab68bdedd387236c03f26f839572860d405a2f7f",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/repository-atlas",
+      "sha": "24ec73234922127c0699d0ec18f18579920c7939",
+      "decision": "deferred: WIP or pending validation/review on current dev"
+    },
+    {
+      "branch": "codex/repository-weather",
+      "sha": "a2b2f479756f27cf14e9e4e9500f23bc88af8068",
+      "decision": "deferred: overlap with current dev requires a separate delta review"
+    },
+    {
+      "branch": "codex/review-content-recovery",
+      "sha": "45e980e49d940b983cf72fa287666aa910258f93",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-graph-311f",
+      "sha": "4492ca72fcc322cbcbc40159b44ca18fc4fc64cc",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-object-protocol-f2b7968",
+      "sha": "2b801c5dc050fc4dcd728077f571834d83f2b250",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-object-storage",
+      "sha": "4f7f397b1e052c410bcbf3f4fda68f2d47dac7c3",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-portability-and-file-views",
+      "sha": "3989feed8ecdd18679dffe3ae7e4b9cea377b958",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-portable-setup",
+      "sha": "e7b9f07969acde9e5fdf32a7996c13257f95506b",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-preflight-remote-ownership",
+      "sha": "ba19e7145fcfaa2589f1c4316a268da5e9b2385e",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-push-repair-12cee4d",
+      "sha": "7a0e399e6d69cc03d7505d4b2cbdd1179c296ba2",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-push-repair-5f348ce",
+      "sha": "3e97efb014e3cf993d0355cbb4a6ed9de0c49da9",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-push-repair-8b8b9b9",
+      "sha": "502c6af92cf370f4ece1b256e3a27ef3f821625b",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-push-repair-ffc2851",
+      "sha": "75c1c42f09f77fc8ef5edc0be86d219690ef6f70",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-push-repair-protocol",
+      "sha": "072d60cbb17776240f25ec0fc5adc46f36dc6ce6",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-safety-checkpoints",
+      "sha": "0a1a623e86170a2d3a2899350951afc4faf55d10",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-saved-views",
+      "sha": "df98bbdf10b1eb8b5595af95572c382c596e77a4",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-sops-60cb579",
+      "sha": "49d9ab928a52c2f23212816e6f629c869d8e6f9a",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-sops-a30f1f1",
+      "sha": "1f60357e9e5854fb86664fe6228271d847db9796",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-ssh-key-helper",
+      "sha": "057e74ec27a17e4344a23148ab100c00a0138eb4",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-standalone-file-tools",
+      "sha": "891b2f5555debea15e3041b5000b99e3524f15e5",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-working-drafts",
+      "sha": "d72bc59726eee4d56cc3f45fcdfe20d00efd6e25",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/review-working-drafts-fix",
+      "sha": "f1d417137abdfa1926c241253bf7925120afb5eb",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/session-recovery-20261107-da0143c",
+      "sha": "c88eb285962ce885c5682430cf568640f959a6c9",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/ssh-key-helper",
+      "sha": "bcb0e78ba1fca0622126a2e72885554ee3fc9e0e",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/standalone-file-tools",
+      "sha": "f1ee4f33cea9f0b3efdd9c9f38e5afc4ea976083",
+      "decision": "deferred: dependent UI/runtime stack needs a dedicated port and fresh review"
+    },
+    {
+      "branch": "codex/structural-refactor-diff",
+      "sha": "c4971a83711973d4f1c29ab6b5d420a03eba2e86",
+      "decision": "integrated with adaptations"
+    },
+    {
+      "branch": "codex/test-capacity-recovery",
+      "sha": "3181f7d9178f6ab426adf053c43231b29d3a2ec5",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/windows-portability-fixes",
+      "sha": "babdceee232928bfbc84f98ca032dd8b4bec096e",
+      "decision": "evidence/consolidation checkpoint; preserved, not merged wholesale"
+    },
+    {
+      "branch": "codex/working-drafts",
+      "sha": "9da1ac5ca49855ba06dbe2760189f360bff35a32",
+      "decision": "deferred: overlap with current dev requires a separate delta review"
+    }
+  ],
+  "review": {
+    "reviewer": "independent native review agent /root/review_codex_integration",
+    "result": "PASS: no blocking findings",
+    "commit": "6489f81d180e5a53ea73fbe8fd0861fae20eea45",
+    "tree": "507661d2fada3a255a30823a6be6f95d5cc78d9e",
+    "base": "d82b2586aa073d23bc031717576d883d02bd187c",
+    "scope": [
+      "Gerrit review workflow",
+      "theme contrast",
+      "Difftastic structural diffs",
+      "graph readability",
+      "bounded Git bundles"
+    ],
+    "previous_review": {
+      "commit": "112c86e8fb4e6e62bf93e9a9996411d65d389abc",
+      "result": "FAIL: four findings",
+      "resolutions": [
+        "Sync bypassed Gerrit review: execution now opens the review dialog, and Sync is removed from both palettes.",
+        "Partial-clone history readers bypassed consent: the entire clone-options feature is excluded.",
+        "Gerrit amend discarded sign-off and bypassed SkipHooks: delayed preparation preserves original argv and hooks recognize the marker offset.",
+        "Gerrit push lost its skip-hooks flag before confirmation: the dialog now owns that choice and confirmed push retains it."
+      ]
+    },
+    "checks": [
+      "All round-one findings resolved on the pinned final candidate.",
+      "Structural stale-result ownership and staging guards reviewed.",
+      "Graph interactions and theme changes reviewed.",
+      "Bundle create-only atomic ref transactions, immutable-byte reparse, no-lazy prerequisite verification, object fsck and checked-out/unborn guards reviewed.",
+      "Independently exercised installed Difftastic 0.72.0 with the exact external-diff protocol/flags on rewrapped Unicode Rust; byte spans and changed tokens matched."
+    ],
+    "limitations": [
+      "Reviewer did not run Cargo or CI.",
+      "Native Windows and live SSH/WSL runtime behavior unverified."
+    ]
+  },
+  "baseline_diagnostics": {
+    "commit": "d82b2586aa073d23bc031717576d883d02bd187c",
+    "initial_candidate": "112c86e8fb4e6e62bf93e9a9996411d65d389abc",
+    "initial_full_library_result": "3042 passed, 6 failed, 7 ignored (4 threads)",
+    "unchanged_dev_reproduction": "The two checkpoint scripts, WSL-path test, Git regex test, and drag/drop rebase test all fail on unchanged dev; the timeout test passes serially.",
+    "normalization": [
+      "GNU sed 4.10 in a temporary tools directory (no Homebrew package installed).",
+      "Canonical TMPDIR=/private/tmp avoids macOS /var versus /private/var aliases.",
+      "Validation shell delegates to /bin/sh without loading login profiles, retaining the isolated tool PATH.",
+      "Serial execution avoids concurrent sleep 6789 fixtures interfering with the existing global process assertion."
+    ],
+    "test_only_fix": "Use portable POSIX [[:space:]] in the existing Git -G regex integration fixture; query production code is unchanged.",
+    "macos_dead_code_allowance": [
+      "desktop_entry::OURS",
+      "desktop_entry::PACKAGE_ENTRY",
+      "desktop_entry::set_actions",
+      "desktop_entry::desktop_id",
+      "desktop_entry::package_entry",
+      "diagnostics::pretty_name"
+    ]
+  },
+  "validated_utc": "2026-11-07T16:39:59.693692+00:00",
+  "validation": {
+    "exit_codes": {
+      "build": 0,
+      "fmt": 0,
+      "clippy": 0,
+      "synthetic": 0,
+      "gerrit_regressions": 0,
+      "full_tests": 0
+    },
+    "platform": "macOS 27.2 arm64",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git": "git version 2.54.0 (Apple Git-157)",
+    "difftastic": "0.72.0 revision6201bc9, macOS aarch64",
+    "gnu_sed": "4.10, extracted temporary Homebrew bottle; not installed system-wide",
+    "commands": {
+      "build": "cargo +1.95.0 test --locked --no-run",
+      "fmt": "cargo +1.95.0 fmt --check",
+      "clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code",
+      "full_tests": "cargo +1.95.0 test --locked -- --test-threads=1"
+    },
+    "environment": {
+      "CARGO_TARGET_DIR": "worktree-private target/",
+      "PATH": "temporary tools directory containing real Difftastic and GNU sed, followed by inherited PATH",
+      "TMPDIR": "/private/tmp",
+      "SHELL": "temporary validation-shell file",
+      "validation_shell_contents": "#!/bin/sh\n# Keep the validation PATH rather than loading machine-specific login profiles.\nif [ \"$1\" = -l ]; then shift; fi\nexec /bin/sh \"$@\"\n"
+    },
+    "library_test_binary_sha256": "7772b490f90311530b970cfe8f4ab391686940d2f9569f667ec1d7f42448d54c",
+    "aggregate": {
+      "passed": 3050,
+      "failed": 0,
+      "ignored": 7,
+      "filtered_out": 0
+    },
+    "suite_results": [
+      "test result: ok. 3042 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 814.27s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.06s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ],
+    "full_test_log": {
+      "artifact": "codex-recovery-2026-11-07-tests.log.gz",
+      "uncompressed_sha256": "58a91481641ded4205b03874157290bb78022b3a9366091af722a8c106f16559",
+      "gzip_sha256": "34418979388dd55206a23e58e5a07a3c8cf52a601c9af414755a7d852480d29f"
+    },
+    "other_logs": {
+      "build": {
+        "sha256": "6d5399383fd95347e0465f22862c2033d1bde2b0b748ad6cbff1c5d4f3d09303",
+        "text": "   Compiling gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)\nwarning: constant `OURS` is never used\n   --> src/desktop_entry.rs:115:7\n    |\n115 | const OURS: &str = \"X-Gitcraft-Actions=true\";\n    |       ^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: constant `PACKAGE_ENTRY` is never used\n   --> src/desktop_entry.rs:118:7\n    |\n118 | const PACKAGE_ENTRY: &str = \"/usr/share/applications/gitcraft.desktop\";\n    |       ^^^^^^^^^^^^^\n\nwarning: function `set_actions` is never used\n   --> src/desktop_entry.rs:123:8\n    |\n123 | pub fn set_actions(items: &[crate::os_shell::MenuItem]) {\n    |        ^^^^^^^^^^^\n\nwarning: function `desktop_id` is never used\n   --> src/desktop_entry.rs:160:8\n    |\n160 | pub fn desktop_id() -> &'static str {\n    |        ^^^^^^^^^^\n\nwarning: function `package_entry` is never used\n   --> src/desktop_entry.rs:179:4\n    |\n179 | fn package_entry(items: &[crate::os_shell::MenuItem]) -> String {\n    |    ^^^^^^^^^^^^^\n\nwarning: function `pretty_name` is never used\n   --> src/diagnostics.rs:162:8\n    |\n162 | pub fn pretty_name(text: &str) -> Option<String> {\n    |        ^^^^^^^^^^^\n\nwarning: constant `PACKAGE_ENTRY` is never used\n   --> src/desktop_entry.rs:118:7\n    |\n118 | const PACKAGE_ENTRY: &str = \"/usr/share/applications/gitcraft.desktop\";\n    |       ^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `gitcraft` (lib) generated 6 warnings\nwarning: `gitcraft` (lib test) generated 3 warnings (2 duplicates)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.57s\n  Executable unittests src/lib.rs (target/debug/deps/gitcraft-ba5a0d4352e25ac9)\n  Executable unittests src/main.rs (target/debug/deps/gitcraft-5aa80b4732d55f49)\n  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-79723e01d83c219e)\n  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-37b62dfaf7372cd3)\n  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-2b004b2df7e8bf9b)\n"
+      },
+      "fmt": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "clippy": {
+        "sha256": "ca1409e92c7aae28695211167df1aea039b63590ec780f8a0f738c8d466075d1",
+        "text": "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.39s\n"
+      },
+      "synthetic": {
+        "sha256": "ff61df14f4e14206daf0dffe501d64cd94cbdf84373bab6b1ca93fea7100e3ca",
+        "text": "\nrunning 2 tests\ntest git::bundles::tests::windows_bundle_arguments_preserve_drive_unc_unicode_and_long_paths ... ok\ntest repo::gerrit::integration_tests::sync_and_skipped_push_require_review_confirmation ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3047 filtered out; finished in 0.00s\n\n"
+      },
+      "gerrit_regressions": {
+        "sha256": "7832b2f5fc50400c70a016b29b32a03145b3769a64ad9b89f85b04802a752683",
+        "text": "\nrunning 2 tests\ntest repo::gerrit::integration_tests::amend_preserves_signoff_and_skips_only_the_requested_commit_hooks ... ok\ntest repo::gerrit::integration_tests::sync_and_skipped_push_require_review_confirmation ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3047 filtered out; finished in 0.68s\n\n"
+      },
+      "baseline_failures": {
+        "sha256": "ec3ebf72d255356e77a3a6fe5058aa4061b1a6cd8d3b97453db27dbce85bcf24",
+        "text": "\nrunning 6 tests\ntest agent::checkpoint_tests::the_script_for_other_machines_saves_what_gitcraft_saves ... FAILED\ntest agent::checkpoint_tests::the_script_reads_escapes_and_blank_lines_as_gitcraft_does ... FAILED\ntest git::external_tool::tests::real::in_wsl_the_windows_tool_gets_wsl_localhost_paths ... FAILED\ntest git::search_query::tests::contents_regex_and_merges_on_a_real_repository ... FAILED\ntest parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped ... ok\ntest repo::drag_drop::tests::a_fast_forward_refuses_a_branch_being_rebased_elsewhere ... FAILED\n\nfailures:\n\n---- agent::checkpoint_tests::the_script_for_other_machines_saves_what_gitcraft_saves stdout ----\n\nthread 'agent::checkpoint_tests::the_script_for_other_machines_saves_what_gitcraft_saves' (3530658) panicked at src/agent/checkpoint_tests.rs:174:5:\nassertion `left == right` failed: []\n  left: None\n right: Some(\"Fix \\\"it\\\" now\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- agent::checkpoint_tests::the_script_reads_escapes_and_blank_lines_as_gitcraft_does stdout ----\n\nthread 'agent::checkpoint_tests::the_script_reads_escapes_and_blank_lines_as_gitcraft_does' (3531191) panicked at src/agent/checkpoint_tests.rs:277:5:\nassertion `left == right` failed: []\n  left: \"\"\n right: \"open C:\\\\new\\\\temp \\\"now\\\"\"\n\n---- git::external_tool::tests::real::in_wsl_the_windows_tool_gets_wsl_localhost_paths stdout ----\n\nthread 'git::external_tool::tests::real::in_wsl_the_windows_tool_gets_wsl_localhost_paths' (3531637) panicked at src/git/external_tool/tests.rs:957:9:\nassertion `left == right` failed\n  left: [\"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\gitcraft-empty-file\", \"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\merged file.txt\", \"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\no base yet\", \"-mergeoutput=\\\\\\\\wsl.localhost\\\\Test\\\\private\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\merged file.txt\"]\n right: [\"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\gitcraft-empty-file\", \"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\merged file.txt\", \"\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\no base yet\", \"-mergeoutput=\\\\\\\\wsl.localhost\\\\Test\\\\var\\\\folders\\\\0z\\\\snd05v_n21jd6pkhvg2h0vlc0000gp\\\\T\\\\gitcraft-tool-wsl-script-85521\\\\merged file.txt\"]\n\n---- git::search_query::tests::contents_regex_and_merges_on_a_real_repository stdout ----\n\nthread 'git::search_query::tests::contents_regex_and_merges_on_a_real_repository' (3531748) panicked at src/git/search_query/tests.rs:503:5:\nassertion `left == right` failed\n  left: []\n right: [\"a7ed5e5b75e7bc352c098e1c27b8931458f9f468\", \"3467ecf50242e1906bd1681700f2d2e9ad7686e0\"]\n\n---- repo::drag_drop::tests::a_fast_forward_refuses_a_branch_being_rebased_elsewhere stdout ----\n\nthread 'repo::drag_drop::tests::a_fast_forward_refuses_a_branch_being_rebased_elsewhere' (3533141) panicked at src/repo/drag_drop/tests.rs:29:5:\ngit [\"-c\", \"sequence.editor=sed -i s/^pick/edit/\", \"rebase\", \"-q\", \"-i\", \"--root\"]: Err(\"sed: 1: \\\"/private/var/folders/0z ...\\\": invalid command code v\\nerror: there was a problem with the editor 'sed -i s/^pick/edit/'\")\n\n\nfailures:\n    agent::checkpoint_tests::the_script_for_other_machines_saves_what_gitcraft_saves\n    agent::checkpoint_tests::the_script_reads_escapes_and_blank_lines_as_gitcraft_does\n    git::external_tool::tests::real::in_wsl_the_windows_tool_gets_wsl_localhost_paths\n    git::search_query::tests::contents_regex_and_merges_on_a_real_repository\n    repo::drag_drop::tests::a_fast_forward_refuses_a_branch_being_rebased_elsewhere\n\ntest result: FAILED. 1 passed; 5 failed; 0 ignored; 0 measured; 2986 filtered out; finished in 6.63s\n\n"
+      },
+      "baseline_normalized": {
+        "sha256": "bee852ccea620c92981bac4d8ee0f61fb592f3a231f3573a139b61caf3a4b25f",
+        "text": "\nrunning 5 tests\ntest agent::checkpoint_tests::the_script_for_other_machines_saves_what_gitcraft_saves ... ok\ntest agent::checkpoint_tests::the_script_reads_escapes_and_blank_lines_as_gitcraft_does ... ok\ntest git::external_tool::tests::real::in_wsl_the_windows_tool_gets_wsl_localhost_paths ... ok\ntest parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped ... ok\ntest repo::drag_drop::tests::a_fast_forward_refuses_a_branch_being_rebased_elsewhere ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2987 filtered out; finished in 7.22s\n\n"
+      }
+    }
+  },
+  "documentation_binding": "Subsequent changes only add this recovery report and validation artifacts. Application gates bind the pinned candidate after verifying all other tracked files are identical."
+}

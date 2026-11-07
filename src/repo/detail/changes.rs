@@ -465,7 +465,7 @@ fn list_header(ui: &mut Ui, title: &str, count: usize, button: Option<&str>) -> 
         t.text_faint,
     );
     let Some(label) = button else { return false };
-    let galley = p.layout_no_wrap(label.to_owned(), theme::medium(11.5), t.accent);
+    let galley = p.layout_no_wrap(label.to_owned(), theme::medium(11.5), t.accent_fg);
     let b = egui::Rect::from_center_size(
         pos2(rect.right() - 12.0 - galley.size().x / 2.0 - 6.0, y),
         vec2(galley.size().x + 12.0, 22.0),
@@ -480,7 +480,7 @@ fn list_header(ui: &mut Ui, title: &str, count: usize, button: Option<&str>) -> 
     ui.painter().galley(
         pos2(b.left() + 6.0, y - galley.size().y / 2.0),
         galley,
-        t.accent,
+        t.accent_fg,
     );
     resp.clicked()
 }

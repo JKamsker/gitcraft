@@ -273,14 +273,24 @@ mod tests {
         assert_eq!(shown.refs, MIN_REFS_W);
         assert_eq!(shown.graph, MIN_GRAPH_W);
         assert_eq!(description(&shown, AVAILABLE), MIN_DESCRIPTION_W);
-        assert_eq!(shown.author, 560.0);
+        assert_eq!(
+            shown.author,
+            AVAILABLE - MIN_REFS_W - MIN_GRAPH_W - MIN_DESCRIPTION_W
+        );
     }
 
     #[test]
     fn dragging_back_restores_every_squeezed_column() {
         let squeezed = drag(preferred(), None, Bar::Author, -10.0, 100);
-        // From 560 back to the 150 it started at.
-        let restored = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 41);
+        // From the maximum back to the width it started at.
+        let maximum = AVAILABLE - MIN_REFS_W - MIN_GRAPH_W - MIN_DESCRIPTION_W;
+        let restored = drag(
+            squeezed,
+            Some(Bar::Author),
+            Bar::Author,
+            maximum - preferred().author,
+            1,
+        );
         assert_eq!(restored.squeezed(AVAILABLE, Some(Bar::Author)), preferred());
     }
 
@@ -288,8 +298,14 @@ mod tests {
     fn squeezed_columns_come_back_in_reverse_order() {
         let squeezed = drag(preferred(), None, Bar::Author, -10.0, 100);
         // At 280 the branch column has its width back; the graph is still 20 short.
-        let shown = drag(squeezed, Some(Bar::Author), Bar::Author, 10.0, 28)
-            .squeezed(AVAILABLE, Some(Bar::Author));
+        let shown = drag(
+            squeezed,
+            Some(Bar::Author),
+            Bar::Author,
+            AVAILABLE - MIN_REFS_W - MIN_GRAPH_W - MIN_DESCRIPTION_W - 280.0,
+            1,
+        )
+        .squeezed(AVAILABLE, Some(Bar::Author));
         assert_eq!(shown.author, 280.0);
         assert_eq!(shown.refs, 330.0);
         assert_eq!(shown.graph, 80.0);
@@ -303,7 +319,10 @@ mod tests {
         };
         let shown = drag(prefs, None, Bar::Date, -10.0, 100).squeezed(AVAILABLE, Some(Bar::Date));
         assert_eq!(shown.author, MIN_COL_W);
-        assert_eq!(shown.date, 510.0);
+        assert_eq!(
+            shown.date,
+            AVAILABLE - MIN_REFS_W - MIN_GRAPH_W - MIN_DESCRIPTION_W - MIN_COL_W
+        );
     }
 
     #[test]

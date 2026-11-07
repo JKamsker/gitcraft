@@ -91,7 +91,9 @@ fn commit_file(dir: &Path, file: &str, message: &str) -> String {
 
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) -> bool {
     let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(10) {
+    // This waits for Git and the subsequent asynchronous snapshot, not a performance
+    // budget. Windows Git process startup under shard load can exceed ten seconds.
+    while start.elapsed() < Duration::from_secs(30) {
         tab.poll(ctx);
         if done(tab) {
             return true;
@@ -115,7 +117,16 @@ fn receipt_of(dir: &Path, action: Action) -> (Option<Receipt>, String) {
     let mut tab = RepoTab::new(dir.to_owned(), &ctx);
     assert!(wait(&mut tab, &ctx, settled));
     tab.apply(action, &ctx);
-    assert!(wait(&mut tab, &ctx, settled), "{:?}", tab.status);
+    assert!(
+        wait(&mut tab, &ctx, settled),
+        "status={:?}, loading={}, busy={}, history={}, timeline_loaded={}, awaiting={:?}",
+        tab.status,
+        tab.loading,
+        tab.busy_op.is_some(),
+        tab.history_gen,
+        tab.timeline.loaded,
+        tab.timeline.awaiting
+    );
     let id = tab.timeline.current.unwrap_or_default();
     // The background work that would have made one is done (it names commits too).
     wait(&mut tab, &ctx, |t| {
