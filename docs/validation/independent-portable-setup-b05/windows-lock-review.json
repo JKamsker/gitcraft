@@ -1,0 +1,11 @@
+{
+  "application_candidate": "b05e51c529c12cc66bb907772e66450cd4ad9cc8",
+  "scope": "Static Windows path reasoning plus synthetic parser fixture; no Windows runtime. Independent owned Linux Git fixture confirms repeated lock fails.",
+  "existing_project_windows_porcelain_fixture": "src/git/worktree.rs:242 uses C:/src/app-fix",
+  "git_porcelain_path": "C:/fixture/portable-worktrees/feature",
+  "rust_canonical_path_spelling": "\\\\?\\C:\\fixture\\portable-worktrees\\feature",
+  "b05_parser_recognized_existing_lock": false,
+  "second_lock_exit_code": 128,
+  "second_lock_stderr": "fatal: '/tmp/gitcraft-lock-review-q6wfo3_y/work' is already locked\n",
+  "temp_fixture_deleted_after_capture": true
+}
