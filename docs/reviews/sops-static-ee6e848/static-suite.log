@@ -1,0 +1,16 @@
+test_cycles_cannot_add_ancestors_or_unrelated_nodes (test_sops_safety.SyntheticSafetyTests.test_cycles_cannot_add_ancestors_or_unrelated_nodes) ... ok
+test_duplicate_handles_and_pid_reuse_ambiguities_refuse_the_whole_plan (test_sops_safety.SyntheticSafetyTests.test_duplicate_handles_and_pid_reuse_ambiguities_refuse_the_whole_plan) ... ok
+test_exact_owned_tree_excludes_init_ancestors_siblings_and_unrelated (test_sops_safety.SyntheticSafetyTests.test_exact_owned_tree_excludes_init_ancestors_siblings_and_unrelated) ... ok
+test_exhaustive_small_parent_graphs_never_include_unreachable_handles (test_sops_safety.SyntheticSafetyTests.test_exhaustive_small_parent_graphs_never_include_unreachable_handles) ... ok
+test_foreign_scope_escape_dead_records_and_unknown_parent_are_not_signaled (test_sops_safety.SyntheticSafetyTests.test_foreign_scope_escape_dead_records_and_unknown_parent_are_not_signaled) ... ok
+test_missing_wrong_or_unowned_root_never_produces_a_plan (test_sops_safety.SyntheticSafetyTests.test_missing_wrong_or_unowned_root_never_produces_a_plan) ... ok
+test_model_has_no_process_io_dynamic_execution_or_signal_capability (test_sops_safety.SyntheticSafetyTests.test_model_has_no_process_io_dynamic_execution_or_signal_capability) ... ok
+test_pid_zero_one_negative_and_group_session_mismatch_fail_closed (test_sops_safety.SyntheticSafetyTests.test_pid_zero_one_negative_and_group_session_mismatch_fail_closed) ... ok
+test_record_order_does_not_change_the_exact_plan (test_sops_safety.SyntheticSafetyTests.test_record_order_does_not_change_the_exact_plan) ... ok
+test_recorder_has_only_owned_handle_intents_and_rejects_foreign_targets (test_sops_safety.SyntheticSafetyTests.test_recorder_has_only_owned_handle_intents_and_rejects_foreign_targets) ... ok
+test_runtime_and_fixture_remain_quarantined_without_remote_process_apis (test_sops_safety.SyntheticSafetyTests.test_runtime_and_fixture_remain_quarantined_without_remote_process_apis) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.006s
+
+OK
