@@ -298,7 +298,11 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         path: "acme/app".to_owned(),
         web: "https://github.com".to_owned(),
     });
-    let key = "github.com/acme/app";
+    let key = tab
+        .hosting
+        .as_ref()
+        .and_then(|h| h.review_repository_key())
+        .ok_or("missing canonical review key")?;
     let main = git(dir, &["rev-parse", "main"])?;
     let topic = git(dir, &["rev-parse", "topic"])?;
     let base = git(dir, &["merge-base", "main", "topic"])?;
@@ -319,15 +323,15 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         .is_some_and(|v| v.data.is_some())));
     std::thread::sleep(std::time::Duration::from_millis(100));
     tab.poll(&ctx);
-    assert_eq!(git::reviewed(dir, key, 4)?, None);
+    assert_eq!(git::reviewed(dir, &key, 4)?, None);
 
     tab.show_pr_since(since(&topic), &ctx);
-    assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, key, 4)
+    assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, &key, 4)
         .ok()
         .flatten()
         .is_some()));
     assert_eq!(
-        git::reviewed(dir, key, 4)?,
+        git::reviewed(dir, &key, 4)?,
         Some(git::Series::new(&base, &topic))
     );
     assert_eq!(tab.versions.seen_heads.get(&4), Some(&topic));
