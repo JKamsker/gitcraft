@@ -83,6 +83,7 @@ impl State {
         self.reader.cancel();
         self.scope = None;
         self.selection = None;
+        self.error = None;
         self.dirty = true;
     }
     pub fn len(&self) -> usize {
@@ -246,7 +247,7 @@ impl RepoTab {
             self.saved_views.dirty = true;
         }
     }
-    fn load_graph_view_page(&mut self) {
+    pub(super) fn load_graph_view_page(&mut self) {
         if self.saved_views.reader.busy()
             || self.loading_more
             || !self.has_more

@@ -319,6 +319,10 @@ impl RepoTab {
     }
 
     pub(super) fn load_more(&mut self, ctx: &egui::Context) {
+        if self.saved_views.active() {
+            self.load_graph_view_page();
+            return;
+        }
         if self.loading_more || !self.has_more || self.history.len() >= MAX_HISTORY {
             return;
         }

@@ -35,7 +35,7 @@ impl RepoTab {
                 save=ui.add_enabled(!self.saved_views.name.trim().is_empty()&&self.saved_views.prefs.saved.len()<32,egui::Button::new("Save view")).clicked();
                 remove=ui.add_enabled(self.saved_views.prefs.saved.iter().any(|p|p==preset),egui::Button::new("Delete saved")).clicked();
                 refresh|=ui.button("Refresh view").clicked();collapse=ui.add_enabled(!self.saved_views.expanded.is_empty(),egui::Button::new("Collapse spans")).clicked();
-                if self.saved_views.reader.busy(){ui.add(crate::spinner::Spinner::new());}
+                if self.saved_views.reader.busy(){ui.add(crate::spinner::Spinner::new());if ui.button("Cancel view read").clicked(){choose=Some(None);}}
                 if self.has_more{page=ui.add_enabled(!self.saved_views.reader.busy()&&!self.loading_more,egui::Button::new("Load older context")).on_hover_text("Read one bounded page at the view's pinned tips, without downloading objects").clicked();}
             }
         });
@@ -79,7 +79,8 @@ impl RepoTab {
         if self.saved_views.active() {
             if let Some(selection) = &self.saved_views.selection {
                 ui.small(format!(
-                    "{} matches · {}{} · working changes, stashes and selection kept as context",
+                    "{} loaded matches / {} selected · {}{} · working changes, stashes and selection kept as context",
+                    self.history.iter().filter(|c|selection.commits.contains(&c.hash)).count(),
                     selection.commits.len(),
                     selection.explanation,
                     if selection.limited {

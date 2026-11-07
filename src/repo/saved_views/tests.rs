@@ -183,3 +183,73 @@ fn persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed() {
     assert!(p.saved.is_empty());
     assert!(p.active.is_none());
 }
+
+#[test]
+fn actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers() -> Result<(), String>
+{
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    for mode in 0..3 {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recording-only/saved-view-lifecycle".into(), &ctx);
+        tab.saved_views.prefs.active = Some(Preset {
+            name: "View".into(),
+            kind: Kind::MyUnpushed,
+            days: 30,
+        });
+        tab.saved_views.scope = Some(Scope {
+            tips: vec![],
+            remotes: vec![],
+            email: "recording@test.invalid".into(),
+            default_branch: None,
+            now: 0,
+        });
+        let (entered, entry) = mpsc::channel();
+        let (stopped, stop) = mpsc::channel();
+        tab.saved_views.reader.queue(move |active| {
+            entered.send(()).map_err(|e| e.to_string())?;
+            let start = Instant::now();
+            while active() {
+                if start.elapsed() > Duration::from_secs(5) {
+                    return Err("Cancellation was not observed".into());
+                }
+                std::thread::yield_now();
+            }
+            stopped.send(()).map_err(|e| e.to_string())?;
+            Ok(Answer::Selection(Selection {
+                commits: BTreeSet::from(["f".repeat(40)]),
+                ..Default::default()
+            }))
+        });
+        tab.poll_saved_views(&ctx);
+        entry
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        match mode {
+            0 => tab.set_graph_view(None, &ctx),
+            1 => {
+                tab.shown = false;
+                tab.poll_saved_views(&ctx);
+            }
+            _ => {
+                drop(tab);
+                stop.recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?;
+                continue;
+            }
+        }
+        stop.recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        tab.shown = true;
+        let start = Instant::now();
+        while tab.saved_views.reader.busy() {
+            tab.poll_saved_views(&ctx);
+            if start.elapsed() > Duration::from_secs(5) {
+                return Err("Canceled reader slot did not clear".into());
+            }
+            std::thread::yield_now();
+        }
+        assert!(tab.saved_views.selection.is_none());
+    }
+    Ok(())
+}

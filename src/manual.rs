@@ -49,6 +49,8 @@ const FEATURES: &[(&str, &[&str])] = &[
     (
         "Graph",
         &[
+            "Choose a relation above the graph: My unpushed work, My recent changes + dependencies (days), Descendants of selected commit, or Only merges into a local branch such as main. Name it and Save view to remember the parameters in this repository; All history exits. Unpushed uses the exact current author email and local remote-tracking tips, without contacting a server. Views compose with branch visibility and search.",
+            "Click a dashed connector to expand omitted commits; Collapse spans restores the compact view. Working changes, stashes, short gaps and selection remain context. Refresh view pins new tips; Load older context explicitly reads one bounded page without downloading objects. Counts distinguish loaded matches from selected history; 30000-commit query and missing-history limits stay visible. Cancel view read stops the current view. Reads run in background, require Git --no-lazy-fetch support and do not run source hooks, filters or signing.",
             "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",
             "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
             "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
