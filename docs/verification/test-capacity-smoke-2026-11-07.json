@@ -1,0 +1,14 @@
+{
+  "zombies_before": 31300,
+  "zombies_after": 31300,
+  "zombie_delta": 0,
+  "exit_status": 37,
+  "checks": {
+    "exact_exit_37": true,
+    "orphan_adopted_by_supervisor": true,
+    "orphan_reaped": true,
+    "zombie_count_unchanged": true
+  },
+  "stdout": "main_parent_tini_pid=1638162\norphan_pid=1638165\norphan_adopted_parent_pid=1638162\n[TRACE tini (1638162)] Registered as child subreaper\n[INFO  tini (1638162)] Spawned child process '/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3' with pid '1638163'\n[DEBUG tini (1638162)] Received SIGCHLD\n[DEBUG tini (1638162)] Reaped child with pid: '1638165'\n[TRACE tini (1638162)] No child to reap\n[DEBUG tini (1638162)] Received SIGCHLD\n[DEBUG tini (1638162)] Reaped child with pid: '1638163'\n[INFO  tini (1638162)] Main child exited normally (with status '37')\n[TRACE tini (1638162)] No child to wait\n[TRACE tini (1638162)] Exiting: child has exited\n",
+  "stderr": "[WARN  tini (1638162)] Reaped zombie process with pid=1638165\n"
+}
