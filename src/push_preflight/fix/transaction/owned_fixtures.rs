@@ -145,6 +145,13 @@ impl Fixture {
         let root = remote::sh_quote(&self.root.to_string_lossy());
         let repo = remote::sh_quote(&self.repo.to_string_lossy());
         let old = remote::sh_quote(&self.old);
+        let action = if mode.ends_with("switch-head") {
+            "switch-head"
+        } else if mode.ends_with("detach-head") {
+            "detach-head"
+        } else {
+            mode
+        };
         let script = format!(
             r#"#!/bin/sh
 set -eu
@@ -156,13 +163,22 @@ cat >"$root/original-input-$1"
 printf '%s\0' "$@" >"$root/original-args-$1"
 git config --get core.hooksPath >"$root/original-config-$1"
 if [ "$1" = prepared ]; then
- case {mode} in
+ case {action} in
  veto) exit 1 ;;
  switch-head) git symbolic-ref HEAD refs/heads/other >"$root/mutation.stdout" 2>"$root/mutation.stderr" || exit $? ;;
  detach-head) git update-ref --no-deref HEAD {old} >"$root/mutation.stdout" 2>"$root/mutation.stderr" || exit $? ;;
  index-change) cp -- "$root/external.index" "$repo/.git/index" ;;
  work-change) printf 'external-work\n' >"$repo/file.txt" ;;
  timeout) sleep 20 ;;
+ full-fix)
+   for directory in "$TMPDIR"/gitcraft-push-ref-transaction-*; do
+     [ -d "$directory" ] || continue
+     [ "$(cat "$directory/mode")" = repair ] || continue
+     for phase in prepared checkout committed; do
+       (set -C; : >"$directory/$phase.ok") || exit 1
+       ln -- "$directory/$phase.ok" "$root/observed-$phase.ok" || exit 1
+     done
+   done ;;
  esac
 fi
 if [ "$1" = committed ] && [ {mode} = committed-failure ]; then
@@ -221,6 +237,9 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     if case.starts_with("native-") {
         return native_case(root, case);
     }
+    if case == "full-fix" {
+        return full_fix_case(root);
+    }
     if case == "split-index" {
         return split_case(root);
     }
@@ -235,7 +254,7 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
         "sha1"
     };
     let f = Fixture::new(root, refs, objects)?;
-    if case == "switch-head" {
+    if case.ends_with("switch-head") || case.starts_with("prelock-") {
         run(&f.repo, &["branch", "other", &f.old], b"", None)?;
     }
     if case == "index-change" {
@@ -330,6 +349,39 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     if case == "missing-ack" {
         hook.capability_acknowledged = false;
     }
+    if case == "prelock-switch-head" {
+        run(
+            &f.repo,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "symbolic-ref",
+                "HEAD",
+                "refs/heads/other",
+            ],
+            b"",
+            None,
+        )?;
+    } else if case == "prelock-detach-head" {
+        run(
+            &f.repo,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "update-ref",
+                "--no-deref",
+                "HEAD",
+                &f.old,
+            ],
+            b"",
+            None,
+        )?;
+    }
+    let before = if case.starts_with("prelock-") {
+        snapshot(&f.repo)?
+    } else {
+        before
+    };
     let held_lock = if case == "held-ref-lock" || case == "checkout-failure" {
         let path = if case == "held-ref-lock" {
             f.repo.join(".git/refs/heads/main.lock")
@@ -352,7 +404,10 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     let retained = evidence(&directory);
     write(root.join("case.json"),serde_json::to_vec_pretty(&json!({"case":case,"backend":refs,"object_format":objects,"old":f.old,"new":f.new,"before":before,"after":after,"result":result,"elapsed_ms":elapsed,"directory":directory,"directory_retained":directory.exists(),"capability":capability,"evidence":retained})).map_err(|error| error.to_string())?)?;
     drop(held_lock); // Owned file handle only. The owned lock file is deliberately retained.
-    if case.starts_with("files-") || case.starts_with("reftable-") {
+    if matches!(
+        case,
+        "files-sha1" | "files-sha256" | "reftable-sha1" | "reftable-sha256"
+    ) {
         result?;
         assert_eq!(after["head"], f.new);
         assert_eq!(after["symref"], "refs/heads/main");
@@ -435,17 +490,35 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
             "index-change",
             "work-change",
             "missing-ack",
+            "prelock-switch-head",
+            "prelock-detach-head",
+            "reftable-switch-head",
+            "reftable-detach-head",
         ]
         .contains(&case)
         {
             assert!(!directory.join("checkout-attempted").exists());
         }
-        if ["switch-head", "detach-head"].contains(&case) {
+        if [
+            "switch-head",
+            "detach-head",
+            "reftable-switch-head",
+            "reftable-detach-head",
+        ]
+        .contains(&case)
+        {
             assert!(
                 fs::read_to_string(root.join("mutation.stderr"))
                     .map_err(|error| error.to_string())?
-                    .contains("HEAD.lock")
+                    .contains(if case.starts_with("reftable") {
+                        "lock"
+                    } else {
+                        "HEAD.lock"
+                    })
             );
+        }
+        if case.starts_with("prelock-") {
+            assert!(!root.join("original-input-prepared").exists());
         }
         if case == "timeout" {
             assert!((14_000..25_000).contains(&elapsed));
@@ -453,6 +526,97 @@ fn execute_case(root: &Path, case: &str) -> Result<(), String> {
     }
     Ok(())
 }
+fn full_fix_case(root: &Path) -> Result<(), String> {
+    let f = Fixture::new(root, "files", "sha1")?;
+    let receiver = root.join("owned-receiver.git");
+    run(
+        &f.repo,
+        &["init", "--template=", "--bare", &receiver.to_string_lossy()],
+        b"",
+        None,
+    )?;
+    run(
+        &f.repo,
+        &["remote", "add", "origin", &receiver.to_string_lossy()],
+        b"",
+        None,
+    )?;
+    run(
+        &f.repo,
+        &["push", "--set-upstream", "origin", "main"],
+        b"",
+        None,
+    )?;
+    write(
+        f.repo.join("private.txt"),
+        b"password=fixture_dummy_value_123\n",
+    )?;
+    run(&f.repo, &["add", "--", "private.txt"], b"", None)?;
+    run(
+        &f.repo,
+        &["commit", "--no-gpg-sign", "-m", "Owned outgoing fixture"],
+        b"",
+        None,
+    )?;
+    let outgoing = run(&f.repo, &["rev-parse", "HEAD"], b"", None)?;
+    f.observer("full-fix")?;
+    let before = snapshot(&f.repo)?;
+    let profile = crate::settings::profiles::UserProfile {
+        author_name: "Gate2 Fixture".into(),
+        author_email: "gate2@example.invalid".into(),
+        ..Default::default()
+    };
+    let plan = crate::push_preflight::scan(&f.repo, vec![vec!["push".into()]], profile, &|| true)?;
+    assert!(
+        plan.findings
+            .iter()
+            .any(|finding| finding.kind == crate::push_preflight::Kind::Secret)
+    );
+    let result = crate::push_preflight::fix(&f.repo, &plan, "secrets");
+    let after = snapshot(&f.repo)?;
+    write(root.join("case.json"), serde_json::to_vec_pretty(&json!({"case":"full-fix","before":before,"after":after,"result":result,"secret_file_exists_after":f.repo.join("private.txt").exists(),"receiver_head":run(&receiver,&["rev-parse","HEAD"],b"",None)?,"baseline":f.old})).map_err(|error| error.to_string())?)?;
+    result?;
+    let new = run(&f.repo, &["rev-parse", "HEAD"], b"", None)?;
+    assert_ne!(new, outgoing);
+    assert_eq!(run(&f.repo, &["rev-parse", "HEAD^"], b"", None)?, f.old);
+    assert!(!f.repo.join("private.txt").exists());
+    assert!(
+        run(
+            &f.repo,
+            &["status", "--porcelain=v1", "--untracked-files=all"],
+            b"",
+            None
+        )?
+        .is_empty()
+    );
+    assert_eq!(
+        run(&receiver, &["rev-parse", "refs/heads/main"], b"", None)?,
+        f.old
+    );
+    for phase in ["prepared", "checkout", "committed"] {
+        assert_eq!(
+            fs::read(root.join(format!("observed-{phase}.ok")))
+                .map_err(|error| error.to_string())?,
+            format!("refs/heads/main\n{outgoing}\n{new}\n").as_bytes()
+        );
+    }
+    assert_eq!(
+        fs::read(root.join("original-input-prepared")).map_err(|error| error.to_string())?,
+        format!("{outgoing} {new} refs/heads/main\n").as_bytes()
+    );
+    assert_eq!(
+        fs::read(root.join("original-args-prepared")).map_err(|error| error.to_string())?,
+        b"prepared\0"
+    );
+    assert!(
+        crate::push_preflight::scan(&f.repo, vec![vec!["push".into()]], plan.profile, &|| true)?
+            .findings
+            .iter()
+            .all(|finding| finding.kind != crate::push_preflight::Kind::Secret)
+    );
+    Ok(())
+}
+
 fn split_case(root: &Path) -> Result<(), String> {
     let f = Fixture::new(root, "files", "sha1")?;
     run(&f.repo, &["update-index", "--split-index"], b"", None)?;
@@ -688,7 +852,7 @@ fn gate2_owned_local_fixture() -> Result<(), String> {
     }
     fs::create_dir(&root).map_err(|e| e.to_string())?;
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
-    for name in ["home", "xdg", "tmp"] {
+    for name in ["home", "xdg", "tmp", "template"] {
         fs::create_dir(root.join(name)).map_err(|e| e.to_string())?;
     }
     write(root.join("global.gitconfig"), b"")?;
@@ -716,6 +880,7 @@ fn gate2_owned_local_fixture() -> Result<(), String> {
         .env("TMPDIR", root.join("tmp"))
         .env("GIT_CONFIG_GLOBAL", root.join("global.gitconfig"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_TEMPLATE_DIR", root.join("template"))
         .env("GIT_ATTR_NOSYSTEM", "1")
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("LC_ALL", "C")

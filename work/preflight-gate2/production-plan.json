@@ -1,0 +1,32 @@
+{
+  "status": "PRESERVED; NOT EXECUTED",
+  "authorization": "Root accepts recording6PASS14e081b and releases full ownedproductionGate2",
+  "production_static_pass": "5f348cecf859d91a5af90da25b2927819edc6dac",
+  "production_prefix_sha256": "37b090eaaa01d28c9183a24f51fe4cb71e6f06ebde06e2f0f3207dad83e4bb60",
+  "cases": [
+    "files-sha1",
+    "files-sha256",
+    "reftable-sha1",
+    "reftable-sha256",
+    "prelock-switch-head",
+    "prelock-detach-head",
+    "switch-head",
+    "detach-head",
+    "reftable-switch-head",
+    "reftable-detach-head",
+    "held-ref-lock",
+    "veto",
+    "index-change",
+    "work-change",
+    "checkout-failure",
+    "committed-failure",
+    "timeout",
+    "split-index",
+    "old-git",
+    "missing-ack",
+    "full-fix"
+  ],
+  "containment": "Same ignored explicitownedGate2 entry, env_clear/privateHOME/XDG/Gitconfig/TMPDIR/emptytemplate; pinnedGit2.52.0 and old2.47.3, existing bounded runner, noPIDselectors/controllers/signals/livehosts/userrepos/credentials/CI",
+  "proof": "Actual Hooknew+execute all4backendformats; zerooriginalrelay/checkoutprelocktarget/detach; nativepreparedattemptedHEADmutations; locks/veto/index/work; realGIT_INDEX_FILE splitrotation/missingdep; failure/timeoutretainrecovery; actualscan/fixsecretfindingremovedwithACK/relayandreceiverunchanged",
+  "after": "Preserve resultsbeforebroadergates. Productionchange requires staticre-review. Remove temporaryignore for ordinaryownedcases /capabilityrefusaloldGit after acceptedGate2; thenfulllocalfeaturegates; remotecompletion/outcome remainsOPEN."
+}
