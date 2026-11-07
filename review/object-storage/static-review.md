@@ -2,7 +2,7 @@
 
 Candidate: `c805f6eded6e150b62e3acd44a85b109d582a1ae`; tree `f029597db8b70eb952dc68a5a0ab5848378b5050`; base `b5df68070a6df9d91cd29ca5d6270db80c9040c9`.
 
-Scope: exact queue entries #49 Shared and borrowed objects, #49 How an object is stored. Read-only inspection of all 14 changed files, existing tests, queue requirements, AGENTS.md and CI policy. No CI use. No application source edits.
+Scope: exact queue entries #49 Shared and borrowed objects, #49 How an object is stored. Read-only inspection of the core changed Git command/object-storage modules, inspector UI module, existing tests, queue requirements, AGENTS.md and CI policy. Remaining glue was identified from diff statistics; a complete 14-file review was not completed. No CI use. No application source edits.
 
 Evidence checks: all four author manifest log SHA-256 values match their files. Test-list has 884 distinct names. Full log reports 881 passed / 0 failed / 3 ignored / 0 filtered. This verifies prior evidence, not fresh execution. Source tree matches manifest. Baseline retained-name comparison remains to be independently checked.
 
