@@ -147,7 +147,7 @@
   "windows_corrective": {
     "candidate": "e1e1be8842d83a01a902b6b6ff1be779ba693f84",
     "scope": "Retain and validate every rooted canonical physical ancestor from volume/UNC share through repository before descendant CREATE_NEW, using existing no-delete/no-reparse directory handles. No new unsafe/API/process boundary.",
-    "deferred_native_test": "git::recovery::file::tests::windows_physical_ancestors_are_rooted_and_cover_drive_and_unc_paths",
+    "deferred_native_test": "git::recovery::file::root_replacement_tests::physical_paths_include_every_drive_and_unc_ancestor_without_drive_relative_prefixes",
     "linux_test_count_unchanged": true,
     "independent_static_notes_commit": "7cc5f59"
   }
