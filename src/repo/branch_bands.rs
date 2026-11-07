@@ -269,7 +269,7 @@ impl RepoTab {
             }
         });
         if self.band_reader.busy() {
-            ui.spinner();
+            ui.add(crate::spinner::Spinner::new().size(14.0));
             ui.small("Updating branch-model layout…").on_hover_text(
                 "The visible layout is a preview until the selected branch model finishes rebuilding.",
             );
