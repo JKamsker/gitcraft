@@ -1,0 +1,21 @@
+{
+  "candidate": "3cef22c2110ce42bbaa83465e8e5a6a5f81a3efa",
+  "review_base": "ff901aad4346ee409509b60f9c6e7b12689fde44",
+  "prior_failed_candidate": "51ea04904419b850805a8fc627f71af8b9255fb9",
+  "status": "Static correction review passes; focused independent confirmation pending",
+  "finding": "DRAFTS-1",
+  "static_evidence": [
+    "Per-reader generation is checked by the actual active callback; Cancel/Escape, action dialog replacement, profile reload, parking and lifetime drop invalidate it.",
+    "reader_running is retained until the matching completion message. A single latest-only PendingRead replaces older queued closures and pins the initiating Profile context. Stale messages cannot publish.",
+    "ForecastCompletion ticket increments synchronously before connections::spawn; the ticket lives around the full actual remote::exec call rather than the15-second caller wait. Nested cleanup workers inherit scope and acquire independent tickets before their parents release.",
+    "A replacement starts only when reader_running is None and the previous completion scope has no outstanding tickets; repaint polling checks actual ownership rather than an assumed transport deadline.",
+    "Original snapshot/recovery content algorithms, raw index semantics, path checks, stale file/index/ref guards and retention CAS are unchanged. The only core context edits add cancellable config reads and tracked remote cleanup spawning."
+  ],
+  "evidence_validation": "All current manifest source/log hashes match3cef22c. All27 named regression cases appear passing in supplied full816pass+3ignored+0filtered log. Evidence head9da1ac5 only adds validation documents/logs.",
+  "planned_confirmation": [
+    "Run retained private test binary: completion ownership1 case; repo::drafts lifecycle6 cases; git::drafts core19 cases; pre-operation snapshot1 case.",
+    "No Cargo rebuild/full rerun, real remote/account/credentials, OS process experiments or CI. Source stays read-only."
+  ],
+  "binary": "/workspace/work/working-drafts/target/debug/deps/gitcraft-31822f5b138c0fe8",
+  "ci": "Not used per explicit user policy."
+}
