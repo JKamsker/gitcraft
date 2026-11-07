@@ -214,6 +214,9 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
+        if !shown {
+            self.discard_decrypted();
+        }
         // Changes on disk, debounced. Taken in before the finished work, so that a reload
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
@@ -223,6 +226,9 @@ impl RepoTab {
             }
         }
 
+        if self.fs_pending.is_some() {
+            self.discard_decrypted();
+        }
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }

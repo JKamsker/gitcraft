@@ -99,6 +99,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
             "In a Markdown file's diff, the eye button renders it: its changes block by block, or with File the whole file.",
             "Syntax in a diff compares syntax with Difftastic (difft), installed where the repository is. Changed tokens stand out through reindentation and wrapping. Turn off Syntax to stage or see formatting edits; unsupported languages, parse errors and tool errors show the patch with a note.",
+            "SOPS files offer Show decrypted: a private read-only comparison through SOPS 3.10+ and keys on the repository's machine. It distinguishes content changes from recipient/wrapped-key changes and re-encryption. Plaintext stays only in the active view and pipes, never in files, logs, settings or shared caches. Closing, refreshing, switching modes/tabs or starting an operation discards it. Use Encrypted patch / cancel to stage the encrypted patch. Missing tools/keys and limits show a safe explanation; tool diagnostics, copying and comments are unavailable. Each side must be UTF-8 within 2 MiB/20,000 lines/8,192 characters per line; each command has 20 seconds. YAML aliases/anchors are unsupported.",
             "Right-click a pull request and choose Open in worktree to work on its branch in a worktree of its own, made for it when there is none.",
             "A terminal panel with tabs, in the repository's folder.",
         ],

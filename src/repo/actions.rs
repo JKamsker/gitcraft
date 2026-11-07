@@ -127,6 +127,7 @@ pub(crate) enum Action {
     DiffRendered(bool),
     /// Read syntax changes through Difftastic; staging stays in the patch.
     DiffStructural(bool),
+    DiffDecrypted(bool),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// The commit pane lists every file of the commit, or only those it changed.

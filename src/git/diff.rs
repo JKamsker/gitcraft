@@ -110,9 +110,10 @@ pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, 
 }
 
 /// What makes git print a plain patch.
-const PATCH_ARGS: [&str; 4] = [
+const PATCH_ARGS: [&str; 5] = [
     "--no-color",
     "--no-ext-diff",
+    "--no-textconv",
     "--src-prefix=a/",
     "--dst-prefix=b/",
 ];
