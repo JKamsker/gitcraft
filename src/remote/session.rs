@@ -142,6 +142,67 @@ pub fn exec(host: &Host, req: &Request) -> Result<Output, String> {
     }
 }
 
+/// A dedicated pipe-only command for private views. Unlike `exec`, this never frames
+/// output through the persistent shell's temporary files. Input stays on stdin; the
+/// application deadline/cancellation closes the transport and its local descendants.
+pub(crate) fn private_output(
+    host: &Host,
+    req: &Request,
+    active: &dyn Fn() -> bool,
+    max: u64,
+) -> Result<Output, String> {
+    super::ui_guard::off_ui_thread("private comparison")?;
+    let marker = format!("__GITCRAFT_PRIVATE_{}__\n", nonce());
+    let script = private_script(req, &marker);
+    let (mut command, attempt) = shell_command(host);
+    command.args(private_args(host, &script));
+    crate::shell_path::apply(&mut command);
+    let out = crate::bounded_process::run_input(
+        command,
+        req.stdin.clone(),
+        active,
+        req.time_limit(),
+        max + 4096,
+        32768,
+    )?;
+    let start = out
+        .stdout
+        .windows(marker.len())
+        .position(|s| s == marker.as_bytes())
+        .ok_or("Private comparison transport did not start")?
+        + marker.len();
+    if let Some(attempt) = attempt {
+        attempt.connected();
+    }
+    let stdout = out.stdout[start..].to_vec();
+    if stdout.len() as u64 > max {
+        return Err("Private comparison output exceeded its limit".into());
+    }
+    Ok(Output {
+        code: out.status.code().unwrap_or(-1),
+        stdout,
+        stderr: out.stderr,
+    })
+}
+
+fn private_script(req: &Request, marker: &str) -> String {
+    format!(
+        "{MORE_PATH}\nprintf '%s' {}\n{}",
+        sh_quote(marker),
+        inline(req, "")
+    )
+}
+
+fn private_args(host: &Host, script: &str) -> [String; 2] {
+    [
+        "-c".to_owned(),
+        match host {
+            Host::Ssh(_) => sh_quote(script),
+            Host::Wsl(_) => script.to_owned(),
+        },
+    ]
+}
+
 /// Stops the process `pid` on `host` (a command that hung, or the shell it hung in) and
 /// everything it started, however deep, in the background: politely, then for good. The
 /// processes are listed first, as one stopped leaves what it started to another parent.

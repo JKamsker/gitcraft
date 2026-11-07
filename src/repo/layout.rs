@@ -14,6 +14,9 @@ impl RepoTab {
         // Shown: its first read can't wait any more.
         self.start_deferred(&ctx);
         self.poll(&ctx);
+        if self.conflict.is_some() || self.rebase.is_some() {
+            self.discard_decrypted();
+        }
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()

@@ -24,8 +24,10 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial =
-            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
+        let partial = matches!(&view.data, Some(Ok(d)) if d.partial)
+            && idle
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         let settings = Settings::get(ui.ctx());
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
@@ -44,6 +46,24 @@ impl RepoTab {
             markdown,
             acts,
         );
+
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(egui::RichText::new("SOPS encrypted file").color(t.text_dim));
+                if view.encrypted.enabled {
+                    if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
+                    if ui.button("Retry decryption").clicked() { acts.push(Action::DiffDecrypted(true)); }
+                } else if ui.button("Show decrypted").on_hover_text("Use SOPS and keys on the repository's machine. Plaintext is shown only in this view and is discarded when you leave it.").clicked() {
+                    acts.push(Action::DiffDecrypted(true));
+                }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                super::encrypted::show(ui, &mut view.encrypted);
+            }
+            return;
+        }
 
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
@@ -201,6 +221,7 @@ impl RepoTab {
                         }
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -210,7 +231,11 @@ impl RepoTab {
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }
-                        if !as_file && !rendered && !view.structural.enabled {
+                        if !as_file
+                            && !rendered
+                            && !view.structural.enabled
+                            && !view.encrypted.enabled
+                        {
                             view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                             ui.add_space(8.0);
                             change_steps(ui, acts);

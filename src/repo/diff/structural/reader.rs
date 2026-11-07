@@ -17,7 +17,10 @@ pub(super) fn load(repo: &Path, key: &DiffKey) -> Result<Structural, String> {
     model::parse(&json, &old, &new)
 }
 
-pub(super) fn read_sides(repo: &Path, key: &DiffKey) -> Result<(String, String), String> {
+pub(in crate::repo::diff) fn read_sides(
+    repo: &Path,
+    key: &DiffKey,
+) -> Result<(String, String), String> {
     let (old, new) = locations(repo, key)?;
     Ok((read(repo, old)?, read(repo, new)?))
 }

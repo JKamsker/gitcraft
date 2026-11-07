@@ -227,6 +227,7 @@ impl RepoTab {
             Action::DiffAsFile(on) => self.show_diff_as_file(on, ctx),
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
             Action::DiffStep(delta) => {
                 let rendered = self.diff_rendered
                     && self

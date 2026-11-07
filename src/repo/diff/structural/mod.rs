@@ -1,7 +1,7 @@
 //! Opt-in syntax comparison through Difftastic. The patch remains the source for staging.
 
 mod model;
-mod reader;
+pub(in crate::repo::diff) mod reader;
 #[cfg(test)]
 mod tests;
 mod tool;
@@ -45,6 +45,7 @@ impl State {
 
 impl RepoTab {
     pub(in crate::repo) fn show_diff_structural(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         let Some(view) = &mut self.diff else { return };
         view.structural.enabled = on;
         view.chosen.clear();
