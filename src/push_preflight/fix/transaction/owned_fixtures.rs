@@ -549,12 +549,11 @@ cat >"$root/native-input-$1" || exit 1
 printf '%s\0' "$@" >"$root/native-args-$1" || exit 1
 if [ "$1" = prepared ]; then
     branch=0
-    head=0
     while read -r before after reference; do
         [ "$before" = {old} ] && [ "$after" = {new} ] || exit 1
-        case "$reference" in refs/heads/main) branch=$((branch+1)) ;; HEAD) head=$((head+1)) ;; *) exit 1 ;; esac
+        case "$reference" in refs/heads/main) branch=$((branch+1)) ;; *) exit 1 ;; esac
     done <"$root/native-input-$1"
-    [ "$branch" = 1 ] && [ "$head" = 1 ] || exit 1
+    [ "$branch" = 1 ] || exit 1
     [ "$(git symbolic-ref -q HEAD)" = refs/heads/main ] || exit 1
     [ "$(git rev-parse --verify HEAD)" = {old} ] || exit 1
     case {case} in

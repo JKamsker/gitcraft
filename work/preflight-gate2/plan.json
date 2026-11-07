@@ -64,6 +64,7 @@
       "native-detach-head",
       "native-prelock-switch"
     ],
-    "scope": "Owned refs only, no checkout; exact expected main+HEAD old/new hook stdin, HEAD before/after, prepared/committed ACK; attempted symbolic/detached changes must hit native HEAD lock. Same-tip switch before transaction must refuse while preserving it."
+    "scope": "Owned refs only, no checkout; exact expected main+HEAD old/new hook stdin, HEAD before/after, prepared/committed ACK; attempted symbolic/detached changes must hit native HEAD lock. Same-tip switch before transaction must refuse while preserving it.",
+    "actual_native_stdin": "Observed native update HEAD supplies only real branch update (HEAD reflog-only record excluded); diagnostic requires exact expected branch line and symbolic HEAD before/after, rather than a fictitious HEAD stdin line."
   }
 }
