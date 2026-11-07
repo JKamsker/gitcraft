@@ -4,6 +4,7 @@ use super::{Outcome, buttons, title};
 use crate::repo::{Action, Refresh};
 use crate::theme::Tokens;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn review(
     ui: &mut egui::Ui,
     remote: &str,
@@ -11,6 +12,7 @@ pub(super) fn review(
     targets: &[(String, String)],
     target: &mut String,
     topic: &mut String,
+    skip_hooks: bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
     title(
@@ -43,13 +45,21 @@ pub(super) fn review(
         .find(|(name, _)| name == target)
         .map(|(_, sha)| sha.as_str())
         .unwrap_or_default();
-    let plan = crate::gerrit::review_ops(remote, target, topic, head, base);
+    let mut plan = crate::gerrit::review_ops(remote, target, topic, head, base);
     ui.add_space(6.0);
     if targets.is_empty() {
         ui.label(egui::RichText::new("Fetch the remote's target branches first.").color(t.warning));
     } else {
         ui.label(format!("{remote}: {head} → refs/for/{target}"));
         ui.label(egui::RichText::new("Checks every commit above the fetched target for a unique Change-Id. Amend a change, keep its Change-Id, then push here again to upload a new patch set.").color(t.text_dim));
+    }
+    if skip_hooks {
+        ui.label("The pre-push hook will be skipped for this submission.");
+        if let Ok(steps) = &mut plan
+            && let Some(push) = steps.last_mut()
+        {
+            push.insert(1, "--no-verify".to_owned());
+        }
     }
     if !crate::gerrit::valid_topic(topic) {
         ui.label(

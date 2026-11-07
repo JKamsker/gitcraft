@@ -220,14 +220,26 @@ pub(crate) fn valid_topic(topic: &str) -> bool {
 pub(crate) const CHECK: &str = "\0gerrit-review";
 pub(crate) const AMEND: &str = "\0gerrit-amend";
 
-pub(crate) fn amend_args(repo: &Path, message: &str) -> Result<Vec<String>, String> {
-    let message = amended_message(&git::head_message(repo)?, message)?;
-    Ok(vec![
-        "commit".to_owned(),
-        "--amend".to_owned(),
-        "-m".to_owned(),
-        message,
-    ])
+pub(crate) fn amend_args(repo: &Path, args: &[String]) -> Result<Vec<String>, String> {
+    let mut prepared = Vec::new();
+    let mut paragraphs = Vec::new();
+    let mut words = args.iter();
+    while let Some(word) = words.next() {
+        if word == "-m" {
+            paragraphs.push(words.next().ok_or("Missing amend message")?.as_str());
+        } else {
+            prepared.push(word.clone());
+        }
+    }
+    if prepared.first().map(String::as_str) != Some("commit")
+        || !prepared.iter().any(|word| word == "--amend")
+        || paragraphs.is_empty()
+    {
+        return Err("Invalid Gerrit amendment".to_owned());
+    }
+    let message = amended_message(&git::head_message(repo)?, &paragraphs.join("\n\n"))?;
+    prepared.extend(["-m".to_owned(), message]);
+    Ok(prepared)
 }
 
 pub(crate) fn review_ops(

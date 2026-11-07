@@ -222,6 +222,10 @@ impl RepoTab {
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
     /// at the pull when that fails (on conflicts, which are left to resolve).
     pub(super) fn sync(&mut self, ctx: &egui::Context) {
+        if let Some(dialog) = self.review_dialog() {
+            self.dialog = Some(dialog);
+            return;
+        }
         if self.busy_op.is_some() {
             return;
         }

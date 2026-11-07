@@ -533,10 +533,10 @@ pub(super) fn run_steps_counted(
         }
         let args: Vec<&str> = op.iter().map(String::as_str).collect();
         result = (|| {
-            if let [mark, message] = op.as_slice()
+            if let [mark, original @ ..] = op.as_slice()
                 && mark == crate::gerrit::AMEND
             {
-                let prepared = crate::gerrit::amend_args(path, message)?;
+                let prepared = crate::gerrit::amend_args(path, original)?;
                 let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
                 return run_step(path, &args, creds, quiet, control);
             }

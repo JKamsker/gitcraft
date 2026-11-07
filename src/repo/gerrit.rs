@@ -43,6 +43,7 @@ impl RepoTab {
             targets,
             target,
             topic: String::new(),
+            skip_hooks: false,
         })
     }
 
@@ -142,7 +143,13 @@ mod tests {
         // A new patch set has the same Change-Id, but a different commit object. Delete the
         // fixture's ref: Gerrit consumes refs/for and doesn't keep this as an ordinary ref.
         assert!(git::run(Some(&receiver), &["update-ref", "-d", "refs/for/main"]).is_ok());
-        let amend = vec![vec![AMEND.to_owned(), "Revised review".to_owned()]];
+        let amend = vec![vec![
+            AMEND.to_owned(),
+            "commit".to_owned(),
+            "--amend".to_owned(),
+            "-m".to_owned(),
+            "Revised review".to_owned(),
+        ]];
         assert!(run_steps(&path, &amend, OpKind::plain(), None).0.is_ok());
         let second = git::head(&path);
         assert_ne!(first, second);
@@ -226,5 +233,139 @@ mod flow_tests {
                 .collect::<Vec<_>>(),
             vec!["main", "stable"]
         );
+    }
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::git;
+    use std::time::{Duration, Instant};
+
+    fn settle(tab: &mut RepoTab, ctx: &egui::Context) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            tab.poll(ctx);
+            if tab.busy_op.is_none() && !tab.loading {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            tab.busy_op.is_none() && !tab.loading,
+            "background operation did not finish"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn amend_preserves_signoff_and_skips_only_the_requested_commit_hooks() -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let path =
+            std::env::temp_dir().join(format!("gitcraft-gerrit-options-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+        let run = |args: &[&str]| git::run(Some(&path), args);
+        for args in [
+            vec!["init", "-q", "-b", "main"],
+            vec!["config", "user.name", "Review Author"],
+            vec!["config", "user.email", "review@example.invalid"],
+            vec!["config", "commit.gpgSign", "false"],
+            vec![
+                "remote",
+                "add",
+                "origin",
+                "https://gerrit.example.invalid/project",
+            ],
+            vec![
+                "commit",
+                "--allow-empty",
+                "-qm",
+                "Original\n\nChange-Id: I0123456789abcdef0123456789abcdef01234567",
+            ],
+        ] {
+            run(&args)?;
+        }
+        let hook = path.join(".git/hooks/pre-commit");
+        std::fs::write(&hook, "#!/bin/sh\nexit 1\n").map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(path.clone(), &ctx);
+        tab.reload(&ctx);
+        settle(&mut tab, &ctx);
+        assert!(tab.gerrit.is_some());
+        tab.dco_act(crate::repo::dco::DcoAct::SetSignOff(true), &ctx);
+        tab.amend = true;
+        tab.commit_summary = "Amended".to_owned();
+        tab.commit_body = "Keep this paragraph.".to_owned();
+        tab.skip_hooks.commit = true;
+        let before = git::head(&path);
+        tab.commit(&ctx);
+        settle(&mut tab, &ctx);
+        let amended = git::head(&path);
+        assert_ne!(amended, before, "{:?}", tab.status);
+        assert!(!tab.skip_hooks.commit);
+        let message = git::head_message(&path)?;
+        assert!(message.contains("Keep this paragraph."));
+        assert!(
+            message.contains("Signed-off-by: Review Author <review@example.invalid>"),
+            "{message}"
+        );
+        assert_eq!(message.matches("Change-Id:").count(), 1);
+        assert_eq!(
+            crate::gerrit::change_id(&message)?,
+            "I0123456789abcdef0123456789abcdef01234567"
+        );
+        tab.amend = true;
+        tab.commit_summary = "This one must run its hook".to_owned();
+        tab.commit(&ctx);
+        settle(&mut tab, &ctx);
+        assert_eq!(git::head(&path), amended);
+        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        drop(tab);
+        let _ = std::fs::remove_dir_all(path);
+        Ok(())
+    }
+
+    #[test]
+    fn sync_and_skipped_push_require_review_confirmation() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/gerrit-review-actions".into(), &ctx);
+        tab.gerrit = Some(crate::gerrit::Server {
+            remote: "origin".into(),
+            web: "https://gerrit.example.invalid".into(),
+            project: "project".into(),
+        });
+        tab.refs.head = "a".repeat(40);
+        tab.sync(&ctx);
+        assert!(matches!(
+            tab.dialog,
+            Some(Dialog::GerritReview {
+                skip_hooks: false,
+                ..
+            })
+        ));
+        assert!(tab.busy_op.is_none());
+        assert!(tab.last_op.is_none());
+        tab.push_skipping_hooks(&ctx);
+        assert!(matches!(
+            tab.dialog,
+            Some(Dialog::GerritReview {
+                skip_hooks: true,
+                ..
+            })
+        ));
+        assert!(tab.busy_op.is_none());
+        assert!(tab.last_op.is_none());
+        assert!(
+            !tab.additional_palette_items()
+                .iter()
+                .any(|(_, _, a)| matches!(a, Action::Sync))
+        );
+        assert!(!tab.palette_items().iter().any(|i| matches!(
+            i.run,
+            crate::repo::palette::PaletteRun::Action(Action::Sync)
+        )));
     }
 }

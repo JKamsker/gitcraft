@@ -556,7 +556,12 @@ impl RepoTab {
                 Action::Sync,
             ),
             (
-                "Push, skipping hooks".into(),
+                if self.gerrit.is_some() {
+                    "Push for review, skipping hooks"
+                } else {
+                    "Push, skipping hooks"
+                }
+                .into(),
                 "--no-verify".into(),
                 Action::PushSkippingHooks,
             ),
@@ -566,6 +571,9 @@ impl RepoTab {
                 Action::OpenSparse,
             ),
         ];
+        if self.gerrit.is_some() {
+            items.retain(|(_, _, action)| !matches!(action, Action::Sync));
+        }
         items.extend(
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );

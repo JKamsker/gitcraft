@@ -43,6 +43,7 @@ pub enum Dialog {
         targets: Vec<(String, String)>,
         target: String,
         topic: String,
+        skip_hooks: bool,
     },
     HistoryLoading(u64),
     DownloadHistory {
@@ -498,7 +499,8 @@ impl RepoTab {
                     targets,
                     target,
                     topic,
-                } => gerrit::review(ui, remote, head, targets, target, topic),
+                    skip_hooks,
+                } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks),
                 Dialog::HistoryLoading(_) => {
                     ui.label("Checking whether file contents need downloading…");
                     ui.add(crate::spinner::Spinner::new());

@@ -273,12 +273,7 @@ impl RepoTab {
         }
         let mut steps = Vec::new();
         if self.amend && self.gerrit.is_some() {
-            let message = if body.is_empty() {
-                summary.to_owned()
-            } else {
-                format!("{summary}\n\n{body}")
-            };
-            commit = vec![crate::gerrit::AMEND.to_owned(), message];
+            commit.insert(0, crate::gerrit::AMEND.to_owned());
             steps.push(super::operations::expect_ref_at("HEAD", &self.refs.head));
         }
         // Nothing staged: commit everything, like "Stage all and commit" (an amend with
