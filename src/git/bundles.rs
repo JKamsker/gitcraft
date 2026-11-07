@@ -402,7 +402,7 @@ fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
         if prerequisite {
             prerequisites.push(r);
         } else {
-            if !names.insert(name) {
+            if !names.insert(name.to_owned()) {
                 return Err("Duplicate advertised bundle ref".into());
             }
             refs.push(r);
