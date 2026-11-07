@@ -1,0 +1,243 @@
+{
+  "feature": "Issue #44 standalone gitcraft difftool / mergetool and arbitrary two-file comparison",
+  "status": "CORRECTED IMPLEMENTATION; exact local Linux gates PASS; independent re-review PENDING; native Windows/macOS NOT RUN; NO CI",
+  "head": "9bb73a3256573a68f665f09cc390def05ba2f139",
+  "base": "c56d0502d7deb59ba85ac8a807c59a8d68729874",
+  "tree": "36df8a02e1ce88ad5b78cda5cec4770d39664b2b",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "remote_branch_sha": "9bb73a3256573a68f665f09cc390def05ba2f139",
+  "full_summary": {
+    "library_passed": 842,
+    "executable_integration_passed": 3,
+    "aggregate_passed": 845,
+    "ignored": 3,
+    "failures": 0,
+    "filtered": 0,
+    "new_feature_tests_passed": 28
+  },
+  "commands": [
+    "cargo fmt --check",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked standalone::",
+    "env -u GITCRAFT_TEST_SSH -u GITCRAFT_TEST_WSL cargo test --locked"
+  ],
+  "environment": {
+    "private_target": "/workspace/work/standalone-file-tools/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "real_difftastic": "/workspace/work/difft-bin",
+    "optional_live_ssh_wsl": "unset",
+    "ci": "not used"
+  },
+  "correction": {
+    "finding": "STANDALONE-1 from exact7fb independent review FAIL P2",
+    "prior_review": "/workspace/work/review-standalone-file-tools/docs/validation/independent-standalone-7fb68f2/review.json",
+    "interim_unit": "d4648b8990a0122a0332512e81854386b623f6b5",
+    "interim_gate_binding": "/workspace/work/standalone-d4648b8.json",
+    "fix": "Bounded exact access-policy snapshots on output/candidate/displaced files; verify prepared policy against captured source; compare original before move, after displacement, before publication and before success. No ctime comparison across own rename. Late policy drift never reports successful save; retained original and current result remain recoverable.",
+    "regressions": [
+      "Linux named-user POSIX ACL read-to-none tightening with unchanged ordinary Stamp at BeforeMove/AfterMove/BeforeInstall/AfterInstall; real Output::save_with returns error; tightened original policy retained/restored",
+      "Linux xattr-only edit since opening and after candidate preparation refuses save",
+      "Windows helper snapshot mode command/script recording only, exits before SetAccessControl",
+      "Owned icacls DACL mutation fixture recording checks4literal argv,no recursion,no shell; native execution NOT RUN",
+      "Native macOS clone/ACL preservation and ACL-drift fixture source added; NOT RUN"
+    ]
+  },
+  "dependency_inventory": {
+    "exacl": {
+      "version": "0.13.0",
+      "target": "macOS only",
+      "default_features": false,
+      "registry_checksum": "8de9e551ced9d700a31dacb8b168129640240fcd7a279a3fa4d59608b84ebcae",
+      "license": "MIT",
+      "published": "2026-05-05",
+      "repository": "https://github.com/byllyfish/exacl",
+      "purpose": "Safe native ACL read wrapper only; no bindgen/new app unsafe/CLI helper; all4transitive deps already locked",
+      "native_compilation_or_execution": "NOT RUN on Linux"
+    }
+  },
+  "limits": [
+    "2 MiB per file/default stream and result;20,000 text input lines;200 editable conflict blocks;whole-file byte fallback",
+    "Installed Git supporting --no-lazy-fetch required for text alignment/computed merge; no repository/profile/filter/forge/decryption fallback",
+    "Missing input paths error except /dev/null or bare Windows NUL empty sentinel; output may not alias an input or be a link/device",
+    "Save requires safe hardlinks; refuses unsupported filesystem/platform metadata operations before moving original",
+    "Previous result intentionally retained in sibling recovery directory; late writes remain recoverable; brief destination absence is documented",
+    "Git registration is explicit local global-config write in product; development wrote owned temporary config only",
+    "No real services/credentials/user merges/network writes; no CI and no PR",
+    "Native macOS/Windows target compilation and execution NOT RUN; Linux does not compile cfg-only native paths/exacl dependency. Native fixtures await static protocol approval and final-stage platform gates.",
+    "Windows named streams and native attributes beyond ARCHIVE/NORMAL refused; shipped Windows PowerShell required. Descriptor snapshot branch and test-only owned icacls argv need independent static recheck before native execution.",
+    "macOS ACLs capped128entries/1024-byte principal names; native xattrs capped1MiB. Target-specific exacl reader uses no-follow path API with retained file identity checks before/after; native file clone must preserve snapshot policy or saving refuses.",
+    "A late metadata change detected after publication returns an error and retains both current result and original policy for recovery; no blind overwrite rollback."
+  ],
+  "gates": {
+    "fmt": {
+      "file": "fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "results": [],
+      "pass": true
+    },
+    "clippy": {
+      "file": "clippy.log",
+      "sha256": "001d78ad00344dd612c4be03d3f51be178707ffc70daa696f849bad1405fd57f",
+      "results": [],
+      "pass": true
+    },
+    "targeted": {
+      "file": "targeted.log",
+      "sha256": "7a734242299dbc060be140060472bed52833dcc5dad76ad6bd4385d2a336a24a",
+      "results": [
+        "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 820 filtered out; finished in 0.19s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s"
+      ],
+      "pass": true
+    },
+    "test": {
+      "file": "test.log",
+      "sha256": "c316b5fd6a1e5e6e2a109040b7f4f9f91c68e6c6559fec587611439f8fa32b58",
+      "results": [
+        "test result: ok. 842 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 28.90s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "pass": true
+    }
+  },
+  "source_binding": {
+    "file": "source-sha256.json",
+    "sha256": "99a72c7b3d13475df068c1caf303211c94ff83ca69e11ecb491b77868a380cfd",
+    "files": 350
+  },
+  "test_names": {
+    "file": "test-names.json",
+    "sha256": "69e0402da918a65d047a2049986d69156b154d2377ffcd2870cc9fad086653df"
+  },
+  "feature_tests": [
+    {
+      "name": "standalone::cli::tests::file_modes_have_exact_arity_and_option_looking_names_stay_native",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::cli::tests::non_utf8_arguments_are_not_reconstructed_from_display_strings",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::files::tests::native_byte_paths_and_explicit_input_links_are_read_only",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::files::tests::native_snapshots_keep_binary_bytes_detect_edits_and_bound_reads",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::binary_whole_side_choices_preserve_bytes_and_stale_inputs_refuse_save",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::existing_result_is_kept_and_computed_conflicts_require_a_choice",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::nonoverlapping_three_way_merge_preserves_the_missing_final_newline",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::model::tests::file_modes_work_under_a_profile_error_without_repository_fallback",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::permissions::tests::edited_results_keep_bounded_user_metadata_and_executable_mode_without_privileged_bits",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::registered_shell_commands_pass_literal_native_file_paths_and_propagate_status",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::isolated_global_registration_preserves_relative_override_meaning",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::destination_drift_and_concurrent_creators_are_preserved_without_success",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::registration_settings_do_not_write_until_the_user_clicks_the_concrete_action",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::missing_outputs_install_create_only_aliases_and_read_only_outputs_are_refused",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::explicit_save_retains_the_old_inode_and_never_writes_inputs",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::swapped_parents_and_output_links_never_redirect_writes",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::save::tests::xattr_only_drift_since_open_or_after_copy_is_not_a_successful_save",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::registration::tests::explicit_temp_config_registration_keeps_unrelated_defaults_and_supports_opt_in",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_diff_close_succeeds_but_unsaved_merge_close_cancels_and_load_error_is_distinct",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_result_editor_and_conflict_choice_save_exact_bytes_with_success",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::windows_metadata::fixture_recording_tests::owned_acl_fixture_records_literal_single_file_arguments_without_recursion",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::windows_metadata::tests::metadata_protocol_records_only_constant_script_and_literal_native_path_data",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::actual_save_refuses_changed_destination_and_reports_nonzero_without_overwrite",
+      "result": "ok"
+    },
+    {
+      "name": "standalone::ui::tests::hostile_profile_cannot_redirect_the_standalone_background_ui",
+      "result": "ok"
+    },
+    {
+      "name": "native_non_utf8_file_arguments_never_panic_in_utf8_helper_dispatch",
+      "result": "ok"
+    },
+    {
+      "name": "malformed_native_helper_fields_fail_closed_instead_of_opening_a_repository",
+      "result": "ok"
+    },
+    {
+      "name": "help_and_usage_exit_without_repository_profile_or_display_fallback",
+      "result": "ok"
+    }
+  ],
+  "executed_artifact_sha256": {
+    "target/debug/deps/standalone_cli-f55959dae1e687f5": "c83848b73c725dfaa441c9dcbd10031e902f82fefe6ea5b6c7a54b2ba60dba88",
+    "target/debug/gitcraft": "1ad5f55cfea7e25118428a862764fd827ff7e789e5ea3e1eda287bc2ef65539d",
+    "target/debug/deps/gitcraft-cdb92a3e5c63a8e6": "5732349bfc9d2958aeb94dfee44b8b922fa2ed01371942fe0e366743aa2edc3a",
+    "target/debug/deps/gitcraft-762977eb2acd9c77": "ac13d18072200a59f81fb4e73e3ad7d78b7b5e3757552d78cf28d21ae6265768"
+  },
+  "review_inventory": [
+    "Linux exact ACL/xattr capture; prepared/captured equivalence; pre-move/displaced/before-publication/after-publication policy guards; rename ctime deliberately excluded",
+    "Actual Linux ACL-only reduction at all4transaction phases and xattr-only since-open/after-copy regressions PASS",
+    "Windows read-mode constant-script branch returns bounded base64 SDDL before SetAccessControl; command paths remain native environment data; recording-only test PASS",
+    "Test-only Windows icacls fixture uses absolute shipped executable, one exclusively owned temp file,4literal arguments/no shell/no recursion; Linux recording-only control PASS. Native fixture NOT RUN; static protocol recheck required first.",
+    "macOS-only exacl0.13.0 safe reader, no-follow path and retained identity checks, bounded xattrs/file flags and safe native clone. Native clone/ACL-only-drift fixture source included; compilation/execution NOT RUN."
+  ]
+}
