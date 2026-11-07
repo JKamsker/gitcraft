@@ -1,0 +1,72 @@
+{
+  "gate": "Gate1 recording-only; root authorized after STATIC_PASS8b8b9b9",
+  "status": "PLAN_PRESERVED_BEFORE_EXECUTION",
+  "reviewed_commit": "8b8b9b97fca698daf4a6bc26a279fe3a171cda2b",
+  "review_report_sha256": "64679b2ce94e44376dc8a63761ff1d316509b611c4923fa4a4f3351b34d7471b",
+  "compiled_source_commit": "490a9e7c3b579e24718ffdcb446b86c6f1b2c66f",
+  "application_source_tree": "8526dee9183d9709ff1c0e7e50ef13e9aaaf8b53",
+  "compiler_fix": {
+    "description": "Only positional9argument script inputs became HookScript fields immediately destructured; same production/test values, no protocol logic changes.",
+    "diff_file": "compiler-only.diff",
+    "diff_sha256": "c72c6df61bd5177fa831f27987a7936fef5a2a017beff9fdcc66f4d1f890281e",
+    "reviewed_script_generation_body_byte_identical": true,
+    "script_body_sha256": "7daf51735988ec4732783fa242507b12f07a1df8b0f4dcfd5722f5a68a6dbf37"
+  },
+  "compiler": {
+    "private_target": "/workspace/work/push-preflight/target",
+    "incremental": false,
+    "jobs": 2,
+    "clippy": "PASS --locked --all-targets -- -D warnings",
+    "build": "PASS cargo test --locked --no-run --message-format=json; no tests executed",
+    "artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///workspace/work/push-preflight#gitcraft@0.3.4",
+      "manifest_path": "/workspace/work/push-preflight/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "gitcraft",
+        "src_path": "/workspace/work/push-preflight/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8"
+      ],
+      "executable": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+      "fresh": false
+    },
+    "binary": "/workspace/work/push-preflight/target/debug/deps/gitcraft-31822f5b138c0fe8",
+    "binary_sha256": "aec397e715249612815e45011f11fa56427ce059a56a07bce9877d0d1e34e36c"
+  },
+  "tests": [
+    "push_preflight::fix::transaction::tests::rotated_split_index_dependency_is_resolved_from_the_saved_index",
+    "push_preflight::fix::transaction::tests::synthetic_capability_versions_refuse_before_user_dispatch",
+    "push_preflight::fix::transaction::tests::missing_backend_acknowledgement_cannot_qualify_user_dispatch",
+    "push_preflight::fix::transaction::tests::synthetic_uncertain_lifecycle_always_retains_owned_evidence",
+    "push_preflight::fix::transaction::tests::recording_hook_changes_are_refused_before_checkout_and_keep_external_bytes"
+  ],
+  "execution": "Direct exact compiled library-test executable, one named test per invocation, --exact --test-threads=1 --nocapture; unset GITCRAFT_TEST_SSH/GITCRAFT_TEST_WSL. No Cargo default filters/fullsuite.",
+  "prohibited": [
+    "Real Git reference protocol",
+    "Actual repositories/hosts/keys or service calls",
+    "Host-wide process/PID selectors/signals or watchdogs",
+    "CI dispatch/use/poll/wait",
+    "Gate2 real owned-repository fixtures until root accepts Gate1"
+  ],
+  "source_binding": "Any subsequent evidence-only commit must keep src tree and build inputs identical to compiled source commit. Test binary itself is not committed; its hash/path/compiler artifact are bound above."
+}
