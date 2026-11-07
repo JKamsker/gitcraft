@@ -168,6 +168,16 @@ fn resolve_inner(
         let (name, email) = line.rsplit_once('<').ok_or("Invalid mapped identity")?;
         mapped.insert(identity, (name.trim_end().to_owned(), email.to_owned()));
     }
+    apply_mapping(records, &mapped, active, 64 * 1024 * 1024)
+}
+
+fn apply_mapping(
+    records: &mut [Record],
+    mapped: &BTreeMap<(String, String), (String, String)>,
+    active: &dyn Fn() -> bool,
+    max_bytes: usize,
+) -> Result<(), String> {
+    let mut remaining = max_bytes;
     for record in records {
         if !active() {
             return Err("Analysis cancelled".into());
@@ -175,8 +185,49 @@ fn resolve_inner(
         let (name, email) = mapped
             .get(&(record.name.clone(), record.email.clone()))
             .ok_or("Missing mapped author")?;
+        // A tiny raw identity may map to a long canonical name. Bound the
+        // cumulative expansion before cloning it into every commit record.
+        let cost = name
+            .len()
+            .checked_add(email.len())
+            .ok_or("Mapped author size overflow")?;
+        remaining = remaining.checked_sub(cost).ok_or_else(||format!("Expanded mapped author metadata exceeds the {max_bytes} byte allocation budget; scan fewer commits"))?;
         record.name = name.clone();
         record.email = email.clone();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn canonical_identity_expansion_refuses_before_cloning_every_record() -> Result<(), String> {
+        let day = super::super::Day::parse("2026-11-08").ok_or("date")?;
+        let mut records: Vec<_> = (0..512)
+            .map(|_| Record {
+                hash: String::new(),
+                name: "Raw".into(),
+                email: "old@test".into(),
+                author: day,
+                committer: day,
+                subject: String::new(),
+                paths: Default::default(),
+            })
+            .collect();
+        let mapped = BTreeMap::from([(
+            ("Raw".into(), "old@test".into()),
+            ("N".repeat(16_384), "canonical@test".into()),
+        )]);
+        assert!(
+            apply_mapping(&mut records, &mapped, &|| true, 32_768)
+                .is_err_and(|e| e.contains("allocation budget"))
+        );
+        assert_eq!(records.iter().filter(|r| r.name.len() > 100).count(), 1);
+        assert!(
+            apply_mapping(&mut records[1..], &mapped, &|| false, 32_768)
+                .is_err_and(|e| e.contains("cancelled"))
+        );
+        Ok(())
+    }
 }
