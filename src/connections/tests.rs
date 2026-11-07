@@ -949,33 +949,160 @@ fn actual_profile_ssh_wrapper_auto_probe_preserves_nondefault_port_over_inherite
     ));
     std::fs::write(&profile_file, text).map_err(|e| e.to_string())?;
     let request = serde_json::json!({"key":key,"args_file":args_file,"relay":true});
-    let output = Command::new("git")
-        .current_dir(&repo)
-        .args(["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"])
-        .env("GIT_CONFIG_GLOBAL", &profile_file)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_COUNT", "0")
-        .env("GITCRAFT_SSH_HELPER_FIXTURE", request.to_string())
-        .env("PATH", "/usr/bin:/bin")
-        .env_remove("GIT_SSH_VARIANT")
-        .env_remove("GIT_SSH_COMMAND")
-        .env_remove("GIT_SSH")
-        .env_remove("SSH_AUTH_SOCK")
-        .output()
+    let bin = dir.join("bin");
+    std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
+    let probe_marker = dir.join("ssh-was-started");
+    let real_ssh = crate::shell_path::resolve("ssh");
+    std::fs::write(
+        bin.join("ssh"),
+        format!(
+            "#!/bin/sh\nprintf called > {}\nexec {} \"$@\"\n",
+            shell_quote(&probe_marker.to_string_lossy()),
+            shell_quote(&real_ssh)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::set_permissions(bin.join("ssh"), std::fs::Permissions::from_mode(0o755))
         .map_err(|e| e.to_string())?;
-    assert!(!output.status.success()); // recording ProxyCommand always refuses transport
-    assert_eq!(
-        std::fs::read_to_string(marker)
-            .map_err(|e| format!("{e}: {}", String::from_utf8_lossy(&output.stderr)))?,
-        "2222\n"
-    );
-    let args = std::fs::read(args_file).map_err(|e| e.to_string())?;
-    let args = args
-        .split(|b| *b == 0)
-        .filter_map(|s| std::str::from_utf8(s).ok())
-        .collect::<Vec<_>>();
-    assert!(args.windows(2).any(|pair| pair == ["-p", "2222"]));
-    assert!(!args.contains(&"-P"));
+    let path = std::env::join_paths([bin, PathBuf::from("/usr/bin"), PathBuf::from("/bin")])
+        .map_err(|e| e.to_string())?;
+    for source in ["local", "environment"] {
+        for variant in ["auto", "ssh", "simple", "plink", "putty", "tortoiseplink"] {
+            let _ = std::fs::remove_file(&marker);
+            let _ = std::fs::remove_file(&args_file);
+            let _ = std::fs::remove_file(&probe_marker);
+            let mut setting = Command::new("git");
+            setting
+                .current_dir(&repo)
+                .env("GIT_CONFIG_GLOBAL", &profile_file)
+                .env("GIT_CONFIG_NOSYSTEM", "1");
+            if source == "local" {
+                assert!(
+                    setting
+                        .args(["config", "--local", "ssh.variant", variant])
+                        .status()
+                        .map_err(|e| e.to_string())?
+                        .success()
+                );
+            } else {
+                let _ = setting
+                    .args(["config", "--local", "--unset-all", "ssh.variant"])
+                    .status();
+            }
+            let mut command = Command::new("git");
+            command
+                .current_dir(&repo)
+                .args(["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"])
+                .env("GIT_CONFIG_GLOBAL", &profile_file)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_COUNT", "0")
+                .env("GITCRAFT_SSH_HELPER_FIXTURE", request.to_string())
+                .env("PATH", &path)
+                .env_remove("GIT_SSH_COMMAND")
+                .env_remove("GIT_SSH")
+                .env_remove("SSH_AUTH_SOCK");
+            if source == "environment" {
+                command.env("GIT_SSH_VARIANT", variant);
+            } else {
+                command.env_remove("GIT_SSH_VARIANT");
+            }
+            let output = command.output().map_err(|e| e.to_string())?;
+            assert!(!output.status.success()); // all recording ProxyCommands refuse transport
+            if matches!(variant, "auto" | "ssh") {
+                assert_eq!(
+                    std::fs::read_to_string(&marker).map_err(|e| format!(
+                        "{source}/{variant}: {e}: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    ))?,
+                    "2222\n"
+                );
+                let args = std::fs::read(&args_file).map_err(|e| e.to_string())?;
+                let args = args
+                    .split(|b| *b == 0)
+                    .filter_map(|s| std::str::from_utf8(s).ok())
+                    .collect::<Vec<_>>();
+                assert!(args.windows(2).any(|pair| pair == ["-p", "2222"]));
+                assert!(!args.contains(&"-P"));
+            } else {
+                assert!(
+                    !marker.exists(),
+                    "{source}/{variant}: incompatible dialect reached a transport"
+                );
+                assert!(
+                    !probe_marker.exists(),
+                    "{source}/{variant}: incompatible dialect reached an SSH probe"
+                );
+                assert_eq!(
+                    args_file.exists(),
+                    variant != "simple",
+                    "{source}/{variant}: Git/helper boundary control"
+                );
+            }
+        }
+    }
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
+}
+
+#[test]
+fn profile_openssh_options_refuse_plink_dialects_before_any_probe() {
+    for args in [
+        vec!["-P", "2222", "git@fixture"],
+        vec!["-P2222", "git@fixture"],
+        vec!["-vP2222", "git@fixture"],
+        vec!["-batch", "git@fixture"],
+        vec!["-ssh", "git@fixture"],
+        vec!["--putty", "git@fixture"],
+    ] {
+        let args = args.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        assert!(validate_ssh_options(&args).is_err_and(|e| e.contains("incompatible SSH options")));
+    }
+    for args in [
+        vec![
+            "-G",
+            "-o",
+            "SendEnv=GIT_PROTOCOL",
+            "-p",
+            "2222",
+            "git@fixture",
+            "git-upload-pack '/path'",
+        ],
+        vec![
+            "-vv",
+            "-4",
+            "-F",
+            "/fixture/-P-config",
+            "-o",
+            "ProxyCommand=tool -P 2222",
+            "git@fixture",
+        ],
+        vec!["--", "git@fixture", "-P remote-command-data"],
+    ] {
+        assert!(
+            validate_ssh_options(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_ok()
+        );
+    }
+}
+
+#[test]
+fn profile_openssh_checks_options_after_the_hostname_until_the_command_boundary() {
+    for args in [
+        vec!["git@fixture", "-P", "2222"],
+        vec!["-vv", "git@fixture", "-vP2222"],
+        vec!["git@fixture", "-batch"],
+    ] {
+        assert!(
+            validate_ssh_options(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_err()
+        );
+    }
+    for args in [
+        vec!["git@fixture", "-p", "2222", "git-upload-pack '/x'"],
+        vec!["--", "git@fixture", "-P2222"],
+        vec!["git@fixture", "--", "-P2222"],
+        vec!["git@fixture", "git-upload-pack /x", "-P2222"],
+    ] {
+        assert!(
+            validate_ssh_options(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_ok()
+        );
+    }
 }

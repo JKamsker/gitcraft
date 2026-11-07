@@ -259,7 +259,10 @@ so your config, credentials and hooks apply as usual.
     The generated profile sets `ssh.variant=auto` so an inherited PuTTY configuration cannot
     change the wrapper's port arguments; repository-local transports are still detected by
     Git, and a repository's explicit `ssh.variant` still wins. Ambiguous/control-character
-    identity paths are refused before starting the transport.
+    identity paths are refused before starting the transport. If a repository explicitly
+    selects a PuTTY variant while retaining this OpenSSH helper, incompatible options are
+    refused before probing or connecting; use `ssh.variant=auto`/`ssh`, or that repository's
+    own matching PuTTY command.
   - Background jobs retain the initiating profile's account choices and an immutable config
     snapshot across profile edits, switching or deletion. Git in WSL/SSH repositories keeps
     that machine's own credentials; forge commands run here with this profile's account.

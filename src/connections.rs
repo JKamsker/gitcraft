@@ -760,12 +760,61 @@ pub(crate) fn ssh_helper() -> Option<i32> {
     })
 }
 
+/// Git's Plink dialect is not OpenSSH: notably -P is a port in Plink and a tag in
+/// modern OpenSSH. Validate before even the -G probe, so an explicit local variant
+/// cannot silently change the endpoint. Operand values and the remote command are data.
+fn validate_ssh_options(args: &[String]) -> Result<(), String> {
+    const BAD: &str = "This profile's key uses OpenSSH, but Git supplied incompatible SSH options. Set this repository's ssh.variant to auto or ssh, or use its own matching SSH command.";
+    let mut at = 0;
+    let mut have_host = false;
+    while let Some(arg) = args.get(at) {
+        if arg == "--" {
+            break;
+        }
+        if !arg.starts_with('-') || arg == "-" {
+            // OpenSSH parses options again after its destination, until the remote
+            // command (or --) starts. Plink options there are just as ambiguous.
+            if have_host {
+                break;
+            }
+            have_host = true;
+            at += 1;
+            continue;
+        }
+        if arg == "-batch" {
+            return Err(BAD.into());
+        }
+        let mut chars = arg[1..].chars().peekable();
+        while let Some(option) = chars.next() {
+            if option == 'P' {
+                return Err(BAD.into());
+            }
+            if "1246AaCfGgKkMNnqsTtVvXxYy".contains(option) {
+                continue;
+            }
+            if "BbcDEeFIiJLlmOopQRSWw".contains(option) {
+                if chars.peek().is_none() {
+                    at += 1;
+                    if args.get(at).is_none() {
+                        return Err(BAD.into());
+                    }
+                }
+                break;
+            }
+            return Err(BAD.into());
+        }
+        at += 1;
+    }
+    Ok(())
+}
+
 /// Shared with the helper-boundary fixtures: these are the exact checks and transport
 /// launch used by --gitcraft-profile-ssh, without reading any key contents in gitcraft.
 fn run_ssh(key: &str, rest: &[String]) -> Result<i32, String> {
     if !Path::new(key).is_absolute() || key.chars().any(char::is_control) {
         return Err("Invalid profile SSH key path".to_owned());
     }
+    validate_ssh_options(rest)?;
     let mut inspect = ssh_command(key);
     inspect.arg("-G").args(rest);
     let config = read_private(inspect)?;
