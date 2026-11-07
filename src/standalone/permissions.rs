@@ -13,16 +13,16 @@ pub(super) fn candidate(
     if let Some(original) = original {
         // Deny write/delete while the managed OS helper verifies bounded native
         // metadata and copies exact access rules. File paths remain environment data.
-        let pinned = Snapshot::from_file(
+        let pinned = Snapshot::output(
             &parent.path.join(name),
             parent
                 .stable_source(name)
                 .map_err(|e| format!("Close other writers before saving: {e}"))?,
-            &|| true,
         )?;
         if pinned.handle != original.handle
             || pinned.stamp != original.stamp
             || pinned.bytes != original.bytes
+            || pinned.access != original.access
         {
             return Err("MERGED changed before metadata preparation".into());
         }
@@ -53,25 +53,8 @@ pub(super) fn candidate(
     }
     #[cfg(target_vendor = "apple")]
     if let Some(original) = original {
-        let source = original
-            .handle
-            .as_ref()
-            .ok_or("No source identity")?
-            .as_file();
-        rustix::fs::fclonefileat(
-            source,
-            dir.file(),
-            "replacement",
-            rustix::fs::CloneFlags::NOOWNERCOPY,
-        )
-        .map_err(|e| {
-            format!("This filesystem cannot safely clone the output's ACL/metadata: {e}")
-        })?;
-        let file = dir
-            .rewrite_owned(OsStr::new("replacement"), bytes, original)
-            .map_err(|e| e.to_string())?;
-        unix_mode(&file, source)?;
-        return Ok(file);
+        let _ = original;
+        return Err("Safe concurrent native ACL verification is unavailable on this platform; the existing output was not changed".into());
     }
     #[cfg(not(windows))]
     let _ = (parent, name);

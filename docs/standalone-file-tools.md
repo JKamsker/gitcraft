@@ -40,6 +40,11 @@ MERGED is moved into that recovery directory, then checked again. Installation u
 atomic create-only hard link: a concurrently recreated destination is never overwritten.
 If anything changed, success is refused; restoration is also create-only. This protocol
 can briefly leave the destination absent while its original is safely retained.
+Output snapshots include bounded, exact access-policy metadata: Linux extended attributes
+(including POSIX ACLs) and Windows owner/group/DACL descriptors. The displaced original is
+checked again immediately before publication and before reporting success. Rename-sensitive
+ctime is not used as a substitute for the policy. A late change after publication causes an
+error and preserves both the current result and the original policy in recovery.
 
 The previous file remains at `.gitcraft-merge-<id>/previous` beside MERGED, and its location
 is reported on success or failure. Late writes through old handles go to that retained
@@ -55,8 +60,9 @@ mode bits, capabilities or stale integrity signatures; ownership/group are prese
 saving is refused. Windows uses a constant, profile-free managed OS helper to copy and
 verify the exact owner/group/access descriptor, and requires other writers to release the
 source during preparation. Named streams and unsupported native attributes are refused
-before moving the original. macOS uses native file cloning to preserve
-ACLs and refuses unsupported filesystems. The retained original keeps its original
+before moving the original. Existing-output saves on macOS and other platforms without
+a safe native ACL comparison API are explicitly refused; new outputs and read-only
+comparisons remain available. The retained original keeps its original
 metadata. Permission/metadata failures leave it preserved and do not report success.
 
 ## Git integration

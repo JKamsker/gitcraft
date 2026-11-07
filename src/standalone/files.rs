@@ -51,6 +51,19 @@ impl Stamp {
             attributes: metadata.file_attributes(),
         }
     }
+    pub fn replacement_matches(&self, original: &Self) -> bool {
+        #[cfg(unix)]
+        {
+            self.uid == original.uid
+                && self.gid == original.gid
+                && (self.mode & 0o7777) == (original.mode & 0o777)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = original;
+            true
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -59,6 +72,7 @@ pub(super) struct Snapshot {
     pub bytes: Vec<u8>,
     pub stamp: Option<Stamp>,
     pub handle: Option<Arc<same_file::Handle>>,
+    pub access: Option<super::access::AccessMetadata>,
 }
 impl Snapshot {
     pub fn read(path: &Path, active: &dyn Fn() -> bool) -> Result<Self, String> {
@@ -71,6 +85,7 @@ impl Snapshot {
                 bytes: Vec::new(),
                 stamp: None,
                 handle: None,
+                access: None,
             });
         }
         let file = open_input(path).map_err(|e| format!("Could not open {}: {e}", label(path)))?;
@@ -119,7 +134,26 @@ impl Snapshot {
             handle: Some(Arc::new(
                 same_file::Handle::from_file(file).map_err(|e| e.to_string())?,
             )),
+            access: None,
         })
+    }
+    pub fn output(path: &Path, file: File) -> Result<Self, String> {
+        let before = super::access::read(&file, path)?;
+        let mut snapshot = Self::from_file(path, file, &|| true)?;
+        let handle = snapshot.handle.as_ref().ok_or("No output identity")?;
+        let after = super::access::read(handle.as_file(), path)?;
+        if before != after
+            || snapshot.stamp.as_ref()
+                != Some(&Stamp::new(
+                    &handle.as_file().metadata().map_err(|e| e.to_string())?,
+                ))
+        {
+            return Err(
+                "Output access metadata changed while reading; reopen before saving".into(),
+            );
+        }
+        snapshot.access = Some(after);
+        Ok(snapshot)
     }
     pub fn unchanged(&self) -> Result<bool, String> {
         let now = Self::read(&self.path, &|| true)?;

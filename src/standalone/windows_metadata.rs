@@ -10,7 +10,8 @@ $PSModuleAutoloadingPreference = 'None'
 try {
   $source = [Environment]::GetEnvironmentVariable('GITCRAFT_ACL_SOURCE')
   $target = [Environment]::GetEnvironmentVariable('GITCRAFT_ACL_TARGET')
-  if ([String]::IsNullOrEmpty($source) -or [String]::IsNullOrEmpty($target)) { throw 'Missing metadata paths' }
+  $snapshot = [Environment]::GetEnvironmentVariable('GITCRAFT_ACL_SNAPSHOT') -eq '1'
+  if ([String]::IsNullOrEmpty($source) -or (-not $snapshot -and [String]::IsNullOrEmpty($target))) { throw 'Missing metadata paths' }
   Microsoft.PowerShell.Core\Import-Module ([IO.Path]::Combine($PSHOME, 'Modules\Microsoft.PowerShell.Management\Microsoft.PowerShell.Management.psd1')) -ErrorAction Stop
   Microsoft.PowerShell.Management\Get-Item -LiteralPath $source -Stream '*' -ErrorAction Stop | Microsoft.PowerShell.Core\ForEach-Object {
     if ($_.Stream -ne ':$DATA' -and $_.Stream -ne '$DATA' -and $_.Stream -ne '::$DATA') { throw 'Named data streams cannot be preserved with the bounded save protocol' }
@@ -19,6 +20,10 @@ try {
   $security = [IO.File]::GetAccessControl($source, $sections)
   $descriptor = $security.GetSecurityDescriptorSddlForm($sections)
   if ($descriptor.Length -gt 1048576) { throw 'Access metadata exceeds 1 MiB' }
+  if ($snapshot) {
+    [Console]::Out.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($descriptor)))
+    exit 0
+  }
   $copy = [Security.AccessControl.FileSecurity]::new()
   $copy.SetSecurityDescriptorSddlForm($descriptor, $sections)
   [IO.File]::SetAccessControl($target, $copy)
@@ -47,12 +52,13 @@ fn command(program: &Path, source: &Path, target: &Path) -> Command {
     .arg(base64::engine::general_purpose::STANDARD.encode(encoded))
     .env("GITCRAFT_ACL_SOURCE", source)
     .env("GITCRAFT_ACL_TARGET", target)
+    .env_remove("GITCRAFT_ACL_SNAPSHOT")
     .env_remove("PSModulePath")
     .env_remove("PSExecutionPolicyPreference");
     cmd
 }
 #[cfg(windows)]
-pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
+fn execute(source: &Path, target: Option<&Path>) -> Result<Vec<u8>, String> {
     let system = std::env::var_os("SystemRoot")
         .ok_or("SystemRoot is unavailable; cannot safely preserve output access rules")?;
     let program =
@@ -60,13 +66,19 @@ pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
     if !program.is_absolute() {
         return Err("SystemRoot must be an absolute native path".into());
     }
-    let out = crate::bounded_process::run(
-        command(&program, source, target),
+    let mut command = command(&program, source, target.unwrap_or(Path::new("")));
+    if target.is_none() {
+        command.env("GITCRAFT_ACL_SNAPSHOT", "1");
+    }
+    let out = crate::bounded_process::run_input(
+        command,
+        None,
         &|| true,
         std::time::Duration::from_secs(20),
+        2 * 1024 * 1024,
+        4096,
     )?;
-    if !out.status.success() || String::from_utf8_lossy(&out.stdout).trim() != "gitcraft-acl-v1-ok"
-    {
+    if !out.status.success() {
         return Err(format!(
             "Windows access metadata could not be preserved; original unchanged: {}",
             String::from_utf8_lossy(&out.stderr)
@@ -75,7 +87,28 @@ pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
                 .collect::<String>()
         ));
     }
+    Ok(out.stdout)
+}
+#[cfg(windows)]
+pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
+    if String::from_utf8_lossy(&execute(source, Some(target))?).trim() != "gitcraft-acl-v1-ok" {
+        return Err("Unexpected Windows metadata-copy response".into());
+    }
     Ok(())
+}
+#[cfg(windows)]
+pub(super) fn snapshot(source: &Path) -> Result<Vec<u8>, String> {
+    let out = execute(source, None)?;
+    let encoded = std::str::from_utf8(&out)
+        .map_err(|_| "Invalid access descriptor response")?
+        .trim();
+    let descriptor = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|e| e.to_string())?;
+    if descriptor.len() > 1024 * 1024 {
+        return Err("Output access metadata exceeds 1 MiB".into());
+    }
+    Ok(descriptor)
 }
 #[cfg(test)]
 mod tests {
@@ -122,6 +155,11 @@ mod tests {
             Some(&Some(target.as_os_str()))
         );
         assert_eq!(env.get(std::ffi::OsStr::new("PSModulePath")), Some(&None));
+        assert_eq!(
+            env.get(std::ffi::OsStr::new("GITCRAFT_ACL_SNAPSHOT")),
+            Some(&None)
+        );
+        assert!(SCRIPT.contains("if ($snapshot)"));
         Ok(())
     }
 }

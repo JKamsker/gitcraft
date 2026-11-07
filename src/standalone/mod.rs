@@ -1,4 +1,5 @@
 //! Explicit native-file tools, independent of repository tabs and connection profiles.
+mod access;
 mod cli;
 mod directory;
 mod files;

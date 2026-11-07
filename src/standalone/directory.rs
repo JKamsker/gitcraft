@@ -15,10 +15,6 @@ pub(super) struct Directory {
     _ancestors: Vec<File>,
 }
 impl Directory {
-    #[cfg(target_vendor = "apple")]
-    pub fn file(&self) -> &File {
-        self.handle.as_file()
-    }
     #[cfg(windows)]
     pub fn stable_source(&self, name: &OsStr) -> io::Result<File> {
         use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -34,7 +30,7 @@ impl Directory {
         }
         Ok(file)
     }
-    #[cfg(any(windows, target_vendor = "apple"))]
+    #[cfg(windows)]
     pub fn rewrite_owned(
         &self,
         name: &OsStr,
@@ -195,6 +191,14 @@ impl Directory {
             }
             Ok(file)
         }
+    }
+    pub fn snapshot(&self, name: &OsStr, path: &Path) -> Result<super::files::Snapshot, String> {
+        #[cfg(windows)]
+        let _pin = self.stable_source(name).map_err(|e| e.to_string())?;
+        // The temporary Windows pin excludes path replacement during descriptor
+        // reads, but the retained identity handle must permit our later rename.
+        let file = self.read(name);
+        super::files::Snapshot::output(path, file.map_err(|e| e.to_string())?)
     }
     pub fn create(&self, name: &OsStr, bytes: &[u8]) -> io::Result<File> {
         check_name(name)?;
