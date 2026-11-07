@@ -377,3 +377,5 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) mod drafts;

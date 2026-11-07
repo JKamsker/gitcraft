@@ -2,7 +2,11 @@
 //! owned until the shared local/remote transport returns, even after cancellation.
 use crate::tasks::{Cancellation, Priority, Scope};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-type Job<T> = Box<dyn FnOnce(&dyn Fn() -> bool) -> Result<T, String> + Send>;
+type Read<T> = Box<dyn FnOnce(&dyn Fn() -> bool) -> Result<T, String> + Send>;
+struct Job<T> {
+    read: Read<T>,
+    key: Option<std::path::PathBuf>,
+}
 struct Running<T> {
     id: u64,
     rx: Receiver<Result<T, String>>,
@@ -40,7 +44,21 @@ impl<T: Send + 'static> Reader<T> {
         job: impl FnOnce(&dyn Fn() -> bool) -> Result<T, String> + Send + 'static,
     ) {
         self.cancel();
-        self.pending = Some(Box::new(job));
+        self.pending = Some(Job {
+            read: Box::new(job),
+            key: None,
+        });
+    }
+    pub fn queue_mutation(
+        &mut self,
+        key: std::path::PathBuf,
+        job: impl FnOnce(&dyn Fn() -> bool) -> Result<T, String> + Send + 'static,
+    ) {
+        self.cancel();
+        self.pending = Some(Job {
+            read: Box::new(job),
+            key: Some(key),
+        });
     }
     pub fn busy(&self) -> bool {
         self.running.is_some() || self.pending.is_some()
@@ -78,14 +96,14 @@ impl<T: Send + 'static> Reader<T> {
                 pool.submit_cancellable(
                     cancel.clone(),
                     Priority::Background,
-                    None,
+                    job.key,
                     Some(Box::new(move || {
                         let _ = cancelled_tx.send(Err("History read cancelled".into()));
                         cancel_repaint.request_repaint();
                     })),
                     Box::new(move || {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            job(&|| !token.is_cancelled())
+                            (job.read)(&|| !token.is_cancelled())
                         }))
                         .unwrap_or_else(|_| Err("History worker panicked".into()));
                         let _ = tx.send(result);

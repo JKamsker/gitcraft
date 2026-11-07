@@ -37,6 +37,17 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
+    WorkingDraftLoading,
+    WorkingDraftHistory {
+        on: bool,
+        versions: Vec<crate::git::drafts::Draft>,
+        error: Option<String>,
+        index: bool,
+    },
+    WorkingDraftRecovery {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        selected: std::collections::BTreeSet<usize>,
+    },
     ContentRecovery,
     GerritReview {
         remote: String,
@@ -449,6 +460,7 @@ impl RepoTab {
         };
         let is_remote = crate::remote::is_remote(&self.path);
         let current_branch = self.refs.current.clone();
+        let working_draft_undo = self.working_draft_undo_available();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -482,6 +494,9 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.spinner();if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
+                Dialog::WorkingDraftHistory { on,versions,error,index } => super::working_drafts::view::history(ui,on,versions,error.as_deref(),index,idle,working_draft_undo),
+                Dialog::WorkingDraftRecovery { preview,selected } => super::working_drafts::view::recovery(ui,preview,selected,idle),
                 Dialog::ContentRecovery => self.content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,

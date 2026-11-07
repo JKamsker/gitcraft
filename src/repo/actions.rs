@@ -15,6 +15,19 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftUndo,
+    DraftPreview {
+        id: crate::git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
     OpenContentRecovery,
     ContentSearch(String),
     ContentInspect(usize, Option<usize>),

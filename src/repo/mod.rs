@@ -120,6 +120,7 @@ mod watch;
 mod watch_remote;
 mod weakened_marks;
 pub(crate) mod widgets;
+mod working_drafts;
 pub(crate) mod worktree_tab;
 
 use std::collections::HashMap;
@@ -194,6 +195,7 @@ pub struct RepoTab {
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     content_recovery: content_recovery::State,
+    working_drafts: working_drafts::State,
     saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
@@ -533,6 +535,7 @@ impl RepoTab {
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
             content_recovery: Default::default(),
+            working_drafts: Default::default(),
             saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,

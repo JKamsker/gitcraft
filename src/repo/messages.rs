@@ -377,6 +377,7 @@ impl RepoTab {
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
             while let Ok(change) = rx.try_recv() {
+                self.working_drafts.observe();
                 let was = self.fs_pending.map(|(c, _)| c);
                 self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
@@ -389,6 +390,7 @@ impl RepoTab {
         // A tab not read yet, or suspended, neither fetches nor follows builds.
         self.poll_saved_views(ctx);
         self.poll_content_recovery(ctx);
+        self.poll_working_drafts(ctx);
         if !shown || self.sleeping() {
             return;
         }

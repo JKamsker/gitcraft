@@ -517,6 +517,25 @@ pub(super) fn run_steps_counted(
     if let Err(e) = check_expected(path, ops, control) {
         return (Err(e), kind, 0);
     }
+    // Preserve both index and worktree layers before operations that can replace files.
+    if ops.iter().any(|op| {
+        git::subcommand(&op.iter().map(String::as_str).collect::<Vec<_>>())
+            .is_some_and(|s| matches!(s, "checkout" | "switch" | "rebase"))
+    }) {
+        let active = || {
+            !crate::tasks::cancellation().is_cancelled()
+                && !control.is_some_and(|c| c.is_cancelled())
+        };
+        let snapshot = (|| {
+            if git::drafts::enabled_while(path, &active)? {
+                git::drafts::capture(path, "Before checkout / rebase", &active)?;
+            }
+            Ok::<_, String>(())
+        })();
+        if let Err(error) = snapshot {
+            return (Err(format!("Working draft safety check: {error}")), kind, 0);
+        }
+    }
     let mut result = Ok(String::new());
     let mut stopped = ops.len();
     let mut tried = Vec::new();

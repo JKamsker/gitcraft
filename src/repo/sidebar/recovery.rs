@@ -60,6 +60,9 @@ impl RepoTab {
         {
             acts.push(Action::OpenContentRecovery);
         }
+        if ui.button("Earlier versions of working changes…").clicked() {
+            acts.push(Action::EarlierVersions);
+        }
         let t = Tokens::get(ui.ctx());
         let shown = self.reflog.as_ref().map(|v| &v.source);
         for (icon, title, about, source, act) in rows {

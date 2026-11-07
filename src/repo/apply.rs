@@ -86,6 +86,16 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
+            Action::DraftSnapshot => self.save_working_draft(false, ctx),
+            Action::DraftUndo => self.undo_working_draft(ctx),
+            Action::DraftPreview { id, path, index } => {
+                self.preview_working_draft(id, path, index, ctx)
+            }
+            Action::DraftRecover { preview, hunks } => {
+                self.recover_working_draft(*preview, hunks, ctx)
+            }
             Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
             Action::ContentSearch(query) => self.content_search(query, ctx),
             Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),

@@ -198,7 +198,7 @@ pub fn read_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<Option
 
 /// The script [`read_within`] runs in `repo` (a path there): the file on its output, exit code
 /// 0, when `rel` is such a file. `None` for an empty path.
-fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
+pub(crate) fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
     let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
     if names.is_empty() || names.iter().any(|n| matches!(*n, "." | "..")) {
         return None;
