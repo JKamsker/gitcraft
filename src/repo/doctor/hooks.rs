@@ -59,16 +59,8 @@ impl RepoTab {
         };
         let folder = crate::remote::resolve(&self.path, &found.folder);
         let (name, fix, done): (String, Fix, &str) = match act {
-            HooksAct::MakeExecutable(name) => (
-                name,
-                hooks::make_executable,
-                crate::i18n::text("repo-workflows-doctor-hooks-act-63222fea"),
-            ),
-            HooksAct::ToLf(name) => (
-                name,
-                hooks::to_lf,
-                crate::i18n::text("repo-workflows-doctor-hooks-act-fdf85121"),
-            ),
+            HooksAct::MakeExecutable(name) => (name, hooks::make_executable, "executable"),
+            HooksAct::ToLf(name) => (name, hooks::to_lf, "lf"),
         };
         // A script husky's stub runs is named by its path from the repository's top.
         let script = found
@@ -81,17 +73,19 @@ impl RepoTab {
             crate::remote::join(&folder, &name)
         };
         // A hooks folder of the repository's own (core.hooksPath) is often committed.
-        let tracked_note = if found.hooks_path.is_some() || script {
-            " If it is committed, commit the change too (with core.fileMode off, git \
-             update-index --chmod=+x; eol=lf in .gitattributes keeps line endings LF)."
-        } else {
-            ""
-        };
+        let tracked = found.hooks_path.is_some() || script;
         if let Some(d) = &mut self.doctor {
             d.hooks.fixing = true;
             d.hooks.fixed = None;
         }
-        let message = format!("{name}: {done}.{tracked_note}");
+        let message = crate::i18n::message(
+            "repo-workflows-doctor-hook-fixed",
+            &[
+                ("name", (name.as_str()).into()),
+                ("fix", (done).into()),
+                ("tracked", (if tracked { "yes" } else { "no" }).into()),
+            ],
+        );
         self.then(
             ctx,
             move || fix(&file).map(|()| message),

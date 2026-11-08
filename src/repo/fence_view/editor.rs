@@ -264,12 +264,13 @@ fn save(
     if errors.is_empty() {
         let n = new.len();
         (
-            format!(
-                "Saved {n} entr{}; {written} agent config file{} written in {} worktree{}.",
-                if n == 1 { "y" } else { "ies" },
-                if written == 1 { "" } else { "s" },
-                roots.len(),
-                if roots.len() == 1 { "" } else { "s" }
+            crate::i18n::message(
+                "repo-workflows-fence-saved-summary",
+                &[
+                    ("entries", (n).into()),
+                    ("files", (written).into()),
+                    ("worktrees", (roots.len()).into()),
+                ],
             ),
             false,
         )

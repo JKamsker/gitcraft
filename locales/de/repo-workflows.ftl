@@ -7274,3 +7274,37 @@ repo-workflows-drift-formatting-summary = Nur Formatierung: { $percent } % von {
        *[other] { $files } Dateien mit ausschließlich Formatierungsänderungen
     })
 
+repo-workflows-fence-saved-summary = { $entries ->
+        [one] Ein Eintrag gespeichert
+       *[other] { $entries } Einträge gespeichert
+    }; { $files ->
+        [one] eine Agent-Konfigurationsdatei
+       *[other] { $files } Agent-Konfigurationsdateien
+    } in { $worktrees ->
+        [one] einem Worktree
+       *[other] { $worktrees } Worktrees
+    } geschrieben.
+
+repo-workflows-doctor-hook-fixed = { $name }: { $fix ->
+        [executable] ausführbar gemacht
+       *[lf] mit LF-Zeilenenden gespeichert
+    }.{ $tracked ->
+        [yes] { " Wenn die Datei versioniert ist, committen Sie auch diese Änderung (bei deaktiviertem core.fileMode: git update-index --chmod=+x; eol=lf in .gitattributes erhält LF-Zeilenenden)." }
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-diverged-pull = { $branch } und { $tracking } sind auseinandergegangen. Ein Pull, der nur Fast-Forward zulässt, wird daher abgelehnt{ $fetched ->
+        [yes] { " (nur " }{ $tracking } wird mit dem abgerufenen Stand verschoben)
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-dropped-note = { $count ->
+        [one] Ein Commit ausgelassen: Seine Änderung ist bereits vorhanden.
+       *[other] { $count } Commits ausgelassen: Ihre Änderungen sind bereits vorhanden.
+    }
+
+repo-workflows-fork-unpulled-commits = { $fork }/{ $branch } enthält { $count ->
+        [one] einen Commit, der Ihrem Branch { $local } fehlt. Rufen Sie ihn zuerst mit Pull ab, sonst würde der Push ihn verwerfen.
+       *[other] { $count } Commits, die Ihrem Branch { $local } fehlen. Rufen Sie sie zuerst mit Pull ab, sonst würde der Push sie verwerfen.
+    }
+

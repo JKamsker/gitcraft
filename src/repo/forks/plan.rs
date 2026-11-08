@@ -443,11 +443,14 @@ pub(crate) fn plan_rebase(
     let seen = git::resolve(repo, &tracking)?;
     let missing = count(repo, &format!("{head}..{seen}"))?;
     if missing > 0 {
-        return Err(format!(
-            "{fork}/{} has {missing} commit{} your {local} hasn't: pull them first, or the push \
-             would throw them away",
-            info.branch,
-            if missing == 1 { "" } else { "s" }
+        return Err(crate::i18n::message(
+            "repo-workflows-fork-unpulled-commits",
+            &[
+                ("fork", (fork.as_str()).into()),
+                ("branch", (info.branch.as_str()).into()),
+                ("count", (missing).into()),
+                ("local", (local.as_str()).into()),
+            ],
         ));
     }
     let behind = count(repo, &format!("{head}..{onto}"))?;

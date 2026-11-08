@@ -7276,3 +7276,37 @@ repo-workflows-drift-formatting-summary = Formatting only: { $percent }% of { $l
        *[other] { $files } files with only formatting changes
     })
 
+repo-workflows-fence-saved-summary = Saved { $entries ->
+        [one] one entry
+       *[other] { $entries } entries
+    }; { $files ->
+        [one] one agent config file written
+       *[other] { $files } agent config files written
+    } in { $worktrees ->
+        [one] one worktree
+       *[other] { $worktrees } worktrees
+    }.
+
+repo-workflows-doctor-hook-fixed = { $name }: { $fix ->
+        [executable] made executable
+       *[lf] saved with LF line endings
+    }.{ $tracked ->
+        [yes] { " If it is committed, commit the change too (with core.fileMode off, git update-index --chmod=+x; eol=lf in .gitattributes keeps line endings LF)." }
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-diverged-pull = { $branch } and { $tracking } have diverged, so a fast-forward-only pull refuses{ $fetched ->
+        [yes] { " (only " }{ $tracking } moves, with what it fetches)
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-dropped-note = { $count ->
+        [one] One commit dropped: its change is already there.
+       *[other] { $count } commits dropped: their changes are already there.
+    }
+
+repo-workflows-fork-unpulled-commits = { $fork }/{ $branch } has { $count ->
+        [one] one commit your { $local } does not have: pull it first, or the push would throw it away
+       *[other] { $count } commits your { $local } does not have: pull them first, or the push would throw them away
+    }
+

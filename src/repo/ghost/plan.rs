@@ -327,14 +327,10 @@ impl Ctx<'_> {
         }
         match mode {
             PullMode::FastForwardOnly => {
-                let fetched = if new != tracking {
-                    format!(" (only {} moves, with what it fetches)", up.tracking.name)
-                } else {
-                    String::new()
-                };
-                out.refused = Some(format!(
-                    "{} and {} have diverged, so a fast-forward-only pull refuses{fetched}",
-                    branch.name, up.tracking.name
+                out.refused = Some(diverged_pull(
+                    &branch.name,
+                    &up.tracking.name,
+                    new != tracking,
                 ));
                 Ok(out)
             }
@@ -663,15 +659,7 @@ impl Ctx<'_> {
         out.created = copies;
         let dropped = steps.iter().filter(|s| s.copy.is_none()).count();
         if dropped > 0 {
-            out.notes.push(format!(
-                "{dropped} commit{} dropped: {} already there.",
-                if dropped == 1 { " is" } else { "s are" },
-                if dropped == 1 {
-                    "its change is"
-                } else {
-                    "their changes are"
-                }
-            ));
+            out.notes.push(dropped_note(dropped));
         }
         let stop = match (&replay.stop, emptied) {
             (_, Some(i)) => Some((i, replay.steps[i].original.clone(), Vec::new())),
@@ -848,4 +836,55 @@ fn local_ref(name: &str) -> String {
 /// The commit `c` as the strip names it.
 pub(crate) fn describe(c: &Commit) -> String {
     format!("{} {}", short(&c.hash), c.summary)
+}
+
+fn diverged_pull(branch: &str, tracking: &str, fetched: bool) -> String {
+    crate::i18n::message(
+        "repo-workflows-ghost-diverged-pull",
+        &[
+            ("branch", (branch).into()),
+            ("tracking", (tracking).into()),
+            ("fetched", (if fetched { "yes" } else { "no" }).into()),
+        ],
+    )
+}
+
+fn dropped_note(count: usize) -> String {
+    crate::i18n::message(
+        "repo-workflows-ghost-dropped-note",
+        &[("count", (count).into())],
+    )
+}
+#[cfg(test)]
+mod fluent_notice_tests {
+    use super::*;
+
+    #[test]
+    fn fluent_partition_ghost_actual_notices_keep_refs_opaque_and_counts_numeric() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let branch = "feature/ß-provider";
+            let tracking = "upstream/ß (opaque)";
+            let plain = diverged_pull(branch, tracking, false);
+            let fetched = diverged_pull(branch, tracking, true);
+            assert!(plain.contains(branch) && plain.contains(tracking));
+            assert!(fetched.contains(branch) && fetched.contains(tracking));
+            assert_ne!(plain, fetched);
+            let one = dropped_note(1);
+            let many = dropped_note(1234);
+            if language == "de" {
+                assert!(plain.contains("Fast-Forward"));
+                assert_eq!(
+                    one,
+                    "Ein Commit ausgelassen: Seine Änderung ist bereits vorhanden."
+                );
+                assert!(many.starts_with("1.234 Commits ausgelassen:"));
+            } else {
+                assert!(plain.contains("fast-forward-only"));
+                assert_eq!(one, "One commit dropped: its change is already there.");
+                assert!(many.starts_with("1,234 commits dropped:"));
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }
