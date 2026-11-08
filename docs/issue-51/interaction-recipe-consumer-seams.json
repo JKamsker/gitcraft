@@ -1,0 +1,9 @@
+{
+  "source_base": "2cdbb4f4742ae8dfa171c2fbfd1f17461b48e9aa",
+  "owned_api": "src/agent/recipe/display.rs",
+  "foreign_seams": [
+    {"path": "src/repo/agents/recipe_editor.rs", "actual_paint": "for problem in recipe.problems() => ui.colored_label", "render": "recipe.display_problems()", "keep_control": "recipe.problems().is_empty()"},
+    {"path": "src/repo/agents/recipe_editor.rs", "actual_paint": "self.error", "render": "submitted_recipe.display_error(raw)", "requires": "original submitted Recipe, not later form contents", "keep_control": "stored error and original AgentAct::SaveRecipe payload raw"}
+  ],
+  "explicit_limits": ["agent/files.rs IO/JSON wrappers need actual resolved-path provenance before contextual display; remain opaque", "executable script and terminal output remain literal; no blanket terminal translation"]
+}
