@@ -125,7 +125,8 @@ pub(crate) fn endpoint(bytes: &[u8]) -> Result<Vec<u8>, String> {
 mod recording_tests {
     use super::*;
     #[test]
-    fn records_bind_generation_kind_and_ledger_before_publication() {
+    fn records_bind_generation_kind_and_ledger_before_publication()
+    -> Result<(), Box<dyn std::error::Error>> {
         let authority = WorkspaceAuthority {
             root: "/synthetic/ledger".into(),
             anchor: "unix:1:2".into(),
@@ -133,10 +134,7 @@ mod recording_tests {
             mode: FenceMode::Dispatch,
         };
         let name = format!("{}-dispatch-{}.owner", authority.generation, "b".repeat(32));
-        assert_eq!(
-            authority.record_name(&authority.root.join(&name)).unwrap(),
-            name
-        );
+        assert_eq!(authority.record_name(&authority.root.join(&name))?, name);
         for wrong in [
             PathBuf::from("/foreign").join(&name),
             authority.root.join(name.replace("dispatch", "mutation")),
@@ -146,19 +144,17 @@ mod recording_tests {
         }
         let raw = serde_json::to_vec(&serde_json::json!({"v":2,"nonce":"c".repeat(64),
             "path":std::env::temp_dir().join(format!("gitcraft-native-owned-{}","d".repeat(32))),
-            "port":12345,"token":"e".repeat(64)}))
-        .unwrap();
-        let bound = record(&raw, &authority).unwrap();
-        assert!(
-            super::super::native_owner::Endpoint::from_record(&endpoint(&bound).unwrap()).is_ok()
-        );
+            "port":12345,"token":"e".repeat(64)}))?;
+        let bound = record(&raw, &authority)?;
+        assert!(super::super::native_owner::Endpoint::from_record(&endpoint(&bound)?).is_ok());
         assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&endpoint(&bound).unwrap()).unwrap(),
-            serde_json::from_slice::<serde_json::Value>(&raw).unwrap()
+            serde_json::from_slice::<serde_json::Value>(&endpoint(&bound)?)?,
+            serde_json::from_slice::<serde_json::Value>(&raw)?
         );
-        assert_eq!(endpoint(&raw).unwrap(), raw);
-        let mut malformed: serde_json::Value = serde_json::from_slice(&bound).unwrap();
+        assert_eq!(endpoint(&raw)?, raw);
+        let mut malformed: serde_json::Value = serde_json::from_slice(&bound)?;
         malformed["generation"] = "PID 424242".into();
-        assert!(endpoint(&serde_json::to_vec(&malformed).unwrap()).is_err());
+        assert!(endpoint(&serde_json::to_vec(&malformed)?).is_err());
+        Ok(())
     }
 }

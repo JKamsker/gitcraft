@@ -5,6 +5,7 @@ use egui::{RichText, Sense, Ui};
 
 use super::section::{self, Summary};
 use super::{Backlinks, ExtrasCmd};
+use crate::a11y::Named;
 use crate::git::{BACKLINK_CAP, Backlink};
 use crate::repo::short;
 use crate::theme::{self, Tokens};
@@ -145,22 +146,22 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             ui.id().with(("backlink", &link.hash)),
             Sense::click(),
         )
+        .named(|| format!("Open changes in {}: {}", short(&link.hash), link.subject))
         .on_hover_text(format!(
-            "{} · {} · {}\n\n{}\n\nClick to open it",
+            "{} · {} · {}\n\n{}\n\nClick to open this commit’s changes and diff",
             short(&link.hash),
             link.author,
             link.date,
             link.text
         ));
-    crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
-        format!(
-            "Open commit {}, {}, {}, {}, {}",
-            short(&link.hash),
-            link.subject,
-            link.author,
-            link.date,
-            link.text
-        )
+    // The root's action label and the interaction metadata describe this same button.
+    // Keep one name; a second widget_info call would overwrite its existing action label.
+    ui.ctx().accesskit_node_builder(resp.id, |node| {
+        node.set_description(crate::a11y::labels::join([
+            link.author.as_str(),
+            link.date.as_str(),
+            link.text.as_str(),
+        ]));
     });
     if resp.hovered() {
         ui.painter().set(
@@ -205,7 +206,7 @@ mod tests {
             false,
         );
         h.run();
-        let label = "Open commit aaaaaaaa, s, a, d, t";
+        let label = "Open changes in aaaaaaaa: s";
         h.get_by_role_and_label(egui::accesskit::Role::Button, label);
         h.key_press(egui::Key::Tab);
         h.run();
@@ -227,6 +228,53 @@ mod tests {
         assert_eq!(
             headline(&links[2..], true),
             "1 mention · only the 200 most recent"
+        );
+    }
+}
+
+#[cfg(test)]
+mod headless_tests {
+    use super::*;
+    use crate::git::LinkKind;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn actual_backlink_row_click_emits_the_target_open_command_with_grouped_evidence() {
+        let hash = "a".repeat(40);
+        let links = vec![
+            Backlink {
+                hash: hash.clone(),
+                subject: "Fix the target".into(),
+                author: "Test".into(),
+                date: "today".into(),
+                kind: LinkKind::Trailer("Fixes".into()),
+                text: "Fixes: 1234567".into(),
+            },
+            Backlink {
+                hash: "b".repeat(40),
+                subject: "Mention the target".into(),
+                author: "Test".into(),
+                date: "today".into(),
+                kind: LinkKind::Mention,
+                text: "Related to 1234567".into(),
+            },
+        ];
+        let mut harness = Harness::builder().with_size([900.0, 700.0]).build_ui_state(
+            move |ui, cmds: &mut Vec<ExtrasCmd>| body(ui, &links, false, cmds),
+            Vec::new(),
+        );
+        harness.run();
+        harness.get_by_label("Links");
+        harness.get_by_label("Mentions");
+        harness.get_by_label("Fixes: 1234567");
+        harness
+            .get_by_label("Open changes in aaaaaaaa: Fix the target")
+            .click();
+        harness.run();
+        assert!(
+            harness
+                .state()
+                .iter()
+                .any(|cmd| matches!(cmd,ExtrasCmd::Open(target) if target==&hash))
         );
     }
 }

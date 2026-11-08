@@ -20,6 +20,7 @@ impl RepoTab {
         self.dialog = Some(Dialog::PushLoading { id, token });
         let repo = self.path.clone();
         let profile = Settings::get(ctx).profile();
+        let selection = self.preflight_selection.take();
         spawn_or(
             &self.tx,
             ctx,
@@ -33,9 +34,18 @@ impl RepoTab {
             },
             move || {
                 let began = Instant::now();
-                let result = check::scan(&repo, ops, profile, &|| {
-                    alive.strong_count() > 0 && began.elapsed() < Duration::from_secs(120)
-                });
+                let result = (|| {
+                    if let Some(selected) = &selection {
+                        selected.snapshot.check_publication(&repo)?;
+                    }
+                    let mut plan = check::scan(&repo, ops, profile, &|| {
+                        alive.strong_count() > 0 && began.elapsed() < Duration::from_secs(120)
+                    })?;
+                    if let Some(selected) = selection {
+                        plan.retain_selection(selected)?;
+                    }
+                    Ok(plan)
+                })();
                 let result = if began.elapsed() >= Duration::from_secs(120) {
                     Err("Push preflight exceeded its two-minute budget. Fetch missing history or split this push, then recheck; nothing was pushed.".into())
                 } else {
@@ -58,6 +68,7 @@ impl RepoTab {
     }
 
     pub(super) fn reload_preflight(&mut self, plan: Plan, ctx: &egui::Context) {
+        self.preflight_selection = plan.selection().cloned();
         self.begin_push_preflight(plan.again(), ctx);
     }
 
@@ -292,6 +303,12 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         .show(ui, |ui| {
             for (kind, title, fix, label) in [
                 (
+                    Kind::Transcript,
+                    "Checkpoint / transcript publication",
+                    "",
+                    "",
+                ),
+                (
                     Kind::Identity,
                     "Author matches this profile's host policy",
                     "author",
@@ -341,6 +358,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                         }
                     ));
                     if !found.is_empty()
+                        && !fix.is_empty()
                         && plan.is_current_branch()
                         && ui.small_button(label).clicked()
                     {

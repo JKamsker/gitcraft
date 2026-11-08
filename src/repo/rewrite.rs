@@ -440,7 +440,8 @@ mod tests {
     use crate::git;
 
     #[test]
-    fn recording_interactive_approval_rejects_same_head_branch_and_todo_changes() {
+    fn recording_interactive_approval_rejects_same_head_branch_and_todo_changes()
+    -> Result<(), String> {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/pure-rebase-approval".into(), &ctx);
         tab.refs.current = Some("approved-A".into());
@@ -455,7 +456,7 @@ mod tests {
         };
         let mut editor = rebase::RebaseEditor::new("b".repeat(40), "base".into(), vec![commit]);
         editor.branch_guard = Some(tab.same_branch());
-        editor.approve(&tab.same_branch()).unwrap();
+        editor.approve(&tab.same_branch())?;
         let id = editor.id;
         let approved = editor.clone();
         tab.rebase = Some(editor);
@@ -485,9 +486,10 @@ mod tests {
         assert!(
             !tab.rebase
                 .as_ref()
-                .unwrap()
+                .ok_or("missing rebase editor")?
                 .approved(&tab.same_branch(), &tab.refs.head)
         );
+        Ok(())
     }
 
     fn repo(name: &str) -> PathBuf {

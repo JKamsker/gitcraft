@@ -26,6 +26,7 @@ mod gerrit;
 mod git;
 mod glossary;
 mod graph;
+mod i18n;
 mod icons;
 mod i18n;
 mod image_cache;
@@ -59,12 +60,12 @@ pub mod standalone;
 mod svg;
 mod tab_look;
 mod tasks;
-mod tray;
 mod teleport;
 mod terminal;
 mod theme;
 mod tour;
 mod trackers;
+mod tray;
 mod update;
 mod vscode_theme;
 mod weakened;
@@ -83,6 +84,7 @@ pub fn owned_endpoint_helper() -> Option<i32> {
     {
         Some("--gitcraft-owned-endpoint") => Some(remote::native_owner::entrypoint()),
         Some("--gitcraft-workspace-claim") => Some(remote::workspace_claim::entrypoint()),
+        Some("--gitcraft-contained-git") => Some(git::bundle_helper::entrypoint()),
         _ => None,
     }
 }

@@ -672,8 +672,10 @@ mod tests {
             if refused {
                 let error = result.err().ok_or("silently accepted a partial read")?;
                 assert!(error.contains("4MiB") && error.contains("more notes remain"));
-                let mut state = State::default();
-                state.synced = 150;
+                let mut state = State {
+                    synced: 150,
+                    ..Default::default()
+                };
                 assert!(state.accept(state.generation, Err(error)));
                 assert_eq!(state.synced, 0);
                 assert!(state.error.is_some());
@@ -777,8 +779,10 @@ mod tests {
     }
     #[test]
     fn r2_pure_intent_selection_generation_rejects_read_post_and_error_completions() {
-        let mut state = State::default();
-        state.cache_key = Some("old".into());
+        let mut state = State {
+            cache_key: Some("old".into()),
+            ..Default::default()
+        };
         let old = state.generation;
         state.selection_changed();
         assert!(state.cache_key.is_none());

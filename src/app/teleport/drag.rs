@@ -140,10 +140,10 @@ impl App {
         {
             let mut known = self.recent.clone();
             for tab in &self.tabs {
-                if let Tab::Repo(repo) = tab {
-                    if !known.contains(&repo.path) {
-                        known.push(repo.path.clone());
-                    }
+                if let Tab::Repo(repo) = tab
+                    && !known.contains(&repo.path)
+                {
+                    known.push(repo.path.clone());
                 }
             }
             self.teleport_drag = Some(DragTargets::new(source.clone(), known, ctx));

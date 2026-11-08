@@ -350,10 +350,7 @@ mod tests {
         let commits = [commit("first"), commit("second")];
         assert!(bounded_graph(&commits, 4, &|| true).is_ok());
         assert!(
-            bounded_graph(&commits, 3, &|| true)
-                .err()
-                .unwrap()
-                .contains("parent edges")
+            bounded_graph(&commits, 3, &|| true).is_err_and(|error| error.contains("parent edges"))
         );
         let oversized = [crate::git::Commit {
             hash: "merge".into(),
@@ -371,7 +368,7 @@ mod tests {
                 calls.set(calls.get() + 1);
                 calls.get() < cancel_at
             });
-            assert!(result.err().unwrap().contains("cancelled"));
+            assert!(result.is_err_and(|error| error.contains("cancelled")));
             assert_eq!(calls.get(), cancel_at);
         }
     }

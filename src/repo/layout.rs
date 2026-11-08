@@ -178,6 +178,8 @@ impl RepoTab {
         self.collision_window(&ctx, &mut acts);
         self.lfs_storage_ui(&ctx, &mut acts);
         self.issue_picker(&ctx, &mut acts);
+        self.email_window(&ctx, &mut acts);
+        self.devcontainer_window(&ctx, &mut acts);
         self.owners_lint_window(&ctx, &mut acts);
         self.fence_window(&ctx, &mut acts);
         self.unity_ui(&ctx, &mut acts);
@@ -248,6 +250,8 @@ impl RepoTab {
             && self.bakeoff.picker.is_none()
             && !self.stacks.modal_open()
             && !self.issue_picker_open()
+            && !self.email.open
+            && !self.devcontainer.open
             && !self.keys_blocked
             && !crate::a11y::keyboard_taken(ctx);
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.

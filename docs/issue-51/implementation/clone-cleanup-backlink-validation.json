@@ -1,0 +1,399 @@
+{
+  "application_commit": "be95891e049ceb07121c12813a936f27572b2467",
+  "runtime_hold": true,
+  "independent_review": "Parent-owned; not performed by this writer",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell"
+  },
+  "gates": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 2.16,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_counts": []
+    },
+    {
+      "name": "check-all-targets",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "seconds": 0.26,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/check-all-targets.log",
+      "sha256": "7c54717b46db89cc1c027e02410be697777be81d62137d86e709dabc3f61a9a4",
+      "passed_test_counts": []
+    },
+    {
+      "name": "compile-tests-no-run",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "seconds": 59.7,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/compile-tests-no-run.log",
+      "sha256": "1731b81a15a8021a4d5ce184ed88d0ed72268a2ffb3d962defe641c6fb095c8a",
+      "passed_test_counts": []
+    },
+    {
+      "name": "clone-pure",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "git::clone_options::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 1.43,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/clone-pure.log",
+      "sha256": "854544c0b2888a570f2752b6831ff68e6487fe48f71bf1d315d5f0b825a0f7df",
+      "passed_test_counts": [
+        3,
+        0
+      ]
+    },
+    {
+      "name": "clone-recording",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "git::command::download_policy_recording_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/clone-recording.log",
+      "sha256": "b57a33382b8c2723389dce37a9cbbe5cce1e7fa3ffe897c308e2aaf36601c048",
+      "passed_test_counts": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "remote-tool-recording",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "git::command::tests::a_tool_on_another_machine_may_stay_open_for_hours",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/remote-tool-recording.log",
+      "sha256": "0e8e30ac2b0f2fc6864f89b453bc0546321ab285bef8bf92b93dd7eefea17c8c",
+      "passed_test_counts": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "cleanup-pure",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "git::cleanup::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.25,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/cleanup-pure.log",
+      "sha256": "54b0c9a6411c4f110ce858a07c5defeb3110a155695672e58134e0fb97319f8e",
+      "passed_test_counts": [
+        3,
+        0
+      ]
+    },
+    {
+      "name": "cleanup-headless",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::cleanup::headless_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.25,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/cleanup-headless.log",
+      "sha256": "8b6476c5142e8163bd336ce4c561eb830d36f1943891c4fb3718633fb617ff44",
+      "passed_test_counts": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "backlink-pure",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::commit_changes::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/backlink-pure.log",
+      "sha256": "a357d2892c5095149c0878706da8aedea4fcdc3e90406c99ddb29ece9edc53c8",
+      "passed_test_counts": [
+        2,
+        0
+      ]
+    },
+    {
+      "name": "backlink-headless",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "repo::detail::extras::backlinks_view::headless_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/backlink-headless.log",
+      "sha256": "fb3abf87f82b9e432be549ce2109ded94b7c09f8e6084886051a7ef634fe973e",
+      "passed_test_counts": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "clippy-all-targets",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "exit_code": 101,
+      "seconds": 30.38,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e/clippy-all-targets.log",
+      "sha256": "b512cd2ee9eaba75199a8fbe9808885ed82948854aff729e4bdf176712767137",
+      "passed_test_counts": []
+    }
+  ],
+  "lint_diagnostics": {
+    "count": 127,
+    "added_line_diagnostics": [],
+    "by_file": {
+      "src/forge/gitea/mod.rs": 1,
+      "src/forge/gitlab/api.rs": 1,
+      "src/forge/gitlab/mod.rs": 1,
+      "src/forge/gitlab/native_tests.rs": 33,
+      "src/forge/history/tests.rs": 1,
+      "src/git/command.rs": 4,
+      "src/git/commits.rs": 1,
+      "src/git/investigations/cochange.rs": 2,
+      "src/git/investigations/symbols/tests.rs": 38,
+      "src/git/investigations/tests.rs": 2,
+      "src/repo/diff/rich/search.rs": 1,
+      "src/repo/ghost/tests.rs": 1,
+      "src/repo/graph_view/mod.rs": 1,
+      "src/repo/issue_work/link.rs": 1,
+      "src/repo/issue_work/picker.rs": 5,
+      "src/repo/operations.rs": 6,
+      "src/repo/postcards/render.rs": 2,
+      "src/repo/pr_review/native_discussions.rs": 1,
+      "src/repo/rewrite.rs": 2,
+      "src/repo/symbol_biography.rs": 1,
+      "src/repo/working_drafts/mod.rs": 1,
+      "src/trackers/tests.rs": 21
+    }
+  },
+  "base": "940cacbc31f36b040dfcb4f347afc9bc3698ed45",
+  "test_total": 12,
+  "status": "Compile/pure/headless validated; independent review and runtime held; all-target lint blocked by inherited diagnostics",
+  "feature_commits": {
+    "37.7": [
+      "d232ee4d477e5504a5042393b4408a97c5795fb9",
+      "613d530a728a73844cc94f00eaa2e6947e8fbd5f",
+      "be95891e049ceb07121c12813a936f27572b2467"
+    ],
+    "37.12": [
+      "54527173e93b9a5498ef2f011f428172ea29fe47"
+    ],
+    "50.4": [
+      "fcf2b052f040208280acb93f51ed02570212639b"
+    ]
+  },
+  "source": [
+    {
+      "path": "docs/issue-51/implementation/clone-cleanup-backlink.md",
+      "git_blob": "363b92e84a82cddaaeaebf3b15135c7fcadfcd20",
+      "sha256": "aaba0a77fbadbb3a2456d3611bec6dfffc8f738c7fccd11bbad973ac3353a793"
+    },
+    {
+      "path": "src/app/clone.rs",
+      "git_blob": "837da7310f61976b30f45d3ec3f695735ef85079",
+      "sha256": "0f8ea6416170aa372ff8cc2a19361b282311f2545c073ffc4730ed90b487e2d6"
+    },
+    {
+      "path": "src/git/cleanup.rs",
+      "git_blob": "d46921e11b9540eae7246853bd42cd381b4249e8",
+      "sha256": "05ce1a00a49e432c5b81434d6740d9a23fd6059c08f2a54cb6615a3145757377"
+    },
+    {
+      "path": "src/git/clone_options.rs",
+      "git_blob": "aaf3d2a6b1eb8343280f35231222ed97db2323af",
+      "sha256": "47ea1691ea0b58759961c016a869652f71ddb0a3428e0dde0ee0f749df10bf77"
+    },
+    {
+      "path": "src/git/command.rs",
+      "git_blob": "70143fafae17d33dfd42a6d9dcbd80ff9e27c671",
+      "sha256": "eac138fc164de54279554f1b381078fdd1f79574d2002ab1fff8d1ef6a71ce71"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "git_blob": "1e05229e50d516c84165ac1d47df98842a2c418f",
+      "sha256": "29e8b6a28c31c34a921252b48ff07b7df8982eeb0c25f36062c87b0795c15c40"
+    },
+    {
+      "path": "src/git/overview.rs",
+      "git_blob": "b79156dc5d51be1afc8a177e3ff1ac80d7587d9b",
+      "sha256": "4cbd4e1e6999d3469c253e7ad39540aefd91d70da544bcac03c978ffc95f4d67"
+    },
+    {
+      "path": "src/repo/actions.rs",
+      "git_blob": "6eed41edd5700cac3bd106505ea2e5bfc6e4c344",
+      "sha256": "8291e75a1b18a2f22b3b7b7cfa8c514a9f8ffefe706730ae7ba3dc2dbbe5f080"
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "git_blob": "2652eb62c55bd8e729c2a96059b9d2e5a8fcf752",
+      "sha256": "848099fe0537f3f137b78e7e14d9e364108c0824521d78a656017ac7eed57ff7"
+    },
+    {
+      "path": "src/repo/branch_bands.rs",
+      "git_blob": "088d777e5ddd8966c5a0929715160f99ffba9d03",
+      "sha256": "e816b8cb7de4d215b66772976507097e0afa85e4ab6f34b5482009f8a52c0c69"
+    },
+    {
+      "path": "src/repo/cleanup.rs",
+      "git_blob": "90a24e1c1d9bbfa55ae911520b9ead6a28d253f8",
+      "sha256": "486cf50b2978c2159b5bf8970b204aceefac9d55955503f2097cd206279cbe43"
+    },
+    {
+      "path": "src/repo/commit_changes.rs",
+      "git_blob": "eed035dcf4d6ed2738ffa7d76cd0eba509ab3094",
+      "sha256": "1dddddaa40b4eb7c6a34384cd587193573f1d5dc29194c61143010af4f4cf55b"
+    },
+    {
+      "path": "src/repo/detail/extras/backlinks_view.rs",
+      "git_blob": "9262bb3320cb4150d0ad270fffc527b26ea2c63b",
+      "sha256": "ab8f28f0eccac455343500fd69890412e5548f9df2ae26458e55335fbaa13e91"
+    },
+    {
+      "path": "src/repo/detail/extras/mod.rs",
+      "git_blob": "3b7353b70601993cf57723845a9fc59f8c0305df",
+      "sha256": "42bde6b6708d726596fe66f21ba0f5c9f186f3b157fc5a3925419dfa29148328"
+    },
+    {
+      "path": "src/repo/detail/extras/tests.rs",
+      "git_blob": "3651b7c95a73c38349b8392c6b40efa1cff92165",
+      "sha256": "bd19fcc3a2c3ab93951807c8934a37806db4ffc1db2ef01b0f1f7f31d28cc35a"
+    },
+    {
+      "path": "src/repo/dialogs/mod.rs",
+      "git_blob": "38da3abae4b037864597a46d20e3dba2bb6573a8",
+      "sha256": "8b458b81ddc172d032e0b009cfd8c402ce992f1e53f8854c23c2adb918c1cfdf"
+    },
+    {
+      "path": "src/repo/messages.rs",
+      "git_blob": "8d6b701bd7c409a6e08fcda68575b1a29ddb5743",
+      "sha256": "9281bd76fe80ecc916eb2a2e288d47c1a6b005c3d47f7b3febe56aa479e005ed"
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "git_blob": "06ec2ec72b72b9b1158e13274bfdec459e887015",
+      "sha256": "c087e86bc1f936ee796af8d40f4fcb318e7c4233fceb1373bc5c8d6844effcc2"
+    },
+    {
+      "path": "src/repo/navigate.rs",
+      "git_blob": "58879ddadece2005b566e684a2a1ea398c8adac7",
+      "sha256": "889ffe3b8e7e6ab4b3f2036f4310e1ea31960264faf7e219b58bb50189fce54b"
+    },
+    {
+      "path": "src/repo/popout/views.rs",
+      "git_blob": "7ac3d2c076a6e2938fe0596ccc07b2674df84275",
+      "sha256": "00a95745c1649ad9e9ee29d4fed0ca43281e386961791d4f90b16acd7cf96151"
+    },
+    {
+      "path": "src/repo/sparse.rs",
+      "git_blob": "82e8fc724b3f1df6306b4a2267c36f32de93aa4f",
+      "sha256": "a077f34cb77aee94a3546a146b63894089dc3671a59255445dce4c3e9a903779"
+    }
+  ],
+  "unchanged_baseline_paths": {
+    "src/git/command/credential_policy.rs": "5e944a802b6d31266ecfbed817cae0b667356ba6",
+    "src/git/backend.rs": "5df483277bbfee6f851dba51b4c18ea22a3653a8",
+    "src/git/worktree_location.rs": "fc843b936ca2eca8389d073613adb13ca430b725",
+    "src/git/drafts": "4cddbe131e95a02d838f2ec9a92efa3e42805c7d",
+    "src/repo/working_drafts": "ab2da9ceea2f05aa609e29ca89b50826e18315fa",
+    "src/git/files.rs": "20b12dce7636e89300318c925a36d97ca26be361",
+    ".github": "1893072821a6600ec455e9e117e68d04563b0870",
+    "Cargo.toml": "a178953f3d604f14b5fe710f0066387fe5d2490e",
+    "Cargo.lock": "e8c674758d3363a0a57d230c4e708348b88d2e71"
+  },
+  "runtime_held_tests": [
+    "git::clone_options::runtime_held_tests::blobless_sparse_history_stays_missing_until_explicit_consent",
+    "git::cleanup::runtime_held_tests::actual_filter_repo_rewrites_only_the_owned_fresh_clone_and_reports_refs",
+    "repo::commit_changes::runtime_held_tests::backlink_target_outside_the_loaded_graph_opens_its_actual_diff"
+  ],
+  "overlap": "Interaction owner: src/app/clone.rs additions are options fields, form validation and managed worker call; no poll_clone/window targeting edits. Shared additive wiring in git/repo modules, dialogs, Graph tools and backlink dispatcher.",
+  "limits": [
+    "Guarded CLI object reads require --no-lazy-fetch support; older Git fails closed. Native local reads and metadata/network probes remain unchanged.",
+    "Missing-object UI fetches reachable history from origin; other promisor remotes need terminal; shallow history is not deepened.",
+    "Cleanup is local-only with bounded literal paths/text replacement rules; no binary/message/LFS/fork/cache sanitization guarantee. Installed git-filter-repo is required for the real-tool fixture.",
+    "Publishing is a deliberate separate manual step through existing guarded publisher or terminal; this wizard never publishes.",
+    "No runtime Git/helper/process/HTTP/SSH/PTY/native/cancel/timeout/race fixtures, full suite, CI, PR or independent review executed. No Windows/Linux live execution claimed."
+  ]
+}

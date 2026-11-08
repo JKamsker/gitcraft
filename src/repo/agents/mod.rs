@@ -181,6 +181,13 @@ impl RepoTab {
 
     /// Opens a terminal tab running `launch`, in its worktree.
     pub(super) fn start_launch(&mut self, launch: Launch, ctx: &egui::Context) {
+        let _ = self.start_launch_tracked(launch, ctx);
+    }
+    pub(super) fn start_launch_tracked(
+        &mut self,
+        launch: Launch,
+        ctx: &egui::Context,
+    ) -> Result<std::sync::Arc<std::sync::atomic::AtomicBool>, String> {
         let shell = crate::terminal::default_shell(ctx);
         let spawned = launch
             .program(&shell, crate::agent::launch::windows_sh)
@@ -188,12 +195,16 @@ impl RepoTab {
         self.terminal_open = true;
         match spawned {
             Ok(term) => {
+                let witness = term.output_lifetime();
                 self.terminals.push(term);
                 self.active_terminal = self.terminals.len() - 1;
                 self.terminal_error = None;
+                Ok(witness)
             }
             Err(e) => {
-                self.terminal_error = Some(format!("Could not start {}: {e}", launch.label));
+                let error = format!("Could not start {}: {e}", launch.label);
+                self.terminal_error = Some(error.clone());
+                Err(error)
             }
         }
     }

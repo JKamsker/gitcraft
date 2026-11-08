@@ -1,0 +1,64 @@
+{
+  "base": "e494b165c0ddf502b48b77ac65b231704d81e8a3",
+  "status": "source implementation; independent review and runtime gates pending",
+  "runtime_hold": true,
+  "sources": [
+    {
+      "path": "src/git/bundles.rs",
+      "sha256": "f4f956abc8af1a83a26e8e43ae9b9d9d8f3a3211a55539b23a9c3f7640b36ef5",
+      "git_blob": "dac486a83bc716000307908824ec7baf97852c55"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "sha256": "ab6642eb2bed8e335f18ee5a9387d8871e48d8b5b38ad95507f796479e6879c6",
+      "git_blob": "de5d3397bee517f86f4016588b4591d5285fca98"
+    },
+    {
+      "path": "src/git/machines.rs",
+      "sha256": "c2b0651296354366169cc63ebca65a188e7d1a1c689495108f5919f80f55364b",
+      "git_blob": "a66363e269e90d070aa120d2ea24028fe0cbc057"
+    },
+    {
+      "path": "src/repo/actions.rs",
+      "sha256": "35a7099f966cbadd8101e03e2922dfe7e5c97783b83476f2b618f69b13acfd09",
+      "git_blob": "3aab00eab8d3f12f93c3fa19ee23ae4f24d46cd4"
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "sha256": "2b4319669720cacb2c70778e4574777bdab403c2ec32010f2131d40a7a884df3",
+      "git_blob": "12488ff9bec265aa37d9b3dfd27cae4cfabd20ad"
+    },
+    {
+      "path": "src/repo/dialogs/mod.rs",
+      "sha256": "7d0b923da450c0fea4ed3a74d861f462ca0372151931f79f5e8439729367bca2",
+      "git_blob": "45fd753607e09f00ab1fda4c7280b52a450b6b65"
+    },
+    {
+      "path": "src/repo/dialogs/linked_machines.rs",
+      "sha256": "e75925ffbe75e21accf9c5edc5dad0ca04cf144b3a7ed03523d4eec78dd81528",
+      "git_blob": "6ff6b1d2bb7695830598c306c053b60c11da000d"
+    }
+  ],
+  "gates": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib git::machines::tests",
+      "result": "4 passed; 3183 application tests filtered; 0 OS tests, 15 filtered; pure recording only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib repo::dialogs::linked_machines::tests",
+      "result": "1 passed; 3186 application tests filtered; 0 OS tests, 15 filtered; injected UI only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "result": "pass; 14 lib warnings, 9 lib-test warnings"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked",
+      "result": "pass; 14 pre-existing lib unused/dead-code warnings"
+    },
+    {
+      "command": "cargo +1.95.0 fmt --all -- --check; git diff --check",
+      "result": "pass"
+    }
+  ]
+}

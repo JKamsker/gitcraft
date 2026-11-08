@@ -104,16 +104,15 @@ fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>
                 .desired_width(280.0),
         )
         .on_hover_text("Kept for the repository");
-        let can = !view.build_command.trim().is_empty()
-            && view.attempts.iter().any(|a| a.worktree.is_some());
+        let can = !view.build_command.trim().is_empty() && matches!(view.comparison, Some(Ok(_)));
         let why = if view.build_command.trim().is_empty() {
             "Type the command that builds the project"
         } else {
-            "Only attempts with a worktree can be built"
+            "Compare the attempts first"
         };
         if ui
             .add_enabled(can, egui::Button::new("Build all"))
-            .on_hover_text("Runs it in a terminal in each attempt's worktree")
+            .on_hover_text("Explicitly runs this command on each compared snapshot in a fresh detached worktree. No setup recipe runs. Workspaces remain in Worktrees for inspection and removal.")
             .on_disabled_hover_text(why)
             .clicked()
         {
@@ -205,7 +204,19 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
             ui.label(RichText::new("Builds").color(t.text_dim));
             for (i, a) in view.attempts.iter().enumerate() {
                 let built = view.builds.get(i).copied().flatten();
-                build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                ui.vertical(|ui| {
+                    build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                    if view.statuses.get(i).is_some_and(Option::is_some)
+                        && ui
+                            .small_button("Build output…")
+                            .on_hover_text(
+                                "Open this run's complete saved output in the configured editor",
+                            )
+                            .clicked()
+                    {
+                        *act = Some(BakeAct::Output(i));
+                    }
+                });
             }
             ui.end_row();
         });
@@ -214,13 +225,15 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
 fn build_cell(
     ui: &mut Ui,
     built: Option<Built>,
-    has_worktree: bool,
+    _has_worktree: bool,
     i: usize,
     t: &Tokens,
     act: &mut Option<BakeAct>,
 ) {
     ui.horizontal(|ui| {
         match built {
+            Some(Built::Preparing) => {ui.label("preparing snapshot…");}
+            Some(Built::Unavailable) => {ui.colored_label(t.warning,"outcome unavailable").on_hover_text("Launch failed, terminal closed/output ended, or receipt is invalid. This does not prove all child processes finished.");}
             Some(Built::Running) => {
                 ui.add(crate::spinner::Spinner::new().size(12.0));
                 ui.label(RichText::new("building…").color(t.text_dim))
@@ -233,26 +246,21 @@ fn build_cell(
                 ui.colored_label(t.danger, format!("✘ fails ({code})"))
                     .on_hover_text("Its output is in the terminal tab");
             }
-            None if has_worktree => {
+            None => {
                 ui.label(RichText::new("not built").color(t.text_faint));
             }
-            None => {
-                ui.label(RichText::new("a branch: no worktree to build in").color(t.text_faint))
-                    .on_hover_text(
-                        "Add a worktree for it (WORKTREES +), then pick it with Other attempts…",
-                    );
-            }
         }
-        if has_worktree {
+        if built != Some(Built::Preparing) {
             let (label, tip) = match built {
                 Some(Built::Running) => (
-                    "Build again",
-                    "Stopped or closed its terminal? Starts the build over",
+                    "Retry in fresh workspace",
+                    "The old build may still run. Starts a separate retained snapshot; does not stop or clean up the old launch",
                 ),
-                Some(_) => ("Build again", "Runs the build command again"),
+                Some(Built::Unavailable) => ("Retry in fresh workspace", "The previous outcome is unknown and its processes may still run. Starts another retained workspace; no automatic stop or cleanup"),
+                Some(_) => ("Build again", "Runs the command in another fresh retained snapshot"),
                 None => (
                     "Build",
-                    "Runs the build command in a terminal of its worktree",
+                    "Runs your command on the exact compared snapshot in a fresh detached worktree",
                 ),
             };
             if ui.small_button(label).on_hover_text(tip).clicked() {
@@ -650,5 +658,64 @@ mod tests {
         assert_eq!(super::super::next_name("bakeoff/x"), "bakeoff/x-2");
         assert_eq!(super::super::next_name("bakeoff/x-2"), "bakeoff/x-3");
         assert_eq!(super::super::next_name("agent/fix-1"), "agent/fix-1-2");
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn pure_bakeoff_unavailable_and_running_cells_offer_explicit_fresh_workspace_retry() {
+        for built in [Built::Unavailable, Built::Running] {
+            let ctx = egui::Context::default();
+            let mut act = None;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 400.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            let position = output.shapes.iter().find_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.text() == "Retry in fresh workspace" => {
+                    Some(text.pos + text.galley.size() / 2.0)
+                }
+                _ => None,
+            });
+            output.textures_delta.clear();
+            let position = position.expect("retry remains reachable without a completion receipt");
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::PointerMoved(position),
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: true,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            output.textures_delta.clear();
+            assert!(matches!(act, Some(BakeAct::Build(0))));
+        }
     }
 }

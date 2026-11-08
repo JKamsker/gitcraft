@@ -216,7 +216,10 @@ mod tests {
                 events.borrow_mut().push("frozen fetch B");
                 Ok((*frozen).into())
             },
-            |_| panic!("unchanged B cannot validate the observed A selection"),
+            |_| {
+                events.borrow_mut().push("unexpected verification");
+                Err("unchanged B cannot validate the observed A selection".into())
+            },
         );
         assert!(
             changed

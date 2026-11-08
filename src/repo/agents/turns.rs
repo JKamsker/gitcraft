@@ -148,8 +148,22 @@ fn session_title(session: &[Turn]) -> String {
 fn session_header(ui: &mut Ui, title: &str, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) {
     let r = ui.label(RichText::new(title).small().color(t.text_dim));
     session_menu(&r, session, acts);
+    if ui.small_button("Review since last looked…").clicked()
+        && let Some(action) = aggregate_action(session)
+    {
+        acts.push(action);
+    }
 }
 
+fn aggregate_action(session: &[Turn]) -> Option<Action> {
+    let last = session.last()?;
+    Some(Action::RepositoryTools(
+        crate::repo::repository_tools::Act::AggregateTurn(
+            last.session.clone(),
+            last.commit.clone(),
+        ),
+    ))
+}
 fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
     let Some(first) = session.first() else {
         return;
@@ -158,6 +172,14 @@ fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
     crate::menu_item::context(r)
         .style(crate::theme::menu_style)
         .show(|ui| {
+            if crate::menu_item::MenuItem::new("Review everything since last looked…")
+                .icon("file-diff")
+                .show(ui)
+                .clicked()
+                && let Some(action) = aggregate_action(session)
+            {
+                acts.push(action);
+            }
             if crate::menu_item::MenuItem::new("Delete this session's turns")
                 .icon("minus")
                 .show(ui)
@@ -210,6 +232,19 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
     crate::menu_item::context(&r)
         .style(crate::theme::menu_style)
         .show(|ui| {
+            if crate::menu_item::MenuItem::new("Review hunks / revert only this turn…")
+                .icon("file-diff")
+                .show(ui)
+                .clicked()
+            {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::Turn(
+                        turn.parent.clone(),
+                        turn.commit.clone(),
+                        turn.session.clone(),
+                    ),
+                ));
+            }
             if crate::menu_item::MenuItem::new("What this turn changed")
                 .icon("command")
                 .show(ui)

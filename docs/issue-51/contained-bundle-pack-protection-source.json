@@ -1,0 +1,87 @@
+{
+  "base_commit": "84eb79a0e797015fb2adaa0957c64d0f25932def",
+  "finding": "BUNDLE-R1-1 only",
+  "status": "source fix; pure recording/compile gates passed; independent finding-delta review pending; runtime held",
+  "review_report": {
+    "path": "/tmp/gitcraft-51-contained-bundle-review-r1.md",
+    "sha256": "cc746ffe2bad786a4aca788559215abc3f6ffbe63a26080eddf474c45ae35a0c"
+  },
+  "review_manifest": {
+    "path": "/tmp/gitcraft-51-contained-bundle-review-r1-manifest.json",
+    "sha256": "5bccf062d1a1019706e87e0f3c1fe29e9ab305cddc577d63bce3cbf37bf60c3b"
+  },
+  "source": [
+    {
+      "path": "crates/gitcraft-os/src/bundle_resources.rs",
+      "git_blob": "447a19ba26a1bd6b318fd3db13de0effaf5b34b5",
+      "sha256": "85e41fa6621a2fb6afbb29c7760a07ae39869e8b707dd3f3fdb6f6d4cdf26097"
+    },
+    {
+      "path": "crates/gitcraft-os/src/lib.rs",
+      "git_blob": "09ce9b520389d57476282db316de0a6023472dac",
+      "sha256": "0d0f5fa219713bc8102d40b4d4bba31ca229b9605605611bdd3d9850d2054318"
+    },
+    {
+      "path": "src/git/bundle_helper.rs",
+      "git_blob": "d9ce9aaffaffe6e61b659fe3c5d4ba048fffd7dd",
+      "sha256": "dcd6fd1e1bbd91ee45b6b9c6004cf1d90ab3390e6363a14b1363b00a4301bb09"
+    },
+    {
+      "path": "src/parallel_bisect/bundle.rs",
+      "git_blob": "e217d4829b9beae290833af5b7c754a9ea582ca2",
+      "sha256": "c97d6ba73c1427537ec872383a786f6472cc51bf52d5b7b72a3377112115eaf5"
+    }
+  ],
+  "gates": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked -p gitcraft-os bundle_resources::recording_tests",
+      "result": "3 passed (2 prior limit tests + 1 new nonce/filename validation)",
+      "log": "/tmp/gitcraft51-bundle-r1-os-recording.log",
+      "log_sha256": "05fc72b3ac338d2b43a89f3fdc2025e7af7ad0c23a89c3f7d9eae64610cebf40"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib parallel_bisect::bundle::recording_tests",
+      "result": "8 passed (3 prior + 5 new pack-protection schedules)",
+      "log": "/tmp/gitcraft51-bundle-r1-pipeline-recording.log",
+      "log_sha256": "8cd7a381c2e902c2f7961f8415b893263dea625845067986a9e3aa4ec0913b01"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "result": "PASS; 14 inherited lib / 9 lib-test warnings",
+      "log": "/tmp/gitcraft51-bundle-r1-check.log",
+      "log_sha256": "86614ea33680db67b2d2af81f437f4a082d5527944ef8cff78919a487e63f352"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked",
+      "result": "PASS; 14 inherited warnings",
+      "log": "/tmp/gitcraft51-bundle-r1-build.log",
+      "log_sha256": "622ba45cfe347b0122a233bfd35f5f94d39fc59bae87f7ffa7b73f08d5c65626"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked -p gitcraft-os --all-targets --target x86_64-pc-windows-gnu",
+      "result": "PASS; OS-crate compilation only",
+      "log": "/tmp/gitcraft51-bundle-r1-windows-check.log",
+      "log_sha256": "3e990fc6b577a561c700771488f6b944e3ea2551fd12e653fddc457717472bd2"
+    }
+  ],
+  "test_environment": {
+    "TMPDIR": "/private/tmp",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell"
+  },
+  "other_checks": [
+    "cargo +1.95.0 fmt --all -- --check: PASS",
+    "git diff --check: PASS"
+  ],
+  "unchanged_resource_limit_implementation": true,
+  "unchanged_supervisor_and_other_machine_features": true,
+  "runtime_executed": false,
+  "limits": [
+    "ordinary independent Git maintenance must respect owned .keep; no hostile-manual Unix namespace-lock claim",
+    "errors conservatively retain keep; manual inspection/retirement can be required",
+    "macOS unpack/import remains refused",
+    "no Linux cross-build or Windows application-helper/runtime claim",
+    "broader runtime hold unchanged"
+  ],
+  "binary_evidence_committed": false
+}

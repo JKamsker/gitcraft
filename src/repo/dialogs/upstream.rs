@@ -27,7 +27,7 @@ pub(super) fn set_upstream(
     title(
         ui,
         "Set upstream",
-        &format!("The remote branch {branch} pulls from and pushes to."),
+        &format!("The upstream {branch} pulls from. Its push route is configured separately."),
         &t,
     );
     if remote_names.len() > 1 {

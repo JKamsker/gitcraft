@@ -4,7 +4,7 @@ use crate::{git, remote};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub(super) struct Context {
+pub(in crate::git) struct Context {
     pub repo: PathBuf,
     pub path: PathBuf,
     env: Vec<(&'static str, String)>,

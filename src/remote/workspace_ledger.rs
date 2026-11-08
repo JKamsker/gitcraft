@@ -446,7 +446,8 @@ mod recording_tests {
         }
     }
     #[test]
-    fn recovery_manifest_merge_never_overwrites_changed_or_unbounded_evidence() {
+    fn recovery_manifest_merge_never_overwrites_changed_or_unbounded_evidence()
+    -> Result<(), Box<dyn std::error::Error>> {
         let authority = WorkspaceAuthority {
             root: "/synthetic".into(),
             anchor: "unix:1:2".into(),
@@ -455,20 +456,17 @@ mod recording_tests {
         };
         let name = format!("{}-mutation-{}.owner", authority.generation, "b".repeat(32));
         let endpoint = serde_json::json!({"v":2,"nonce":"c".repeat(64),"path":std::env::temp_dir().join(format!("gitcraft-native-owned-{}","d".repeat(32))),"port":12345,"token":"e".repeat(64)});
-        let record =
-            workspace_authority::record(&serde_json::to_vec(&endpoint).unwrap(), &authority)
-                .unwrap();
+        let record = workspace_authority::record(&serde_json::to_vec(&endpoint)?, &authority)?;
         let receipt = serde_json::to_vec(
             &serde_json::json!({"endpoint":endpoint,"state":"stopped","code":0,"complete":true}),
-        )
-        .unwrap();
+        )?;
         let proof = Proof {
             name: name.clone(),
             record: B64.encode(&record),
             receipt: B64.encode(&receipt),
         };
         let mut entries = BTreeMap::new();
-        merge(&mut entries, decode(&proof, &authority.anchor).unwrap()).unwrap();
+        merge(&mut entries, decode(&proof, &authority.anchor)?)?;
         let mut wrong = proof.clone();
         wrong.record = B64.encode(b"missing owner");
         assert!(decode(&wrong, &authority.anchor).is_err());
@@ -476,9 +474,10 @@ mod recording_tests {
         wrong.receipt = B64.encode(b"missing receipt");
         assert!(decode(&wrong, &authority.anchor).is_err());
         assert!(decode(&proof, "replaced anchor").is_err());
-        let mut changed = decode(&proof, &authority.anchor).unwrap();
+        let mut changed = decode(&proof, &authority.anchor)?;
         changed.record.push(b' ');
         assert!(merge(&mut entries, changed).is_err());
         assert_eq!(entries[&name].record, record);
+        Ok(())
     }
 }

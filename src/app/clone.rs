@@ -11,6 +11,9 @@ use crate::git;
 use crate::theme::{self, Tokens};
 
 pub(super) struct CloneForm {
+    options: git::CloneOptions,
+    depth: String,
+    sparse_folders: String,
     url: String,
     parent: String,
     name: String,
@@ -48,6 +51,9 @@ impl App {
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         self.clone_form = Some(CloneForm {
+            options: Default::default(),
+            depth: String::new(),
+            sparse_folders: String::new(),
             url: String::new(),
             parent,
             name: String::new(),
@@ -153,6 +159,33 @@ impl App {
             form.error = Some(format!("{} already exists and isn't empty", dest.display()));
             return;
         }
+        form.options.depth = if form.depth.trim().is_empty() {
+            None
+        } else {
+            match form.depth.trim().parse::<u32>() {
+                Ok(n) if n > 0 => Some(n),
+                _ => {
+                    form.error =
+                        Some("Depth must be a positive number, or empty for full history".into());
+                    return;
+                }
+            }
+        };
+        if form.options.folders.is_some() {
+            form.options.folders = Some(
+                form.sparse_folders
+                    .lines()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .collect(),
+            );
+        }
+        if let Err(error) = form.options.validate() {
+            form.error = Some(error);
+            return;
+        }
+        let options = form.options.clone();
         let url = form.url.trim().to_owned();
         let creds = if form.auth && !form.username.trim().is_empty() {
             match git::Credentials::for_url(
@@ -177,13 +210,15 @@ impl App {
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
         crate::connections::spawn(move || {
-            let result = git::clone(&url, &dest2, creds.as_ref(), &following).and_then(|()| {
-                if crate::remote::is_remote(&dest2) {
-                    Ok(dest2.clone())
-                } else {
-                    repo_root(&dest2)
-                }
-            });
+            let result =
+                git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
+                    .and_then(|()| {
+                        if crate::remote::is_remote(&dest2) {
+                            Ok(dest2.clone())
+                        } else {
+                            repo_root(&dest2)
+                        }
+                    });
             let _ = tx.send(result);
             ctx2.request_repaint();
         });
@@ -380,6 +415,16 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .color(t.text_faint)
             .small(),
     );
+    ui.collapsing("Clone options", |ui| {
+        ui.horizontal(|ui| { ui.label("Depth (empty = full history)"); ui.text_edit_singleline(&mut form.depth); });
+        ui.checkbox(&mut form.options.blobless, "Blobless: download file contents on demand");
+        let mut sparse = form.options.folders.is_some();
+        if ui.checkbox(&mut sparse, "Check out selected folders (cone mode)").changed() {
+            form.options.folders = sparse.then(Vec::new);
+        }
+        if sparse { ui.label("Repository-relative folders, one per line. Root files are always included."); ui.text_edit_multiline(&mut form.sparse_folders); }
+        ui.label("Clone downloads the selected checkout. Later history reads never download automatically; use Graph tools → Sparse checkout and downloads for consent. Passive object reads require Git with --no-lazy-fetch support.");
+    });
     if form.auth {
         ui.add_space(6.0);
         ui.label(

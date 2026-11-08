@@ -164,6 +164,13 @@ impl RepoTab {
                 let id = ui.id().with(("robot", &commit.hash));
                 crate::repo::authorship_view::robot(ui, left, row.mid(), &a, id)
             });
+            let deferred = self.deferred_badge(
+                ui,
+                row.gx + row.cols.graph + 6.0 + robot,
+                row.mid(),
+                &commit.hash,
+                acts,
+            );
             let lane = if self.test_lane.visible { LANE_W } else { 0.0 };
             // With the lane, the CI dot's place is kept on every row, so the lane is straight.
             let dots = if lane > 0.0 || ci.is_some() {
@@ -189,7 +196,7 @@ impl RepoTab {
                     self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing(),
                 ),
                 dot_w + badge_w,
-                robot,
+                robot + deferred,
             );
             if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
                 // Left on no ref by the operation a ghost run shows: struck through.

@@ -28,6 +28,7 @@ pub(crate) enum Kind {
     Secret,
     Large,
     RemoteHistory,
+    Transcript,
 }
 
 #[derive(Clone, Debug)]
@@ -79,6 +80,7 @@ pub(crate) struct Plan {
     tracking_ref: Option<String>,
     lfs_config: Vec<(String, String)>,
     receive_pack: String,
+    selection: Option<git::repository_tools::routes::PreparedPush>,
 }
 
 fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
@@ -125,7 +127,7 @@ fn config_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String
             "config",
             "--null",
             "--get-regexp",
-            r"^(remote\..*\.(url|pushurl|fetch|push|mirror|receivepack)|branch\..*\.(remote|merge|pushremote)|remote\.pushdefault|push\.(default|followtags|recursesubmodules)|url\..*\.(insteadof|pushinsteadof)|user\.(name|email|signingkey)|commit\.gpgsign|gpg\.(format|program)|gpg\..*\.program|core\.(sshcommand|hookspath)|ssh\.variant|lfs\.(url|pushurl|storage)|remote\..*\.(lfsurl|lfspushurl))$",
+            r"^(remote\..*\.(url|pushurl|fetch|push|mirror|receivepack)|branch\..*\.(remote|merge|pushremote|gitcraftpushbranch)|remote\.pushdefault|push\.(default|followtags|recursesubmodules)|url\..*\.(insteadof|pushinsteadof)|user\.(name|email|signingkey)|commit\.gpgsign|gpg\.(format|program)|gpg\..*\.program|core\.(sshcommand|hookspath)|ssh\.variant|lfs\.(url|pushurl|storage)|remote\..*\.(lfsurl|lfspushurl))$",
         ],
         active,
     )?;
@@ -177,6 +179,7 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
                 "-u" | "--set-upstream" => tracking = true,
                 "-f" | "--force" | "--force-with-lease" => force = true,
                 "--no-follow-tags" | "--porcelain" | "--no-verify" => {},
+                "--recurse-submodules=check" => extras.push(word.clone()),
                 "--delete" | "-d" => deleting = true,
                 _ if word.starts_with("--force-with-lease=") => force = true,
                 _ if word.starts_with("--push-option=") => extras.push(word.clone()),
@@ -226,6 +229,13 @@ fn valid_object_id(value: &str) -> bool {
     matches!(value.len(), 40 | 64) && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+// The internals branch picker extends only implicit plain pushes. Explicit refs
+// and workflow-reviewed plans keep the exact root plan chosen by their caller.
+fn saved_branch_spec(current: &str, saved: &str, implicit: bool) -> Option<String> {
+    (implicit && !current.is_empty() && !saved.is_empty())
+        .then(|| format!("refs/heads/{current}:refs/heads/{saved}"))
+}
+
 pub(crate) fn scan(
     repo: &Path,
     original: Vec<Vec<String>>,
@@ -261,6 +271,7 @@ pub(crate) fn scan(
     }
     let skip_hooks = pushes[0].iter().any(|w| w == "--no-verify");
     let (remote, spec, mut force, tracking, extras, delete_option) = parse(pushes[0])?;
+    let implicit_route = remote.is_none() && spec.is_none();
     let mut local_refs = BTreeMap::new();
     for op in &original {
         if let Some(name) = companion_branch(op) {
@@ -375,6 +386,16 @@ pub(crate) fn scan(
         return Err("The remote has no supported push address.".into());
     }
     let default_source = format!("refs/heads/{current}");
+    let saved_branch = if implicit_route && !current.is_empty() {
+        config(
+            repo,
+            &format!("branch.{current}.gitcraftPushBranch"),
+            active,
+        )?
+    } else {
+        String::new()
+    };
+    let spec = spec.or_else(|| saved_branch_spec(current, &saved_branch, implicit_route));
     let spec = match spec {
         Some(s) => s,
         None => {
@@ -657,6 +678,44 @@ pub(crate) fn scan(
         || config(repo, "commit.gpgSign", active)?.eq_ignore_ascii_case("true");
     let mut commits = Vec::new();
     let mut findings = Vec::new();
+    if !deleting {
+        let names = read(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+                "refs/heads/entire/checkpoints/",
+                "refs/entire/checkpoints/",
+                "refs/gitcraft/agent/",
+            ],
+            active,
+        )?;
+        if names.len() > 1024 * 1024 {
+            return Err(
+                "Checkpoint reference list exceeds 1 MiB; narrow publication before pushing".into(),
+            );
+        }
+        if let Some(detail) = crate::git::prompt_session::entire_automatic_publication(
+            repo, &names, skip_hooks, active,
+        )? {
+            findings.push(Finding {
+                kind: Kind::Transcript,
+                commit: push_oid.clone(),
+                path: String::new(),
+                detail: detail.into(),
+            });
+        }
+        if crate::git::prompt_session::checkpoint_publication(
+            &source,
+            &destination,
+            &push_oid,
+            &head,
+            &names,
+        ) {
+            findings.push(Finding { kind: Kind::Transcript, commit: push_oid.clone(), path: String::new(), detail: "Checkpoint publication may disclose prompts, local paths, assistant summaries and tool activity. This exact object or route contains agent checkpoint history. Review its contents and recipients explicitly before sending; local prompt/session viewing itself never publishes transcripts.".into() });
+        }
+    }
+
     if !deleting && push_oid != head {
         let tag = read(repo, &["cat-file", "tag", &push_oid], active)?;
         if secret_lines(tag.split_once("\n\n").map_or("", |x| x.1))
@@ -889,6 +948,7 @@ pub(crate) fn scan(
         tracking_ref,
         lfs_config,
         receive_pack,
+        selection: None,
     };
     check_active(repo, &plan, active)?;
     if !plan.deleting
@@ -955,6 +1015,40 @@ pub(crate) fn display_path(path: &str) -> String {
 }
 
 impl Plan {
+    pub(crate) fn selection(&self) -> Option<&git::repository_tools::routes::PreparedPush> {
+        self.selection.as_ref()
+    }
+
+    /// A sidebar/dependency choice can constrain a root checklist, never approve
+    /// it. Keep the original endpoint and lease across rechecks and echo/retry.
+    pub(crate) fn retain_selection(
+        &mut self,
+        selected: git::repository_tools::routes::PreparedPush,
+    ) -> Result<(), String> {
+        self.matches_selection(&selected.route)?;
+        self.selection = Some(selected);
+        Ok(())
+    }
+
+    fn matches_selection(
+        &self,
+        selected: &git::repository_tools::routes::PushRoute,
+    ) -> Result<(), String> {
+        if self.deleting
+            || self.remote != selected.remote
+            || self.destination != selected.destination
+            || self.push_oid != selected.commit
+            || self.head != selected.commit
+            || self.urls != selected.urls
+            || selected
+                .lease
+                .as_deref()
+                .is_some_and(|lease| self.base.as_deref() != Some(lease))
+        {
+            return Err("The selected push endpoint, commit or advertised lease changed. Fetch the exact target if needed, then reopen the original push action; nothing was sent.".into());
+        }
+        Ok(())
+    }
     pub(crate) fn is_current_branch(&self) -> bool {
         !self.deleting && self.branch == self.checkout && self.branch.starts_with("refs/heads/")
     }
@@ -1157,6 +1251,7 @@ pub(crate) fn check(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    check_selected_snapshot(plan, |snapshot| snapshot.check_publication(repo))?;
     clean_lfs_config(repo, &plan.checkout_oid, active)?;
     if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
         return Err("The checked-out branch moved. Reopen push preflight.".into());
@@ -1189,7 +1284,20 @@ fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(
     Ok(())
 }
 
+fn check_selected_snapshot(
+    plan: &Plan,
+    check: impl FnOnce(&git::repository_tools::guard::Snapshot) -> Result<(), String>,
+) -> Result<(), String> {
+    if let Some(selected) = &plan.selection {
+        check(&selected.snapshot)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
+    if let Some(selected) = &plan.selection {
+        plan.matches_selection(&selected.route)?;
+    }
     if (plan.force || plan.deleting) && plan.base.is_none() {
         return Err(
             "Fetch this exact target before force pushing: no remote lease was inspected.".into(),
@@ -1199,7 +1307,15 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
         "push".into(),
         "--porcelain".into(),
         "--no-follow-tags".into(),
-        "--recurse-submodules=no".into(),
+        if plan
+            .extras
+            .iter()
+            .any(|s| s == "--recurse-submodules=check")
+        {
+            "--recurse-submodules=check".into()
+        } else {
+            "--recurse-submodules=no".into()
+        },
     ];
     if !plan.destination.starts_with("refs/for/") {
         if !plan.deleting
@@ -1216,7 +1332,12 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
             plan.base.as_deref().unwrap_or_default()
         ));
     }
-    args.extend(plan.extras.clone());
+    args.extend(
+        plan.extras
+            .iter()
+            .filter(|s| s.as_str() != "--recurse-submodules=check")
+            .cloned(),
+    );
     args.extend([
         "--".into(),
         plan.remote.clone(),
@@ -1251,6 +1372,60 @@ pub(crate) fn execute(
 ) -> Result<String, String> {
     execute_controlled(repo, plan, creds, None)
 }
+/// Source evidence returned by RepoTab::reviewed_send after the user's personal
+/// rulebook gate. It is bound to the exact preflight argv, never a generic approval.
+#[derive(Clone)]
+pub(crate) struct ReviewedSend {
+    original: Vec<String>,
+    source: Option<Arc<git::CommandSource>>,
+}
+impl ReviewedSend {
+    pub(crate) fn from_echo(
+        original: Vec<String>,
+        source: Option<Arc<git::CommandSource>>,
+    ) -> Self {
+        Self { original, source }
+    }
+    pub(crate) fn check_plan(&self, plan: &Plan) -> Result<(), String> {
+        if self.original != push_args(plan)? {
+            return Err("Reviewer echo belongs to a different exact push; prepare again".into());
+        }
+        Ok(())
+    }
+}
+/// Execute only after caller preflight/consent and RepoTab::reviewed_send. Retain
+/// original-route typed auth receipts and repeat route/source proof per endpoint.
+pub(crate) fn execute_bound_controlled(
+    repo: &Path,
+    plan: &Plan,
+    reviewed: &ReviewedSend,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    reviewed.check_plan(plan)?;
+    let captured = std::cell::RefCell::new(None);
+    crate::repo::run_reviewed_push(
+        &reviewed.original,
+        |args| {
+            let binding = git::RouteBinding::capture(repo, args)?;
+            captured.replace(Some(binding.clone()));
+            Ok(binding)
+        },
+        || {
+            let route = captured.borrow();
+            let route = route.as_ref().ok_or("Reviewed route was not captured")?;
+            execute_controlled_with_guard(repo, plan, creds, control, || {
+                route.verify(repo)?;
+                if let Some(source) = &reviewed.source {
+                    source.check_execution()?;
+                }
+                Ok(())
+            })
+        },
+        control,
+    )
+}
+
 pub(crate) fn execute_controlled(
     repo: &Path,
     plan: &Plan,
@@ -1402,3 +1577,166 @@ pub(super) fn recording_input(
     )?
     .complete()
 }
+
+#[cfg(test)]
+mod internals_route_recording {
+    use super::*;
+    #[test]
+    fn saved_branch_enters_the_reviewed_plan_without_overriding_explicit_refs() {
+        assert_eq!(
+            saved_branch_spec("main", "dev", true),
+            Some("refs/heads/main:refs/heads/dev".into())
+        );
+        for (branch, saved, implicit) in [
+            ("main", "dev", false),
+            ("", "dev", true),
+            ("main", "", true),
+        ] {
+            assert_eq!(saved_branch_spec(branch, saved, implicit), None);
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod selected_continuation_recording {
+    use super::*;
+    use git::repository_tools::routes::{PreparedPush, PushRoute};
+
+    pub(crate) fn plan(route: &PushRoute) -> Plan {
+        Plan {
+            branch: format!("refs/heads/{}", route.branch),
+            remote: route.remote.clone(),
+            destination: route.destination.clone(),
+            head: route.commit.clone(),
+            base: route.lease.clone(),
+            commits: Vec::new(),
+            findings: Vec::new(),
+            targets: route.urls.iter().map(|u| target_label(u)).collect(),
+            expected_name: String::new(),
+            expected_email: String::new(),
+            expected_accounts: BTreeMap::new(),
+            profile: UserProfile::default(),
+            force: route.lease.is_some(),
+            deleting: false,
+            tracking: false,
+            lfs_objects: BTreeSet::new(),
+            skip_hooks: false,
+            push_oid: route.commit.clone(),
+            original: route.operations(),
+            urls: route.urls.clone(),
+            checkout: "refs/heads/other-checkout".into(),
+            checkout_oid: "c".repeat(40),
+            config: String::new(),
+            config_before_push: String::new(),
+            local_refs: BTreeMap::new(),
+            extras: Vec::new(),
+            tracking_ref: None,
+            lfs_config: Vec::new(),
+            receive_pack: String::new(),
+            selection: None,
+        }
+    }
+
+    #[test]
+    fn prewrite_snapshot_guard_blocks_changed_selection_and_leaves_ordinary_pushes_unchanged()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let original = git::repository_tools::guard::Snapshot::recording();
+        for (selected, change) in [(true, 0), (true, 1), (true, 2), (false, 1)] {
+            let mut plan = plan(&route);
+            let expected_args = push_args(&plan)?;
+            if selected {
+                plan.retain_selection(PreparedPush {
+                    snapshot: original.clone(),
+                    route: route.clone(),
+                })?;
+            }
+            let mut current = original.clone();
+            match change {
+                1 => current.worktrees.push_str("new linked worktree"),
+                2 => current.status.push_str("tracked working changes"),
+                _ => {}
+            }
+            let mut checks = 0;
+            let mut endpoints = 0;
+            let result = check_selected_snapshot(&plan, |captured| {
+                checks += 1;
+                assert_eq!(captured, &original); // retained input, never recaptured
+                if *captured == current {
+                    Ok(())
+                } else {
+                    Err("selected Snapshot changed".into())
+                }
+            })
+            .and_then(|()| {
+                // Inert dispatch callback after the same production guard. No
+                // repository read, command constructor or endpoint is executed.
+                endpoints += 1;
+                push_args(&plan)
+            });
+            assert_eq!(checks, usize::from(selected));
+            if selected && change != 0 {
+                assert_eq!(result, Err("selected Snapshot changed".into()));
+                assert_eq!(endpoints, 0);
+            } else {
+                assert_eq!(result?, expected_args);
+                assert_eq!(endpoints, 1);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn changed_endpoint_oid_destination_or_lease_cannot_enter_the_selected_checklist()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let selected = PreparedPush {
+            snapshot: git::repository_tools::guard::Snapshot::recording(),
+            route: route.clone(),
+        };
+        let mut original = plan(&route);
+        original.retain_selection(selected.clone())?;
+        assert_eq!(original.selection().map(|s| &s.route), Some(&route));
+        assert_eq!(original.again(), route.operations());
+        assert!(push_args(&original)?.contains(&format!(
+            "--force-with-lease=refs/heads/release:{}",
+            "b".repeat(40)
+        )));
+        for change in 0..5 {
+            let mut changed = plan(&route);
+            match change {
+                0 => changed.urls = vec!["https://foreign.invalid/repo".into()],
+                1 => changed.push_oid = "d".repeat(40),
+                2 => changed.destination = "refs/heads/other".into(),
+                3 => changed.remote = "pull-host".into(),
+                _ => changed.base = Some("e".repeat(40)),
+            }
+            assert!(changed.retain_selection(selected.clone()).is_err());
+            assert!(changed.selection().is_none());
+        }
+        // A mutable UI plan also cannot substitute another lease after review.
+        original.base = Some("f".repeat(40));
+        assert!(push_args(&original).is_err());
+        Ok(())
+    }
+}
+/// Credential-free routing/identity stamp for durable outbox endpoint identity.
+pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
+    config_stamp(repo, &|| !crate::tasks::cancellation().is_cancelled())
+}
+
+pub(crate) use fix::accept_rewrite;

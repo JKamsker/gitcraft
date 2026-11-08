@@ -676,10 +676,7 @@ fn bisects_on_another_machine() -> Result<(), String> {
         return Ok(());
     };
     let req = crate::remote::Request {
-        script: concat!(
-            "for d in ~/.cache/gitcraft/bisect/*/; do case $d in */run-*/) echo \"left: $d\";; esac; done"
-        )
-        .to_owned(),
+        script: "for d in ~/.cache/gitcraft/bisect/*/; do case $d in */run-*/) echo \"left: $d\";; esac; done".to_owned(),
         ..crate::remote::Request::default()
     };
     let left = crate::remote::exec(host, &req)?;

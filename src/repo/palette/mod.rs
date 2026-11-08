@@ -296,6 +296,16 @@ impl RepoTab {
             "act",
             Action::LocalCi(super::local_ci::Act::Open),
         ));
+        items.push(PaletteItem::action(
+            "Email patches…",
+            "b4",
+            Action::Email(super::email::Act::Open),
+        ));
+        items.push(PaletteItem::action(
+            "Worktree dev container…",
+            "environment",
+            Action::Devcontainer(super::devcontainer::Act::Open),
+        ));
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push(PaletteItem::action(
                 "Show CI for HEAD",

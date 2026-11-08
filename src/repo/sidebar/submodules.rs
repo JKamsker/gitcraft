@@ -42,7 +42,11 @@ impl RepoTab {
         for sub in &self.submodules {
             let r = submodule_row(ui, sub).on_hover_text(submodule_tip(sub));
             let cloned = sub.state != SubmoduleState::NotInitialized;
-            if r.double_clicked() && cloned {
+            if r.double_clicked() && sub.state == SubmoduleState::Conflicted {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::SubmoduleConflict(sub.path.clone()),
+                ));
+            } else if r.double_clicked() && cloned {
                 acts.push(Action::OpenTab(crate::remote::join(&self.path, &sub.path)));
             }
             crate::menu_item::context(&r)
@@ -67,6 +71,13 @@ impl RepoTab {
             .clicked()
         {
             acts.push(update_one(&sub.path));
+        }
+        if sub.state == SubmoduleState::Conflicted
+            && ui.button("Resolve pointer as a graph…").clicked()
+        {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::SubmoduleConflict(sub.path.clone()),
+            ));
         }
         let folder = crate::remote::join(&self.path, &sub.path);
         if MenuItem::new("Open in a new tab")

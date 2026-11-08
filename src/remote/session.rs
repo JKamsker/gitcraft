@@ -340,10 +340,9 @@ pub(crate) fn streaming_command_bounded(
     })
 }
 
-pub(super) fn claim_command(
-    host: &Host,
-    data: &str,
-) -> (Command, Vec<u8>, Option<Box<dyn FnOnce() + Send>>) {
+type ClaimCommand = (Command, Vec<u8>, Option<Box<dyn FnOnce() + Send>>);
+
+pub(super) fn claim_command(host: &Host, data: &str) -> ClaimCommand {
     let (command, connection) = shell_command(host, false);
     let input = format!("{MORE_PATH}\n{}", super::supervisor::claim(data)).into_bytes();
     (

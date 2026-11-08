@@ -1,7 +1,7 @@
 //! Teleport (a tab's menu, or the palette): the dialog that picks a machine and where the work
 //! goes there, and the teleport itself, run on a thread of its own (see `crate::teleport`).
 
-mod drag;
+pub(super) mod drag;
 mod view;
 pub(super) use drag::DragTargets;
 

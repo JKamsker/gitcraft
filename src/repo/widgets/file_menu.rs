@@ -98,6 +98,13 @@ pub fn file_menu_with(
                     tab: FileTab::File,
                 });
             }
+            if let Some(rev) = rev
+                && ui.button("Inspect stored object…").clicked()
+            {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::Object(format!("{rev}:{path}")),
+                ));
+            }
             if crate::menu_item::MenuItem::new("File history")
                 .icon("history")
                 .keys_when(crate::keymap::Command::FileHistory, shortcuts)

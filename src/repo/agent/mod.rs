@@ -5,6 +5,7 @@
 //! denied automatically.
 
 pub(crate) mod plan;
+pub(crate) mod preview;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -58,6 +59,7 @@ impl Job {
 struct Ready {
     job: Job,
     plan: Plan,
+    preview: Option<preview::Preview>,
 }
 
 /// A request waiting for the user's Approve or Deny.
@@ -103,6 +105,7 @@ impl Default for Agents {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CardView {
     pub agent: String,
+    pub preview: Option<preview::Preview>,
     pub ask: Ask,
     /// The git commands it runs, as they would be typed.
     pub commands: Vec<String>,
@@ -171,9 +174,16 @@ impl RepoTab {
             ctx,
             move || {
                 let planned = plan::plan(&path, &job.op);
-                (job, planned)
+                let preview = if planned.as_ref().is_ok_and(|p| p.ask.is_some()) {
+                    preview::read(&path, &job.op, &|| job.abandoned())
+                } else {
+                    None
+                };
+                (job, planned, preview)
             },
-            move |tab, (job, planned), ctx| tab.agent_planned(job, planned, approved, ctx),
+            move |tab, (job, planned, preview), ctx| {
+                tab.agent_planned(job, planned, preview, approved, ctx)
+            },
         );
     }
 
@@ -182,6 +192,7 @@ impl RepoTab {
         &mut self,
         job: Job,
         planned: Result<Plan, String>,
+        preview: Option<preview::Preview>,
         approved: Option<Ask>,
         ctx: &egui::Context,
     ) {
@@ -212,15 +223,30 @@ impl RepoTab {
             self.agent_calls.queue.push_front(job);
             return;
         }
+        if let Some(ask) = &mut plan.ask {
+            use sha2::{Digest, Sha256};
+            let guards: Vec<_> = plan
+                .ops
+                .iter()
+                .filter(|s| s.first().is_some_and(|v| v.starts_with('\0')))
+                .collect();
+            let bytes = serde_json::to_vec(&guards).expect("string vectors serialize");
+            let digest = Sha256::digest(bytes)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>();
+            ask.body
+                .push_str(&format!("\nExact source guards: {digest}\n{guards:?}"));
+        }
         match plan.ask.take() {
             // What the user approved is still what it would do.
             Some(ask) if approved.as_ref() == Some(&ask) => {
-                self.agent_start(Ready { job, plan }, ctx)
+                self.agent_start(Ready { job, plan, preview }, ctx)
             }
             Some(ask) => {
                 plan.ask = Some(ask);
                 self.agent_calls.card = Some(Waiting {
-                    ready: Ready { job, plan },
+                    ready: Ready { job, plan, preview },
                     shown: Instant::now(),
                     until: Instant::now() + self.agent_calls.approval_wait,
                 });
@@ -229,7 +255,7 @@ impl RepoTab {
                 ));
                 ctx.request_repaint();
             }
-            None => self.agent_start(Ready { job, plan }, ctx),
+            None => self.agent_start(Ready { job, plan, preview }, ctx),
         }
     }
 
@@ -292,7 +318,7 @@ impl RepoTab {
     }
 
     fn agent_start(&mut self, ready: Ready, ctx: &egui::Context) {
-        let Ready { job, plan } = ready;
+        let Ready { job, plan, .. } = ready;
         let before = self.refs.head.clone();
         self.run_ops(
             &plan.label,
@@ -320,6 +346,7 @@ impl RepoTab {
         let ask = plan.ask.as_ref()?;
         Some(CardView {
             agent: visible(&waiting.ready.job.agent),
+            preview: waiting.ready.preview.clone(),
             ask: Ask {
                 title: visible(&ask.title),
                 body: visible(&ask.body),
@@ -343,7 +370,7 @@ impl RepoTab {
         let Some(waiting) = self.agent_calls.card.take() else {
             return;
         };
-        let Ready { job, plan } = waiting.ready;
+        let Ready { job, plan, .. } = waiting.ready;
         if !approve {
             job.answer(
                 Outcome::Denied,

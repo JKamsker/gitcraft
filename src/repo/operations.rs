@@ -696,7 +696,7 @@ fn merge_pure_reviewed_echo_operands_are_strict_and_survive_retry() -> Result<()
     Ok(())
 }
 
-fn run_reviewed_push(
+pub(crate) fn run_reviewed_push(
     original: &[String],
     capture: impl FnOnce(&[&str]) -> Result<git::RouteBinding, String>,
     execute: impl FnOnce() -> Result<String, String>,
@@ -1265,19 +1265,75 @@ mod tests {
     use super::{run_steps, stash_push_args};
     use crate::git;
 
-    fn recorded_route() -> git::RouteBinding {
+    #[test]
+    fn selected_continuation_recording_retains_actual_route_receipt_and_expect_retry()
+    -> Result<(), String> {
+        let route = git::repository_tools::routes::PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let mut plan = crate::push_preflight::selected_continuation_recording::plan(&route);
+        plan.retain_selection(git::repository_tools::routes::PreparedPush {
+            snapshot: git::repository_tools::guard::Snapshot::recording(),
+            route: route.clone(),
+        })?;
+        let original = crate::push_preflight::push_args(&plan)?;
+        let binding: git::RouteBinding = serde_json::from_value(serde_json::json!({ "args":original, "routes":route.urls, "configuration":"recorded original route" })).map_err(|e| e.to_string())?;
+        let control = git::OpControl::new(|| {});
+        let receipt = crate::push_preflight::remember_auth_endpoint(&route.urls[0]);
+        let failed = super::run_reviewed_push(
+            &original,
+            |_| Ok(binding.clone()),
+            || Err(receipt.clone()),
+            Some(&control),
+        );
+        assert_eq!(failed, Err(receipt));
+        let failure = control
+            .auth_failure()
+            .ok_or("typed reviewed receipt missing")?;
+        assert_eq!(failure.binding, Some(binding.clone()));
+        assert_eq!(failure.endpoints, route.urls);
+        let mut ops = crate::push_preflight::approved_ops(plan);
+        let guard = ops[0].clone();
+        ops.insert(
+            0,
+            vec![
+                super::EXPECT_HTTPS_ROUTE.into(),
+                serde_json::to_string(&binding).map_err(|e| e.to_string())?,
+            ],
+        );
+        super::retain_unfinished(&mut ops, 1);
+        assert!(ops.contains(&guard));
+        let mut checked = 0;
+        super::check_https_routes(&ops, |actual| {
+            checked += 1;
+            assert_eq!(actual, &binding);
+            Ok(())
+        })?;
+        assert_eq!(checked, 1);
+        let approved = ops.last().ok_or("APPROVED continuation missing")?;
+        super::reviewed_operands(approved)?;
+        Ok(())
+    }
+
+    fn recorded_route() -> Result<git::RouteBinding, String> {
         serde_json::from_value(serde_json::json!({
             "args": ["push", "--", "original", "HEAD:refs/heads/main"],
             "routes": ["https://push.invalid/team/repo"],
             "configuration": "captured-routing-config"
         }))
-        .unwrap()
+        .map_err(|e| e.to_string())
     }
 
     #[test]
-    fn recording_reviewed_route_is_captured_before_dispatch_and_proves_one_shot_receipt() {
+    fn recording_reviewed_route_is_captured_before_dispatch_and_proves_one_shot_receipt()
+    -> Result<(), String> {
         use std::cell::Cell;
-        let binding = recorded_route();
+        let binding = recorded_route()?;
         let original = binding.args.clone();
         let control = git::OpControl::new(|| {});
         let captured = Cell::new(false);
@@ -1306,7 +1362,9 @@ mod tests {
             )
         });
         assert_eq!(result, Err(receipt.clone())); // human diagnostics stay opaque
-        let failure = control.auth_failure().unwrap();
+        let failure = control
+            .auth_failure()
+            .ok_or("missing authentication failure")?;
         assert_eq!(failure.context, context);
         assert!(failure.confirmed);
         assert_eq!(failure.endpoints, ["https://push.invalid/team/repo"]);
@@ -1317,7 +1375,10 @@ mod tests {
             let mut tab =
                 super::RepoTab::new_deferred("/nonexistent/reviewed-signin-recording".into(), &ctx);
             tab.offer_failed_https_signin(failure.clone(), true, &ctx);
-            let ticket = tab.https_challenge.as_ref().unwrap();
+            let ticket = tab
+                .https_challenge
+                .as_ref()
+                .ok_or("missing sign-in ticket")?;
             assert!(ticket.authorizes_endpoint("https://push.invalid/team/repo"));
             assert!(!ticket.authorizes_endpoint("https://fetch.invalid/team/repo"));
             assert_eq!(ticket.binding, Some(binding));
@@ -1325,7 +1386,8 @@ mod tests {
                 tab.dialog,
                 Some(super::Dialog::Credentials { .. })
             ));
-        });
+            Ok::<(), String>(())
+        })?;
         let mut changed = context.clone();
         changed.choices.github.user = "later-account".into();
         changed.run(|| {
@@ -1336,12 +1398,14 @@ mod tests {
             assert!(tab.https_challenge.is_none());
             assert!(tab.dialog.is_none());
         });
+        Ok(())
     }
 
     #[test]
-    fn recording_reviewed_auth_missing_foreign_or_unproven_routes_refuse_without_dispatch() {
+    fn recording_reviewed_auth_missing_foreign_or_unproven_routes_refuse_without_dispatch()
+    -> Result<(), String> {
         use std::cell::Cell;
-        let binding = recorded_route();
+        let binding = recorded_route()?;
         let original = binding.args.clone();
         let dispatched = Cell::new(false);
         let control = git::OpControl::new(|| {});
@@ -1381,16 +1445,18 @@ mod tests {
             super::reviewed_auth_failure(&receipt, binding, crate::connections::Context::default())
                 .is_none()
         );
+        Ok(())
     }
 
     #[test]
-    fn recording_https_route_proof_is_rechecked_after_draft_and_retained_for_retry() {
+    fn recording_https_route_proof_is_rechecked_after_draft_and_retained_for_retry()
+    -> Result<(), String> {
         use std::cell::Cell;
-        let binding = recorded_route();
+        let binding = recorded_route()?;
         let ops = vec![
             vec![
                 super::EXPECT_HTTPS_ROUTE.into(),
-                serde_json::to_string(&binding).unwrap(),
+                serde_json::to_string(&binding).map_err(|e| e.to_string())?,
             ],
             vec!["checkout".into(), "topic".into()],
         ];
@@ -1426,14 +1492,24 @@ mod tests {
             quiet: false,
         });
         tab.keep_unfinished(1);
-        assert_eq!(tab.last_op.as_ref().unwrap().ops, ops);
+        assert_eq!(
+            tab.last_op.as_ref().ok_or("missing retry operation")?.ops,
+            ops
+        );
         let malformed = vec![vec![
             super::EXPECT_HTTPS_ROUTE.into(),
             "invalid-json".into(),
         ]];
+        let called = Cell::new(false);
         assert!(
-            super::check_https_routes(&malformed, |_| panic!("invalid proof dispatched")).is_err()
+            super::check_https_routes(&malformed, |_| {
+                called.set(true);
+                Err("invalid proof dispatched".into())
+            })
+            .is_err()
         );
+        assert!(!called.get(), "invalid proof dispatched");
+        Ok(())
     }
 
     #[test]

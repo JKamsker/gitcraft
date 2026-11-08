@@ -22,14 +22,12 @@ fn recording_timeline_reads_have_local_only_policy_and_cancel_before_dispatch() 
     assert!(
         reader
             .run(&["status"], vec![], &[0])
-            .unwrap_err()
-            .contains("cancelled")
+            .is_err_and(|error| error.contains("cancelled"))
     );
     assert!(
         reader
             .diff_files(&"a".repeat(40), &"b".repeat(40))
-            .unwrap_err()
-            .contains("cancelled")
+            .is_err_and(|error| error.contains("cancelled"))
     );
 }
 pub(crate) struct Repo(pub PathBuf);

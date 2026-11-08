@@ -399,6 +399,8 @@ impl RepoTab {
             self.poll_history_activity(ctx);
         }
         self.agent_step(ctx);
+        self.poll_outbox(ctx);
+        self.poll_deferred(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
         self.poll_saved_views(ctx);
         self.poll_content_recovery(ctx);
@@ -549,6 +551,7 @@ impl RepoTab {
                         }
                         Err(e) => self.detail_error = Some(e),
                     }
+                    self.finish_commit_changes(&hash, ctx);
                 }
             }
             Msg::RebaseCommits {

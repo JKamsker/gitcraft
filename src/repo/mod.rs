@@ -21,11 +21,13 @@ mod bundles;
 mod celebration;
 mod ci_status;
 mod ci_view;
+mod cleanup;
 mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
+mod commit_changes;
 pub(crate) mod conflict;
 mod conflict_check;
 mod content_recovery;
@@ -35,6 +37,7 @@ pub(crate) mod custom_commands;
 mod dco;
 mod detached;
 mod detail;
+mod devcontainer;
 mod dialogs;
 mod diff;
 mod diff_split;
@@ -44,6 +47,7 @@ mod drafts;
 mod drafts_tests;
 mod drag_drop;
 mod drift_view;
+mod email;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
@@ -90,6 +94,7 @@ mod navigate;
 mod navigation;
 mod offline;
 pub(crate) mod operations;
+pub(crate) use operations::run_reviewed_push;
 mod owners;
 mod package;
 mod palette;
@@ -114,6 +119,7 @@ mod reflog;
 mod rehearse;
 mod release;
 mod remerge;
+mod repository_tools;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
@@ -124,6 +130,7 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod sparse;
 mod ssh_setup;
 mod stack;
 mod state;
@@ -189,6 +196,7 @@ pub struct RepoTab {
     pub name: String,
     tx: messages::JobSender,
     _jobs: crate::tasks::Scope,
+    behaviour_cache: crate::parallel_bisect::observe::Cache,
     rx: Receiver<Msg>,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
@@ -305,6 +313,7 @@ pub struct RepoTab {
     scroll_to: Option<usize>,
     /// The commit the detail pane is about (a graph row or a stash).
     detail_hash: Option<String>,
+    pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     /// The selected commit's signature, containment, notes and backlinks.
@@ -322,6 +331,8 @@ pub struct RepoTab {
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     local_ci: local_ci::State,
+    email: email::State,
+    devcontainer: devcontainer::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -351,6 +362,10 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    deferred: repository_tools::DeferredCache,
+    prompt_session: prompt_session::State,
+    outbox_last: Option<std::time::Instant>,
+    outbox_reading: bool,
     /// The release being prepared or cut (its dialog).
     release: Option<release::ReleaseView>,
     /// The hotfix flow: the dialog that finishes one, and the push after it.
@@ -364,6 +379,7 @@ pub struct RepoTab {
     push_flow: push::PushFlow,
     plain_rebase_request: u64,
     preflight_pending: Option<PendingOp>,
+    preflight_selection: Option<git::repository_tools::routes::PreparedPush>,
     preflight_after: Option<(String, PendingOp)>,
     preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -465,6 +481,8 @@ pub struct RepoTab {
     graph_narration: graph_walk::Narration,
     postcards: postcards::State,
     growth: Option<growth::State>,
+    cleanup: Option<cleanup::State>,
+    sparse: Option<sparse::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
@@ -581,6 +599,7 @@ impl RepoTab {
             name,
             tx,
             _jobs: jobs,
+            behaviour_cache: Default::default(),
             rx,
             opened: Instant::now(),
             life: lifecycle::Lifecycle::new(Instant::now()),
@@ -657,6 +676,7 @@ impl RepoTab {
             stash_view: None,
             scroll_to: None,
             detail_hash: None,
+            pending_commit_diff: None,
             detail: None,
             detail_error: None,
             extras: Default::default(),
@@ -670,6 +690,8 @@ impl RepoTab {
             review_tools: Default::default(),
             ci_view: None,
             local_ci: Default::default(),
+            email: Default::default(),
+            devcontainer: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,
@@ -687,6 +709,10 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            deferred: Default::default(),
+            prompt_session: Default::default(),
+            outbox_last: None,
+            outbox_reading: false,
             release: None,
             hotfix: hotfix::Hotfix::default(),
             package: None,
@@ -694,6 +720,7 @@ impl RepoTab {
             push_flow: Default::default(),
             plain_rebase_request: 0,
             preflight_pending: None,
+            preflight_selection: None,
             preflight_after: None,
             preflight_timeline: None,
             credentials: None,
@@ -754,6 +781,8 @@ impl RepoTab {
             graph_narration: Default::default(),
             postcards: Default::default(),
             growth: None,
+            cleanup: None,
+            sparse: None,
             atlas: None,
             history_activity: None,
             history_minimap: Default::default(),
@@ -880,3 +909,5 @@ pub(crate) fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
         .map(|args| args.iter().map(|a| (*a).to_owned()).collect())
         .collect()
 }
+
+mod prompt_session;

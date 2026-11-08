@@ -123,6 +123,38 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
     ui.add_space(8.0);
     ui.add(egui::Label::new(&card.ask.body).wrap());
     ui.add_space(8.0);
+    if let Some(preview) = &card.preview {
+        egui::CollapsingHeader::new("Ghost preview")
+            .default_open(true)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("approval-ghost")
+                    .max_height(170.0)
+                    .show(ui, |ui| {
+                        for (name, from, to) in &preview.moves {
+                            ui.label(RichText::new(name).strong());
+                            ui.horizontal_wrapped(|ui| {
+                                ui.colored_label(
+                                    t.text_dim,
+                                    format!("○ {}", crate::repo::short(from)),
+                                );
+                                ui.colored_label(t.accent, "→");
+                                ui.colored_label(
+                                    t.accent.gamma_multiply(0.75),
+                                    format!("◌ {}", crate::repo::short(to)),
+                                )
+                                .on_hover_text(format!("{from} → {to}"));
+                            });
+                        }
+                        for commit in &preview.leaving {
+                            ui.colored_label(t.warning, format!("Leaving: {commit}"));
+                        }
+                        for note in &preview.notes {
+                            ui.label(note);
+                        }
+                    });
+            });
+    }
     ui.label(RichText::new("Commands:").color(t.text_dim).small());
     egui::Frame::new()
         .fill(t.field)

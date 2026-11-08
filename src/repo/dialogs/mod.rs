@@ -1,5 +1,6 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
+mod behaviour;
 mod bisect;
 pub(super) mod branch;
 mod bundles;
@@ -10,6 +11,7 @@ mod fold;
 mod gerrit;
 mod interaction;
 mod keep_detached;
+mod linked_machines;
 mod parallel_bisect;
 mod preview;
 mod rehearse;
@@ -58,6 +60,7 @@ pub enum Dialog {
         selected: std::collections::BTreeSet<usize>,
     },
     ContentRecovery,
+    RepositoryTools(Box<super::repository_tools::State>),
     GerritReview {
         remote: String,
         head: String,
@@ -67,16 +70,15 @@ pub enum Dialog {
         skip_hooks: bool,
         web_warning: Option<String>,
     },
+    Behaviour(Box<behaviour::Form>),
+    LinkedMachines(Box<linked_machines::Form>),
     BundleLoading(u64),
     BundleExport {
         refs: Vec<crate::git::BundleRef>,
         selected: std::collections::BTreeSet<String>,
         base: String,
     },
-    BundleIncoming {
-        label: String,
-        preview: Box<crate::git::BundlePreview>,
-    },
+    BundleIncoming(Box<bundles::Form>),
     CreateBranch {
         /// Commit the branch starts at.
         at: String,
@@ -460,6 +462,8 @@ impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.history_activity_window(ctx, acts);
         self.atlas_window(ctx);
+        self.sparse_window(ctx, acts);
+        self.cleanup_window(ctx);
         self.growth_window(ctx);
         self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
@@ -530,6 +534,12 @@ impl RepoTab {
                     skip_hooks,
                     web_warning,
                 } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks, web_warning.as_deref()),
+                Dialog::RepositoryTools(state) => {
+                    super::repository_tools::show(ui, state, acts);
+                    if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
+                Dialog::Behaviour(form) => form.show(ui),
+                Dialog::LinkedMachines(form) => form.show(ui),
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
@@ -537,7 +547,7 @@ impl RepoTab {
                     if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
                 Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
-                Dialog::BundleIncoming { label, preview } => bundles::incoming(ui, label, preview),
+                Dialog::BundleIncoming(form) => form.show(ui),
                 Dialog::CreateBranch {
                     at,
                     at_label,

@@ -31,9 +31,14 @@ impl RepoTab {
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        // Any later user action supersedes a pending automatic backlink diff opening.
+        if !matches!(&action, Action::OpenCommitChanges(_)) {
+            self.pending_commit_diff = None;
+        }
         if matches!(
             &action,
             Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
                 | Action::FileView { .. }
                 | Action::ShowActivity(_)
                 | Action::OpenPr(_)
@@ -68,6 +73,7 @@ impl RepoTab {
         if matches!(
             &action,
             Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
                 | Action::OpenPr(_)
                 | Action::OpenCi { .. }
                 | Action::FileView { .. }
@@ -95,6 +101,7 @@ impl RepoTab {
             Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
             Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
+            Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::DvcPull => {
                 self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
             }
@@ -126,6 +133,7 @@ impl RepoTab {
                 self.hint_after_select(row, ctx);
             }
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
+            Action::OpenCommitChanges(hash) => self.open_commit_changes(hash, ctx),
             Action::SelectHash(hash) => {
                 self.leave_pages();
                 // Following a link is a step of its own, back and forward.
@@ -179,6 +187,8 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::LoadPromptSession(hash) => self.load_prompt_session(hash, ctx),
+            Action::ShowPromptHunk(seed) => self.show_prompt_hunk(seed, ctx),
             Action::OpenLineDossier(seed) => {
                 self.symbols.close();
                 self.open_line_dossier(seed, ctx)
@@ -220,6 +230,8 @@ impl RepoTab {
             Action::ContentPrepare(target) => self.content_prepare(target, ctx),
             Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
             Action::LocalCi(act) => self.local_ci_act(act, ctx),
+            Action::Email(act) => self.email_act(act, ctx),
+            Action::Devcontainer(act) => self.devcontainer_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
@@ -507,6 +519,8 @@ impl RepoTab {
             Action::ReviewBranch { branch, base } => self.start_review(ctx, branch, base),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenBehaviour => self.open_behaviour(),
+            Action::OpenLinkedMachines => self.open_linked_machines(ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleInspect => self.open_bundle_inspect(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),
