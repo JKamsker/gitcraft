@@ -55,6 +55,23 @@ pub(crate) enum Command {
     PreviousChange,
     NextChangeAlt,
     PreviousChangeAlt,
+    GraphPrevious,
+    GraphNext,
+    GraphLeft,
+    GraphRight,
+    RebasePrevious,
+    RebaseNext,
+    RebaseMoveUp,
+    RebaseMoveDown,
+    RebasePick,
+    RebaseReword,
+    RebaseEdit,
+    RebaseSquash,
+    RebaseFixup,
+    RebaseDrop,
+    SettingsSearch,
+    SettingsPrevious,
+    SettingsNext,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
@@ -65,20 +82,45 @@ pub(crate) enum Scope {
     Files,
     Diff,
     Changes,
+    Graph,
+    Rebase,
+    Settings,
 }
 
 impl Scope {
     fn overlaps(self, other: Self) -> bool {
-        !matches!(
-            (self, other),
-            (Self::Files, Self::Diff) | (Self::Diff, Self::Files)
-        )
+        match (self, other) {
+            (Self::Window, _) | (_, Self::Window) => true,
+            (Self::Settings, scope) | (scope, Self::Settings) => scope == Self::Settings,
+            (Self::Rebase, Self::Files | Self::Diff | Self::Changes | Self::Graph)
+            | (Self::Files | Self::Diff | Self::Changes | Self::Graph, Self::Rebase)
+            | (Self::Files, Self::Diff | Self::Graph)
+            | (Self::Diff | Self::Graph, Self::Files) => false,
+            _ => true,
+        }
     }
 }
 
 impl Command {
     pub(crate) fn scope(self) -> Scope {
         match self {
+            Command::GraphPrevious
+            | Command::GraphNext
+            | Command::GraphLeft
+            | Command::GraphRight => Scope::Graph,
+            Command::RebasePrevious
+            | Command::RebaseNext
+            | Command::RebaseMoveUp
+            | Command::RebaseMoveDown
+            | Command::RebasePick
+            | Command::RebaseReword
+            | Command::RebaseEdit
+            | Command::RebaseSquash
+            | Command::RebaseFixup
+            | Command::RebaseDrop => Scope::Rebase,
+            Command::SettingsSearch | Command::SettingsPrevious | Command::SettingsNext => {
+                Scope::Settings
+            }
             Command::NewTab
             | Command::CloseTab
             | Command::ReopenTab
@@ -132,6 +174,23 @@ impl Command {
             Self::PreviousChange => "previous_change",
             Self::NextChangeAlt => "next_change_alternate",
             Self::PreviousChangeAlt => "previous_change_alternate",
+            Self::GraphPrevious => "graph_previous",
+            Self::GraphNext => "graph_next",
+            Self::GraphLeft => "graph_left",
+            Self::GraphRight => "graph_right",
+            Self::RebasePrevious => "rebase_previous",
+            Self::RebaseNext => "rebase_next",
+            Self::RebaseMoveUp => "rebase_move_up",
+            Self::RebaseMoveDown => "rebase_move_down",
+            Self::RebasePick => "rebase_pick",
+            Self::RebaseReword => "rebase_reword",
+            Self::RebaseEdit => "rebase_edit",
+            Self::RebaseSquash => "rebase_squash",
+            Self::RebaseFixup => "rebase_fixup",
+            Self::RebaseDrop => "rebase_drop",
+            Self::SettingsSearch => "settings_search",
+            Self::SettingsPrevious => "settings_previous",
+            Self::SettingsNext => "settings_next",
             Self::NewTab => "new_tab",
             Self::CloseTab => "close_tab",
             Self::ReopenTab => "reopen_tab",
@@ -196,6 +255,16 @@ impl Command {
                 | Command::PreviousChangeAlt
                 | Command::Back
                 | Command::Forward
+                | Command::GraphPrevious
+                | Command::GraphNext
+                | Command::GraphLeft
+                | Command::GraphRight
+                | Command::RebasePrevious
+                | Command::RebaseNext
+                | Command::RebaseMoveUp
+                | Command::RebaseMoveDown
+                | Command::SettingsPrevious
+                | Command::SettingsNext
         )
     }
 }
@@ -272,6 +341,23 @@ pub(crate) const BINDINGS: &[Binding] = &[
     bind(Command::PreviousChange, Modifiers::SHIFT, Key::F7),
     bind(Command::NextChangeAlt, Modifiers::ALT, Key::ArrowDown),
     bind(Command::PreviousChangeAlt, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::GraphPrevious, NONE, Key::ArrowUp),
+    bind(Command::GraphNext, NONE, Key::ArrowDown),
+    bind(Command::GraphLeft, NONE, Key::ArrowLeft),
+    bind(Command::GraphRight, NONE, Key::ArrowRight),
+    bind(Command::RebasePrevious, NONE, Key::ArrowUp),
+    bind(Command::RebaseNext, NONE, Key::ArrowDown),
+    bind(Command::RebaseMoveUp, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::RebaseMoveDown, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::RebasePick, NONE, Key::P),
+    bind(Command::RebaseReword, NONE, Key::R),
+    bind(Command::RebaseEdit, NONE, Key::E),
+    bind(Command::RebaseSquash, NONE, Key::S),
+    bind(Command::RebaseFixup, NONE, Key::F),
+    bind(Command::RebaseDrop, NONE, Key::D),
+    bind(Command::SettingsSearch, CMD, Key::F),
+    bind(Command::SettingsPrevious, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::SettingsNext, Modifiers::ALT, Key::ArrowDown),
 ];
 
 /// The command `key` with `modifiers` held does, if any.
@@ -279,7 +365,11 @@ pub(crate) const BINDINGS: &[Binding] = &[
 pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
     BINDINGS
         .iter()
-        .find(|b| b.key == key && modifiers.matches_exact(b.modifiers))
+        .find(|b| {
+            matches!(b.command.scope(), Scope::Window | Scope::Repository)
+                && b.key == key
+                && modifiers.matches_exact(b.modifiers)
+        })
         .map(|b| b.command)
 }
 
@@ -427,6 +517,26 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
 ];
 
 pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(&[Command::GraphPrevious], "Graph: previous commit"),
+    row(&[Command::GraphNext], "Graph: next commit"),
+    row(&[Command::GraphLeft], "Graph lane walk: jump to tip"),
+    row(
+        &[Command::GraphRight],
+        "Graph lane walk: cycle merge parent",
+    ),
+    row(&[Command::RebasePrevious], "Rebase: previous row"),
+    row(&[Command::RebaseNext], "Rebase: next row"),
+    row(&[Command::RebaseMoveUp], "Rebase: move commit up"),
+    row(&[Command::RebaseMoveDown], "Rebase: move commit down"),
+    row(&[Command::RebasePick], "Rebase: pick"),
+    row(&[Command::RebaseReword], "Rebase: reword"),
+    row(&[Command::RebaseEdit], "Rebase: edit"),
+    row(&[Command::RebaseSquash], "Rebase: squash"),
+    row(&[Command::RebaseFixup], "Rebase: fix up"),
+    row(&[Command::RebaseDrop], "Rebase: drop"),
+    row(&[Command::SettingsSearch], "Settings: focus search"),
+    row(&[Command::SettingsPrevious], "Settings: previous page"),
+    row(&[Command::SettingsNext], "Settings: next page"),
     row(&[Command::NextChange], "Next change"),
     row(&[Command::PreviousChange], "Previous change"),
     row(&[Command::NextChangeAlt], "Next change (alternate binding)"),

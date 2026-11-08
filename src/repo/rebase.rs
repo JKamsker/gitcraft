@@ -390,7 +390,19 @@ fn sh_path(path: &Path) -> String {
 }
 
 /// How the rows are moved and their actions set, for the footer's tooltip.
-const KEYS_HINT: &str = "Drag a row by its handle, or Alt+↑ / Alt+↓, to move it. Click a row, then P / R / E / S / F / D set its action and ↑ / ↓ select another.";
+fn keys_hint(ctx: &egui::Context) -> String {
+    use crate::keymap::{self, Command};
+    let steps = Step::ALL
+        .map(|step| format!("{}: {}", step.label(), keymap::label(ctx, step.command())))
+        .join("; ");
+    format!(
+        "Drag a row by its handle, or {} / {}, to move it. {} / {} select a row. {steps}",
+        keymap::label(ctx, Command::RebaseMoveUp),
+        keymap::label(ctx, Command::RebaseMoveDown),
+        keymap::label(ctx, Command::RebasePrevious),
+        keymap::label(ctx, Command::RebaseNext)
+    )
+}
 
 fn short(hash: &str) -> &str {
     hash.get(..7).unwrap_or(hash)
@@ -452,7 +464,7 @@ impl RepoTab {
                     "Move the branches on these commits along with them (git rebase \
                      --update-refs, git 2.38+): the lower layers of a stack rebased from its \
                      top. Branches checked out in other worktrees are left where they are; \
-                     Restack… in STACKS handles those. One Ctrl+Z puts every branch back.",
+                     Restack… in STACKS handles those. Undo puts every branch back.",
                 );
                 ui.add_space(4.0);
                 // The buttons first, from the right: the text takes what is left, cut short.
@@ -479,14 +491,15 @@ impl RepoTab {
                             None => {
                                 let n = editor.entries.len();
                                 egui::RichText::new(format!(
-                                    "{n} commit{}, newest on top · Ctrl+Z undoes the rebase",
-                                    if n == 1 { "" } else { "s" }
+                                    "{n} commit{}, newest on top · {} undoes the rebase",
+                                    if n == 1 { "" } else { "s" },
+                                    crate::keymap::label(ui.ctx(), crate::keymap::Command::Undo)
                                 ))
                                 .color(t.text_dim)
                             }
                         };
                         ui.add(egui::Label::new(note).truncate())
-                            .on_hover_text(KEYS_HINT);
+                            .on_hover_text(keys_hint(ui.ctx()));
                     });
                 });
             });

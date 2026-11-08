@@ -588,6 +588,7 @@ impl App {
             ctx,
             match self.tabs.get(self.active) {
                 Some(Tab::Repo(r)) => r.key_scopes(ctx),
+                Some(Tab::Settings) => vec![keymap::Scope::Window, keymap::Scope::Settings],
                 _ => vec![keymap::Scope::Window],
             },
         );
@@ -623,6 +624,19 @@ impl App {
                 && repo.search_shortcut_exception(ctx)
             {
                 allowed.push(keymap::Command::Search);
+            }
+            if self.palette.is_none()
+                && !self.manual_open
+                && !self.window_has_dialog()
+                && !self.askpass_open()
+                && matches!(self.tabs.get(self.active), Some(Tab::Settings))
+                && Settings::search_has_focus(ctx)
+            {
+                allowed.extend([
+                    keymap::Command::SettingsSearch,
+                    keymap::Command::SettingsPrevious,
+                    keymap::Command::SettingsNext,
+                ]);
             }
             Some(allowed)
         } else {

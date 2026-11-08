@@ -19,7 +19,9 @@ mod search;
 pub(super) mod suggest;
 mod suggest_popup;
 
-use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
+#[cfg(test)]
+use egui::Key;
+use egui::{Align2, FontId, Response, Sense, Ui, vec2};
 
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
@@ -405,24 +407,25 @@ impl RepoTab {
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
+        use crate::keymap::{self, Command};
+        keymap::active(ui.ctx(), self.key_scopes(ui.ctx()));
+        let up = keymap::take(ui.ctx(), Command::GraphPrevious);
+        let down = keymap::take(ui.ctx(), Command::GraphNext);
+        let left = keymap::take(ui.ctx(), Command::GraphLeft);
+        let right = keymap::take(ui.ctx(), Command::GraphRight);
         if Settings::get(ui.ctx()).graph_lane_walk {
-            let direction = ui.input(|i| {
-                if !i.modifiers.is_none() {
-                    return None;
-                }
-                use crate::repo::graph_walk::Direction;
-                if i.key_pressed(Key::ArrowDown) {
-                    Some(Direction::Parent)
-                } else if i.key_pressed(Key::ArrowUp) {
-                    Some(Direction::Child)
-                } else if i.key_pressed(Key::ArrowRight) {
-                    Some(Direction::Merge)
-                } else if i.key_pressed(Key::ArrowLeft) {
-                    Some(Direction::Tip)
-                } else {
-                    None
-                }
-            });
+            use crate::repo::graph_walk::Direction;
+            let direction = if down {
+                Some(Direction::Parent)
+            } else if up {
+                Some(Direction::Child)
+            } else if right {
+                Some(Direction::Merge)
+            } else if left {
+                Some(Direction::Tip)
+            } else {
+                None
+            };
             if let Some(direction) = direction
                 && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
             {
@@ -431,15 +434,6 @@ impl RepoTab {
             }
             return;
         }
-        // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
-        let below = self.diff_beside_graph(ui.ctx());
-        let (up, down) = ui.input(|i| {
-            let plain = !(below && i.modifiers.alt);
-            (
-                plain && i.key_pressed(Key::ArrowUp),
-                plain && i.key_pressed(Key::ArrowDown),
-            )
-        });
         let current = self.selected.or(ringed).unwrap_or(0);
         let next = if up {
             Some(current.saturating_sub(1))
@@ -842,5 +836,61 @@ mod tests {
         frame(&mut tab, Vec::new());
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    #[test]
+    fn configured_graph_movement_reaches_actual_selection_adapter() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = Settings {
+            graph_lane_walk: false,
+            ..Default::default()
+        };
+        settings.key_bindings.insert(
+            Command::GraphNext.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        let mut tab = RepoTab::new_deferred("/recorded/graph-registry".into(), &ctx);
+        tab.commits = (0..3)
+            .map(|i| {
+                std::sync::Arc::new(git::Commit {
+                    hash: i.to_string(),
+                    ..Default::default()
+                })
+            })
+            .collect();
+        tab.selected = Some(0);
+        for (key, expected) in [(Key::F8, true), (Key::ArrowDown, false)] {
+            let mut acts = Vec::new();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| tab.arrow_keys(ui, None, &mut acts),
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(matches!(acts.as_slice(), [Action::Select(1)]), expected);
+        }
     }
 }

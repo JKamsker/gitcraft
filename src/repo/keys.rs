@@ -7,7 +7,20 @@ use crate::settings::Settings;
 
 impl RepoTab {
     pub(crate) fn command_refusal(&self, command: Command) -> Option<String> {
-        self.key_action(command).err()
+        match command.scope() {
+            crate::keymap::Scope::Graph if self.commits.is_empty() => {
+                Some("No history loaded".into())
+            }
+            crate::keymap::Scope::Rebase if self.rebase.is_none() => {
+                Some("No rebase editor is open".into())
+            }
+            crate::keymap::Scope::Rebase
+                if self.rebase.as_ref().is_some_and(|editor| editor.starting) =>
+            {
+                Some("The rebase is being prepared".into())
+            }
+            _ => self.key_action(command).err(),
+        }
     }
 
     /// The action the key of `command` stands for here, or why it can't be done now, as the
@@ -83,17 +96,7 @@ impl RepoTab {
             | Command::HunkStage
             | Command::HunkUnstage
             | Command::HunkDiscard => return self.keyboard_command(command).map(Some),
-            Command::NewTab
-            | Command::CloseTab
-            | Command::ReopenTab
-            | Command::NextTab
-            | Command::PreviousTab
-            | Command::GoToTab(_)
-            | Command::LastTab
-            | Command::Palette
-            | Command::Settings
-            | Command::Reload
-            | Command::Manual => return Ok(None),
+            _ => return Ok(None),
         };
         Ok(Some(action))
     }

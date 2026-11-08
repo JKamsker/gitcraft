@@ -733,10 +733,7 @@ impl Settings {
                         "Topology navigation",
                         "accessibility audio lanes graph parent child",
                         |ui| {
-                            ui.checkbox(
-                                &mut self.graph_lane_walk,
-                                "Walk graph topology with arrow keys",
-                            );
+                            ui.checkbox(&mut self.graph_lane_walk, "Walk graph topology");
                             ui.checkbox(
                                 &mut self.graph_sounds,
                                 "Soft sounds for merges and lane crossings",

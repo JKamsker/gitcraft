@@ -418,7 +418,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Graph",
         &[
-            ("↑ / ↓", "Previous / next commit"),
             ("Enter / Shift+Enter", "Next / previous search result"),
             ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
             ("Cmd+click", "Compare with the selected commit"),
@@ -432,18 +431,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Merge, rebase, fast-forward, cherry-pick, move or squash",
             ),
             ("Esc", "Close the find bar, diff, comparison or search"),
-        ],
-    ),
-    (
-        "Interactive rebase",
-        &[
-            (
-                "P / R / E / S / F / D",
-                "Pick, reword, edit, squash, fix up or drop the selected row",
-            ),
-            ("↑ / ↓", "Select the row above / below"),
-            ("Alt+↑ / Alt+↓", "Move the selected commit up / down"),
-            ("Esc", "Close the editor without rebasing"),
         ],
     ),
     (
@@ -481,14 +468,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+Shift+C", "Copy the selection"),
         ],
     ),
-    (
-        "Settings",
-        &[
-            ("Cmd+F", "Search the settings"),
-            ("Esc", "Clear the search"),
-            ("Alt+↑ / Alt+↓", "Previous / next page"),
-        ],
-    ),
 ];
 
 /// Every group of shortcuts, as the manual and Settings → Keyboard shortcuts list them: the
@@ -505,7 +484,7 @@ pub(crate) fn shortcut_groups(
     let mut groups = vec![
         ("Window", from_keymap(keymap::WINDOW_ROWS)),
         ("Repository", from_keymap(keymap::REPOSITORY_ROWS)),
-        ("Files and hunks", from_keymap(keymap::LOCAL_ROWS)),
+        ("Contextual actions", from_keymap(keymap::LOCAL_ROWS)),
     ];
     groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
         let keys = keys

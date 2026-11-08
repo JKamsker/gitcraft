@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use egui::{Event, Key, Modifiers, RawInput};
 
 use super::*;
@@ -28,61 +26,12 @@ fn parse(combo: &str) -> Option<(Key, bool, bool, bool)> {
     Some((key, cmd, shift, alt))
 }
 
-const EVERY_COMMAND: &[Command] = &[
-    Command::Undo,
-    Command::Redo,
-    Command::Timeline,
-    Command::Search,
-    Command::Back,
-    Command::Forward,
-    Command::NextChange,
-    Command::PreviousChange,
-    Command::NextChangeAlt,
-    Command::PreviousChangeAlt,
-    Command::NewTab,
-    Command::CloseTab,
-    Command::ReopenTab,
-    Command::NextTab,
-    Command::PreviousTab,
-    Command::GoToTab(1),
-    Command::GoToTab(2),
-    Command::GoToTab(3),
-    Command::GoToTab(4),
-    Command::GoToTab(5),
-    Command::GoToTab(6),
-    Command::GoToTab(7),
-    Command::GoToTab(8),
-    Command::LastTab,
-    Command::Palette,
-    Command::Settings,
-    Command::Reload,
-    Command::Manual,
-    Command::Fetch,
-    Command::Pull,
-    Command::Push,
-    Command::Stash,
-    Command::NewBranch,
-    Command::Terminal,
-    Command::StageAll,
-    Command::Commit,
-    Command::FocusSidebar,
-    Command::FocusGraph,
-    Command::FocusDetail,
-    Command::FileNext,
-    Command::FilePrevious,
-    Command::FileToggleStage,
-    Command::FileOpen,
-    Command::HunkStage,
-    Command::HunkUnstage,
-    Command::HunkDiscard,
-];
-
 #[test]
 fn no_two_bindings_share_a_key() {
-    let mut seen = HashSet::new();
-    for b in BINDINGS {
-        assert!(seen.insert(normalised(b)), "{:?} is bound twice", b.key);
-    }
+    assert!(
+        config::validate(&Overrides::new()).is_ok(),
+        "all coexisting default bindings must be unambiguous"
+    );
 }
 
 #[test]
@@ -110,22 +59,24 @@ fn no_binding_takes_a_key_a_view_already_uses() {
 
 #[test]
 fn every_command_has_one_key_and_finds_its_way_back() {
-    for &command in EVERY_COMMAND {
+    for command in config::commands() {
         let bindings: Vec<_> = BINDINGS.iter().filter(|b| b.command == command).collect();
         assert_eq!(bindings.len(), 1, "{command:?}");
         let b = bindings[0];
-        assert_eq!(find(b.key, b.modifiers), Some(command));
+        assert_eq!(
+            pressed_with(vec![key(b.key, b.modifiers, false)], command.scope()),
+            [command]
+        );
         assert!(!label(&egui::Context::default(), command).is_empty());
     }
-    assert_eq!(BINDINGS.len(), EVERY_COMMAND.len());
 }
 
 #[test]
 fn every_command_is_in_the_manual_once() {
     let rows = WINDOW_ROWS.iter().chain(REPOSITORY_ROWS).chain(LOCAL_ROWS);
     let listed: Vec<Command> = rows.flat_map(|r| r.commands.iter().copied()).collect();
-    for command in EVERY_COMMAND {
-        let times = listed.iter().filter(|c| *c == command).count();
+    for command in config::commands() {
+        let times = listed.iter().filter(|c| **c == command).count();
         assert_eq!(times, 1, "{command:?}");
     }
     for r in REPOSITORY_ROWS {
@@ -199,9 +150,19 @@ fn pressed_with(events: Vec<Event>, scope: Scope) -> Vec<Command> {
         events,
         ..Default::default()
     };
-    ctx.run_ui(input, |ui| got = pressed(ui.ctx(), scope))
-        .textures_delta
-        .clear();
+    ctx.run_ui(input, |ui| {
+        active(
+            ui.ctx(),
+            if scope == Scope::Settings {
+                vec![Scope::Window, Scope::Settings]
+            } else {
+                vec![Scope::Window, Scope::Repository, scope]
+            },
+        );
+        got = pressed(ui.ctx(), scope);
+    })
+    .textures_delta
+    .clear();
     got
 }
 

@@ -119,6 +119,18 @@ impl RepoTab {
             scopes.push(Scope::Changes);
         }
         if available(self, ctx) {
+            if self.rebase.is_some() {
+                scopes.push(Scope::Rebase);
+                return scopes;
+            }
+            if self.keyboard.borrow().pane != Some(Pane::Detail)
+                && (matches!(
+                    self.current_view(),
+                    Some(super::navigation::View::Graph { .. })
+                ) || self.diff_beside_graph(ctx))
+            {
+                scopes.push(Scope::Graph);
+            }
             match self.keyboard.borrow().pane {
                 Some(Pane::Detail) => scopes.push(Scope::Files),
                 None | Some(Pane::Graph) if self.diff.is_some() => scopes.push(Scope::Diff),
