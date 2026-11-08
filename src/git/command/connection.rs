@@ -9,6 +9,7 @@ pub(crate) struct ConnectionProbe {
 }
 fn probe_extra(dir: &Path) -> Extra {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.timeout = Some(Duration::from_secs(45));
     extra.output_limit = Some(2 << 20);
     extra.env.extend([
@@ -31,15 +32,37 @@ pub(crate) fn connection_probe(dir: &Path, url: &str) -> Result<ConnectionProbe,
         elapsed: started.elapsed(),
     })
 }
-pub(crate) fn connection_read(dir: &Path, args: &[&str]) -> Result<String, String> {
+/// Captured exit codes, bounded output/deadline, selected repository and captured profile.
+/// Callers interpreting exit 1 must not fall back to unsanitized run_captured.
+pub(crate) fn connection_captured(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> Result<Captured, String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
+    extra.stdin = input.map(<[u8]>::to_vec);
     extra.timeout = Some(Duration::from_secs(10));
     extra.output_limit = Some(128 << 10);
     let out = execute(Some(dir), &extra, args)?;
-    finish(out, args, &[0, 1])
+    Ok(Captured {
+        code: out.code,
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        raw: out.stdout,
+    })
+}
+pub(crate) fn connection_read(dir: &Path, args: &[&str]) -> Result<String, String> {
+    let out = connection_captured(dir, args, None)?;
+    if matches!(out.code, Some(0 | 1)) {
+        Ok(out.stdout)
+    } else {
+        Err(crate::diagnostics::crash::scrub(&out.stderr))
+    }
 }
 pub(crate) fn connection_shell(dir: &Path, script: &str) -> Result<String, String> {
     let extra = Extra {
+        normalize_repository: true,
         pre: vec!["-c", SHELL_ALIAS_ENV_DEF],
         env: vec![(SHELL_SCRIPT_VAR, script.into())],
         timeout: Some(Duration::from_secs(10)),
@@ -83,6 +106,7 @@ fn helper_trace(trace: &str) -> Vec<String> {
 }
 pub(crate) fn https_account(dir: &Path, url: &str) -> Result<HttpsAccount, String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.env.extend([
         ("GCM_INTERACTIVE", "never".into()),
         ("GIT_TRACE", "1".into()),
@@ -103,6 +127,7 @@ pub(crate) fn https_account(dir: &Path, url: &str) -> Result<HttpsAccount, Strin
 }
 pub(crate) fn https_reject(dir: &Path, url: &str) -> Result<(), String> {
     let mut extra = unattended_extra(cfg!(unix) || remote::is_remote(dir));
+    extra.normalize_repository = true;
     extra.stdin = Some(format!("url={url}\n\n").into_bytes());
     extra.timeout = Some(Duration::from_secs(15));
     extra.output_limit = Some(64 << 10);
@@ -116,6 +141,121 @@ pub(crate) fn https_reject(dir: &Path, url: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile() {
+        let profile = crate::connections::Context {
+            git_config: Some("/synthetic/profile.gitconfig".into()),
+            ..Default::default()
+        };
+        profile.run(|| {
+            let cmd = apply_command_extras(
+                Command::new("/recorded/git"),
+                Some(Path::new("/synthetic/repository")),
+                &probe_extra(Path::new("/synthetic/repository")),
+                &["remote"],
+            );
+            let env: std::collections::HashMap<_, _> = cmd
+                .get_envs()
+                .map(|(k, v)| {
+                    (
+                        k.to_string_lossy().into_owned(),
+                        v.map(|v| v.to_string_lossy().into_owned()),
+                    )
+                })
+                .collect();
+            for key in [
+                "GIT_DIR",
+                "GIT_WORK_TREE",
+                "GIT_CONFIG_COUNT",
+                "GIT_CONFIG_PARAMETERS",
+            ] {
+                assert_eq!(env.get(key), Some(&None));
+            }
+            assert_eq!(
+                env.get("GIT_CONFIG_GLOBAL"),
+                Some(&Some("/synthetic/profile.gitconfig".into()))
+            );
+        });
+    }
+    #[test]
+    fn all_push_urls_are_inventoried_and_only_the_selected_failed_push_is_rejected()
+    -> Result<(), String> {
+        let repo = crate::practice::create(crate::practice::Scenario::Detached)?;
+        struct Cleanup(PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let root = repo.parent().ok_or("No owned root")?;
+        let _cleanup = Cleanup(root.to_owned());
+        run(
+            Some(&repo),
+            &["remote", "add", "origin", "https://fetch.invalid/team/repo"],
+        )?;
+        for url in [
+            "https://push-a.invalid/team/repo",
+            "https://push-b.invalid/team/repo",
+        ] {
+            run(
+                Some(&repo),
+                &["config", "--local", "--add", "remote.origin.pushurl", url],
+            )?;
+        }
+        let endpoints = remote_endpoints(&repo)?;
+        assert_eq!(
+            endpoints.iter().map(|e| e.key()).collect::<Vec<_>>(),
+            ["origin · fetch 1", "origin · push 1", "origin · push 2"]
+        );
+        let attempted = operation_endpoints(&repo, &["push", "origin", "HEAD:main"])?;
+        assert_eq!(
+            attempted,
+            [
+                "https://push-a.invalid/team/repo",
+                "https://push-b.invalid/team/repo"
+            ]
+        );
+        let failure = AuthFailure::from_error(
+            "fatal: Authentication failed for 'https://push-b.invalid/team/repo'",
+            &attempted,
+        );
+        let record = root.join("push-helper-record");
+        let quoted = crate::remote::sh_quote(&record.to_string_lossy());
+        let helper = format!(
+            "!f() {{ printf '%s\\n' \"$1\" >> {quoted}; while IFS= read -r line && test -n \"$line\"; do case \"$line\" in host=*|path=*) printf '%s\\n' \"$line\" >> {quoted};; esac; done; if test \"$1\" = get; then printf 'username=dummy-push-b\\npassword=dummy-token\\n'; fi; }}; f"
+        );
+        run(Some(&repo), &["config", "--local", "credential.helper", ""])?;
+        run(
+            Some(&repo),
+            &["config", "--local", "--add", "credential.helper", &helper],
+        )?;
+        run(
+            Some(&repo),
+            &["config", "--local", "credential.useHttpPath", "true"],
+        )?;
+        assert_eq!(
+            https_account(&repo, &failure.endpoints[0])?
+                .username
+                .as_deref(),
+            Some("dummy-push-b")
+        );
+        https_reject(&repo, &failure.endpoints[0])?;
+        let log = std::fs::read_to_string(record).map_err(|e| e.to_string())?;
+        assert!(
+            log.contains("get\nhost=push-b.invalid\npath=team/repo"),
+            "{log}"
+        );
+        assert!(
+            log.contains("erase\nhost=push-b.invalid\npath=team/repo"),
+            "{log}"
+        );
+        assert!(
+            !log.contains("fetch.invalid")
+                && !log.contains("push-a.invalid")
+                && !log.contains("dummy-token")
+        );
+        Ok(())
+    }
     #[test]
     fn real_git_inspects_and_rejects_only_the_selected_helper_url() -> Result<(), String> {
         let repo = crate::practice::create(crate::practice::Scenario::Detached)?;

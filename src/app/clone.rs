@@ -224,14 +224,13 @@ impl App {
                 if let Some(form) = self.cloning_form.take().filter(|f| f.auth)
                     && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
                     && root.as_ref() == Some(&repo.path)
-                {
-                    if let Ok(creds) = git::Credentials::for_url(
+                    && let Ok(creds) = git::Credentials::for_url(
                         form.url.trim(),
                         form.username.trim().to_owned(),
                         form.password,
-                    ) {
-                        repo.set_credentials(creds);
-                    }
+                    )
+                {
+                    repo.set_credentials(creds);
                 }
             }
             // Back to the form, asking for credentials.
