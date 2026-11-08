@@ -20,7 +20,7 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
 }
 pub(super) fn snapshot(path: &Path) -> Result<Snapshot, String> {
     if crate::remote::is_remote(path) {
-        return Err("Email patches currently require a worktree on this machine and b4 ≥ 0.17 installed there".into());
+        return Err("Email patches currently require a worktree on this machine and the supported b4 ce4c1158 (0.17-dev) source build installed there".into());
     }
     let config = git(path, &["config", "--null", "--list", "--includes"])?;
     let mut config = config.into_bytes();
@@ -59,14 +59,24 @@ pub(super) fn compare(expected: &Snapshot, current: &Snapshot) -> Result<(), Str
     }
     Ok(())
 }
-pub(super) fn b4(path: &Path, args: &[String]) -> Result<String, String> {
-    let version = model::command(&["--version".into()]);
-    model::version(&git(
-        path,
-        &version.iter().map(String::as_str).collect::<Vec<_>>(),
-    )?)?;
-    let args = model::command(args);
+fn invoke_b4(path: &Path, args: &[String], confirmed: bool) -> Result<String, String> {
+    use std::io::Read;
+    let script = crate::shell_path::resolve("b4");
+    if !Path::new(&script).is_absolute() {
+        return Err("Install b4 in an absolute executable PATH directory (a Python virtual environment is supported)".into());
+    }
+    let mut prefix = Vec::new();
+    std::fs::File::open(&script)
+        .map_err(|e| format!("Cannot read installed b4 entrypoint: {e}"))?
+        .take(4096)
+        .read_to_end(&mut prefix)
+        .map_err(|e| e.to_string())?;
+    let python = model::interpreter(&prefix)?;
+    let args = model::command(&python, args, confirmed);
     git(path, &args.iter().map(String::as_str).collect::<Vec<_>>())
+}
+pub(super) fn b4(path: &Path, args: &[String]) -> Result<String, String> {
+    invoke_b4(path, args, false)
 }
 pub(super) struct Scratch(pub PathBuf);
 impl Scratch {
@@ -233,7 +243,7 @@ pub(super) fn send(path: &Path, shown: &Preview) -> Result<String, String> {
     args.extend(shown.recipients.clone());
     model::send_reviewed(&shown.messages, &fresh.messages, || {
         guard(path, &shown.snapshot)?;
-        b4(path, &args).map_err(|e| format!("Send did not report success: {e}. Some mail may already have been delivered. Inspect b4/mail state before retrying."))
+        invoke_b4(path, &args, true).map(|output| format!("b4 reported a successful send. Inspect native sent tags and revision before sending again.\n{output}")).map_err(|e| format!("Send did not report success: {e}. Some mail may already have been delivered. Inspect b4/mail state before retrying."))
     })
 }
 pub(super) fn prepare(
@@ -272,7 +282,7 @@ pub(super) fn prepare(
             args.extend(["--force-revision".into(), number.to_string()]);
         }
         "reroll" => {
-            args.extend(["--manual-reroll".into(), model::source(value)?]);
+            args.extend(["--manual-reroll".into(), model::reroll_id(value)?]);
         }
         _ => return Err("Unknown preparation action".into()),
     }

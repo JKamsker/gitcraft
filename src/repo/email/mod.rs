@@ -115,7 +115,7 @@ impl RepoTab {
         }
         let mut open = true;
         egui::Window::new("Email patches · b4").id(egui::Id::new(("email-patches", &self.path))).open(&mut open).default_width(760.0).vscroll(true).show(ctx, |ui| {
-            ui.label("Requires b4 ≥ 0.17 on this machine. Uses b4's configured identity, public-inbox and sending transport. No credentials are exported by gitcraft.");
+            ui.label("Requires the supported b4 source build ce4c1158 (0.17-dev), installed with its Python entrypoint in a virtual environment on this machine. The Python helper uses isolated mode, so user-site/PYTHONPATH-only installs are unsupported. Other builds are refused until their contract is reviewed. Uses b4's configured identity, public-inbox and sending transport. No credentials are exported by gitcraft.");
             if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button("Cancel operation").clicked() { acts.push(Action::Email(Act::Cancel)); } }
             ui.label(&state.result);
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
@@ -144,7 +144,7 @@ impl RepoTab {
                 if ui.button("Generate outgoing preview (no mail)").clicked() { acts.push(Action::Email(Act::Preview)); }
                 if let Some(preview) = &state.preview {
                     messages(ui, &preview.messages, "outgoing");
-                    ui.label("Sending regenerates volatile Date, Message-ID and signature headers. Recipients, subjects and decoded MIME content are checked against this preview. b4's successful-send tagging/reroll behavior applies.");
+                    ui.label("Sending regenerates volatile Date, Message-ID and signature headers. Recipients, subjects and decoded MIME content are checked against this preview. b4's successful-send tagging/reroll behavior applies. Native failed-preflight or unknown prompts abort; only the final send confirmation is answered by this explicit approval.");
                     ui.checkbox(&mut state.confirm, "I reviewed every recipient and message and want to send real mail");
                     if ui.add_enabled(state.confirm, egui::Button::new("Send reviewed series through b4")).clicked() { acts.push(Action::Email(Act::Send)); }
                 }

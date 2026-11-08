@@ -163,33 +163,63 @@ pub(super) fn recipients(to: &str, cc: &str) -> Result<Vec<String>, String> {
     }
     Ok(args)
 }
-/// Fixed shell alias; every user value is a separate positional argument.
-pub(super) fn command(args: &[String]) -> Vec<String> {
+/// The installed CLI's shebang identifies its Python environment (including pipx/venvs).
+pub(super) fn interpreter(prefix: &[u8]) -> Result<String, String> {
+    let line = std::str::from_utf8(prefix.split(|b| *b == b'\n').next().unwrap_or_default())
+        .map_err(|_| "b4 entrypoint has no Python shebang")?;
+    let words = line
+        .strip_prefix("#!")
+        .ok_or("Installed b4 must have a Python script entrypoint")?
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    match words.as_slice() {
+        [path]
+            if std::path::Path::new(path).is_absolute()
+                && path
+                    .rsplit('/')
+                    .next()
+                    .is_some_and(|p| p.starts_with("python")) =>
+        {
+            Ok((*path).into())
+        }
+        ["/usr/bin/env", name] if ["python", "python3"].contains(name) => Ok((*name).into()),
+        _ => Err(
+            "Unsupported b4 entrypoint; use the supported source build's Python entrypoint".into(),
+        ),
+    }
+}
+pub(super) fn reroll_id(value: &str) -> Result<String, String> {
+    let value = value.trim();
+    let value = if let Some(inner) = value.strip_prefix('<') {
+        inner
+            .strip_suffix('>')
+            .ok_or("Unbalanced Message-ID brackets")?
+    } else {
+        value
+    };
+    if value.contains("://") || value.contains(['<', '>']) {
+        return Err("Use the previous sent Message-ID, not a URL".into());
+    }
+    source(value)?;
+    Ok(value.into())
+}
+/// Fixed alias; Python code, interpreter and every native argument remain positional.
+pub(super) fn command(python: &str, args: &[String], confirmed: bool) -> Vec<String> {
     let mut result = vec![
         "-c".into(),
-        "alias.gitcraft-b4=!f() { exec b4 -c b4.save-maildirs=no --no-interactive --no-stdin \"$@\"; }; f".into(),
+        "alias.gitcraft-b4=!f() { py=\"$1\"; shift; exec \"$py\" -I -c \"$@\"; }; f".into(),
         "gitcraft-b4".into(),
+        python.into(),
+        include_str!("b4_entry.py").into(),
+        if confirmed {
+            "confirmed-send"
+        } else {
+            "no-send"
+        }
+        .into(),
     ];
     result.extend_from_slice(args);
     result
-}
-
-/// No process is executed by these gates; runtime results are supplied by the caller.
-pub(super) fn version(value: &str) -> Result<(), String> {
-    let v = value.trim().trim_start_matches("b4 ");
-    let mut parts = v.split('.');
-    let major = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .ok_or("Cannot read b4 version")?;
-    let minor = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .ok_or("Cannot read b4 version")?;
-    if major == 0 && minor < 17 {
-        return Err("Install b4 ≥ 0.17 (cover-from-file is required)".into());
-    }
-    Ok(())
 }
 pub(super) fn send_reviewed<T>(
     shown: &[Message],

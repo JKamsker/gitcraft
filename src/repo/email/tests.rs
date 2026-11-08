@@ -52,7 +52,11 @@ fn native_arguments_never_interpolate_source_or_recipients() -> Result<(), Strin
     let recipients = model::recipients(value, "c@example.test")?;
     assert_eq!(recipients, vec!["--to", value, "--cc", "c@example.test"]);
     assert!(model::recipients("a@example.test\nBcc: stolen@example.test", "").is_err());
-    let args = model::command(&["am".into(), "--".into(), "$(touch bad)@example.test".into()]);
+    let args = model::command(
+        "/venv/bin/python3",
+        &["am".into(), "--".into(), "$(touch bad)@example.test".into()],
+        false,
+    );
     assert!(!args[1].contains("touch bad"));
     assert_eq!(
         args.last().map(String::as_str),
@@ -67,10 +71,13 @@ fn malformed_or_oversized_mail_is_refused() {
     assert!(model::parse(&vec![b'x'; model::MAX + 1]).is_err());
 }
 #[test]
-fn version_gate_and_final_send_gate_do_not_send_stale_mail() -> Result<(), String> {
-    assert!(model::version("0.17.0").is_ok());
-    assert!(model::version("0.16.4").is_err());
-    assert!(model::version("unexpected").is_err());
+fn interpreter_and_final_send_gate_do_not_send_stale_mail() -> Result<(), String> {
+    assert_eq!(
+        model::interpreter(b"#!/venv/bin/python3\nimport b4")?,
+        "/venv/bin/python3"
+    );
+    assert_eq!(model::interpreter(b"#!/usr/bin/env python3\n")?, "python3");
+    assert!(model::interpreter(b"#!/bin/sh\n").is_err());
     let shown = vec![model::parse(
         b"Subject: reviewed\nTo: a@example.test\n\npatch\n",
     )?];
@@ -119,4 +126,32 @@ fn displayed_snapshot_guards_all_authoring_and_apply_inputs() {
     changed = shown;
     changed.status = " M tracked".into();
     assert!(super::run::compare(&changed, &changed).is_err());
+}
+#[test]
+fn reroll_normalizes_brackets_and_rejects_url() -> Result<(), String> {
+    assert_eq!(
+        model::reroll_id("<sent@example.test>")?,
+        "sent@example.test"
+    );
+    assert_eq!(model::reroll_id("sent@example.test")?, "sent@example.test");
+    assert!(model::reroll_id("https://lore.kernel.org/all/sent@example.test/").is_err());
+    assert!(model::reroll_id("<sent@example.test").is_err());
+    assert!(model::reroll_id("sent@example.test>").is_err());
+    Ok(())
+}
+#[test]
+fn confirmed_native_entrypoint_is_separate_and_pinned() {
+    let args = model::command("/venv/bin/python3", &["send".into()], true);
+    assert_eq!(args[3], "/venv/bin/python3");
+    assert!(args[1].contains(" -I -c "));
+    assert_eq!(args[5], "confirmed-send");
+    assert!(args[4].contains("ce4c1158edb292caca0ce4a6087e5edecc1b0371"));
+    assert!(args[4].contains("b4.save-maildirs=no"));
+    assert!(args[4].contains("check_contract(b4.__VERSION__, sources)"));
+    let preview = model::command(
+        "/venv/bin/python3",
+        &["send".into(), "-o".into(), "/owned/preview".into()],
+        false,
+    );
+    assert_eq!(preview[5], "no-send");
 }
