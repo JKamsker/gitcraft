@@ -506,7 +506,7 @@ mod fluent_release_tests {
             });
             let run = h.state().run.as_ref().ok_or("missing supplied run")?;
             assert_eq!(run.steps[0].1, Status::Failed(original_failure.into()));
-            assert_eq!(run.steps[0].0.label(), "Create tag");
+            assert_eq!(run.steps[0].0.label(), "Tag");
             assert_eq!(run.plan.preview(Some(Forge::GitHub)), expected_preview);
         }
         crate::i18n::set_language("en-US");
