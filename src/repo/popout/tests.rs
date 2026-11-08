@@ -349,7 +349,7 @@ fn without_native_windows_a_pop_out_is_a_window_inside_and_comes_back() {
     // window's reminder of it.
     let has_title = harness.query_by_label(&window_title).is_some();
     let hint = harness
-        .query_by_label("CI view in its own window")
+        .query_by_role_and_label(egui::accesskit::Role::Button, "Show the CI view window")
         .is_some();
     let backs = harness
         .query_all_by_label("Bring the CI view back into the main window")

@@ -17,7 +17,25 @@ pub(crate) fn capturing(ctx: &egui::Context) -> bool {
         .is_some_and(|edit| ctx.cumulative_pass_nr() <= edit.last_seen.saturating_add(1))
 }
 
-pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
+pub(crate) fn page(
+    overrides: &mut Overrides,
+    ui: &mut Ui,
+    mut include: impl FnMut(Command, &str) -> bool,
+) {
+    let rows: Vec<_> = config::commands()
+        .filter_map(|command| {
+            let keys = config::effective(&config::usable(overrides), command)
+                .iter()
+                .map(Stroke::label)
+                .collect::<Vec<_>>()
+                .join(" → ");
+            include(command, &keys).then_some((command, keys))
+        })
+        .collect();
+    // Counting settings search matches must not draw or activate editor controls.
+    if rows.is_empty() {
+        return;
+    }
     ui.label(crate::i18n::text("interaction-control-select-change-press-up-to-four-keys-in-the-capture-control-then-tab-to-save"));
     if let Err(error) = config::validate(overrides) {
         ui.colored_label(
@@ -157,14 +175,9 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
         .striped(true)
         .num_columns(5)
         .show(ui, |ui| {
-            for command in config::commands() {
+            for (command, keys) in rows {
                 ui.push_id(command.id(), |ui| {
                     ui.label(command.title());
-                    let keys = config::effective(&config::usable(overrides), command)
-                        .iter()
-                        .map(Stroke::label)
-                        .collect::<Vec<_>>()
-                        .join(" → ");
                     ui.monospace(if keys.is_empty() {
                         crate::i18n::text("interaction-control-unbound")
                     } else {
@@ -224,7 +237,10 @@ mod tests {
     };
 
     fn harness() -> Harness<'static, Overrides> {
-        Harness::new_ui_state(|ui, overrides| page(overrides, ui), Overrides::default())
+        Harness::new_ui_state(
+            |ui, overrides| page(overrides, ui, |_, _| true),
+            Overrides::default(),
+        )
     }
 
     fn change(h: &mut Harness<'_, Overrides>) {
@@ -449,8 +465,10 @@ mod localization_tests {
         assert_eq!(Command::GoToTab(1).id(), "tab_1");
         assert_eq!(crate::keymap::label(&ctx, Command::GoToTab(1)), before);
         assert_eq!(Command::NewTab.title(), "Neuer Tab");
-        let mut h =
-            Harness::new_ui_state(|ui, overrides| page(overrides, ui), Overrides::default());
+        let mut h = Harness::new_ui_state(
+            |ui, overrides| page(overrides, ui, |_, _| true),
+            Overrides::default(),
+        );
         h.get_all_by_label("Ändern")
             .next()
             .ok_or("missing Change control")?

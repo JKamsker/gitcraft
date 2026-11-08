@@ -1328,7 +1328,13 @@ impl Settings {
             Page::Agents => self.agents_ui(ui, f),
             Page::ContextMenus => self.context_menus_ui(ui, f),
             Page::Shortcuts => {
-                crate::keymap::editor::page(&mut self.key_bindings, ui);
+                crate::keymap::editor::page(&mut self.key_bindings, ui, |command, keys| {
+                    f.include_shortcut(&format!(
+                        "{} {} {keys} keys keyboard",
+                        command.id(),
+                        command.title()
+                    ))
+                });
             }
         }
     }

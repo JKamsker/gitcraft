@@ -137,11 +137,7 @@ mod fluent_badge_tests {
             };
             let tooltip = badge.tooltip();
             assert!(tooltip.contains(expected), "{tooltip}");
-            assert!(tooltip.contains(if lang == "de" {
-                "eine Datei"
-            } else {
-                "one file"
-            }));
+            assert!(tooltip.contains(if lang == "de" { "eine Datei" } else { "1 file" }));
             assert_eq!(
                 badge.labels()[0],
                 if lang == "de" {

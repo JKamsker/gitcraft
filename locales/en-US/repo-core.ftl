@@ -2864,17 +2864,20 @@ repo-core-3698 = Show in Finder
 repo-core-3699 = Open folder
 repo-core-3701 = { $s } s
 repo-core-3702 = { $conflicts ->
-                [one] { $label }: conflicts in { $conflicts } file, resolve it in Changes
+                [one] { $label }: conflicts in { $conflicts } file, resolve them in Changes
                *[other] { $label }: conflicts in { $conflicts } files, resolve them in Changes
             }
 repo-core-3703 = { $n ->
                 [one] { $label }: { $n } file resolved as before, check it in Changes
                *[other] { $label }: { $n } files resolved as before, check them in Changes
             }
-repo-core-3704 = { $conflicts ->
-        [one] { $label }: conflicts in { $conflicts } file, { $n } resolved as before: check these, resolve the rest in Changes
-       *[other] { $label }: conflicts in { $conflicts } files, { $n } resolved as before: check these, resolve the rest in Changes
-    }
+repo-core-3704 = { $label }: conflicts in { $conflicts } { $conflicts ->
+        [one] file
+       *[other] files
+    }, { $n } resolved as before: check { $n ->
+        [one] it
+       *[other] them
+    }, resolve the rest in Changes
 repo-core-3747 = Could not start looking for weakened checks: { $e }
 repo-core-3749 = Open file
 repo-core-3750 = View file

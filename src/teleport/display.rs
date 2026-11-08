@@ -573,7 +573,7 @@ mod diagnostic_tests {
         ] {
             let raw = format!(
                 "A {} is in progress here: finish or abort it first.",
-                op.label().to_lowercase()
+                op.raw_label().to_lowercase()
             );
             assert_ne!(diagnostic(&raw), raw);
             assert_eq!(

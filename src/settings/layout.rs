@@ -64,6 +64,15 @@ impl Filter {
         self.found.get()
     }
 
+    /// Count and select a shortcut editor row using the same search as settings cards.
+    pub fn include_shortcut(&self, keywords: &str) -> bool {
+        if !self.matches(&[self.page, keywords]) {
+            return false;
+        }
+        self.found.set(self.found() + 1);
+        !self.counting
+    }
+
     fn matches(&self, parts: &[&str]) -> bool {
         let text = parts
             .iter()

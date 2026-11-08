@@ -351,11 +351,12 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
 -> Result<(), String> {
     for width in [600, 900, 1800] {
         for percent in [100, 125, 150] {
+            // Reserve the minimap strip in addition to the graph width under test.
             let ctx = egui::Context::default();
             let mut styled = false;
             let scale = percent as f32 / 100.0;
             let mut h = egui_kittest::Harness::builder()
-                .with_size([width as f32 * scale, 540.0 * scale])
+                .with_size([(width as f32 + 84.0) * scale, 540.0 * scale])
                 .build_ui_state(
                     move |ui, tab: &mut RepoTab| {
                         if !std::mem::replace(&mut styled, true) {
@@ -399,7 +400,7 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
                     .ok_or_else(|| format!("missing painted header: {label}"))
             };
             let viewport = h.ctx.content_rect().size();
-            assert!((viewport.x - width as f32).abs() < 0.1);
+            assert!((viewport.x - width as f32 - 84.0).abs() < 0.1);
             let before_graph = find(&h, "GRAPH")?;
             let before_desc = find(&h, "DESCRIPTION")?;
             let press = egui::pos2(before_graph.left() - 6.0, before_graph.center().y);
@@ -870,7 +871,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
         for width in [
             380, 500, 600, 740, 760, 780, 1000, 1800, 600, 380, 1800, 760,
         ] {
-            restarted.set_size(vec2(width as f32 + 16.0, 540.0));
+            restarted.set_size(vec2(width as f32 + 16.0, 120.0));
             restarted.run_steps(4);
             let geometry = painted(&restarted)?;
             assert_eq!(Settings::get(&restarted.ctx), saved);
@@ -893,7 +894,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
             }
         }
         assert_eq!(painted(&restarted)?.cols, original.cols);
-        restarted.set_size(vec2(516.0, 540.0));
+        restarted.set_size(vec2(516.0, 120.0));
         restarted.run_steps(3);
         let blocked = painted(&restarted)?;
         assert_eq!(blocked.cols.description(blocked.header).width(), 140.0);

@@ -4362,8 +4362,8 @@ repo-workflows-rehearse-played-line-cc3a8109 = Goes through cleanly: a merge com
 repo-workflows-rehearse-played-line-da976bc1 = Fails: { $e }
 
 repo-workflows-rehearse-played-line-e270e3ca = { $n ->
-        [one] Replays cleanly: one commit
-       *[other] Replays cleanly: { $n } commits
+        [one] Goes through cleanly: 1 commit
+       *[other] Goes through cleanly: { $n } commits
     }
 
 repo-workflows-rehearse-rehearsals-ended-31373501 = { $name } · rehearsal of { $run-branch-1 } done
@@ -7141,12 +7141,12 @@ repo-workflows-release-changes-since = { $count ->
     }
 
 repo-workflows-remerge-conflicts = { $count ->
-        [one] conflicts resolved in one file
+        [one] conflicts resolved in 1 file
        *[other] conflicts resolved in { $count } files
     }
 
 repo-workflows-remerge-edits = { $count ->
-        [one] one file changed beyond that (by hand, or a merge made with other options)
+        [one] 1 file changed beyond that (by hand, or a merge made with other options)
        *[other] { $count } files changed beyond that (by hand, or a merge made with other options)
     }
 
@@ -7244,22 +7244,22 @@ repo-workflows-timeline-forget-confirm = Forget { $count ->
     }? Undo won’t reach them any more, and the old commits only they kept can be removed by git gc. Your branches don’t change.
 
 repo-workflows-timeline-authors-changed = { $count ->
-        [one] one author changed
+        [one] 1 author changed
        *[other] { $count } authors changed
     }
 
 repo-workflows-timeline-messages-changed = { $count ->
-        [one] one message changed
+        [one] 1 message changed
        *[other] { $count } messages changed
     }
 
 repo-workflows-timeline-commits-signed = { $count ->
-        [one] one commit now signed
+        [one] 1 commit now signed
        *[other] { $count } commits now signed
     }
 
 repo-workflows-timeline-signatures-dropped = { $count ->
-        [one] one signature dropped
+        [one] 1 signature dropped
        *[other] { $count } signatures dropped
     }
 

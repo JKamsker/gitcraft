@@ -302,8 +302,10 @@ fn manual_refs_optional_columns_and_compact_graph_survive_auto_sizing() {
     frame(&ctx, &mut tab, size, vec![], 0.0);
     tab.scroll_to = Some(50);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
+    // This full-height fixture reserves 84 points for the minimap.
+    let available = size.x - 84.0;
     let shown = preferred_cols(&settings, lane_layout(&settings, 1))
-        .squeezed(size.x, settings.last_resized);
+        .squeezed(available, settings.last_resized);
     assert_eq!(
         header_x(&shapes, "GRAPH"),
         shown.refs + crate::repo::columns::CELL_PAD

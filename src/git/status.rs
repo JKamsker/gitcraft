@@ -45,6 +45,17 @@ impl InProgress {
         }
     }
 
+    /// Stable operation name for raw diagnostics parsed by presentation adapters.
+    pub(crate) fn raw_label(self) -> &'static str {
+        match self {
+            Self::Merge => "Merge",
+            Self::CherryPick => "Cherry-pick",
+            Self::Revert => "Revert",
+            Self::Rebase => "Rebase",
+            Self::Am => "Patch",
+        }
+    }
+
     /// The git subcommand whose `--abort` cancels it.
     pub fn command(self) -> &'static str {
         match self {
