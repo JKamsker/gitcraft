@@ -205,7 +205,7 @@ mod tests {
         let mut foreground = vec![Notice::plain(("opaque external".into(), true))];
         foreground.append(&mut parked);
         assert!(parked.is_empty());
-        let retained: Vec<_> = foreground.drain(..).collect();
+        let retained = std::mem::take(&mut foreground);
         assert!(foreground.is_empty());
         assert_eq!(retained[0].projected(), None);
         for language in [

@@ -656,17 +656,19 @@ mod fluent_r2_guard_tests {
         }]
     }
     fn supplied_state() -> Result<State, String> {
-        let mut state = State::default();
-        state.workflows = vec![model::parse("opaque.yml".into(), "on: [push]\njobs:\n  opaque-job:\n    runs-on: ubuntu-latest\n    steps: [{run: 'opaque command --unchanged'}]\n".into())?];
-        state.remote = "fork".into();
-        state.remote_override = true;
-        state.displayed_context = Some(context::Context::capture("fork", &remotes())?);
-        state.payload = "{\"opaque\":\"Working…\"}".into();
-        state.platforms = "ubuntu-latest=supplied/image".into();
-        state.architecture = "linux/arm64".into();
-        state.minutes = 17;
-        state.trust = true;
-        state.provenance = Some("opaque prior provenance\nKein Matrixeintrag ausgewählt".into());
+        let state = State {
+            workflows: vec![model::parse("opaque.yml".into(), "on: [push]\njobs:\n  opaque-job:\n    runs-on: ubuntu-latest\n    steps: [{run: 'opaque command --unchanged'}]\n".into())?],
+            remote: "fork".into(),
+            remote_override: true,
+            displayed_context: Some(context::Context::capture("fork", &remotes())?),
+            payload: "{\"opaque\":\"Working…\"}".into(),
+            platforms: "ubuntu-latest=supplied/image".into(),
+            architecture: "linux/arm64".into(),
+            minutes: 17,
+            trust: true,
+            provenance: Some("opaque prior provenance\nKein Matrixeintrag ausgewählt".into()),
+            ..Default::default()
+        };
         Ok(state)
     }
     fn snapshot(state: &State) -> Result<String, String> {

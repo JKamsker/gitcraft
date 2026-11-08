@@ -262,7 +262,8 @@ mod tests {
     use crate::repo::Notice;
 
     #[test]
-    fn retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale() {
+    fn retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let label = "Commit";
         let note = "provider: done, but opaque $(keep)\nCommit failed: untouched";
@@ -285,7 +286,9 @@ mod tests {
             let mut english = None;
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
-                let shown = retained.projected().unwrap();
+                let shown = retained
+                    .projected()
+                    .ok_or("expected retained presentation")?;
                 if locale == "en-US" {
                     assert_eq!(shown, raw.0);
                     if let Some(previous) = &english {
@@ -303,10 +306,12 @@ mod tests {
             }
             assert_eq!(Notice::plain(raw).projected(), None);
         }
+        Ok(())
     }
 
     #[test]
-    fn retained_finished_uses_original_headline_and_discards_unselected_output() {
+    fn retained_finished_uses_original_headline_and_discards_unselected_output()
+    -> Result<(), String> {
         let name = "repo · $(opaque)\nCommit failed: raw";
         let conflicts =
             "Merge: start\nCONFLICT (content): path with Commit\nCONFLICT (content): $(opaque)\n";
@@ -333,7 +338,9 @@ mod tests {
             assert!(format!("{retained:?}").len() < 2000);
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
-                let shown = retained.projected().unwrap();
+                let shown = retained
+                    .projected()
+                    .ok_or("expected retained presentation")?;
                 assert!(shown.starts_with(&format!("{name} · ")));
                 if locale == "en-US" {
                     assert_eq!(shown, raw.0);
@@ -346,6 +353,7 @@ mod tests {
                 assert_eq!(retained.raw(), &raw);
             }
         }
+        Ok(())
     }
 }
 

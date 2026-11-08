@@ -161,7 +161,7 @@ pub(crate) enum Failure {
     },
     Packages {
         raw: String,
-        cargo: Option<CargoFailure>,
+        cargo: Option<Box<CargoFailure>>,
         package_json: Option<PackageJsonFailure>,
     },
 }
@@ -238,7 +238,7 @@ impl Failure {
                 package_json,
                 ..
             } => display::Diagnostic::Packages {
-                cargo: cargo.as_ref().map(CargoFailure::borrowed),
+                cargo: cargo.as_deref().map(CargoFailure::borrowed),
                 package_json: package_json.as_ref().map(|e| e.detail.as_str()),
             },
         };

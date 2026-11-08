@@ -95,7 +95,7 @@ pub(crate) enum DoctorAct {
 /// A change the doctor asks about before making it.
 #[derive(Clone)]
 pub(crate) struct Confirm {
-    presentation: Option<ConfirmPresentation>,
+    presentation: Option<Box<ConfirmPresentation>>,
     pub(crate) title: String,
     pub(crate) body: String,
     /// The button that makes it.
@@ -398,10 +398,10 @@ enum ConfirmKind {
 }
 impl Confirm {
     fn with_presentation(mut self, kind: ConfirmKind) -> Self {
-        self.presentation = Some(ConfirmPresentation {
+        self.presentation = Some(Box::new(ConfirmPresentation {
             raw: (self.title.clone(), self.body.clone(), self.button.clone()),
             kind,
-        });
+        }));
         self
     }
     fn displayed(&self) -> (String, String, String) {

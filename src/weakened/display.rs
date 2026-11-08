@@ -4,9 +4,6 @@ use crate::i18n::message;
 
 /// Display a diagnostic from this family, after any raw matching.
 pub fn diagnostic(raw: &str) -> String {
-    match raw {
-        _ => {}
-    }
     dynamic(raw).unwrap_or_else(|| raw.to_owned())
 }
 

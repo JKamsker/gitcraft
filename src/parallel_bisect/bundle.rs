@@ -34,6 +34,10 @@ pub(crate) fn run(
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Preserves the original seven import operands with the optional producer-owned presentation out-slot"
+)]
 pub(crate) fn run_with_presentation(
     repo: &Path,
     expected: &str,

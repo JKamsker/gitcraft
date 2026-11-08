@@ -92,7 +92,8 @@ mod warning_presentation_tests {
     use crate::repo::push_preflight::core_guard_paint_tests::paint;
 
     #[test]
-    fn actual_review_warning_paint_repaints_without_changing_raw_server_or_plan() {
+    fn actual_review_warning_paint_repaints_without_changing_raw_server_or_plan()
+    -> Result<(), String> {
         let raw = "Invalid gitcraft.gerritUrl: use an HTTP(S) URL without credentials, query or fragment. Using the remote's web address; Gerrit review submission remains enabled.";
         let server = crate::gerrit::Server {
             remote: "origin".into(),
@@ -105,8 +106,7 @@ mod warning_presentation_tests {
         let targets = vec![("main".to_owned(), hash.clone())];
         let mut target = "main".to_owned();
         let mut topic = "opaque,submit%ready=yes".to_owned();
-        let plan =
-            crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash).unwrap();
+        let plan = crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash)?;
         let ctx = egui::Context::default();
         for locale in ["en-US", "de", "en-US"] {
             crate::i18n::set_language(locale);
@@ -125,7 +125,9 @@ mod warning_presentation_tests {
                     Outcome::Open
                 ));
             });
-            let expected = server.display_web_warning().unwrap();
+            let expected = server
+                .display_web_warning()
+                .ok_or("expected retained warning")?;
             assert!(shown.contains(&expected), "{shown}");
             if locale == "de" {
                 assert_ne!(expected, raw);
@@ -134,9 +136,10 @@ mod warning_presentation_tests {
             }
             assert_eq!(server, original);
             assert_eq!(
-                crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash).unwrap(),
+                crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash)?,
                 plan
             );
         }
+        Ok(())
     }
 }

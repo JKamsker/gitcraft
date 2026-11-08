@@ -617,7 +617,7 @@ mod localization_tests {
                 "日本語 failed: literal.patch wurde nicht angewendet: {raw}"
             )]
         );
-        assert_eq!(targets.applied, [file.clone()]);
+        assert_eq!(targets.applied.as_slice(), std::slice::from_ref(&file));
         assert!(queue.is_empty());
         // Singular and zero variants use the same original retain decision.
         queue.push("later.patch".into(), repo.clone());

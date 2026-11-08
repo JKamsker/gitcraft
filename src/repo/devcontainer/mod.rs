@@ -522,8 +522,10 @@ mod fluent_r1_result_tests {
             LocalResult::Running,
         ] {
             crate::i18n::set_language("de");
-            let mut state = State::default();
-            state.trust = true;
+            let mut state = State {
+                trust: true,
+                ..Default::default()
+            };
             state.remember_result(note);
             let raw = state.result.clone();
             let mut h = Harness::new_ui_state(|ui, state: &mut State| state.result_ui(ui), state);

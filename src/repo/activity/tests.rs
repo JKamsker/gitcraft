@@ -363,7 +363,8 @@ fn fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_di
 
 /// Pure transport checks: no tab, worker, native object, subprocess or Git invocation.
 #[test]
-fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
+fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() -> Result<(), String>
+{
     let mut log = ActivityLog::default();
     let raw = "provider https://token@host.invalid/repo and SECRET";
     let redacted = crate::git::redact(raw, Some("SECRET"));
@@ -376,7 +377,12 @@ fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
         false,
         Some(Failure::capture(raw, None)),
     );
-    assert!(log.last().unwrap().failure_presentation.is_none());
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
     let huge = "provider opaque\n".repeat(MAX_OUTPUT);
     log.push_presented(
         "Commit",
@@ -386,9 +392,14 @@ fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
         false,
         Some(Failure::capture(&huge, None)),
     );
-    assert!(log.last().unwrap().failure_presentation.is_none());
     assert!(
-        matches!(&log.last().unwrap().outcome, Outcome::Failed(kept) if kept != &huge && kept.len() < huge.len())
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    assert!(
+        matches!(&log.last().ok_or("expected recorded activity")?.outcome, Outcome::Failed(kept) if kept != &huge && kept.len() < huge.len())
     );
     log.push_presented(
         "Commit",
@@ -398,7 +409,12 @@ fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
         false,
         Some(Failure::capture(raw, None)),
     );
-    assert!(log.last().unwrap().failure_presentation.is_none());
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
     let id = log.push_presented(
         "Fetch",
         Duration::ZERO,
@@ -407,7 +423,12 @@ fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
         true,
         Some(Failure::capture("opaque same", None)),
     );
-    assert!(log.last().unwrap().failure_presentation.is_some());
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_some()
+    );
     let repeated = log.push(
         "Fetch",
         Duration::ZERO,
@@ -416,6 +437,12 @@ fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
         true,
     );
     assert_eq!(id, repeated);
-    assert_eq!(log.last().unwrap().repeats, 2);
-    assert!(log.last().unwrap().failure_presentation.is_none());
+    assert_eq!(log.last().ok_or("expected recorded activity")?.repeats, 2);
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    Ok(())
 }

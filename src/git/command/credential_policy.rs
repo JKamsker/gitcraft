@@ -9,10 +9,6 @@ pub(crate) struct CredentialCommandPolicy {
 impl CredentialCommandPolicy {
     /// Custom local runners bind the executable they actually selected, before
     /// installing this environment. Shared Git runners perform this automatically.
-    #[expect(
-        dead_code,
-        reason = "Shared policy contract for custom local runners; current consumers use the shared builder's selected-executable pin"
-    )]
     pub fn bind_git(&mut self, selected: &Path) -> Result<(), String> {
         if !selected.is_absolute() {
             return Err(crate::i18n::text(

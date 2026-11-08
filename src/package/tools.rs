@@ -416,7 +416,7 @@ pub(super) fn finish_packages(
         let raw = errors.join("; ");
         return Err(Failure::Packages {
             raw,
-            cargo,
+            cargo: cargo.map(Box::new),
             package_json,
         });
     }

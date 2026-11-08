@@ -1025,7 +1025,7 @@ fn row_tooltip(path: &Path, state: Option<&RepoState>) -> String {
         if let Some(Ok(o)) = &state.seen
             && !o.upstream.is_empty()
         {
-            tip.push_str("\n");
+            tip.push('\n');
             tip.push_str(&crate::i18n::message(
                 "interaction-workspace-tracks",
                 &[("upstream", o.upstream.as_str().into())],

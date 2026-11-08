@@ -4,11 +4,8 @@ use crate::i18n::message;
 
 /// Display a diagnostic from this family, after any raw matching.
 pub fn diagnostic(raw: &str) -> String {
-    match raw {
-        "There is no main branch commit to compare the worktree with" => {
-            return crate::i18n::text("interaction-guards-drift-no-base").into();
-        }
-        _ => {}
+    if raw == "There is no main branch commit to compare the worktree with" {
+        return crate::i18n::text("interaction-guards-drift-no-base").into();
     }
     dynamic(raw).unwrap_or_else(|| raw.to_owned())
 }

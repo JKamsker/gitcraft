@@ -208,17 +208,16 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
 /// "12 s", "3 min", "2 h".
 fn ago(d: std::time::Duration) -> String {
     match d.as_secs() {
-        s @ 0..60 => crate::i18n::message(
-            "repo-workflows-activity-ago-d2916a22",
-            &[("s", (s).clone().into())],
-        ),
+        s @ 0..60 => {
+            crate::i18n::message("repo-workflows-activity-ago-d2916a22", &[("s", s.into())])
+        }
         s @ 60..3600 => crate::i18n::message(
             "repo-workflows-activity-ago-e823f861",
-            &[("s-60-1", (s / 60).clone().into())],
+            &[("s-60-1", (s / 60).into())],
         ),
         s => crate::i18n::message(
             "repo-workflows-activity-ago-4d631fe4",
-            &[("s-3600-1", (s / 3600).clone().into())],
+            &[("s-3600-1", (s / 3600).into())],
         ),
     }
 }
@@ -233,7 +232,8 @@ mod operation_presentation_tests {
     use std::time::Duration;
 
     #[test]
-    fn same_recording_stack_check_repaints_retained_status_finished_and_actual_activity() {
+    fn same_recording_stack_check_repaints_retained_status_finished_and_actual_activity()
+    -> Result<(), String> {
         let hash = "a".repeat(40);
         let other = "b".repeat(40);
         let id = "I0123456789abcdef0123456789abcdef01234567";
@@ -265,7 +265,7 @@ mod operation_presentation_tests {
                     String::new()
                 })
             });
-            let raw_error = result.unwrap_err();
+            let raw_error = result.err().ok_or("expected failed recording check")?;
             assert_eq!(commands.len(), 2);
             assert_eq!(commands[0], ["merge-base", "--is-ancestor", "base", "head"]);
             assert_eq!(
@@ -282,7 +282,7 @@ mod operation_presentation_tests {
             );
             let receipt = control
                 .stack_failure()
-                .expect("same operation's finite witness");
+                .ok_or("same operation's finite witness")?;
             assert!(format!("{receipt:?}").len() < 1000);
             let status = Notice::operation(Status::Failed {
                 label: "Commit".into(),
@@ -323,18 +323,36 @@ mod operation_presentation_tests {
             assert!(control.stack_failure().is_none());
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
-                let entry = activity.last().unwrap();
+                let entry = activity.last().ok_or("expected recorded activity")?;
                 let shown = paint(&ctx, |ui| entry_ui(ui, entry, true, &Tokens::get(ui.ctx())));
                 let error = entry.display_error(&raw_error);
                 assert!(shown.contains(&error), "{shown}");
                 if locale == "de" {
                     assert!(error.contains(german), "{error}");
-                    assert!(status.projected().unwrap().contains(german));
-                    assert!(finished.projected().unwrap().contains(german));
+                    assert!(
+                        status
+                            .projected()
+                            .ok_or("expected retained presentation")?
+                            .contains(german)
+                    );
+                    assert!(
+                        finished
+                            .projected()
+                            .ok_or("expected retained presentation")?
+                            .contains(german)
+                    );
                 } else {
                     assert_eq!(error, raw_error);
-                    assert_eq!(status.projected().unwrap(), status_raw.0);
-                    assert_eq!(finished.projected().unwrap(), finished_raw.0);
+                    assert_eq!(
+                        status.projected().ok_or("expected retained presentation")?,
+                        status_raw.0
+                    );
+                    assert_eq!(
+                        finished
+                            .projected()
+                            .ok_or("expected retained presentation")?,
+                        finished_raw.0
+                    );
                 }
                 assert_eq!(entry.outcome, Outcome::Failed(raw_error.clone()));
                 let mut plain = ActivityLog::default();
@@ -345,7 +363,10 @@ mod operation_presentation_tests {
                     entry.outcome.clone(),
                     false,
                 );
-                assert_eq!(entry.as_text(), plain.last().unwrap().as_text());
+                assert_eq!(
+                    entry.as_text(),
+                    plain.last().ok_or("expected recorded activity")?.as_text()
+                );
                 assert_eq!(status.raw(), &status_raw);
                 assert_eq!(finished.raw(), &finished_raw);
                 assert_eq!(activity.status_link, link);
@@ -353,10 +374,12 @@ mod operation_presentation_tests {
             assert_eq!(Notice::plain(status_raw).projected(), None);
             assert_eq!(Notice::plain(finished_raw).projected(), None);
         }
+        Ok(())
     }
 
     #[test]
-    fn provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness() {
+    fn provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness()
+    -> Result<(), String> {
         let control = crate::git::OpControl::new(|| {});
         let log = format!("{}\0parent\0Missing footer\0", "a".repeat(40));
         let raw = check_stack_captured("b", "h", Some(&control), |args| {
@@ -366,14 +389,25 @@ mod operation_presentation_tests {
                 String::new()
             })
         })
-        .unwrap_err();
+        .err()
+        .ok_or("expected failed recording check")?;
         assert!(control.stack_failure().is_some());
         let changed = format!("{raw}\nprovider added opaque tail");
         let finished =
             Notice::operation_finished("repo", "Commit", &Err(changed), control.stack_failure());
         crate::i18n::set_language("de");
-        assert!(finished.projected().unwrap().ends_with(&raw));
-        assert!(!finished.projected().unwrap().contains("commit-msg-Hook"));
+        assert!(
+            finished
+                .projected()
+                .ok_or("expected retained presentation")?
+                .ends_with(&raw)
+        );
+        assert!(
+            !finished
+                .projected()
+                .ok_or("expected retained presentation")?
+                .contains("commit-msg-Hook")
+        );
         let forged = check_stack_captured("b", "h", Some(&control), |args| {
             if args[0] == "log" {
                 Err(raw.clone())
@@ -403,8 +437,18 @@ mod operation_presentation_tests {
             );
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
-                assert!(status.projected().unwrap().ends_with(&error));
-                assert_eq!(log.last().unwrap().display_error(&error), error);
+                assert!(
+                    status
+                        .projected()
+                        .ok_or("expected retained presentation")?
+                        .ends_with(&error)
+                );
+                assert_eq!(
+                    log.last()
+                        .ok_or("expected recorded activity")?
+                        .display_error(&error),
+                    error
+                );
             }
         }
         let mut commands = Vec::new();
@@ -418,16 +462,21 @@ mod operation_presentation_tests {
         let failed = check_stack_captured("b", "h", Some(&control), |_| {
             Err("provider details stay private".into())
         });
-        let error = failed.unwrap_err();
-        let source = control.stack_failure().unwrap();
+        let error = failed.err().ok_or("expected failed recording check")?;
+        let source = control
+            .stack_failure()
+            .ok_or("expected finite stack failure")?;
         for locale in ["en-US", "de", "en-US"] {
             crate::i18n::set_language(locale);
-            let shown = source.display(&error).unwrap();
+            let shown = source
+                .display(&error)
+                .ok_or("expected matching stack failure")?;
             if locale == "en-US" {
                 assert_eq!(shown, error);
             } else {
                 assert_ne!(shown, error);
             }
         }
+        Ok(())
     }
 }

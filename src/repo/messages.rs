@@ -1186,6 +1186,48 @@ pub(crate) fn display_status(status: &str) -> String {
     crate::git::display_error(&crate::forge::inbox::display_error(status))
 }
 
+/// Paint source-owned Rust dependency reports without interpreting arbitrary operations.
+pub(crate) fn display_review_dependency(raw: &str) -> String {
+    review::dependency(raw)
+}
+/// Paint the intent collector's quarantine envelope; refs and unknown details stay opaque.
+pub(crate) fn display_intent_warning(raw: &str) -> String {
+    review::intent_warning(raw)
+}
+
+fn review_owned(raw: &str) -> String {
+    operation_display_inner(raw, 0, PaintFamily::Review)
+        .map_or_else(|| raw.to_owned(), |painted| painted.text(raw))
+}
+
+fn workflow_argument(id: &str, name: &str, raw: &str, depth: usize) -> Option<String> {
+    use workflow::Adapter;
+    match workflow::adapter(id, name) {
+        Some(Adapter::Operation) if depth < 4 => {
+            known_operation(raw, depth + 1).and_then(|painted| match painted {
+                Painted::Known(text) => Some(text),
+                Painted::Opaque => None,
+            })
+        }
+        Some(Adapter::Operation) => None,
+        Some(Adapter::Scope) => workflow::scope(raw),
+        Some(Adapter::Health) => workflow::health(raw),
+        Some(Adapter::Pick) if matches!(raw, "Stage" | "Unstage" | "Discard" | "Revert") => {
+            known_operation(raw, depth + 1).and_then(|painted| match painted {
+                Painted::Known(text) => Some(text),
+                Painted::Opaque => None,
+            })
+        }
+        Some(Adapter::Pick) => None,
+        Some(Adapter::Noun) => workflow::noun(raw),
+        Some(Adapter::Headline) => workflow::headline(raw),
+        Some(Adapter::Place) => workflow::place(raw),
+        Some(Adapter::InProgress) => workflow::in_progress(raw),
+        Some(Adapter::Receipt) => workflow::receipt(raw),
+        None => Some(raw.to_owned()),
+    }
+}
+
 #[cfg(test)]
 mod fluent_presentation_tests {
     use super::*;
@@ -1362,47 +1404,5 @@ mod fluent_presentation_tests {
         assert_eq!(raw, "Analysis cancelled");
         crate::i18n::set_language("en-US");
         assert_eq!(display_status(crate::git::CANCELLED), crate::git::CANCELLED);
-    }
-}
-
-/// Paint source-owned Rust dependency reports without interpreting arbitrary operations.
-pub(crate) fn display_review_dependency(raw: &str) -> String {
-    review::dependency(raw)
-}
-/// Paint the intent collector's quarantine envelope; refs and unknown details stay opaque.
-pub(crate) fn display_intent_warning(raw: &str) -> String {
-    review::intent_warning(raw)
-}
-
-fn review_owned(raw: &str) -> String {
-    operation_display_inner(raw, 0, PaintFamily::Review)
-        .map_or_else(|| raw.to_owned(), |painted| painted.text(raw))
-}
-
-fn workflow_argument(id: &str, name: &str, raw: &str, depth: usize) -> Option<String> {
-    use workflow::Adapter;
-    match workflow::adapter(id, name) {
-        Some(Adapter::Operation) if depth < 4 => {
-            known_operation(raw, depth + 1).and_then(|painted| match painted {
-                Painted::Known(text) => Some(text),
-                Painted::Opaque => None,
-            })
-        }
-        Some(Adapter::Operation) => None,
-        Some(Adapter::Scope) => workflow::scope(raw),
-        Some(Adapter::Health) => workflow::health(raw),
-        Some(Adapter::Pick) if matches!(raw, "Stage" | "Unstage" | "Discard" | "Revert") => {
-            known_operation(raw, depth + 1).and_then(|painted| match painted {
-                Painted::Known(text) => Some(text),
-                Painted::Opaque => None,
-            })
-        }
-        Some(Adapter::Pick) => None,
-        Some(Adapter::Noun) => workflow::noun(raw),
-        Some(Adapter::Headline) => workflow::headline(raw),
-        Some(Adapter::Place) => workflow::place(raw),
-        Some(Adapter::InProgress) => workflow::in_progress(raw),
-        Some(Adapter::Receipt) => workflow::receipt(raw),
-        None => Some(raw.to_owned()),
     }
 }

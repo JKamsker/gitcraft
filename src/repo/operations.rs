@@ -1895,13 +1895,14 @@ mod core_guard_paint_tests {
     use crate::repo::push_preflight::core_guard_paint_tests::paint;
 
     #[test]
-    fn core_guard_paint_reviewed_auth_extracts_original_proof_before_display() {
+    fn core_guard_paint_reviewed_auth_extracts_original_proof_before_display() -> Result<(), String>
+    {
         let binding: git::RouteBinding = serde_json::from_value(serde_json::json!({
             "args": ["push", "--", "remote-12345", "HEAD:refs/heads/topic-12345"],
             "routes": ["https://push.invalid/team/12345"],
             "configuration": "opaque-configuration-12345"
         }))
-        .unwrap();
+        .map_err(|error| error.to_string())?;
         let original = binding.args.clone();
         for locale in ["en-US", "de"] {
             crate::i18n::set_language(locale);
@@ -1927,7 +1928,7 @@ mod core_guard_paint_tests {
                 Some(&control),
             );
             assert_eq!(result, Err(before.clone()));
-            let failure = control.auth_failure().expect("typed authentication proof");
+            let failure = control.auth_failure().ok_or("typed authentication proof")?;
             assert!(failure.confirmed);
             assert_eq!(failure.binding, Some(binding.clone()));
             assert_eq!(failure.endpoints, ["https://push.invalid/team/12345"]);
@@ -1948,5 +1949,6 @@ mod core_guard_paint_tests {
             assert_eq!(crate::push_preflight::FIX, "\0push-preflight-fix");
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 }

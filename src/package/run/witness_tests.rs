@@ -54,7 +54,7 @@ fn actual_finish_capture_retains_known_and_unknown_children_through_real_aggrega
         assert_eq!(opaque.display(), opaque.raw());
         assert_eq!(known, original);
         assert_eq!(known.clone().into_raw(), original.raw());
-        assert_eq!(missing.display().contains("cargo-1234.5"), true);
+        assert!(missing.display().contains("cargo-1234.5"));
         assert_eq!(missing.display() == missing.raw(), locale == "en-US");
     }
     let timeout = timeout_failure("cargo-1234.5");

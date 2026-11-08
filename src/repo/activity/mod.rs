@@ -206,12 +206,9 @@ pub(super) fn bounded(output: &str) -> String {
     crate::i18n::message(
         "repo-workflows-activity-bounded-62a56981",
         &[
-            ("output-head-end-1", (&output[..head_end]).clone().into()),
-            ("left-out", (left_out).clone().into()),
-            (
-                "output-tail-start-2",
-                (&output[tail_start..]).clone().into(),
-            ),
+            ("output-head-end-1", output[..head_end].into()),
+            ("left-out", left_out.into()),
+            ("output-tail-start-2", output[tail_start..].into()),
         ],
     )
 }
@@ -244,12 +241,9 @@ pub(super) fn short_command_line(args: &[String]) -> String {
         &[
             (
                 "command-line-args-shown-args-1",
-                (command_line(&args[..SHOWN_ARGS])).clone().into(),
+                command_line(&args[..SHOWN_ARGS]).into(),
             ),
-            (
-                "args-len-shown-args-2",
-                (args.len() - SHOWN_ARGS).clone().into(),
-            ),
+            ("args-len-shown-args-2", (args.len() - SHOWN_ARGS).into()),
         ],
     )
 }
@@ -278,7 +272,7 @@ pub(super) fn exit_text(code: Option<i32>) -> String {
         Some(0) => crate::i18n::text("repo-workflows-activity-exit-text-c22995ad").to_owned(),
         Some(c) => crate::i18n::message(
             "repo-workflows-activity-exit-text-bd2f2ddf",
-            &[("c", (c).clone().into())],
+            &[("c", c.into())],
         ),
         None => crate::i18n::text("repo-workflows-activity-exit-text-64df366e").to_owned(),
     }
@@ -298,17 +292,17 @@ pub(super) fn seconds(d: Duration) -> String {
     match ms {
         0..10_000 => crate::i18n::message(
             "repo-workflows-activity-seconds-6f29d45b",
-            &[("d-as-secs-f32-1", (d.as_secs_f32()).clone().into())],
+            &[("d-as-secs-f32-1", (d.as_secs_f32()).into())],
         ),
         10_000..60_000 => crate::i18n::message(
             "repo-workflows-activity-seconds-af37e50f",
-            &[("d-as-secs-1", (d.as_secs()).clone().into())],
+            &[("d-as-secs-1", (d.as_secs()).into())],
         ),
         _ => crate::i18n::message(
             "repo-workflows-activity-seconds-fba4d59d",
             &[
-                ("d-as-secs-60-1", (d.as_secs() / 60).clone().into()),
-                ("d-as-secs-60-2", (d.as_secs() % 60).clone().into()),
+                ("d-as-secs-60-1", (d.as_secs() / 60).into()),
+                ("d-as-secs-60-2", (d.as_secs() % 60).into()),
             ],
         ),
     }

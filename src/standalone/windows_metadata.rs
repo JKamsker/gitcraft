@@ -579,8 +579,8 @@ mod diagnostic_localization_tests {
                 format!("before {HELPER_FAILURE}Missing metadata paths"),
                 format!("{HELPER_FAILURE}Missing metadata paths\r"),
             ] {
-                let expected = if raw.starts_with(HELPER_FAILURE) {
-                    format!("{outer}{prefix}{}", &raw[HELPER_FAILURE.len()..])
+                let expected = if let Some(rest) = raw.strip_prefix(HELPER_FAILURE) {
+                    format!("{outer}{prefix}{rest}")
                 } else {
                     format!("{outer}{raw}")
                 };
