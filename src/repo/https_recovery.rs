@@ -5,6 +5,7 @@ use crate::git;
 pub(super) struct Ticket {
     pub(super) url: String,
     pub(super) endpoints: Vec<String>,
+    pub(super) binding: Option<git::RouteBinding>,
     generation: u64,
     path: std::path::PathBuf,
     context: crate::connections::Context,
@@ -14,6 +15,7 @@ impl RepoTab {
     pub(super) fn https_ticket(&self, url: String) -> Ticket {
         Ticket {
             endpoints: vec![url.clone()],
+            binding: None,
             url,
             generation: self.https_generation,
             path: self.path.clone(),
@@ -57,6 +59,7 @@ impl RepoTab {
         };
         let mut ticket = self.https_ticket(url.clone());
         ticket.endpoints = failure.endpoints.clone();
+        ticket.binding = failure.binding;
         let mut dialog = Dialog::credentials(&url, refused);
         if let Dialog::Credentials { endpoints, .. } = &mut dialog {
             *endpoints = failure.endpoints;
@@ -72,7 +75,11 @@ impl RepoTab {
         match result {
             Ok(()) => {
                 self.status = Some(("Stored HTTPS sign-in rejected. Choose the correct account; profile-selected forge accounts can be changed in Settings → Profile.".into(), false));
-                self.offer_https_signin(ticket.url, false);
+                let url = ticket.url.clone();
+                self.offer_https_signin(url, false);
+                if let Some(current) = &mut self.https_challenge {
+                    current.binding = ticket.binding;
+                }
             }
             Err(e) => {
                 self.status = Some((

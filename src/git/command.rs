@@ -59,8 +59,8 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 use crate::remote::{self, Target};
 
 mod connection;
-mod endpoints;
 mod credential_policy;
+mod endpoints;
 pub(crate) use credential_policy::*;
 pub(crate) use endpoints::*;
 mod setup;

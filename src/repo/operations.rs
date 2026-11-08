@@ -10,6 +10,7 @@ use super::{Dialog, Msg, OpKind, PendingOp, Refresh, RepoTab, Undo, UndoEntry, o
 use crate::git;
 
 /// An operation that takes longer than this gets a notification when it ends.
+const EXPECT_HTTPS_ROUTE: &str = "--gitcraft-expect-https-route";
 pub(super) const LONG_OP: Duration = Duration::from_secs(4);
 
 impl RepoTab {
@@ -133,7 +134,9 @@ impl RepoTab {
             let mut i = 0;
             op.ops.retain(|step| {
                 i += 1;
-                i > stopped || is_expectation(step)
+                i > stopped
+                    || is_expectation(step)
+                    || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
             });
         }
     }
@@ -183,18 +186,35 @@ impl RepoTab {
             ));
             return;
         }
+        let binding = self
+            .https_challenge
+            .as_ref()
+            .filter(|ticket| self.https_ticket_current(ticket))
+            .and_then(|ticket| ticket.binding.clone());
         let path = self.path.clone();
         self.forget_https_memory(&path, &url);
         crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
-        let ticket = self.https_ticket(url.clone());
+        let mut ticket = self.https_ticket(url.clone());
+        ticket.binding = binding.clone();
         let reads = self.reads;
         self.then_or(
             ctx,
             true,
-            Err,
-            move || git::https_reject(&path, &url),
-            move |tab, result, _| {
-                if tab.reads != reads {
+            |error| (Err(error), false),
+            move || {
+                if let Some(binding) = &binding
+                    && let Err(error) = binding.verify(&path)
+                {
+                    return (Err(error), false);
+                }
+                let result = git::https_reject(&path, &url);
+                let route_current = binding
+                    .as_ref()
+                    .is_none_or(|binding| binding.verify(&path).is_ok());
+                (result, route_current)
+            },
+            move |tab, (result, route_current), _| {
+                if tab.reads != reads || !route_current {
                     tab.invalidate_https_challenge();
                 }
                 tab.https_rejection_done(ticket, result);
@@ -215,6 +235,47 @@ impl RepoTab {
             self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
             return;
         }
+        let ticket = challenge.expect("validated challenge");
+        let binding = ticket.binding.clone();
+        let path = self.path.clone();
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || binding.as_ref().map_or(Ok(()), |b| b.verify(&path)),
+            move |tab, result, ctx| {
+                if !tab.https_ticket_current(&ticket) {
+                    tab.status = Some((
+                        "Sign-in was discarded because the operation or connection changed.".into(),
+                        true,
+                    ));
+                    return;
+                }
+                if let Err(error) = result {
+                    tab.invalidate_https_challenge();
+                    tab.status = Some((error, true));
+                    return;
+                }
+                if let Some(binding) = ticket.binding
+                    && let Some(op) = &mut tab.last_op
+                {
+                    match serde_json::to_string(&binding) {
+                        Ok(json) => op.ops.insert(0, vec![EXPECT_HTTPS_ROUTE.into(), json]),
+                        Err(_) => {
+                            tab.status = Some((
+                                "Could not preserve the sign-in route. Run the operation again."
+                                    .into(),
+                                true,
+                            ));
+                            return;
+                        }
+                    }
+                }
+                tab.accept_scoped_signin(creds, ctx);
+            },
+        );
+    }
+    fn accept_scoped_signin(&mut self, creds: git::Credentials, ctx: &egui::Context) {
         self.credentials = Some(creds);
         if let Some(busy) = &self.busy_op
             && let Some(op) = &self.last_op
@@ -428,11 +489,15 @@ fn run_step(
     if control.is_cancelled() {
         return Err(git::CANCELLED.to_owned());
     }
-    let endpoints = if git::goes_over_network(args) {
-        git::operation_endpoints(path, args).unwrap_or_default()
+    let binding = if git::goes_over_network(args) {
+        git::RouteBinding::capture(path, args).ok()
     } else {
-        Vec::new()
+        None
     };
+    let endpoints = binding
+        .as_ref()
+        .map(|b| b.urls().to_vec())
+        .unwrap_or_default();
     // Each call kept for the activity log.
     let (result, recorded) = if git::goes_over_network(args) {
         git::run_watched_recorded(Some(path), args, creds, quiet, control)
@@ -442,7 +507,9 @@ fn run_step(
     if let Err(error) = &result
         && git::is_auth_error(error)
     {
-        control.authentication_failed(git::AuthFailure::from_error(error, &endpoints));
+        let mut failure = git::AuthFailure::from_error(error, &endpoints);
+        failure.binding = binding;
+        control.authentication_failed(failure);
     }
     let mut recorded = recorded;
     recorded.output = super::activity::bounded(&recorded.output);
@@ -553,6 +620,18 @@ pub(super) fn run_steps_counted(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
+    for op in ops {
+        if let [marker, json] = op.as_slice()
+            && marker == EXPECT_HTTPS_ROUTE
+        {
+            let check = serde_json::from_str::<git::RouteBinding>(json)
+                .map_err(|_| "Invalid sign-in route proof".to_owned())
+                .and_then(|binding| binding.verify(path));
+            if let Err(error) = check {
+                return (Err(error), kind, 0);
+            }
+        }
+    }
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -592,7 +671,7 @@ pub(super) fn run_steps_counted(
     let mut stopped = ops.len();
     let mut tried = Vec::new();
     for (i, op) in ops.iter().enumerate() {
-        if is_expectation(op) {
+        if is_expectation(op) || op.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE) {
             continue;
         }
         if let [mark, says, args @ ..] = &op[..]
@@ -769,6 +848,7 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
         || expected_symref(op).is_some()
         || expected_tree(op).is_some()
         || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
+        || matches!(op, [mark, _] if mark == EXPECT_HTTPS_ROUTE)
 }
 
 fn check_expected(
