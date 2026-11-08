@@ -990,7 +990,7 @@ fn review_source_owned_diagnostics_keep_refs_commands_and_unknown_lookalikes_opa
         assert_eq!(
             intent_warning(raw),
             if language == "de" {
-                "refs/gitcraft/intents/日本語/00001234: Ungültiges Intent-JSON: provider: Stage"
+                "refs/gitcraft/intents/日本語/00001234: Ungültiges Absichts-JSON: provider: Stage"
             } else {
                 raw
             }
