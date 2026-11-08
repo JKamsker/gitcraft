@@ -1,0 +1,367 @@
+//! Inert supplied-state checks. No Git, processes, filesystem, native UI or discovery.
+use super::*;
+use crate::i18n::set_language;
+use std::path::Path;
+
+#[test]
+fn guard_display_push_keeps_raw_guard_and_auth_receipt_classification() {
+    let raw = crate::push_preflight::valid_ref(Path::new("inert"), "incomplete", &|| {
+        panic!("the incomplete-ref guard must not reach Git")
+    })
+    .unwrap_err();
+    let receipt =
+        crate::push_preflight::remember_auth_endpoint("https://example.invalid/team/repo");
+    let raw_receipt = receipt.clone();
+    for (locale, expected) in [
+        (
+            "en-US",
+            "Choose one complete destination ref, such as refs/heads/main.",
+        ),
+        (
+            "de",
+            "Wähle eine vollständige Zielreferenz, etwa refs/heads/main.",
+        ),
+    ] {
+        set_language(locale);
+        assert_eq!(diagnostic(&raw), expected);
+        assert_eq!(
+            raw,
+            "Choose one complete destination ref, such as refs/heads/main."
+        );
+        assert!(crate::push_preflight::is_reviewed_auth_error(&receipt));
+        assert_eq!(diagnostic(&receipt), raw_receipt);
+        assert_eq!(crate::push_preflight::APPROVED, "\0push-preflight");
+        assert_eq!(crate::push_preflight::FIX, "\0push-preflight-fix");
+    }
+    assert_eq!(
+        crate::push_preflight::take_auth_endpoint(&receipt).as_deref(),
+        Some("https://example.invalid/team/repo")
+    );
+    assert_eq!(
+        reviewed_auth_failure(),
+        "Die Authentifizierung für das geprüfte Push-Ziel ist fehlgeschlagen."
+    );
+    assert_eq!(receipt, raw_receipt);
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_push_supplied_findings_and_uncertain_recovery_keep_opaque_fields() {
+    use crate::push_preflight::{Finding, Kind};
+    let finding = Finding {
+        kind: Kind::Secret,
+        commit: "0123456789abcdef".into(),
+        path: "src/12345 key.rs".into(),
+        detail: "Likely secret at line 12345; value withheld.".into(),
+    };
+    let history = "Force push would drop 12345 remote commits, 2345 by other authors. Based on the fetched target; the lease must still match.";
+    let directory = "/owned/12345/EXPECT { $detail }";
+    let uncertain = format!(
+        "The remote repair outcome is unknown. It may still be running; its owned guard and recovery remain in {directory}. Recheck after the host finishes; no replacement or cleanup was dispatched."
+    );
+    for (locale, number, other) in [("en-US", "12,345", "2,345"), ("de", "12.345", "2.345")] {
+        set_language(locale);
+        assert!(diagnostic(&finding.detail).contains(number));
+        let shown = diagnostic(history);
+        assert!(shown.contains(number) && shown.contains(other));
+        assert!(diagnostic(&uncertain).contains(directory));
+        assert!(diagnostic("5.0 MiB Git blob; consider Git LFS.").contains("5.0 MiB"));
+        assert!(
+            diagnostic("Author email differs from the profile policy for host/12345/repo.")
+                .contains("host/12345/repo")
+        );
+        assert_eq!(
+            finding.detail,
+            "Likely secret at line 12345; value withheld."
+        );
+        assert_eq!(finding.commit, "0123456789abcdef");
+        assert_eq!(finding.path, "src/12345 key.rs");
+        assert_eq!(finding.kind, Kind::Secret);
+        assert_eq!(
+            diagnostic("Likely secret at line +12; value withheld."),
+            "Likely secret at line +12; value withheld."
+        );
+        assert_eq!(
+            diagnostic("Likely secret at line text; value withheld."),
+            "Likely secret at line text; value withheld."
+        );
+        assert!(target("/owned/12345/repo").ends_with("/owned/12345/repo"));
+        assert_eq!(path("src/a\nb.rs"), "src/a\\nb.rs");
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() {
+    use crate::authorship::{self, Source, Who, branch::Figures};
+    // Actual precedence: the agent's author account takes precedence over a co-author trailer.
+    let attribution = authorship::attribute(
+        "Claude",
+        "noreply@anthropic.com",
+        "Co-authored-by: Copilot <copilot@github.com>",
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(attribution.who, Who::Agent);
+    assert_eq!(attribution.source, Source::Author);
+    let raw = attribution.describe();
+    let figures = Figures {
+        commits: 12345,
+        agent: 9000,
+        mixed: 1000,
+        human: 1000,
+        unknown: 1345,
+        edited: 900,
+        partial: true,
+    };
+    let before = figures.clone();
+    let raw_headline = figures.headline("refs/heads/12345");
+    for (locale, number, who) in [
+        ("en-US", "12,345", "Agent-written"),
+        ("de", "12.345", "Von einem Agenten geschrieben"),
+    ] {
+        set_language(locale);
+        let description = attribution.display_description();
+        assert!(description.contains(who) && description.contains("Claude"));
+        let shown = figures.display_headline("refs/heads/12345");
+        assert!(shown.contains(number));
+        assert!(shown.contains("refs/heads/12345"));
+        assert!(shown.contains("10%"));
+        assert_eq!(attribution.describe(), raw);
+        assert_eq!(figures.headline("refs/heads/12345"), raw_headline);
+        assert_eq!(figures, before);
+        assert_eq!(
+            attribution.source.label(),
+            "an agent's account as the author"
+        );
+        let error = authorship::load::one(Path::new("inert"), "-12345").unwrap_err();
+        assert_eq!(error, "-12345 is not a commit");
+        assert!(authorship::display::diagnostic(&error).contains("-12345"));
+    }
+    for source in [
+        Source::GitAi,
+        Source::AgentTrace,
+        Source::Author,
+        Source::Trailer,
+    ] {
+        for who in [Who::Agent, Who::Mixed, Who::Human, Who::Unknown] {
+            for has_lines in [false, true] {
+                let mut a = attribution.clone();
+                a.source = source;
+                a.who = who;
+                if has_lines {
+                    a.lines.insert("source.rs".into(), vec![(1, 2, who)]);
+                }
+                for with_agents in [false, true] {
+                    if !with_agents {
+                        a.agents.clear();
+                    } else {
+                        a.agents = vec!["Opaque 12345 { $source }".into()];
+                    }
+                    for locale in ["en-US", "de"] {
+                        set_language(locale);
+                        assert!(!a.display_description().contains("interaction-guards-"));
+                        if with_agents {
+                            assert!(a.display_description().contains("Opaque 12345 { $source }"));
+                        }
+                        assert_eq!(a.line("source.rs", 1), who);
+                    }
+                }
+            }
+        }
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_drift_uses_supplied_report_without_changing_task_or_prompt() {
+    use crate::drift::{self, Dependency, Folder, Report};
+    let mut report = Report {
+        files: vec!["src/12345.rs".into()],
+        folders: vec![Folder {
+            path: "src".into(),
+            files: vec!["src/12345.rs".into()],
+            related: false,
+        }],
+        dependencies: vec![Dependency {
+            manifest: "Cargo.toml".into(),
+            name: "Opaque 12345".into(),
+        }],
+        changed_lines: 12345,
+        formatting_lines: 2469,
+        judged: true,
+        ..Default::default()
+    };
+    let original = report.clone();
+    let prompt = drift::llm::prompt("Task { $source } 12345", &report);
+    let raw = drift::measure(Path::new("inert"), "-12345", "task").unwrap_err();
+    assert_eq!(raw, "-12345 is not a revision");
+    for (locale, phrase, single) in [
+        ("en-US", "20% formatting only", "one folder"),
+        ("de", "20% reine Formatierung", "einem Ordner"),
+    ] {
+        set_language(locale);
+        let headline = report.display_headline();
+        assert!(
+            headline.contains(phrase) && headline.contains(single),
+            "{headline}"
+        );
+        assert!(drift::display::diagnostic(&raw).contains("-12345"));
+        assert_eq!(
+            drift::llm::prompt("Task { $source } 12345", &report),
+            prompt
+        );
+        assert_eq!(report, original);
+        // Issue numbers are identities, unlike timeout seconds.
+        let detail = "provider: EXPECT { $seconds } 12345\nunknown diagnostic";
+        assert!(
+            drift::display::diagnostic(&format!("Could not read issue #12345: {detail}"))
+                .contains("#12345")
+        );
+        assert!(
+            drift::display::diagnostic(&format!("Could not run codex: {detail}")).contains(detail)
+        );
+        let timeout = drift::display::diagnostic("codex took longer than 12345 s");
+        assert!(timeout.contains(if locale == "de" { "12.345" } else { "12,345" }));
+    }
+    report.judged = false;
+    set_language("de");
+    assert!(!report.display_headline().contains("Ordner"));
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_fence_uses_actual_pure_validation_and_preserves_pathspecs() {
+    use crate::fence::{self, Pattern};
+    let validation = Pattern::check("!src/12345").unwrap();
+    for locale in ["en-US", "de"] {
+        set_language(locale);
+        let shown = fence::display::diagnostic(&validation);
+        assert!(shown.contains("!src/12345"));
+        assert_eq!(
+            Pattern::check("!src/12345").as_deref(),
+            Some(validation.as_str())
+        );
+        let wrapped = format!("Could not save the agent fence: {validation}");
+        let displayed = fence::display::diagnostic(&wrapped);
+        assert!(displayed.contains("!src/12345"));
+        if locale == "de" {
+            assert!(!displayed.contains("a fence takes"));
+        }
+        let payload = "provider { $detail } 12345: no translation";
+        let wrapped = format!("Could not read the agent fence: {payload}");
+        assert!(fence::display::diagnostic(&wrapped).contains(payload));
+        assert_eq!(
+            Pattern::parse("/src/12345").unwrap().pathspecs(),
+            [":(glob,icase)src/12345", ":(glob,icase)src/12345/**"]
+        );
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_collision_retains_raw_status_and_old_git_matching() {
+    use crate::collision::{self, Matrix};
+    let raw = collision::simulate(Path::new("inert"), "-12345", "refs/heads/12345").unwrap_err();
+    let old_git = "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)";
+    let matrix = Matrix {
+        with_target: vec![Err(old_git.into())],
+        ..Default::default()
+    };
+    for locale in ["en-US", "de"] {
+        set_language(locale);
+        assert!(collision::display::diagnostic(&raw).contains("-12345"));
+        assert_eq!(matrix.first_error(), Some(old_git));
+        assert!(matrix.first_error().unwrap().contains("needs git"));
+        assert!(collision::display::diagnostic(old_git).contains("git merge-tree --write-tree"));
+        assert_eq!(collision::STOPPED, "Stopped");
+        assert_eq!(
+            collision::display::diagnostic(collision::STOPPED),
+            if locale == "de" {
+                "Angehalten"
+            } else {
+                "Stopped"
+            }
+        );
+        let payload = "provider: unknown option { $a } 12345";
+        let raw =
+            format!("Could not merge refs/heads/12345 with refs/heads/23456 in memory: {payload}");
+        let shown = collision::display::diagnostic(&raw);
+        assert!(
+            shown.contains("refs/heads/12345")
+                && shown.contains("refs/heads/23456")
+                && shown.contains(payload)
+        );
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_weakened_uses_actual_scan_flags_and_preserves_source_and_numeric_lexemes() {
+    use crate::weakened::{self, Reason};
+    let patch = "diff --git a/tests/a.rs b/tests/a.rs\n--- a/tests/a.rs\n+++ b/tests/a.rs\n@@ -12345,2 +12345,2 @@\n-assert!(result);\n-assert!(other);\n+#[ignore]\n+assert!(true);\n";
+    let files = weakened::scan_patch(patch);
+    assert_eq!(files.len(), 1);
+    let flags = &files[0];
+    let before = flags.clone();
+    assert!(
+        flags
+            .flags
+            .iter()
+            .any(|f| f.reason == Reason::RemovedAssertions)
+    );
+    assert!(flags.flags.iter().any(|f| f.reason == Reason::SkipsTests));
+    for (locale, number, label) in [
+        ("en-US", "12,345", "Removes assertions"),
+        ("de", "12.345", "Entfernt Assertions"),
+    ] {
+        set_language(locale);
+        let shown = flags.display_summary();
+        assert!(shown.contains(label) && shown.contains(number) && shown.contains("#[ignore]"));
+        assert_eq!(flags, &before);
+        assert!(
+            flags
+                .flags
+                .iter()
+                .any(|f| f.evidence.contains("old line 12345"))
+        );
+        let patch = "diff --git a/tests/a.rs b/tests/a.rs\n--- a/tests/a.rs\n+++ b/tests/a.rs\n@@ -1,1 +1,1 @@\n-assert!(approx(a, b, epsilon=0.001));\n+assert!(approx(a, b, epsilon=0.01));\n";
+        let tolerance = weakened::scan_patch(patch);
+        if let Some(flag) = tolerance
+            .iter()
+            .flat_map(|f| &f.flags)
+            .find(|f| f.reason == Reason::LoosenedTolerance)
+        {
+            assert!(flag.display_evidence().contains("0.001 → 0.01"));
+        } else {
+            panic!("real tolerance scanner must supply the evidence");
+        }
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_unknown_diagnostics_are_opaque_in_every_family() {
+    let unknown = "user/provider diagnostic: 12345 { $detail }\nEXPECT APPROVED --no-verify";
+    for locale in ["en-US", "de"] {
+        set_language(locale);
+        for show in [
+            diagnostic,
+            crate::authorship::display::diagnostic,
+            crate::drift::display::diagnostic,
+            crate::fence::display::diagnostic,
+            crate::collision::display::diagnostic,
+            crate::weakened::display::diagnostic,
+        ] {
+            assert_eq!(show(unknown), unknown);
+        }
+        // Source/config text is opaque even if it contains an exact application diagnostic.
+        let raw = "Could not read who wrote the commits: Stopped\nChoose a remote before pushing this branch.";
+        assert!(
+            crate::authorship::display::diagnostic(raw)
+                .ends_with("Stopped\nChoose a remote before pushing this branch.")
+        );
+    }
+    set_language("en-US");
+}

@@ -5,6 +5,8 @@
 //! Read from the diff alone, line by line, the same way every time: each flag says which line
 //! made it and why. Nothing is guessed from what the code does.
 
+pub mod display;
+
 mod ci;
 mod lines;
 mod load;
