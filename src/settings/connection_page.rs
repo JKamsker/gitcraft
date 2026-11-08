@@ -51,6 +51,20 @@ impl Settings {
                         },
                     );
                 }
+                for (service, account) in [
+                    (
+                        crate::forge::cloud::Service::Azure,
+                        &mut profile.connections.azure,
+                    ),
+                    (
+                        crate::forge::cloud::Service::Bitbucket,
+                        &mut profile.connections.bitbucket,
+                    ),
+                ] {
+                    card.row(service.name(), "azure bitbucket provider account", |ui| {
+                        crate::forge::cloud::ui::show(ui, id, service, account)
+                    });
+                }
                 for (kind, account) in [
                     (crate::trackers::Kind::Jira, &mut profile.connections.jira),
                     (

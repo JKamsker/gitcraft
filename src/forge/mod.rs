@@ -8,6 +8,7 @@
 //!   credential helper) already has for the host. See [`gitea`].
 
 mod cli;
+pub(crate) mod cloud;
 pub(crate) use cli::tool_location;
 mod forks;
 pub(crate) use cli::{ToolReport, tool_report};
