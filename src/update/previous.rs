@@ -9,6 +9,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::witness::{Failure, PlacementFailure};
+
 /// The version kept to go back to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Previous {
@@ -92,13 +94,24 @@ pub(super) fn replace_keeping(
     current: &str,
     move_into: impl Fn(&Path, &Path) -> Result<(), String>,
 ) -> Result<(), String> {
+    replace_keeping_witnessed(target, new, current, |from, to| {
+        move_into(from, to).map_err(PlacementFailure::Opaque)
+    })
+    .map_err(Failure::into_raw)
+}
+
+pub(super) fn replace_keeping_witnessed(
+    target: &Path,
+    new: &Path,
+    current: &str,
+    move_into: impl Fn(&Path, &Path) -> Result<(), PlacementFailure>,
+) -> Result<(), Failure> {
     let old = aside(target);
     remove(&old);
-    fs::rename(target, &old)
-        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
+    fs::rename(target, &old).map_err(|e| move_aside_failure(target, e.to_string()))?;
     if let Err(e) = move_into(new, target) {
         let _ = fs::rename(&old, target);
-        return Err(format!("Could not put the new version in place: {e}"));
+        return Err(placement_failure(e));
     }
     keep(target, &old, current);
     Ok(())
@@ -107,24 +120,30 @@ pub(super) fn replace_keeping(
 /// Swaps `target` (the running version, `current`) with the version kept beside it, which
 /// then keeps `current` to go forward to again. Returns the version gone back to.
 pub(super) fn swap_back(target: &Path, current: &str) -> Result<Previous, String> {
-    let previous = find(target).ok_or("No previous version of gitcraft is kept")?;
+    swap_back_witnessed(target, current).map_err(Failure::into_raw)
+}
+
+pub(super) fn swap_back_witnessed(target: &Path, current: &str) -> Result<Previous, Failure> {
+    let previous = find(target).ok_or_else(no_previous)?;
     let old = aside(target);
     remove(&old);
-    fs::rename(target, &old)
-        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
+    fs::rename(target, &old).map_err(|e| move_aside_failure(target, e.to_string()))?;
     if let Err(e) = fs::rename(&previous.path, target) {
         if fs::rename(&old, target).is_err() {
-            return Err(format!(
-                "Could not put gitcraft {} back in place ({e}), nor this version: it is at {}; \
-                 rename it back to {} by hand",
-                previous.label(),
-                old.display(),
-                target.display()
+            return Err(restore_failure(
+                &previous,
+                e.to_string(),
+                &old,
+                target,
+                true,
             ));
         }
-        return Err(format!(
-            "Could not put gitcraft {} back in place: {e}",
-            previous.label()
+        return Err(restore_failure(
+            &previous,
+            e.to_string(),
+            &old,
+            target,
+            false,
         ));
     }
     keep(target, &old, current);
@@ -173,3 +192,56 @@ pub const PIN_THIS: &str = "this version";
 
 #[cfg(test)]
 mod tests;
+
+fn no_previous() -> Failure {
+    Failure::NoPrevious {
+        raw: "No previous version of gitcraft is kept".to_owned(),
+    }
+}
+fn move_aside_failure(target: &Path, e: String) -> Failure {
+    Failure::MoveAside {
+        raw: format!("Could not move {} aside: {e}", target.display()),
+        target: target.display().to_string(),
+        detail: e,
+    }
+}
+pub(super) fn placement_failure(failure: PlacementFailure) -> Failure {
+    Failure::PutNew {
+        raw: format!("Could not put the new version in place: {}", failure.raw()),
+        failure,
+    }
+}
+fn restore_failure(
+    previous: &Previous,
+    detail: String,
+    old: &Path,
+    target: &Path,
+    rollback_failed: bool,
+) -> Failure {
+    if rollback_failed {
+        return Failure::RestoreBoth {
+            raw: format!(
+                "Could not put gitcraft {} back in place ({detail}), nor this version: it is at {}; rename it back to {} by hand",
+                previous.label(),
+                old.display(),
+                target.display()
+            ),
+            previous: previous.version.clone(),
+            detail,
+            old: old.display().to_string(),
+            target: target.display().to_string(),
+        };
+    }
+    Failure::RestorePrevious {
+        raw: format!(
+            "Could not put gitcraft {} back in place: {detail}",
+            previous.label()
+        ),
+        previous: previous.version.clone(),
+        detail,
+    }
+}
+
+#[cfg(test)]
+#[path = "previous/witness_tests.rs"]
+mod witness_tests;
