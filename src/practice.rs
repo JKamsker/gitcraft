@@ -25,6 +25,7 @@ impl Scenario {
         Self::Published,
     ];
 
+    #[cfg(test)]
     pub fn title(self) -> &'static str {
         match self {
             Self::Conflict => "Resolve a merge conflict",
@@ -34,6 +35,7 @@ impl Scenario {
         }
     }
 
+    #[cfg(test)]
     pub fn goal(self) -> &'static str {
         match self {
             Self::Conflict => {
@@ -51,6 +53,7 @@ impl Scenario {
         }
     }
 
+    #[cfg(test)]
     pub fn hint(self) -> &'static str {
         match self {
             Self::Conflict => {

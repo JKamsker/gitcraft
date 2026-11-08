@@ -275,6 +275,7 @@ impl PreviewFailure {
         }
     }
     /// Existing String callers retain the backend's display-at-call compatibility boundary.
+    #[cfg(test)]
     fn legacy(&self) -> String {
         match self {
             Self::Backend(failure) => failure.display(),
@@ -565,16 +566,6 @@ fn git_version(
 
 #[cfg(test)]
 mod tests;
-
-/// The existing ghost planner rendered inside an MCP approval card as ref moves/losses.
-pub(in crate::repo) fn approval_preview(
-    repo: &std::path::Path,
-    op: &GhostOp,
-    facts: &op::Facts,
-    cancelled: &dyn Fn() -> bool,
-) -> Result<crate::repo::agent::preview::Preview, String> {
-    approval_preview_with_witness(repo, op, facts, cancelled).map_err(|failure| failure.legacy())
-}
 
 pub(in crate::repo) fn approval_preview_with_witness(
     repo: &std::path::Path,

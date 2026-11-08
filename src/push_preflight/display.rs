@@ -523,11 +523,13 @@ fn dynamic(raw: &str) -> Option<String> {
 }
 
 /// Paint only after authentication receipt classification/extraction has completed.
+#[cfg(test)]
 pub(crate) fn reviewed_auth_failure() -> &'static str {
     crate::i18n::text("interaction-guards-push-authentication-failed")
 }
 
 /// Uses the canonical redaction helper before translating its application-owned label.
+#[cfg(test)]
 pub(crate) fn target(url: &str) -> String {
     target_label(&super::target_label(url))
 }

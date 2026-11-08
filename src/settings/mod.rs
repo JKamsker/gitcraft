@@ -270,8 +270,7 @@ fn id() -> egui::Id {
 /// What crate::i18n::text("interaction-settings-compact") does.
 pub(crate) const DEFAULT_REFS_WIDTH: f32 = 280.0;
 
-pub const COMPACT_TIP: &str = "Lanes closer together, for a narrower graph column";
-/// Localized prose; the legacy constant stays stable for source consumers during migration.
+/// Localized prose for the compact graph setting.
 pub fn compact_tip() -> &'static str {
     crate::i18n::text("interaction-settings-compact-tip")
 }

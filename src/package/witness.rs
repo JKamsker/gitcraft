@@ -82,6 +82,7 @@ impl CargoFailure {
             Self::Metadata { raw, .. } | Self::Tool { raw, .. } => raw,
         }
     }
+    #[cfg(test)]
     pub(crate) fn into_raw(self) -> String {
         match self {
             Self::Metadata { raw, .. } | Self::Tool { raw, .. } => raw,
@@ -92,9 +93,6 @@ impl CargoFailure {
             Self::Metadata { detail, .. } => display::CargoFailure::Metadata { detail },
             Self::Tool { failure, .. } => display::CargoFailure::Tool(failure.borrowed()),
         }
-    }
-    pub(crate) fn display(&self) -> String {
-        self.borrowed().display()
     }
 }
 
@@ -174,6 +172,7 @@ impl From<ToolFailure> for Failure {
     }
 }
 impl Failure {
+    #[cfg(test)]
     pub(crate) fn raw(&self) -> &str {
         match self {
             Self::Tool(failure) => failure.raw(),
@@ -191,6 +190,7 @@ impl Failure {
             | Self::Packages { raw, .. } => raw,
         }
     }
+    #[cfg(test)]
     pub(crate) fn into_raw(self) -> String {
         match self {
             Self::Tool(failure) => failure.into_raw(),

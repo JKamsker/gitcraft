@@ -252,7 +252,7 @@ pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result
                 .into());
             }
             let mut excluded = BTreeSet::new();
-            for triple in fields.chunks_exact(3) {
+            for triple in fields.as_chunks::<3>().0 {
                 if matches!(triple[2], b"set" | b"true") {
                     let path = std::str::from_utf8(triple[0])
                         .map_err(|_| crate::i18n::text("backend-invalid-attribute-path-83f4c3"))?;

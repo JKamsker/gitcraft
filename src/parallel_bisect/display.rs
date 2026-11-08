@@ -2,6 +2,7 @@
 //! protocol, cache, storage, command or worker-event identities. Unknown details stay opaque.
 use crate::i18n;
 
+#[cfg(test)]
 const EXACT: &[(&str, &str)] = &[
     (
         "git listed a commit of the range twice",
@@ -314,6 +315,7 @@ const EXACT: &[(&str, &str)] = &[
     ),
 ];
 
+#[cfg(test)]
 const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
     (
         "git listed a parent of ",
@@ -512,6 +514,7 @@ const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
 /// A Result<String> from bundle/observe does not prove cleanup-combinator ownership.
 /// Use cleanup_diagnostic only with separately retained source-bound fields; raw strings
 /// alone cannot select that seam. This function leaves unknown cleanup/keep lookalikes raw.
+#[cfg(test)]
 pub(crate) fn diagnostic(raw: &str) -> String {
     let exact = raw.strip_suffix('\n').unwrap_or(raw);
     let shown = raw;
@@ -547,6 +550,7 @@ pub(crate) fn diagnostic(raw: &str) -> String {
 }
 /// Finite templates emitted by session/runner/observe/workspace/bundle/verdict.
 /// Split only known outer envelopes; captured external errors and output remain raw.
+#[cfg(test)]
 fn envelope(raw: &str) -> Option<String> {
     let message = |id, args: &[(&str, i18n::Value<'_>)]| Some(i18n::message(id, args));
     if let Some(rest) = raw.strip_prefix("could not check out ")
@@ -685,6 +689,7 @@ pub(crate) fn machine_label(machine: &super::Machine) -> String {
 }
 
 /// Display a captured Machine::label without changing its cached identity.
+#[cfg(test)]
 pub(crate) fn machine_name(raw: &str) -> &str {
     if raw == "this computer" {
         i18n::text("interaction-bisect-machine-here")
@@ -694,6 +699,7 @@ pub(crate) fn machine_name(raw: &str) -> &str {
 }
 
 /// Verdict::word and its consumers that classify/store results remain unchanged.
+#[cfg(test)]
 pub(crate) fn verdict(verdict: super::Verdict) -> &'static str {
     i18n::text(match verdict {
         super::Verdict::Good => "interaction-bisect-verdict-good",
@@ -704,12 +710,14 @@ pub(crate) fn verdict(verdict: super::Verdict) -> &'static str {
 }
 
 /// Supplied numeric benchmark value only; never use this to parse or cache worker output.
+#[cfg(test)]
 pub(crate) fn scalar(value: f64) -> String {
     i18n::message("interaction-bisect-scalar", &[("value", value.into())])
 }
 
 /// Session warnings may prefix an app-owned error with its short commit hash.
 /// Do not pass worker output to this adapter.
+#[cfg(test)]
 pub(crate) fn warning(raw: &str) -> String {
     if let Some((hash, detail)) = raw.split_once(": ")
         && matches!(hash.len(), 8 | 40 | 64)
@@ -731,6 +739,7 @@ pub(crate) fn machine_location(raw: &str) -> &str {
     }
 }
 
+#[cfg(test)]
 fn observation_detail(raw: &str) -> String {
     let id = match raw {
         "Frame output exceeds 2 MiB; no result cached" => "interaction-bisect-frame-too-large",
@@ -756,6 +765,7 @@ fn observation_detail(raw: &str) -> String {
 
 // This source-owned repository-path form is separate from cleanup-combinator metadata.
 // Cleanup/keep suffixes are never inferred here: lower-level errors can contain them.
+#[cfg(test)]
 fn trailing_envelope(raw: &str) -> Option<String> {
     let message = |id, args: &[(&str, i18n::Value<'_>)]| Some(i18n::message(id, args));
     if let Some(rest) = raw.strip_suffix(" is not a git repository")
@@ -839,6 +849,7 @@ pub(crate) fn cleanup_diagnostic(raw: &str, context: CleanupContext<'_>) -> Stri
     i18n::message(id, &[("detail", primary.into()), (name, detail.into())])
 }
 
+#[cfg(test)]
 fn known_observation_detail(raw: &str) -> bool {
     matches!(
         raw,

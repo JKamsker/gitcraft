@@ -200,7 +200,7 @@ pub(super) fn render(
         let texture = textures.get(&mesh.texture_id).ok_or(crate::i18n::text(
             "repo-workflows-postcards-render-eb578243",
         ))?;
-        for (index, triangle) in mesh.indices.chunks_exact(3).enumerate() {
+        for (index, triangle) in mesh.indices.as_chunks::<3>().0.iter().enumerate() {
             if index % 128 == 0 && !active() {
                 return Err("Postcard rendering cancelled".into());
             }

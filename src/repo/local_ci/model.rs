@@ -38,6 +38,7 @@ fn strings(value: &Yaml) -> Result<Vec<String>, String> {
     }
     Ok(values)
 }
+#[cfg(test)]
 pub(super) fn parse(file: String, source: String) -> Result<Workflow, String> {
     parse_with_witness(file, source).map_err(|failure| failure.display())
 }

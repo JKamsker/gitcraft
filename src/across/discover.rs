@@ -35,6 +35,7 @@ pub enum Machine {
 }
 
 impl Machine {
+    #[cfg(test)]
     pub fn label(&self) -> String {
         match self {
             Machine::Here => "This computer".to_owned(),

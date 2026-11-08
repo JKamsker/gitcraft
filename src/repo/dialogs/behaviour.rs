@@ -17,6 +17,7 @@ enum Frame {
 }
 enum Event {
     Loaded(Vec<git::BehaviourCommit>),
+    #[cfg(test)]
     Frame(usize, Result<Observation, String>),
     Done(Result<(), String>),
     FrameWithPresentation(usize, Result<Observation, String>, Option<Presentation>),
@@ -209,6 +210,7 @@ impl Form {
                     self.index = 0;
                     self.refresh_cache();
                 }
+                #[cfg(test)]
                 Event::Frame(i, result) => {
                     if let Some(frame) = self.frames.get_mut(i) {
                         *frame = result.map_or_else(Frame::Failed, Frame::Observed);

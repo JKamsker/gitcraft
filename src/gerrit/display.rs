@@ -28,6 +28,7 @@ pub(crate) fn error(raw: &str) -> String {
 }
 
 impl Server {
+    #[cfg(test)]
     pub(crate) fn display_web_warning(&self) -> Option<String> {
         self.web_warning.as_deref().map(error)
     }
@@ -162,6 +163,7 @@ pub(crate) fn check_stack_presented_with(
 }
 
 /// Legacy display API: context must be the successful log from the same invocation.
+#[cfg(test)]
 pub(crate) fn stack_error(raw: &str, recorded_log: &str) -> String {
     StackFailure::from_log(recorded_log)
         .and_then(|source| source.display(raw))

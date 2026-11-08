@@ -137,6 +137,7 @@ impl Drop for Handle {
 
 /// Starts bisecting as `setup` says, results kept in `cache`; `wake` is called after each
 /// event (to have the window drawn again).
+#[cfg(test)]
 pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'static) -> Handle {
     start_impl(setup, cache, wake, false)
 }

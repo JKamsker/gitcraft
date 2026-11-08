@@ -269,6 +269,7 @@ fn forge_of(tool: &str) -> Result<Forge, String> {
 }
 
 /// Whether `glab` with `args` takes `--repo`: every command but `api`.
+#[cfg(test)]
 fn gitlab_takes_repo(args: &[&str]) -> bool {
     args.first().is_some_and(|sub| *sub != "api")
 }

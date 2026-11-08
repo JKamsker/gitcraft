@@ -77,17 +77,6 @@ pub(crate) fn pr_shows(dco: &Dco, details: &PrDetails) -> bool {
     dco.required() || dco.failing_check == Some(details.number)
 }
 
-fn commits_count(n: usize) -> String {
-    if n == 1 {
-        crate::i18n::text("repo-workflows-dco-commits-count-acfd7b9e").to_owned()
-    } else {
-        crate::i18n::message(
-            "repo-workflows-dco-commits-count-4eb116dc",
-            &[("n", (n).into())],
-        )
-    }
-}
-
 /// The pull request's sign-off section (see [`pr_shows`]), with the commits the DCO check
 /// refuses and the button that signs them off. `current`: the branch checked out here.
 pub(crate) fn pr_section(

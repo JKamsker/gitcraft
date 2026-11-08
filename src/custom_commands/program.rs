@@ -130,11 +130,13 @@ impl CapturedToast {
     }
 }
 
+#[cfg(test)]
 pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
     CapturedToast::capture(name, code, stdout, stderr).raw()
 }
 
 /// Opt-in presentation from actual source fields; legacy callers retain their API.
+#[cfg(test)]
 pub fn display_toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
     CapturedToast::capture(name, code, stdout, stderr).display()
 }

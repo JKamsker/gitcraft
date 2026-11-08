@@ -203,12 +203,6 @@ impl Workspace {
         add()
     }
 
-    /// Sends the commits `wanted` (and their history) to the repository there, when it is not
-    /// `source` and lacks some of them: as a bundle, with only what it lacks when it has the
-    /// rest, else whole.
-    pub fn send(&self, source: &Path, wanted: &[String]) -> Result<(), String> {
-        self.send_with_presentation(source, wanted, &mut None)
-    }
     pub(crate) fn send_with_presentation(
         &self,
         source: &Path,

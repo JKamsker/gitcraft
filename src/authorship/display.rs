@@ -3,10 +3,21 @@
 use crate::i18n::message;
 
 /// Display a diagnostic from this family, after any raw matching.
+// Not wired: authorship failures reach the UI as raw strings without source provenance.
+// Keep this adapter until that handoff is available; no target-specific cfg models it.
+#[allow(
+    dead_code,
+    reason = "Localization adapter awaits a source-owned presentation handoff"
+)]
 pub fn diagnostic(raw: &str) -> String {
     dynamic(raw).unwrap_or_else(|| raw.to_owned())
 }
 
+#[allow(
+    dead_code,
+    reason = "Localization adapter awaits a source-owned presentation handoff"
+)]
+// Only the pending diagnostic entry point calls this template helper.
 fn dynamic(raw: &str) -> Option<String> {
     if let Some(text) = raw
         .strip_prefix("Could not read who wrote the commits: ")

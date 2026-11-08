@@ -33,11 +33,6 @@ impl PlacementFailure {
             Self::CopyFailed { raw } | Self::Opaque(raw) => raw,
         }
     }
-    pub fn into_raw(self) -> String {
-        match self {
-            Self::CopyFailed { raw } | Self::Opaque(raw) => raw,
-        }
-    }
     fn borrowed(&self) -> display::PlacementFailure<'_> {
         match self {
             Self::CopyFailed { .. } => display::PlacementFailure::CopyFailed,

@@ -7,6 +7,7 @@ use crate::i18n::{message, text};
 impl Channel {
     /// Disjoint display API for this base, whose canonical `label` still returns English.
     /// The interaction owner's newer `label` may already use its own shared message IDs.
+    #[cfg(test)]
     pub fn display_label(self) -> &'static str {
         text(match self {
             Self::Main => "interaction-update-channel-main",
@@ -92,6 +93,7 @@ pub(crate) enum Diagnostic<'a> {
     Unpack {
         detail: &'a str,
     },
+    #[cfg(test)]
     CopyNew,
     NoPrevious,
     MoveAside {
@@ -130,6 +132,7 @@ impl Diagnostic<'_> {
             Self::Unpack { detail } => {
                 message("interaction-update-unpack", &[("detail", detail.into())])
             }
+            #[cfg(test)]
             Self::CopyNew => text("interaction-update-copy-new").to_owned(),
             Self::NoPrevious => text("interaction-update-no-previous").to_owned(),
             Self::MoveAside { target, detail } => message(

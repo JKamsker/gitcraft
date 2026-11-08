@@ -1655,6 +1655,7 @@ fn two_arguments(raw: &str) -> Option<String> {
 /// Session errors include an opaque command before a host. The caller must supply the
 /// same command/host that produced the error; never infer a command from arbitrary stderr.
 #[must_use]
+#[cfg(test)]
 pub fn execution_error(raw: &str, command: &str, host: &super::Host) -> String {
     let label = host.label();
     let prefix = format!("{command} on {label}: ");
@@ -1683,6 +1684,7 @@ pub fn execution_error(raw: &str, command: &str, host: &super::Host) -> String {
 /// verbatim. Only an exact known application message is translated; tracebacks and
 /// unknown OS/JSON errors must be passed through unchanged by the caller.
 #[must_use]
+#[cfg(test)]
 pub fn python_exception(kind: &str, detail: &str) -> String {
     let detail = known(detail).unwrap_or_else(|| detail.to_owned());
     pair(
@@ -1693,6 +1695,7 @@ pub fn python_exception(kind: &str, detail: &str) -> String {
 }
 
 #[must_use]
+#[cfg(test)]
 pub fn perl_exception(detail: &str, location: &str) -> String {
     let detail = diagnostic(detail);
     pair(
@@ -1704,7 +1707,13 @@ pub fn perl_exception(detail: &str, location: &str) -> String {
 
 /// Render the owned UI-thread debug envelope from supplied values only. The caller
 /// retains the original backtrace payload and never uses this for control decisions.
+// Not wired: ui_guard::off_ui_thread writes its raw backtrace directly to stderr.
+// Keep the display seam until a presentation consumer receives those fields.
 #[must_use]
+#[allow(
+    dead_code,
+    reason = "Localization adapter awaits a source-owned presentation handoff"
+)]
 pub fn ui_thread_debug(command: &str, detail: &str) -> String {
     pair(
         "interaction-remote-ui-thread-debug",

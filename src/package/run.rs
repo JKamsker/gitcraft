@@ -106,6 +106,7 @@ pub(super) fn run_witnessed(
     finish_witnessed(program, status.success(), &out, &err, false)
 }
 
+#[cfg(test)]
 fn missing(program: &str) -> String {
     missing_witnessed(program).into_raw()
 }
@@ -139,6 +140,7 @@ fn timeout_failure(program: &str) -> ToolFailure {
     }
 }
 
+#[cfg(test)]
 fn finish(
     program: &str,
     ok: bool,

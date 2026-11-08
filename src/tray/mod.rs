@@ -25,6 +25,13 @@ pub(crate) enum Availability {
     Disabled,
     Starting,
     Ready,
+    #[cfg_attr(
+        test,
+        allow(
+            dead_code,
+            reason = "Tests replace the native backend with an always-ready adapter"
+        )
+    )]
     Fallback(String),
 }
 

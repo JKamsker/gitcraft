@@ -98,6 +98,7 @@ fn lines(out: String) -> Result<Vec<String>, String> {
 }
 
 /// Compatibility String interface; cached previews use [`replay_with_witness`].
+#[cfg(test)]
 pub fn replay(
     repo: &Path,
     onto: &str,

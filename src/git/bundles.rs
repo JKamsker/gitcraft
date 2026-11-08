@@ -229,16 +229,6 @@ pub(crate) fn bundle_digest(bytes: &[u8]) -> String {
 
 /// Validation is repeated against the held file snapshot before any mutation. Import
 /// always verifies again; a prior verification result is only information for the user.
-pub(crate) fn check_bundle(
-    repo: &Path,
-    preview: &BundlePreview,
-    selected: &BTreeSet<String>,
-    prefix: &str,
-    import: bool,
-) -> Result<Vec<BundleRef>, String> {
-    check_bundle_with_presentation(repo, preview, selected, prefix, import, &mut None)
-}
-
 pub(crate) fn check_bundle_with_presentation(
     repo: &Path,
     preview: &BundlePreview,

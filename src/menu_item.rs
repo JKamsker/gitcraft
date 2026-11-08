@@ -219,11 +219,6 @@ pub(crate) fn bounded_menu<R>(
         .inner
 }
 
-/// Keep the toolkit's submenu hover, keyboard and close behavior, with reachable scrolling.
-pub(crate) fn group(ui: &mut Ui, label: &str, content: impl FnOnce(&mut Ui)) {
-    group_named(ui, label, label, content);
-}
-
 /// A raw stable menu salt and independently localized caption.
 pub(crate) fn group_named(ui: &mut Ui, salt: &str, label: &str, content: impl FnOnce(&mut Ui)) {
     // A salted child UI still mixes its position into the automatic button ID. Use an

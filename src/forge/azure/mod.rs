@@ -85,7 +85,8 @@ pub(super) fn location(remote: &str) -> Option<(String, String)> {
             project: p[1].clone(),
             repo: p[3].clone(),
         }
-    } else if let Some(org) = host.strip_suffix(".visualstudio.com") {
+    } else {
+        let org = host.strip_suffix(".visualstudio.com")?;
         let p = if p.first().is_some_and(|p| p == "DefaultCollection") {
             &p[1..]
         } else {
@@ -99,8 +100,6 @@ pub(super) fn location(remote: &str) -> Option<(String, String)> {
             project: p[0].clone(),
             repo: p[2].clone(),
         }
-    } else {
-        return None;
     };
     if !super::cloud::plain(&loc.org)
         || [&loc.project, &loc.repo]

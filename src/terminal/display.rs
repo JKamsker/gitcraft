@@ -2,6 +2,7 @@
 //! protocol, cache, storage, command or worker-event identities. Unknown details stay opaque.
 use crate::i18n;
 
+#[cfg(test)]
 const EXACT: &[(&str, &str)] = &[
     (
         "its program has ended",
@@ -13,6 +14,7 @@ const EXACT: &[(&str, &str)] = &[
     ),
 ];
 
+#[cfg(test)]
 const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
     (
         "could not open a terminal: ",
@@ -33,6 +35,7 @@ const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
 /// Only pass application-generated diagnostics from this partition, at paint time.
 /// stdout/stderr, custom-command output and arbitrary provider text must bypass this API.
 /// Nested detail captures are intentionally opaque; no recursive search/replacement.
+#[cfg(test)]
 pub(crate) fn diagnostic(raw: &str) -> String {
     let exact = raw.strip_suffix('\n').unwrap_or(raw);
     let shown = raw;
@@ -59,6 +62,7 @@ pub(crate) fn diagnostic(raw: &str) -> String {
 }
 
 /// Resolve only built-in shell labels; keep user-selected program and arguments raw.
+#[cfg(test)]
 pub(crate) fn shell_label(raw: &str) -> &str {
     match raw {
         "Windows PowerShell" => i18n::text("interaction-terminal-shell-powershell"),

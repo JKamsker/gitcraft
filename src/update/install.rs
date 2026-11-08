@@ -172,10 +172,6 @@ pub(super) fn prefetch_witnessed(release: &Release) -> Result<PathBuf, Failure> 
     Ok(ready.join(unpacked))
 }
 
-fn download(url: &str, to: &Path) -> Result<(), String> {
-    download_witnessed(url, to).map_err(Failure::into_raw)
-}
-
 fn download_witnessed(url: &str, to: &Path) -> Result<(), Failure> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(15))
@@ -194,10 +190,6 @@ fn download_witnessed(url: &str, to: &Path) -> Result<(), Failure> {
 
 /// Unpacks `archive` into `dir`: with `ditto` on macOS, which keeps an app bundle's signature
 /// whole, `tar` elsewhere.
-fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
-    unpack_witnessed(archive, dir).map_err(Failure::into_raw)
-}
-
 fn unpack_witnessed(archive: &Path, dir: &Path) -> Result<(), Failure> {
     let mut cmd = if cfg!(target_os = "macos") {
         let mut cmd = Command::new("ditto");
@@ -235,10 +227,6 @@ fn unpack_witnessed(archive: &Path, dir: &Path) -> Result<(), Failure> {
 
 /// Puts the parked version `new` in place of this copy of gitcraft, keeping this one to go
 /// back to. Returns what to start.
-pub fn install(new: &Path) -> Result<PathBuf, String> {
-    install_witnessed(new).map_err(Failure::into_raw)
-}
-
 pub fn install_witnessed(new: &Path) -> Result<PathBuf, Failure> {
     let layout = Layout::get().ok_or_else(not_updated)?;
     let target = layout.path();
@@ -261,10 +249,6 @@ pub fn previous() -> Option<Previous> {
 
 /// Puts the version kept by the last update back in place of this one ("Go back to 0.3.3"),
 /// keeping this one in its stead. Returns what to start, and the version gone back to.
-pub fn go_back() -> Result<(PathBuf, Previous), String> {
-    go_back_witnessed().map_err(Failure::into_raw)
-}
-
 pub fn go_back_witnessed() -> Result<(PathBuf, Previous), Failure> {
     let layout = Layout::get().ok_or_else(not_updated)?;
     let target = layout.path();
@@ -277,10 +261,6 @@ pub fn go_back_witnessed() -> Result<(PathBuf, Previous), Failure> {
 }
 
 /// A rename, or a copy when the parking is on another drive than gitcraft.
-fn move_into(from: &Path, to: &Path) -> Result<(), String> {
-    move_into_witnessed(from, to).map_err(PlacementFailure::into_raw)
-}
-
 fn move_into_witnessed(from: &Path, to: &Path) -> Result<(), PlacementFailure> {
     if fs::rename(from, to).is_ok() {
         return Ok(());

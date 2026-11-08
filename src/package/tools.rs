@@ -10,10 +10,6 @@ use super::{Ecosystem, Package};
 
 /// The packages of the repository at `repo` that can be published: Cargo's (`cargo metadata`)
 /// and npm's (a `package.json` at the top that isn't private).
-pub(crate) fn packages(repo: &Path, cargo: bool, npm: bool) -> Result<Vec<Package>, String> {
-    packages_witnessed(repo, cargo, npm).map_err(Failure::into_raw)
-}
-
 pub(super) fn packages_witnessed(
     repo: &Path,
     cargo: bool,
@@ -72,6 +68,7 @@ fn own_folder(repo: &Path) -> String {
 
 /// The publishable packages of `cargo metadata --no-deps` in `root` (the repository's top as
 /// cargo spells it; empty: the workspace's root), their folders relative to it.
+#[cfg(test)]
 pub(crate) fn parse_cargo_metadata(json: &str, root: &str) -> Result<Vec<Package>, String> {
     parse_cargo_metadata_witnessed(json, root).map_err(CargoFailure::into_raw)
 }
@@ -177,10 +174,6 @@ pub(crate) fn parse_package_json(text: &str) -> Option<Package> {
 }
 
 /// The files `pkg` would ship, from its folder, and their sizes when the tool says them.
-pub(crate) fn files(repo: &Path, pkg: &Package) -> Result<Vec<(String, Option<u64>)>, String> {
-    files_witnessed(repo, pkg).map_err(Failure::into_raw)
-}
-
 pub(super) fn files_witnessed(
     repo: &Path,
     pkg: &Package,
@@ -216,6 +209,7 @@ pub(super) fn files_witnessed(
 }
 
 /// `npm pack --dry-run --json`: `[{"files": [{"path": "…", "size": 12}]}]`.
+#[cfg(test)]
 pub(crate) fn parse_npm_pack(json: &str) -> Result<Vec<(String, Option<u64>)>, String> {
     parse_npm_pack_witnessed(json).map_err(Failure::into_raw)
 }
@@ -246,10 +240,6 @@ pub(super) fn parse_npm_pack_witnessed(json: &str) -> Result<Vec<(String, Option
 
 /// The version published last (a release, not a pre-release, when there is one), and where
 /// its archive is.
-pub(crate) fn published(pkg: &Package) -> Result<Option<(String, String)>, String> {
-    published_witnessed(pkg).map_err(Failure::into_raw)
-}
-
 pub(super) fn published_witnessed(pkg: &Package) -> Result<Option<(String, String)>, Failure> {
     let web = match pkg.ecosystem {
         Ecosystem::Cargo => "https://crates.io",
@@ -315,10 +305,6 @@ pub(super) fn published_witnessed(pkg: &Package) -> Result<Option<(String, Strin
 }
 
 /// The files of the archive at `url`.
-pub(crate) fn published_files(url: &str) -> Result<Vec<String>, String> {
-    published_files_witnessed(url).map_err(Failure::into_raw)
-}
-
 pub(super) fn published_files_witnessed(url: &str) -> Result<Vec<String>, Failure> {
     let web: String = url.splitn(4, '/').take(3).collect::<Vec<_>>().join("/");
     let agent = crate::forge::http::with_proxy(ureq::AgentBuilder::new(), &web)

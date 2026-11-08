@@ -78,6 +78,7 @@ pub(crate) struct Report {
 }
 
 /// The packages the repository has: those of the manifests at its top.
+#[cfg(test)]
 pub(crate) fn packages(repo: &Path) -> Result<Vec<Package>, String> {
     packages_witnessed(repo).map_err(Failure::into_raw)
 }
@@ -90,7 +91,8 @@ pub(crate) fn packages_witnessed(repo: &Path) -> Result<Vec<Package>, Failure> {
 }
 
 /// Works out the report of `pkg`, from its tool and git (the registry is asked apart:
-/// [`published`]).
+/// [`published_witnessed`]).
+#[cfg(test)]
 pub(crate) fn report(repo: &Path, pkg: &Package) -> Result<Report, String> {
     report_witnessed(repo, pkg).map_err(Failure::into_raw)
 }
@@ -115,13 +117,6 @@ pub(crate) fn report_witnessed(repo: &Path, pkg: &Package) -> Result<Report, Fai
 
 /// How `files` (of `pkg`) differ from the version on the registry; `Ok(None)`: never
 /// published there.
-pub(crate) fn published(
-    pkg: &Package,
-    files: &[(String, Option<u64>)],
-) -> Result<Option<Published>, String> {
-    published_witnessed(pkg, files).map_err(Failure::into_raw)
-}
-
 pub(crate) fn published_witnessed(
     pkg: &Package,
     files: &[(String, Option<u64>)],

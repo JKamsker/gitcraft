@@ -127,6 +127,7 @@ impl Notice {
         &self.raw
     }
 
+    #[cfg(test)]
     pub(super) fn into_raw(self) -> (String, bool) {
         self.raw
     }

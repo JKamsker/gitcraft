@@ -120,15 +120,6 @@ fn verdict_color(t: &Tokens, verdict: Verdict) -> Color32 {
     }
 }
 
-/// "good" → "Good".
-fn capital(word: &str) -> String {
-    let mut chars = word.chars();
-    chars
-        .next()
-        .map(|c| c.to_uppercase().chain(chars).collect())
-        .unwrap_or_default()
-}
-
 fn display_verdict(verdict: Verdict) -> &'static str {
     crate::i18n::text(match verdict {
         Verdict::Good => "repo-workflows-r1-verdict-good",

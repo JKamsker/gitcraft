@@ -157,15 +157,6 @@ fn repeated(a: impl Into<Sample>, b: impl Into<Sample>) -> Observation {
         Observation::Inconsistent
     }
 }
-pub(crate) fn run(
-    repo: &Path,
-    hash: &str,
-    command: &str,
-    mode: Mode,
-    timeout: Duration,
-) -> Result<Observation, String> {
-    run_with_presentation(repo, hash, command, mode, timeout, &mut None)
-}
 
 pub(crate) fn run_with_presentation(
     repo: &Path,

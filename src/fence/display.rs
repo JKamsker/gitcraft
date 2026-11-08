@@ -307,17 +307,6 @@ fn known_detail(raw: &str) -> String {
     raw.to_owned()
 }
 
-impl super::check::How {
-    pub fn display_label(self) -> &'static str {
-        crate::i18n::text(match self {
-            Self::Committed => "interaction-guards-fence-how-committed",
-            Self::Uncommitted => "interaction-guards-fence-how-uncommitted",
-            Self::Untracked => "interaction-guards-fence-how-untracked",
-            Self::Ignored => "interaction-guards-fence-how-ignored",
-        })
-    }
-}
-
 /// `target` is exactly the supplied ref or `remote::display(worktree)` used by the producer.
 /// It may contain punctuation or text resembling an error delimiter; preserve it whole.
 pub fn check_diagnostic(raw: &str, target: &str) -> String {

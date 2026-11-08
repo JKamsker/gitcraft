@@ -184,9 +184,11 @@ pub fn is_ancestor(repo: &Path, ancestor: &str, descendant: &str) -> bool {
 }
 
 /// Compatibility String interface; cached previews retain the typed witness instead.
+#[cfg(test)]
 pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
     merge_with_witness(repo, ours, theirs, version).map_err(|failure| failure.display())
 }
+#[cfg(test)]
 pub fn unreachable(
     repo: &Path,
     old: &[String],
@@ -196,16 +198,7 @@ pub fn unreachable(
 ) -> Result<Vec<String>, String> {
     unreachable_with_witness(repo, old, new, moved, limit).map_err(|failure| failure.display())
 }
-pub(crate) fn unreachable_bounded(
-    reader: &super::super::investigations::Reader<'_>,
-    old: &[String],
-    new: &[String],
-    moved: &[String],
-    limit: usize,
-) -> Result<Vec<String>, String> {
-    unreachable_bounded_with_witness(reader, old, new, moved, limit)
-        .map_err(|failure| failure.display())
-}
+#[cfg(test)]
 pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
     leaving_with_witness(repo, old, new, limit).map_err(|failure| failure.display())
 }

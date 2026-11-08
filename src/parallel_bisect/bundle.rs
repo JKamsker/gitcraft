@@ -13,27 +13,6 @@ pub(crate) fn identity(repo: &Path) -> Result<String, String> {
     workspace::canonical_common(repo)
 }
 
-pub(crate) fn run(
-    repo: &Path,
-    expected: &str,
-    pack: &[u8],
-    refs: &[BundleRef],
-    prerequisites: &[BundleRef],
-    mapped: &[BundleRef],
-    import: bool,
-) -> Result<(), String> {
-    run_with_presentation(
-        repo,
-        expected,
-        pack,
-        refs,
-        prerequisites,
-        mapped,
-        import,
-        &mut None,
-    )
-}
-
 #[expect(
     clippy::too_many_arguments,
     reason = "Preserves the original seven import operands with the optional producer-owned presentation out-slot"
@@ -182,6 +161,7 @@ fn created_keep(output: &[u8], width: usize, message: String) -> Result<Keep, St
         _ => Err("Unconfirmed pack keep response; protection retained".into()),
     }
 }
+#[cfg(test)]
 fn pipeline(
     backend: &mut impl Backend,
     pack: &[u8],

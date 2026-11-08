@@ -46,6 +46,7 @@ pub(super) enum RecentStatus {
 
 impl RecentStatus {
     /// The words the start page shows for it, after the name: the branch, or what is wrong.
+    #[cfg(test)]
     pub(super) fn label(&self) -> String {
         match self {
             RecentStatus::Repo { head, .. } => match head {

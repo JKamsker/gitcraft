@@ -22,9 +22,6 @@ mod tests;
 pub use load::{Area, Scope, scan};
 use patch::{FilePatch, Hunk, Mark};
 
-/// The badge's label.
-pub const BADGE: &str = "weakens checks";
-
 /// Why a file or hunk weakens the checks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Reason {
@@ -108,6 +105,7 @@ pub struct FileFlags {
 
 impl FileFlags {
     /// The whole list as a hover text: each reason once, then its evidence.
+    #[cfg(test)]
     pub fn summary(&self) -> String {
         summary(self.flags.iter())
     }

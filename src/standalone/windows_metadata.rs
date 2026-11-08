@@ -276,7 +276,9 @@ mod tests {
             .decode(&args[4])
             .map_err(|e| e.to_string())?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|b| u16::from_le_bytes([b[0], b[1]]))
             .collect::<Vec<_>>();
         assert_eq!(
@@ -402,7 +404,9 @@ mod full_policy_fixture_recording_tests {
             .decode(args[4].to_string_lossy().as_bytes())
             .map_err(|e| e.to_string())?;
         let units = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|b| u16::from_le_bytes([b[0], b[1]]))
             .collect::<Vec<_>>();
         assert_eq!(

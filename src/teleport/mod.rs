@@ -189,6 +189,7 @@ pub enum Step {
 
 impl Step {
     /// What the dialog says meanwhile.
+    #[cfg(test)]
     pub fn label(self) -> String {
         match self {
             Step::Checking => "Checking both machines…".to_owned(),

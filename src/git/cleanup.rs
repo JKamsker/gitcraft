@@ -423,10 +423,7 @@ fn scan_residuals(
     if ids.is_empty() {
         return Ok((vec![false; config.replacements.len()], false));
     }
-    let input: Vec<u8> = ids
-        .iter()
-        .flat_map(|id| id.bytes().chain([b'\n']))
-        .collect();
+    let input: Vec<u8> = ids.iter().flat_map(|id| id.bytes().chain(*b"\n")).collect();
     let metadata = run(&["cat-file", "--batch-check"], input, LIMIT)?;
     let metadata = std::str::from_utf8(&metadata)
         .map_err(|_| crate::i18n::text("backend-invalid-object-metadata-cafe82"))?;
@@ -477,7 +474,7 @@ fn scan_residuals(
     }
     let input = blobs
         .iter()
-        .flat_map(|(id, _)| id.bytes().chain([b'\n']))
+        .flat_map(|(id, _)| id.bytes().chain(*b"\n"))
         .collect();
     if blobs.is_empty() {
         return Ok((vec![false; config.replacements.len()], false));

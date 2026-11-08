@@ -28,6 +28,7 @@ impl GitVersion {
     }
 
     /// Compatibility String interface; cached previews use [`Self::of_with_witness`].
+    #[cfg(test)]
     pub fn of(repo: &Path) -> Result<Self, String> {
         Self::of_with_witness(repo).map_err(|failure| failure.display())
     }

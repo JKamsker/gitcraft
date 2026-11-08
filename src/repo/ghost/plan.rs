@@ -80,6 +80,7 @@ pub(crate) struct Outcome {
 
 /// What `op` would do in `repo`, as `facts` describe it. `cancel` is asked between the git
 /// calls; `true` ends it with [`CANCELLED`].
+#[cfg(test)]
 pub(crate) fn plan(
     repo: &Path,
     op: &GhostOp,

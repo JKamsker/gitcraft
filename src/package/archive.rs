@@ -22,6 +22,7 @@ pub(crate) const fn max() -> u64 {
 
 /// The paths of the files in the gzip'd tar `bytes`, without their first folder (`app-1.2.3/`,
 /// `package/`).
+#[cfg(test)]
 pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
     list_witnessed(bytes).map_err(Failure::into_raw)
 }

@@ -506,11 +506,13 @@ mod saved_policy_tests {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn pure_native_full_policy_roundtrip_keeps_owner_group_native_attributes_and_acl()
     -> Result<(), String> {
-        let mut access = serde_json::json!({"entries": [[[117,115,101,114,46,97],[1,2,3]]]});
+        let access = serde_json::json!({"entries": [[[117,115,101,114,46,97],[1,2,3]]]});
         #[cfg(target_os = "macos")]
-        {
+        let access = {
+            let mut access = access;
             access["acl"] = serde_json::json!([{"kind":"user","name":"501","perms":["read"],"flags":[],"allow":false}]);
-        }
+            access
+        };
         let policy: Policy = serde_json::from_value(serde_json::json!({
             "platform":std::env::consts::OS,"mode":416,"uid":501,"gid":20,"access":access
         }))

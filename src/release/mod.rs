@@ -299,6 +299,7 @@ impl Plan {
     }
 
     /// What each step will do, in words and commands, for the dialog.
+    #[cfg(test)]
     pub(crate) fn preview(&self, forge: Option<Forge>) -> Vec<(Step, String)> {
         let short = crate::repo::short(&self.commit);
         self.steps()

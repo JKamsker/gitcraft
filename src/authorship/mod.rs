@@ -81,6 +81,7 @@ impl Attribution {
     }
 
     /// A short description for a hover: _Agent-written (Claude), from git-ai notes_.
+    #[cfg(test)]
     pub fn describe(&self) -> String {
         // Line by line, a commit may record only some of its lines: it has agent lines, it
         // isn't said to be all an agent's.

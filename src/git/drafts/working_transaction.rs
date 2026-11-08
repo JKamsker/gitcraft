@@ -257,11 +257,13 @@ pub(super) fn apply_with_commit(
 mod policy_noop_tests {
     use super::*;
     fn policy(platform: &str, gid: u32) -> Result<native_files::Policy, String> {
-        let mut value = serde_json::json!({"platform":platform,"mode":384,"uid":1,"gid":gid,"access":{"entries":[]}});
+        let value = serde_json::json!({"platform":platform,"mode":384,"uid":1,"gid":gid,"access":{"entries":[]}});
         #[cfg(target_os = "macos")]
-        {
+        let value = {
+            let mut value = value;
             value["access"]["acl"] = serde_json::json!([]);
-        }
+            value
+        };
         serde_json::from_value(value).map_err(|error| error.to_string())
     }
     #[test]

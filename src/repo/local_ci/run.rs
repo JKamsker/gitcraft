@@ -6,16 +6,6 @@ use std::{
     time::Duration,
 };
 
-pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), String> {
-    read_catalog_with_witness(path)
-        .map(|(workflows, errors)| {
-            (
-                workflows,
-                errors.iter().map(CatalogFailure::display).collect(),
-            )
-        })
-        .map_err(|failure| failure.display())
-}
 fn read_source(path: &Path, file: &str) -> Result<String, String> {
     let bytes = crate::safe_read::read_inside(path, file, model::MAX as u64).ok_or(
         crate::i18n::text("repo-workflows-local_ci-read-source-0066c097"),

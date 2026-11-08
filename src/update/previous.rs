@@ -88,6 +88,7 @@ fn plain_version(v: &str) -> bool {
 
 /// Puts `new` in place of `target` (the running version, `current`), which is kept as the
 /// previous version. `move_into` moves a file or bundle (a copy across drives).
+#[cfg(test)]
 pub(super) fn replace_keeping(
     target: &Path,
     new: &Path,
@@ -119,6 +120,7 @@ pub(super) fn replace_keeping_witnessed(
 
 /// Swaps `target` (the running version, `current`) with the version kept beside it, which
 /// then keeps `current` to go forward to again. Returns the version gone back to.
+#[cfg(test)]
 pub(super) fn swap_back(target: &Path, current: &str) -> Result<Previous, String> {
     swap_back_witnessed(target, current).map_err(Failure::into_raw)
 }
