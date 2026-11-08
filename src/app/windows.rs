@@ -155,6 +155,7 @@ type WindowCache = Arc<Mutex<BTreeMap<ViewportId, Children>>>;
 pub struct DesktopApp {
     app: Arc<Mutex<App>>,
     cache: WindowCache,
+    deferred_close: bool,
 }
 
 impl DesktopApp {
@@ -163,6 +164,7 @@ impl DesktopApp {
         Self {
             app: Arc::new(Mutex::new(app)),
             cache: Default::default(),
+            deferred_close: false,
         }
     }
 
@@ -309,15 +311,30 @@ impl DesktopApp {
         // hidden/minimized-safe tick drains their completion channels without polling Git.
         ctx.request_repaint_after(Duration::from_millis(250));
     }
+
+    fn logic_tick(&mut self, ctx: &egui::Context, frame: Option<&eframe::Frame>) {
+        if let Ok(mut app) = self.app.try_lock() {
+            if std::mem::take(&mut self.deferred_close) && !app.root_close_request(ctx, true) {
+                // The request was delayed only while a native picker borrowed App.
+                // Explicit Quit and an ordinary last-window close still complete.
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            app.tick_model(ctx, frame);
+        } else {
+            if ctx.viewport_id() == ViewportId::ROOT
+                && ctx.input(|i| i.viewport().close_requested())
+            {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.deferred_close = true;
+            }
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
+    }
 }
 
 impl eframe::App for DesktopApp {
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        if let Ok(mut app) = self.app.try_lock() {
-            app.tick_model(ctx, Some(frame));
-        } else {
-            ctx.request_repaint_after(Duration::from_millis(50));
-        }
+        self.logic_tick(ctx, Some(frame));
     }
 
     fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
@@ -610,17 +627,23 @@ impl App {
     }
 
     pub(super) fn close_root_with_children(&mut self, ctx: &egui::Context) {
+        self.root_close_request(ctx, ctx.input(|i| i.viewport().close_requested()));
+    }
+
+    fn root_close_request(&mut self, ctx: &egui::Context, requested: bool) -> bool {
         if !self.windows.quit_requested
             && self.windows.current == ViewportId::ROOT
             && (!self.windows.parked.is_empty() || self.window_has_dialog())
-            && ctx.input(|i| i.viewport().close_requested())
+            && requested
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             if !self.window_has_dialog() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
                 self.windows.root_hidden = true;
             }
+            return true;
         }
+        false
     }
 
     pub(super) fn window_strip(&mut self, ctx: &egui::Context, strip: Rect) {
@@ -1513,6 +1536,54 @@ mod tests {
                 .place_at_pixels
                 .is_none()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn contended_logic_defers_close_then_replays_keep_children_or_explicit_quit()
+    -> Result<(), String> {
+        for quit in [false, true] {
+            let mut h = harness();
+            let ctx = h.ctx.clone();
+            let owner = h.state().app.clone();
+            let child = ViewportId::from_hash_of("kept-during-contention");
+            let mut held = owner.lock().map_err(|e| e.to_string())?;
+            held.windows
+                .parked
+                .insert(child, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+            held.windows.quit_requested = quit;
+            let mut raw = egui::RawInput::default();
+            let info = raw.viewports.entry(ViewportId::ROOT).or_default();
+            info.minimized = Some(true);
+            info.events.push(egui::ViewportEvent::Close);
+            let output = ctx.run_logic(&raw, |ctx| h.state_mut().logic_tick(ctx, None));
+            assert!(
+                output.viewport_commands[&ViewportId::ROOT]
+                    .contains(&egui::ViewportCommand::CancelClose)
+            );
+            assert!(h.state().deferred_close);
+            drop(held);
+            let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+                h.state_mut().logic_tick(ctx, None)
+            });
+            let commands = &output.viewport_commands[&ViewportId::ROOT];
+            if quit {
+                assert!(commands.contains(&egui::ViewportCommand::Close));
+                assert!(!commands.contains(&egui::ViewportCommand::CancelClose));
+            } else {
+                assert!(commands.contains(&egui::ViewportCommand::CancelClose));
+                assert!(commands.contains(&egui::ViewportCommand::Visible(false)));
+            }
+            assert!(!h.state().deferred_close);
+            assert!(
+                owner
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .windows
+                    .parked
+                    .contains_key(&child)
+            );
+        }
         Ok(())
     }
 }
