@@ -1,0 +1,54 @@
+{
+  "source_revision": "a532ed25578a7e3db5bb0af04bd16ecbf0332839",
+  "source_tree": "aa4292b76940c1124815dc51795eb453ef1221c8",
+  "baseline_revision": "760c79bb69ffc3af5401612bd9c48dcd254eca54",
+  "method": "Lexical, all tracked Rust in src/ and crates/, including tests and cfg branches; see docs/architecture.md",
+  "before": {
+    "rust_files": 948,
+    "rust_lines": 308298,
+    "functions": 12131,
+    "largest_function_lines": 620,
+    "function_lines_p95": 59,
+    "repo_tab_fields": 188,
+    "constructor_lines": 208,
+    "dispatcher_lines": 422,
+    "root_action_variants": 165
+  },
+  "after": {
+    "rust_files": 949,
+    "rust_lines": 308573,
+    "functions": 12157,
+    "largest_function_lines": 620,
+    "function_lines_p95": 59,
+    "repo_tab_fields": 185,
+    "constructor_lines": 205,
+    "dispatcher_lines": 419,
+    "root_action_variants": 162
+  },
+  "history_window": {
+    "first_parent_commits": 207,
+    "median_text_files_per_commit": 14,
+    "hotspots": {
+      "src/repo/mod.rs": {
+        "commits": 107,
+        "added": 2120,
+        "deleted": 3233
+      },
+      "src/repo/actions.rs": {
+        "commits": 72,
+        "added": 1169,
+        "deleted": 340
+      },
+      "src/repo/apply.rs": {
+        "commits": 67,
+        "added": 894,
+        "deleted": 86
+      }
+    }
+  },
+  "feature_followup": {
+    "revision": "a532ed25578a7e3db5bb0af04bd16ecbf0332839",
+    "previous": "496f61b2d796565b46364fc9173bdefd06924511",
+    "central_files_changed": []
+  }
+}

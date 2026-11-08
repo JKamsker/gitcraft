@@ -178,6 +178,17 @@ when unavailable.
 5. Keep Git/forge/process I/O below the UI; preserve bounded jobs, cancellation,
    offline policy and persisted formats. Dependency direction is window/tab →
    feature → Git/forge/terminal services; services must not depend on `RepoTab`.
-6. Demonstrate a later small terminal change touching its owner and tests alone.
-   Review central edit count and cross-module writes alongside metrics. Rust
+6. Review central edit count and cross-module writes alongside metrics. Rust
    privacy is the initial high-signal guard, not a blanket size threshold.
+
+The feature-local follow-up in this phase adds `TerminalAct::Hide`: the existing
+Hide button expresses an idempotent hide intent even if another event already
+hid the panel. It changes the terminal owner, its tests and its tab strip, with
+**zero edits** to `RepoTab` fields, constructor, root action enum or dispatcher.
+The toolbar/key still toggles (and focuses an existing popout) as before.
+
+The [results](architecture-results.json) and [validation evidence](validation/architecture-178.md)
+record the actual before/after metrics, source equivalence, local checks, timing
+smoke results and limitations. The owning boundary reduces four central state
+fields to one and four root variants to one; it does not eliminate the remaining
+`RepoTab`, settings, operation or async hotspots. Continue those as bounded phases.
