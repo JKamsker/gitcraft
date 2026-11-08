@@ -15,7 +15,8 @@ pub(crate) fn diagnostic(raw: &str) -> String {
         "push.default=nothing: choose an explicit branch push." => {
             return crate::i18n::text("interaction-guards-push-default-nothing").into();
         }
-        ".lfsconfig must not pass through a content filter when reviewing endpoint configuration." => {
+        ".lfsconfig must not pass through a content filter when reviewing endpoint configuration." =>
+        {
             return crate::i18n::text("interaction-guards-push-lfs-filter").into();
         }
         "The local push preview could not be completed. Fetch missing history explicitly, then try again; no push was run." =>

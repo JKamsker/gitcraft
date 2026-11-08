@@ -443,3 +443,70 @@ fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized
     }
     set_language("en-US");
 }
+
+#[test]
+fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallback() {
+    use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut paired = Vec::new();
+    for (locale, catalog) in [
+        (
+            "en-US",
+            include_str!("../../../locales/en-US/interaction-guards.ftl"),
+        ),
+        (
+            "de",
+            include_str!("../../../locales/de/interaction-guards.ftl"),
+        ),
+    ] {
+        let mut contracts: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+        let mut current = "";
+        for line in catalog.lines() {
+            if let Some((id, _)) = line.split_once(" = ") {
+                assert!(id.starts_with("interaction-guards-"));
+                current = id;
+                assert!(contracts.insert(id, BTreeSet::new()).is_none());
+            }
+            for suffix in line.split('$').skip(1) {
+                let name: String = suffix
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                contracts.get_mut(current).unwrap().insert(name);
+            }
+        }
+        let mut bundle = FluentBundle::new(vec![locale.parse().unwrap()]);
+        bundle.set_use_isolating(false);
+        bundle
+            .add_resource(FluentResource::try_new(catalog.to_owned()).unwrap())
+            .unwrap();
+        // Direct bundles make a broken German message fail instead of using English fallback.
+        for (id, names) in &contracts {
+            for (number, selector) in [(1u64, "yes"), (12345u64, "no")] {
+                let mut args = FluentArgs::new();
+                for name in names {
+                    match name.as_str() {
+                        "line" | "count" | "others" | "seconds" | "megabytes" | "percent"
+                        | "agent" | "total" | "commits" | "edited" | "mixed" | "unknown"
+                        | "files" | "unrelated_files" | "folders" | "dependencies"
+                        | "signatures" | "removed" | "old" => args.set(name, number),
+                        "has_agent" | "has_mixed" | "has_unknown" | "partial" | "unrelated" => {
+                            args.set(name, selector)
+                        }
+                        _ => args.set(name, "opaque 12345 { $untouched }"),
+                    }
+                }
+                let mut errors = Vec::new();
+                let shown = bundle.format_pattern(
+                    bundle.get_message(id).unwrap().value().unwrap(),
+                    Some(&args),
+                    &mut errors,
+                );
+                assert!(errors.is_empty(), "{locale} {id}: {errors:?}");
+                assert!(!shown.is_empty(), "{locale} {id}");
+            }
+        }
+        paired.push(contracts);
+    }
+    assert_eq!(paired[0], paired[1]);
+}
