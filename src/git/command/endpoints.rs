@@ -1,5 +1,6 @@
 //! Effective endpoint metadata. Expanded URLs are never fed back into a mutating Git call.
 use super::*;
+mod literal;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RemoteEndpoint {
     pub remote: String,
@@ -195,6 +196,7 @@ impl RouteBinding {
 /// Inspect the operation's own remote selection, including implicit branch push overrides.
 /// Only metadata is expanded; the original command retains Git's normal routing semantics.
 pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<String>, String> {
+    let original_args = args;
     let args = after_options(args);
     let Some(sub) = args.first() else {
         return Ok(vec![]);
@@ -276,31 +278,59 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
     if !matched.is_empty() {
         return Ok(matched);
     }
-    // Resolve literal transport rewrites through Git's own get-url implementation,
-    // with a new command-only remote name that cannot collide with repository data.
-    let known = connection_read(repo, &["remote"])?;
-    let mut index = 0;
-    let name = loop {
-        let name = format!("gitcraft-endpoint-metadata-{index}");
-        if !known.lines().any(|n| n == name) {
-            break name;
-        }
-        index += 1;
-    };
-    let config = format!("remote.{name}.url={remote}");
-    let mut args = vec!["-c", config.as_str(), "remote", "get-url"];
-    if push {
-        args.push("--push");
+    // `remote get-url` requires a locally configured remote: a command-only
+    // synthetic remote cannot resolve a literal operand. Read only rewrite
+    // metadata, retaining the operation's explicit global options, then apply
+    // Git's single longest-prefix substitution without starting a transport.
+    let query = literal_query(original_args, explicit.is_some())?;
+    let configuration = connection_read(repo, &query)?;
+    Ok(vec![literal::resolve(&configuration, &remote, push)?])
+}
+
+fn literal_query<'a>(original_args: &'a [&'a str], explicit: bool) -> Result<Vec<&'a str>, String> {
+    if !explicit {
+        return Err("Could not establish the operation's implicit remote destination".into());
     }
-    args.extend(["--all", name.as_str()]);
-    Ok(connection_read(repo, &args)?
-        .lines()
-        .map(String::from)
-        .collect())
+    let command = after_options(original_args);
+    let mut query = original_args[..original_args.len() - command.len()].to_vec();
+    query.extend([
+        "config",
+        "--null",
+        "--get-regexp",
+        r"^url\..*\.(insteadof|pushinsteadof)$",
+    ]);
+    Ok(query)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn literal_metadata_query_keeps_owned_config_without_a_transport() -> Result<(), String> {
+        let original = [
+            "-c",
+            "url.ssh://host/.pushInsteadOf=short:",
+            "push",
+            "short:repo",
+        ];
+        assert_eq!(
+            literal_query(&original, true)?,
+            [
+                "-c",
+                "url.ssh://host/.pushInsteadOf=short:",
+                "config",
+                "--null",
+                "--get-regexp",
+                r"^url\..*\.(insteadof|pushinsteadof)$"
+            ]
+        );
+        assert_eq!(original[2..], ["push", "short:repo"]);
+        // A missing implicit match is not a literal URL. Git may select a sole
+        // configured remote instead of the conventional origin name.
+        for operation in ["fetch", "pull", "push"] {
+            assert!(literal_query(&[operation], false).is_err());
+        }
+        Ok(())
+    }
     #[test]
     fn push_only_and_override_configuration_changes_invalidate_route_snapshots() {
         let binding=RouteBinding{args:vec!["push".into(),"origin".into()],routes:vec!["https://old.invalid/repo".into()],configuration:"remote.origin.url\nhttps://fetch.invalid/repo\0remote.origin.pushurl\nhttps://old.invalid/repo\0".into()};
