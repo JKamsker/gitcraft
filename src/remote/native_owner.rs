@@ -793,9 +793,112 @@ mod tests {
     }
     #[test]
     fn helper_entrypoint() {
+        #[cfg(unix)]
+        match super::super::owned_runtime::dispatch() {
+            Ok(false) => {}
+            Ok(true) => unreachable!(),
+            Err(error) => {
+                eprintln!("finite fixture child: {error}");
+                std::process::exit(125);
+            }
+        }
         if std::env::var_os("GITCRAFT_NATIVE_HELPER").is_some() {
             std::process::exit(entrypoint());
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "runtime hold: exact source-reviewed invocation only"]
+    fn owned_runtime_endpoint_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        use super::super::owned_runtime as fixture;
+        let mut scratch = fixture::Scratch::new()?;
+        let service = crate::processes::owned_fixture_service()?;
+        let canary = fixture::canary(&service, &scratch.0)?;
+        fixture::challenge(&canary, &scratch.0, b"before-native")?;
+        for (mode, cancelled) in [("exit", false), ("leader", true)] {
+            let directory = scratch.0.join(mode);
+            std::fs::create_dir(&directory)?;
+            let record = directory.join("target.owner");
+            let native = command(fixture::command(mode, &directory)?, &record, fixture::LIMIT)?;
+            let identity = native.endpoint.clone();
+            let mut options = fixture::options();
+            let transport = native.configure(&mut options);
+            let ticket = service.submit(transport, options)?;
+            fixture::until(|| Ok(record.exists()))?;
+            let record_bytes = std::fs::read(&record)?;
+            let endpoint = Endpoint::from_record(&record_bytes)?;
+            if cancelled {
+                fixture::until(|| Ok(directory.join("target-ready").exists()))?;
+                let mut wrong = endpoint.clone();
+                wrong.token = if endpoint.token == "a".repeat(64) {
+                    "b".repeat(64)
+                } else {
+                    "a".repeat(64)
+                };
+                assert!(wrong.stop().is_err());
+                assert!(!endpoint.path.join("terminal").exists());
+                assert_eq!(std::fs::read(&record)?, record_bytes);
+                assert!(
+                    ticket.try_result().is_none(),
+                    "wrong token stopped the target"
+                );
+                fixture::challenge(&canary, &scratch.0, b"after-wrong-token")?;
+                ticket.cancel(); // configure's authenticated stop_remote owns cancellation.
+            }
+            let output = fixture::wait(&ticket)?;
+            assert_eq!(
+                output.stop_kind,
+                if cancelled {
+                    Some(crate::processes::StopKind::Cancelled)
+                } else {
+                    None
+                },
+                "{:?}",
+                output.stopped
+            );
+            assert_eq!(output.status.code(), Some(if cancelled { 125 } else { 7 }));
+            assert_eq!(
+                *identity.lock().map_err(|e| e.to_string())?,
+                Some(endpoint.clone())
+            );
+            if !cancelled {
+                assert_eq!(output.stdout, fixture::stdout(b"finite-stdout\0\xff\n"));
+                assert_eq!(output.stderr, b"finite-stderr\0\xfe\n");
+            }
+            let receipt_bytes = endpoint.terminal()?;
+            endpoint.stop()?;
+            endpoint.stop()?; // Atomic terminal proof makes repeated stop idempotent.
+            let receipt: Receipt = serde_json::from_slice(&receipt_bytes)?;
+            assert!(endpoint.confirms(&receipt_bytes));
+            assert_eq!(receipt.endpoint, endpoint);
+            assert_eq!(receipt.state, "stopped");
+            assert_eq!(receipt.code, if cancelled { 125 } else { 7 });
+            assert_eq!(receipt.complete, !cancelled);
+            assert!(!endpoint.path.join("terminal.new").exists());
+            assert_eq!(std::fs::read(&record)?, record_bytes);
+            assert_eq!(super::super::recover_owner(&record)?, record_bytes);
+            let mut wrong_receipt = receipt_bytes.clone();
+            wrong_receipt.push(b'x');
+            assert!(endpoint.retire_proven(&wrong_receipt).is_err());
+            assert_eq!(endpoint.terminal()?, receipt_bytes);
+            endpoint.retire_proven(&receipt_bytes)?;
+            endpoint.retire_proven(&receipt_bytes)?;
+            assert!(!endpoint.path.join("terminal").exists());
+            if cancelled {
+                std::thread::sleep(fixture::EFFECT_DELAY + Duration::from_millis(100));
+                assert!(!directory.join("unexpected-effect").exists());
+            }
+            fixture::challenge(&canary, &scratch.0, mode.as_bytes())?;
+        }
+        canary.cancel();
+        assert_eq!(
+            fixture::wait(&canary)?.stop_kind,
+            Some(crate::processes::StopKind::Cancelled)
+        );
+        drop(service); // Joins only this fixture's Service and its retained children.
+        scratch.complete();
+        Ok(())
     }
     #[test]
     fn recording_endpoint_refuses_wrong_identity_and_extra_fields() -> Result<(), String> {
