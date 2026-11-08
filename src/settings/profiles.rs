@@ -118,6 +118,15 @@ impl UserProfile {
         }
     }
 
+    /// The visible title; the raw title remains stable for generated config and saved names.
+    pub fn display_title(&self) -> &str {
+        if self.name.trim().is_empty() {
+            crate::i18n::text("interaction-accounts-unnamed")
+        } else {
+            self.title()
+        }
+    }
+
     /// One or two letters for its badge: the first letters of its first two words.
     pub fn initials(&self) -> String {
         let letters: String = self
