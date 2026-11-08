@@ -25,6 +25,8 @@ pub struct Conflicted {
     original: Option<Vec<u8>>,
     /// How many conflicts it had then.
     pub conflicts: usize,
+    /// How long its conflict markers are (`conflict-marker-size`).
+    marker: usize,
     /// The agent left a link (or anything but a file) in its place: kept as such.
     agent_not_plain: bool,
 }
@@ -65,6 +67,15 @@ struct KeptFile {
     original: bool,
     /// "file" (under `resolved/`), "deleted" or "not_plain".
     agent: String,
+    #[serde(default = "marker_size")]
+    marker: usize,
+}
+
+/// How long conflict markers are unless the `conflict-marker-size` attribute says otherwise.
+pub const MARKER_SIZE: usize = 7;
+
+fn marker_size() -> usize {
+    MARKER_SIZE
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -108,22 +119,49 @@ impl FileResult {
     }
 }
 
-/// Whether `text` has a conflict marker at the start of a line.
-pub fn has_markers(text: &[u8]) -> bool {
-    text.split(|&b| b == b'\n').any(is_marker)
+/// Whether `text` has a conflict marker `size` long (see [`MARKER_SIZE`]) at the start of a
+/// line: `<<<<<<< ours`, `>>>>>>> theirs`, or the base's `|||||||`. A lone `=======` isn't
+/// taken for one: plenty of text has that line of its own.
+pub fn has_markers(text: &[u8], size: usize) -> bool {
+    text.split(|&b| b == b'\n')
+        .any(|line| b"<>|".iter().any(|&sign| is_marker(line, sign, size)))
 }
 
-/// How many conflicts `text` has.
-pub fn count_conflicts(text: &[u8]) -> usize {
+/// How many conflicts `text` has, its markers `size` long.
+pub fn count_conflicts(text: &[u8], size: usize) -> usize {
     text.split(|&b| b == b'\n')
-        .filter(|line| line.starts_with(b"<<<<<<<"))
+        .filter(|line| is_marker(line, b'<', size))
         .count()
 }
 
-fn is_marker(line: &[u8]) -> bool {
+/// Whether `line` is `size` of `sign`, alone or before a space.
+fn is_marker(line: &[u8], sign: u8, size: usize) -> bool {
     let line = line.strip_suffix(b"\r").unwrap_or(line);
-    let marker = |m: &[u8]| line == m || (line.starts_with(m) && line.get(7) == Some(&b' '));
-    marker(b"<<<<<<<") || marker(b">>>>>>>")
+    line.len() >= size
+        && line[..size].iter().all(|&b| b == sign)
+        && matches!(line.get(size), None | Some(b' '))
+}
+
+/// How long the conflict markers git writes in each of `paths` of `repo` are.
+fn marker_sizes(repo: &Path, paths: &[&str]) -> Result<Vec<usize>, String> {
+    let input: String = paths.iter().map(|p| format!("{p}\0")).collect();
+    let out = git::run_input(
+        Some(repo),
+        &["check-attr", "-z", "--stdin", "conflict-marker-size"],
+        &input,
+    )?;
+    // `<path>\0conflict-marker-size\0<value>\0` for each, in their order.
+    let fields: Vec<&str> = out.split('\0').collect();
+    let sizes: Vec<usize> = fields
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|[_, _, value]| value.parse().ok().filter(|n| *n > 0).unwrap_or(MARKER_SIZE))
+        .collect();
+    if sizes.len() != paths.len() {
+        return Err("git didn't say how long the conflict markers are".to_owned());
+    }
+    Ok(sizes)
 }
 
 /// The operation `repo` is in the middle of, its commit and how to replay it in a worktree of
@@ -136,7 +174,15 @@ fn in_progress(repo: &Path) -> Option<(&'static str, String, Vec<&'static str>)>
             .filter(|h| !h.is_empty())
     };
     if let Some(h) = head("MERGE_HEAD") {
-        return Some(("merge", h, vec!["merge", "--no-commit", "--no-ff", "-q"]));
+        // Histories without a common commit were let be merged, or there would be no merge.
+        let merge = vec![
+            "merge",
+            "--no-commit",
+            "--no-ff",
+            "-q",
+            "--allow-unrelated-histories",
+        ];
+        return Some(("merge", h, merge));
     }
     if let Some(h) = head("CHERRY_PICK_HEAD") {
         return Some(("cherry-pick", h, vec!["cherry-pick", "--no-commit"]));
@@ -177,6 +223,12 @@ fn sides(repo: &Path) -> (Sides, Option<Vec<String>>) {
         return (sides, None);
     };
     let mut replay: Vec<String> = replay.iter().map(|w| (*w).to_owned()).collect();
+    if let Some(parent) = (operation != "merge")
+        .then(|| mainline(repo, &theirs))
+        .flatten()
+    {
+        replay.extend(["-m".to_owned(), parent]);
+    }
     replay.push(theirs.clone());
     let sides = Sides {
         operation: operation.to_owned(),
@@ -193,7 +245,8 @@ fn sides(repo: &Path) -> (Sides, Option<Vec<String>>) {
 /// applied and committed). `Ok(false)` when it, or a folder on its way, isn't there.
 fn plain(top: &Path, path: &str) -> Result<bool, String> {
     let mut at = top.to_path_buf();
-    for part in path.split(['/', '\\']) {
+    // The parts the system goes through to open it: on Unix a `\` is part of a name.
+    for part in Path::new(path).components() {
         at.push(part);
         match std::fs::symlink_metadata(&at) {
             Ok(meta) if meta.file_type().is_symlink() => {
@@ -213,13 +266,11 @@ fn read(top: &Path, path: &str) -> Result<Option<Vec<u8>>, String> {
     if !plain(top, path)? {
         return Ok(None);
     }
-    let file = top.join(path);
-    if !file.is_file() {
-        return Err(format!("{path} isn't a file"));
-    }
-    std::fs::read(&file)
+    // Read so that what was looked at is what is read: a link swapped in on the way since
+    // (by something the agent left running) isn't followed.
+    crate::safe_read::read_inside(top, path, u64::MAX - 1)
         .map(Some)
-        .map_err(|e| format!("couldn't read {path}: {e}"))
+        .ok_or_else(|| format!("{path} isn't a plain file, or couldn't be read"))
 }
 
 /// Writes `bytes` to `path` of the checkout at `top` (removes it for `None`), never through a
@@ -233,7 +284,7 @@ fn write(top: &Path, path: &str, bytes: Option<&[u8]>) -> Result<(), String> {
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("couldn't make the folder of {path}: {e}"))?;
             }
-            std::fs::write(&file, bytes).map_err(|e| format!("couldn't write {path}: {e}"))
+            replace(&file, bytes).map_err(|e| format!("couldn't write {path}: {e}"))
         }
         None => match std::fs::remove_file(&file) {
             Ok(()) => Ok(()),
@@ -243,9 +294,128 @@ fn write(top: &Path, path: &str, bytes: Option<&[u8]>) -> Result<(), String> {
     }
 }
 
+/// Writes `bytes` to `file` whole or not at all: into a file beside it first, then put in its
+/// place, with its permissions (an executable stays one). One that fails leaves it as it was.
+fn replace(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let name = file
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let temp = file.with_file_name(format!(".{name}.gitcraft-{}-{n}", std::process::id()));
+    let written = (|| {
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        out.write_all(bytes)?;
+        out.sync_all()?;
+        drop(out);
+        // Only Unix has more to them than read-only (which would keep it from being replaced).
+        #[cfg(unix)]
+        if let Ok(meta) = std::fs::symlink_metadata(file) {
+            std::fs::set_permissions(&temp, meta.permissions())?;
+        }
+        std::fs::rename(&temp, file)
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    written
+}
+
 /// A path git status gave, checked to stay inside the checkout.
 fn checked(path: &str) -> Result<&str, String> {
     crate::mcp::args::repo_path(path)
+}
+
+/// git in the agent's scratch worktree, without the repository's hooks nor its recorded
+/// resolutions: that copy is gitcraft's own, and nothing the user set up to run on a checkout
+/// or a merge is for it.
+fn hookless(dir: &Path, args: &[&str]) -> Result<String, String> {
+    let mut all = vec![
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "rerere.enabled=false",
+    ];
+    all.extend_from_slice(args);
+    git::run(Some(dir), &all)
+}
+
+/// The files the index of the worktree at `dir` has in conflict.
+fn unmerged(dir: &Path) -> Result<Vec<String>, String> {
+    let out = git::run(Some(dir), &["diff", "--name-only", "-z", "--diff-filter=U"])?;
+    Ok(out
+        .split('\0')
+        .filter(|p| !p.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
+/// Replays the operation in progress (`replay`, see [`sides`]) in the scratch worktree at `dir`.
+/// It conflicts there too (that is why it is replayed): what matters is that the rest of it is
+/// in place. One git refused outright is an error: the agent would be told of an operation that
+/// isn't there.
+fn replay(dir: &Path, replay: &[String]) -> Result<(), String> {
+    let args: Vec<&str> = replay.iter().map(String::as_str).collect();
+    match hookless(dir, &args) {
+        Ok(_) => Ok(()),
+        Err(_) if !unmerged(dir)?.is_empty() => Ok(()),
+        Err(e) => Err(format!(
+            "The operation couldn't be replayed in the agent's worktree: {e}"
+        )),
+    }
+}
+
+/// The files the replay left in conflict in the scratch worktree at `dir` that the agent isn't
+/// given: put there as they are in the checkout at `repo`, the user's resolution included, and
+/// marked resolved there when they are in the checkout. The agent sees what the user decided.
+fn take_resolved(repo: &Path, dir: &Path, given: &[Conflicted]) -> Result<(), String> {
+    let still = unmerged(repo)?;
+    let mut resolved = Vec::new();
+    for path in unmerged(dir)? {
+        if given.iter().any(|f| f.path == path) {
+            continue;
+        }
+        // One that isn't a plain file in the checkout stays as the replay left it.
+        let Some(bytes) = checked(&path).ok().and_then(|p| read(repo, p).ok()) else {
+            continue;
+        };
+        write(dir, &path, bytes.as_deref())?;
+        if !still.contains(&path) {
+            resolved.push(path);
+        }
+    }
+    if resolved.is_empty() {
+        return Ok(());
+    }
+    let mut add = vec!["--literal-pathspecs", "add", "-A", "--"];
+    add.extend(resolved.iter().map(String::as_str));
+    hookless(dir, &add).map(|_| ())
+}
+
+/// The parent a cherry-pick or revert of `commit` of `repo` goes by (`-m`), when it is a merge:
+/// the one git kept for the sequence in progress, else the first (as nearly always).
+fn mainline(repo: &Path, commit: &str) -> Option<String> {
+    let parents = git::run(Some(repo), &["rev-list", "--parents", "-n", "1", commit]).ok()?;
+    if parents.split_whitespace().count() < 3 {
+        return None;
+    }
+    let kept = git::run(Some(repo), &["rev-parse", "--git-path", "sequencer/opts"])
+        .ok()
+        .and_then(|opts| {
+            git::run(
+                Some(repo),
+                &["config", "-f", opts.trim(), "--get", "options.mainline"],
+            )
+            .ok()
+        })
+        .map(|m| m.trim().to_owned())
+        .filter(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
+    Some(kept.unwrap_or_else(|| "1".to_owned()))
 }
 
 impl Workspace {
@@ -263,32 +433,35 @@ impl Workspace {
         if files.is_empty() {
             return Err("There is no conflicted file to resolve".to_owned());
         }
+        let paths = files
+            .iter()
+            .map(|p| checked(p))
+            .collect::<Result<Vec<&str>, String>>()?;
+        let sizes = marker_sizes(repo, &paths)?;
         let mut given = Vec::with_capacity(files.len());
-        for path in files {
-            let path = checked(path)?;
+        for (path, marker) in paths.into_iter().zip(sizes) {
             let original = read(repo, path)?;
-            let conflicts = original.as_deref().map_or(0, count_conflicts);
+            let conflicts = original
+                .as_deref()
+                .map_or(0, |text| count_conflicts(text, marker));
             given.push(Conflicted {
                 path: path.to_owned(),
                 original,
                 conflicts,
+                marker,
                 agent_not_plain: false,
             });
         }
-        let (sides, replay) = sides(repo);
+        let (sides, replay_args) = sides(repo);
         let scratch = Scratch::add_empty(repo, SCRATCH_LABEL, "HEAD")?;
-        scratch.checkout("HEAD")?;
-        if let Some(replay) = replay {
-            // It conflicts there too (that is why it is replayed): what matters is that the
-            // rest of it is in place. gitcraft's own scratch worktree has no hooks to run.
-            let mut args = vec![
-                "-c",
-                "core.hooksPath=/dev/null",
-                "-c",
-                "rerere.enabled=false",
-            ];
-            args.extend(replay.iter().map(String::as_str));
-            let _ = git::run(Some(&scratch.path), &args);
+        hookless(
+            &scratch.path,
+            &["checkout", "--detach", "--force", "-q", "HEAD"],
+        )
+        .map_err(|e| format!("couldn't check out HEAD in the agent's worktree: {e}"))?;
+        if let Some(args) = replay_args {
+            replay(&scratch.path, &args)?;
+            take_resolved(repo, &scratch.path, &given)?;
         }
         for file in &given {
             write(&scratch.path, &file.path, file.original.as_deref())?;
@@ -339,10 +512,13 @@ impl Workspace {
             return FileResult::NotPlain;
         };
         // A file with markers is resolved once they are gone; one without is only when the
-        // agent changed it or said it is done with it.
+        // agent changed it or said it is done with it, and put none in it.
         let decided = theirs != file.original || done.contains(&file.path);
+        let had = (file.original.as_deref()).is_some_and(|o| has_markers(o, file.marker));
         match theirs {
-            Some(text) if file.conflicts > 0 && has_markers(&text) => FileResult::StillConflicted,
+            Some(text) if (file.conflicts > 0 || !had) && has_markers(&text, file.marker) => {
+                FileResult::StillConflicted
+            }
             _ if file.conflicts == 0 && !decided => FileResult::Untouched,
             Some(_) => FileResult::Resolved,
             None => FileResult::Deleted,
@@ -354,15 +530,18 @@ impl Workspace {
     /// meanwhile, or that isn't resolved, is left as it is.
     pub fn apply(&self, repo: &Path, paths: &[String], done: &[String]) -> Applied {
         let mut applied = Applied::default();
-        for (path, result) in self.check(Some(repo), done) {
-            if !result.applies() || !paths.contains(&path) {
+        for file in self.files.iter().filter(|f| paths.contains(&f.path)) {
+            // Each looked at just before it is written, not all of them first: an edit the user
+            // saved meanwhile is kept.
+            if !self.check_one(Some(repo), file, done).applies() {
                 continue;
             }
+            let path = &file.path;
             let copied =
-                read(self.dir(), &path).and_then(|theirs| write(repo, &path, theirs.as_deref()));
+                read(self.dir(), path).and_then(|theirs| write(repo, path, theirs.as_deref()));
             match copied {
-                Ok(()) => applied.written.push(path),
-                Err(e) => applied.failed.push((path, e)),
+                Ok(()) => applied.written.push(path.clone()),
+                Err(e) => applied.failed.push((path.clone(), e)),
             }
         }
         applied
@@ -402,11 +581,16 @@ impl Workspace {
                 Ok(None) => "deleted",
                 Err(_) => "not_plain",
             };
+            // Nothing of an earlier keep is left to be taken for the agent's file.
+            if agent != "file" {
+                write(&resolved, &file.path, None)?;
+            }
             listed.push(KeptFile {
                 path: file.path.clone(),
                 conflicts: file.conflicts,
                 original: file.original.is_some(),
                 agent: agent.to_owned(),
+                marker: file.marker,
             });
             files.push(Conflicted {
                 agent_not_plain: agent == "not_plain",
@@ -438,15 +622,24 @@ impl Workspace {
         let mut files = Vec::with_capacity(kept.files.len());
         for f in kept.files {
             let path = checked(&f.path)?.to_owned();
+            // What is listed must be there, and only that: a file missing is never taken for
+            // one the agent deleted, nor one the user had none of.
+            let damaged = || format!("the agent's work on {path} isn't all there");
             let original = if f.original {
-                read(&from.join("original"), &path)?
+                Some(read(&from.join("original"), &path)?.ok_or_else(damaged)?)
             } else {
                 None
             };
+            let left = plain(&from.join("resolved"), &path)?;
+            match (f.agent.as_str(), left) {
+                ("file", true) | ("deleted" | "not_plain", false) => {}
+                _ => return Err(damaged()),
+            }
             files.push(Conflicted {
                 path,
                 original,
                 conflicts: f.conflicts,
+                marker: f.marker,
                 agent_not_plain: f.agent == "not_plain",
             });
         }
