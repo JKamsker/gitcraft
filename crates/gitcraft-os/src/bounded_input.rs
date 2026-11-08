@@ -15,7 +15,7 @@ struct Permit;
 impl Permit {
     fn acquire() -> io::Result<Self> {
         COUNT
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
                 (n < LIMIT).then_some(n + 1)
             })
             .map(|_| Self)

@@ -49,7 +49,11 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             "repo-workflows-repository_tools-show-79af8f6d",
         ));
         ui.text_edit_singleline(&mut state.query);
-        if ui.button(crate::i18n::text("repo-workflows-repository_tools-show-4759498a")).clicked()
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-4759498a",
+            ))
+            .clicked()
             && let Some(Ok(Data::Lists(v))) = &state.result
         {
             acts.push(Action::RepositoryTools(Act::EditList(

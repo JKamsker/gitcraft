@@ -18,7 +18,7 @@ impl Drop for Permit {
 pub(super) fn reserve() -> io::Result<Permit> {
     sender()?; // Establish the one bounded reaper before any helper may start.
     COUNT
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+        .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
             (n < MAX).then_some(n + 1)
         })
         .map_err(|_| io::Error::other("native controller recovery capacity is full"))?;

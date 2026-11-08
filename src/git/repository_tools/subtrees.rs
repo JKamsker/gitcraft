@@ -1386,7 +1386,7 @@ pub(crate) fn send(
     save(r.repo, &mut view)?;
     result
 }
-#[cfg(test)]
-mod tests;
 #[cfg(all(test, unix))]
 mod runtime_tests;
+#[cfg(test)]
+mod tests;
