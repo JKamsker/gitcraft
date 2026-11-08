@@ -84,6 +84,8 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
+# Reviewed internals private index and verified object-pack staging.
+tempfile = "3"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
@@ -97,6 +99,8 @@ objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }
 
 [target.'cfg(windows)'.dependencies]
+# Reviewed alternates publication compares retained Windows file identities.
+winapi-util = "0.1"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
