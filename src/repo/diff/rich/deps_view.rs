@@ -10,7 +10,12 @@ use crate::theme::{self, Tokens};
 
 const ROW_H: f32 = 24.0;
 
-pub(super) fn show(ui: &mut Ui, diff: &DepsDiff, acts: &mut Vec<Action>) {
+pub(super) fn show(
+    ui: &mut Ui,
+    diff: &DepsDiff,
+    metadata: &mut super::dependency_metadata::State,
+    acts: &mut Vec<Action>,
+) {
     let t = Tokens::get(ui.ctx());
     let count = |c: Change| diff.changes.iter().filter(|d| d.change == c).count();
     let licences = diff
@@ -46,18 +51,26 @@ pub(super) fn show(ui: &mut Ui, diff: &DepsDiff, acts: &mut Vec<Action>) {
                 ui.label(RichText::new(summary).color(t.text_dim));
             });
         });
+    metadata.show(ui);
     ui.spacing_mut().item_spacing.y = 0.0;
     egui::ScrollArea::both()
         .id_salt("rich_deps")
         .auto_shrink(false)
         .show_rows(ui, ROW_H, diff.changes.len(), |ui, range| {
             for (k, d) in diff.changes[range.clone()].iter().enumerate() {
-                ui.push_id(range.start + k, |ui| row(ui, &t, diff, d, acts));
+                ui.push_id(range.start + k, |ui| row(ui, &t, diff, d, metadata, acts));
             }
         });
 }
 
-fn row(ui: &mut Ui, t: &Tokens, diff: &DepsDiff, d: &DepChange, acts: &mut Vec<Action>) {
+fn row(
+    ui: &mut Ui,
+    t: &Tokens,
+    diff: &DepsDiff,
+    d: &DepChange,
+    metadata: &mut super::dependency_metadata::State,
+    acts: &mut Vec<Action>,
+) {
     let (mark, color, fill) = match d.change {
         Change::Upgraded => ("↑", t.accent, Color32::TRANSPARENT),
         Change::Downgraded => ("↓", t.warning, Color32::TRANSPARENT),
@@ -143,5 +156,13 @@ fn row(ui: &mut Ui, t: &Tokens, diff: &DepsDiff, d: &DepChange, acts: &mut Vec<A
         {
             ui.ctx().open_url(egui::OpenUrl::new_tab(url));
         }
+    }
+    if matches!(
+        diff.ecosystem,
+        super::deps::Ecosystem::Cargo | super::deps::Ecosystem::Npm
+    ) && (d.registry.0.is_some() || d.registry.1.is_some())
+        && ui.link("Changelog & licences").clicked()
+    {
+        metadata.select(diff.ecosystem, d, ui.ctx());
     }
 }
