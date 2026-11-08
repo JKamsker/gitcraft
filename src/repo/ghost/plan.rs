@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::PreviewFailure;
 use super::op::{Facts, GhostOp, Upstream, short};
 use crate::git::dry_run::{self, CANCELLED, Engine, GitVersion};
 use crate::git::{self, Branch, ChangedFile, Commit};
@@ -86,6 +87,16 @@ pub(crate) fn plan(
     version: GitVersion,
     cancel: &dyn Fn() -> bool,
 ) -> Result<Outcome, String> {
+    plan_with_witness(repo, op, facts, version, cancel).map_err(|failure| failure.legacy())
+}
+
+pub(super) fn plan_with_witness(
+    repo: &Path,
+    op: &GhostOp,
+    facts: &Facts,
+    version: GitVersion,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Outcome, PreviewFailure> {
     let ctx = Ctx {
         repo,
         facts,
@@ -125,15 +136,15 @@ struct Rewrite<'a> {
 }
 
 impl Ctx<'_> {
-    fn check(&self) -> Result<(), String> {
+    fn check(&self) -> Result<(), PreviewFailure> {
         if (self.cancel)() {
-            Err(CANCELLED.to_owned())
+            Err((CANCELLED.to_owned()).into())
         } else {
             Ok(())
         }
     }
 
-    fn rebase(&self, onto: &str) -> Result<Outcome, String> {
+    fn rebase(&self, onto: &str) -> Result<Outcome, PreviewFailure> {
         let branch = self.facts.current()?;
         let onto_oid = git::resolve(self.repo, onto)?;
         let head = branch.target.as_str();
@@ -174,7 +185,7 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn timeline(&self, state: &crate::repo::timeline::RefState) -> Result<Outcome, String> {
+    fn timeline(&self, state: &crate::repo::timeline::RefState) -> Result<Outcome, PreviewFailure> {
         let active = || !(self.cancel)();
         let reader = git::investigations::Reader::new(self.repo, &active);
         let now = crate::repo::timeline::RefState::of(&self.facts.refs);
@@ -221,7 +232,7 @@ impl Ctx<'_> {
             .map(|m| m.full.clone())
             .chain(std::iter::once("HEAD".into()))
             .collect();
-        let hashes = dry_run::unreachable_bounded(&reader, &old, &new, &moved, LOST_LIMIT + 1)
+        let hashes = dry_run::unreachable_bounded_with_witness(&reader, &old, &new, &moved, LOST_LIMIT + 1)
             .map_err(|_| "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects.".to_owned())?;
         out.lost_more = hashes.len() > LOST_LIMIT;
         let listed = &hashes[..hashes.len().min(LOST_LIMIT)];
@@ -247,7 +258,7 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn reset_hard(&self, to: &str) -> Result<Outcome, String> {
+    fn reset_hard(&self, to: &str) -> Result<Outcome, PreviewFailure> {
         let to = git::resolve(self.repo, to)?;
         let head = self.facts.refs.head.clone();
         let moved = match self.facts.refs.current.as_deref() {
@@ -282,7 +293,7 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn pull(&self, mode: PullMode) -> Result<Outcome, String> {
+    fn pull(&self, mode: PullMode) -> Result<Outcome, PreviewFailure> {
         let branch = self.facts.current()?;
         let up = self.facts.upstream(branch).ok_or_else(|| {
             format!(
@@ -376,9 +387,9 @@ impl Ctx<'_> {
         up: &Upstream<'_>,
         new: &str,
         mut out: Outcome,
-    ) -> Result<Outcome, String> {
+    ) -> Result<Outcome, PreviewFailure> {
         let head = branch.target.as_str();
-        let merged = dry_run::merge(self.repo, head, new, self.version)?;
+        let merged = dry_run::merge_with_witness(self.repo, head, new, self.version)?;
         out.engine = Some(merged.engine);
         out.tree = Some(merged.tree.clone()).filter(|t| !t.is_empty());
         if !merged.conflicts.is_empty() {
@@ -462,7 +473,7 @@ impl Ctx<'_> {
         })
     }
 
-    fn force_push(&self, name: &str) -> Result<Outcome, String> {
+    fn force_push(&self, name: &str) -> Result<Outcome, PreviewFailure> {
         let branch = self
             .facts
             .local(name)
@@ -482,13 +493,14 @@ impl Ctx<'_> {
             from_remote: true,
             ..Outcome::default()
         };
-        let leaving = dry_run::leaving(self.repo, &old, &new, LOST_LIMIT + 1)?;
+        let leaving = dry_run::leaving_with_witness(self.repo, &old, &new, LOST_LIMIT + 1)?;
         out.lost_more = leaving.len() > LOST_LIMIT;
         out.lost = git::commits_of(self.repo, &leaving[..leaving.len().min(LOST_LIMIT)])?;
         self.check()?;
-        out.vanish = dry_run::unreachable(self.repo, &[old], &[new], &[tracking], LOST_LIMIT)?
-            .into_iter()
-            .collect();
+        out.vanish =
+            dry_run::unreachable_with_witness(self.repo, &[old], &[new], &[tracking], LOST_LIMIT)?
+                .into_iter()
+                .collect();
         if out.lost.is_empty() {
             out.notes.push(format!(
                 "{} loses nothing: a plain push would do.",
@@ -502,7 +514,7 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn delete_branch(&self, name: &str, remote: bool) -> Result<Outcome, String> {
+    fn delete_branch(&self, name: &str, remote: bool) -> Result<Outcome, PreviewFailure> {
         let branch = self
             .facts
             .local(name)
@@ -545,7 +557,7 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    fn drop_commit(&self, hash: &str) -> Result<Outcome, String> {
+    fn drop_commit(&self, hash: &str) -> Result<Outcome, PreviewFailure> {
         let branch = self.facts.current()?;
         let hash = git::resolve(self.repo, hash)?;
         let parent = git::resolve(self.repo, &format!("{hash}^"))
@@ -576,7 +588,9 @@ impl Ctx<'_> {
             ],
         )?;
         if merges.trim() != "0" {
-            return Err("merges came after the commit, which this would flatten".to_owned());
+            return Err(
+                ("merges came after the commit, which this would flatten".to_owned()).into(),
+            );
         }
         let mut out = Outcome {
             dropped: git::commits_of(self.repo, std::slice::from_ref(&hash))?
@@ -605,21 +619,22 @@ impl Ctx<'_> {
     /// The commits of `w` replayed: the copies drawn, where it stops, the branch moved (and
     /// with `rebase.updateRefs` the branches on its commits), what it leaves behind and the
     /// files that change.
-    fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), String> {
+    fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), PreviewFailure> {
         let tip = local_ref(&w.branch.name);
         if w.picks.len() > PICKS_LIMIT {
-            return Err(format!(
+            return Err((format!(
                 "{} commits to replay, too many to preview (at most {PICKS_LIMIT})",
                 w.picks.len()
-            ));
+            ))
+            .into());
         }
         if self.config_set("rebase.rebaseMerges") && self.has_merges(w.base, &tip)? {
             return Err(
-                "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet"
-                    .to_owned(),
+                ("rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet"
+                    .to_owned()).into(),
             );
         }
-        let replay = dry_run::replay(
+        let replay = dry_run::replay_with_witness(
             self.repo,
             w.onto,
             (w.base, &tip),
@@ -795,8 +810,8 @@ impl Ctx<'_> {
         old: &[String],
         new: &[String],
         moved: &[String],
-    ) -> Result<(), String> {
-        let hashes = dry_run::unreachable(self.repo, old, new, moved, LOST_LIMIT + 1)?;
+    ) -> Result<(), PreviewFailure> {
+        let hashes = dry_run::unreachable_with_witness(self.repo, old, new, moved, LOST_LIMIT + 1)?;
         out.lost_more = hashes.len() > LOST_LIMIT;
         let listed = &hashes[..hashes.len().min(LOST_LIMIT)];
         out.lost = git::commits_of(self.repo, listed)?;
@@ -859,13 +874,16 @@ pub(super) fn display_preview_text(raw: &str) -> String {
         "Invalid timeline commit ID" => {
             return crate::i18n::text("repo-workflows-ghost-timeline-48223518").to_owned();
         }
-        "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects." => {
+        "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects." =>
+        {
             return crate::i18n::text("repo-workflows-ghost-timeline-5a1baa67").to_owned();
         }
-        "File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded." => {
+        "File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded." =>
+        {
             return crate::i18n::text("repo-workflows-ghost-timeline-18df3f5f").to_owned();
         }
-        "Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump." => {
+        "Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump." =>
+        {
             return crate::i18n::text("repo-workflows-ghost-timeline-6f3d9015").to_owned();
         }
         "Saved refs keep earlier states recoverable. This preview moves no refs or files." => {
@@ -895,10 +913,12 @@ pub(super) fn display_preview_text(raw: &str) -> String {
         "merges came after the commit, which this would flatten" => {
             return crate::i18n::text("repo-workflows-ghost-drop-commit-181a54e0").to_owned();
         }
-        "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet" => {
+        "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet" =>
+        {
             return crate::i18n::text("repo-workflows-ghost-rewrite-3d8b966c").to_owned();
         }
-        "The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet." => {
+        "The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet." =>
+        {
             return crate::i18n::text("repo-workflows-ghost-rewrite-3477e4cb").to_owned();
         }
         "The rebase stops there until the conflicts are resolved; the branch doesn't move yet." => {
