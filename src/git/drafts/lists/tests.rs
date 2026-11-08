@@ -183,3 +183,26 @@ fn stale_list_preview_and_index_locks_fail_without_ref_or_file_changes() -> Resu
     assert_eq!(f.git(&["rev-parse", "HEAD"])?, head);
     Ok(())
 }
+
+#[test]
+fn pure_state_snapshot_budget_stops_before_fifth_eight_mib_read_without_allocating_payloads() {
+    let mut b = SnapshotBudget::from_sizes([]).unwrap();
+    let mut requested = Vec::new();
+    for _ in 0..2000 {
+        let Ok(allowance) = b.allowance() else {
+            break;
+        };
+        requested.push(allowance);
+        b.retain(FILE_LIMIT).unwrap();
+    }
+    assert_eq!(requested, vec![FILE_LIMIT; 4]);
+    assert!(b.allowance().is_err());
+    assert!(SnapshotBudget::from_sizes([usize::MAX, 1]).is_err());
+    let mut b = SnapshotBudget::from_sizes([TOTAL_LIMIT - 17]).unwrap();
+    assert_eq!(b.allowance().unwrap(), 17);
+    assert!(b.retain(18).is_err());
+    assert_eq!(b.allowance().unwrap(), 17);
+    b.retain(17).unwrap();
+    assert!(b.allowance().is_err());
+    assert!(SnapshotBudget::from_sizes([TOTAL_LIMIT + 1]).is_err());
+}

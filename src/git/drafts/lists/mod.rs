@@ -99,6 +99,42 @@ fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Li
     };
     Ok((reference, old, lists))
 }
+/// The allowance is decided before invoking a reader, not after retaining its bytes.
+/// Synthetic tests exercise this contract with lengths, without allocating payloads.
+pub(super) struct SnapshotBudget {
+    remaining: usize,
+}
+impl SnapshotBudget {
+    pub(super) fn from_sizes(sizes: impl IntoIterator<Item = usize>) -> Result<Self, String> {
+        let mut out = Self {
+            remaining: TOTAL_LIMIT,
+        };
+        for size in sizes {
+            out.remaining = out
+                .remaining
+                .checked_sub(size)
+                .ok_or("Working snapshot exceeds 32 MiB")?;
+        }
+        Ok(out)
+    }
+    pub(super) fn allowance(&self) -> Result<usize, String> {
+        if self.remaining == 0 {
+            Err("Working snapshot exhausted its 32 MiB allowance before the next file read".into())
+        } else {
+            Ok(self.remaining.min(FILE_LIMIT))
+        }
+    }
+    pub(super) fn retain(&mut self, size: usize) -> Result<(), String> {
+        if size > self.remaining.min(FILE_LIMIT) {
+            return Err("File reader exceeded its remaining snapshot allowance".into());
+        }
+        self.remaining = self
+            .remaining
+            .checked_sub(size)
+            .ok_or("Working snapshot overflow")?;
+        Ok(())
+    }
+}
 pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
     let ctx = Context::new(repo, active)?;
     let (reference, version, lists) = state(&ctx, active)?;
@@ -133,19 +169,17 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         return Err("Changelists support up to 2000 changed paths".into());
     }
     let mut work = BTreeMap::new();
-    let mut total = 0;
+    let mut budget = SnapshotBudget::from_sizes([])?;
     for p in &paths {
         super::restore::included(&ctx, &now, p, active)?;
         let mode = now.index.get(p).map_or("100644", |e| e.mode.as_str());
         if !matches!(mode, "100644" | "100755") {
             return Err(format!("Changelists require regular files: {p}"));
         }
-        let data = read_file(&ctx, p, mode, active)?;
-        total += data.as_ref().map_or(0, |(_, b)| b.len());
+        let limit = budget.allowance()?;
+        let data = read_file_limited(&ctx, p, mode, limit, active)?;
+        budget.retain(data.as_ref().map_or(0, |(_, b)| b.len()))?;
         work.insert(p.clone(), data);
-    }
-    if total > TOTAL_LIMIT {
-        return Err("Changelists exceed 32 MiB".into());
     }
     if source(&ctx, active)? != now {
         return Err("Index moved while reading lists; reload".into());
@@ -362,6 +396,10 @@ pub(super) fn data(
     entries: &BTreeMap<String, Option<Entry>>,
     active: &dyn Fn() -> bool,
 ) -> Result<Contents, String> {
+    if entries.len() > MAX_FILES {
+        return Err("Snapshot exceeds 2000 paths".into());
+    }
+    let mut budget = SnapshotBudget::from_sizes([])?;
     entries
         .iter()
         .map(|(p, e)| {
@@ -373,13 +411,15 @@ pub(super) fn data(
                     .text(&["cat-file", "-s", &e.oid], vec![], active)?
                     .parse::<usize>()
                     .map_err(|_| "Invalid blob")?;
-                if size > FILE_LIMIT {
-                    return Err("Changelist blob exceeds 8 MiB".into());
+                if size > budget.allowance()? {
+                    return Err("Changelist blob exceeds the remaining 32 MiB / 8 MiB per-file allowance; object was not loaded".into());
                 }
-                Some((
-                    e.mode.clone(),
-                    ctx.run(&["cat-file", "blob", &e.oid], vec![], &[0], active)?,
-                ))
+                let bytes = ctx.run(&["cat-file", "blob", &e.oid], vec![], &[0], active)?;
+                if bytes.len() != size {
+                    return Err("Snapshot blob size changed".into());
+                }
+                budget.retain(bytes.len())?;
+                Some((e.mode.clone(), bytes))
             } else {
                 None
             };

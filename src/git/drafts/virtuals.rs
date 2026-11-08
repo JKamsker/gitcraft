@@ -431,6 +431,9 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
     let (reference, version, state) = state(&ctx, active)?;
     let mut source = lists::read(repo, active)?;
     if let Some(m) = &state.mode {
+        let mut budget = lists::SnapshotBudget::from_sizes(
+            source.work.values().flatten().map(|(_, bytes)| bytes.len()),
+        )?;
         for path in m
             .branches
             .iter()
@@ -442,21 +445,17 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
                     .index
                     .get(path)
                     .map_or("100644", |e| e.mode.as_str());
-                let bytes = read_file(&ctx, path, mode, active)?;
+                if source.work.len() >= MAX_FILES {
+                    return Err(
+                        "Virtual snapshot exceeds 2000 paths before the next file read".into(),
+                    );
+                }
+                let allowance = budget.allowance()?;
+                let bytes = read_file_limited(&ctx, path, mode, allowance, active)?;
+                budget.retain(bytes.as_ref().map_or(0, |(_, bytes)| bytes.len()))?;
                 Arc::make_mut(&mut source.work).insert(path.clone(), bytes);
                 source.paths.push(path.clone());
             }
-        }
-        if source.work.len() > MAX_FILES
-            || source
-                .work
-                .values()
-                .flatten()
-                .map(|(_, b)| b.len())
-                .sum::<usize>()
-                > TOTAL_LIMIT
-        {
-            return Err("Virtual working snapshot exceeds 2000 files / 32 MiB".into());
         }
     }
 

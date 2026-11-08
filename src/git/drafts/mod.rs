@@ -718,12 +718,22 @@ fn read_file(
     fallback: &str,
     active: &dyn Fn() -> bool,
 ) -> Result<Option<(String, Vec<u8>)>, String> {
+    read_file_limited(ctx, path, fallback, FILE_LIMIT, active)
+}
+fn read_file_limited(
+    ctx: &Context,
+    path: &str,
+    fallback: &str,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<(String, Vec<u8>)>, String> {
     valid_path(path)?;
+    let limit = limit.min(FILE_LIMIT);
     if !active() {
         return Err("Draft cancelled".into());
     }
     if let Some(target) = remote::parse(&ctx.repo) {
-        let script = read_script(&ctx.worktree, path, FILE_LIMIT as u64)?;
+        let script = read_script(&ctx.worktree, path, limit as u64)?;
         let out = git::forecast_remote(
             &target.host,
             remote::Request {
@@ -738,7 +748,7 @@ fn read_file(
         }
         if out.code == 0
             && out.stdout.len() >= 8
-            && out.stdout.len() - 8 <= FILE_LIMIT
+            && out.stdout.len() - 8 <= limit
             && (out.stdout.starts_with(b"F100644\n") || out.stdout.starts_with(b"F100755\n"))
         {
             return Ok(Some((
@@ -763,8 +773,13 @@ fn read_file(
             "Cannot draft {path}: symbolic links, submodules and special files are not followed"
         ));
     }
-    let bytes = crate::safe_read::read_inside(root, path, FILE_LIMIT as u64)
-        .ok_or_else(|| format!("Cannot draft {path}: file changed, is linked, or exceeds 8 MiB"))?;
+    if meta.len() > limit as u64 {
+        return Err(format!(
+            "Cannot draft {path}: exceeds remaining snapshot allowance of {limit} bytes"
+        ));
+    }
+    let bytes = crate::safe_read::read_inside(root, path, limit as u64)
+        .ok_or_else(|| format!("Cannot draft {path}: file changed, is linked, or exceeds its remaining snapshot allowance"))?;
     #[cfg(unix)]
     let mode = {
         use std::os::unix::fs::PermissionsExt;
