@@ -63,7 +63,7 @@ pub(crate) enum Act {
 
 /// Whether `error` says the forge's tool is missing or not signed in: what is needed, rather
 /// than a failure to retry.
-fn tool_problem(error: &str) -> bool {
+pub(super) fn tool_problem(error: &str) -> bool {
     let e = error.to_lowercase();
     e.contains("isn't installed") || e.contains("isn't signed in") || e.contains("auth login")
 }
@@ -74,7 +74,7 @@ fn act(act: Act) -> Action {
 
 impl RepoTab {
     /// The commit the view is about: the selected one, else HEAD.
-    fn ci_path_subject(&self) -> Option<(String, String)> {
+    pub(super) fn ci_path_subject(&self) -> Option<(String, String)> {
         if let Some(hash) = self
             .detail_hash
             .as_ref()

@@ -1,6 +1,7 @@
 //! CI/CD through the forges' tools: the build status of commits, and the runs (GitHub Actions)
 //! or pipelines (GitLab CI) of one commit with their jobs and steps.
 
+pub(crate) mod deployments;
 pub(crate) mod github;
 pub(crate) mod gitlab;
 pub(crate) mod route;
