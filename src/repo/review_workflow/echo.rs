@@ -523,14 +523,22 @@ impl RepoTab {
 }
 
 pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Reviewer echo");
-    ui.weak("Enabled push checks conservatively scan all lines in every source tree against the empty tree. Cached fetch-server tips are not treated as push-server baselines. Shell/terminal pushes are outside this Git-operation check.");
-    ui.label("Opt in to collect your own published comments from pull requests on any supported forge. The personal rulebook is shared by this app's repositories.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-reviewer-echo-a4516c",
+    ));
+    ui.weak(crate::i18n::text(
+        "repo-workflows-review-label-enabled-push-checks-conservatively-scan-all-li-fbe58a",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-opt-in-to-collect-your-own-published-comments-4cf4a1",
+    ));
     let mut enabled = s.book.enabled;
     if ui
         .checkbox(
             &mut enabled,
-            "Enable personal reviewer rules before push operations",
+            crate::i18n::text(
+                "repo-workflows-review-label-enable-personal-reviewer-rules-before-push-ope-f97e09",
+            ),
         )
         .changed()
     {
@@ -540,25 +548,52 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     }
     ui.horizontal_wrapped(|ui| {
         for (label, act) in [
-            ("Load rulebook", Act::Load),
-            ("Import my comments from open PR", Act::Import),
-            ("Suggest rules with selected AI", Act::Infer),
-            ("Check outgoing diff", Act::Check),
+            (
+                crate::i18n::text("repo-workflows-review-label-load-rulebook-b28937"),
+                Act::Load,
+            ),
+            (
+                crate::i18n::text(
+                    "repo-workflows-review-label-import-my-comments-from-open-pr-9c5c90",
+                ),
+                Act::Import,
+            ),
+            (
+                crate::i18n::text(
+                    "repo-workflows-review-label-suggest-rules-with-selected-ai-7b58fa",
+                ),
+                Act::Infer,
+            ),
+            (
+                crate::i18n::text("repo-workflows-review-label-check-outgoing-diff-5b59d4"),
+                Act::Check,
+            ),
         ] {
             if ui.add_enabled(!s.busy, egui::Button::new(label)).clicked() {
                 acts.push(Action::ReviewTools(ToolsAct::Echo(act)));
             }
         }
     });
-    ui.weak(format!("{} cited comments · {} rules. AI suggestions start disabled; inspect and enable them below.",s.book.comments.len(),s.book.rules.len()));
+    ui.weak(crate::i18n::message(
+        "repo-workflows-review-message-comments-one-one-cited-comment-other-comments-2a82bb",
+        &[
+            ("comments", (s.book.comments.len()).into()),
+            ("rules", (s.book.rules.len()).into()),
+        ],
+    ));
     if s.busy {
         ui.add(crate::spinner::Spinner::new());
-        if ui.button("Stop AI / collection job").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-stop-ai-collection-job-0ee900",
+            ))
+            .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Echo(Act::Stop)));
         }
     }
     if let Some(e) = &s.error {
-        ui.label(e);
+        ui.label(crate::repo::messages::display_status(e));
     }
     let mut edited = false;
     for rule in &mut s.book.rules {
@@ -566,7 +601,12 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
             edited |= ui.checkbox(&mut rule.enabled, &rule.summary).changed();
             edited |= ui.text_edit_singleline(&mut rule.pattern).changed();
             if rule.source.starts_with("https://") || rule.source.starts_with("http://") {
-                ui.hyperlink_to("Your original review comment", &rule.source);
+                ui.hyperlink_to(
+                    crate::i18n::text(
+                        "repo-workflows-review-label-your-original-review-comment-e2c95e",
+                    ),
+                    &rule.source,
+                );
             }
         });
     }
@@ -577,29 +617,51 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     }
     for hit in &s.hits {
         ui.group(|ui| {
-            ui.label(format!(
-                "You'd flag this: {} · {}:{}",
-                hit.summary, hit.path, hit.line
+            ui.label(crate::i18n::message(
+                "repo-workflows-review-message-you-d-flag-this-summary-path-line-f00dec",
+                &[
+                    ("summary", (hit.summary.as_str()).into()),
+                    ("path", (hit.path.as_str()).into()),
+                    ("line", (hit.line.to_string()).into()),
+                ],
             ));
             ui.monospace(&hit.text);
-            ui.hyperlink_to("Your comment", &hit.url);
+            ui.hyperlink_to(
+                crate::i18n::text("repo-workflows-review-label-your-comment-9fc732"),
+                &hit.url,
+            );
         });
     }
     if s.checking_push {
         ui.add(crate::spinner::Spinner::new());
-        ui.label("Checking pinned push sources…");
+        ui.label(crate::i18n::text(
+            "repo-workflows-review-label-checking-pinned-push-sources-ea23aa",
+        ));
     }
     if let Some(waiting) = &s.pending_push {
-        ui.label(format!("Pending operation: {}", waiting.op.label));
+        ui.label(crate::i18n::message(
+            "repo-workflows-review-message-pending-operation-operation-a0bcce",
+            &[(
+                "operation",
+                (crate::repo::messages::display_operation(&waiting.op.label)).into(),
+            )],
+        ));
         if ui
-            .button("I reviewed these observations; continue this operation")
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-i-reviewed-these-observations-continue-this-op-25680b",
+            ))
             .clicked()
         {
             acts.push(Action::ReviewTools(ToolsAct::Echo(Act::PushAnyway(
                 waiting.stamp.clone(),
             ))));
         }
-        if ui.button("Cancel this push operation").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-cancel-this-push-operation-cd2c32",
+            ))
+            .clicked()
+        {
             s.pending_push = None;
         }
     }
@@ -648,6 +710,89 @@ mod tests {
         assert!(check_patch("", &forged).is_err());
         forged.enabled = false;
         assert!(check_patch("+new.unwrap()", &forged)?.is_empty());
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_echo_actual_rulebook_plural_and_pending_operation_keep_raw_controls()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let comment = Comment {
+            url: "https://opaque.test/comment/{raw}".into(),
+            body: "raw user --argv".into(),
+            author: "user".into(),
+        };
+        let rule = Rule {
+            summary: "User rule {raw}".into(),
+            pattern: "secret\\s*=".into(),
+            source: comment.url.clone(),
+            enabled: false,
+        };
+        let mut state = State::default();
+        state.book = Book {
+            enabled: false,
+            comments: vec![comment],
+            rules: vec![rule],
+        };
+        state.pending_push = Some(Waiting {
+            continuation: None,
+            stamp: "opaque-stamp".into(),
+            source: None,
+            op: PendingOp {
+                label: "Stage".into(),
+                ops: vec![vec![
+                    "push".into(),
+                    "--force-with-lease=refs/heads/main:old".into(),
+                ]],
+                refresh: crate::repo::Refresh::All,
+                kind: crate::repo::OpKind::plain(),
+                quiet: false,
+            },
+        });
+        let before = serde_json::to_string(&state.book).map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        for (locale, count, pending) in [
+            (
+                "en-US",
+                "One cited comment · one rule.",
+                "Pending operation: Stage",
+            ),
+            (
+                "de",
+                "Ein zitierter Kommentar · eine Regel.",
+                "Ausstehende Operation: Vormerken",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| show(ui, &mut state, &mut acts));
+            assert!(text.contains(count) && text.contains(pending), "{text}");
+            assert!(text.contains("User rule {raw}"), "{text}");
+        }
+        assert_eq!(
+            serde_json::to_string(&state.book).map_err(|e| e.to_string())?,
+            before
+        );
+        assert_eq!(
+            state.pending_push.as_ref().ok_or("pending")?.op.label,
+            "Stage"
+        );
+        click(
+            &ctx,
+            "Ich habe diese Beobachtungen geprüft; Operation fortsetzen",
+            |ui| show(ui, &mut state, &mut acts),
+        )?;
+        assert!(
+            matches!(acts.as_slice(), [Action::ReviewTools(ToolsAct::Echo(Act::PushAnyway(stamp)))] if stamp == "opaque-stamp")
+        );
+        assert_eq!(
+            state.pending_push.as_ref().ok_or("pending")?.op.ops[0][1],
+            "--force-with-lease=refs/heads/main:old"
+        );
         Ok(())
     }
 }

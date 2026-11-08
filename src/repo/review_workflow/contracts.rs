@@ -266,9 +266,17 @@ pub(super) fn show(
     branches: &[String],
     acts: &mut Vec<Action>,
 ) {
-    ui.heading("Backport by contract");
-    ui.label("Drag a graph commit onto a release below, or enter a fix and targets. Rehearsal applies and tests in detached scratch worktrees; your release branches stay at their original tips.");
-    egui::CollapsingHeader::new("Drop a fix onto a release").show(ui, |ui| {
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-backport-by-contract-247835",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-drag-a-graph-commit-onto-a-release-below-or-en-775ed9",
+    ));
+    egui::CollapsingHeader::new(crate::i18n::text(
+        "repo-workflows-review-label-drop-a-fix-onto-a-release-c1a96f",
+    ))
+    .id_salt("repo-workflows-review-label-drop-a-fix-onto-a-release-c1a96f")
+    .show(ui, |ui| {
         for branch in branches {
             let response = ui.group(|ui| ui.label(branch)).response;
             if let Some(payload) = response.dnd_release_payload::<Payload>()
@@ -280,22 +288,33 @@ pub(super) fn show(
             }
         }
     });
-    ui.add(egui::TextEdit::singleline(&mut s.plan.fix).hint_text("Fix commit"));
-    ui.label("Targets, one per line; optional target=adaptation-commit:");
+    ui.add(
+        egui::TextEdit::singleline(&mut s.plan.fix).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-fix-commit-c192f6",
+        )),
+    );
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-targets-one-per-line-optional-target-adaptatio-074e6e",
+    ));
     ui.text_edit_multiline(&mut s.plan.targets);
     ui.add(
-        egui::TextEdit::multiline(&mut s.plan.command)
-            .hint_text("Regression command, e.g. cargo test token_lifetime"),
+        egui::TextEdit::multiline(&mut s.plan.command).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-regression-command-e-g-cargo-test-token-lifeti-75b901",
+        )),
     );
     ui.checkbox(
         &mut s.plan.trusted,
-        "I trust this command and the repository code it runs in scratch worktrees",
+        crate::i18n::text(
+            "repo-workflows-review-label-i-trust-this-command-and-the-repository-code-i-fcc4fd",
+        ),
     );
     ui.horizontal(|ui| {
         if ui
             .add_enabled(
                 !s.busy && s.plan.trusted,
-                egui::Button::new("Rehearse backports and regression test"),
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-review-label-rehearse-backports-and-regression-test-bf2331",
+                )),
             )
             .clicked()
         {
@@ -303,54 +322,61 @@ pub(super) fn show(
                 s.plan.clone(),
             ))));
         }
-        if ui.button("Load preserved results").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-load-preserved-results-23b59f",
+            ))
+            .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Contract(Act::Load)));
         }
-        if s.busy && ui.button("Stop rehearsal").clicked() {
+        if s.busy
+            && ui
+                .button(crate::i18n::text(
+                    "repo-workflows-review-label-stop-rehearsal-1464d4",
+                ))
+                .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Contract(Act::Stop)));
         }
     });
     if let Some(rows) = &s.rows {
         match rows {
             Err(e) => {
-                ui.label(e);
+                ui.label(crate::repo::messages::display_status(e));
             }
             Ok(rows) => {
                 for row in rows {
                     ui.group(|ui| {
-                        ui.strong(format!(
-                            "{} at {}",
-                            row.target,
-                            crate::repo::short(&row.tip)
-                        ));
+                        ui.strong(crate::i18n::message("repo-workflows-review-message-target-at-commit-9e4831", &[("target", (row.target.as_str()).into()), ("commit", (crate::repo::short(&row.tip)).into())]));
                         ui.label(if let Some(tree) = &row.applied {
-                            format!("Patch applied · staged tree {tree}")
+                            crate::i18n::message("repo-workflows-review-message-patch-applied-staged-tree-tree-6e0863", &[("tree", (tree.as_str()).into())])
                         } else {
-                            "Patch did not apply".into()
+                            crate::i18n::text("repo-workflows-review-label-patch-did-not-apply-a1c90f").into()
                         });
                         if let Some(e) = &row.error {
-                            ui.label(e);
+                            ui.label(crate::repo::messages::display_status(e));
                         }
                         if let Some(test) = &row.test {
                             show_observation(ui, test);
                         } else {
-                            ui.label("Behavior not tested");
+                            ui.label(crate::i18n::text("repo-workflows-review-label-behavior-not-tested-9f5ef2"));
                         }
                         if let Some((original, adapted)) = &row.adaptation {
-                            egui::CollapsingHeader::new("Adaptation next to original").show(
+                            egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-adaptation-next-to-original-df4874")).id_salt("repo-workflows-review-label-adaptation-next-to-original-df4874").show(
                                 ui,
                                 |ui| {
                                     ui.columns(2, |cols| {
-                                        cols[0].label("Original fix");
+                                        cols[0].label(crate::i18n::text("repo-workflows-review-label-original-fix-27d835"));
                                         cols[0].monospace(original);
-                                        cols[1].label("Adaptation");
+                                        cols[1].label(crate::i18n::text("repo-workflows-review-label-adaptation-760fad"));
                                         cols[1].monospace(adapted);
                                     });
                                 },
                             );
                         }
                         if let Some(e) = &row.cleanup {
-                            ui.label(format!("Scratch cleanup requires attention: {e}"));
+                            ui.label(crate::i18n::message("repo-workflows-review-message-scratch-cleanup-requires-attention-detail-0f29d4", &[("detail", (crate::repo::messages::display_status(e)).into())]));
                         }
                     });
                 }
@@ -358,23 +384,47 @@ pub(super) fn show(
         }
     }
 }
+fn observation_summary(test: &Observation) -> String {
+    if test.stopped {
+        crate::i18n::message(
+            "repo-workflows-review-message-test-stopped-command-command-machine-machine-t-03203f",
+            &[
+                ("command", (test.command.as_str()).into()),
+                ("machine", (test.machine.as_str()).into()),
+                ("tree", (test.tree.as_str()).into()),
+            ],
+        )
+    } else if let Some(code) = test.code {
+        crate::i18n::message(
+            "repo-workflows-review-message-test-exit-code-command-command-machine-machine-96779e",
+            &[
+                ("code", (code).into()),
+                ("command", (test.command.as_str()).into()),
+                ("machine", (test.machine.as_str()).into()),
+                ("tree", (test.tree.as_str()).into()),
+            ],
+        )
+    } else {
+        crate::i18n::message(
+            "repo-workflows-review-message-test-exit-unknown-command-command-machine-mach-b250e6",
+            &[
+                ("command", (test.command.as_str()).into()),
+                ("machine", (test.machine.as_str()).into()),
+                ("tree", (test.tree.as_str()).into()),
+            ],
+        )
+    }
+}
 pub(super) fn show_observation(ui: &mut egui::Ui, test: &Observation) {
-    ui.label(format!(
-        "Test {} · command {} · machine {} · tree {}",
-        if test.stopped {
-            "stopped".into()
-        } else {
-            format!("exit {:?}", test.code)
-        },
-        test.command,
-        test.machine,
-        test.tree
-    ));
-    egui::CollapsingHeader::new("Observed output")
-        .id_salt((&test.tree, &test.command))
-        .show(ui, |ui| {
-            ui.monospace(test.lines.join("\n"));
-        });
+    ui.label(observation_summary(test));
+    egui::CollapsingHeader::new(crate::i18n::text(
+        "repo-workflows-review-label-observed-output-49acbe",
+    ))
+    .id_salt("repo-workflows-review-label-observed-output-49acbe")
+    .id_salt((&test.tree, &test.command))
+    .show(ui, |ui| {
+        ui.monospace(test.lines.join("\n"));
+    });
 }
 #[cfg(test)]
 mod tests {
@@ -485,6 +535,54 @@ mod tests {
         assert_eq!(
             r.git(&["show", &format!("{}:fix.txt", tree.trim())])?,
             "fix\n"
+        );
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::paint;
+
+    #[test]
+    fn fluent_review_contract_actual_observation_keeps_opaque_command_output_and_receipt()
+    -> Result<(), String> {
+        let mut observation = Observation {
+            commit: "abc".into(),
+            tree: "opaque-tree".into(),
+            command: "Review hunk".into(),
+            code: Some(1234),
+            stopped: false,
+            lines: vec!["provider output {literal} --force=refs/heads/main".into()],
+            machine: "ssh host{raw}".into(),
+        };
+        let before = serde_json::to_string(&observation).map_err(|e| e.to_string())?;
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            observation_summary(&observation),
+            "Test exit 1,234 · command Review hunk · machine ssh host{raw} · tree opaque-tree"
+        );
+        crate::i18n::set_language("de");
+        assert_eq!(
+            observation_summary(&observation),
+            "Test-Exitcode 1.234 · Befehl Review hunk · Rechner ssh host{raw} · Baum opaque-tree"
+        );
+        assert_eq!(
+            serde_json::to_string(&observation).map_err(|e| e.to_string())?,
+            before
+        );
+        observation.stopped = true;
+        assert!(
+            observation_summary(&observation).starts_with("Test gestoppt · Befehl Review hunk")
+        );
+        observation.stopped = false;
+        observation.code = None;
+        assert!(observation_summary(&observation).starts_with("Test-Exitcode unbekannt"));
+        let ctx = egui::Context::default();
+        let output = paint(&ctx, |ui| show_observation(ui, &observation));
+        assert!(
+            output.contains("Beobachtete Ausgabe") && output.contains("Review hunk"),
+            "{output}"
         );
         Ok(())
     }

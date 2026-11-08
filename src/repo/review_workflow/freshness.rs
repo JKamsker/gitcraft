@@ -274,23 +274,23 @@ pub(in crate::repo) fn show(
     files: &PrFiles,
     acts: &mut Vec<Action>,
 ) {
-    egui::CollapsingHeader::new("Review freshness").default_open(false).show(ui,|ui|{
-        ui.label("Exact blob and patch receipts. Rust syntax analysis follows uniquely resolved static calls. Watched dependency paths add explicit witnesses for any language; other dependencies remain unchecked.");
-        ui.horizontal(|ui|{ui.label("Dependency paths for the next receipt (one per line):");if ui.button("Refresh receipts").clicked(){acts.push(Action::Freshness(FreshnessAct::Refresh));}});
+    egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-review-freshness-619aab")).id_salt("repo-workflows-review-label-review-freshness-619aab").default_open(false).show(ui,|ui|{
+        ui.label(crate::i18n::text("repo-workflows-review-label-exact-blob-and-patch-receipts-rust-syntax-anal-d8aa92"));
+        ui.horizontal(|ui|{ui.label(crate::i18n::text("repo-workflows-review-label-dependency-paths-for-the-next-receipt-one-per-e53c2e"));if ui.button(crate::i18n::text("repo-workflows-review-label-refresh-receipts-d3782d")).clicked(){acts.push(Action::Freshness(FreshnessAct::Refresh));}});
         ui.text_edit_multiline(&mut state.dependencies);
         let Some(rows)=&state.rows else{ui.add(crate::spinner::Spinner::new());return};
-        match rows {Err(e)=>{ui.label(e);},Ok(rows)=>for row in rows{
+        match rows {Err(e)=>{ui.label(crate::repo::messages::display_status(e));},Ok(rows)=>for row in rows{
             ui.horizontal_wrapped(|ui|{
                 ui.monospace(&row.path);
-                ui.label(match &row.status{Status::Unreviewed=>"Not reviewed".into(),Status::Unchanged=>"Unchanged since reviewed".into(),Status::Direct=>"Changed directly (blob or patch)".into(),Status::Dependency(paths)=>format!("Text unchanged; dependencies changed: {}",paths.join(", "))});
-                if !row.dependencies_checked && row.rust.is_none(){ui.weak("Dependencies unchecked");}
+                ui.label(match &row.status{Status::Unreviewed=>crate::i18n::text("repo-workflows-review-label-not-reviewed-dc9250").into(),Status::Unchanged=>crate::i18n::text("repo-workflows-review-label-unchanged-since-reviewed-c9f208").into(),Status::Direct=>crate::i18n::text("repo-workflows-review-label-changed-directly-blob-or-patch-b8e844").into(),Status::Dependency(paths)=>crate::i18n::message("repo-workflows-review-message-text-unchanged-dependencies-changed-paths-fab840", &[("paths", (paths.join(", ")).into())])});
+                if !row.dependencies_checked && row.rust.is_none(){ui.weak(crate::i18n::text("repo-workflows-review-label-dependencies-unchecked-144460"));}
                 if let Some(rust)=&row.rust {
-                    ui.weak(format!("{} unchanged Rust symbols inspected",rust.checked));
-                    for witness in &rust.witnesses {ui.label(format!("Dependency freshness: {witness}"));}
-                    for limitation in &rust.limitations {ui.weak(format!("Unchecked: {limitation}"));}
+                    ui.weak(crate::i18n::message("repo-workflows-review-message-count-one-one-unchanged-rust-symbol-inspected-da406d", &[("count", (rust.checked).into())]));
+                    for witness in &rust.witnesses {ui.label(crate::i18n::message("repo-workflows-review-message-dependency-freshness-witness-25c9d7", &[("witness", (crate::repo::messages::display_status(witness)).into())]));}
+                    for limitation in &rust.limitations {ui.weak(crate::i18n::message("repo-workflows-review-message-unchecked-detail-5176bf", &[("detail", (crate::repo::messages::display_status(limitation)).into())]));}
                 }
-                if let Some((base,head))=&row.reviewed{ui.weak(format!("Receipt {}..{}",crate::repo::short(base),crate::repo::short(head)));}
-                if ui.button("Mark file reviewed").clicked(){acts.push(Action::Freshness(FreshnessAct::Mark{path:row.path.clone(),base:files.from.clone(),head:files.to.clone(),dependencies:state.dependencies.lines().map(str::trim).filter(|s|!s.is_empty()).map(str::to_owned).collect()}));}
+                if let Some((base,head))=&row.reviewed{ui.weak(crate::i18n::message("repo-workflows-review-message-receipt-base-head-433a2f", &[("base", (crate::repo::short(base)).into()), ("head", (crate::repo::short(head)).into())]));}
+                if ui.button(crate::i18n::text("repo-workflows-review-label-mark-file-reviewed-7e0e78")).clicked(){acts.push(Action::Freshness(FreshnessAct::Mark{path:row.path.clone(),base:files.from.clone(),head:files.to.clone(),dependencies:state.dependencies.lines().map(str::trim).filter(|s|!s.is_empty()).map(str::to_owned).collect()}));}
             });
         }}
     });
@@ -320,6 +320,68 @@ mod tests {
             Status::Direct
         );
         assert_eq!(classify(&a, &a), Status::Unchanged);
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_freshness_actual_receipt_repaints_without_recomputing_generations()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let files = PrFiles {
+            from: "base{opaque}".into(),
+            to: "head{opaque}".into(),
+            files: vec![],
+        };
+        let mut state = Freshness {
+            request: 9,
+            rows: Some(Ok(vec![Row {
+                path: "src/a{raw}.rs".into(),
+                status: Status::Unchanged,
+                reviewed: Some((files.from.clone(), files.to.clone())),
+                dependencies_checked: true,
+                rust: Some(rust_dependencies::Report {
+                    checked: 1,
+                    ..Default::default()
+                }),
+            }])),
+            dependencies: "src/dependency{raw}.rs".into(),
+        };
+        let mut acts = vec![];
+        for (locale, label, plural) in [
+            (
+                "en-US",
+                "Review freshness",
+                "One unchanged Rust symbol inspected",
+            ),
+            (
+                "de",
+                "Aktualität des Reviews",
+                "Ein unverändertes Rust-Symbol untersucht",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            // Expand the actual localized header (same stable ID in both languages).
+            if locale == "en-US" {
+                click(&ctx, label, |ui| show(ui, &mut state, &files, &mut acts))?;
+            }
+            let text = paint(&ctx, |ui| show(ui, &mut state, &files, &mut acts));
+            assert!(
+                text.contains(plural) && text.contains("src/a{raw}.rs"),
+                "{text}"
+            );
+        }
+        assert_eq!(state.request, 9);
+        click(&ctx, "Datei als geprüft markieren", |ui| {
+            show(ui, &mut state, &files, &mut acts)
+        })?;
+        assert!(
+            matches!(acts.as_slice(), [Action::Freshness(FreshnessAct::Mark { path, base, head, dependencies })] if path == "src/a{raw}.rs" && base == &files.from && head == &files.to && dependencies == &["src/dependency{raw}.rs"])
+        );
         Ok(())
     }
 }

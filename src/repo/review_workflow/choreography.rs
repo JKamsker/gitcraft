@@ -39,6 +39,9 @@ struct Stage {
     label: String,
     commit: String,
     tree: String,
+    // Missing provenance in older evidence must never reinterpret an explicit user label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    generated_index: Option<usize>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Source {
@@ -90,6 +93,21 @@ fn valid_name(name: &str) -> bool {
         && name.as_bytes()[0].is_ascii_alphabetic()
         && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
+fn stage_input(line: &str, i: usize) -> (String, &str, Option<usize>) {
+    line.split_once('=')
+        .map_or((format!("Stage {i}"), line, Some(i)), |(a, b)| {
+            (a.trim().into(), b.trim(), None)
+        })
+}
+fn display_stage(stage: &Stage) -> String {
+    match stage.generated_index {
+        Some(stage) => crate::i18n::message(
+            "repo-workflows-review-raw-stage-i-53efae",
+            &[("stage", stage.into())],
+        ),
+        None => stage.label.clone(),
+    }
+}
 fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
     if !(2..=6).contains(&plan.components.len()) {
         return Err("Add 2–6 repositories to the release board".into());
@@ -120,11 +138,7 @@ fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
             .filter(|l| !l.is_empty())
             .enumerate()
         {
-            let (label, revision) = line
-                .split_once('=')
-                .map_or((format!("Stage {i}"), line), |(a, b)| {
-                    (a.trim().into(), b.trim())
-                });
+            let (label, revision, generated_index) = stage_input(line, i);
             let commit = contracts::resolve(&path, revision)?;
             let tree = git::run(Some(&path), &["rev-parse", &format!("{commit}^{{tree}}")])?
                 .trim()
@@ -133,6 +147,7 @@ fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
                 label,
                 commit,
                 tree,
+                generated_index,
             });
         }
         if !(2..=4).contains(&stages.len()) {
@@ -417,33 +432,54 @@ impl RepoTab {
     }
 }
 pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec<Action>) {
-    ui.heading("Release choreography across repositories");
-    ui.label("Give each repository deployed, optional bridge, and next revisions. Rules constrain when a component may switch. Rehearsal tests every permitted in-between combination and searches for a passing release order. Publishing is a separate operation.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-release-choreography-across-repositories-ebc4ee",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-give-each-repository-deployed-optional-bridge-7a467e",
+    ));
     let mut remove = None;
     for (i, component) in s.plan.components.iter_mut().enumerate() {
         ui.group(|ui| {
             ui.horizontal(|ui| {
-                ui.label(format!("Component {}", i + 1));
-                if ui.small_button("Remove").clicked() {
+                ui.label(crate::i18n::message(
+                    "repo-workflows-review-message-component-number-2d0dbb",
+                    &[("number", (i + 1).into())],
+                ));
+                if ui
+                    .small_button(crate::i18n::text(
+                        "repo-workflows-review_workflow-show-c3812fc4",
+                    ))
+                    .clicked()
+                {
                     remove = Some(i);
                 }
             });
             ui.add(
-                egui::TextEdit::singleline(&mut component.name)
-                    .hint_text("Identifier, e.g. backend"),
+                egui::TextEdit::singleline(&mut component.name).hint_text(crate::i18n::text(
+                    "repo-workflows-review-label-identifier-e-g-backend-593c47",
+                )),
             );
             ui.add(
-                egui::TextEdit::singleline(&mut component.repo)
-                    .hint_text("Repository path (same machine as this board)"),
+                egui::TextEdit::singleline(&mut component.repo).hint_text(crate::i18n::text(
+                    "repo-workflows-review-label-repository-path-same-machine-as-this-board-1839cc",
+                )),
             );
-            ui.label("Ordered stages, one label=revision per line (first is deployed):");
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-ordered-stages-one-label-revision-per-line-fir-e2768b",
+            ));
             ui.text_edit_multiline(&mut component.revisions);
         });
     }
     if let Some(i) = remove {
         s.plan.components.remove(i);
     }
-    if ui.button("Add repository component").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-review-label-add-repository-component-e7a69c",
+        ))
+        .clicked()
+    {
         s.plan.components.push(Component {
             repo: repo.to_string_lossy().into(),
             ..Default::default()
@@ -454,7 +490,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
     for (i, rule) in s.plan.rules.iter_mut().enumerate() {
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label("When");
+                ui.label(crate::i18n::text("repo-workflows-review-label-when-cf9c7a"));
                 egui::ComboBox::from_id_salt(("rule-dependent", i))
                     .selected_text(&rule.dependent)
                     .show_ui(ui, |ui| {
@@ -462,9 +498,9 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                             ui.selectable_value(&mut rule.dependent, n.clone(), n);
                         }
                     });
-                ui.label("reaches stage");
+                ui.label(crate::i18n::text("repo-workflows-review-label-reaches-stage-b0463b"));
                 ui.add(egui::DragValue::new(&mut rule.at).range(1..=3));
-                ui.label("require");
+                ui.label(crate::i18n::text("repo-workflows-review-label-require-c4d0cf"));
                 egui::ComboBox::from_id_salt(("rule-prerequisite", i))
                     .selected_text(&rule.prerequisite)
                     .show_ui(ui, |ui| {
@@ -472,44 +508,67 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                             ui.selectable_value(&mut rule.prerequisite, n.clone(), n);
                         }
                     });
-                ui.label("at least stage");
+                ui.label(crate::i18n::text("repo-workflows-review-label-at-least-stage-aeda37"));
                 ui.add(egui::DragValue::new(&mut rule.min).range(1..=3));
-                if ui.small_button("Remove rule").clicked() {
+                if ui.small_button(crate::i18n::text("repo-workflows-review-label-remove-rule-3fab73")).clicked() {
                     remove = Some(i);
                 }
             });
             ui.add(
                 egui::TextEdit::singleline(&mut rule.reason)
-                    .hint_text("e.g. backend supports both protocols before SDK switches"),
+                    .hint_text(crate::i18n::text("repo-workflows-review-label-e-g-backend-supports-both-protocols-before-sdk-b4f54d")),
             );
         });
     }
     if let Some(i) = remove {
         s.plan.rules.remove(i);
     }
-    if ui.button("Add ordering / compatibility rule").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-review-label-add-ordering-compatibility-rule-e45b80",
+        ))
+        .clicked()
+    {
         s.plan.rules.push(Rule {
             at: 1,
             min: 1,
             ..Default::default()
         });
     }
-    ui.add(egui::TextEdit::multiline(&mut s.plan.command).hint_text("Compatibility command"));
-    ui.weak("The command receives GITCRAFT_COMPONENT_<NAME> scratch paths and GITCRAFT_STAGE_<NAME> numbers. Run cross-project integration tests using those paths. Each combination starts in fresh detached worktrees.");
+    ui.add(
+        egui::TextEdit::multiline(&mut s.plan.command).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-compatibility-command-4b1ecc",
+        )),
+    );
+    ui.weak(crate::i18n::text(
+        "repo-workflows-review-label-the-command-receives-gitcraft-component-name-s-a6ca30",
+    ));
     ui.checkbox(
         &mut s.plan.trusted,
-        "I trust this compatibility command and the repository code it runs",
+        crate::i18n::text(
+            "repo-workflows-review-label-i-trust-this-compatibility-command-and-the-rep-46eb9c",
+        ),
     );
     ui.horizontal_wrapped(|ui| {
         for (label, act) in [
-            ("Save board", Act::Save(s.plan.clone())),
-            ("Load board and evidence", Act::Load),
             (
-                "Plan order without running tests",
+                crate::i18n::text("repo-workflows-review-label-save-board-3bbd88"),
+                Act::Save(s.plan.clone()),
+            ),
+            (
+                crate::i18n::text("repo-workflows-review-label-load-board-and-evidence-28df38"),
+                Act::Load,
+            ),
+            (
+                crate::i18n::text(
+                    "repo-workflows-review-label-plan-order-without-running-tests-47f369",
+                ),
                 Act::Plan(s.plan.clone()),
             ),
             (
-                "Rehearse every permitted combination",
+                crate::i18n::text(
+                    "repo-workflows-review-label-rehearse-every-permitted-combination-16276e",
+                ),
                 Act::Rehearse(s.plan.clone()),
             ),
         ] {
@@ -517,21 +576,33 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                 acts.push(Action::ReviewTools(ToolsAct::Choreography(act)));
             }
         }
-        if s.busy && ui.button("Stop rehearsal").clicked() {
+        if s.busy
+            && ui
+                .button(crate::i18n::text(
+                    "repo-workflows-review-label-stop-rehearsal-1464d4",
+                ))
+                .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Choreography(Act::Stop)));
         }
     });
     if let Some(e) = &s.error {
-        ui.label(e);
+        ui.label(crate::repo::messages::display_status(e));
     }
     if let Some(r) = &s.report {
         ui.label(if r.tested {
-            "Observed compatibility under your recorded command"
+            crate::i18n::text(
+                "repo-workflows-review-label-observed-compatibility-under-your-recorded-com-8785b1",
+            )
         } else {
-            "Candidate plan only — no compatibility test executed"
+            crate::i18n::text(
+                "repo-workflows-review-label-candidate-plan-only-no-compatibility-test-exec-afa4f9",
+            )
         });
         if r.stopped {
-            ui.label("Stopped: untested combinations cannot establish a passing order");
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-stopped-untested-combinations-cannot-establish-627b12",
+            ));
         }
         if let Some(route) = &r.route {
             for pair in route.windows(2) {
@@ -540,18 +611,18 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                     ui.label(format!(
                         "{} → {} ({})",
                         r.sources[i].name,
-                        stage.label,
+                        display_stage(stage),
                         crate::repo::short(&stage.commit)
                     ));
                 }
             }
         } else {
-            ui.label("No permitted passing release order was established");
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-no-permitted-passing-release-order-was-establi-244ee9",
+            ));
         }
-        egui::CollapsingHeader::new(format!(
-            "{} combinations and their evidence",
-            r.states.len()
-        ))
+        egui::CollapsingHeader::new(crate::i18n::message("repo-workflows-review-message-count-one-one-combination-and-its-evidence-oth-e7b196", &[("count", (r.states.len()).into())]))
+        .id_salt("review-release-combination-evidence")
         .show(ui, |ui| {
             for combination in &r.states {
                 ui.group(|ui| {
@@ -563,7 +634,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                                 format!(
                                     "{}={} ({})",
                                     source.name,
-                                    source.stages[i].label,
+                                    display_stage(&source.stages[i]),
                                     crate::repo::short(&source.stages[i].commit)
                                 )
                             })
@@ -571,19 +642,22 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                             .join(" · "),
                     );
                     if !combination.allowed {
-                        ui.label("Excluded by your declared ordering rules");
+                        ui.label(crate::i18n::text("repo-workflows-review-label-excluded-by-your-declared-ordering-rules-2c5680"));
                     } else if let Some(error) = &combination.error {
-                        ui.label(error);
+                        ui.label(crate::repo::messages::display_status(error));
                     } else if let Some(observed) = &combination.observed {
                         contracts::show_observation(ui, observed);
                     } else {
-                        ui.label("Not tested");
+                        ui.label(crate::i18n::text("repo-workflows-review-label-not-tested-51e3a0"));
                     }
                 });
             }
         });
         for e in &r.cleanup {
-            ui.label(format!("Scratch cleanup needs attention: {e}"));
+            ui.label(crate::i18n::message(
+                "repo-workflows-review-message-scratch-cleanup-needs-attention-detail-1b274a",
+                &[("detail", (crate::repo::messages::display_status(e)).into())],
+            ));
         }
     }
 }
@@ -601,6 +675,7 @@ mod tests {
                         label: i.to_string(),
                         commit: i.to_string(),
                         tree: i.to_string(),
+                        generated_index: None,
                     })
                     .collect(),
             })
@@ -677,5 +752,247 @@ mod tests {
         for bad in ["", "2sdk", "SDK;rm", "$(command)", "SDK-NEXT"] {
             assert!(!valid_name(bad));
         }
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_choreography_actual_board_repaints_numeric_plurals_and_keeps_plan()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let mut state = State::default();
+        state.plan.components.push(Component {
+            name: "backend{literal}".into(),
+            repo: "/opaque/Repo A".into(),
+            revisions: "deployed=refs/heads/main".into(),
+        });
+        state.report = Some(Report {
+            sources: vec![],
+            rules: vec![],
+            command: "printf 'keep argv'".into(),
+            states: vec![Combination {
+                stages: vec![],
+                allowed: true,
+                observed: None,
+                error: None,
+            }],
+            route: None,
+            tested: false,
+            stopped: false,
+            cleanup: vec![],
+        });
+        let before = serde_json::to_string(&state.plan).map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        for (locale, heading, count) in [
+            (
+                "en-US",
+                "Release choreography across repositories",
+                "One combination and its evidence",
+            ),
+            (
+                "de",
+                "Release-Choreografie über mehrere Repositorys",
+                "Eine Kombination und ihre Nachweise",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+            });
+            assert!(text.contains(heading) && text.contains(count), "{text}");
+            assert!(
+                text.contains("backend{literal}") && text.contains("deployed=refs/heads/main"),
+                "{text}"
+            );
+        }
+        state
+            .report
+            .as_mut()
+            .ok_or("report")?
+            .states
+            .push(Combination {
+                stages: vec![],
+                allowed: true,
+                observed: None,
+                error: None,
+            });
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+        });
+        assert!(
+            text.contains("2 Kombinationen und ihre Nachweise"),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::to_string(&state.plan).map_err(|e| e.to_string())?,
+            before
+        );
+        click(&ctx, "Board speichern", |ui| {
+            show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+        })?;
+        assert!(
+            matches!(acts.as_slice(), [Action::ReviewTools(ToolsAct::Choreography(Act::Save(plan)))] if plan.components[0].repo == "/opaque/Repo A")
+        );
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_r1_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    fn inert_stage(line: &str, i: usize) -> Stage {
+        let (label, revision, generated_index) = stage_input(line, i);
+        Stage {
+            label,
+            commit: revision.into(),
+            tree: format!("tree-{i}"),
+            generated_index,
+        }
+    }
+
+    #[test]
+    fn fluent_review_r1_stage_provenance_preserves_explicit_collisions_and_legacy_labels()
+    -> Result<(), String> {
+        for (locale, generated) in [("en-US", "Stage 1"), ("de", "Stufe 1")] {
+            crate::i18n::set_language(locale);
+            let stage = inert_stage("refs/heads/generated", 1);
+            assert_eq!(stage.label, "Stage 1");
+            assert_eq!(stage.commit, "refs/heads/generated");
+            assert_eq!(stage.generated_index, Some(1));
+            assert_eq!(display_stage(&stage), generated);
+            let reopened: Stage =
+                serde_json::from_str(&serde_json::to_string(&stage).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(display_stage(&reopened), generated);
+            for label in ["Stage1", "Stage 1", "Custom {raw}", "Stufe 1"] {
+                let stage = inert_stage(&format!("{label}= refs/heads/opaque"), 1);
+                assert_eq!(stage.generated_index, None);
+                assert_eq!(stage.label, label);
+                assert_eq!(display_stage(&stage), label);
+                assert_eq!(stage.commit, "refs/heads/opaque");
+                let serialized = serde_json::to_string(&stage).map_err(|e| e.to_string())?;
+                assert!(!serialized.contains("generated_index"));
+            }
+            // Older reports cannot prove whether Stage 1 was generated or entered by a user.
+            let legacy: Stage =
+                serde_json::from_str(r#"{"label":"Stage 1","commit":"oid","tree":"tree"}"#)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(legacy.generated_index, None);
+            assert_eq!(display_stage(&legacy), "Stage 1");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fluent_review_r1_actual_route_evidence_and_count_header_retain_locale_state()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let mut state = State::default();
+        state.report = Some(Report {
+            sources: vec![
+                Source {
+                    name: "backend".into(),
+                    repo: PathBuf::from("/opaque/backend"),
+                    stages: vec![inert_stage("base-oid", 0), inert_stage("next-oid", 1)],
+                },
+                Source {
+                    name: "custom".into(),
+                    repo: PathBuf::from("/opaque/custom"),
+                    stages: vec![
+                        inert_stage("Stage 1=userbase", 0),
+                        inert_stage("Stage1=usernext", 1),
+                    ],
+                },
+            ],
+            rules: vec![],
+            command: "Stage --opaque-command".into(),
+            states: vec![
+                Combination {
+                    stages: vec![0, 0],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+                Combination {
+                    stages: vec![1, 1],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+            ],
+            route: Some(vec![vec![0, 0], vec![1, 0], vec![1, 1]]),
+            tested: false,
+            stopped: false,
+            cleanup: vec![],
+        });
+        let before = serde_json::to_string(state.report.as_ref().ok_or("report")?)
+            .map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        crate::i18n::set_language("en-US");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(text.contains("backend → Stage 1 (next-oid)"), "{text}");
+        assert!(
+            !text.contains("backend=Stage 0"),
+            "evidence should start collapsed: {text}"
+        );
+        click(&ctx, "2 combinations and their evidence", |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        })?;
+        for (locale, generated) in [("en-US", "Stage"), ("de", "Stufe"), ("en-US", "Stage")] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, Path::new("/opaque"), &mut acts)
+            });
+            assert!(
+                text.contains(&format!("backend → {generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 0 (base-oid)")),
+                "evidence expansion lost: {text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains("custom → Stage1 (usernext)")
+                    && text.contains("custom=Stage 1 (userbase)")
+                    && text.contains("custom=Stage1 (usernext)"),
+                "explicit labels changed: {text}"
+            );
+        }
+        assert_eq!(
+            serde_json::to_string(state.report.as_ref().ok_or("report")?)
+                .map_err(|e| e.to_string())?,
+            before
+        );
+        state
+            .report
+            .as_mut()
+            .ok_or("report")?
+            .states
+            .push(Combination {
+                stages: vec![0, 0],
+                allowed: true,
+                observed: None,
+                error: None,
+            });
+        crate::i18n::set_language("de");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(
+            text.contains("3 Kombinationen und ihre Nachweise") && text.contains("backend=Stufe 0"),
+            "count change lost expansion: {text}"
+        );
+        assert!(acts.is_empty());
+        Ok(())
     }
 }

@@ -704,6 +704,33 @@ impl RepoTab {
         );
     }
 }
+fn display_phase(phase: &str) -> &str {
+    match phase {
+        "Old failure" => crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"),
+        "Invariant" => crate::i18n::text("repo-workflows-review-label-invariant-59d137"),
+        "Fix" => crate::i18n::text("repo-workflows-review-label-fix-21f159"),
+        "Result" => crate::i18n::text("repo-workflows-review-label-result-6e7d50"),
+        _ => phase,
+    }
+}
+fn display_verdict(verdict: &str) -> &str {
+    match verdict {
+        "good" => crate::i18n::text("repo-workflows-review-label-good-770e60"),
+        "bad" => crate::i18n::text("repo-workflows-review-label-bad-2f05d4"),
+        _ => verdict,
+    }
+}
+fn display_test_command(command: &str) -> String {
+    const CONFIGURED: &str =
+        "Configured when pinned (execution command not recorded by test lane): ";
+    match command.strip_prefix(CONFIGURED) {
+        Some(command) => crate::i18n::message(
+            "repo-workflows-review-raw-configured-when-pinned-execution-command-not-r-ddb1ee",
+            &[("command", command.into())],
+        ),
+        None => command.to_owned(),
+    }
+}
 pub(in crate::repo) fn show(
     ui: &mut egui::Ui,
     state: &mut Storyboard,
@@ -712,48 +739,44 @@ pub(in crate::repo) fn show(
     remotes: &[git::Remote],
     acts: &mut Vec<Action>,
 ) {
-    egui::CollapsingHeader::new("Review storyboard").show(ui, |ui| {
-        if ui.button("Load storyboard").clicked() {
+    egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-review-storyboard-f917d1")).id_salt("repo-workflows-review-label-review-storyboard-f917d1").show(ui, |ui| {
+        if ui.button(crate::i18n::text("repo-workflows-review-label-load-storyboard-df2f79")).clicked() {
             acts.push(Action::Story(StoryAct::Load));
         }
-        egui::ComboBox::from_id_salt("story-sharing-remote").selected_text(if state.remote.is_empty(){"Choose storyboard remote"}else{&state.remote}).show_ui(ui,|ui|{
+        egui::ComboBox::from_id_salt("story-sharing-remote").selected_text(if state.remote.is_empty(){crate::i18n::text("repo-workflows-review-label-choose-storyboard-remote-bd2c8d")}else{&state.remote}).show_ui(ui,|ui|{
             for remote in remotes {ui.selectable_value(&mut state.remote,remote.name.clone(),&remote.name);}
         });
-        ui.weak("Sharing publishes the cards and their pinned source history through a dedicated Git ref. Imported cards are advisory Git metadata; they never execute tests or commands.");
-        if ui.button("Fetch shared author storyboard").clicked(){acts.push(Action::Story(StoryAct::Fetch{remote:state.remote.clone(),head:f.to.clone()}));}
-        if state.imported {ui.label("Showing imported storyboard; load the local storyboard before editing.");}
+        ui.weak(crate::i18n::text("repo-workflows-review-label-sharing-publishes-the-cards-and-their-pinned-s-4f1959"));
+        if ui.button(crate::i18n::text("repo-workflows-review-label-fetch-shared-author-storyboard-ec4246")).clicked(){acts.push(Action::Story(StoryAct::Fetch{remote:state.remote.clone(),head:f.to.clone()}));}
+        if state.imported {ui.label(crate::i18n::text("repo-workflows-review-label-showing-imported-storyboard-load-the-local-sto-cc81d0"));}
         let own = d
             .extras
             .viewer
             .as_deref()
             .is_some_and(|v| v.eq_ignore_ascii_case(&d.author));
-        if own && ui.button("Publish my local storyboard").clicked(){acts.push(Action::Story(StoryAct::Publish{remote:state.remote.clone(),head:f.to.clone()}));}
+        if own && ui.button(crate::i18n::text("repo-workflows-review-label-publish-my-local-storyboard-3ee6c4")).clicked(){acts.push(Action::Story(StoryAct::Publish{remote:state.remote.clone(),head:f.to.clone()}));}
         let own=own && !state.imported;
         if let Some(rows) = &state.rows {
             match rows {
                 Err(e) => {
-                    ui.label(e);
+                    ui.label(crate::repo::messages::display_status(e));
                 }
                 Ok(rows) => {
                     for (i, row) in rows.iter().enumerate() {
                         ui.group(|ui| {
-                            ui.strong(format!("{}. {}", i + 1, row.card.phase));
+                            ui.strong(format!("{}. {}", i + 1, display_phase(&row.card.phase)));
                             ui.label(&row.card.text);
-                            ui.weak(format!(
-                                "Pinned {}..{}",
-                                crate::repo::short(&row.card.base),
-                                crate::repo::short(&row.card.head)
-                            ));
+                            ui.weak(crate::i18n::message("repo-workflows-review-message-pinned-base-head-96c6e6", &[("base", (crate::repo::short(&row.card.base)).into()), ("head", (crate::repo::short(&row.card.head)).into())]));
                             if let Some(stale) = &row.stale {
-                                ui.colored_label(egui::Color32::YELLOW, format!("Stale: {stale}"));
+                                ui.colored_label(egui::Color32::YELLOW, crate::i18n::message("repo-workflows-review-message-stale-detail-264fc0", &[("detail", (crate::repo::messages::display_status(stale)).into())]));
                             }
                             ui.horizontal_wrapped(|ui| {
                                 if let Some((commit, path, line)) = &row.target
                                     && ui
                                         .button(if *line > 0 {
-                                            "Open pinned hunk"
+                                            crate::i18n::text("repo-workflows-review-label-open-pinned-hunk-beb93d")
                                         } else {
-                                            "Open file"
+                                            crate::i18n::text("repo-workflows-review-label-open-file-4190c0")
                                         })
                                         .clicked()
                                 {
@@ -763,7 +786,7 @@ pub(in crate::repo) fn show(
                                     Anchor::Code {
                                         commit, path, line, ..
                                     } => {
-                                        if ui.button("Open original revision").clicked() {
+                                        if ui.button(crate::i18n::text("repo-workflows-review-label-open-original-revision-e14b40")).clicked() {
                                             open(acts, commit, path, *line);
                                         }
                                     }
@@ -773,9 +796,7 @@ pub(in crate::repo) fn show(
                                         verdict,
                                         ..
                                     } => {
-                                        ui.monospace(format!(
-                                            "Observed {verdict} · tree {tree} · {command}"
-                                        ));
+                                        ui.monospace(crate::i18n::message("repo-workflows-review-message-observed-verdict-tree-tree-command-a654d0", &[("verdict", (display_verdict(verdict)).into()), ("tree", (tree.as_str()).into()), ("command", (display_test_command(command)).into())]));
                                     }
                                 }
                                 if own {
@@ -788,7 +809,7 @@ pub(in crate::repo) fn show(
                                             }));
                                         }
                                     }
-                                    if ui.small_button("Remove").clicked() {
+                                    if ui.small_button(crate::i18n::text("repo-workflows-review_workflow-show-c3812fc4")).clicked() {
                                         acts.push(Action::Story(StoryAct::Remove {
                                             index: i,
                                             head: f.to.clone(),
@@ -804,39 +825,39 @@ pub(in crate::repo) fn show(
         if own {
             let form = &mut state.form;
             egui::ComboBox::from_id_salt("story-phase")
-                .selected_text(["Old failure", "Invariant", "Fix", "Result"][form.phase])
+                .selected_text([crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"), crate::i18n::text("repo-workflows-review-label-invariant-59d137"), crate::i18n::text("repo-workflows-review-label-fix-21f159"), crate::i18n::text("repo-workflows-review-label-result-6e7d50")][form.phase])
                 .show_ui(ui, |ui| {
-                    for (i, name) in ["Old failure", "Invariant", "Fix", "Result"]
+                    for (i, name) in [crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"), crate::i18n::text("repo-workflows-review-label-invariant-59d137"), crate::i18n::text("repo-workflows-review-label-fix-21f159"), crate::i18n::text("repo-workflows-review-label-result-6e7d50")]
                         .iter()
                         .enumerate()
                     {
                         ui.selectable_value(&mut form.phase, i, *name);
                     }
                 });
-            ui.add(egui::TextEdit::multiline(&mut form.text).hint_text("Explain this step"));
-            ui.checkbox(&mut form.test, "Pin a test-lane result at this revision");
+            ui.add(egui::TextEdit::multiline(&mut form.text).hint_text(crate::i18n::text("repo-workflows-review-label-explain-this-step-7f09ed")));
+            ui.checkbox(&mut form.test, crate::i18n::text("repo-workflows-review-label-pin-a-test-lane-result-at-this-revision-6f1f6f"));
             ui.add(
                 egui::TextEdit::singleline(&mut form.commit)
-                    .hint_text("Commit (empty = current PR head)"),
+                    .hint_text(crate::i18n::text("repo-workflows-review-label-commit-empty-current-pr-head-6e6c30")),
             );
             if !form.test {
                 ui.add(
                     egui::TextEdit::singleline(&mut form.path)
-                        .hint_text("Repository-relative path"),
+                        .hint_text(crate::i18n::text("repo-workflows-review-label-repository-relative-path-3f3f0a")),
                 );
                 ui.add(
                     egui::TextEdit::singleline(&mut form.line)
-                        .hint_text("Line (empty = entire file)"),
+                        .hint_text(crate::i18n::text("repo-workflows-review-label-line-empty-entire-file-afe710")),
                 );
             }
-            if ui.button("Add revision-pinned card").clicked() {
+            if ui.button(crate::i18n::text("repo-workflows-review-label-add-revision-pinned-card-634c2d")).clicked() {
                 acts.push(Action::Story(StoryAct::Add {
                     form: form.clone(),
                     head: f.to.clone(),
                 }));
             }
         }
-        ui.weak("Stored in this clone. Cards never execute commands or change the pull request.");
+        ui.weak(crate::i18n::text("repo-workflows-review-label-stored-in-this-clone-cards-never-execute-comma-4cb802"));
     });
 }
 fn open(acts: &mut Vec<Action>, commit: &str, path: &str, line: u64) {
@@ -1057,5 +1078,206 @@ mod tests {
                 .is_some_and(|rows| rows[0].stale.is_some())
         );
         assert!(state.imported);
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_storyboard_actual_phase_adapter_keeps_persisted_metadata_and_stale_generation()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let details = PrDetails {
+            author: "author".into(),
+            head_oid: "head{opaque}".into(),
+            ..Default::default()
+        };
+        let files = PrFiles {
+            from: "base{opaque}".into(),
+            to: details.head_oid.clone(),
+            files: vec![],
+        };
+        let card = Card {
+            phase: "Old failure".into(),
+            text: "User story --argv {raw}".into(),
+            base: files.from.clone(),
+            head: files.to.clone(),
+            anchor: Anchor::Test {
+                commit: "opaque".into(),
+                tree: "tree{raw}".into(),
+                command: "cargo test --offline --test user_test".into(),
+                verdict: "bad".into(),
+            },
+        };
+        let before = serde_json::to_string(&card).map_err(|e| e.to_string())?;
+        let mut state = Storyboard {
+            request: 41,
+            rows: Some(Ok(vec![Shown {
+                card,
+                target: None,
+                stale: None,
+            }])),
+            imported: true,
+            ..Default::default()
+        };
+        let mut acts = vec![];
+        for (locale, heading, phase, verdict) in [
+            ("en-US", "Review storyboard", "Old failure", "Observed bad"),
+            (
+                "de",
+                "Review-Storyboard",
+                "Früherer Fehler",
+                "Beobachtet schlecht",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            if locale == "en-US" {
+                click(&ctx, heading, |ui| {
+                    show(ui, &mut state, &details, &files, &[], &mut acts)
+                })?;
+            }
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, &details, &files, &[], &mut acts)
+            });
+            assert!(text.contains(phase) && text.contains(verdict), "{text}");
+            assert!(
+                text.contains("cargo test --offline --test user_test")
+                    && text.contains("User story --argv {raw}"),
+                "{text}"
+            );
+        }
+        assert_eq!(
+            display_phase("Unknown user phase {raw}"),
+            "Unknown user phase {raw}"
+        );
+        assert_eq!(display_verdict("custom --verdict"), "custom --verdict");
+        let stored = &state
+            .rows
+            .as_ref()
+            .ok_or("rows")?
+            .as_ref()
+            .map_err(|e| e.as_str())?[0]
+            .card;
+        assert_eq!(
+            serde_json::to_string(stored).map_err(|e| e.to_string())?,
+            before
+        );
+        assert_eq!(state.request, 41);
+        assert!(acts.is_empty());
+        state.accept(40, Err("stale response".into()));
+        assert!(state.rows.as_ref().ok_or("rows")?.is_ok());
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_r1_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_r1_actual_storyboard_commands_are_opaque_even_when_operation_names_collide()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let details = PrDetails {
+            author: "author".into(),
+            head_oid: "head".into(),
+            ..Default::default()
+        };
+        let files = PrFiles {
+            from: "base".into(),
+            to: "head".into(),
+            files: vec![],
+        };
+        let mut state = Storyboard {
+            rows: Some(Ok(vec![Shown {
+                card: Card {
+                    phase: "Result".into(),
+                    text: "User story {raw}".into(),
+                    base: "base".into(),
+                    head: "head".into(),
+                    anchor: Anchor::Test {
+                        commit: "oid".into(),
+                        tree: "tree{opaque}".into(),
+                        command: "Stage".into(),
+                        verdict: "bad".into(),
+                    },
+                },
+                target: None,
+                stale: None,
+            }])),
+            imported: true,
+            ..Default::default()
+        };
+        let mut acts = vec![];
+        crate::i18n::set_language("en-US");
+        click(&ctx, "Review storyboard", |ui| {
+            show(ui, &mut state, &details, &files, &[], &mut acts)
+        })?;
+        const PREFIX: &str =
+            "Configured when pinned (execution command not recorded by test lane): ";
+        let commands = [
+            "Stage".to_owned(),
+            "Undo Stage".to_owned(),
+            "Preparing Stage".to_owned(),
+            "cargo test --offline --test user_test".to_owned(),
+            "Custom {raw} --argv=Stage".to_owned(),
+            format!("{PREFIX}Stage"),
+            format!("{PREFIX}Undo Stage --argv={{raw}}"),
+            format!(" {PREFIX}Stage"),
+            "Configured when pinned: Stage".to_owned(),
+        ];
+        for (locale, envelope) in [
+            ("en-US", PREFIX),
+            (
+                "de",
+                "Beim Fixieren konfiguriert (Ausführungsbefehl nicht von der Testspur aufgezeichnet): ",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            for command in &commands {
+                let rows = state
+                    .rows
+                    .as_mut()
+                    .ok_or("rows")?
+                    .as_mut()
+                    .map_err(|e| e.to_string())?;
+                let Anchor::Test {
+                    command: recorded, ..
+                } = &mut rows[0].card.anchor
+                else {
+                    return Err("anchor".into());
+                };
+                *recorded = command.clone();
+                let before = serde_json::to_string(&rows[0].card).map_err(|e| e.to_string())?;
+                let expected = command
+                    .strip_prefix(PREFIX)
+                    .map_or_else(|| command.clone(), |suffix| format!("{envelope}{suffix}"));
+                let text = paint(&ctx, |ui| {
+                    show(ui, &mut state, &details, &files, &[], &mut acts)
+                });
+                assert!(
+                    text.contains(&format!("tree{{opaque}} · {expected}")),
+                    "recorded command reinterpreted in {locale}: {text}"
+                );
+                assert!(
+                    !text.contains("Vormerken"),
+                    "operation translation reached command data: {text}"
+                );
+                let rows = state
+                    .rows
+                    .as_ref()
+                    .ok_or("rows")?
+                    .as_ref()
+                    .map_err(|e| e.to_string())?;
+                assert_eq!(
+                    serde_json::to_string(&rows[0].card).map_err(|e| e.to_string())?,
+                    before
+                );
+            }
+        }
+        assert!(acts.is_empty());
+        Ok(())
     }
 }

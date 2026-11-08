@@ -132,3 +132,7 @@ repo-workflows-repository_tools-show-9174163c = Isolierter Restack
 repo-workflows-repository_tools-start-send-628a48e6 = Profil oder Anmeldung des vorbereiteten Ausgangs geändert. Erneut vorbereiten und freigeben.
 repo-workflows-repository_tools-start-send-994ea6b0 = Exakten eingereihten Push senden
 repo-workflows-repository_tools-start-send-e7b0c78d = Automatischer Versand des freigegebenen einfachen Ausgangs-Pushes
+
+repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Schließen
+
+repo-workflows-review_workflow-show-c3812fc4 = Entfernen

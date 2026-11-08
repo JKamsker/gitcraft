@@ -132,3 +132,7 @@ repo-workflows-repository_tools-show-9174163c = Isolated restack
 repo-workflows-repository_tools-start-send-628a48e6 = Prepared outbox profile/sign-in changed; prepare and approve again
 repo-workflows-repository_tools-start-send-994ea6b0 = Send exact queued push
 repo-workflows-repository_tools-start-send-e7b0c78d = Autosend opted-in plain outbox push
+
+repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Close
+
+repo-workflows-review_workflow-show-c3812fc4 = Remove
