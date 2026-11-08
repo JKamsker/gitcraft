@@ -918,29 +918,13 @@ fn review14_effective_destination_validation_uses_shared_canonical_identity() {
 }
 
 #[test]
-fn review14_confirmed_owned_rebase_executes_and_cleans_running() {
+fn review14_confirmed_owned_rebase_executes_and_cleans_running()
+-> Result<(), Box<dyn std::error::Error>> {
     let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Metered));
     let w = World::new("confirm-execution");
-    let p = rebase_ready(&w);
     let ctx = egui::Context::default();
-    let mut tab = recorded_tab(&w, &ctx);
-    // This fixture assigns web metadata to owned local transports; no forge is called.
-    tab.remotes = git::remotes(&w.me).unwrap_or_default();
-    tab.forge_remotes.truncate(1);
-    tab.take_forge_selection(true, &ctx);
-    let primary = tab.remotes.iter().find(|r| r.name == "origin").cloned();
-    assert!(primary.is_some());
-    let Some(primary) = primary else { return };
-    assert!(tab.hosting.is_some());
-    let Some(hosting) = tab.hosting.clone() else {
-        return;
-    };
-    let scope = super::guard::Scope::new(tab.forge_generation, hosting, primary);
-    let id = scope.id;
-    tab.forks.scope = Some(scope);
-    let label = "Rebase #7 onto main and push".to_owned();
-    tab.forks.scope_label = Some(label.clone());
-    tab.forks.running = Some((label, p.clone()));
+    let (p, mut tab) = refresh_stable_rebase(&w, &ctx)?;
+    let id = confirmation_id(&tab);
     tab.fork_act(super::ForkAct::ConfirmRebase(id), &ctx);
     assert!(tab.busy_op.is_some());
     drain_until(&mut tab, &ctx, |t| {
@@ -961,6 +945,7 @@ fn review14_confirmed_owned_rebase_executes_and_cleans_running() {
     );
     assert_ne!(git::head(&w.me), p.head);
     assert!(tab.timeline.entries.iter().any(|e| e.undo.is_some()));
+    Ok(())
 }
 
 #[test]
@@ -1191,6 +1176,65 @@ fn review19_first_checkout_accepts_canonical_https_to_ssh_rewrite() {
     );
     assert_eq!(std::fs::read_to_string(log).unwrap_or_default(), "fetch");
     assert_eq!(git::head(&w.me), w.info().sha);
+}
+
+// A real refresh must rediscover the same forge while these fixtures wait for the
+// separate push checklist. The SSH spelling supplies that identity; this strict
+// helper executes only the owned upstream's upload-pack, never a network client.
+fn refresh_stable_rebase(
+    w: &World,
+    ctx: &egui::Context,
+) -> Result<(plan::Rebase, crate::repo::RepoTab), Box<dyn std::error::Error>> {
+    let _ = rebase_ready(w);
+    let quoted = |p: &Path| format!("'{}'", arg(p).replace('\'', "'\\''"));
+    let ssh = w.root.join("owned upstream ssh");
+    let script = format!(
+        "#!/bin/sh\nhost=no\ncommand=no\nfor arg do\n  [ \"$arg\" = \"git@forge.example\" ] && host=yes\n  [ \"$arg\" = \"git-upload-pack 'origin/app'\" ] && command=yes\ndone\n[ \"$host:$command\" = yes:yes ] || exit 97\nexec git-upload-pack {}\n",
+        quoted(&w.upstream)
+    );
+    assert!(std::fs::write(&ssh, script).is_ok());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert!(std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700)).is_ok());
+    }
+    run(&w.me, &["config", "core.sshCommand", &quoted(&ssh)]);
+    run(&w.me, &["config", "ssh.variant", "ssh"]);
+    run(&w.me, &["config", "gitcraft.forge", "forgejo"]);
+    run(
+        &w.me,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "git@forge.example:origin/app",
+        ],
+    );
+    let remotes = git::remotes(&w.me)?;
+    let primary = remotes.iter().find(|r| r.name == "origin").cloned();
+    assert!(primary.is_some());
+    let primary = primary.ok_or("owned origin is configured above")?;
+    let p = plan::plan_rebase(&w.me, &w.info(), &primary, &w.setup(), None, None, None);
+    assert!(p.is_ok(), "{p:?}");
+    let p = p?;
+    let mut tab = crate::repo::RepoTab::new_deferred(w.me.clone(), ctx);
+    tab.forge_remotes = crate::forge::detect_remotes(&w.me, &remotes);
+    tab.remotes = remotes;
+    tab.take_forge_selection(false, ctx);
+    let hosting = tab.hosting.clone();
+    assert!(hosting.is_some());
+    if let Some(hosting) = hosting {
+        tab.forks.scope = Some(super::guard::Scope::new(
+            tab.forge_generation,
+            hosting,
+            primary,
+        ));
+    }
+    tab.forks.info.insert(7, w.info());
+    let label = "Rebase #7 onto main and push".to_owned();
+    tab.forks.scope_label = Some(label.clone());
+    tab.forks.running = Some((label, p.clone()));
+    Ok((p, tab))
 }
 
 fn execution_tab(w: &World, p: &plan::Rebase, ctx: &egui::Context) -> crate::repo::RepoTab {
@@ -1546,9 +1590,8 @@ fn review19_conflict_continuation_pins_its_tip_and_original_explicit_lease()
         run(&w.ann, &["checkout", "-q", "-B", "up", "origin/main"]);
         edit_base(&w.ann, "upstream version")?;
         run(&w.ann, &["push", "-q", "origin", "up:main"]);
-        let p = rebase_ready(&w);
         let ctx = egui::Context::default();
-        let mut tab = execution_tab(&w, &p, &ctx);
+        let (p, mut tab) = refresh_stable_rebase(&w, &ctx)?;
         let scope = tab.forks.scope.clone().ok_or("missing fork scope")?;
         let result = crate::repo::operations::run_steps_guarded(
             &w.me,
