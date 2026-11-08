@@ -1,0 +1,8 @@
+{
+  "base": "74c765dc89a02a4a2d02fecd660460ff8b92a7e1",
+  "protected_blocks": {
+    "src/settings/labels.rs": "cb6836a7a08a9c63561a300219cc83a09cfa7dde7a44e556f35d8f8160f350fc",
+    "src/settings/file_menus.rs": "1073606ee0ce31589a374a2530f67846ff7afd7c4b1c72af00764f5c9141cd89",
+    "src/desktop_entry.rs": "e788f023751c476f3d64007dc8616e2a5d897080c1b893ad67dae2ee60a89684"
+  }
+}

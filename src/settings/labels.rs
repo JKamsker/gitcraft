@@ -2,6 +2,7 @@
 //! search identities; user-supplied names pass through unchanged.
 pub(super) fn display(raw: &str) -> &str {
     match raw {
+        "Files (GNOME)" => crate::i18n::text("interaction-shell-prose-files"),
         "AI" => crate::i18n::text("interaction-settings-label-ai"),
         "Accent colour" => crate::i18n::text("interaction-settings-label-accent-colour"),
         "Add gitcraft to an agent" => {

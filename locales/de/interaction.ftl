@@ -1928,3 +1928,7 @@ interaction-recent-status-missing = Ordner nicht gefunden
 interaction-recent-status-not-repo = kein Repository mehr
 interaction-recent-status-timeout = hat nicht rechtzeitig geantwortet
 interaction-recent-status-failed = konnte nicht gelesen werden
+interaction-shell-prose-home = Kein Benutzerordner
+interaction-shell-prose-files = Dateien (GNOME)
+interaction-shell-prose-description = Ein kleiner visueller Git-Client
+interaction-shell-prose-links = Öffnet gitcraft://-Links aus dem Browser in gitcraft

@@ -67,10 +67,77 @@ fn menu_row(ui: &mut Ui, menu: &Menu) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "interaction-settings-file-menu-error",
-                &[("error", e.as_str().into())],
+                &[("error", display_error(&e).into())],
             ))
             .color(t.danger)
             .small(),
+        );
+    }
+}
+
+/// The fixed application guard is known; native/path-bearing details stay opaque.
+fn display_error(raw: &str) -> &str {
+    match raw {
+        "No home folder" => crate::i18n::text("interaction-shell-prose-home"),
+        _ => raw,
+    }
+}
+
+#[cfg(test)]
+mod localized_error_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_supplied_file_menu_row_translates_at_paint_with_raw_identity_and_callbacks_untouched()
+    {
+        let menu = Menu {
+            label: "Files (GNOME)",
+            keywords: "nautilus files gnome",
+            note: "",
+            installed: || true,
+            install: Box::new(|| Err("recorded install must not be called".into())),
+            uninstall: || Err("recorded uninstall must not be called".into()),
+        };
+        let raw = "No home folder";
+        let error_id = egui::Id::new(("settings-file-menu-error", menu.label));
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, original: &mut String| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                ui.data_mut(|d| d.insert_temp(error_id, original.clone()));
+                let filter = layout::Filter::new("", "General", false);
+                layout::section(ui, &filter, "General", None, |card| {
+                    card.row(menu.label, menu.keywords, |ui| menu_row(ui, &menu))
+                });
+            },
+            raw.to_owned(),
+        );
+        h.run();
+        h.get_by_label("Files (GNOME)");
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("Dateien (GNOME)");
+        assert_eq!(display_error(raw), "Kein Benutzerordner");
+        h.get_by_label("Änderung fehlgeschlagen: Kein Benutzerordner");
+        assert_eq!(h.state(), raw);
+        // The exact raw widget/error identity survives the localized title.
+        assert_eq!(
+            h.ctx.data(|d| d.get_temp::<String>(error_id)).as_deref(),
+            Some(raw)
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Files (GNOME)");
+        h.get_by_label("Couldn't change it: No home folder");
+        assert_eq!(h.state(), raw);
+        assert_eq!(
+            display_error("native IO: No home folder"),
+            "native IO: No home folder"
         );
     }
 }

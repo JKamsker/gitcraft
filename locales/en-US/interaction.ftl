@@ -1934,3 +1934,7 @@ interaction-recent-status-missing = folder not found
 interaction-recent-status-not-repo = not a repository any more
 interaction-recent-status-timeout = didn't answer in time
 interaction-recent-status-failed = couldn't read it
+interaction-shell-prose-home = No home folder
+interaction-shell-prose-files = Files (GNOME)
+interaction-shell-prose-description = A small visual git client
+interaction-shell-prose-links = Opens gitcraft:// links from the browser in gitcraft
