@@ -71,10 +71,12 @@ pub(super) fn remote(
 }
 
 /// Asks for the username and password of `url`, after `refused` ones if they were.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn credentials(
     ui: &mut Ui,
     enter: bool,
-    url: &str,
+    url: &mut String,
+    endpoints: &[String],
     refused: bool,
     username: &mut String,
     password: &mut String,
@@ -89,6 +91,22 @@ pub(super) fn credentials(
          token as the password.",
         &t,
     );
+    if url.is_empty() || endpoints.len() > 1 {
+        ui.label("Git did not identify the failing endpoint. Choose the destination this sign-in should authorize. Other endpoints will not receive this token.");
+        egui::ComboBox::from_id_salt("https-failed-endpoint")
+            .selected_text(if url.is_empty() {
+                "Choose destination"
+            } else {
+                url.as_str()
+            })
+            .show_ui(ui, |ui| {
+                for endpoint in endpoints {
+                    ui.selectable_value(url, endpoint.clone(), endpoint);
+                }
+            });
+    } else {
+        ui.label(format!("Endpoint: {url}"));
+    }
     if refused {
         ui.colored_label(
             t.danger,

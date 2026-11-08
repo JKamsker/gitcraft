@@ -4,7 +4,7 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Inventory {
-    pub remotes: Vec<(String, String)>,
+    pub remotes: Vec<git::RemoteEndpoint>,
     pub lines: Vec<String>,
 }
 /// A display endpoint never includes a user, password, path, query, or command text.
@@ -58,16 +58,15 @@ fn disabled(value: Option<&str>) -> bool {
 const TLS_ENV: &str =
     "case \"$GIT_SSL_NO_VERIFY\" in ''|false|FALSE|no|NO|off|OFF|0) ;; *) printf disabled;; esac";
 pub(crate) fn inventory(repo: &Path, chosen: Option<&str>) -> Result<Inventory, String> {
-    let remotes: Vec<_> = git::remotes(repo)?
-        .into_iter()
-        .map(|r| (r.name, r.url))
-        .collect();
+    let remotes = git::remote_endpoints(repo)?;
     let selected = chosen
-        .and_then(|name| remotes.iter().find(|(n, _)| n == name))
+        .and_then(|name| remotes.iter().find(|e| e.key() == name))
         .or_else(|| remotes.first());
     let mut lines = Vec::new();
-    if let Some((name, url)) = selected {
-        lines.push(format!("Remote {name}: {}", endpoint(url)));
+    if let Some(selected) = selected {
+        let name = &selected.remote;
+        let url = &selected.url;
+        lines.push(format!("{}: {}", selected.key(), endpoint(url)));
         let proxy = config(repo, "http.proxy", Some(url))?;
         let override_proxy = config(repo, &format!("remote.{name}.proxy"), None)?;
         lines.push(format!(
@@ -211,11 +210,14 @@ pub(crate) struct Report {
     pub success: bool,
 }
 pub(crate) fn test(repo: &Path, name: &str) -> Result<Report, String> {
-    let url = git::remotes(repo)?
+    let selected = git::remote_endpoints(repo)?
         .into_iter()
-        .find(|r| r.name == name)
-        .ok_or("The selected remote no longer exists")?
-        .url;
+        .find(|e| e.key() == name)
+        .ok_or("The selected endpoint no longer exists")?;
+    if selected.push {
+        return Err("Connection tests read the fetch route. Push sign-ins can be inspected and rejected on the HTTPS sign-ins page; write permissions are checked by the actual push.".into());
+    }
+    let url = selected.url;
     if !(url.starts_with("https://") || url.starts_with("http://") || ssh_host(&url).is_some()) {
         return Err("Choose an HTTPS, HTTP or SSH remote to test a network connection".into());
     }
@@ -223,7 +225,7 @@ pub(crate) fn test(repo: &Path, name: &str) -> Result<Report, String> {
         && (disabled(config(repo, "http.sslVerify", Some(&url))?.as_deref())
             || disabled(config(repo, "http.proxySSLVerify", Some(&url))?.as_deref())
             || git::connection_shell(repo, TLS_ENV)?.trim() == "disabled");
-    let result = git::connection_probe(repo, name)?;
+    let result = git::connection_probe(repo, &selected.remote)?;
     let mut report = classify(
         result.success,
         &result.trace,

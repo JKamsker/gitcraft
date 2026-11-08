@@ -160,10 +160,12 @@ impl RepoTab {
                 .as_ref()
                 .is_some_and(|c| c.scope.as_ref().is_some_and(|scope| scope.matches_url(url)))
         {
+            let had_signin = self.credentials.is_some()
+                || self.https_challenge.is_some()
+                || matches!(self.dialog, Some(Dialog::Credentials { .. }));
             self.credentials = None;
-            self.invalidate_https_challenge();
-            if matches!(self.dialog, Some(Dialog::Credentials { .. })) {
-                self.dialog = None;
+            if had_signin {
+                self.invalidate_https_challenge();
             }
         }
         for parked in &mut self.parked {
@@ -185,12 +187,18 @@ impl RepoTab {
         self.forget_https_memory(&path, &url);
         crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
         let ticket = self.https_ticket(url.clone());
+        let reads = self.reads;
         self.then_or(
             ctx,
             true,
             Err,
             move || git::https_reject(&path, &url),
-            move |tab, result, _| tab.https_rejection_done(ticket, result),
+            move |tab, result, _| {
+                if tab.reads != reads {
+                    tab.invalidate_https_challenge();
+                }
+                tab.https_rejection_done(ticket, result);
+            },
         );
     }
 
@@ -202,7 +210,7 @@ impl RepoTab {
                 && creds
                     .scope
                     .as_ref()
-                    .is_some_and(|scope| scope.matches_url(&ticket.url))
+                    .is_some_and(|scope| ticket.endpoints.iter().any(|url| scope.matches_url(url)))
         }) {
             self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
             return;
@@ -255,6 +263,7 @@ impl RepoTab {
         {
             self.network_failed = true;
         }
+        let auth_failure = running.as_ref().and_then(|r| r.control.auth_failure());
         let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
         self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self
@@ -301,14 +310,10 @@ impl RepoTab {
                 let typed = self.credentials.take().is_some();
                 let refused = typed || e.contains("401") || e.contains("403");
                 self.status = Some((format!("{label}: sign-in needed"), true));
-                let url = self
-                    .default_remote()
-                    .and_then(|r| self.remotes.iter().find(|x| x.name == r))
-                    .map(|r| r.url.clone())
-                    .unwrap_or_default();
-                // An undo or redo stays where it is in the timeline until signing in runs it
-                // again, so that cancelling the sign-in keeps it.
-                self.offer_https_signin(url, refused);
+                // Only a URL reported by the failed step, or its captured destinations.
+                // An absent endpoint must never be replaced with the default fetch URL.
+                let failure = auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
+                self.offer_failed_https_signin(failure, refused);
             }
             Err(e) => {
                 self.note_reused(Some(e));
@@ -423,12 +428,22 @@ fn run_step(
     if control.is_cancelled() {
         return Err(git::CANCELLED.to_owned());
     }
+    let endpoints = if git::goes_over_network(args) {
+        git::operation_endpoints(path, args).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     // Each call kept for the activity log.
     let (result, recorded) = if git::goes_over_network(args) {
         git::run_watched_recorded(Some(path), args, creds, quiet, control)
     } else {
         git::run_recorded(Some(path), args, creds, quiet)
     };
+    if let Err(error) = &result
+        && git::is_auth_error(error)
+    {
+        control.authentication_failed(git::AuthFailure::from_error(error, &endpoints));
+    }
     let mut recorded = recorded;
     recorded.output = super::activity::bounded(&recorded.output);
     control.record(recorded);

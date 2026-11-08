@@ -4,6 +4,7 @@ use crate::git;
 #[derive(Clone)]
 pub(super) struct Ticket {
     pub(super) url: String,
+    pub(super) endpoints: Vec<String>,
     generation: u64,
     path: std::path::PathBuf,
     context: crate::connections::Context,
@@ -12,6 +13,7 @@ pub(super) struct Ticket {
 impl RepoTab {
     pub(super) fn https_ticket(&self, url: String) -> Ticket {
         Ticket {
+            endpoints: vec![url.clone()],
             url,
             generation: self.https_generation,
             path: self.path.clone(),
@@ -36,6 +38,31 @@ impl RepoTab {
     pub(super) fn offer_https_signin(&mut self, url: String, refused: bool) {
         self.https_challenge = Some(self.https_ticket(url.clone()));
         self.dialog = Some(Dialog::credentials(&url, refused));
+    }
+    pub(super) fn offer_failed_https_signin(&mut self, failure: git::AuthFailure, refused: bool) {
+        if failure.context != self.connection_context
+            || failure.context != crate::connections::current()
+        {
+            self.status = Some(("The operation used a previous connection. Run it again with the current profile before signing in.".into(), true));
+            return;
+        }
+        if failure.endpoints.is_empty() {
+            self.status = Some(("Git did not report an HTTP(S) sign-in endpoint. Inspect HTTPS sign-ins in Settings, then run the operation again.".into(), true));
+            return;
+        }
+        let url = if failure.confirmed {
+            failure.endpoints[0].clone()
+        } else {
+            String::new()
+        };
+        let mut ticket = self.https_ticket(url.clone());
+        ticket.endpoints = failure.endpoints.clone();
+        let mut dialog = Dialog::credentials(&url, refused);
+        if let Dialog::Credentials { endpoints, .. } = &mut dialog {
+            *endpoints = failure.endpoints;
+        }
+        self.https_challenge = Some(ticket);
+        self.dialog = Some(dialog);
     }
     pub(super) fn https_rejection_done(&mut self, ticket: Ticket, result: Result<(), String>) {
         if !self.https_ticket_current(&ticket) {

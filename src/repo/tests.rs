@@ -533,7 +533,11 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     // A push git answers like one that needs signing in.
-    let push = ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]);
+    let push = ops(&[&[
+        "-c",
+        "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+        "gitcraft-test-auth",
+    ]]);
     let steps: Vec<Vec<String>> = ops(&[&["tag", "v1"]])
         .into_iter()
         .chain(push.clone())
@@ -549,11 +553,9 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     finish(&mut tab, &ctx);
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     let kept = tab.last_op.as_ref().map(|op| op.ops.clone());
-    let creds = git::Credentials {
-        scope: None,
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())
+            .expect("scoped dummy credentials");
     tab.sign_in(creds, &ctx);
     finish(&mut tab, &ctx);
     let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
@@ -597,7 +599,11 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let entry = UndoEntry {
         id: 0,
         label: "Push".to_owned(),
-        undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
+        undo: ops(&[&[
+            "-c",
+            "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+            "gitcraft-test-auth",
+        ]]),
         redo: Vec::new(),
         heads: None,
         agent: None,
@@ -623,11 +629,9 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     // Cancelled.
     tab.dialog = None;
     let after_cancel = tab.timeline.current;
-    let creds = git::Credentials {
-        scope: None,
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())
+            .expect("scoped dummy credentials");
     tab.sign_in(creds, &ctx);
     let retrying = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
