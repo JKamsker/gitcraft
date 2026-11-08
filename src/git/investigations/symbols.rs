@@ -77,10 +77,7 @@ impl Trace<'_> {
             return Ok(symbols.clone());
         }
         if !self.reader.active() {
-            return Err(crate::i18n::text(
-                "backend-symbol-history-cancelled-or-reached-its-time-budget-6f2781",
-            )
-            .into());
+            return Err("Symbol history cancelled or reached its time budget".into());
         }
         if self.files.len() >= 1500 {
             return Err(crate::i18n::text(
@@ -401,19 +398,27 @@ fn boundary_event(
         }
     }
     Ok(if parents == 0 {
-        (crate::i18n::text("backend-created-d70b9e"), false)
+        ("Created", false)
     } else if traversable_parents.iter().all(u8::is_ascii_whitespace) {
-        (
-            crate::i18n::text("backend-earlier-shallow-boundary-creation-unproven-4afdd7"),
-            true,
-        )
+        ("Earlier shallow boundary (creation unproven)", true)
     } else {
-        (
-            crate::i18n::text("backend-earlier-boundary-creation-unproven-801381"),
-            true,
-        )
+        ("Earlier boundary (creation unproven)", true)
     })
 }
+fn display_boundary(boundary: &str) -> &str {
+    let id = match boundary {
+        "Created" => "backend-created-d70b9e",
+        "Earlier shallow boundary (creation unproven)" => {
+            "backend-earlier-shallow-boundary-creation-unproven-4afdd7"
+        }
+        "Earlier boundary (creation unproven)" => {
+            "backend-earlier-boundary-creation-unproven-801381"
+        }
+        _ => return boundary,
+    };
+    crate::i18n::text(id)
+}
+
 fn event(before: &Symbol, after: &Symbol) -> String {
     let mut events = Vec::new();
     if before.path != after.path {
@@ -703,7 +708,13 @@ pub(crate) fn investigate(
             .reader
             .run(&["cat-file", "commit", &commits[at]], vec![], &[0])?;
         let (boundary, unproven) = boundary_event(&raw, &parents)?;
-        steps.push(trace.step(&commits[at], boundary.into(), Some(current), vec![], None)?);
+        steps.push(trace.step(
+            &commits[at],
+            display_boundary(boundary).into(),
+            Some(current),
+            vec![],
+            None,
+        )?);
         if unproven {
             incomplete = true;
             if boundary.contains("shallow") {

@@ -555,10 +555,7 @@ pub(crate) fn trace(
     let mut seen = BTreeSet::new();
     for step in 0..STEPS {
         if !t.reader.active() {
-            return Err(crate::i18n::text(
-                "backend-line-history-cancelled-or-exceeded120seconds-7448a3",
-            )
-            .into());
+            return Err("Line history cancelled or exceeded120seconds".into());
         }
         if !seen.insert(cursor.clone()) {
             result.stopped = crate::i18n::text(

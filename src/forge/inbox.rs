@@ -144,6 +144,15 @@ pub fn is_no_login(err: &str) -> bool {
 /// Resolve application-owned protocol errors only when presenting them. The original
 /// error remains available to retry/login control flow through `gives_up`/`is_no_login`.
 pub fn display_error(error: &str) -> String {
+    if let Some((tool, rest)) = error.split_once(" isn't signed in to ")
+        && let Some((host, command)) = rest.split_once(": `")
+        && command == format!("{tool} auth login --hostname {host}` to use it")
+    {
+        return crate::i18n::message(
+            "backend-tool-isn-t-signed-in-to-host-tool-auth-login-hostname-host-to-use-5c4b1b",
+            &[("tool", tool.into()), ("host", host.into())],
+        );
+    }
     if let Some(rest) = error.strip_prefix("no ")
         && let Some((forge, rest)) = rest.split_once(" login known for ")
         && let Some((host, _)) = rest.split_once(": add one with `tea login add`")

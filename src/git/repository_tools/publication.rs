@@ -161,10 +161,7 @@ fn publish_inner(
             continue;
         }
         if runner.control.is_cancelled() {
-            destination.result = Some(Err(crate::i18n::text(
-                "backend-cancelled-before-this-destination-e79896",
-            )
-            .into()));
+            destination.result = Some(Err("Cancelled before this destination".into()));
             continue;
         }
         // Revalidate routing before each destination, including after other pushes/hooks.

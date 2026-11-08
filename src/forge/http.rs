@@ -159,10 +159,7 @@ impl Api {
                 crate::i18n::text("backend-forge-history-response-could-not-be-read-a63d58")
             })?;
         if bytes.len() > 2 * 1024 * 1024 || !active() {
-            return Err(crate::i18n::text(
-                "backend-forge-history-response-exceeded-its-budget-or-was-cancelled-233e64",
-            )
-            .into());
+            return Err("Forge history response exceeded its budget or was cancelled".into());
         }
         serde_json::from_slice(&bytes).map_err(|_| {
             crate::i18n::text("backend-forge-history-response-is-malformed-json-712688").into()

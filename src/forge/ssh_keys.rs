@@ -29,10 +29,7 @@ impl SshKeyAccount {
         active: &dyn Fn() -> bool,
     ) -> Result<(), String> {
         if !active() {
-            return Err(crate::i18n::text(
-                "backend-public-key-upload-cancelled-before-sending-eecb8c",
-            )
-            .into());
+            return Err("Public-key upload cancelled before sending.".into());
         }
         if title.len() > 512 || title.chars().any(char::is_control) {
             return Err(crate::i18n::text(

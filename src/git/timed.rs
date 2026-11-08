@@ -65,12 +65,9 @@ pub fn run_timed(
 }
 
 fn stopped(what: &str, limit: Duration) -> String {
-    crate::i18n::message(
-        "backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894",
-        &[
-            ("what", (what).to_string().into()),
-            ("seconds", (limit.as_secs_f32().ceil()).into()),
-        ],
+    format!(
+        "{what} didn't finish within {} seconds and was stopped",
+        limit.as_secs_f32().ceil()
     )
 }
 
@@ -200,5 +197,33 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(10));
         assert!(out.is_ok(), "{out:?}");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_timeout_keeps_timeout_classification() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::stopped(
+                "git interpret-trailers",
+                std::time::Duration::from_millis(2100),
+            );
+            assert_eq!(
+                raw,
+                "git interpret-trailers didn't finish within 3 seconds and was stopped"
+            );
+            assert!(raw.contains("didn't finish within"));
+            assert_eq!(
+                crate::git::display_error(&raw),
+                if locale == "de" {
+                    "git interpret-trailers wurde nicht innerhalb von 3 Sekunden fertig und wurde gestoppt."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

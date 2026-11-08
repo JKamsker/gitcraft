@@ -134,9 +134,7 @@ pub(super) fn parse(
             None,
             Some(ParseOptions::new().progress_callback(&mut stop)),
         )
-        .ok_or(crate::i18n::text(
-            "backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02",
-        ))?;
+        .ok_or("Symbol parsing cancelled or exceeded two seconds")?;
     if tree.root_node().has_error() {
         return Err(crate::i18n::message(
             "backend-cannot-prove-symbol-lineage-path-has-syntax-errors-for-its-gramma-1bbed8",
@@ -149,10 +147,7 @@ pub(super) fn parse(
     while let Some(node) = stack.pop() {
         visited += 1;
         if visited > 200_000 || out.len() > 5000 || !active() {
-            return Err(crate::i18n::text(
-                "backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57",
-            )
-            .into());
+            return Err("Symbol parsing cancelled or exceeded structural budget".into());
         }
         if function(node)
             && let (Some(n), Some(body)) = (name(node), node.child_by_field_name("body"))

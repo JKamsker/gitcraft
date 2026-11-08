@@ -146,10 +146,7 @@ impl Client<'_> {
     fn get(&mut self, path: &str) -> Result<Value, String> {
         if self.requests >= 48 || self.began.elapsed() > Duration::from_secs(90) || !(self.active)()
         {
-            return Err(crate::i18n::text(
-                "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d",
-            )
-            .into());
+            return Err("History evidence request budget reached or cancelled".into());
         }
         self.requests += 1;
         match &self.api {

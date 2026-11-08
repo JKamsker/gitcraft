@@ -475,17 +475,16 @@ pub fn shell_command_here(dir: &Path, script: &str) -> (String, Vec<String>) {
     ("git".to_owned(), args.to_vec())
 }
 
+// Kept raw for recent-status/across classification. Translate only at display_error.
+fn missing_folder(target: &Target) -> String {
+    format!("{} isn't a folder on {}", target.path, target.host.label())
+}
+
 fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
     // The folder is gone (or never was) on that machine.
     if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        return Err(crate::i18n::message(
-            "backend-isn-t-a-folder-on-859699",
-            &[
-                ("path", (target.path).to_string().into()),
-                ("target", (target.host.label()).to_string().into()),
-            ],
-        ));
+        return Err(missing_folder(&target));
     }
     let (stderr, events) = if extra.trace_hooks {
         super::hooks::split_trace(&out.stderr)
@@ -538,13 +537,7 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
     Some(if out.code == 0 {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        Err(crate::i18n::message(
-            "backend-isn-t-a-folder-on-859699",
-            &[
-                ("path", (target.path).to_string().into()),
-                ("target", (target.host.label()).to_string().into()),
-            ],
-        ))
+        Err(missing_folder(&target))
     } else {
         Err(download_read_error(
             args,
@@ -574,13 +567,7 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
             request.stdin = input.map(<[u8]>::to_vec);
             let out = remote::exec(&target.host, &request)?;
             if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-                return Err(crate::i18n::message(
-                    "backend-isn-t-a-folder-on-859699",
-                    &[
-                        ("path", (target.path).to_string().into()),
-                        ("target", (target.host.label()).to_string().into()),
-                    ],
-                ));
+                return Err(missing_folder(&target));
             }
             Ran {
                 code: Some(out.code),
@@ -3250,5 +3237,31 @@ mod internals_merge_recording {
             }
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_missing_folder_keeps_recent_status_identity() {
+        let target = crate::remote::Target {
+            host: crate::remote::Host::Ssh("fixture-host".into()),
+            path: "/fixture/de/repo".into(),
+        };
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::missing_folder(&target);
+            assert_eq!(raw, "/fixture/de/repo isn't a folder on SSH · fixture-host");
+            assert!(raw.to_lowercase().contains("isn't a folder on"));
+            assert_eq!(
+                crate::git::display_error(&raw),
+                if locale == "de" {
+                    "/fixture/de/repo ist kein Ordner auf SSH · fixture-host."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

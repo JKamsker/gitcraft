@@ -235,6 +235,30 @@ fn unquote(value: &str) -> String {
 /// Render known application control errors without changing their transport identity.
 /// Provider/Git diagnostics and unknown strings remain opaque.
 pub fn display_error(error: &str) -> String {
+    if let Some(display) = super::hooks::display_failure(error) {
+        return display;
+    }
+    if let Some(path) = error.strip_suffix(" is not inside a git repository") {
+        return crate::i18n::message(
+            "backend-is-not-inside-a-git-repository-116bc9",
+            &[("path", path.into())],
+        );
+    }
+    if let Some((path, target)) = error.rsplit_once(" isn't a folder on ") {
+        return crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[("path", path.into()), ("target", target.into())],
+        );
+    }
+    if let Some(rest) = error.strip_suffix(" seconds and was stopped")
+        && let Some((what, seconds)) = rest.rsplit_once(" didn't finish within ")
+        && let Ok(seconds) = seconds.parse::<u64>()
+    {
+        return crate::i18n::message(
+            "backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894",
+            &[("what", what.into()), ("seconds", seconds.into())],
+        );
+    }
     if let Some(detail) = error.strip_prefix("Contained bundle Git: ") {
         return crate::i18n::message(
             "backend-contained-bundle-error",

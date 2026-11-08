@@ -389,10 +389,7 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         }
         for (tree, layer) in layers {
             if !reader.active() {
-                return Err(crate::i18n::text(
-                    "backend-content-recovery-cancelled-or-timed-out-b878c7",
-                )
-                .into());
+                return Err("Content recovery cancelled or timed out".into());
             }
             if !trees.contains_key(tree) {
                 trees.insert(tree.clone(), tree_entries(&reader, tree, &mut report)?);

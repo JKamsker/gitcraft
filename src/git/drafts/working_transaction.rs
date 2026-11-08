@@ -146,10 +146,7 @@ fn native_apply(
         check()?;
         for item in &mut items {
             if !active() {
-                return Err(crate::i18n::text(
-                    "backend-working-folder-publication-cancelled-a8f541",
-                )
-                .into());
+                return Err("Working-folder publication cancelled".into());
             }
             check()?;
             item.publish()?;

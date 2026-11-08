@@ -307,3 +307,28 @@ fn ambiguity_is_visible_and_split_candidates_preserve_structural_evidence()
     assert!(choose(&before[0], &[a, b]).is_err());
     Ok(())
 }
+
+#[test]
+fn backend_fluent_shallow_boundary_keeps_creation_classification() -> Result<(), String> {
+    let raw = format!(
+        "tree {}\nparent {}\n\nsubject\n",
+        "a".repeat(40),
+        "b".repeat(40)
+    );
+    for locale in ["en-US", "de"] {
+        crate::i18n::set_language(locale);
+        let (boundary, unproven) = boundary_event(raw.as_bytes(), b"\n")?;
+        assert_eq!(boundary, "Earlier shallow boundary (creation unproven)");
+        assert!(boundary.contains("shallow") && unproven);
+        assert_eq!(
+            display_boundary(boundary),
+            if locale == "de" {
+                "Frühere flache Grenze (Erstellung unbewiesen)"
+            } else {
+                boundary
+            }
+        );
+    }
+    crate::i18n::set_language("en-US");
+    Ok(())
+}

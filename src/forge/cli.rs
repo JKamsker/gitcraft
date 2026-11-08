@@ -258,15 +258,14 @@ fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String
     // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
     // to, so a repository can't send the tool, and a token, to a host of its choosing.
     if !trusted_host(forge, tool, &host)? {
-        return Err(crate::i18n::message(
-            "backend-tool-isn-t-signed-in-to-host-tool-auth-login-hostname-host-to-use-5c4b1b",
-            &[
-                ("tool", (tool).to_string().into()),
-                ("host", (host).to_string().into()),
-            ],
-        ));
+        return Err(not_signed_in(tool, &host));
     }
     Ok((host, path))
+}
+
+// The inbox's retry policy consumes this protocol identity; translate at display_error.
+fn not_signed_in(tool: &str, host: &str) -> String {
+    format!("{tool} isn't signed in to {host}: `{tool} auth login --hostname {host}` to use it")
 }
 
 /// Whether `path` is a plain `owner/repo` (`group/sub/repo`): never a URL, an `scp`-style
@@ -934,5 +933,33 @@ mod tests {
             ),
             Err(format!("/recorded/gh input exceeds {INPUT_LIMIT} bytes")),
         );
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_signin_keeps_retry_identity() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::not_signed_in("glab", "git.example:8443");
+            assert_eq!(
+                raw,
+                "glab isn't signed in to git.example:8443: `glab auth login --hostname git.example:8443` to use it"
+            );
+            assert!(crate::forge::inbox::gives_up(&raw));
+            let display = crate::forge::inbox::display_error(&raw);
+            if locale == "de" {
+                assert_eq!(
+                    display,
+                    "glab ist nicht bei git.example:8443 angemeldet: zur Verwendung `glab auth login --hostname git.example:8443` ausführen."
+                );
+            } else {
+                assert_eq!(display, raw);
+            }
+            let opaque = "provider says it isn't signed in to elsewhere";
+            assert_eq!(crate::forge::inbox::display_error(opaque), opaque);
+        }
+        crate::i18n::set_language("en-US");
     }
 }

@@ -283,6 +283,11 @@ pub fn version() -> Result<String, String> {
     run(None, &["--version"]).map(|s| s.trim().to_owned())
 }
 
+// The dropped-repository classifier consumes this raw identity.
+fn outside_repository(path: &Path) -> String {
+    format!("{} is not inside a git repository", path.display())
+}
+
 /// The top-level folder of the repository containing `path`.
 pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
     let out = run(Some(path), &["rev-parse", "--show-toplevel"]).map_err(|e| {
@@ -293,10 +298,7 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
         {
             e
         } else {
-            crate::i18n::message(
-                "backend-is-not-inside-a-git-repository-116bc9",
-                &[("path", (path.display()).to_string().into())],
-            )
+            outside_repository(path)
         }
     })?;
     // Only the line end: a folder's name can end with a space.
@@ -648,6 +650,28 @@ mod backend_fluent_adapter_tests {
                 lines
             );
             assert_eq!(human_size(1024), size);
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_outside_repository_keeps_drop_classification() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::outside_repository(std::path::Path::new("/fixture/de/repo"));
+            assert_eq!(raw, "/fixture/de/repo is not inside a git repository");
+            assert!(raw.to_lowercase().contains("not inside a git repository"));
+            assert_eq!(
+                super::display_error(&raw),
+                if locale == "de" {
+                    "/fixture/de/repo liegt nicht in einem Git-Repository."
+                } else {
+                    &raw
+                }
+            );
         }
         crate::i18n::set_language("en-US");
     }

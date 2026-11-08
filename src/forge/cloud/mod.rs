@@ -418,10 +418,9 @@ impl Api {
             .into());
         }
         if crate::tasks::cancellation().is_cancelled() {
-            return Err(crate::i18n::text(
-                "backend-provider-request-cancelled-refresh-to-establish-any-write-outcome-70b94f",
-            )
-            .into());
+            return Err(
+                "Provider request cancelled; refresh to establish any write outcome".into(),
+            );
         }
         Ok(bytes)
     }
