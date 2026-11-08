@@ -1041,3 +1041,56 @@ fn review14_stale_conflict_and_auth_completion_cannot_offer_a_fork_push() {
         assert_eq!(git::resolve(&w.fork, "fix").unwrap_or_default(), p.seen);
     }
 }
+
+#[test]
+fn review14_other_tab_preference_aba_stops_worker_before_first_tab_polls() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let w = World::new("cross-tab-worker");
+    let p = rebase_ready(&w);
+    let ctx = egui::Context::default();
+    let first = recorded_tab(&w, &ctx);
+    let mut second = recorded_tab(&w, &ctx);
+    assert!(first.hosting.is_some());
+    let Some(hosting) = first.hosting.clone() else {
+        return;
+    };
+    let scope = super::guard::Scope::new(
+        first.forge_generation,
+        hosting,
+        git::Remote {
+            name: "origin".into(),
+            url: arg(&w.upstream),
+        },
+    )
+    .with_forge_lifetime(&ctx, first.repo_key());
+    assert!(
+        scope.check().is_ok(),
+        "another tab reading the same preference must preserve the lifetime"
+    );
+    let generation = first.forge_generation;
+    second.set_primary_forge(Some("secondary".into()), &ctx);
+    second.set_primary_forge(Some("origin".into()), &ctx);
+    assert_eq!(
+        first.forge_generation, generation,
+        "the running tab has not polled/rebound"
+    );
+    let before = git::head(&w.me);
+    let result = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps(),
+        OpKind::plain(),
+        None,
+        false,
+        None,
+        Some(&scope),
+    )
+    .0;
+    assert!(
+        result
+            .as_ref()
+            .is_err_and(|e| e.contains("primary forge changed")),
+        "{result:?}"
+    );
+    assert_eq!(git::head(&w.me), before);
+    assert_eq!(git::resolve(&w.fork, "fix").unwrap_or_default(), p.seen);
+}

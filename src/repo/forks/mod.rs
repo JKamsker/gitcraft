@@ -244,12 +244,9 @@ impl RepoTab {
                     ..hosting.clone()
                 };
                 self.replace_fork_scope(
-                    guard::Scope::new(self.forge_generation, hosting, primary).with_fork(
-                        plan.remote.clone(),
-                        url,
-                        fork_hosting,
-                        plan.new_remote,
-                    ),
+                    guard::Scope::new(self.forge_generation, hosting, primary)
+                        .with_forge_lifetime(ctx, self.repo_key())
+                        .with_fork(plan.remote.clone(), url, fork_hosting, plan.new_remote),
                 );
                 self.forks.scope_label = Some(label.clone());
                 self.run_undoable(
@@ -288,7 +285,8 @@ impl RepoTab {
         };
         let repo = self.path.clone();
         let setup = self.forks.setup.clone();
-        let scope = guard::Scope::new(self.forge_generation, hosting.clone(), upstream.clone());
+        let scope = guard::Scope::new(self.forge_generation, hosting.clone(), upstream.clone())
+            .with_forge_lifetime(ctx, self.repo_key());
         self.replace_fork_scope(scope.clone());
         let creds = self.credentials.clone();
         #[cfg(test)]
@@ -315,6 +313,15 @@ impl RepoTab {
             },
             move |tab, plan, _| {
                 if scope.check().is_err() {
+                    if tab.forks.scope.as_ref().is_some_and(|s| s.id == scope.id) {
+                        tab.forks.scope = None;
+                        tab.forks.running = None;
+                        tab.forks.scope_label = None;
+                        tab.status = Some((
+                            "The primary forge changed; plan the fork action again".into(),
+                            true,
+                        ));
+                    }
                     return;
                 }
                 match plan {
@@ -597,7 +604,8 @@ impl RepoTab {
         else {
             return;
         };
-        let scope = guard::Scope::new(self.forge_generation, hosting.clone(), primary);
+        let scope = guard::Scope::new(self.forge_generation, hosting.clone(), primary)
+            .with_forge_lifetime(ctx, self.repo_key());
         self.replace_fork_scope(scope.clone());
         let label = format!("Approve #{number}'s workflow runs");
         self.forks.scope_label = Some(label.clone());

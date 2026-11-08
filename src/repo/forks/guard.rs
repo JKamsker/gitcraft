@@ -16,6 +16,7 @@ pub(in crate::repo) struct Scope {
     pub hosting: Hosting,
     pub primary: git::Remote,
     valid: Arc<AtomicBool>,
+    preference: Option<(Arc<AtomicU64>, u64)>,
     fork: Option<(String, String, Hosting, bool)>,
 }
 static NEXT_SCOPE: AtomicU64 = AtomicU64::new(1);
@@ -28,7 +29,12 @@ impl Scope {
             primary,
             valid: Arc::new(AtomicBool::new(true)),
             fork: None,
+            preference: None,
         }
+    }
+    pub fn with_forge_lifetime(mut self, ctx: &egui::Context, repo: &Path) -> Self {
+        self.preference = Some(crate::repo::forge_selection::lifetime(ctx, repo));
+        self
     }
     pub fn with_fork(mut self, name: String, url: String, hosting: Hosting, new: bool) -> Self {
         self.fork = Some((name, url, hosting, new));
@@ -64,10 +70,15 @@ impl Scope {
                 destination.validate(Some(hosting), true)?;
             }
         }
-        Ok(())
+        self.check()
     }
     pub fn check(&self) -> Result<(), String> {
-        if self.valid.load(Ordering::SeqCst) {
+        if self.valid.load(Ordering::SeqCst)
+            && self
+                .preference
+                .as_ref()
+                .is_none_or(|(clock, read)| clock.load(Ordering::SeqCst) == *read)
+        {
             Ok(())
         } else {
             Err("The primary forge changed; plan this fork action again. Any completed local rewrite remains undoable.".into())
