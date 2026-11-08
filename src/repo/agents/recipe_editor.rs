@@ -62,13 +62,12 @@ impl RecipeForm {
     /// run on right away.
     pub(super) fn ui(&mut self, ui: &mut Ui, in_linked: bool) -> Option<AgentAct> {
         let t = Tokens::get(ui.ctx());
-        ui.label(RichText::new("Worktree setup recipe").font(theme::semibold(15.0)));
         ui.label(
-            RichText::new(
-                "Runs in every worktree gitcraft makes for this repository, for an agent or \
-                 not: in a terminal, with sh, on the repository's machine.",
-            )
-            .color(t.text_dim),
+            RichText::new(crate::i18n::text("repo-workflows-agents-ui-cbcf7990"))
+                .font(theme::semibold(15.0)),
+        );
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-agents-ui-f8894f23")).color(t.text_dim),
         );
         ui.add_space(8.0);
         if self.loading {
@@ -79,15 +78,15 @@ impl RecipeForm {
         egui::ScrollArea::vertical()
             .max_height(ui.ctx().content_rect().height() * 0.6)
             .show(ui, |ui| {
-                area(ui, &t, "Copy from the main worktree, one path per line", &mut self.copy, ".env.local\nconfig/dev.json", 2, false);
-                area(ui, &t, "Link to the main worktree, one path per line", &mut self.link, "node_modules", 2, false);
-                area(ui, &t, "Variables, NAME=value per line ($GITCRAFT_WORKTREE_INDEX: the worktree's number, 0 for the main one)", &mut self.env, "PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))\nCARGO_TARGET_DIR=target-$GITCRAFT_WORKTREE_INDEX", 2, true);
-                area(ui, &t, "Setup command (sh -e: it stops at the first command that fails)", &mut self.command, "npm ci", 3, true);
+                area(ui, &t, crate::i18n::text("repo-workflows-agents-ui-136eaccc"), &mut self.copy, ".env.local\nconfig/dev.json", 2, false);
+                area(ui, &t, crate::i18n::text("repo-workflows-agents-ui-5c81d3ac"), &mut self.link, "node_modules", 2, false);
+                area(ui, &t, crate::i18n::text("repo-workflows-agents-ui-cd1b3ecb"), &mut self.env, "PORT=$((3000 + GITCRAFT_WORKTREE_INDEX))\nCARGO_TARGET_DIR=target-$GITCRAFT_WORKTREE_INDEX", 2, true);
+                area(ui, &t, crate::i18n::text("repo-workflows-agents-ui-74b240bb"), &mut self.command, "npm ci", 3, true);
                 let recipe = self.recipe();
                 for problem in recipe.problems() {
                     ui.colored_label(t.danger, problem);
                 }
-                egui::CollapsingHeader::new(RichText::new("The script it runs").color(t.text_dim))
+                egui::CollapsingHeader::new(RichText::new(crate::i18n::text("repo-workflows-agents-ui-7227fcf5")).color(t.text_dim))
                     .id_salt("recipe-script")
                     .show(ui, |ui| {
                         let mut script = recipe.script();
@@ -106,31 +105,42 @@ impl RecipeForm {
         let recipe = self.recipe();
         let valid = recipe.problems().is_empty() && !self.saving;
         ui.horizontal(|ui| {
-            if crate::repo::primary_button(ui, "Save", valid, 90.0).clicked() {
+            if crate::repo::primary_button(
+                ui,
+                crate::i18n::text("repo-workflows-agents-ui-1509f561"),
+                valid,
+                90.0,
+            )
+            .clicked()
+            {
                 act = Some(AgentAct::SaveRecipe(recipe.clone()));
             }
             let why_not = if !in_linked {
-                Some("Open a linked worktree of this repository to try the recipe on it")
+                Some(crate::i18n::text("repo-workflows-agents-ui-f37424d8"))
             } else if recipe.is_empty() {
-                Some("The recipe is empty: nothing to run")
+                Some(crate::i18n::text("repo-workflows-agents-ui-beafb9a1"))
             } else if !valid {
-                Some("Fix what is shown in red first")
+                Some(crate::i18n::text("repo-workflows-agents-ui-6f521989"))
             } else {
                 None
             };
             if ui
                 .add_enabled(
                     why_not.is_none(),
-                    egui::Button::new("Run in this worktree").min_size(egui::vec2(80.0, 30.0)),
+                    egui::Button::new(crate::i18n::text("repo-workflows-agents-ui-1fe95550"))
+                        .min_size(egui::vec2(80.0, 30.0)),
                 )
-                .on_hover_text("Runs it as typed, in a terminal of this worktree (it isn't saved)")
+                .on_hover_text(crate::i18n::text("repo-workflows-agents-ui-196e15ae"))
                 .on_disabled_hover_text(why_not.unwrap_or_default())
                 .clicked()
             {
                 act = Some(AgentAct::RunRecipeHere(recipe));
             }
             if ui
-                .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                .add(
+                    egui::Button::new(crate::i18n::text("repo-workflows-agents-ui-19766ed6"))
+                        .min_size(egui::vec2(80.0, 30.0)),
+                )
                 .clicked()
             {
                 act = Some(AgentAct::CloseDialog);
@@ -163,7 +173,12 @@ fn area(
 }
 
 fn cancel_only(ui: &mut Ui) -> Option<AgentAct> {
-    ui.add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
-        .clicked()
-        .then_some(AgentAct::CloseDialog)
+    ui.add(
+        egui::Button::new(crate::i18n::text(
+            "repo-workflows-agents-cancel-only-19766ed6",
+        ))
+        .min_size(egui::vec2(80.0, 30.0)),
+    )
+    .clicked()
+    .then_some(AgentAct::CloseDialog)
 }

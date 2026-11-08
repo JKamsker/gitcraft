@@ -33,7 +33,10 @@ pub(super) fn read(
                 hash: commit.clone(),
             },
             WriteOp::Push { force: true } => GhostOp::ForcePush {
-                branch: refs.current.clone().ok_or("Detached HEAD")?,
+                branch: refs
+                    .current
+                    .clone()
+                    .ok_or(crate::i18n::text("repo-workflows-agent-read-23b028a2"))?,
             },
             _ => return Ok(None),
         };
@@ -47,7 +50,10 @@ pub(super) fn read(
     match result {
         Ok(preview) => preview,
         Err(e) => Some(Preview {
-            notes: vec![format!("Ghost preview unavailable: {e}")],
+            notes: vec![crate::i18n::message(
+                "repo-workflows-agent-read-e72061c5",
+                &[("e", (e).clone().into())],
+            )],
             ..Default::default()
         }),
     }

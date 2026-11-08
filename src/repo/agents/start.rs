@@ -83,18 +83,22 @@ impl StartForm {
     /// Draws the dialog's body; what it asks for, if anything.
     pub(super) fn ui(&mut self, ui: &mut Ui, enter: bool) -> Option<AgentAct> {
         let t = Tokens::get(ui.ctx());
-        ui.label(RichText::new("Start agent task").font(theme::semibold(15.0)));
         ui.label(
-            RichText::new(
-                "A branch and a worktree of its own, then a terminal there running the agent.",
-            )
-            .color(t.text_dim),
+            RichText::new(crate::i18n::text("repo-workflows-agents-ui-97c3e67d"))
+                .font(theme::semibold(15.0)),
+        );
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-agents-ui-3553b76b")).color(t.text_dim),
         );
         ui.add_space(10.0);
-        caption(ui, "Task", &t);
+        caption(
+            ui,
+            crate::i18n::text("repo-workflows-agents-ui-4bc74b21"),
+            &t,
+        );
         let edit = ui.add(
             egui::TextEdit::multiline(&mut self.task)
-                .hint_text("What the agent should do (optional)")
+                .hint_text(crate::i18n::text("repo-workflows-agents-ui-27cec493"))
                 .desired_rows(3)
                 .desired_width(f32::INFINITY),
         );
@@ -108,7 +112,11 @@ impl StartForm {
             }
         }
         ui.add_space(6.0);
-        caption(ui, "Branch", &t);
+        caption(
+            ui,
+            crate::i18n::text("repo-workflows-agents-ui-52656e81"),
+            &t,
+        );
         if single(ui, &mut self.branch).changed() {
             // As in the other dialogs: a branch name has no spaces.
             self.branch = self.branch.replace(' ', "-");
@@ -117,9 +125,17 @@ impl StartForm {
                 self.folder = (self.folder_for)(&self.branch);
             }
         }
-        caption(ui, "Starting at", &t);
+        caption(
+            ui,
+            crate::i18n::text("repo-workflows-agents-ui-e8a96feb"),
+            &t,
+        );
         single(ui, &mut self.base);
-        caption(ui, "Folder", &t);
+        caption(
+            ui,
+            crate::i18n::text("repo-workflows-agents-ui-74ccd433"),
+            &t,
+        );
         if single(ui, &mut self.folder).changed() {
             self.folder_edited = true;
         }
@@ -128,12 +144,9 @@ impl StartForm {
         self.agent_choice(ui, &t);
         ui.add_space(6.0);
         ui.label(
-            RichText::new(
-                "If the repository has a worktree setup recipe (Worktree setup… in the \
-                 palette), it runs first, in the same terminal.",
-            )
-            .small()
-            .color(t.text_faint),
+            RichText::new(crate::i18n::text("repo-workflows-agents-ui-74296b58"))
+                .small()
+                .color(t.text_faint),
         );
         ui.add_space(10.0);
         let agent = self.agent_command();
@@ -145,7 +158,15 @@ impl StartForm {
         let valid = problem.is_none();
         let mut act = None;
         ui.horizontal(|ui| {
-            if crate::repo::primary_button(ui, "Start", valid, 90.0).clicked() || (enter && valid) {
+            if crate::repo::primary_button(
+                ui,
+                crate::i18n::text("repo-workflows-agents-ui-e4bb9f1e"),
+                valid,
+                90.0,
+            )
+            .clicked()
+                || (enter && valid)
+            {
                 act = Some(AgentAct::Start(Box::new(NewTask {
                     branch: self.branch.trim().to_owned(),
                     folder: folder.clone().unwrap_or_default(),
@@ -160,15 +181,24 @@ impl StartForm {
                 })));
             }
             if ui
-                .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                .add(
+                    egui::Button::new(crate::i18n::text("repo-workflows-agents-ui-19766ed6"))
+                        .min_size(egui::vec2(80.0, 30.0)),
+                )
                 .clicked()
             {
                 act = Some(AgentAct::CloseDialog);
             }
             ui.label(
-                RichText::new(format!("{}+Enter to start", crate::manual::command()))
-                    .small()
-                    .color(t.text_faint),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-agents-ui-44e1cc2b",
+                    &[(
+                        "crate-manual-command-1",
+                        (crate::manual::command()).clone().into(),
+                    )],
+                ))
+                .small()
+                .color(t.text_faint),
             );
         });
         act
@@ -178,35 +208,33 @@ impl StartForm {
     fn problem(&self, folder: &Result<String, String>, agent: &str) -> Option<String> {
         let branch = self.branch.trim();
         if branch.is_empty() {
-            return Some("Name the branch the agent works on".to_owned());
+            return Some(crate::i18n::text("repo-workflows-agents-problem-5fbb1fb2").to_owned());
         }
         if branch.starts_with('-') {
-            return Some("A branch name can't start with -".to_owned());
+            return Some(crate::i18n::text("repo-workflows-agents-problem-8bffbdf3").to_owned());
         }
         if self.branches.iter().any(|b| b == branch) {
-            return Some(format!(
-                "A branch named {branch} exists already: pick another name"
+            return Some(crate::i18n::message(
+                "repo-workflows-agents-problem-80f33652",
+                &[("branch", (branch).clone().into())],
             ));
         }
         let base = self.base.trim();
         if base.is_empty() || base.starts_with('-') {
-            return Some("Say where the branch starts: a branch, tag or commit".to_owned());
+            return Some(crate::i18n::text("repo-workflows-agents-problem-c3177bf6").to_owned());
         }
         if let Err(why) = folder {
             return Some(why.clone());
         }
         let typed = self.folder.trim();
         if typed.is_empty() {
-            return Some("Pick the folder for the worktree".to_owned());
+            return Some(crate::i18n::text("repo-workflows-agents-problem-bbc12752").to_owned());
         }
         if crate::remote::is_remote(&self.repo) && typed.starts_with('~') {
-            return Some(
-                "Give the folder's full path on that machine (/home/…): git doesn't read ~"
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-workflows-agents-problem-6eabbce8").to_owned());
         }
         if agent.is_empty() {
-            return Some("Type the command that starts the agent".to_owned());
+            return Some(crate::i18n::text("repo-workflows-agents-problem-97c58cf1").to_owned());
         }
         None
     }
@@ -219,10 +247,15 @@ impl StartForm {
     }
 
     fn agent_choice(&mut self, ui: &mut Ui, t: &Tokens) {
-        caption(ui, "Agent", t);
-        let selected = KNOWN
-            .get(self.agent)
-            .map_or("Command of my own", |cli| cli.label);
+        caption(
+            ui,
+            crate::i18n::text("repo-workflows-agents-agent-choice-11b39c93"),
+            t,
+        );
+        let selected = KNOWN.get(self.agent).map_or(
+            crate::i18n::text("repo-workflows-agents-agent-choice-57b9f7ac"),
+            |cli| cli.label,
+        );
         egui::ComboBox::from_id_salt("agent-cli")
             .width(ui.available_width())
             .selected_text(selected)
@@ -234,28 +267,34 @@ impl StartForm {
                         format!("{}  ({})", cli.label, cli.program),
                     );
                 }
-                ui.selectable_value(&mut self.agent, KNOWN.len(), "Command of my own");
+                ui.selectable_value(
+                    &mut self.agent,
+                    KNOWN.len(),
+                    crate::i18n::text("repo-workflows-agents-agent-choice-57b9f7ac"),
+                );
             });
         match KNOWN.get(self.agent) {
             None => {
                 single(ui, &mut self.custom);
                 ui.label(
-                    RichText::new("Run by sh in the worktree, e.g. claude --model opus")
-                        .small()
-                        .color(t.text_faint),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-agents-agent-choice-92a24920",
+                    ))
+                    .small()
+                    .color(t.text_faint),
                 );
             }
             Some(cli) if cli.prompt_flag.is_some() => {
                 ui.checkbox(
                     &mut self.give_prompt,
-                    "Give it the task as its first message",
+                    crate::i18n::text("repo-workflows-agents-agent-choice-c8daf5c0"),
                 );
             }
             Some(cli) => {
                 ui.label(
-                    RichText::new(format!(
-                        "{} takes no first message: type it there",
-                        cli.label
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-agents-agent-choice-2b8f8124",
+                        &[("cli-label-1", (cli.label).clone().into())],
                     ))
                     .small()
                     .color(t.text_faint),
@@ -263,11 +302,13 @@ impl StartForm {
             }
         }
         if self.takes_hooks() {
-            ui.checkbox(&mut self.hooks, "Save each turn to review on its own")
-                .on_hover_text(
-                    "Installs the agent's hooks in the worktree: after each turn they run gitcraft \
-                     checkpoint, and Uncommitted changes lists the turns, each to diff on its own",
-                );
+            ui.checkbox(
+                &mut self.hooks,
+                crate::i18n::text("repo-workflows-agents-agent-choice-e383f131"),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-agents-agent-choice-36a10f87",
+            ));
         }
     }
 }
@@ -418,5 +459,106 @@ mod tests {
             (form.folder_for)("feat/awesome-stuff"),
             "/home/me/app/custom.worktrees/feat/awesome-stuff"
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_partition_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    // Supplied state only: no RepoTab/App construction, discovery, terminal or Git run.
+    fn supplied_form() -> StartForm {
+        StartForm {
+            task: "Keep --literal-pathspecs and refs/heads/topic".into(),
+            branch: "topic/Überprüfung".into(),
+            branch_edited: true,
+            folder: "/supplied/work tree".into(),
+            folder_edited: true,
+            base: "refs/heads/main".into(),
+            agent: KNOWN.len(),
+            custom: "codex --model exact-model".into(),
+            give_prompt: true,
+            hooks: false,
+            focus: false,
+            repo: "/supplied/repository".into(),
+            branches: vec![],
+            folder_for: Box::new(|_| panic!("supplied UI must not discover folders")),
+        }
+    }
+
+    #[test]
+    fn fluent_partition_actual_start_form_keeps_action_payload_in_both_languages() {
+        for (language, title, task, start) in [
+            (
+                "en-US",
+                "Start agent task",
+                "What the agent should do (optional)",
+                "Start",
+            ),
+            (
+                "de",
+                "Agent-Aufgabe starten",
+                "Was der Agent tun soll (optional)",
+                "Starten",
+            ),
+        ] {
+            crate::i18n::set_language(language);
+            let mut h = Harness::new_ui_state(
+                |ui, form: &mut StartForm| {
+                    let _ = form.ui(ui, false);
+                },
+                supplied_form(),
+            );
+            h.get_by_label(title);
+            h.get_by_label(task);
+            h.get_by_label(start);
+            assert_eq!(h.state().agent_command(), "codex --model exact-model");
+            assert_eq!(h.state().branch, "topic/Überprüfung");
+            let mut action = None;
+            let ctx = egui::Context::default();
+            let mut form = supplied_form();
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    action = form.ui(ui, true);
+                });
+            });
+            let Some(AgentAct::Start(payload)) = action else {
+                panic!("expected recorded Start action");
+            };
+            assert_eq!(payload.agent, "codex --model exact-model");
+            assert_eq!(payload.branch, "topic/Überprüfung");
+            assert_eq!(payload.folder, "/supplied/work tree");
+            assert_eq!(payload.base, "refs/heads/main");
+            assert_eq!(
+                payload.prompt,
+                "Keep --literal-pathspecs and refs/heads/topic"
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+
+    #[test]
+    fn fluent_partition_actual_validation_preserves_named_repository_content() {
+        let mut form = supplied_form();
+        form.branches.push(form.branch.clone());
+        for (language, expected) in [
+            (
+                "en-US",
+                "A branch named topic/Überprüfung exists already: pick another name",
+            ),
+            (
+                "de",
+                "Ein Branch namens topic/Überprüfung existiert bereits. Wählen Sie einen anderen Namen.",
+            ),
+        ] {
+            crate::i18n::set_language(language);
+            assert_eq!(
+                form.problem(&Ok(form.folder.clone()), &form.agent_command())
+                    .as_deref(),
+                Some(expected)
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

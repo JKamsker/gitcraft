@@ -40,7 +40,7 @@ pub(crate) struct Ask {
 }
 
 /// Said under a card's commands for what can't be undone from gitcraft.
-const NO_UNDO: &str = "This can't be undone from gitcraft.";
+const NO_UNDO: &str = "repo-workflows-agent--14b0fc42";
 
 /// The repository as a plan needs it: HEAD's commit (empty before the first commit) and the
 /// branch checked out (`None` when detached).
@@ -74,7 +74,7 @@ impl Here {
     fn branch(&self) -> Result<&str, String> {
         self.branch
             .as_deref()
-            .ok_or_else(|| "HEAD is detached: check out a branch first".to_owned())
+            .ok_or_else(|| crate::i18n::text("repo-workflows-agent-branch-7776bacf").to_owned())
     }
 
     /// The guard that the same branch (or a detached HEAD) is still checked out.
@@ -103,8 +103,18 @@ pub(crate) fn plan(repo: &Path, op: &WriteOp) -> Result<Plan, String> {
         WriteOp::RenameBranch { from, to } => rename_branch(repo, from, to),
         WriteOp::Checkout { branch } => checkout(repo, &here, branch),
         WriteOp::Stash { message } => stash(repo, message),
-        WriteOp::CherryPick { commit } => replay(repo, commit, "Cherry-pick", &["cherry-pick"]),
-        WriteOp::Revert { commit } => replay(repo, commit, "Revert", &["revert", "--no-edit"]),
+        WriteOp::CherryPick { commit } => replay(
+            repo,
+            commit,
+            crate::i18n::text("repo-workflows-agent-plan-4c49fdb6"),
+            &["cherry-pick"],
+        ),
+        WriteOp::Revert { commit } => replay(
+            repo,
+            commit,
+            crate::i18n::text("repo-workflows-agent-plan-0026c505"),
+            &["revert", "--no-edit"],
+        ),
         WriteOp::Reset { commit, mode } => reset(repo, &here, commit, *mode),
         WriteOp::MoveCommit { commit, up } => {
             let edit = if *up { Edit::MoveUp } else { Edit::MoveDown };
@@ -131,7 +141,12 @@ fn commit_of(repo: &Path, rev: &str) -> Result<String, String> {
     .map(|s| s.trim().to_owned())
     .ok()
     .filter(|h| !h.is_empty())
-    .ok_or_else(|| format!("`{rev}` is not a commit in this repository"))
+    .ok_or_else(|| {
+        crate::i18n::message(
+            "repo-workflows-agent-commit-of-8c23b76d",
+            &[("rev", (rev).clone().into())],
+        )
+    })
 }
 
 /// The commit the local branch `name` is at, if there is such a branch.
@@ -153,7 +168,7 @@ fn summary(repo: &Path, hash: &str) -> String {
 
 fn checked_paths(paths: &[String]) -> Result<Vec<String>, String> {
     if paths.is_empty() {
-        return Err("name at least one path".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-checked-paths-0e0e013b").to_owned());
     }
     paths
         .iter()
@@ -165,7 +180,10 @@ fn checked_paths(paths: &[String]) -> Result<Vec<String>, String> {
 fn paths_label(paths: &[String]) -> String {
     match paths {
         [one] => one.clone(),
-        many => format!("{} paths", many.len()),
+        many => crate::i18n::message(
+            "repo-workflows-agent-paths-label-26d36d06",
+            &[("many-len-1", (many.len()).clone().into())],
+        ),
     }
 }
 
@@ -188,10 +206,15 @@ fn conflicted_among(repo: &Path, paths: &[String]) -> Result<Vec<String>, String
 /// undo can't start it again.
 fn not_in_progress(repo: &Path, what: &str) -> Result<(), String> {
     match git::status(repo)?.in_progress {
-        Some(state) => Err(format!(
-            "a {} is in progress: {what} would end it, which can't be undone. Finish or abort \
-             it first (see `conflicts`)",
-            state.label().to_lowercase()
+        Some(state) => Err(crate::i18n::message(
+            "repo-workflows-agent-not-in-progress-1049b227",
+            &[
+                (
+                    "state-label-to-lowercase-1",
+                    (state.label().to_lowercase()).clone().into(),
+                ),
+                ("what", (what).clone().into()),
+            ],
         )),
         None => Ok(()),
     }
@@ -283,7 +306,10 @@ fn stage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
         .map(str::to_owned)
         .to_vec();
     add.extend(paths.iter().cloned());
-    let label = format!("Stage {}", paths_label(&paths));
+    let label = crate::i18n::message(
+        "repo-workflows-agent-stage-3b4ddea7",
+        &[("paths-label-paths-1", (paths_label(&paths)).clone().into())],
+    );
     let conflicted = conflicted_among(repo, &paths)?;
     if !conflicted.is_empty() {
         // Staging marks them resolved, and the conflict can't be brought back after.
@@ -293,17 +319,14 @@ fn stage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
             refresh: Refresh::All,
             undo: Undo::None,
             ask: Some(Ask {
-                title: "Mark conflicts resolved".to_owned(),
-                undo_note: NO_UNDO.to_owned(),
-                body: format!(
-                    "Stage {} as resolved: {}. git then forgets the conflict and its three \
-                     sides.",
-                    if conflicted.len() == 1 {
-                        "this conflicted file"
-                    } else {
-                        "these conflicted files"
-                    },
-                    conflicted.join(", ")
+                title: crate::i18n::text("repo-workflows-agent-stage-17e7b517").to_owned(),
+                undo_note: crate::i18n::text(NO_UNDO).to_owned(),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-stage-conflicts",
+                    &[
+                        ("count", (conflicted.len()).into()),
+                        ("paths", (conflicted.join(", ")).into()),
+                    ],
                 ),
             }),
         });
@@ -325,18 +348,24 @@ fn unstage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
     let paths = checked_paths(paths)?;
     let conflicted = conflicted_among(repo, &paths)?;
     if !conflicted.is_empty() {
-        return Err(format!(
-            "{} conflicted: resolve the conflict first (unstaging would end it)",
-            conflicted.join(", ")
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-unstage-9d879ab6",
+            &[("conflicted-join-1", (conflicted.join(", ")).clone().into())],
         ));
     }
     let staged = staged_entries(repo, &paths)?;
     if staged.is_empty() {
-        return Err(format!("nothing is staged in {}", paths.join(", ")));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-unstage-a79ec226",
+            &[("paths-join-1", (paths.join(", ")).clone().into())],
+        ));
     }
     let step = reset_index(here, &paths);
     Ok(Plan {
-        label: format!("Unstage {}", paths_label(&paths)),
+        label: crate::i18n::message(
+            "repo-workflows-agent-unstage-eb003390",
+            &[("paths-label-paths-1", (paths_label(&paths)).clone().into())],
+        ),
         ops: vec![step.clone()],
         refresh: Refresh::Status,
         undo: Undo::Custom {
@@ -359,13 +388,11 @@ fn headline(message: &str) -> String {
 fn commit(repo: &Path, here: &Here, message: &str, amend: bool) -> Result<Plan, String> {
     let message = args::message(message)?;
     if amend && here.head.is_empty() {
-        return Err("there is no commit to amend yet".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-commit-abf5ac58").to_owned());
     }
     let staged = git::run(Some(repo), &["diff", "--cached", "--name-only", "-z"])?;
     if staged.is_empty() && !amend {
-        return Err(
-            "nothing is staged: stage the changes to commit first (tool `stage`)".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-agent-commit-d5a3b056").to_owned());
     }
     let mut step = vec!["commit".to_owned()];
     if amend {
@@ -374,7 +401,11 @@ fn commit(repo: &Path, here: &Here, message: &str, amend: bool) -> Result<Plan, 
     step.extend(["-m".to_owned(), message.to_owned()]);
     // Not plain "Commit": the window takes that label for its own commit box, and would clear
     // the message the user is writing there.
-    let what = if amend { "Amend" } else { "Commit" };
+    let what = if amend {
+        crate::i18n::text("repo-workflows-agent-commit-4475f515")
+    } else {
+        crate::i18n::text("repo-workflows-agent-commit-82a9c46f")
+    };
     Ok(Plan {
         label: format!("{what} “{}”", headline(message)),
         ops: vec![step],
@@ -389,7 +420,12 @@ fn check_branch_name(repo: &Path, name: &str) -> Result<(), String> {
     let name = args::branch_name(name)?;
     git::run(Some(repo), &["check-ref-format", "--branch", name])
         .map(|_| ())
-        .map_err(|_| format!("`{name}` can't be a branch name"))
+        .map_err(|_| {
+            crate::i18n::message(
+                "repo-workflows-agent-check-branch-name-89d905bf",
+                &[("name", (name).clone().into())],
+            )
+        })
 }
 
 fn create_branch(
@@ -401,7 +437,10 @@ fn create_branch(
 ) -> Result<Plan, String> {
     check_branch_name(repo, name)?;
     if branch_at(repo, name).is_some() {
-        return Err(format!("a branch called {name} already exists"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-create-branch-8464d926",
+            &[("name", (name).clone().into())],
+        ));
     }
     let at = commit_of(repo, start.unwrap_or("HEAD"))?;
     let step: Vec<String> = if checkout {
@@ -411,7 +450,10 @@ fn create_branch(
     }
     .concat();
     Ok(Plan {
-        label: format!("Create branch {name}"),
+        label: crate::i18n::message(
+            "repo-workflows-agent-create-branch-d2a49cac",
+            &[("name", (name).clone().into())],
+        ),
         ops: vec![step.clone()],
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -426,13 +468,22 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
     args::branch_name(from)?;
     check_branch_name(repo, to)?;
     if branch_at(repo, from).is_none() {
-        return Err(format!("there is no local branch called {from}"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rename-branch-00b004f0",
+            &[("from", (from).clone().into())],
+        ));
     }
     if branch_at(repo, to).is_some() {
-        return Err(format!("a branch called {to} already exists"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rename-branch-4fe447cd",
+            &[("to", (to).clone().into())],
+        ));
     }
     Ok(Plan {
-        label: format!("Rename {from} to {to}"),
+        label: crate::i18n::message(
+            "repo-workflows-agent-rename-branch-5de8c7a7",
+            &[("from", (from).clone().into()), ("to", (to).clone().into())],
+        ),
         ops: ops(&[&["branch", "-m", from, to]]),
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -446,14 +497,21 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
 fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
     args::branch_name(branch)?;
     if branch_at(repo, branch).is_none() {
-        return Err(format!(
-            "there is no local branch called {branch} (create it with `create_branch`)"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-checkout-994822a7",
+            &[("branch", (branch).clone().into())],
         ));
     }
     if here.branch.as_deref() == Some(branch) {
-        return Err(format!("{branch} is checked out already"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-checkout-31e4be52",
+            &[("branch", (branch).clone().into())],
+        ));
     }
-    not_in_progress(repo, "checking out")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-checkout-7a3686d6"),
+    )?;
     let previous = here.checked_out();
     // `--`: the name is a branch, never a file to throw the changes of away.
     let run = ops(&[&["checkout", branch, "--"]]);
@@ -466,7 +524,10 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
         }
     };
     Ok(Plan {
-        label: format!("Checkout {branch}"),
+        label: crate::i18n::message(
+            "repo-workflows-agent-checkout-734452f6",
+            &[("branch", (branch).clone().into())],
+        ),
         ops: run,
         refresh: Refresh::All,
         undo,
@@ -476,19 +537,22 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
 
 fn stash(repo: &Path, message: &str) -> Result<Plan, String> {
     if git::status(repo)?.is_clean() {
-        return Err("there are no changes to stash".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-stash-a7f01d16").to_owned());
     }
-    not_in_progress(repo, "stashing")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-stash-4fce16d0"),
+    )?;
     let message = message.trim();
     if message.chars().any(char::is_control) || message.len() > 1000 {
-        return Err("the stash message must be one line of at most 1000 bytes".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-stash-ee431f75").to_owned());
     }
     let mut args: Vec<&str> = stash_push_args().to_vec();
     if !message.is_empty() {
         args.extend(["-m", message]);
     }
     Ok(Plan {
-        label: "Stash".to_owned(),
+        label: crate::i18n::text("repo-workflows-agent-stash-38bdfeaa").to_owned(),
         ops: ops(&[&args]),
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -552,33 +616,30 @@ fn commits_between(repo: &Path, from: &str, to: &str) -> usize {
 
 /// The card of a hard reset of `target` (at `here`) to `hash`.
 fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
-    let lost = match tracked_changes(repo) {
-        0 => "There are no uncommitted changes to tracked files now.".to_owned(),
-        1 => "The uncommitted changes to 1 tracked file are thrown away for good.".to_owned(),
-        n => format!("The uncommitted changes to {n} tracked files are thrown away for good."),
-    };
-    let left = match commits_between(repo, hash, &here.head) {
-        0 => String::new(),
-        1 => format!(
-            " The commit after {} is no longer on {target}.",
-            short(hash)
-        ),
-        n => format!(
-            " The {n} commits after {} are no longer on {target}.",
-            short(hash)
-        ),
-    };
+    let lost = tracked_changes(repo);
+    let left = commits_between(repo, hash, &here.head);
     Ask {
-        title: format!("Hard reset {target} to {}", short(hash)),
-        body: format!(
-            "Move {target} from {} to {} (“{}”) and make the working tree match it. \
-             {lost}{left} Untracked files stay.",
-            short(&here.head),
-            short(hash),
-            summary(repo, hash)
+        title: crate::i18n::message(
+            "repo-workflows-agent-hard-ask-e720ce31",
+            &[
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(hash)).clone().into()),
+            ],
         ),
-        undo_note: format!(
-            "Ctrl+Z moves {target} back afterwards; the thrown-away changes stay lost."
+        body: crate::i18n::message(
+            "repo-workflows-agent-hard-reset-body",
+            &[
+                ("target", (target).into()),
+                ("from", (short(&here.head)).into()),
+                ("to", (short(hash)).into()),
+                ("subject", (summary(repo, hash)).into()),
+                ("lost", (lost).into()),
+                ("left", (left).into()),
+            ],
+        ),
+        undo_note: crate::i18n::message(
+            "repo-workflows-agent-hard-ask-8de2bf44",
+            &[("target", (target).clone().into())],
         ),
     }
 }
@@ -592,33 +653,51 @@ fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Optio
         return Ok(None);
     }
     Ok(Some(Ask {
-        title: format!("Reset {target} to {} (mixed)", short(hash)),
-        body: format!(
-            "Move {target} from {} to {} (“{}”) and unstage everything: the {files} staged \
-             file{} keep their changes, unstaged. The working tree stays as it is.",
-            short(&here.head),
-            short(hash),
-            summary(repo, hash),
-            if files == 1 { "" } else { "s" },
+        title: crate::i18n::message(
+            "repo-workflows-agent-mixed-ask-2c1fd48b",
+            &[
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(hash)).clone().into()),
+            ],
         ),
-        undo_note: format!(
-            "Ctrl+Z moves {target} back afterwards, but doesn't stage those changes again."
+        body: crate::i18n::message(
+            "repo-workflows-agent-mixed-reset-body",
+            &[
+                ("target", (target).into()),
+                ("from", (short(&here.head)).into()),
+                ("to", (short(hash)).into()),
+                ("subject", (summary(repo, hash)).into()),
+                ("files", (files).into()),
+            ],
+        ),
+        undo_note: crate::i18n::message(
+            "repo-workflows-agent-mixed-ask-2ddd09f5",
+            &[("target", (target).clone().into())],
         ),
     }))
 }
 
 fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan, String> {
     if here.head.is_empty() {
-        return Err("there are no commits to reset to yet".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-reset-7c10af6a").to_owned());
     }
     let hash = commit_of(repo, commit)?;
     let target = here.branch.clone().unwrap_or_else(|| "HEAD".to_owned());
     if hash == here.head {
         // Nothing would move, so nothing would go on the undo list, while the index (and a
         // hard reset's working tree) would still change.
-        return Err(format!("{target} is at {} already", short(&hash)));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-reset-5247bb50",
+            &[
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(&hash)).clone().into()),
+            ],
+        ));
     }
-    not_in_progress(repo, "a reset")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-reset-c6ebf3c0"),
+    )?;
     let word = match mode {
         ResetMode::Soft => "soft",
         ResetMode::Mixed => "mixed",
@@ -656,9 +735,12 @@ fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan
 fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, String> {
     let branch = here.branch()?.to_owned();
     if let Some(state) = git::status(repo)?.in_progress {
-        return Err(format!(
-            "a {} is in progress: finish or abort it first",
-            state.label().to_lowercase()
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rewrite-7d959a5b",
+            &[(
+                "state-label-to-lowercase-1",
+                (state.label().to_lowercase()).clone().into(),
+            )],
         ));
     }
     let hash = commit_of(repo, commit)?;
@@ -667,21 +749,31 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
     let editor = quick_edit::plan(edit, &hash, commits)?;
     let command = editor.command(repo)?;
     let what = match edit {
-        Edit::Drop => "Drop commit",
-        Edit::MoveUp => "Move commit up",
-        Edit::MoveDown => "Move commit down",
-        Edit::Message => return Err("the message is changed with `commit` and `amend`".to_owned()),
+        Edit::Drop => crate::i18n::text("repo-workflows-agent-rewrite-601e2a07"),
+        Edit::MoveUp => crate::i18n::text("repo-workflows-agent-rewrite-3d1ccb79"),
+        Edit::MoveDown => crate::i18n::text("repo-workflows-agent-rewrite-2630fe5c"),
+        Edit::Message => {
+            return Err(crate::i18n::text("repo-workflows-agent-rewrite-ff973443").to_owned());
+        }
     };
     let ask = (edit == Edit::Drop).then(|| Ask {
-        title: format!("Drop commit {}", short(&hash)),
-        body: format!(
-            "Remove {} (“{}”) and its changes from {branch}, and replay the {after} commit{} \
-             after it. If a later commit conflicts, the rebase stops for you to finish or abort.",
-            short(&hash),
-            summary(repo, &hash),
-            if after == 1 { "" } else { "s" },
+        title: crate::i18n::message(
+            "repo-workflows-agent-rewrite-fc4198eb",
+            &[("short-hash-1", (short(&hash)).clone().into())],
         ),
-        undo_note: format!("Ctrl+Z puts {branch} back as it is now."),
+        body: crate::i18n::message(
+            "repo-workflows-agent-drop-body",
+            &[
+                ("commit", (short(&hash)).into()),
+                ("subject", (summary(repo, &hash)).into()),
+                ("branch", (branch.as_str()).into()),
+                ("after", (after).into()),
+            ],
+        ),
+        undo_note: crate::i18n::message(
+            "repo-workflows-agent-rewrite-177f568d",
+            &[("branch", (branch).clone().into())],
+        ),
     });
     Ok(Plan {
         label: format!("{what} {}", short(&hash)),
@@ -699,11 +791,15 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
 fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Plan, String> {
     args::branch_name(name)?;
     let Some(target) = branch_at(repo, name) else {
-        return Err(format!("there is no local branch called {name}"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-delete-branch-55a975e8",
+            &[("name", (name).clone().into())],
+        ));
     };
     if here.branch.as_deref() == Some(name) {
-        return Err(format!(
-            "{name} is checked out: check out another branch first"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-delete-branch-94d21a83",
+            &[("name", (name).clone().into())],
         ));
     }
     let flag = if force { "-D" } else { "-d" };
@@ -712,13 +808,12 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
         expect_ref_at(&format!("refs/heads/{name}"), &target),
         ops(&[&["branch", flag, "--", name]]).concat(),
     ];
-    let merged_note = if force {
-        " even if it isn't merged"
-    } else {
-        " (git refuses if it isn't merged)"
-    };
+
     Ok(Plan {
-        label: format!("Delete branch {name}"),
+        label: crate::i18n::message(
+            "repo-workflows-agent-delete-branch-d32d800a",
+            &[("name", (name).clone().into())],
+        ),
         ops: steps,
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -726,14 +821,20 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
             redo: redo_delete(name, ops(&[&["branch", "-D", "--", name]])),
         },
         ask: Some(Ask {
-            title: format!("Delete branch {name}"),
-            body: format!(
-                "Delete the local branch “{name}”, at {} (“{}”),{merged_note}. Its copy on a \
-                 remote stays.",
-                short(&target),
-                summary(repo, &target)
+            title: crate::i18n::message(
+                "repo-workflows-agent-delete-branch-d32d800a",
+                &[("name", (name).clone().into())],
             ),
-            undo_note: "Ctrl+Z makes it again at that commit.".to_owned(),
+            body: crate::i18n::message(
+                "repo-workflows-agent-delete-body",
+                &[
+                    ("name", (name).into()),
+                    ("commit", (short(&target)).into()),
+                    ("subject", (summary(repo, &target)).into()),
+                    ("force", (if force { "yes" } else { "no" }).into()),
+                ],
+            ),
+            undo_note: crate::i18n::text("repo-workflows-agent-delete-branch-7ef8245e").to_owned(),
         }),
     })
 }
@@ -758,7 +859,12 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
         .local
         .iter()
         .find(|b| b.name == branch)
-        .ok_or_else(|| format!("{branch} has no commits to push yet"))?;
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "repo-workflows-agent-push-e5edacbd",
+                &[("branch", (branch).clone().into())],
+            )
+        })?;
     let tracked = (!local.upstream.is_empty() && !local.upstream_gone())
         .then(|| split_upstream(&remotes, &local.upstream))
         .flatten();
@@ -770,15 +876,20 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
                 .map(|r| r.name.as_str())
                 .find(|r| *r == "origin")
                 .or_else(|| remotes.first().map(|r| r.name.as_str()))
-                .ok_or("this repository has no remote to push to")?
+                .ok_or(crate::i18n::text("repo-workflows-agent-push-f86f9688"))?
                 .to_owned();
             (remote, branch.clone(), true)
         }
     };
     let (ahead, behind) = local.ahead_behind();
     if !publish && !force && ahead == 0 {
-        return Err(format!(
-            "nothing to push: {branch} has no commits that {remote}/{there} lacks"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-push-2d7f2003",
+            &[
+                ("branch", (branch).clone().into()),
+                ("remote", (remote).clone().into()),
+                ("there", (there).clone().into()),
+            ],
         ));
     }
     let refspec = format!("refs/heads/{branch}:refs/heads/{there}");
@@ -795,48 +906,96 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
     }
     step.extend([remote.clone(), refspec]);
     let to = format!("{remote}/{there}");
-    let plural = |n: u32| if n == 1 { "" } else { "s" };
     let (title, body) = if publish {
         (
-            format!("Publish {branch} on {remote}"),
-            format!("Send {branch} to {remote} as a new branch {there}, and track it."),
+            crate::i18n::message(
+                "repo-workflows-agent-push-7d6400fd",
+                &[
+                    ("branch", (branch).clone().into()),
+                    ("remote", (remote).clone().into()),
+                ],
+            ),
+            crate::i18n::message(
+                "repo-workflows-agent-push-747bd6a7",
+                &[
+                    ("branch", (branch).clone().into()),
+                    ("remote", (remote).clone().into()),
+                    ("there", (there).clone().into()),
+                ],
+            ),
         )
     } else if force {
         let gone = match behind {
-            0 => format!("{to} has no commits that {branch} lacks, as of the last fetch."),
-            n => format!(
-                "The {n} commit{} on {to} that {branch} doesn't have are removed from it, for \
-                 everyone who uses it.",
-                plural(n)
+            0 => crate::i18n::message(
+                "repo-workflows-agent-push-a74bf451",
+                &[
+                    ("to", (to).clone().into()),
+                    ("branch", (branch).clone().into()),
+                ],
+            ),
+            n => crate::i18n::message(
+                "repo-workflows-agent-force-lost",
+                &[
+                    ("count", (n).into()),
+                    ("to", (to.as_str()).into()),
+                    ("branch", (branch.as_str()).into()),
+                ],
             ),
         };
         (
-            format!("Force push {branch} to {to}"),
-            format!(
-                "Overwrite {to} with {branch}. {gone} git refuses if {to} has changed since \
-                 it was last fetched."
+            crate::i18n::message(
+                "repo-workflows-agent-push-ccafdcaa",
+                &[
+                    ("branch", (branch).clone().into()),
+                    ("to", (to).clone().into()),
+                ],
+            ),
+            crate::i18n::message(
+                "repo-workflows-agent-push-56d04849",
+                &[
+                    ("to", (to).clone().into()),
+                    ("branch", (branch).clone().into()),
+                    ("gone", (gone).clone().into()),
+                ],
             ),
         )
     } else {
         (
-            format!("Push {branch} to {to}"),
-            format!(
-                "Send {branch}'s {ahead} new commit{} to {to}.",
-                plural(ahead)
+            crate::i18n::message(
+                "repo-workflows-agent-push-cb055d06",
+                &[
+                    ("branch", (branch).clone().into()),
+                    ("to", (to).clone().into()),
+                ],
+            ),
+            crate::i18n::message(
+                "repo-workflows-agent-push-body",
+                &[
+                    ("branch", (branch.as_str()).into()),
+                    ("count", (ahead).into()),
+                    ("to", (to.as_str()).into()),
+                ],
             ),
         )
     };
     // What is sent is the branch as the card describes it: not commits made since.
     let at = local.target.clone();
     Ok(Plan {
-        label: format!("{} {branch}", if force { "Force push" } else { "Push" }),
+        label: format!(
+            "{} {branch}",
+            if force {
+                crate::i18n::text("repo-workflows-agent-push-1d502fc3")
+            } else {
+                crate::i18n::text("repo-workflows-agent-push-731ce7ed")
+            }
+        ),
         ops: vec![expect_ref_at(&format!("refs/heads/{branch}"), &at), step],
         refresh: Refresh::All,
         undo: Undo::None,
         ask: Some(Ask {
             title,
             body,
-            undo_note: NO_UNDO.to_owned(),
+            undo_note: crate::i18n::text(NO_UNDO).to_owned(),
         }),
     })
 }

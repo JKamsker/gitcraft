@@ -52,14 +52,23 @@ impl RepoTab {
 
     pub(super) fn install_hooks(&mut self, ctx: &egui::Context) {
         let repo = self.path.clone();
-        self.status = Some(("Installing the agent hooks…".to_owned(), false));
+        self.status = Some((
+            crate::i18n::text("repo-workflows-agents-install-hooks-2f5d6dc4").to_owned(),
+            false,
+        ));
         self.then(
             ctx,
             move || crate::agent::hooks::install(&repo),
             |tab, result, _| {
                 tab.status = Some(match result {
                     Ok(said) => (said.join(" "), false),
-                    Err(e) => (format!("The agent hooks weren't installed: {e}"), true),
+                    Err(e) => (
+                        crate::i18n::message(
+                            "repo-workflows-agents-install-hooks-a8f2778c",
+                            &[("e", (e).clone().into())],
+                        ),
+                        true,
+                    ),
                 });
             },
         );
@@ -73,7 +82,13 @@ impl RepoTab {
             |tab, result, _| {
                 tab.agents.turns_for = None;
                 if let Err(e) = result {
-                    tab.status = Some((format!("The turns weren't deleted: {e}"), true));
+                    tab.status = Some((
+                        crate::i18n::message(
+                            "repo-workflows-agents-forget-turns-1d1d391e",
+                            &[("e", (e).clone().into())],
+                        ),
+                        true,
+                    ));
                 }
             },
         );
@@ -91,14 +106,15 @@ impl RepoTab {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.label(
-                    RichText::new("AGENT TURNS")
-                        .font(theme::semibold(10.5))
-                        .color(t.text_faint),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-agents-agent-turns-94377c68",
+                    ))
+                    .font(theme::semibold(10.5))
+                    .color(t.text_faint),
                 )
-                .on_hover_text(
-                    "Saved by the agent's hooks after each turn. Click a turn to see what it \
-                     changed; its menu compares it with the files as they are now",
-                );
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-agents-agent-turns-9a299007",
+                ));
                 for (n, session) in sessions(turns).into_iter().enumerate() {
                     let title = session_title(session);
                     if n == 0 {
@@ -137,18 +153,27 @@ fn session_title(session: &[Turn]) -> String {
     let first = session.first().map_or("", |t| t.label.as_str());
     let last = session.iter().map(|t| t.time).max().unwrap_or(0);
     let count = session.len();
-    format!(
-        "{} · {count} turn{} · {}",
-        shorten(first, 32),
-        if count == 1 { "" } else { "s" },
-        crate::git::relative_time(last, crate::git::now())
+    crate::i18n::message(
+        "repo-workflows-agent-session-title",
+        &[
+            ("first", (shorten(first, 32)).into()),
+            ("count", (count).into()),
+            (
+                "when",
+                (crate::git::relative_time(last, crate::git::now())).into(),
+            ),
+        ],
     )
 }
 
 fn session_header(ui: &mut Ui, title: &str, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) {
     let r = ui.label(RichText::new(title).small().color(t.text_dim));
     session_menu(&r, session, acts);
-    if ui.small_button("Review since last looked…").clicked()
+    if ui
+        .small_button(crate::i18n::text(
+            "repo-workflows-agents-session-header-16959302",
+        ))
+        .clicked()
         && let Some(action) = aggregate_action(session)
     {
         acts.push(action);
@@ -172,19 +197,25 @@ fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
     crate::menu_item::context(r)
         .style(crate::theme::menu_style)
         .show(|ui| {
-            if crate::menu_item::MenuItem::new("Review everything since last looked…")
-                .icon("file-diff")
-                .show(ui)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-agents-session-menu-816f49fb",
+            ))
+            .icon("file-diff")
+            .show(ui)
+            .clicked()
                 && let Some(action) = aggregate_action(session)
             {
                 acts.push(action);
             }
-            if crate::menu_item::MenuItem::new("Delete this session's turns")
-                .icon("minus")
-                .show(ui)
-                .on_hover_text("The saved turns go; the files stay as they are")
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-agents-session-menu-c3cada37",
+            ))
+            .icon("minus")
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-agents-session-menu-835a56f7",
+            ))
+            .clicked()
             {
                 acts.push(Action::Agent(AgentAct::ForgetTurns(id.clone())));
             }
@@ -207,9 +238,18 @@ fn turn_list(ui: &mut Ui, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) 
 fn turn_diff(turn: &Turn, label: &str) -> Action {
     Action::Compare {
         base: turn.parent.clone(),
-        base_label: format!("before turn {}", turn.number),
+        base_label: crate::i18n::message(
+            "repo-workflows-agents-turn-diff-dc601e7b",
+            &[("turn-number-1", (turn.number).clone().into())],
+        ),
         target: Some(turn.commit.clone()),
-        target_label: format!("turn {}: {label}", turn.number),
+        target_label: crate::i18n::message(
+            "repo-workflows-agents-turn-diff-9021b8b9",
+            &[
+                ("turn-number-1", (turn.number).clone().into()),
+                ("label", (label).clone().into()),
+            ],
+        ),
         since_fork: false,
     }
 }
@@ -232,10 +272,12 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
     crate::menu_item::context(&r)
         .style(crate::theme::menu_style)
         .show(|ui| {
-            if crate::menu_item::MenuItem::new("Review hunks / revert only this turn…")
-                .icon("file-diff")
-                .show(ui)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-agents-turn-chip-a3b0355d",
+            ))
+            .icon("file-diff")
+            .show(ui)
+            .clicked()
             {
                 acts.push(Action::RepositoryTools(
                     crate::repo::repository_tools::Act::Turn(
@@ -245,24 +287,34 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
                     ),
                 ));
             }
-            if crate::menu_item::MenuItem::new("What this turn changed")
-                .icon("command")
-                .show(ui)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-agents-turn-chip-a246e9f1",
+            ))
+            .icon("command")
+            .show(ui)
+            .clicked()
             {
                 acts.push(turn_diff(turn, &label));
             }
-            if crate::menu_item::MenuItem::new("Everything since this turn")
-                .icon("command")
-                .show(ui)
-                .on_hover_text("This turn against the files as they are now")
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-agents-turn-chip-1d35c7ca",
+            ))
+            .icon("command")
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-agents-turn-chip-eaf6cf58",
+            ))
+            .clicked()
             {
                 acts.push(Action::Compare {
                     base: turn.commit.clone(),
-                    base_label: format!("after turn {}", turn.number),
+                    base_label: crate::i18n::message(
+                        "repo-workflows-agents-turn-chip-60c8b8ae",
+                        &[("turn-number-1", (turn.number).clone().into())],
+                    ),
                     target: None,
-                    target_label: "now".to_owned(),
+                    target_label: crate::i18n::text("repo-workflows-agents-turn-chip-ed5eb9a3")
+                        .to_owned(),
                     since_fork: false,
                 });
             }
@@ -271,12 +323,19 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
 
 fn hover(turn: &Turn) -> String {
     let prompt = if turn.prompt.is_empty() {
-        "(no prompt recorded)"
+        crate::i18n::text("repo-workflows-agents-hover-eae937e9")
     } else {
         turn.prompt.as_str()
     };
     let when = crate::git::relative_time(turn.time, crate::git::now());
-    format!("Turn {} · {when}\n\n{prompt}", turn.number)
+    crate::i18n::message(
+        "repo-workflows-agents-hover-0b4191eb",
+        &[
+            ("turn-number-1", (turn.number).clone().into()),
+            ("when", (when).clone().into()),
+            ("prompt", (prompt).clone().into()),
+        ],
+    )
 }
 
 fn shorten(label: &str, max: usize) -> String {

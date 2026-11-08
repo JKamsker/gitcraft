@@ -212,7 +212,8 @@ impl RepoTab {
             plan.ask = Some(Ask {
                 title: plan.label.clone(),
                 body: plan.label.clone(),
-                undo_note: "This can't be undone from gitcraft.".to_owned(),
+                undo_note: crate::i18n::text("repo-workflows-agent-agent-planned-14b0fc42")
+                    .to_owned(),
             });
         }
         if self.busy_op.is_some() || self.loading {
@@ -281,10 +282,12 @@ impl RepoTab {
         {
             waiting.ready.job.answer(
                 Outcome::TimedOut,
-                format!(
-                    "Nobody answered gitcraft's approval card within {} seconds, so nothing was \
-                     done. Ask the user to watch for the card in gitcraft before trying again.",
-                    agents.approval_wait.as_secs()
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-step-97d87ec1",
+                    &[(
+                        "agents-approval-wait-as-secs-1",
+                        (agents.approval_wait.as_secs()).clone().into(),
+                    )],
                 ),
             );
         }
@@ -296,10 +299,12 @@ impl RepoTab {
             if let Some(stale) = agents.queue.pop_front() {
                 stale.answer(
                     Outcome::TimedOut,
-                    format!(
-                        "gitcraft was busy for {} minutes (another operation or an approval \
-                         card), so nothing was done. Try again.",
-                        QUEUE_WAIT.as_secs() / 60
+                    crate::i18n::message(
+                        "repo-workflows-agent-agent-step-c03ca088",
+                        &[(
+                            "queue-wait-as-secs-60-1",
+                            (QUEUE_WAIT.as_secs() / 60).clone().into(),
+                        )],
                     ),
                 );
             }
@@ -334,7 +339,10 @@ impl RepoTab {
                 reply: job.reply,
             });
         } else {
-            job.answer(Outcome::Failed, "gitcraft couldn't start it: try again");
+            job.answer(
+                Outcome::Failed,
+                crate::i18n::text("repo-workflows-agent-agent-start-917ed8ba"),
+            );
         }
     }
 
@@ -374,7 +382,7 @@ impl RepoTab {
         if !approve {
             job.answer(
                 Outcome::Denied,
-                "Don't try it again unless the user asks you to.",
+                crate::i18n::text("repo-workflows-agent-agent-decide-7695bed1"),
             );
             return;
         }
@@ -394,16 +402,39 @@ impl RepoTab {
         };
         let reply = match result {
             Ok(_) => {
-                self.status = Some((format!("{}: {label}: done", running.agent), false));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-workflows-agent-agent-op-done-16d1e9b2",
+                        &[
+                            ("running-agent-1", (running.agent).clone().into()),
+                            ("label", (label).clone().into()),
+                        ],
+                    ),
+                    false,
+                ));
                 let how = if undoable {
-                    "It is the latest step of gitcraft's undo list: the user can undo it with \
-                     Ctrl+Z."
+                    crate::i18n::text("repo-workflows-agent-agent-op-done-d5e3a3af")
                 } else {
-                    "It can't be undone from gitcraft."
+                    crate::i18n::text("repo-workflows-agent-agent-op-done-cf3e44cf")
                 };
-                Reply::new(Outcome::Done, format!("{label}: done. {how}"))
+                Reply::new(
+                    Outcome::Done,
+                    crate::i18n::message(
+                        "repo-workflows-agent-agent-op-done-79a8519c",
+                        &[
+                            ("label", (label).clone().into()),
+                            ("how", (how).clone().into()),
+                        ],
+                    ),
+                )
             }
-            Err(e) => Reply::new(Outcome::Failed, format!("{label} failed: {e}")),
+            Err(e) => Reply::new(
+                Outcome::Failed,
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-op-done-8336fbfe",
+                    &[("label", (label).clone().into()), ("e", (e).clone().into())],
+                ),
+            ),
         };
         let _ = running.reply.send(reply);
     }
@@ -414,9 +445,9 @@ impl RepoTab {
         if let Some(running) = self.agent_calls.running.take_if(|r| r.label == label) {
             let _ = running.reply.send(Reply::new(
                 Outcome::Failed,
-                format!(
-                    "{label} needs the user to sign in to the remote: gitcraft asked them for \
-                     it. Try again once they have."
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-needs-sign-in-dc823c53",
+                    &[("label", (label).clone().into())],
                 ),
             ));
         }

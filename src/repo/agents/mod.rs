@@ -95,7 +95,8 @@ impl RepoTab {
                 self.agents.dialog = None;
                 self.start_launch(
                     Launch {
-                        label: "setup".to_owned(),
+                        label: crate::i18n::text("repo-workflows-agents-agent-act-8fb6d5f3")
+                            .to_owned(),
                         worktree: self.path.clone(),
                         recipe,
                         agent: None,
@@ -202,7 +203,13 @@ impl RepoTab {
                 Ok(witness)
             }
             Err(e) => {
-                let error = format!("Could not start {}: {e}", launch.label);
+                let error = crate::i18n::message(
+                    "repo-workflows-agents-start-launch-tracked-d71ae829",
+                    &[
+                        ("launch-label-1", (launch.label).clone().into()),
+                        ("e", (e).clone().into()),
+                    ],
+                );
                 self.terminal_error = Some(error.clone());
                 Err(error)
             }
@@ -267,12 +274,21 @@ impl RepoTab {
             move |tab, (recipe, listed, hooks), ctx| {
                 if let Some(Err(e)) = hooks {
                     tab.status = Some((
-                        format!("The agent checkpoint hooks weren't installed: {e}"),
+                        crate::i18n::message(
+                            "repo-workflows-agents-after-worktree-add-9fd23075",
+                            &[("e", (e).clone().into())],
+                        ),
                         true,
                     ));
                 }
                 let recipe = recipe.unwrap_or_else(|e| {
-                    tab.status = Some((format!("The worktree setup recipe wasn't run: {e}"), true));
+                    tab.status = Some((
+                        crate::i18n::message(
+                            "repo-workflows-agents-after-worktree-add-a2ffe669",
+                            &[("e", (e).clone().into())],
+                        ),
+                        true,
+                    ));
                     Recipe::default()
                 });
                 if let Some(listed) = listed {
@@ -283,9 +299,13 @@ impl RepoTab {
                     return;
                 }
                 let launch = Launch {
-                    label: agent
-                        .as_deref()
-                        .map_or_else(|| "setup".to_owned(), tasks::agent_label),
+                    label: agent.as_deref().map_or_else(
+                        || {
+                            crate::i18n::text("repo-workflows-agents-after-worktree-add-8fb6d5f3")
+                                .to_owned()
+                        },
+                        tasks::agent_label,
+                    ),
                     worktree: made.worktree,
                     recipe,
                     agent,
@@ -302,11 +322,17 @@ impl RepoTab {
 
     fn start_agent_task(&mut self, new: start::NewTask, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some((
+                crate::i18n::text("repo-workflows-agents-start-agent-task-f80416ff").to_owned(),
+                true,
+            ));
             return;
         }
         self.agents.dialog = None;
-        let label = format!("Start agent task {}", new.branch);
+        let label = crate::i18n::message(
+            "repo-workflows-agents-start-agent-task-d4ec2011",
+            &[("new-branch-1", (new.branch).clone().into())],
+        );
         let worktree = worktree_path(&self.path, &new.folder);
         let task = AgentTask {
             branch: new.branch.clone(),
@@ -368,7 +394,10 @@ impl RepoTab {
             |tab, result, _| match result {
                 Ok(()) => {
                     tab.agents.dialog = None;
-                    tab.status = Some(("Worktree setup recipe saved".to_owned(), false));
+                    tab.status = Some((
+                        crate::i18n::text("repo-workflows-agents-save-recipe-97381b52").to_owned(),
+                        false,
+                    ));
                 }
                 Err(e) => {
                     if let Some(AgentDialog::Recipe(form)) = &mut tab.agents.dialog {
