@@ -355,11 +355,11 @@ pub(crate) fn list_violations(found: &[Violation]) -> String {
                     ("path", (v.path.as_str()).into()),
                     (
                         "how",
-                        (match v.how {
-                            fence::How::Committed => "committed",
-                            fence::How::Uncommitted => "uncommitted",
-                            fence::How::Untracked => "untracked",
-                            fence::How::Ignored => "ignored",
+                        (match v.how.label() {
+                            "committed" => "committed",
+                            "not committed" => "uncommitted",
+                            "untracked" => "untracked",
+                            _ => "ignored",
                         })
                         .into(),
                     ),

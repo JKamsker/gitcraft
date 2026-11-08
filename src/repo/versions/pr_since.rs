@@ -466,11 +466,6 @@ impl RepoTab {
 pub(in crate::repo) fn banner_text(since: &Since) -> (String, bool) {
     let c = &since.counts;
     if since.rewritten && c.changed == 0 && c.added == 0 && c.dropped == 0 {
-        let moved = if c.moved > 0 {
-            ", only their order"
-        } else {
-            ""
-        };
         return (
             crate::i18n::message(
                 "repo-workflows-versions-rebased-banner",
