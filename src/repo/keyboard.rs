@@ -91,6 +91,12 @@ fn take_key(ctx: &egui::Context, key: Key, _repeat: bool) -> bool {
 }
 
 impl RepoTab {
+    pub(crate) fn cancel_keyboard_ownership(&mut self, ctx: &egui::Context) {
+        self.work_epoch = self.work_epoch.wrapping_add(1);
+        *self.keyboard.borrow_mut() = State::default();
+        keymap::cancel(ctx, Scope::Window);
+    }
+
     fn keyboard_scope(&self) {
         let mut state = self.keyboard.borrow_mut();
         if state.path != self.path {
@@ -122,10 +128,9 @@ impl RepoTab {
             }
         } else if !self.keys_blocked
             && let Some(focused) = self.keyboard.borrow_mut().parked_focus.take()
+            && ctx.memory(|m| m.focused().is_none())
         {
-            if ctx.memory(|m| m.focused().is_none()) {
-                ctx.memory_mut(|m| m.request_focus(focused));
-            }
+            ctx.memory_mut(|m| m.request_focus(focused));
         }
         keymap::active(ctx, self.key_scopes(ctx));
         if !available(self, ctx) {

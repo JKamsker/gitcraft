@@ -239,8 +239,11 @@ mod interaction_tests {
         assert!(action.accesskit_node().is_disabled());
         let why = h.get_by_label("This branch is checked out in another worktree");
         assert!(
-            why.accesskit_node().data().bounds().unwrap().y0
-                >= action.accesskit_node().data().bounds().unwrap().y1 - 3.0
+            why.accesskit_node()
+                .data()
+                .bounds()
+                .zip(action.accesskit_node().data().bounds())
+                .is_some_and(|(why, action)| why.y0 >= action.y1 - 3.0)
         );
         assert!(h.get_by_label("Fetch").accesskit_node().is_disabled());
         h.get_by_label("Another operation is running");
@@ -332,8 +335,12 @@ mod interaction_tests {
         let action = h.get_by_label("Inspect repository");
         let row = h.get_by_label("Repository row");
         assert!(
-            action.accesskit_node().data().bounds().unwrap().y0
-                >= row.accesskit_node().data().bounds().unwrap().y0
+            action
+                .accesskit_node()
+                .data()
+                .bounds()
+                .zip(row.accesskit_node().data().bounds())
+                .is_some_and(|(action, row)| action.y0 >= row.y0)
         );
         h.key_press(Key::ArrowDown);
         h.run();

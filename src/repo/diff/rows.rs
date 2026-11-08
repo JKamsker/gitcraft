@@ -659,6 +659,23 @@ fn line_label(line: &super::DiffLine) -> String {
     )
 }
 
+fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {
+    use egui::Key;
+    for (key, value) in [
+        (Key::Home, 0.0),
+        (Key::End, total),
+        (Key::ArrowUp, offset - LINE_H),
+        (Key::ArrowDown, offset + LINE_H),
+        (Key::PageUp, offset - page),
+        (Key::PageDown, offset + page),
+    ] {
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+            return Some(value.clamp(0.0, (total - page).max(0.0)));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod accessibility_tests {
     use super::*;
@@ -706,21 +723,4 @@ mod accessibility_tests {
             "added, old line none, new line 42: let 日本語 = 1;"
         );
     }
-}
-
-fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {
-    use egui::Key;
-    for (key, value) in [
-        (Key::Home, 0.0),
-        (Key::End, total),
-        (Key::ArrowUp, offset - LINE_H),
-        (Key::ArrowDown, offset + LINE_H),
-        (Key::PageUp, offset - page),
-        (Key::PageDown, offset + page),
-    ] {
-        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
-            return Some(value.clamp(0.0, (total - page).max(0.0)));
-        }
-    }
-    None
 }

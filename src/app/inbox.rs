@@ -588,10 +588,14 @@ impl App {
             return;
         };
         let connecting = self.connecting_to(&opening.repo);
-        let tab = self.tabs.iter_mut().find_map(|t| match t {
-            super::Tab::Repo(r) if r.path == opening.repo => Some(r),
-            _ => None,
-        });
+        let tab = self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            .find_map(|t| match t {
+                super::Tab::Repo(r) if r.path == opening.repo => Some(r),
+                _ => None,
+            });
         match tab {
             Some(tab) if tab.shows_pull_requests() => {
                 tab.queue(crate::repo::Action::OpenPr(opening.number));

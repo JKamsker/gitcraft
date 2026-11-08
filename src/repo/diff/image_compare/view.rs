@@ -545,7 +545,7 @@ mod accessibility_tests {
             .drop_without_applying_deltas();
             match key {
                 egui::Key::ArrowRight => assert!(state.center.x > 0.5),
-                egui::Key::Equals => assert!(state.zoom.unwrap() > 0.5),
+                egui::Key::Equals => assert!(state.zoom.is_some_and(|zoom| zoom > 0.5)),
                 egui::Key::Home => assert!(state.zoom.is_none()),
                 _ => unreachable!(),
             }

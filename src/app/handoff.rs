@@ -16,6 +16,7 @@ impl App {
     /// Does `request`: opens its folder as the command line does on start (a tab for it, or the
     /// one it has), and brings the window to the front.
     pub(super) fn handle_handoff(&mut self, request: Request, ctx: &egui::Context) {
+        self.windows.focused_elsewhere = false;
         match request {
             Request::Focus => {}
             // Never queued here: an agent's call goes to the tab of its repository, with its
@@ -40,7 +41,10 @@ impl App {
                 }
             }
         }
-        come_to_front(ctx);
+        if !self.windows.focused_elsewhere {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            come_to_front(ctx);
+        }
     }
 }
 

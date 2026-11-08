@@ -75,8 +75,10 @@ struct StripActions {
     close_worktree: bool,
     /// The tab closed last is to be opened again.
     reopen: bool,
+    quit: bool,
     /// The work of this repository tab is to be teleported.
     teleport: Option<PathBuf>,
+    window: Option<(usize, Option<egui::ViewportId>, Option<egui::Pos2>)>,
 }
 
 /// A tab's name, laid out, its colour, the tab's width, its worktree chip and how many of its
@@ -110,6 +112,8 @@ struct TabEnv<'a> {
     switcher_focus: &'a mut bool,
     t: &'a Tokens,
     actions: &'a mut StripActions,
+    windows: Vec<(egui::ViewportId, String)>,
+    can_detach: bool,
 }
 
 impl App {
@@ -123,6 +127,7 @@ impl App {
         let title_bar = super::title_bar::wanted(&self.settings);
         let strip = ui.available_rect_before_wrap();
         let strip = Rect::from_min_size(strip.min, vec2(strip.width(), TAB_H));
+        self.window_strip(ui.ctx(), strip);
         let right_to_left = egui::Layout::right_to_left(egui::Align::Center);
 
         // From the right: the caption buttons, the strip's own buttons against them and the
@@ -188,7 +193,7 @@ impl App {
                 ui.set_clip_rect(area.intersect(ui.clip_rect()));
                 // The strip is as tall as a tab however the tabs are scrolled.
                 ui.advance_cursor_after_rect(area);
-                self.tabs_row(ui, &t, &mut actions, &titles, row);
+                self.tabs_row(ui, &t, &mut actions, &titles, row, strip);
                 // The ends fade where more tabs are scrolled out of view.
                 let max = (total - area.width()).max(0.0);
                 if offset > 0.5 {
@@ -294,6 +299,7 @@ impl App {
         actions: &mut StripActions,
         titles: &[Title],
         row: Rect,
+        strip: Rect,
     ) {
         let ctx = ui.ctx().clone();
         let n = titles.len();
@@ -310,14 +316,22 @@ impl App {
         if let (Some((from, _)), Some(slot)) = (dragged, slot)
             && !ctx.input(|i| i.pointer.primary_down())
         {
-            actions.moved = Some((from, slot));
+            if let Some((target, position)) = self.drop_window_target(from, strip, &ctx) {
+                actions.window = Some((from, target, Some(position)));
+            } else {
+                actions.moved = Some((from, slot));
+            }
         }
 
         // The dragged tab is drawn last, over the others.
         let dragging = dragged.map(|(from, _)| from);
         let paint_order = (0..n).filter(|&j| Some(j) != dragging).chain(dragging);
         let ids = self.tab_ids();
+        let windows = self.window_targets();
+        let can_detach = self.windows.enabled && !ctx.embed_viewports();
         let mut env = TabEnv {
+            windows,
+            can_detach,
             active: self.active,
             dragging,
             can_reopen: !self.closed.is_empty(),
@@ -460,6 +474,17 @@ impl App {
     }
 
     fn apply_strip_actions(&mut self, actions: StripActions, ctx: &egui::Context) {
+        if actions.quit {
+            self.windows.quit_requested = true;
+            ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+            return;
+        }
+        if let Some((index, target, position)) = actions.window
+            && actions.close.is_none()
+        {
+            self.move_to_window(index, target, position, ctx);
+            return;
+        }
         if let Some(i) = actions.select {
             self.active = i;
         }

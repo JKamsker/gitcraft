@@ -28,8 +28,10 @@ mod teleport;
 mod tests;
 pub(crate) mod title_bar;
 mod update_banner;
+mod windows;
 mod workspaces;
 mod worktrees;
+pub use windows::DesktopApp;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -88,6 +90,7 @@ struct Saved {
     found_repos: Vec<PathBuf>,
     /// What was seen of each pull request (by URL) when it was opened from the inbox.
     inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
+    windows: Vec<windows::SavedWindow>,
 }
 
 enum Tab {
@@ -98,6 +101,7 @@ enum Tab {
 }
 
 pub struct App {
+    windows: windows::Windows,
     git_version: Result<String, String>,
     tabs: Vec<Tab>,
     /// What is typed in the worktree switcher.
@@ -219,6 +223,14 @@ impl App {
     /// The window, carrying out `cmd` from the command line (`gitcraft log <file>`…): its
     /// relative paths are taken from the current folder.
     pub fn launched(cc: &eframe::CreationContext<'_>, cmd: Option<crate::launch::Command>) -> Self {
+        Self::launched_using(cc, cmd, git::version)
+    }
+
+    fn launched_using(
+        cc: &eframe::CreationContext<'_>,
+        cmd: Option<crate::launch::Command>,
+        version: impl FnOnce() -> Result<String, String>,
+    ) -> Self {
         // The window's thread: it never waits for another machine (see `remote::ui_guard`).
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
@@ -243,7 +255,8 @@ impl App {
         crate::desktop_entry::refresh();
 
         let mut app = Self {
-            git_version: git::version(),
+            windows: Default::default(),
+            git_version: version(),
             tabs: Vec::new(),
             switcher_query: String::new(),
             switcher_focus: false,
@@ -330,6 +343,7 @@ impl App {
         if app.tabs.is_empty() {
             app.tabs.push(Tab::Home);
         }
+        app.restore_windows(saved.windows, ctx);
         app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
         if let Some(cmd) = cmd
             && app.git_version.is_ok()
@@ -348,6 +362,9 @@ impl App {
     /// Opens `path` in the active tab if it's a start page, otherwise in a new tab. One on
     /// another machine opens once it is reached, in the background.
     fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
+        if self.focus_elsewhere(path, ctx) {
+            return;
+        }
         if crate::remote::is_remote(path) {
             // Already open: no need to reach it first.
             if let Some(i) = self
@@ -394,6 +411,9 @@ impl App {
 
     /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).
     fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
+        if self.focus_elsewhere(&root, ctx) {
+            return;
+        }
         self.remember(&root);
         self.error = None;
         self.error_card.take_if(|card| !card.fixed());
@@ -729,9 +749,59 @@ impl App {
     }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+impl App {
+    /// Model work only: called by eframe even while the root has no painting pass, and
+    /// by deferred children. Channel draining and service deadlines keep a single owner.
+    fn tick_model(&mut self, ctx: &egui::Context, frame: Option<&eframe::Frame>) {
+        self.settings = Settings::get(ctx);
+        crate::portable::set_credential_store(self.settings.portable_credential_store);
+        crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
+        crate::network::start_watching(ctx);
+        self.take_handoffs(ctx);
+        if self.git_version.is_err() {
+            return;
+        }
+        self.poll_clone(ctx);
+        self.poll_connecting(ctx);
+        self.poll_launch(ctx);
+        self.poll_update(ctx);
+        self.poll_inbox_opening(ctx);
+        self.agent_requests(ctx);
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
+            if let Tab::Repo(r) = tab {
+                r.poll(ctx);
+                r.background_tick();
+                r.poll_parked(ctx);
+            }
+        }
+        if let Some(frame) = frame {
+            self.os_shell(ctx, frame);
+        }
+        let focused = ctx.input(|i| i.raw.viewports.values().any(|v| v.focused == Some(true)));
+        self.keep_drafts(ctx, focused);
+        self.toast_finished(focused);
+        // A dormant root still services completions/launches, even when every child is
+        // minimized. This schedules logic; it does not force a hidden window to paint.
+        if self.windows.enabled && !self.windows.parked.is_empty() {
+            ctx.request_repaint_after_for(
+                std::time::Duration::from_millis(250),
+                egui::ViewportId::ROOT,
+            );
+        }
+    }
+
+    fn window_ui(&mut self, ui: &mut Ui, frame: Option<&mut eframe::Frame>) {
         let ctx = ui.ctx().clone();
+        if frame.is_none() {
+            self.tick_model(&ctx, None);
+        }
+        if std::mem::take(&mut self.pick_on_start) {
+            self.pick_existing(&ctx);
+        }
         crate::image_cache::maintain(&ctx);
         let t = Tokens::get(&ctx);
         // A button dropped moves in the settings, read just below.
@@ -744,7 +814,10 @@ impl eframe::App for App {
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
         crate::network::start_watching(&ctx);
         title_bar::apply(&ctx, &self.settings, &mut self.decorated);
-        title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        if let Some(frame) = frame {
+            title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        }
+        self.close_root_with_children(&ctx);
         crate::app_buttons::set_current_theme(&ctx, &self.theme);
 
         // eframe shows the window after the first frame; maximize it on the next one.
@@ -757,41 +830,14 @@ impl eframe::App for App {
             }
         }
 
-        self.take_handoffs(&ctx);
         if let Err(err) = self.git_version.clone() {
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(t.dock))
                 .show(ui, |ui| self.git_missing(ui, &err));
             return;
         }
-        self.poll_clone(&ctx);
-        self.os_shell(&ctx, frame);
-        self.poll_connecting(&ctx);
-        self.poll_launch(&ctx);
-        self.poll_update(&ctx);
-        self.poll_inbox_opening(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
-        self.agent_requests(&ctx);
-
-        // Background repos still need their results drained. Those restored on start are read
-        // only once shown, and those left alone for a while are suspended (see
-        // `repo::lifecycle`).
-        for (i, tab) in self.tabs.iter_mut().enumerate() {
-            if let Tab::Repo(r) = tab
-                && i != self.active
-            {
-                r.poll(&ctx);
-                r.background_tick();
-            }
-        }
-
-        // Worktrees parked in any tab keep going too.
-        for tab in &mut self.tabs {
-            if let Tab::Repo(r) = tab {
-                r.poll_parked(&ctx);
-            }
-        }
 
         // The caption buttons go up to the window's corner.
         let strip_right = if title_bar::wanted(&self.settings) {
@@ -858,10 +904,22 @@ impl eframe::App for App {
         });
         crate::a11y::end_frame(&ctx);
     }
+}
+
+impl eframe::App for App {
+    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.tick_model(ctx, Some(frame));
+    }
+
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+        self.window_ui(ui, Some(frame));
+    }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         // Index of the active tab among the saved (repo) tabs.
-        let (open, active) = self.open_repos();
+        let (mut open, active) = self.open_repos();
+        let detached = self.saved_windows();
+        open.retain(|p| !detached.iter().any(|w| w.open.contains(p)));
         let saved = Saved {
             open,
             active,
@@ -878,6 +936,7 @@ impl eframe::App for App {
             workspaces: self.workspaces.clone(),
             found_repos: self.found_repos.clone(),
             inbox_seen: self.inbox_seen.clone(),
+            windows: detached,
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }

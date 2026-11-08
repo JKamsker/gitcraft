@@ -155,7 +155,7 @@ fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
         return;
     };
     let id = first.session.clone();
-    crate::menu_item::context(&r)
+    crate::menu_item::context(r)
         .style(crate::theme::menu_style)
         .show(|ui| {
             if crate::menu_item::MenuItem::new("Delete this session's turns")

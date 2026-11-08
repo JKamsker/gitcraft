@@ -49,6 +49,7 @@ impl App {
         let mut clones: Vec<Known> = self
             .tabs
             .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
             .filter_map(|t| match t {
                 Tab::Repo(r) => {
                     let remotes = r.remotes_read();
@@ -111,6 +112,22 @@ impl App {
         for (root, then) in waiting {
             match self.tab_of(&root) {
                 Some(i) => self.show_in(i, then),
+                None if self.focus_elsewhere(&root, ctx) => {
+                    let repo = self
+                        .windows
+                        .parked
+                        .values_mut()
+                        .flat_map(|w| &mut w.tabs)
+                        .find_map(|t| match t {
+                            Tab::Repo(r) if r.path == root => Some(r.as_mut()),
+                            _ => None,
+                        });
+                    if let Some(repo) = repo
+                        && let Some(error) = queue_then(repo, then)
+                    {
+                        self.toasts.push(Toast::new(error, true));
+                    }
+                }
                 // Elsewhere: still being reached (or that failed, and said so).
                 None if !self.connecting.is_empty() => self.launching.waiting.push((root, then)),
                 None => {}
@@ -125,19 +142,8 @@ impl App {
         let Some(Tab::Repo(repo)) = self.tabs.get_mut(i) else {
             return;
         };
-        if then != Then::Nothing && repo.editor_open() {
-            let name = repo.name.clone();
-            self.toasts.push(Toast::new(
-                format!(
-                    "{name}: finish or close the conflict or rebase editor first, then run the \
-                     command again"
-                ),
-                true,
-            ));
-            return;
-        }
-        for action in crate::launch::actions(then) {
-            repo.queue(action);
+        if let Some(error) = queue_then(repo, then) {
+            self.toasts.push(Toast::new(error, true));
         }
     }
 
@@ -146,4 +152,17 @@ impl App {
             .iter()
             .position(|t| matches!(t, Tab::Repo(r) if r.path == root))
     }
+}
+
+fn queue_then(repo: &mut crate::repo::RepoTab, then: Then) -> Option<String> {
+    if then != Then::Nothing && repo.editor_open() {
+        return Some(format!(
+            "{}: finish or close the conflict or rebase editor first, then run the command again",
+            repo.name
+        ));
+    }
+    for action in crate::launch::actions(then) {
+        repo.queue(action);
+    }
+    None
 }

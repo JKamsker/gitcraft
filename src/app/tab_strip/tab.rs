@@ -161,8 +161,24 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
             {
                 env.actions.reopen = true;
             }
+            ui.separator();
+            if MenuItem::new("Quit gitcraft").icon("x").show(ui).clicked() {
+                env.actions.quit = true;
+            }
             if let Tab::Repo(r) = tab {
                 ui.separator();
+                if MenuItem::new("Move tab to a new window")
+                    .icon("external-link")
+                    .refused((!env.can_detach).then_some("This backend embeds windows; native repository windows are unavailable"))
+                    .show(ui).clicked() {
+                    env.actions.window = Some((i, None, None));
+                }
+                for (target, name) in &env.windows {
+                    if MenuItem::new(format!("Move tab to {name}"))
+                        .icon("arrow-right").show(ui).clicked() {
+                        env.actions.window = Some((i, Some(*target), None));
+                    }
+                }
                 if crate::menu_item::MenuItem::new("Teleport to…").icon("command").show(ui)
                     .on_hover_text(
                         "Carry the branch and its uncommitted work to another machine, in a new worktree",

@@ -754,3 +754,16 @@ fn tabbing_to_a_file_updates_the_keyboard_target_before_space_stages() -> Result
     assert_eq!(t.git(&["diff", "--cached", "--name-only"])?.trim(), "b.txt");
     Ok(())
 }
+
+#[test]
+fn session_transfer_rejects_delayed_patch_completion_without_changing_the_index()
+-> Result<(), String> {
+    let mut t = Test::new("transfer-callback")?;
+    let (saved, prepared) = delay_real_hunk_preparation(&mut t)?;
+    t.tab.cancel_keyboard_ownership(&t.ctx);
+    t.tab.picked_prepared(prepared, Ok(saved), &t.ctx);
+    assert!(t.tab.busy_op.is_none());
+    assert!(t.git(&["diff", "--cached"])?.is_empty());
+    assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
+    Ok(())
+}

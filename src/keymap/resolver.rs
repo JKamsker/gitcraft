@@ -565,9 +565,7 @@ mod modal_chord_tests {
         retain_allowed(&ctx);
         assert!(
             ctx.data(|d| d.get_temp::<Resolver>(key))
-                .unwrap()
-                .prefix
-                .is_empty()
+                .is_some_and(|r| r.prefix.is_empty())
         );
     }
 

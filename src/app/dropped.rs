@@ -77,8 +77,8 @@ pub(super) fn folder_error(folder: &Path, err: &str) -> String {
 }
 
 /// The repository tab of `repo` among `tabs`.
-fn repo_tab<'a>(tabs: &'a mut [Tab], repo: &Path) -> Option<&'a mut RepoTab> {
-    tabs.iter_mut().find_map(|t| match t {
+fn repo_tab<'a>(tabs: &'a mut [&mut Tab], repo: &Path) -> Option<&'a mut RepoTab> {
+    tabs.iter_mut().find_map(|t| match &mut **t {
         Tab::Repo(r) if r.path == repo => Some(&mut **r),
         _ => None,
     })
@@ -103,7 +103,12 @@ impl PatchQueue {
 
     /// Takes in how the patch being applied went and gives the next one to its tab, until one
     /// has to wait. Returns what to tell (each an error).
+    #[cfg(test)]
     pub(super) fn advance(&mut self, tabs: &mut [Tab], ctx: &egui::Context) -> Vec<String> {
+        self.advance_in(&mut tabs.iter_mut().collect::<Vec<_>>(), ctx)
+    }
+
+    fn advance_in(&mut self, tabs: &mut [&mut Tab], ctx: &egui::Context) -> Vec<String> {
         let mut said = Vec::new();
         loop {
             if let Some((file, repo)) = self.current.clone() {
@@ -194,7 +199,12 @@ impl App {
             }
         }
         if !self.patches.is_empty() {
-            for msg in self.patches.advance(&mut self.tabs, ctx) {
+            let mut tabs = self
+                .tabs
+                .iter_mut()
+                .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+                .collect::<Vec<_>>();
+            for msg in self.patches.advance_in(&mut tabs, ctx) {
                 self.toasts.push(Toast::new(msg, true));
             }
             if !self.patches.is_empty() {

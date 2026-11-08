@@ -38,7 +38,7 @@ pub(crate) struct StartForm {
     /// The local branches, which the new one mustn't be.
     branches: Vec<String>,
     /// Where the folder suggested for a branch goes: beside the main worktree.
-    folder_for: Box<dyn Fn(&str) -> String>,
+    folder_for: Box<dyn Fn(&str) -> String + Send>,
 }
 
 impl StartForm {

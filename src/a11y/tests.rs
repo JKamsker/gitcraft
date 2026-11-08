@@ -447,7 +447,7 @@ fn disclosures_expose_expansion_and_panes_expose_a_role() {
 }
 
 #[test]
-fn painted_focus_draws_an_accent_ring_inside_the_control() {
+fn painted_focus_draws_an_accent_ring_inside_the_control() -> Result<(), String> {
     let ctx = egui::Context::default();
     let mut expected = None;
     let out = ctx.run_ui(egui::RawInput::default(), |ui| {
@@ -457,10 +457,11 @@ fn painted_focus_draws_an_accent_ring_inside_the_control() {
         expected = Some(r.rect.shrink(1.0));
         super::end_frame(ui.ctx());
     });
-    let rect = expected.unwrap();
+    let rect = expected.ok_or("No painted control")?;
     let accent = crate::theme::Tokens::get(&ctx).accent;
     assert!(out.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Rect(r) if r.rect == rect && r.stroke.width == 2.0 && r.stroke.color == accent)));
     out.drop_without_applying_deltas();
+    Ok(())
 }
 
 #[test]

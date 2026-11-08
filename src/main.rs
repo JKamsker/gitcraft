@@ -68,7 +68,11 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| Ok(Box::new(app::App::launched(cc, launch)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DesktopApp::new(app::App::launched(
+                cc, launch,
+            ))))
+        }),
     );
     app::after_exit();
     result
