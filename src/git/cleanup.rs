@@ -22,10 +22,16 @@ pub(crate) struct Config {
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
         if self.paths.is_empty() && self.replacements.is_empty() {
-            return Err("Choose paths to remove or literal text replacements".into());
+            return Err(crate::i18n::text(
+                "backend-choose-paths-to-remove-or-literal-text-replacements-7b28de",
+            )
+            .into());
         }
         if self.paths.len() > RULES || self.replacements.len() > RULES {
-            return Err("Use at most 32 paths and 32 replacements".into());
+            return Err(crate::i18n::text(
+                "backend-use-at-most-32-paths-and-32-replacements-7f0e68",
+            )
+            .into());
         }
         let mut bytes = 0;
         for path in &self.paths {
@@ -41,12 +47,14 @@ impl Config {
                     .iter()
                     .any(|s| s.len() > 4096 || s.contains(['\0', '\r', '\n']))
             {
-                return Err("Replacements need nonempty literal text on one line, at most 4096 bytes per field; neither field can contain ==>".into());
+                return Err(crate::i18n::text("backend-replacements-need-nonempty-literal-text-on-one-line-at-most-4096-69e0a3").into());
             }
             bytes += rule.find.len() + rule.replace.len();
         }
         if bytes > 64 << 10 {
-            return Err("Cleanup configuration exceeds 64 KiB".into());
+            return Err(
+                crate::i18n::text("backend-cleanup-configuration-exceeds-64-kib-3c65fe").into(),
+            );
         }
         Ok(())
     }
@@ -66,9 +74,9 @@ impl Config {
             args.extend(self.paths.iter().map(|p| format!("--path={p}")));
         }
         if !self.replacements.is_empty() {
-            let file = file
-                .and_then(Path::to_str)
-                .ok_or("Replacement file path must be UTF-8")?;
+            let file = file.and_then(Path::to_str).ok_or(crate::i18n::text(
+                "backend-replacement-file-path-must-be-utf-8-450541",
+            ))?;
             args.extend(["--replace-text".into(), file.into()]);
         }
         Ok(args)
@@ -87,7 +95,7 @@ impl Config {
         let mut at = 0;
         while at < text.len() && out.len() < LIMIT {
             if let Some(pattern) = patterns.iter().find(|p| text[at..].starts_with(p.as_str())) {
-                out.push_str("[replacement text hidden]");
+                out.push_str(crate::i18n::text("backend-replacement-text-hidden-e095a3"));
                 at += pattern.len();
             } else if let Some(c) = text[at..].chars().next() {
                 out.push(c);
@@ -121,15 +129,22 @@ pub(crate) struct Report {
 }
 fn git(repo: &Path, args: &[&str], timeout: u64) -> Result<String, String> {
     let bytes = bounded::local(repo, args, Vec::new(), LIMIT, Duration::from_secs(timeout))?;
-    String::from_utf8(bytes).map_err(|_| "Cleanup output was not UTF-8".into())
+    String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("backend-cleanup-output-was-not-utf-8-643278").into())
 }
 pub(crate) fn capability(repo: &Path) -> Result<String, String> {
     if crate::remote::is_remote(repo) {
-        return Err("This cleanup wizard supports local repositories only".into());
+        return Err(crate::i18n::text(
+            "backend-this-cleanup-wizard-supports-local-repositories-only-ca84fe",
+        )
+        .into());
     }
     let version = git(repo, &["filter-repo", "--version"], 10)?;
     if version.trim().is_empty() {
-        return Err("filter-repo did not report its installed version".into());
+        return Err(crate::i18n::text(
+            "backend-filter-repo-did-not-report-its-installed-version-b1517a",
+        )
+        .into());
     }
     Ok(version.trim().chars().take(128).collect())
 }
@@ -143,16 +158,20 @@ fn refs(repo: &Path) -> Result<BTreeMap<String, String>, String> {
 fn parse_refs(text: &str) -> Result<BTreeMap<String, String>, String> {
     let mut refs = BTreeMap::new();
     for line in text.lines() {
-        let (name, oid) = line.split_once('\0').ok_or("Invalid ref report")?;
+        let (name, oid) = line
+            .split_once('\0')
+            .ok_or(crate::i18n::text("backend-invalid-ref-report-6022e2"))?;
         if !name.starts_with("refs/")
             || !matches!(oid.len(), 40 | 64)
             || !oid.bytes().all(|c| c.is_ascii_hexdigit())
             || refs.insert(name.into(), oid.into()).is_some()
         {
-            return Err("Invalid or repeated ref report".into());
+            return Err(crate::i18n::text("backend-invalid-or-repeated-ref-report-851574").into());
         }
         if refs.len() > 20_000 {
-            return Err("Cleanup supports at most 20000 refs".into());
+            return Err(
+                crate::i18n::text("backend-cleanup-supports-at-most-20000-refs-3057ca").into(),
+            );
         }
     }
     Ok(refs)
@@ -171,9 +190,12 @@ fn changes(before: &BTreeMap<String, String>, after: &BTreeMap<String, String>) 
 }
 fn workspace(parent: &Path) -> Result<PathBuf, String> {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let parent = parent
-        .canonicalize()
-        .map_err(|e| format!("Choose an existing local output folder: {e}"))?;
+    let parent = parent.canonicalize().map_err(|e| {
+        crate::i18n::message(
+            "backend-choose-an-existing-local-output-folder-e-1d8e89",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
     {
@@ -189,10 +211,15 @@ fn workspace(parent: &Path) -> Result<PathBuf, String> {
         match builder.create(&path) {
             Ok(()) => return Ok(path),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
-            Err(e) => return Err(format!("Could not create an owned cleanup folder: {e}")),
+            Err(e) => {
+                return Err(crate::i18n::message(
+                    "backend-could-not-create-an-owned-cleanup-folder-e-dc38a2",
+                    &[("detail", (e).to_string().into())],
+                ));
+            }
         }
     }
-    Err("Could not allocate a fresh cleanup folder".into())
+    Err(crate::i18n::text("backend-could-not-allocate-a-fresh-cleanup-folder-f43b39").into())
 }
 struct ReplacementFile(PathBuf);
 impl Drop for ReplacementFile {
@@ -224,10 +251,12 @@ pub(crate) fn execute(source: &Path, parent: &Path, config: &Config) -> Result<R
     let source = source.canonicalize().map_err(|e| e.to_string())?;
     let root = workspace(parent)?;
     execute_owned(&source, &root, config).map_err(|e| {
-        format!(
-            "Cleanup stopped. Owned artifacts remain at {}. {}",
-            root.display(),
-            config.redact(&e)
+        crate::i18n::message(
+            "backend-cleanup-stopped-owned-artifacts-remain-at-849273",
+            &[
+                ("path", (root.display()).to_string().into()),
+                ("config", (config.redact(&e)).to_string().into()),
+            ],
         )
     })
 }
@@ -240,7 +269,7 @@ fn execute_owned(source: &Path, root: &Path, config: &Config) -> Result<Report, 
     let text = |path: &Path| {
         path.to_str()
             .map(str::to_owned)
-            .ok_or("Cleanup paths must be UTF-8".to_owned())
+            .ok_or(crate::i18n::text("backend-cleanup-paths-must-be-utf-8-92e003").to_owned())
     };
     let source = text(source)?;
     let destination = text(&repo)?;
@@ -265,7 +294,7 @@ fn execute_owned(source: &Path, root: &Path, config: &Config) -> Result<Report, 
     )?;
     let before = refs(&repo)?;
     if before.is_empty() {
-        return Err("The source has no refs to rewrite".into());
+        return Err(crate::i18n::text("backend-the-source-has-no-refs-to-rewrite-bdb255").into());
     }
     let rules = if config.replacements.is_empty() {
         None
@@ -280,7 +309,7 @@ fn execute_owned(source: &Path, root: &Path, config: &Config) -> Result<Report, 
     let mut checks = Vec::new();
     let fsck = git(&repo, &["fsck", "--full", "--no-reflogs"], 600);
     checks.push(Check {
-        label: "Object integrity".into(),
+        label: crate::i18n::text("backend-object-integrity-49cf95").into(),
         passed: fsck.is_ok(),
         detail: config.redact(&fsck.unwrap_or_else(|e| e)),
     });
@@ -297,7 +326,13 @@ fn execute_owned(source: &Path, root: &Path, config: &Config) -> Result<Report, 
             ],
             120,
         );
-        checks.push(check_result(format!("Removed path: {path}"), answer));
+        checks.push(check_result(
+            crate::i18n::message(
+                "backend-removed-path-path-abb2ac",
+                &[("path", (path).to_string().into())],
+            ),
+            answer,
+        ));
     }
     checks.extend(residual_checks(config, |args, input, limit| {
         bounded::local(&repo, args, input, limit, Duration::from_secs(120))
@@ -320,12 +355,15 @@ fn check_result(label: String, result: Result<String, String>) -> Check {
         Ok(s) if s.trim().is_empty() => Check {
             label,
             passed: true,
-            detail: "No matching reachable history found".into(),
+            detail: crate::i18n::text("backend-no-matching-reachable-history-found-544805").into(),
         },
         Ok(_) => Check {
             label,
             passed: false,
-            detail: "Matching reachable history remains; inspect before publishing".into(),
+            detail: crate::i18n::text(
+                "backend-matching-reachable-history-remains-inspect-before-publishing-74cfd1",
+            )
+            .into(),
         },
         Err(e) => Check {
             label,
@@ -350,12 +388,12 @@ fn residual_checks(
     let result = scan_residuals(config, &mut run);
     config.replacements.iter().enumerate().map(|(i, _)| {
         let (passed, detail) = match &result {
-            Ok((hits, _)) if hits[i] => (false, "Literal find text remains in reachable text blobs; inspect before publishing".into()),
-            Ok((_, true)) => (false, "Unverified: binary blobs were skipped (NUL in first 8192 bytes)".into()),
-            Ok(_) => (true, "No literal find text in reachable text blobs (at most 20000 objects, 4 MiB per blob, 16 MiB total). Messages, LFS and external copies are unverified".into()),
+            Ok((hits, _)) if hits[i] => (false, crate::i18n::text("backend-literal-find-text-remains-in-reachable-text-blobs-inspect-before-dabdf8").into()),
+            Ok((_, true)) => (false, crate::i18n::text("backend-unverified-binary-blobs-were-skipped-nul-in-first-8192-bytes-6ac1e7").into()),
+            Ok(_) => (true, crate::i18n::text("backend-no-literal-find-text-in-reachable-text-blobs-at-most-20000-object-6fd071").into()),
             Err(error) => (false, format!("Unverified: {}", config.redact(error))),
         };
-        Check { label: format!("Replacement {} residual search", i + 1), passed, detail }
+        Check { label: crate::i18n::message("backend-replacement-residual-search-99ed56", &[("index", (i + 1).to_string().into())]), passed, detail }
     }).collect()
 }
 fn scan_residuals(
@@ -367,15 +405,19 @@ fn scan_residuals(
         Vec::new(),
         LIMIT,
     )?;
-    let text = std::str::from_utf8(&objects).map_err(|_| "Invalid reachable object list")?;
+    let text = std::str::from_utf8(&objects)
+        .map_err(|_| crate::i18n::text("backend-invalid-reachable-object-list-1be452"))?;
     let mut ids = std::collections::BTreeSet::new();
     for id in text.lines() {
         if !valid_object_id(id) {
-            return Err("Invalid reachable object ID".into());
+            return Err(crate::i18n::text("backend-invalid-reachable-object-id-413f0f").into());
         }
         ids.insert(id);
         if ids.len() > SCAN_OBJECTS {
-            return Err("Reachable object scan exceeds 20000 objects".into());
+            return Err(crate::i18n::text(
+                "backend-reachable-object-scan-exceeds-20000-objects-d55e4e",
+            )
+            .into());
         }
     }
     if ids.is_empty() {
@@ -386,43 +428,52 @@ fn scan_residuals(
         .flat_map(|id| id.bytes().chain([b'\n']))
         .collect();
     let metadata = run(&["cat-file", "--batch-check"], input, LIMIT)?;
-    let metadata = std::str::from_utf8(&metadata).map_err(|_| "Invalid object metadata")?;
+    let metadata = std::str::from_utf8(&metadata)
+        .map_err(|_| crate::i18n::text("backend-invalid-object-metadata-cafe82"))?;
     let mut lines = metadata.lines();
     let mut blobs = Vec::new();
     let mut total = 0usize;
     for id in ids {
-        let line = lines.next().ok_or("Incomplete object metadata")?;
+        let line = lines.next().ok_or(crate::i18n::text(
+            "backend-incomplete-object-metadata-de847e",
+        ))?;
         let fields: Vec<_> = line.split(' ').collect();
         if fields.len() != 3 || fields[0] != id {
-            return Err("Missing or mismatched reachable object".into());
+            return Err(
+                crate::i18n::text("backend-missing-or-mismatched-reachable-object-6c3d8d").into(),
+            );
         }
         let size = fields[2]
             .parse::<usize>()
-            .map_err(|_| "Invalid object size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-object-size-8e8433"))?;
         match fields[1] {
             "blob" => {
                 if size > SCAN_BLOB {
                     return Err(
-                        "Text scan exceeds 4 MiB per blob; inspect larger blobs separately".into(),
+                        crate::i18n::text("backend-text-scan-exceeds-4-mib-per-blob-inspect-larger-blobs-separately-4b331a").into(),
                     );
                 }
-                total = total
-                    .checked_add(size)
-                    .ok_or("Object sizes overflow the scan budget")?;
+                total = total.checked_add(size).ok_or(crate::i18n::text(
+                    "backend-object-sizes-overflow-the-scan-budget-f89027",
+                ))?;
                 if total > SCAN_TOTAL {
                     return Err(
-                        "Text scan exceeds 16 MiB total; inspect the remaining history separately"
+                        crate::i18n::text("backend-text-scan-exceeds-16-mib-total-inspect-the-remaining-history-sepa-a0b054")
                             .into(),
                     );
                 }
                 blobs.push((id.to_owned(), size));
             }
             "tree" | "commit" | "tag" => (),
-            _ => return Err("Unknown reachable object type".into()),
+            _ => {
+                return Err(
+                    crate::i18n::text("backend-unknown-reachable-object-type-1850cd").into(),
+                );
+            }
         }
     }
     if lines.next().is_some() {
-        return Err("Unexpected object metadata".into());
+        return Err(crate::i18n::text("backend-unexpected-object-metadata-d1d00f").into());
     }
     let input = blobs
         .iter()
@@ -444,14 +495,14 @@ fn scan_residuals(
         let end = rest
             .iter()
             .position(|b| *b == b'\n')
-            .ok_or("Missing blob header")?;
+            .ok_or(crate::i18n::text("backend-missing-blob-header-3b114f"))?;
         let header = format!("{id} blob {size}");
         if rest[..end] != *header.as_bytes() {
-            return Err("Mismatched blob header".into());
+            return Err(crate::i18n::text("backend-mismatched-blob-header-41e487").into());
         }
         rest = &rest[end + 1..];
         if rest.len() <= size || rest[size] != b'\n' {
-            return Err("Truncated blob stream".into());
+            return Err(crate::i18n::text("backend-truncated-blob-stream-24db27").into());
         }
         let blob = &rest[..size];
         if blob[..blob.len().min(8192)].contains(&0) {
@@ -464,7 +515,7 @@ fn scan_residuals(
         rest = &rest[size + 1..];
     }
     if !rest.is_empty() {
-        return Err("Unexpected blob stream suffix".into());
+        return Err(crate::i18n::text("backend-unexpected-blob-stream-suffix-16709a").into());
     }
     Ok((hits, skipped_binary))
 }

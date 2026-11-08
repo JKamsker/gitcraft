@@ -135,10 +135,11 @@ pub(super) fn head(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<Stri
         }
         return Err("Could not resolve HEAD".into());
     }
-    let oid = String::from_utf8(out.stdout).map_err(|_| "Invalid HEAD")?;
+    let oid = String::from_utf8(out.stdout)
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?;
     let oid = oid.trim();
     if !hash(oid) {
-        return Err("Invalid HEAD".into());
+        return Err(crate::i18n::text("backend-invalid-head-e1661b").into());
     }
     Ok(Some(oid.into()))
 }
@@ -226,7 +227,7 @@ pub(super) fn tree(
         let metadata = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid tree metadata")?;
         let fields: Vec<_> = metadata.split(' ').collect();
         if fields.len() != 3 || !hash(fields[2]) {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         }
         let entry = Entry {
             path: row[tab + 1..].to_vec(),

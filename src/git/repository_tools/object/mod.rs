@@ -142,7 +142,7 @@ fn metadata(repo: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Option<
     }
     let number = |s: &str| {
         s.parse::<u64>()
-            .map_err(|_| "Invalid object size".to_owned())
+            .map_err(|_| crate::i18n::text("backend-invalid-object-size-8e8433").to_owned())
     };
     Ok(Some(Object {
         oid: oid.into(),
@@ -249,7 +249,7 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
             let tab = record
                 .iter()
                 .position(|b| *b == b'\t')
-                .ok_or("Invalid tree entry")?;
+                .ok_or(crate::i18n::text("backend-invalid-tree-entry-8d7b6f"))?;
             let meta = std::str::from_utf8(&record[..tab]).map_err(|_| "Invalid tree metadata")?;
             let f: Vec<_> = meta.split_whitespace().collect();
             if f.len() != 3 || !valid_oid(f[2]) {

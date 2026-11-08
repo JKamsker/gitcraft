@@ -11,8 +11,12 @@ pub(super) fn resolve(
     records: &mut [Record],
     active: &dyn Fn() -> bool,
 ) -> Result<(), String> {
-    resolve_inner(repo, records, active)
-        .map_err(|e| format!("Contributor mailmap unavailable: {e}"))
+    resolve_inner(repo, records, active).map_err(|e| {
+        crate::i18n::message(
+            "backend-contributor-mailmap-unavailable-e-860d54",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }
 
 fn resolve_inner(
@@ -40,7 +44,7 @@ fn resolve_inner(
         None,
     )?;
     let root = std::str::from_utf8(&root)
-        .map_err(|_| "Mailmap repository path is not UTF-8")?
+        .map_err(|_| crate::i18n::text("backend-mailmap-repository-path-is-not-utf-8-74b4cc"))?
         .trim_end_matches(['\r', '\n']);
     // Pin a configured revision expression to its immutable blob. A bare repository also
     // defaults to HEAD:.mailmap, but an absent default .mailmap is normal, not an error.
@@ -57,11 +61,11 @@ fn resolve_inner(
                 None,
             )?;
             let oid = std::str::from_utf8(&oid)
-                .map_err(|_| "Invalid mailmap blob ID")?
+                .map_err(|_| crate::i18n::text("backend-invalid-mailmap-blob-id-ef142c"))?
                 .trim()
                 .to_owned();
             if !is_hash(oid.as_bytes()) {
-                return Err("Invalid mailmap blob ID".into());
+                return Err(crate::i18n::text("backend-invalid-mailmap-blob-id-ef142c").into());
             }
             Some(oid)
         }
@@ -71,10 +75,10 @@ fn resolve_inner(
                 None
             } else {
                 let head = std::str::from_utf8(&head)
-                    .map_err(|_| "Invalid HEAD")?
+                    .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?
                     .trim();
                 if !is_hash(head.as_bytes()) {
-                    return Err("Invalid HEAD".into());
+                    return Err(crate::i18n::text("backend-invalid-head-e1661b").into());
                 }
                 let entry = run(
                     &["--no-lazy-fetch", "ls-tree", "-z", head, "--", ".mailmap"],
@@ -86,17 +90,23 @@ fn resolve_inner(
                     let metadata = entry
                         .split(|b| *b == b'\t')
                         .next()
-                        .ok_or("Invalid mailmap tree entry")?;
+                        .ok_or(crate::i18n::text(
+                            "backend-invalid-mailmap-tree-entry-f1ba1a",
+                        ))?;
                     let oid = metadata
                         .split(|b| *b == b' ')
                         .next_back()
-                        .ok_or("Invalid mailmap blob ID")?;
+                        .ok_or(crate::i18n::text("backend-invalid-mailmap-blob-id-ef142c"))?;
                     if !is_hash(oid) {
-                        return Err("Invalid mailmap blob ID".into());
+                        return Err(
+                            crate::i18n::text("backend-invalid-mailmap-blob-id-ef142c").into()
+                        );
                     }
                     Some(
                         std::str::from_utf8(oid)
-                            .map_err(|_| "Invalid mailmap blob ID")?
+                            .map_err(|_| {
+                                crate::i18n::text("backend-invalid-mailmap-blob-id-ef142c")
+                            })?
                             .to_owned(),
                     )
                 }
@@ -128,11 +138,17 @@ fn resolve_inner(
     let mut input = Vec::new();
     for (name, email) in identities.keys() {
         if name.contains(['\n', '\r', '\0']) || email.contains(['\n', '\r', '\0']) {
-            return Err("An author identity contains unsupported line breaks".into());
+            return Err(crate::i18n::text(
+                "backend-an-author-identity-contains-unsupported-line-breaks-68ed6b",
+            )
+            .into());
         }
         input.extend_from_slice(format!("{name} <{email}>\n").as_bytes());
         if input.len() > MAX_INPUT {
-            return Err("Author identities exceeded the 16 MiB mapping limit".into());
+            return Err(crate::i18n::text(
+                "backend-author-identities-exceeded-the-16-mib-mapping-limit-bfd026",
+            )
+            .into());
         }
     }
     let file_option = format!("mailmap.file={file}");
@@ -152,20 +168,27 @@ fn resolve_inner(
         Some(&input),
     )?;
     if fingerprint()? != before {
-        return Err(
-            "The configured mailmap file changed while resolving authors; refresh activity".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-the-configured-mailmap-file-changed-while-resolving-authors-refre-8ccfd4",
+        )
+        .into());
     }
-    let output =
-        std::str::from_utf8(&output).map_err(|_| "Git returned a non-UTF-8 author mapping")?;
+    let output = std::str::from_utf8(&output)
+        .map_err(|_| crate::i18n::text("backend-git-returned-a-non-utf-8-author-mapping-99e699"))?;
     let lines: Vec<_> = output.lines().collect();
     if lines.len() != identities.len() {
-        return Err("Git returned an incomplete author mapping".into());
+        return Err(
+            crate::i18n::text("backend-git-returned-an-incomplete-author-mapping-c5c730").into(),
+        );
     }
     let mut mapped = BTreeMap::new();
     for ((identity, _), line) in identities.into_iter().zip(lines) {
-        let line = line.strip_suffix('>').ok_or("Invalid mapped identity")?;
-        let (name, email) = line.rsplit_once('<').ok_or("Invalid mapped identity")?;
+        let line = line
+            .strip_suffix('>')
+            .ok_or(crate::i18n::text("backend-invalid-mapped-identity-2642a6"))?;
+        let (name, email) = line
+            .rsplit_once('<')
+            .ok_or(crate::i18n::text("backend-invalid-mapped-identity-2642a6"))?;
         mapped.insert(identity, (name.trim_end().to_owned(), email.to_owned()));
     }
     apply_mapping(records, &mapped, active, 64 * 1024 * 1024)
@@ -180,18 +203,25 @@ fn apply_mapping(
     let mut remaining = max_bytes;
     for record in records {
         if !active() {
-            return Err("Analysis cancelled".into());
+            return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
         }
         let (name, email) = mapped
             .get(&(record.name.clone(), record.email.clone()))
-            .ok_or("Missing mapped author")?;
+            .ok_or(crate::i18n::text("backend-missing-mapped-author-1b52c7"))?;
         // A tiny raw identity may map to a long canonical name. Bound the
         // cumulative expansion before cloning it into every commit record.
         let cost = name
             .len()
             .checked_add(email.len())
-            .ok_or("Mapped author size overflow")?;
-        remaining = remaining.checked_sub(cost).ok_or_else(||format!("Expanded mapped author metadata exceeds the {max_bytes} byte allocation budget; scan fewer commits"))?;
+            .ok_or(crate::i18n::text(
+                "backend-mapped-author-size-overflow-2a1087",
+            ))?;
+        remaining = remaining.checked_sub(cost).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-expanded-mapped-author-metadata-exceeds-the-max-bytes-byte-alloca-5875de",
+                &[("max_bytes", (max_bytes).to_string().into())],
+            )
+        })?;
         record.name = name.clone();
         record.email = email.clone();
     }

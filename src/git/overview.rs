@@ -224,10 +224,12 @@ fn sections_there(target: &crate::remote::Target, limit: Duration) -> Result<Vec
     };
     let out = crate::remote::exec(&target.host, &req)?;
     if out.code == 1 && crate::remote::is_missing_folder(&out.stderr) {
-        return Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
+        return Err(crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[
+                ("path", (target.path).to_string().into()),
+                ("target", (target.host.label()).to_string().into()),
+            ],
         ));
     }
     if out.code != 0 {

@@ -39,13 +39,18 @@ impl DiffAlgorithm {
     /// What it does, for its tooltip.
     pub fn about(self) -> &'static str {
         match self {
-            DiffAlgorithm::Myers => "The classic algorithm, fast: pairs the longest common runs",
-            DiffAlgorithm::Minimal => "Myers, taking the time to find the smallest diff",
-            DiffAlgorithm::Patience => {
-                "Pairs lines that appear once on each side first, so braces and blank lines \
-                 don't line up unrelated code"
+            DiffAlgorithm::Myers => crate::i18n::text(
+                "backend-the-classic-algorithm-fast-pairs-the-longest-common-runs-bb690f",
+            ),
+            DiffAlgorithm::Minimal => {
+                crate::i18n::text("backend-myers-taking-the-time-to-find-the-smallest-diff-f4df46")
             }
-            DiffAlgorithm::Histogram => "Patience, extended to lines that are rare; often clearest",
+            DiffAlgorithm::Patience => crate::i18n::text(
+                "backend-pairs-lines-that-appear-once-on-each-side-first-so-braces-and-bla-ec78a3",
+            ),
+            DiffAlgorithm::Histogram => crate::i18n::text(
+                "backend-patience-extended-to-lines-that-are-rare-often-clearest-9778f4",
+            ),
         }
     }
 

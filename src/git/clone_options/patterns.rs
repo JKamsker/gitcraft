@@ -64,9 +64,9 @@ fn open(path: &Path) -> std::io::Result<std::fs::File> {
 }
 #[cfg(not(any(unix, windows)))]
 fn open(_: &Path) -> std::io::Result<std::fs::File> {
-    Err(std::io::Error::other(
-        "Bounded sparse metadata is unsupported on this platform",
-    ))
+    Err(std::io::Error::other(crate::i18n::text(
+        "backend-bounded-sparse-metadata-is-unsupported-on-this-platform-9fa9fe",
+    )))
 }
 fn regular(is_file: bool, len: u64) -> Result<(), String> {
     if !is_file || len > CAP as u64 {
@@ -112,10 +112,15 @@ fn bounded(reader: impl Read) -> Result<Vec<u8>, String> {
 fn decode(code: i32, bytes: Vec<u8>) -> Result<String, String> {
     match code {
         11 if bytes.is_empty() => Ok(String::new()),
-        0 if bytes.len() <= CAP => String::from_utf8(bytes)
-            .map_err(|_| "Sparse patterns are not UTF-8; inspect them in the terminal".into()),
-        _ => Err(format!(
-            "{REFUSED}. Remote reads require python3 and descriptor no-follow/nonblocking support"
+        0 if bytes.len() <= CAP => String::from_utf8(bytes).map_err(|_| {
+            crate::i18n::text(
+                "backend-sparse-patterns-are-not-utf-8-inspect-them-in-the-terminal-6b42d3",
+            )
+            .into()
+        }),
+        _ => Err(crate::i18n::message(
+            "backend-refused-remote-reads-require-python3-and-descriptor-no-follow-non-0f288a",
+            &[("refused", (REFUSED).to_string().into())],
         )),
     }
 }

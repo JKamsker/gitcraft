@@ -42,7 +42,10 @@ pub(in crate::git) fn local(
     if !out.status.success() {
         let message = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         return Err(if message.is_empty() {
-            format!("Git failed: {}", out.status)
+            crate::i18n::message(
+                "backend-git-failed-7124da",
+                &[("status", (out.status).to_string().into())],
+            )
         } else {
             message
         });
@@ -59,12 +62,17 @@ fn there(
     let request = request(target, args, input, limit);
     let out = remote::exec(&target.host, &request)?;
     if out.stdout.len() > limit || out.stderr.len() > ERROR_LIMIT {
-        return Err("Bundle output exceeds the size limit".to_owned());
+        return Err(
+            crate::i18n::text("backend-bundle-output-exceeds-the-size-limit-caef83").to_owned(),
+        );
     }
     if out.code != 0 {
         let message = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         return Err(if message.is_empty() {
-            format!("Git failed with exit code {}", out.code)
+            crate::i18n::message(
+                "backend-git-failed-with-exit-code-2cecca",
+                &[("code", (out.code).to_string().into())],
+            )
         } else {
             message
         });

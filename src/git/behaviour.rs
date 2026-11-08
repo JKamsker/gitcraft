@@ -13,7 +13,9 @@ pub(crate) fn behaviour_commits(
     count: usize,
 ) -> Result<Vec<BehaviourCommit>, String> {
     if revision.trim().is_empty() || revision.len() > 4096 || !(1..=32).contains(&count) {
-        return Err("Choose an ending revision and 1–32 frames".into());
+        return Err(
+            crate::i18n::text("backend-choose-an-ending-revision-and-1-32-frames-478aa2").into(),
+        );
     }
     let no_lazy = super::bundles::no_lazy_fetch(repo)?;
     let revision = format!("{}^{{commit}}", revision.trim());
@@ -31,10 +33,10 @@ pub(crate) fn behaviour_commits(
         "--end-of-options",
         &revision,
     ])?)
-    .map_err(|_| "Commit identity is not UTF-8")?;
+    .map_err(|_| crate::i18n::text("backend-commit-identity-is-not-utf-8-06a85e"))?;
     let tip = tip.trim();
     if !valid_oid(tip) {
-        return Err("Invalid ending commit identity".into());
+        return Err(crate::i18n::text("backend-invalid-ending-commit-identity-60e487").into());
     }
     let count = format!("--max-count={count}");
     let bytes = read(&[
@@ -52,15 +54,16 @@ fn valid_oid(s: &str) -> bool {
     matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 fn parse(bytes: &[u8]) -> Result<Vec<BehaviourCommit>, String> {
-    let text = std::str::from_utf8(bytes).map_err(|_| "Commit metadata is not UTF-8")?;
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("backend-commit-metadata-is-not-utf-8-4e5bf7"))?;
     let mut frames = Vec::new();
     for line in text.lines() {
         let words: Vec<_> = line.splitn(3, '\t').collect();
         let [hash, tree, summary] = words.as_slice() else {
-            return Err("Malformed timeline metadata".into());
+            return Err(crate::i18n::text("backend-malformed-timeline-metadata-691ee5").into());
         };
         if !valid_oid(hash) || !valid_oid(tree) || hash.len() != tree.len() || frames.len() >= 32 {
-            return Err("Invalid timeline identity/count".into());
+            return Err(crate::i18n::text("backend-invalid-timeline-identity-count-9bb4bd").into());
         }
         frames.push(BehaviourCommit {
             hash: (*hash).into(),
@@ -69,7 +72,7 @@ fn parse(bytes: &[u8]) -> Result<Vec<BehaviourCommit>, String> {
         });
     }
     if frames.is_empty() {
-        return Err("No timeline commits found".into());
+        return Err(crate::i18n::text("backend-no-timeline-commits-found-8ca124").into());
     }
     Ok(frames)
 }

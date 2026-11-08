@@ -363,7 +363,8 @@ pub(crate) fn load(
     if metadata.len() > FILE_LIMIT {
         return Err("Commit evidence metadata exceeds 4 MiB".into());
     }
-    let metadata = std::str::from_utf8(&metadata).map_err(|_| "Commit metadata is not UTF-8")?;
+    let metadata = std::str::from_utf8(&metadata)
+        .map_err(|_| crate::i18n::text("backend-commit-metadata-is-not-utf-8-4e5bf7"))?;
     let fields = metadata.splitn(4, '\0').collect::<Vec<_>>();
     let [oid, time, parents, message] = fields.as_slice() else {
         return Err("Invalid commit metadata".into());

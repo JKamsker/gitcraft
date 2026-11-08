@@ -51,7 +51,7 @@ pub(super) fn entries(
         valid_path(path)?;
         let p = info.split_whitespace().collect::<Vec<_>>();
         if p.len() != 3 {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         }
         out.insert(
             path.into(),

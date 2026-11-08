@@ -444,10 +444,12 @@ fn pick(repo: &Path, rev: &str) -> Result<Pick, String> {
             rev,
         ],
     )?;
-    parse_picks(&out)
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("{rev} is not a commit"))
+    parse_picks(&out).into_iter().next().ok_or_else(|| {
+        crate::i18n::message(
+            "backend-rev-is-not-a-commit-081a0f",
+            &[("rev", (rev).to_string().into())],
+        )
+    })
 }
 
 /// Commits from `%H%x00%P%x00%s%x00` records.
@@ -577,7 +579,12 @@ fn tree_of(repo: &Path, rev: &str) -> Result<String, String> {
         &["rev-parse", "--verify", "-q", &format!("{rev}^{{tree}}")],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| format!("{rev} is not a commit"))
+    .map_err(|_| {
+        crate::i18n::message(
+            "backend-rev-is-not-a-commit-081a0f",
+            &[("rev", (rev).to_string().into())],
+        )
+    })
 }
 
 /// A commit of `tree` that nothing points to, for git before 2.45, whose `merge-tree` takes

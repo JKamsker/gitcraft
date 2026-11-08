@@ -45,7 +45,7 @@ fn tree_links(repo: &Path, commit: &str) -> Result<BTreeMap<String, BTreeSet<Str
     let mut links: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for row in out.split('\0').filter(|s| !s.is_empty()) {
         let Some((meta, path)) = row.split_once('\t') else {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         };
         let f: Vec<_> = meta.split_whitespace().collect();
         if f.len() == 3 && f[0] == "160000" {

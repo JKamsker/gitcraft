@@ -230,7 +230,12 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
                 .as_ref()
                 .map(std::fs::File::create)
                 .transpose()
-                .map_err(|e| format!("could not save output: {e}"))?,
+                .map_err(|e| {
+                    crate::i18n::message(
+                        "backend-could-not-save-output-e-d0d53d",
+                        &[("detail", (e).to_string().into())],
+                    )
+                })?,
             output_limit: extra.output_limit.unwrap_or(64 << 20),
             background: extra.long || extra.tool || extra.test.is_some() || goes_over_network(args),
             timeout: extra.timeout,
@@ -474,10 +479,12 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
     let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
     // The folder is gone (or never was) on that machine.
     if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        return Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
+        return Err(crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[
+                ("path", (target.path).to_string().into()),
+                ("target", (target.host.label()).to_string().into()),
+            ],
         ));
     }
     let (stderr, events) = if extra.trace_hooks {
@@ -487,7 +494,10 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
     };
     Ok(Ran {
         code: Some(out.code),
-        status: format!("exit status: {}", out.code),
+        status: crate::i18n::message(
+            "backend-exit-status-c5b63a",
+            &[("code", (out.code).to_string().into())],
+        ),
         stdout: out.stdout,
         stderr,
         failed_hook: (out.code != 0)
@@ -528,10 +538,12 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
     Some(if out.code == 0 {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
+        Err(crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[
+                ("path", (target.path).to_string().into()),
+                ("target", (target.host.label()).to_string().into()),
+            ],
         ))
     } else {
         Err(download_read_error(
@@ -562,15 +574,20 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
             request.stdin = input.map(<[u8]>::to_vec);
             let out = remote::exec(&target.host, &request)?;
             if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-                return Err(format!(
-                    "{} isn't a folder on {}",
-                    target.path,
-                    target.host.label()
+                return Err(crate::i18n::message(
+                    "backend-isn-t-a-folder-on-859699",
+                    &[
+                        ("path", (target.path).to_string().into()),
+                        ("target", (target.host.label()).to_string().into()),
+                    ],
                 ));
             }
             Ran {
                 code: Some(out.code),
-                status: format!("exit status: {}", out.code),
+                status: crate::i18n::message(
+                    "backend-exit-status-c5b63a",
+                    &[("code", (out.code).to_string().into())],
+                ),
                 stdout: out.stdout,
                 stderr: out.stderr,
                 failed_hook: None,
@@ -672,7 +689,10 @@ fn inert_object_options(
         args.first().copied(),
         Some("ls-tree" | "cat-file" | "rev-parse" | "hash-object" | "update-ref")
     ) {
-        return Err("Sandbox source preparation permits only raw object plumbing".into());
+        return Err(crate::i18n::text(
+            "backend-sandbox-source-preparation-permits-only-raw-object-plumbing-c05abe",
+        )
+        .into());
     }
     Ok(Extra {
         pre: vec![

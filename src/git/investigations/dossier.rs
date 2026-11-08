@@ -274,7 +274,7 @@ impl<'a> Trace<'a> {
             .split_whitespace()
             .collect();
         let [mode, kind, id] = fields.as_slice() else {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         };
         if !matches!(*mode, "100644" | "100755") || *kind != "blob" || !oid(id) {
             return Err(

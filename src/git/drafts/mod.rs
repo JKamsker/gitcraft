@@ -372,7 +372,8 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
     }
     let text = |args: &[&str]| -> Result<Option<String>, String> {
         let bytes = ctx.source(args, vec![], &[0, 1], active)?;
-        let s = String::from_utf8(bytes).map_err(|_| "Invalid HEAD")?;
+        let s = String::from_utf8(bytes)
+            .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?;
         Ok((!s.trim().is_empty()).then(|| s.trim().to_owned()))
     };
     let cache = internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default();

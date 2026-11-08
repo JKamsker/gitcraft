@@ -472,7 +472,7 @@ pub(crate) fn investigate(
         .reader
         .run(&["rev-parse", "--verify", "HEAD"], vec![], &[0])?;
     let head = std::str::from_utf8(&head)
-        .map_err(|_| "Invalid HEAD")?
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?
         .trim()
         .to_owned();
     let mut tip = head.clone();

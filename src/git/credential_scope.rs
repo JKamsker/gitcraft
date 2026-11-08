@@ -11,7 +11,10 @@ pub struct CredentialScope {
 
 fn field(value: &str) -> Result<(), String> {
     if value.len() > 16384 || value.chars().any(char::is_control) {
-        return Err("Credential fields must be bounded single-line values".into());
+        return Err(crate::i18n::text(
+            "backend-credential-fields-must-be-bounded-single-line-values-16b34d",
+        )
+        .into());
     }
     Ok(())
 }
@@ -20,17 +23,22 @@ fn decode(value: &str) -> Result<String, String> {
     let mut at = 0;
     while at < value.len() {
         if value.as_bytes()[at] == b'%' {
-            let hex = value
-                .get(at + 1..at + 3)
-                .ok_or("Invalid credential URL escape")?;
-            bytes.push(u8::from_str_radix(hex, 16).map_err(|_| "Invalid credential URL escape")?);
+            let hex = value.get(at + 1..at + 3).ok_or(crate::i18n::text(
+                "backend-invalid-credential-url-escape-c15863",
+            ))?;
+            bytes.push(
+                u8::from_str_radix(hex, 16).map_err(|_| {
+                    crate::i18n::text("backend-invalid-credential-url-escape-c15863")
+                })?,
+            );
             at += 3;
         } else {
             bytes.push(value.as_bytes()[at]);
             at += 1;
         }
     }
-    let text = String::from_utf8(bytes).map_err(|_| "Credential URL must be UTF-8")?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("backend-credential-url-must-be-utf-8-60a721"))?;
     field(&text)?;
     Ok(text)
 }
@@ -41,44 +49,52 @@ impl CredentialScope {
         field(url)?;
         field(account)?;
         if account.is_empty() {
-            return Err("A transient credential requires a named account".into());
+            return Err(crate::i18n::text(
+                "backend-a-transient-credential-requires-a-named-account-d8810e",
+            )
+            .into());
         }
-        let (protocol, rest) = url
-            .split_once("://")
-            .ok_or("Credentials require an explicit HTTP(S) endpoint")?;
+        let (protocol, rest) = url.split_once("://").ok_or(crate::i18n::text(
+            "backend-credentials-require-an-explicit-http-s-endpoint-ba6f8d",
+        ))?;
         let protocol = protocol.to_ascii_lowercase();
         let default_port = match protocol.as_str() {
             "https" => 443,
             "http" => 80,
             _ => {
-                return Err(
-                    "Transient credentials are only supported for HTTP(S) endpoints".into(),
-                );
+                return Err(crate::i18n::text(
+                    "backend-transient-credentials-are-only-supported-for-http-s-endpoints-3e5bb6",
+                )
+                .into());
             }
         };
         let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
         if authority.contains(['?', '#', '\\']) {
-            return Err("Invalid credential URL authority".into());
+            return Err(
+                crate::i18n::text("backend-invalid-credential-url-authority-e092fb").into(),
+            );
         }
         let authority = if let Some((userinfo, host)) = authority.rsplit_once('@') {
             if userinfo.contains(':') || decode(userinfo)? != account {
-                return Err("The URL account does not match the selected account, or embeds a password. Use a credential-free URL and sign in explicitly".into());
+                return Err(crate::i18n::text("backend-the-url-account-does-not-match-the-selected-account-or-embeds-a-p-26be25").into());
             }
             host
         } else {
             authority
         };
         let (host, port) = if let Some(ipv6) = authority.strip_prefix('[') {
-            let (ip, tail) = ipv6.split_once(']').ok_or("Invalid IPv6 credential host")?;
+            let (ip, tail) = ipv6.split_once(']').ok_or(crate::i18n::text(
+                "backend-invalid-ipv6-credential-host-8550c4",
+            ))?;
             ip.parse::<std::net::Ipv6Addr>()
-                .map_err(|_| "Invalid IPv6 credential host")?;
+                .map_err(|_| crate::i18n::text("backend-invalid-ipv6-credential-host-8550c4"))?;
             let port = if tail.is_empty() {
                 default_port
             } else {
                 tail.strip_prefix(':')
-                    .ok_or("Invalid credential port")?
+                    .ok_or(crate::i18n::text("backend-invalid-credential-port-374dd6"))?
                     .parse::<u16>()
-                    .map_err(|_| "Invalid credential port")?
+                    .map_err(|_| crate::i18n::text("backend-invalid-credential-port-374dd6"))?
             };
             (format!("[{ip}]"), port)
         } else {
@@ -86,9 +102,9 @@ impl CredentialScope {
                 authority
                     .split_once(':')
                     .map_or(Ok((authority, default_port)), |(h, p)| {
-                        p.parse::<u16>()
-                            .map(|p| (h, p))
-                            .map_err(|_| "Invalid credential port")
+                        p.parse::<u16>().map(|p| (h, p)).map_err(|_| {
+                            crate::i18n::text("backend-invalid-credential-port-374dd6")
+                        })
                     })?;
             if host.is_empty()
                 || host.starts_with('-')
@@ -96,12 +112,12 @@ impl CredentialScope {
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
             {
-                return Err("Invalid credential host".into());
+                return Err(crate::i18n::text("backend-invalid-credential-host-fb5ee2").into());
             }
             (host.to_ascii_lowercase(), port)
         };
         if port == 0 {
-            return Err("Invalid credential port".into());
+            return Err(crate::i18n::text("backend-invalid-credential-port-374dd6").into());
         }
         let mut path = decode(path.trim_start_matches('/'))?;
         // Git keeps its first decoded character even when that character is '/'.
@@ -163,7 +179,9 @@ impl super::Credentials {
     pub fn for_url(url: &str, username: String, password: String) -> Result<Self, String> {
         field(&password)?;
         if password.is_empty() {
-            return Err("An empty password cannot be cached".into());
+            return Err(
+                crate::i18n::text("backend-an-empty-password-cannot-be-cached-1f6db3").into(),
+            );
         }
         let scope = CredentialScope::for_url(url, &username)?;
         Ok(Self {
@@ -175,14 +193,16 @@ impl super::Credentials {
     /// Shared by ordinary Git, preflight and multi-host runners. Never synthesize a
     /// scope for legacy cached secrets: require another explicit scoped sign-in.
     pub fn helper_environment(&self) -> Result<Vec<(&'static str, String)>, String> {
-        let scope = self
-            .scope
-            .as_ref()
-            .ok_or("Unscoped cached credentials refused; sign in again for the actual endpoint")?;
+        let scope = self.scope.as_ref().ok_or(crate::i18n::text(
+            "backend-unscoped-cached-credentials-refused-sign-in-again-for-the-actual-ec3b92",
+        ))?;
         field(&self.username)?;
         field(&self.password)?;
         if scope.account != self.username {
-            return Err("Cached credential account changed; sign in again".into());
+            return Err(crate::i18n::text(
+                "backend-cached-credential-account-changed-sign-in-again-9a01c6",
+            )
+            .into());
         }
         Ok(vec![
             ("GITCRAFT_GIT_USERNAME", self.username.clone()),

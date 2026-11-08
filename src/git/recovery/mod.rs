@@ -557,7 +557,7 @@ fn tree_entries(
         let info = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid tree metadata")?;
         let parts: Vec<_> = info.split_whitespace().collect();
         let [mode, kind, oid] = parts.as_slice() else {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         };
         if !valid_oid(oid) {
             return Err("Invalid tree object ID".into());

@@ -21,7 +21,7 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
     let run = |args: &[&str]| process::run(repo, args, None, active);
     let head = run(&["rev-parse", "--revs-only", "HEAD"])?;
     let head = std::str::from_utf8(&head)
-        .map_err(|_| "Invalid HEAD")?
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?
         .trim();
     let shallow = run(&["rev-parse", "--is-shallow-repository"])? == b"true\n";
     if head.is_empty() {

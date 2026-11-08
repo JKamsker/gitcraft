@@ -204,7 +204,7 @@ pub(super) fn working(
     active: &dyn Fn() -> bool,
 ) -> Result<Version, String> {
     if !active() {
-        return Err("Comparison cancelled".into());
+        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
     }
     if let Some(target) = crate::remote::parse(repo) {
         let out = super::super::command::comparison_remote(

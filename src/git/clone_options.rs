@@ -18,7 +18,7 @@ pub struct CloneOptions {
 impl CloneOptions {
     pub fn validate(&self) -> Result<(), String> {
         if self.depth == Some(0) {
-            return Err("Depth must be at least 1".to_owned());
+            return Err(crate::i18n::text("backend-depth-must-be-at-least-1-77f396").to_owned());
         }
         if let Some(folders) = &self.folders {
             validate_folders(folders)?;
@@ -29,7 +29,10 @@ impl CloneOptions {
     fn args(&self, url: &str, dest: &str) -> Result<Vec<String>, String> {
         self.validate()?;
         if url.is_empty() || url.contains(['\0', '\n', '\r']) {
-            return Err("Enter a repository URL or path on one line".to_owned());
+            return Err(crate::i18n::text(
+                "backend-enter-a-repository-url-or-path-on-one-line-44a616",
+            )
+            .to_owned());
         }
         let mut args = vec!["clone".to_owned()];
         if let Some(depth) = self.depth {
@@ -80,9 +83,12 @@ pub fn clone_with_options(
         let args = sparse_args(Some(folders))?;
         let refs: Vec<_> = args.iter().map(String::as_str).collect();
         download_scope(|| run_watched(Some(dest), &refs, creds, false, control)).map_err(|e| {
-            format!(
-                "Clone exists at {}. Setting its sparse folders failed: {e}. Open it to retry.",
-                dest.display()
+            crate::i18n::message(
+                "backend-clone-exists-at-setting-its-sparse-folders-failed-e-open-it-to-re-d27a4c",
+                &[
+                    ("path", (dest.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
             )
         })?;
     }
@@ -141,7 +147,7 @@ pub(super) fn passive_object_read(args: &[&str]) -> bool {
 /// Cone paths are literal repository-relative directories, never patterns or arguments.
 pub fn validate_folders(folders: &[String]) -> Result<(), String> {
     if folders.len() > 10_000 {
-        return Err("Choose at most 10000 folders".to_owned());
+        return Err(crate::i18n::text("backend-choose-at-most-10000-folders-d49b66").to_owned());
     }
     for folder in folders {
         if folder.is_empty()
@@ -152,7 +158,10 @@ pub fn validate_folders(folders: &[String]) -> Result<(), String> {
                 .any(|p| p.is_empty() || p == "." || p == ".." || p.eq_ignore_ascii_case(".git"))
             || folder.as_bytes().get(1) == Some(&b':')
         {
-            return Err(format!("{folder:?} is not a repository-relative folder"));
+            return Err(crate::i18n::message(
+                "backend-folder-is-not-a-repository-relative-folder-98306d",
+                &[("folder", format!("{:?}", folder).into())],
+            ));
         }
     }
     Ok(())
@@ -233,7 +242,7 @@ pub fn sparse_state(repo: &Path) -> Result<SparseState, String> {
         .lines()
         .map(|s| {
             if s.starts_with('"') {
-                serde_json::from_str::<String>(s).map_err(|_| "Cannot read a quoted sparse folder; use git sparse-checkout in the terminal".to_owned())
+                serde_json::from_str::<String>(s).map_err(|_| crate::i18n::text("backend-cannot-read-a-quoted-sparse-folder-use-git-sparse-checkout-in-the-627b53").to_owned())
             } else { Ok(s.to_owned()) }
         })
         .collect::<Result<BTreeSet<_>, _>>()?
@@ -258,9 +267,10 @@ pub fn sparse_state(repo: &Path) -> Result<SparseState, String> {
     .map(str::to_owned)
     .collect::<Vec<_>>();
     if folders.len() > 20_000 {
-        return Err(
-            "This tree has over 20000 folders; use git sparse-checkout in the terminal".to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-this-tree-has-over-20000-folders-use-git-sparse-checkout-in-the-t-d7a454",
+        )
+        .to_owned());
     }
     Ok(SparseState {
         head,
@@ -286,13 +296,17 @@ pub fn set_sparse(
     }
     let now = sparse_state(repo)?;
     if !same_sparse_definition(before, &now) {
-        return Err(
-            "HEAD or sparse-checkout changed since this dialog opened; reopen it".to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-head-or-sparse-checkout-changed-since-this-dialog-opened-reopen-i-15a1d8",
+        )
+        .to_owned());
     }
     ensure_sparse_clean(repo)?;
     if super::status(repo)?.in_progress.is_some() {
-        return Err("Finish the operation in progress before changing sparse folders".to_owned());
+        return Err(crate::i18n::text(
+            "backend-finish-the-operation-in-progress-before-changing-sparse-folders-804713",
+        )
+        .to_owned());
     }
     sparse_mutation(repo, folders, allow_download, credentials, super::run_with)
 }
@@ -338,16 +352,16 @@ fn ensure_sparse_clean(repo: &Path) -> Result<(), String> {
         ],
     )?;
     if status.split('\0').any(|entry| entry.starts_with("!! ")) {
-        return Err(
-            "Move or back up ignored files outside the working tree before changing sparse folders. Git can delete ignored files during sparse checkout."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-move-or-back-up-ignored-files-outside-the-working-tree-before-cha-cfc50b",
+        )
+        .to_owned());
     }
     if !status.is_empty() {
-        return Err(
-            "Commit, stash or move uncommitted and untracked files before changing sparse folders"
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-commit-stash-or-move-uncommitted-and-untracked-files-before-chang-ec2b84",
+        )
+        .to_owned());
     }
     Ok(())
 }

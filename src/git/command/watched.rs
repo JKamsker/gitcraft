@@ -184,7 +184,13 @@ pub(in crate::git) fn run_watched_extra_recorded(
 ) -> (Result<String, String>, Recorded) {
     let started = Instant::now();
     if control.is_cancelled() {
-        let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
+        let not_run = Recorded::new(
+            args,
+            None,
+            crate::i18n::text("backend-not-run-cancelled-02b0ef"),
+            creds,
+            started,
+        );
         return (Err(CANCELLED.to_owned()), not_run);
     }
     let _timer = crate::git::backend::CliTimer::new(args);
@@ -249,7 +255,13 @@ pub(in crate::git) fn run_watched_extra_recorded(
             .lines()
             .any(|l| remote::is_missing_folder(l.as_bytes()))
     {
-        let e = format!("{} isn't a folder on {}", t.path, t.host.label());
+        let e = crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[
+                ("path", (t.path).to_string().into()),
+                ("t", (t.host.label()).to_string().into()),
+            ],
+        );
         return (Err(e), recorded);
     }
     let e = failure_message(
@@ -281,9 +293,9 @@ pub(super) fn reviewed(
         &words,
         ended.code,
         if ended.code == Some(0) {
-            "Reviewed push completed"
+            crate::i18n::text("backend-reviewed-push-completed-f39141")
         } else {
-            "Reviewed push failed; server diagnostics withheld"
+            crate::i18n::text("backend-reviewed-push-failed-server-diagnostics-withheld-2b8b01")
         },
         None,
         started,
