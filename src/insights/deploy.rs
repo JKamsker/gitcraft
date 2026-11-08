@@ -131,6 +131,8 @@ pub fn environments(
             names.push((d.environment.clone(), d.url.clone()));
         }
     }
+    // With the list cut, an environment's older deployments weren't read.
+    let cut = read.deployments.len() >= crate::ci::deployments::MAX_DEPLOYMENTS;
     let check = |sha: &str| {
         if same(sha, commit) {
             Some(true)
@@ -160,6 +162,10 @@ pub fn environments(
                         d.sha.get(..7).unwrap_or(&d.sha)
                     )),
                 },
+                None if cut => Inclusion::Unknown(format!(
+                    "no successful deployment among the latest {} read",
+                    crate::ci::deployments::MAX_DEPLOYMENTS
+                )),
                 None if mine.is_empty() => Inclusion::NoRecord,
                 None if mine.iter().any(|d| d.state() == DeployState::NotRead) => {
                     Inclusion::Unknown(
@@ -392,6 +398,21 @@ mod tests {
         assert_eq!(rows[2].inclusion, Inclusion::NoRecord);
         assert_eq!(rows[2].inclusion.label(), "no deployment recorded");
         assert!(matches!(rows[3].inclusion, Inclusion::Unknown(_)));
+    }
+
+    /// With as many deployments read as are asked for, older ones weren't: an environment
+    /// without a successful one among them isn't known never to have had one.
+    #[test]
+    fn a_cut_list_leaves_environments_without_success_unknown() {
+        let max = crate::ci::deployments::MAX_DEPLOYMENTS as u64;
+        let read = recorded(
+            (0..max)
+                .map(|i| deployment(i, "staging", "c9", DeployState::Failed))
+                .collect(),
+        );
+        let rows = environments(&read, "c1", |_| None);
+        assert!(matches!(rows[0].inclusion, Inclusion::Unknown(_)));
+        assert!(matches!(rows[1].inclusion, Inclusion::Unknown(_)));
     }
 
     #[test]

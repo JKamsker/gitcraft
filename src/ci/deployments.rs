@@ -48,12 +48,10 @@ impl DeployState {
         }
     }
 
-    /// Still to come: queued or under way.
+    /// Still to come: queued or under way, as its status says. One with no status says
+    /// nothing either way (it may be an old one that never got any).
     pub fn in_flight(self) -> bool {
-        matches!(
-            self,
-            DeployState::InProgress | DeployState::Queued | DeployState::NoStatus
-        )
+        matches!(self, DeployState::InProgress | DeployState::Queued)
     }
 }
 

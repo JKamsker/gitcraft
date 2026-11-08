@@ -47,9 +47,13 @@ pub fn at_revision(repo: &Path, sha: &str, path: &str) -> Result<String, String>
     if path.is_empty() || path.starts_with(['-', '/']) {
         return Err("not a workflow file".to_owned());
     }
-    let bytes = crate::git::file_at(repo, Some(sha), path)
-        .map_err(|_| format!("{path} isn't in this repository at {}", short(sha)))?;
-    String::from_utf8(bytes).map_err(|_| format!("{path} isn't text"))
+    // A partial clone would fetch a blob it lacks: not for a view that only reads.
+    crate::git::run_env(
+        Some(repo),
+        &["cat-file", "blob", &format!("{sha}:{path}")],
+        &[("GIT_NO_LAZY_FETCH", "1")],
+    )
+    .map_err(|_| format!("{path} isn't in this repository at {}", short(sha)))
 }
 
 fn short(sha: &str) -> &str {

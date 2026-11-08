@@ -71,10 +71,14 @@ pub struct TimedJob {
 }
 
 impl TimedJob {
-    /// When it was waiting to start from: created, or `queued` seconds before it started.
+    /// When it was waiting to start from: `queued` seconds before it started when the forge
+    /// says how long it queued (GitLab, whose jobs are all created with their pipeline), else
+    /// when it was created.
     pub fn ready(&self) -> Option<i64> {
-        self.created
-            .or_else(|| self.started.zip(self.queued).map(|(s, q)| s - q))
+        self.started
+            .zip(self.queued)
+            .map(|(s, q)| s - q)
+            .or(self.created)
     }
 
     /// The page of step `step`'s log (GitHub), or the job's.
@@ -489,6 +493,10 @@ mod tests {
         assert!(jobs[0].runner.is_empty());
         let rspec = &jobs[1];
         assert_eq!(rspec.queued, Some(12));
+        // It waited 12 s for a runner, not the minute since its pipeline was created.
+        assert_eq!(rspec.ready(), rspec.started.map(|s| s - 12));
+        assert_ne!(rspec.ready(), rspec.created);
+        assert_eq!(jobs[0].ready(), jobs[0].created);
         assert_eq!(rspec.state, CheckState::Failed);
         assert_eq!(
             rspec.runner[0],

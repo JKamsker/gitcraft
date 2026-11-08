@@ -183,6 +183,7 @@ fn states_map_from_either_forge() {
     assert_eq!(gitlab_state("running"), DeployState::InProgress);
     assert_eq!(gitlab_state("canceled"), DeployState::Cancelled);
     assert!(DeployState::Queued.in_flight() && !DeployState::Success.in_flight());
+    assert!(!DeployState::NoStatus.in_flight());
 }
 
 #[test]
