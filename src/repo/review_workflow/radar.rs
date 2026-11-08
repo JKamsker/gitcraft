@@ -150,23 +150,51 @@ fn status(
     repo: &Path,
     tip: &str,
 ) -> Patch {
-    let found = ids.iter().position(|(id, _)| id == fix);
-    let reverted = ids.iter().position(|(id, _)| id == reverse);
-    if let Some(revert) = reverted
-        && found.is_none_or(|fix| revert < fix)
-    {
-        return Patch::Reverted(ids[revert].1.clone());
-    }
-    if let Some(found) = found {
-        return Patch::Same(ids[found].1.clone());
-    }
-    if let Some(adapted) = adaptation
-        && git::is_ancestor(repo, adapted, tip)
-    {
-        return Patch::Adapted(adapted.into());
+    let adaptation = adaptation
+        .filter(|rev| git::is_ancestor(repo, rev, tip))
+        .and_then(|rev| {
+            Some((
+                rev,
+                patch_id(repo, rev, false).ok()?,
+                patch_id(repo, rev, true).ok()?,
+            ))
+        });
+    patch_status(
+        ids,
+        fix,
+        reverse,
+        adaptation
+            .as_ref()
+            .map(|(rev, id, reverse)| (*rev, id.as_str(), reverse.as_str())),
+    )
+}
+fn patch_status(
+    ids: &[(String, String)],
+    fix: &str,
+    reverse: &str,
+    adaptation: Option<(&str, &str, &str)>,
+) -> Patch {
+    // History is newest first. Positive and reverse witnesses for BOTH patch identities
+    // participate in one ordering; ancestry by itself is never survival evidence.
+    for (id, commit) in ids {
+        if id == reverse {
+            return Patch::Reverted(commit.clone());
+        }
+        if id == fix {
+            return Patch::Same(commit.clone());
+        }
+        if let Some((adapted, patch, reverse)) = adaptation {
+            if id == reverse {
+                return Patch::Reverted(commit.clone());
+            }
+            if id == patch {
+                return Patch::Adapted(adapted.into());
+            }
+        }
     }
     Patch::NotChecked
 }
+
 fn check(repo: &Path, pins: &[Pin]) -> Result<Vec<Row>, String> {
     let evidence = store::load::<BTreeMap<String, Observation>>(repo, "fix-tests", "results")?
         .unwrap_or_default();
@@ -498,5 +526,51 @@ mod tests {
             Patch::Same(_)
         ));
         Ok(())
+    }
+    #[test]
+    fn r2_pure_adapted_reverts_reapplications_and_truncated_history() {
+        let history = |ids: &[&str]| {
+            ids.iter()
+                .enumerate()
+                .map(|(i, id)| ((*id).into(), format!("commit{i}")))
+                .collect::<Vec<_>>()
+        };
+        let adaptation = Some(("adapted-oid", "adapted", "reverse-adapted"));
+        assert_eq!(
+            patch_status(&history(&["adapted"]), "fix", "reverse-fix", adaptation),
+            Patch::Adapted("adapted-oid".into())
+        );
+        assert_eq!(
+            patch_status(
+                &history(&["reverse-adapted", "adapted", "fix"]),
+                "fix",
+                "reverse-fix",
+                adaptation
+            ),
+            Patch::Reverted("commit0".into())
+        );
+        assert_eq!(
+            patch_status(
+                &history(&["adapted", "reverse-adapted", "fix"]),
+                "fix",
+                "reverse-fix",
+                adaptation
+            ),
+            Patch::Adapted("adapted-oid".into())
+        );
+        assert_eq!(
+            patch_status(&history(&["unrelated"]), "fix", "reverse-fix", adaptation),
+            Patch::NotChecked
+        );
+        assert_eq!(
+            patch_status(
+                &history(&["fix", "reverse-adapted"]),
+                "fix",
+                "reverse-fix",
+                adaptation
+            ),
+            Patch::Same("commit0".into())
+        );
+        // Patch classification cannot read or mutate independent behavior observations.
     }
 }

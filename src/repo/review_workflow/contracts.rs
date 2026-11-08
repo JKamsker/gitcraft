@@ -122,6 +122,39 @@ fn targets(repo: &Path, text: &str) -> Result<Vec<(String, String, Option<String
         .map(|(name, (tip, adaptation))| (name, tip, adaptation))
         .collect())
 }
+fn evidence_roots(
+    fix: &str,
+    target: &str,
+    source: &str,
+    tree: Option<&str>,
+) -> Vec<(String, String)> {
+    let mut roots = vec![];
+    for oid in [fix, target, source] {
+        roots.push((
+            format!("refs/gitcraft/backport-objects/commits/{oid}"),
+            oid.into(),
+        ));
+    }
+    if let Some(tree) = tree {
+        roots.push((
+            format!("refs/gitcraft/backport-objects/trees/{tree}"),
+            tree.into(),
+        ));
+    }
+    roots
+}
+fn retain_evidence(
+    repo: &Path,
+    fix: &str,
+    target: &str,
+    source: &str,
+    tree: Option<&str>,
+) -> Result<(), String> {
+    for (reference, oid) in evidence_roots(fix, target, source, tree) {
+        git::run(Some(repo), &["update-ref", &reference, &oid])?;
+    }
+    Ok(())
+}
 fn run(repo: &Path, plan: &Plan, stop: &git::RunStop) -> Result<Vec<Row>, String> {
     if !plan.trusted || plan.command.trim().is_empty() {
         return Err("Explicitly trust and enter the regression command first".into());
@@ -130,28 +163,9 @@ fn run(repo: &Path, plan: &Plan, stop: &git::RunStop) -> Result<Vec<Row>, String
     let targets = targets(repo, &plan.targets)?;
     let original_patch = patch(repo, &fix)?;
     let mut rows = vec![];
-    // Retain evidence inputs even if a target branch or original fix is later rewritten.
-    for (i, (_, tip, adaptation)) in targets.iter().enumerate() {
-        for (role, rev) in [
-            ("target", tip),
-            ("fix", &fix),
-            ("adaptation", adaptation.as_ref().unwrap_or(&fix)),
-        ] {
-            git::run(
-                Some(repo),
-                &[
-                    "update-ref",
-                    &format!(
-                        "refs/gitcraft/backport-inputs/{:x}/{i}/{role}",
-                        md5::compute(format!("{}:{}", plan.fix, plan.targets))
-                    ),
-                    rev,
-                ],
-            )?;
-        }
-    }
     for (target, tip, adaptation) in targets {
         let source = adaptation.as_ref().unwrap_or(&fix).clone();
+        retain_evidence(repo, &fix, &tip, &source, None)?;
         let mut row = Row {
             target,
             tip: tip.clone(),
@@ -187,6 +201,8 @@ fn run(repo: &Path, plan: &Plan, stop: &git::RunStop) -> Result<Vec<Row>, String
             let tree = git::run(Some(&scratch.path), &["write-tree"])?
                 .trim()
                 .to_owned();
+            // A ref directly to the tree is a real Git reachability root. JSON alone is not.
+            retain_evidence(repo, &fix, &tip, &source, Some(&tree))?;
             row.applied = Some(tree.clone());
             if adaptation.is_some() {
                 row.adaptation = Some((original_patch.clone(), patch(repo, &source)?));
@@ -427,6 +443,49 @@ mod tests {
             trusted: false,
         };
         assert!(run(r.path(), &plan, &git::RunStop::default()).is_err());
+        Ok(())
+    }
+    #[test]
+    fn r2_pure_backport_roots_are_content_addressed_and_include_applied_tree() {
+        let first = evidence_roots("fix-A", "release-A", "adaptation-A", Some("composite-A"));
+        let second = evidence_roots("fix-B", "release-B", "adaptation-B", Some("composite-B"));
+        assert!(first.iter().any(
+            |(reference, oid)| reference.ends_with("trees/composite-A") && oid == "composite-A"
+        ));
+        assert!(
+            first
+                .iter()
+                .all(|(name, _)| !second.iter().any(|(other, _)| other == name))
+        );
+        assert_eq!(first.len(), 4);
+    }
+    #[test]
+    #[ignore = "R2 runtime hold: owned Git/GC fixture authored, not executed"]
+    fn r2_runtime_backport_roots_survive_gc_after_source_rewrites() -> Result<(), String> {
+        let r = git::stack::test_repo::TestRepo::new("backport-gc")?;
+        let base = r.tip("HEAD")?;
+        let fix = r.commit("fix.txt", "fix\n", "fix")?;
+        r.git(&["reset", "--hard", &base])?;
+        let target = r.commit("release-only.txt", "diverged\n", "release")?;
+        r.git(&["cherry-pick", "--no-commit", &fix])?;
+        let tree = git::run(Some(r.path()), &["write-tree"])?;
+        retain_evidence(r.path(), &fix, &target, &fix, Some(tree.trim()))?;
+        r.git(&["reset", "--hard", &base])?;
+        let later = r.commit("later.txt", "later\n", "rewrite sources")?;
+        retain_evidence(r.path(), &later, &base, &later, None)?;
+        r.git(&["reflog", "expire", "--expire=now", "--all"])?;
+        r.git(&["gc", "--prune=now"])?;
+        r.git(&["cat-file", "-e", tree.trim()])?;
+        r.git(&["cat-file", "-e", &fix])?;
+        r.git(&["cat-file", "-e", &target])?;
+        assert_eq!(
+            r.git(&["show", &format!("{}:release-only.txt", tree.trim())])?,
+            "diverged\n"
+        );
+        assert_eq!(
+            r.git(&["show", &format!("{}:fix.txt", tree.trim())])?,
+            "fix\n"
+        );
         Ok(())
     }
 }
