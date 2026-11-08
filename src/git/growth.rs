@@ -67,7 +67,10 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
             validate_path(path)?;
             baseline.insert(path.to_vec());
             if baseline.len() > 100_000 {
-                return Err("Growth replay is limited to 100,000 files".into());
+                return Err(crate::i18n::text(
+                    "backend-growth-replay-is-limited-to-100-000-files-033a66",
+                )
+                .into());
             }
         }
     }
@@ -75,7 +78,7 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
     for frame in frames.iter().skip(1) {
         for (path, present) in &frame.changes {
             if !active() {
-                return Err("Replay cancelled".into());
+                return Err(crate::i18n::text("backend-replay-cancelled-c6ccd5").into());
             }
             if *present {
                 state.insert(path.clone());
@@ -83,7 +86,10 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
                 state.remove(path);
             }
             if state.len() > 100_000 {
-                return Err("Growth replay is limited to 100,000 files per tree".into());
+                return Err(crate::i18n::text(
+                    "backend-growth-replay-is-limited-to-100-000-files-per-tree-bdda59",
+                )
+                .into());
             }
         }
     }
@@ -96,7 +102,7 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
 }
 fn validate_path(path: &[u8]) -> Result<(), String> {
     if path.is_empty() || path.len() > 32768 || path.split(|b| *b == b'/').count() > 128 {
-        return Err("Growth path/depth budget exceeded".into());
+        return Err(crate::i18n::text("backend-growth-path-depth-budget-exceeded-005a3e").into());
     }
     Ok(())
 }
@@ -108,9 +114,13 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
             continue;
         }
         if !matches!(hash.len(), 40 | 64) || !hash.iter().all(u8::is_ascii_hexdigit) {
-            return Err("Invalid replay commit".into());
+            return Err(crate::i18n::text("backend-invalid-replay-commit-16a0f0").into());
         }
-        let mut next = || fields.next().ok_or("Truncated replay metadata");
+        let mut next = || {
+            fields.next().ok_or(crate::i18n::text(
+                "backend-truncated-replay-metadata-3ff873",
+            ))
+        };
         let name = String::from_utf8_lossy(next()?).into_owned();
         let date = String::from_utf8_lossy(next()?).into_owned();
         let subject = String::from_utf8_lossy(next()?).into_owned();
@@ -120,7 +130,9 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
                 fields.next();
                 break;
             }
-            let field = fields.next().ok_or("Missing replay change")?;
+            let field = fields
+                .next()
+                .ok_or(crate::i18n::text("backend-missing-replay-change-64b263"))?;
             let field = field.strip_prefix(b"\n").unwrap_or(field);
             if field.is_empty() {
                 continue;
@@ -131,11 +143,15 @@ fn parse(raw: &[u8]) -> Result<Vec<Frame>, String> {
                 || parts[4].len() != 1
                 || !b"ACDMTUXB".contains(&parts[4][0])
             {
-                return Err("Invalid replay changed-path record".into());
+                return Err(
+                    crate::i18n::text("backend-invalid-replay-changed-path-record-379a2d").into(),
+                );
             }
-            let path = fields.next().ok_or("Missing replay path")?;
+            let path = fields
+                .next()
+                .ok_or(crate::i18n::text("backend-missing-replay-path-97a526"))?;
             if path.is_empty() {
-                return Err("Empty replay path".into());
+                return Err(crate::i18n::text("backend-empty-replay-path-aeff66").into());
             }
             validate_path(path)?;
             changes.push((path.to_vec(), parts[4] != b"D"));
@@ -161,14 +177,14 @@ impl Growth {
         let mut files = BTreeSet::new();
         for path in &self.baseline {
             if !active() {
-                return Err("Frame cancelled".into());
+                return Err(crate::i18n::text("backend-frame-cancelled-4d6f8f").into());
             }
             files.insert(path.as_slice());
         }
         for frame in self.frames.iter().take(cursor.saturating_add(1)).skip(1) {
             for (path, present) in &frame.changes {
                 if !active() {
-                    return Err("Frame cancelled".into());
+                    return Err(crate::i18n::text("backend-frame-cancelled-4d6f8f").into());
                 }
                 if *present {
                     files.insert(path.as_slice());

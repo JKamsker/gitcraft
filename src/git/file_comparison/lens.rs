@@ -30,10 +30,10 @@ pub(crate) fn read_lens(
         || spec.path.contains(char::REPLACEMENT_CHARACTER)
         || spec.previous.as_ref().is_some_and(|p| !valid_path(repo, p))
     {
-        return Err(
-            "This working-tree path cannot be read safely on this machine; use Git in the terminal"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-this-working-tree-path-cannot-be-read-safely-on-this-machine-use-a96416",
+        )
+        .into());
     }
     let head = head(repo, active)?;
     let index_stamp = super::transaction::index_stamp(repo, active)?;
@@ -69,9 +69,10 @@ pub(crate) fn read_lens(
         || working(repo, &spec.path, active)? != work_raw
         || super::transaction::index_stamp(repo, active)? != index_stamp
     {
-        return Err(
-            "HEAD, index or working file changed while reading. Refresh the staging lens.".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-head-index-or-working-file-changed-while-reading-refresh-the-stag-b73388",
+        )
+        .into());
     }
     Ok(Lens {
         spec: spec.clone(),
@@ -140,26 +141,39 @@ pub(super) fn attribute_state(
     // Git can report unreadable attribute blobs on stderr while exiting zero.
     // Unknown conversion rules must not become permission to stage raw bytes.
     if response.code != 0 || !response.stderr.is_empty() {
-        return Err(format!(
-            "Could not read file attributes without downloading objects: {}",
-            String::from_utf8_lossy(&response.stderr).trim()
+        return Err(crate::i18n::message(
+            "backend-could-not-read-file-attributes-without-downloading-objects-f7f006",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&response.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
         ));
     }
     let data = response.stdout;
     let fields: Vec<_> = data.split(|b| *b == 0).filter(|s| !s.is_empty()).collect();
     if !fields.len().is_multiple_of(3) {
-        return Err("Invalid attribute response".into());
+        return Err(crate::i18n::text("backend-invalid-attribute-response-68e85a").into());
     }
     let conversions = fields
         .chunks(3)
         .any(|f| f[2] != b"unspecified" && f[2] != b"unset");
     let autocrlf = output(repo, &["config", "--get", "core.autocrlf"], active)?;
     if !matches!(autocrlf.code, 0 | 1) || !autocrlf.stderr.is_empty() {
-        return Err("Could not establish the file's EOL conversion settings".into());
+        return Err(crate::i18n::text(
+            "backend-could-not-establish-the-file-s-eol-conversion-settings-538c97",
+        )
+        .into());
     }
     let value = String::from_utf8_lossy(&autocrlf.stdout);
-    let warning = (conversions || (!value.trim().is_empty() && value.trim() != "false"))
-        .then(|| "Line staging is unavailable with clean filters, text/EOL or working-tree-encoding conversion. Use the normal patch to stage with Git's conversions.".into());
+    let warning =
+        (conversions || (!value.trim().is_empty() && value.trim() != "false")).then(|| {
+            crate::i18n::text(
+                "backend-line-staging-is-unavailable-with-clean-filters-text-eol-or-workin-764553",
+            )
+            .into()
+        });
     let mut state = data;
     state.extend_from_slice(b"autocrlf\0");
     state.extend_from_slice(&autocrlf.stdout);
@@ -182,15 +196,19 @@ fn require_attribute_sources(
         let name = format!("{parent}.gitattributes");
         let working = working(repo, &name, active)?;
         if working.warning.is_some() || (working.mode.is_some() && !working.regular()) {
-            return Err(format!("File attributes are not safely readable: {name}"));
+            return Err(crate::i18n::message(
+                "backend-file-attributes-are-not-safely-readable-name-12cb5a",
+                &[("name", (name).to_string().into())],
+            ));
         }
         if let Some(entry) = entries.get(name.as_bytes()) {
             if !matches!(entry.mode.as_str(), "100644" | "100755") {
-                return Err(format!("Unsupported indexed attributes: {name}"));
+                return Err(crate::i18n::message(
+                    "backend-unsupported-indexed-attributes-name-598013",
+                    &[("name", (name).to_string().into())],
+                ));
             }
-            blob(repo, Some(entry), active).map_err(|_| format!(
-                "File attributes are unavailable without downloading objects: {name}. Fetch explicitly before using the staging lens."
-            ))?;
+            blob(repo, Some(entry), active).map_err(|_| crate::i18n::message("backend-file-attributes-are-unavailable-without-downloading-objects-name-bba7de", &[("name", (name).to_string().into())]))?;
         }
         parent.push_str(component);
         parent.push('/');
@@ -217,18 +235,25 @@ pub(super) fn working(
             active,
         )?;
         if out.code != 0 {
-            return Err(format!(
-                "Could not read the working file safely: {}",
-                String::from_utf8_lossy(&out.stderr).trim()
+            return Err(crate::i18n::message(
+                "backend-could-not-read-the-working-file-safely-ee9eea",
+                &[(
+                    "from_utf8_lossy",
+                    (String::from_utf8_lossy(&out.stderr).trim())
+                        .to_string()
+                        .into(),
+                )],
             ));
         }
         let split = out
             .stdout
             .iter()
             .position(|b| *b == 0)
-            .ok_or("Invalid working-file response")?;
-        let mode =
-            std::str::from_utf8(&out.stdout[..split]).map_err(|_| "Invalid working-file mode")?;
+            .ok_or(crate::i18n::text(
+                "backend-invalid-working-file-response-3a1bec",
+            ))?;
+        let mode = std::str::from_utf8(&out.stdout[..split])
+            .map_err(|_| crate::i18n::text("backend-invalid-working-file-mode-c2dc1e"))?;
         if mode == "missing" {
             return Ok(Version::missing());
         }
@@ -236,11 +261,14 @@ pub(super) fn working(
             return Ok(unavailable());
         }
         if !matches!(mode, "100644" | "100755" | "120000") {
-            return Err("Invalid working-file type".into());
+            return Err(crate::i18n::text("backend-invalid-working-file-type-ddc704").into());
         }
         let bytes = out.stdout[split + 1..].to_vec();
         if bytes.len() > FILE_LIMIT {
-            return Err("File comparison is limited to 2 MiB per version".into());
+            return Err(crate::i18n::text(
+                "backend-file-comparison-is-limited-to-2-mib-per-version-6a524d",
+            )
+            .into());
         }
         return Ok(Version {
             mode: Some(mode.into()),
@@ -294,7 +322,17 @@ pub(super) fn working(
     })
 }
 fn unavailable() -> Version {
-    Version{mode:Some("unknown".into()),oid:None,bytes:Vec::new(),warning:Some("Not a safely readable regular file/link within 2 MiB; no staging actions are available".into())}
+    Version {
+        mode: Some("unknown".into()),
+        oid: None,
+        bytes: Vec::new(),
+        warning: Some(
+            crate::i18n::text(
+                "backend-not-a-safely-readable-regular-file-link-within-2-mib-no-staging-a-4db372",
+            )
+            .into(),
+        ),
+    }
 }
 #[cfg(unix)]
 fn link_inside(repo: &Path, path: &str) -> Option<Vec<u8>> {
@@ -334,7 +372,7 @@ pub(super) fn working_script(repo: &str, path: &str) -> Result<String, String> {
         || path.starts_with('/')
         || path.contains('\0')
     {
-        return Err("Invalid working path".into());
+        return Err(crate::i18n::text("backend-invalid-working-path-2f86c8").into());
     }
     let mut script = format!(
         "cd -P -- {} || exit 1\nroot=$(pwd -P) || exit 1\n[ \"$root\" = / ] && root=\n",
@@ -367,7 +405,8 @@ pub(super) fn index_path(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathB
     )?;
     // Git terminates its path with exactly one LF; a newline in the directory is data.
     let raw = raw.strip_suffix(b"\n").unwrap_or(&raw);
-    let path = std::str::from_utf8(raw).map_err(|_| "The Git index path is not UTF-8")?;
+    let path = std::str::from_utf8(raw)
+        .map_err(|_| crate::i18n::text("backend-the-git-index-path-is-not-utf-8-58fd10"))?;
     Ok(crate::remote::resolve(repo, path))
 }
 
@@ -380,7 +419,10 @@ pub(super) fn symlinks(repo: &Path, active: &dyn Fn() -> bool) -> Result<String,
 fn boolean_config(repo: &Path, key: &str, active: &dyn Fn() -> bool) -> Result<String, String> {
     let out = output(repo, &["config", "--bool", "--get", key], active)?;
     if !matches!(out.code, 0 | 1) {
-        return Err(format!("Could not read {key}"));
+        return Err(crate::i18n::message(
+            "backend-could-not-read-key-da46a0",
+            &[("key", (key).to_string().into())],
+        ));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().into())
 }

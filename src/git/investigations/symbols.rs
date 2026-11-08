@@ -462,7 +462,7 @@ pub(crate) fn investigate(
         &[0],
     )?;
     let selected = std::str::from_utf8(&resolved)
-        .map_err(|_| "Invalid revision")?
+        .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa"))?
         .trim()
         .to_owned();
     if !oid(&selected) {

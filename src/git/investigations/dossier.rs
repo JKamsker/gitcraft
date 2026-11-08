@@ -265,12 +265,12 @@ impl<'a> Trace<'a> {
         let split = record
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Invalid tree record")?;
+            .ok_or(crate::i18n::text("backend-invalid-tree-record-bf9356"))?;
         if &record[split + 1..] != path.as_bytes() {
             return Err("Tree path did not match its literal request".into());
         }
         let fields: Vec<_> = std::str::from_utf8(&record[..split])
-            .map_err(|_| "Invalid tree metadata")?
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?
             .split_whitespace()
             .collect();
         let [mode, kind, id] = fields.as_slice() else {

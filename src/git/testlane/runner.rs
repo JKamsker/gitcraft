@@ -234,7 +234,7 @@ pub fn run_tests(
     events: &(dyn Fn(TestEvent) + Sync),
 ) -> Result<RunSummary, String> {
     if plan.command.trim().is_empty() {
-        return Err("Type the command to test with".to_owned());
+        return Err(crate::i18n::text("backend-type-the-command-to-test-with-4b88f5").to_owned());
     }
     let known = if plan.retest {
         HashMap::new()

@@ -552,9 +552,10 @@ fn tree_entries(
     let mut entries = Vec::new();
     for row in bytes.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         let Some(tab) = row.iter().position(|b| *b == b'\t') else {
-            return Err("Invalid tree record".into());
+            return Err(crate::i18n::text("backend-invalid-tree-record-bf9356").into());
         };
-        let info = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid tree metadata")?;
+        let info = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
         let parts: Vec<_> = info.split_whitespace().collect();
         let [mode, kind, oid] = parts.as_slice() else {
             return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());

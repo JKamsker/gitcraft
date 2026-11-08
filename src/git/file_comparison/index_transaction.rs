@@ -44,7 +44,10 @@ impl Snapshot {
         use std::os::unix::fs::MetadataExt;
         let meta = file.metadata().map_err(|e| e.to_string())?;
         if !meta.is_file() || meta.len() > 16 * 1024 * 1024 {
-            return Err("Index is not a regular file within 16 MiB".into());
+            return Err(crate::i18n::text(
+                "backend-index-is-not-a-regular-file-within-16-mib-e5c832",
+            )
+            .into());
         }
         let policy = access::read(&file, path)?;
         let mut bytes = Vec::new();
@@ -53,7 +56,7 @@ impl Snapshot {
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         if bytes.len() > 16 * 1024 * 1024 || policy != access::read(&file, path)? {
-            return Err("Index changed during read".into());
+            return Err(crate::i18n::text("backend-index-changed-during-read-c76aff").into());
         }
         #[cfg(unix)]
         let (mode, uid, gid) = (meta.mode(), meta.uid(), meta.gid());
@@ -101,7 +104,10 @@ impl Lock {
         }
         self.active = false;
         if !self.owned() {
-            return Err("Index lock changed owner; foreign lock preserved".into());
+            return Err(crate::i18n::text(
+                "backend-index-lock-changed-owner-foreign-lock-preserved-f042aa",
+            )
+            .into());
         }
         // A check followed by rename is NOT identity-conditional. Capture first and
         // inspect what moved. A late foreign creator is retained and restored only
@@ -118,9 +124,9 @@ impl Lock {
             let _ = self
                 .recovery
                 .link(OsStr::new("released-lock"), &self.parent, &self.name);
-            return Err(format!(
-                "Foreign lock captured during release; retained at {}",
-                self.recovery.path.display()
+            return Err(crate::i18n::message(
+                "backend-foreign-lock-captured-during-release-retained-at-6c84e6",
+                &[("path", (self.recovery.path.display()).to_string().into())],
             ));
         }
         Ok(())
@@ -136,7 +142,10 @@ fn policy(repo: &Path) -> Result<Vec<u8>, String> {
         true
     })?;
     if out.code > 1 {
-        return Err("Could not read configured index sharing policy".into());
+        return Err(crate::i18n::text(
+            "backend-could-not-read-configured-index-sharing-policy-b62cd3",
+        )
+        .into());
     }
     Ok(out.stdout)
 }
@@ -151,9 +160,16 @@ pub(super) fn apply(
     use std::os::unix::fs::PermissionsExt;
     let index = lens::index_path(repo, &|| true)?;
     let parent = Arc::new(
-        Directory::open(index.parent().ok_or("Index has no parent")?).map_err(|e| e.to_string())?,
+        Directory::open(
+            index
+                .parent()
+                .ok_or(crate::i18n::text("backend-index-has-no-parent-b1c595"))?,
+        )
+        .map_err(|e| e.to_string())?,
     );
-    let name = index.file_name().ok_or("Index has no name")?;
+    let name = index
+        .file_name()
+        .ok_or(crate::i18n::text("backend-index-has-no-name-a4f6d6"))?;
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let recovery = loop {
         let name = OsString::from(format!(
@@ -168,9 +184,12 @@ pub(super) fn apply(
         }
     };
     let lock_name = OsString::from(format!("{}.lock", name.to_string_lossy()));
-    let held = parent
-        .create(&lock_name, &[])
-        .map_err(|e| format!("Could not lock the Git index: {e}"))?;
+    let held = parent.create(&lock_name, &[]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-lock-the-git-index-e-78eb1c",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut lock = Lock {
         parent: parent.clone(),
         recovery: recovery.clone(),
@@ -210,7 +229,9 @@ pub(super) fn apply(
         }
         args.extend([
             "--",
-            patch_path.to_str().ok_or("Non-UTF8 private patch path")?,
+            patch_path.to_str().ok_or(crate::i18n::text(
+                "backend-non-utf8-private-patch-path-3e66d7",
+            ))?,
         ]);
         transaction::alternate(repo, &candidate_path, &args)?;
         // Git creates the alternate index using core.sharedRepository and the actual
@@ -234,7 +255,12 @@ pub(super) fn apply(
                         Some(rustix::process::Uid::from_raw(s.uid)),
                         Some(rustix::process::Gid::from_raw(s.gid)),
                     )
-                    .map_err(|e| format!("Cannot retain index ownership: {e}"))?;
+                    .map_err(|e| {
+                        crate::i18n::message(
+                            "backend-cannot-retain-index-ownership-e-70a7e8",
+                            &[("detail", (e).to_string().into())],
+                        )
+                    })?;
                 }
             }
             #[cfg(windows)]
@@ -245,7 +271,7 @@ pub(super) fn apply(
                 .map_err(|e| e.to_string())?;
             if access::read(&file, &candidate_path)? != s.policy {
                 return Err(
-                    "Configured index mode conflicts with captured ACL; original unchanged".into(),
+                    crate::i18n::text("backend-configured-index-mode-conflicts-with-captured-acl-original-unchan-26e352").into(),
                 );
             }
         }
@@ -257,7 +283,10 @@ pub(super) fn apply(
             || !lock.owned()
             || policy(repo)? != sharing
         {
-            return Err("Index identity, policy or lock changed before publication".into());
+            return Err(crate::i18n::text(
+                "backend-index-identity-policy-or-lock-changed-before-publication-617d84",
+            )
+            .into());
         }
         transaction::verify(repo, lens)?;
         hook(Phase::BeforeMove);
@@ -272,7 +301,10 @@ pub(super) fn apply(
             ) || !parent.unchanged()
             {
                 restore(&recovery, &parent, name);
-                return Err("Index changed during preservation; captured inode retained".into());
+                return Err(crate::i18n::text(
+                    "backend-index-changed-during-preservation-captured-inode-retained-76824b",
+                )
+                .into());
             }
         }
         hook(Phase::BeforeInstall);
@@ -284,11 +316,17 @@ pub(super) fn apply(
             )
         {
             restore(&recovery, &parent, name);
-            return Err("Index policy or ownership changed before installation".into());
+            return Err(crate::i18n::text(
+                "backend-index-policy-or-ownership-changed-before-installation-c48400",
+            )
+            .into());
         }
         if let Err(e) = recovery.link(candidate, &parent, name) {
             restore(&recovery, &parent, name);
-            return Err(format!("Index create-only installation refused: {e}"));
+            return Err(crate::i18n::message(
+                "backend-index-create-only-installation-refused-e-f133bd",
+                &[("detail", (e).to_string().into())],
+            ));
         }
         hook(Phase::AfterInstall);
         if !lock.owned()
@@ -299,20 +337,24 @@ pub(super) fn apply(
                 original.as_ref(),
             )
         {
-            return Err(
-                "Index changed after installation; previous inode retained for recovery".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-index-changed-after-installation-previous-inode-retained-for-reco-4c9bd0",
+            )
+            .into());
         }
         hook(Phase::BeforeUnlock);
         lock.release_with(&mut || hook(Phase::DuringUnlock))?;
         if policy(repo)? != sharing
             || !Snapshot::read(&parent, name)?.is_some_and(|s| s.same(&prepared))
         {
-            return Err("Index changed at unlock; transaction recovery retained".into());
+            return Err(crate::i18n::text(
+                "backend-index-changed-at-unlock-transaction-recovery-retained-82f660",
+            )
+            .into());
         }
-        Ok(format!(
-            "Staging updated. Previous index and transaction evidence: {}",
-            recovery.path.display()
+        Ok(crate::i18n::message(
+            "backend-staging-updated-previous-index-and-transaction-evidence-875f34",
+            &[("path", (recovery.path.display()).to_string().into())],
         ))
     })();
     if result.is_err() {

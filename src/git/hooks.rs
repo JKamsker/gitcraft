@@ -62,9 +62,21 @@ impl FailedHook {
         let (name, code) = (&self.name, self.code);
         // A `post-` hook runs once the work is done: only its exit code fails the command.
         let mut text = if name.starts_with("post-") {
-            format!("it was done, but the {name} hook failed afterwards (exit code {code})")
+            crate::i18n::message(
+                "backend-it-was-done-but-the-name-hook-failed-afterwards-exit-code-code-ce81ed",
+                &[
+                    ("name", (name).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            )
         } else {
-            format!("the {name} hook stopped it (exit code {code})")
+            crate::i18n::message(
+                "backend-the-name-hook-stopped-it-exit-code-code-cc1a4c",
+                &[
+                    ("name", (name).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            )
         };
         let said = said.trim();
         if !said.is_empty() {
@@ -72,12 +84,12 @@ impl FailedHook {
             text.push_str(said);
         }
         let hint = match (subcommand(args), name.as_str()) {
-            (Some("commit"), "pre-commit" | "commit-msg") => {
-                Some("Tick Skip hooks in the commit box to commit once without them.")
-            }
-            (Some("push"), "pre-push") => {
-                Some("Right-click Push for Push, skipping hooks, to push once without it.")
-            }
+            (Some("commit"), "pre-commit" | "commit-msg") => Some(crate::i18n::text(
+                "backend-tick-skip-hooks-in-the-commit-box-to-commit-once-without-them-cab006",
+            )),
+            (Some("push"), "pre-push") => Some(crate::i18n::text(
+                "backend-right-click-push-for-push-skipping-hooks-to-push-once-without-it-4b9ac1",
+            )),
             _ => None,
         };
         if let Some(hint) = hint {

@@ -250,7 +250,8 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
                 .iter()
                 .position(|b| *b == b'\t')
                 .ok_or(crate::i18n::text("backend-invalid-tree-entry-8d7b6f"))?;
-            let meta = std::str::from_utf8(&record[..tab]).map_err(|_| "Invalid tree metadata")?;
+            let meta = std::str::from_utf8(&record[..tab])
+                .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
             let f: Vec<_> = meta.split_whitespace().collect();
             if f.len() != 3 || !valid_oid(f[2]) {
                 return Err("Invalid tree object ID".into());
