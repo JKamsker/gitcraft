@@ -613,7 +613,8 @@ pub(super) fn run_steps_guarded(
             matches!(op.as_slice(), [reset, mode, _] if reset == "reset" && mode == "--keep");
         let deleting =
             matches!(op.as_slice(), [branch, delete, ..] if branch == "branch" && delete == "-D");
-        if (resetting || deleting)
+        if guarded_fork
+            && (resetting || deleting)
             && let Err(e) = check_local_expected(path, ops, op, control)
         {
             result = Err(e);
