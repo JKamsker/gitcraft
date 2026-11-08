@@ -42,10 +42,10 @@ pub(crate) fn diagnostic(raw: &str) -> String {
     if let Some(rest) = shown.strip_prefix("could not start ")
         && let Some((program, detail)) = rest.split_once(": ")
     {
-        return i18n::message("interaction-terminal-start-failed", &[
-            ("program", program.into()),
-            ("detail", detail.into()),
-        ]);
+        return i18n::message(
+            "interaction-terminal-start-failed",
+            &[("program", program.into()), ("detail", detail.into())],
+        );
     }
     for &(prefix, suffix, id, name, _) in DETAIL {
         if let Some(value) = shown
@@ -75,10 +75,10 @@ pub(crate) fn shell_label(raw: &str) -> &str {
 }
 
 pub(super) fn scrollback(count: usize) -> String {
-    i18n::message("interaction-terminal-scrollback", &[(
-        "count",
-        count.into(),
-    )])
+    i18n::message(
+        "interaction-terminal-scrollback",
+        &[("count", count.into())],
+    )
 }
 
 pub(super) fn accessibility() -> &'static str {

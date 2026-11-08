@@ -527,17 +527,20 @@ pub(crate) fn diagnostic(raw: &str) -> String {
         .strip_prefix(prefix)
         .and_then(|s| s.strip_suffix(suffix))
         {
-            return i18n::message(id, &[(
-                name,
-                if name == "machine" {
-                    machine_location(value).into()
-                } else {
-                    value.into()
-                },
-            )]);
+            return i18n::message(
+                id,
+                &[(
+                    name,
+                    if name == "machine" {
+                        machine_location(value).into()
+                    } else {
+                        value.into()
+                    },
+                )],
+            );
         }
     }
-    raw.to_owned()
+    trailing_envelope(shown).unwrap_or_else(|| raw.to_owned())
 }
 /// Finite templates emitted by session/runner/observe/workspace/bundle/verdict.
 /// Split only known outer envelopes; captured external errors and output remain raw.
@@ -547,11 +550,14 @@ fn envelope(raw: &str) -> Option<String> {
         && let Some((hash, rest)) = rest.split_once(" in a worktree on ")
         && let Some((machine, detail)) = rest.split_once(": ")
     {
-        return message("interaction-bisect-checkout", &[
-            ("hash", hash.into()),
-            ("machine", machine_location(machine).into()),
-            ("detail", detail.into()),
-        ]);
+        return message(
+            "interaction-bisect-checkout",
+            &[
+                ("hash", hash.into()),
+                ("machine", machine_location(machine).into()),
+                ("detail", detail.into()),
+            ],
+        );
     }
     if let Some(rest) = raw.strip_prefix("The worktrees on ")
         && let Some((machine, rest)) = rest.split_once(" couldn't all be removed (")
@@ -564,10 +570,10 @@ fn envelope(raw: &str) -> Option<String> {
         && let Some(code) = rest.strip_suffix(" (a crash or a signal): it counts as skipped.")
         && let Ok(code) = code.parse::<i32>()
     {
-        return message("interaction-bisect-crash-skipped", &[
-            ("hash", hash.into()),
-            ("code", code.into()),
-        ]);
+        return message(
+            "interaction-bisect-crash-skipped",
+            &[("hash", hash.into()), ("code", code.into())],
+        );
     }
     if let Some((hash, rest)) = raw.split_once(" ended its test with exit code ")
         && let Some((code, output)) = rest.split_once(
@@ -576,11 +582,14 @@ fn envelope(raw: &str) -> Option<String> {
         && (output.is_empty() || output.starts_with('\n'))
         && let Ok(code) = code.parse::<i32>()
     {
-        return message("interaction-bisect-end-test-failed", &[
-            ("hash", hash.into()),
-            ("code", code.into()),
-            ("output", output.strip_prefix('\n').unwrap_or(output).into()),
-        ]);
+        return message(
+            "interaction-bisect-end-test-failed",
+            &[
+                ("hash", hash.into()),
+                ("code", code.into()),
+                ("output", output.strip_prefix('\n').unwrap_or(output).into()),
+            ],
+        );
     }
     if let Some(rest) = raw.strip_prefix("ended its test with exit code ")
         && let Some(code) = rest.strip_suffix(
@@ -593,44 +602,45 @@ fn envelope(raw: &str) -> Option<String> {
     // Observe's stderr may itself contain the separator; use the first outer stderr marker.
     if let Some((before, stderr)) = raw.split_once("); stderr: ")
         && let Some((detail, code)) = before.rsplit_once(" (exit ")
+        && known_observation_detail(detail)
+        && (!detail.starts_with("PNG frame ")
+            || (raw.matches(" (exit ").count() == 1 && raw.matches("); stderr: ").count() == 1))
         && let Ok(code) = code.parse::<i32>()
     {
-        return message("interaction-bisect-observation-exit", &[
-            ("detail", observation_detail(detail).into()),
-            ("code", code.into()),
-            ("stderr", stderr.into()),
-        ]);
+        return message(
+            "interaction-bisect-observation-exit",
+            &[
+                ("detail", observation_detail(detail).into()),
+                ("code", code.into()),
+                ("stderr", stderr.into()),
+            ],
+        );
     }
     if let Some(rest) = raw.strip_prefix("could not make a repository for the bisect on ")
         && let Some((machine, detail)) = rest.split_once(": ")
     {
-        return message("interaction-bisect-repository-make", &[
-            ("machine", machine_location(machine).into()),
-            ("detail", detail.into()),
-        ]);
-    }
-    if let Some(rest) = raw.strip_suffix(" is not a git repository")
-        && let Some((path, machine)) = rest.rsplit_once(" on ")
-    {
-        return message("interaction-bisect-not-repository", &[
-            ("path", path.into()),
-            ("machine", machine_location(machine).into()),
-        ]);
+        return message(
+            "interaction-bisect-repository-make",
+            &[
+                ("machine", machine_location(machine).into()),
+                ("detail", detail.into()),
+            ],
+        );
     }
     if let Some(detail) = raw.strip_prefix("Contained Git failed (no exit code): ") {
-        return message("interaction-bisect-contained-no-code", &[(
-            "detail",
-            detail.into(),
-        )]);
+        return message(
+            "interaction-bisect-contained-no-code",
+            &[("detail", detail.into())],
+        );
     }
     if let Some(rest) = raw.strip_prefix("Contained Git failed (")
         && let Some((code, detail)) = rest.split_once("): ")
         && let Ok(code) = code.parse::<i32>()
     {
-        return message("interaction-bisect-contained-failed", &[
-            ("code", code.into()),
-            ("detail", detail.into()),
-        ]);
+        return message(
+            "interaction-bisect-contained-failed",
+            &[("code", code.into()), ("detail", detail.into())],
+        );
     }
     if let Some(rest) = raw.strip_prefix("bisect shell ended with status ") {
         if rest == "None" {
@@ -639,10 +649,10 @@ fn envelope(raw: &str) -> Option<String> {
         if let Some(code) = rest.strip_prefix("Some(").and_then(|s| s.strip_suffix(')'))
             && let Ok(code) = code.parse::<i32>()
         {
-            return message("interaction-bisect-shell-status", &[(
-                "status",
-                code.into(),
-            )]);
+            return message(
+                "interaction-bisect-shell-status",
+                &[("status", code.into())],
+            );
         }
     }
     for (prefix, id) in [
@@ -659,37 +669,7 @@ fn envelope(raw: &str) -> Option<String> {
             return message(id, &[("detail", detail.into())]);
         }
     }
-    // These suffixes are produced only by the listed app-owned cleanup combinators.
-    for (separator, id) in [
-        (
-            "; quarantine cleanup failed: ",
-            "interaction-bisect-quarantine-cleanup",
-        ),
-        (
-            "; transfer cleanup: ",
-            "interaction-bisect-transfer-cleanup",
-        ),
-        (
-            "; workspace cleanup: ",
-            "interaction-bisect-workspace-cleanup-pair",
-        ),
-        ("; lease release: ", "interaction-bisect-lease-release"),
-    ] {
-        if let Some((detail, cleanup)) = raw.rsplit_once(separator) {
-            return message(id, &[
-                ("detail", detail.into()),
-                ("cleanup", cleanup.into()),
-            ]);
-        }
-    }
-    if let Some(rest) = raw.strip_suffix(".keep retained")
-        && let Some((detail, hash)) = rest.rsplit_once("; owned pack-")
-    {
-        return message("interaction-bisect-keep-retained", &[
-            ("detail", detail.into()),
-            ("hash", hash.into()),
-        ]);
-    }
+
     None
 }
 
@@ -732,10 +712,10 @@ pub(crate) fn warning(raw: &str) -> String {
         && matches!(hash.len(), 8 | 40 | 64)
         && hash.bytes().all(|b| b.is_ascii_hexdigit())
     {
-        return i18n::message("interaction-bisect-warning", &[
-            ("hash", hash.into()),
-            ("detail", diagnostic(detail).into()),
-        ]);
+        return i18n::message(
+            "interaction-bisect-warning",
+            &[("hash", hash.into()), ("detail", diagnostic(detail).into())],
+        );
     }
     diagnostic(raw)
 }
@@ -749,18 +729,85 @@ fn machine_location(raw: &str) -> &str {
 }
 
 fn observation_detail(raw: &str) -> String {
-    if matches!(
+    let id = match raw {
+        "Frame output exceeds 2 MiB; no result cached" => "interaction-bisect-frame-too-large",
+        "Text output is not UTF-8" => "interaction-bisect-text-encoding",
+        "Benchmark output is not UTF-8" => "interaction-bisect-benchmark-encoding",
+        "Benchmark must print one finite number" => "interaction-bisect-benchmark-finite",
+        _ => {
+            return raw
+                .strip_prefix("PNG frame could not be decoded (maximum 1024×1024): ")
+                .map_or_else(
+                    || raw.to_owned(),
+                    |detail| {
+                        i18n::message(
+                            "interaction-bisect-png-decode",
+                            &[("detail", detail.into())],
+                        )
+                    },
+                );
+        }
+    };
+    i18n::text(id).to_owned()
+}
+
+// Trailing forms have less provenance than anchored app prefixes. Only try them after
+// those prefixes have captured their entire opaque detail, including lookalike phrases.
+fn trailing_envelope(raw: &str) -> Option<String> {
+    let message = |id, args: &[(&str, i18n::Value<'_>)]| Some(i18n::message(id, args));
+    if let Some(rest) = raw.strip_suffix(" is not a git repository")
+        && let Some((path, machine)) = rest.rsplit_once(" on ")
+    {
+        return message(
+            "interaction-bisect-not-repository",
+            &[
+                ("path", path.into()),
+                ("machine", machine_location(machine).into()),
+            ],
+        );
+    }
+    // These suffixes are produced only by the listed app-owned cleanup combinators.
+    for (separator, id) in [
+        (
+            "; quarantine cleanup failed: ",
+            "interaction-bisect-quarantine-cleanup",
+        ),
+        (
+            "; transfer cleanup: ",
+            "interaction-bisect-transfer-cleanup",
+        ),
+        (
+            "; workspace cleanup: ",
+            "interaction-bisect-workspace-cleanup-pair",
+        ),
+        ("; lease release: ", "interaction-bisect-lease-release"),
+    ] {
+        if let Some((detail, cleanup)) = raw.rsplit_once(separator) {
+            return message(
+                id,
+                &[("detail", detail.into()), ("cleanup", cleanup.into())],
+            );
+        }
+    }
+    if let Some(rest) = raw.strip_suffix(".keep retained")
+        && let Some((detail, hash)) = rest.rsplit_once("; owned pack-")
+    {
+        return message(
+            "interaction-bisect-keep-retained",
+            &[("detail", detail.into()), ("hash", hash.into())],
+        );
+    }
+    None
+}
+
+fn known_observation_detail(raw: &str) -> bool {
+    matches!(
         raw,
         "Frame output exceeds 2 MiB; no result cached"
             | "Text output is not UTF-8"
             | "Benchmark output is not UTF-8"
             | "Benchmark must print one finite number"
     ) || raw.starts_with("PNG frame could not be decoded (maximum 1024×1024): ")
-    {
-        diagnostic(raw)
-    } else {
-        raw.to_owned()
-    }
 }
 
 #[cfg(test)]
@@ -933,6 +980,48 @@ mod execution_fluent_tests {
             warning.contains("01234567")
                 && warning.contains("konnte nicht gelesen")
                 && warning.contains("native payload")
+        );
+        i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod execution_fluent_payload_tests {
+    use super::*;
+
+    #[test]
+    fn anchored_details_keep_lookalike_cleanup_and_exit_phrases_opaque() {
+        i18n::set_language("de");
+        for detail in [
+            "provider text; quarantine cleanup failed: provider detail",
+            "provider text; workspace cleanup: provider detail",
+            "provider text (exit 2345); stderr: provider detail",
+            "provider/path on provider-host is not a git repository",
+            "provider text; owned pack-01234567.keep retained",
+            "provider text\ntrailing newline\n",
+        ] {
+            for prefix in [
+                "could not read stopped test log: ",
+                "Observation cleanup unknown: ",
+            ] {
+                let raw = format!("{prefix}{detail}");
+                assert!(
+                    diagnostic(&raw).contains(detail),
+                    "{raw} -> {}",
+                    diagnostic(&raw)
+                );
+            }
+        }
+        let decoder = "provider (exit 7); stderr: decoder raw data";
+        let raw = format!(
+            "PNG frame could not be decoded (maximum 1024×1024): {decoder} (exit 2345); stderr: actual stderr"
+        );
+        assert!(diagnostic(&raw).contains(decoder));
+        assert_eq!(
+            observation_detail(&format!(
+                "PNG frame could not be decoded (maximum 1024×1024): {decoder}"
+            )),
+            format!("Der PNG-Frame konnte nicht dekodiert werden (maximal 1024×1024): {decoder}")
         );
         i18n::set_language("en-US");
     }
