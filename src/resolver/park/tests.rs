@@ -678,3 +678,35 @@ fn recovery_archive_collision_keeps_both_originals() -> Result<(), String> {
     assert!(folder(repo.path(), &parked.id)?.join("raw/a.txt").is_file());
     Ok(())
 }
+
+#[test]
+fn filtered_clean_edit_after_parking_is_refused_before_any_writes() -> Result<(), String> {
+    let repo = mid_merge("park-post-clean-raw")?;
+    // Use persistent attributes on HEAD, not only attributes stored in the parked merge.
+    let attributes = git_dir(repo.path())?.join("info/attributes");
+    std::fs::write(attributes, "notes.txt text eol=lf\n").map_err(|e| e.to_string())?;
+    let parked = park(repo.path(), "post-clean-raw", &["a.txt".into()])?;
+    write(repo.path(), "notes.txt", "notes\r\n")?;
+    assert!(
+        repo.git(&["status", "--porcelain", "--untracked-files=no"])?
+            .is_empty()
+    );
+    let before = state(&repo)?;
+    let index = std::fs::read(git_dir(repo.path())?.join("index")).map_err(|e| e.to_string())?;
+    let error = bring_back(repo.path(), &parked).expect_err("must retain hidden user edit");
+    assert!(error.contains("raw bytes changed"), "{error}");
+    assert_eq!(state(&repo)?, before);
+    assert_eq!(
+        std::fs::read(git_dir(repo.path())?.join("index")).map_err(|e| e.to_string())?,
+        index
+    );
+    assert_eq!(list(repo.path())?, vec![parked.clone()]);
+    assert!(
+        folder(repo.path(), &parked.id)?
+            .join("raw/notes.txt")
+            .is_file()
+    );
+    write(repo.path(), "notes.txt", "notes\n")?;
+    bring_back(repo.path(), &parked)?;
+    Ok(())
+}
