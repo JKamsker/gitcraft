@@ -30,6 +30,61 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
             "Choose a literal root ref (such as HEAD) or a ref/prefix beginning with refs/".into(),
         );
     }
+    let (refs, root_fallback) = references(repo)?;
+    let selected: Vec<_> = refs
+        .iter()
+        .filter(|r| {
+            namespace.is_empty()
+                || r.name == namespace
+                || r.name
+                    .starts_with(&format!("{}/", namespace.trim_end_matches('/')))
+        })
+        .collect();
+    let mut tips = Vec::new();
+    for r in &selected {
+        if r.kind == "commit" {
+            tips.push(r.oid.clone());
+        } else if r.kind == "tag"
+            && let Ok(commit) = text(
+                repo,
+                &["rev-parse", "--verify", &format!("{}^{{commit}}", r.oid)],
+            )
+        {
+            tips.push(commit.trim().to_owned());
+        }
+    }
+    tips.sort();
+    tips.dedup();
+    let history = if tips.is_empty() {
+        String::new()
+    } else {
+        String::from_utf8(super::read(
+            repo,
+            &[
+                "--no-pager",
+                "log",
+                "--graph",
+                "--no-color",
+                "--no-show-signature",
+                "--format=%h %s",
+                "-n",
+                "200",
+                "--stdin",
+            ],
+            (tips.join("\n") + "\n").into_bytes(),
+            1 << 20,
+        )?)
+        .map_err(|_| "Ref history is not UTF-8")?
+    };
+    Ok(Browser {
+        refs,
+        history,
+        root_fallback,
+    })
+}
+
+/// Enumeration shared with migration verification; history rendering is separate.
+pub(super) fn references(repo: &Path) -> Result<(Vec<Reference>, bool), String> {
     let format = "--format=%(refname)%00%(objectname)%00%(objecttype)%00%(symref)";
     let output = super::capture_with(
         repo,
@@ -109,56 +164,7 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         });
     }
     refs.sort_by(|a, b| a.name.cmp(&b.name));
-    let selected: Vec<_> = refs
-        .iter()
-        .filter(|r| {
-            namespace.is_empty()
-                || r.name == namespace
-                || r.name
-                    .starts_with(&format!("{}/", namespace.trim_end_matches('/')))
-        })
-        .collect();
-    let mut tips = Vec::new();
-    for r in &selected {
-        if r.kind == "commit" {
-            tips.push(r.oid.clone());
-        } else if r.kind == "tag"
-            && let Ok(commit) = text(
-                repo,
-                &["rev-parse", "--verify", &format!("{}^{{commit}}", r.oid)],
-            )
-        {
-            tips.push(commit.trim().to_owned());
-        }
-    }
-    tips.sort();
-    tips.dedup();
-    let history = if tips.is_empty() {
-        String::new()
-    } else {
-        String::from_utf8(super::read(
-            repo,
-            &[
-                "--no-pager",
-                "log",
-                "--graph",
-                "--no-color",
-                "--no-show-signature",
-                "--format=%h %s",
-                "-n",
-                "200",
-                "--stdin",
-            ],
-            (tips.join("\n") + "\n").into_bytes(),
-            1 << 20,
-        )?)
-        .map_err(|_| "Ref history is not UTF-8")?
-    };
-    Ok(Browser {
-        refs,
-        history,
-        root_fallback,
-    })
+    Ok((refs, root_fallback))
 }
 
 #[cfg(test)]

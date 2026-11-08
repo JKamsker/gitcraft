@@ -69,11 +69,18 @@ pub(crate) fn migrate(
     if let Some(why) = &inspect(runner.repo)?.blocked {
         return Err(why.clone());
     }
-    let refs = expected.snapshot.refs.clone();
+    let refs = ref_witness(runner.repo)?;
     let reflogs = text(
         runner.repo,
-        &["reflog", "show", "--all", "--format=%gD%x00%H%x00%gs"],
+        &[
+            "reflog",
+            "show",
+            "--all",
+            "--date=raw",
+            "--format=%gD%x00%H%x00%gn%x00%ge%x00%gs",
+        ],
     )?;
+    expected.snapshot.check(runner.repo)?;
     runner.run(&[
         "refs",
         "migrate",
@@ -81,12 +88,18 @@ pub(crate) fn migrate(
         "--reflog",
     ])?;
     let after = inspect(runner.repo)?;
-    if after.format != target || after.snapshot.refs != refs {
+    if after.format != target || ref_witness(runner.repo)? != refs {
         return Err("Migration completed but ref verification differs. Do not continue writing; inspect git refs verify and the migration output.".into());
     }
     let after_logs = text(
         runner.repo,
-        &["reflog", "show", "--all", "--format=%gD%x00%H%x00%gs"],
+        &[
+            "reflog",
+            "show",
+            "--all",
+            "--date=raw",
+            "--format=%gD%x00%H%x00%gn%x00%ge%x00%gs",
+        ],
     )?;
     let mut before: Vec<_> = reflogs.lines().collect();
     let mut after: Vec<_> = after_logs.lines().collect();
@@ -104,13 +117,24 @@ pub(crate) fn migrate(
     ))
 }
 
+fn ref_witness(repo: &Path) -> Result<Vec<super::all_refs::Reference>, String> {
+    let (refs, fallback) = super::all_refs::references(repo)?;
+    if fallback {
+        return Err("Migration requires root-ref enumeration for verification; update Git before continuing".into());
+    }
+    Ok(refs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn round_trip_preserves_refs_and_refuses_linked_or_stale() -> Result<(), String> {
         let r = crate::git::fixture::Repo::new("reftable-migration")?;
-        r.commit("base", &[])?;
+        let commit = r.commit("base", &[])?;
+        r.git(&["update-ref", "APP_ROOT", &commit])?;
+        r.git(&["symbolic-ref", "refs/gitcraft/root", "APP_ROOT"])?;
+        let refs = ref_witness(r.path());
         let before = inspect(r.path())?;
         if !before.migrates {
             return Ok(());
@@ -121,10 +145,13 @@ mod tests {
             control: &control,
             credentials: None,
         };
+        let refs = refs?;
         migrate(&runner, &before, "reftable")?;
+        assert_eq!(ref_witness(r.path())?, refs);
         assert_eq!(inspect(r.path())?.format, "reftable");
         assert!(migrate(&runner, &before, "reftable").is_err());
         migrate(&runner, &inspect(r.path())?, "files")?;
+        assert_eq!(ref_witness(r.path())?, refs);
         let linked = r.path().join("linked");
         r.git(&["worktree", "add", "--detach", &linked.to_string_lossy()])?;
         assert!(inspect(r.path())?.blocked.is_some());
