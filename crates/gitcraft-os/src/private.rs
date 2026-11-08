@@ -75,7 +75,7 @@ fn windows_private(path: &Path) -> io::Result<()> {
         ConvertSidToStringSidW(user.User.Sid, &mut sid).map_err(fail)?;
         let sid_text = sid.to_string().map_err(|e| io::Error::other(e.to_string()));
         let _ = LocalFree(Some(HLOCAL(sid.0.cast())));
-        let descriptor = format!("D:P(A;OICI;FA;;;{})", sid_text?);
+        let descriptor = format!("O:{0}D:P(A;OICI;FA;;;{0})", sid_text?);
         let wide: Vec<u16> = descriptor.encode_utf16().chain(Some(0)).collect();
         let mut security = PSECURITY_DESCRIPTOR::default();
         ConvertStringSecurityDescriptorToSecurityDescriptorW(

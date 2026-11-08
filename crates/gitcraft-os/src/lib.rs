@@ -25,6 +25,8 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod workspace_lock;
+pub use workspace_lock::{WorkspaceClaim, WorkspaceFence, WorkspaceGrant};
 mod private_directory;
 pub use private_directory::{PrivateDirectory, PrivateFileMode, file_identity};
 mod receipt_retirement;

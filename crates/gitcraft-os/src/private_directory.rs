@@ -189,6 +189,53 @@ impl PrivateDirectory {
         }
         Ok(unsafe { File::from_raw_handle(handle.0) })
     }
+    #[cfg(windows)]
+    pub(crate) fn protect_file(&self, file: &File) -> io::Result<()> {
+        use std::os::windows::io::AsRawHandle;
+        use windows::Win32::{
+            Foundation::{HANDLE, HLOCAL, LocalFree},
+            Security::{
+                Authorization::{GetSecurityInfo, SE_FILE_OBJECT, SetSecurityInfo},
+                DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
+                PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+            },
+        };
+        let fail = |e: windows::core::Error| io::Error::other(e.to_string());
+        let mut descriptor = PSECURITY_DESCRIPTOR::default();
+        let mut owner = PSID::default();
+        let mut acl = std::ptr::null_mut();
+        // SAFETY: copy only the held, already validated private directory's user-only
+        // DACL to this newly exclusive-created file, before writing/publishing its data.
+        unsafe {
+            GetSecurityInfo(
+                HANDLE(self.file.as_raw_handle()),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                Some(&mut owner),
+                None,
+                Some(&mut acl),
+                None,
+                Some(&mut descriptor),
+            )
+            .ok()
+            .map_err(fail)?;
+            let result = SetSecurityInfo(
+                HANDLE(file.as_raw_handle()),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION
+                    | PROTECTED_DACL_SECURITY_INFORMATION
+                    | OWNER_SECURITY_INFORMATION,
+                Some(owner),
+                None,
+                Some(acl),
+                None,
+            )
+            .ok()
+            .map_err(fail);
+            let _ = LocalFree(Some(HLOCAL(descriptor.0)));
+            result
+        }
+    }
     /// Remove this namespace's fixed terminal receipt; Windows deletes its retained HANDLE.
     pub(crate) fn retire_terminal(&self, terminal: &File) -> io::Result<()> {
         #[cfg(unix)]
