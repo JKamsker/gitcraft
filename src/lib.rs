@@ -69,6 +69,7 @@ pub fn owned_endpoint_helper() -> Option<i32> {
     {
         Some("--gitcraft-owned-endpoint") => Some(remote::native_owner::entrypoint()),
         Some("--gitcraft-workspace-claim") => Some(remote::workspace_claim::entrypoint()),
+        Some("--gitcraft-contained-git") => Some(git::bundle_helper::entrypoint()),
         _ => None,
     }
 }

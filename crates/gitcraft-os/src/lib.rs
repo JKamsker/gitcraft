@@ -27,6 +27,8 @@ pub struct Link {
 
 mod close_file;
 pub use close_file::close_file;
+mod bundle_resources;
+pub use bundle_resources::{BUNDLE_FILE_BYTES, BUNDLE_MEMORY_BYTES, BundleResources};
 mod workspace_lock;
 pub use workspace_lock::{WorkspaceClaim, WorkspaceFence, WorkspaceGrant};
 mod private_directory;

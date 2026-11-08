@@ -7,6 +7,7 @@
 //! - [`workspace`] and [`runner`]: the worktrees on that machine, and the tests run there;
 //! - [`cache`]: answers by tree, so that no tree is tested twice.
 
+pub(crate) mod bundle;
 mod cache;
 mod dag;
 mod machine;

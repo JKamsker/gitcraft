@@ -1,4 +1,4 @@
-//! Offline export and read-only bundle inspection. Import awaits OS resource containment.
+//! Offline export, read-only header inspection and explicitly confirmed contained import.
 use std::collections::BTreeSet;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -23,6 +23,9 @@ pub struct BundlePreview {
     pub prerequisites: Vec<BundleRef>,
     /// Only header/prerequisites are verified. Pack data is never unpacked by inspection.
     pub verification_error: Option<String>,
+    pub(crate) bytes: std::sync::Arc<Vec<u8>>,
+    pub digest: String,
+    pub(crate) repository: String,
 }
 
 pub fn bundle_refs(repo: &Path) -> Result<Vec<BundleRef>, String> {
@@ -185,11 +188,118 @@ pub fn inspect_bundle(repo: &Path, bytes: Vec<u8>) -> Result<BundlePreview, Stri
     }
     let temp = BundleFile::new(repo, &bytes)?;
     let verification_error = verify(repo, &temp.path, &refs, &bytes).err();
+    let repository = crate::parallel_bisect::bundle::identity(repo)?;
+    let digest = bundle_digest(&bytes);
     Ok(BundlePreview {
         refs,
         prerequisites,
         verification_error,
+        bytes: std::sync::Arc::new(bytes),
+        digest,
+        repository,
     })
+}
+
+pub(crate) fn bundle_digest(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Validation is repeated against the held file snapshot before any mutation. Import
+/// always verifies again; a prior verification result is only information for the user.
+pub(crate) fn check_bundle(
+    repo: &Path,
+    preview: &BundlePreview,
+    selected: &BTreeSet<String>,
+    prefix: &str,
+    import: bool,
+) -> Result<Vec<BundleRef>, String> {
+    let (refs, prerequisites) = checked_snapshot(preview)?;
+    if no_lazy_fetch(repo)?.is_empty() {
+        return Err("Contained bundle import requires Git 2.45 or newer to prohibit all lazy fetching. Upgrade Git; no pack was opened.".into());
+    }
+    let mapped = import_mapping(&refs, selected, prefix)?;
+    let pack = preview
+        .bytes
+        .windows(2)
+        .position(|b| b == b"\n\n")
+        .ok_or("No bundle header terminator")?
+        + 2;
+    crate::parallel_bisect::bundle::run(
+        repo,
+        &preview.repository,
+        &preview.bytes[pack..],
+        &refs,
+        &prerequisites,
+        &mapped,
+        import,
+    )?;
+    Ok(mapped)
+}
+
+fn checked_snapshot(preview: &BundlePreview) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
+    let (refs, prerequisites) = header(&preview.bytes)?;
+    if refs != preview.refs
+        || prerequisites != preview.prerequisites
+        || bundle_digest(&preview.bytes) != preview.digest
+    {
+        return Err("The held bundle snapshot changed; reopen the file".into());
+    }
+    Ok((refs, prerequisites))
+}
+
+pub(crate) fn import_mapping(
+    refs: &[BundleRef],
+    selected: &BTreeSet<String>,
+    prefix: &str,
+) -> Result<Vec<BundleRef>, String> {
+    if prefix.is_empty()
+        || prefix.len() > 64
+        || !prefix
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-".contains(&b))
+    {
+        return Err(
+            "Use 1–64 lowercase letters, digits, underscores or hyphens for the import group"
+                .into(),
+        );
+    }
+    if selected.is_empty() || selected.len() > REF_LIMIT {
+        return Err("Select between 1 and 1000 incoming refs".into());
+    }
+    if selected.iter().any(|n| !refs.iter().any(|r| &r.name == n)) {
+        return Err("An incoming ref selection is stale".into());
+    }
+    let mut mapped = Vec::new();
+    let mut folded = BTreeSet::new();
+    for r in refs.iter().filter(|r| selected.contains(&r.name)) {
+        valid_ref(&r.name)?;
+        if !valid_oid(&r.oid) {
+            return Err("Invalid incoming object ID".into());
+        }
+        let tail = r.name.strip_prefix("refs/").unwrap_or(&r.name);
+        let name = format!("refs/bundle-import/{prefix}/{tail}");
+        valid_ref(&name)?;
+        if !folded.insert(name.to_lowercase()) {
+            return Err("Incoming refs collide when case is ignored".into());
+        }
+        mapped.push(BundleRef {
+            name,
+            oid: r.oid.clone(),
+        });
+    }
+    for name in &folded {
+        if folded
+            .iter()
+            .any(|other| other.starts_with(&format!("{name}/")))
+        {
+            return Err("Incoming refs have a directory/file name collision".into());
+        }
+    }
+    Ok(mapped)
 }
 
 fn verify(
@@ -400,7 +510,7 @@ fn header(bytes: &[u8]) -> Result<(Vec<BundleRef>, Vec<BundleRef>), String> {
             } else {
                 name.into()
             },
-            oid: oid.into(),
+            oid: oid.to_ascii_lowercase(),
         };
         if prerequisite {
             prerequisites.push(r);
@@ -535,3 +645,96 @@ impl Drop for BundleFile {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod recording_import_tests {
+    use super::*;
+    fn refs(names: &[&str]) -> Vec<BundleRef> {
+        names
+            .iter()
+            .map(|n| BundleRef {
+                name: (*n).into(),
+                oid: "a".repeat(40),
+            })
+            .collect()
+    }
+    #[test]
+    fn selected_refs_map_to_new_names_and_reject_stale_or_colliding_selection() {
+        let refs = refs(&["HEAD", "refs/heads/main", "refs/tags/v1"]);
+        let selected = ["HEAD", "refs/tags/v1"]
+            .map(str::to_owned)
+            .into_iter()
+            .collect();
+        let mapped = import_mapping(&refs, &selected, "handoff_1").unwrap();
+        assert_eq!(
+            mapped.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            [
+                "refs/bundle-import/handoff_1/HEAD",
+                "refs/bundle-import/handoff_1/tags/v1"
+            ]
+        );
+        assert!(mapped.iter().all(|r| r.oid == "a".repeat(40)));
+        for prefix in [
+            "",
+            "../main",
+            "NEW",
+            "a/b",
+            "refs/heads/main",
+            "x\ncreate other",
+        ] {
+            assert!(import_mapping(&refs, &selected, prefix).is_err());
+        }
+        assert!(import_mapping(&refs, &BTreeSet::new(), "new").is_err());
+        assert!(
+            import_mapping(
+                &refs,
+                &["refs/heads/stale".into()].into_iter().collect(),
+                "new"
+            )
+            .is_err()
+        );
+        for names in [
+            ["refs/heads/Main", "refs/heads/main"],
+            ["refs/heads/a", "refs/heads/a/b"],
+        ] {
+            let colliding = self::refs(&names);
+            let all = colliding.iter().map(|r| r.name.clone()).collect();
+            assert!(import_mapping(&colliding, &all, "new").is_err());
+        }
+    }
+    #[test]
+    fn held_snapshot_digest_binds_pack_bytes_not_only_advertised_header() {
+        let header = format!(
+            "# v2 git bundle\n{} refs/heads/main\n\nPACK",
+            "a".repeat(40)
+        );
+        let original = header.into_bytes();
+        let mut altered = original.clone();
+        altered.push(0);
+        assert_eq!(
+            self::header(&original).unwrap(),
+            self::header(&altered).unwrap()
+        );
+        assert_ne!(bundle_digest(&original), bundle_digest(&altered));
+        let (refs, prerequisites) = self::header(&altered).unwrap();
+        let preview = BundlePreview {
+            refs,
+            prerequisites,
+            verification_error: None,
+            bytes: std::sync::Arc::new(altered),
+            digest: bundle_digest(&original),
+            repository: "recording-only".into(),
+        };
+        // This pure production guard runs before any capability probe. No process-
+        // capable backend exists in this test, including on a validation regression.
+        assert!(
+            checked_snapshot(&preview)
+                .unwrap_err()
+                .contains("snapshot changed")
+        );
+        assert_eq!(
+            bundle_digest(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+}

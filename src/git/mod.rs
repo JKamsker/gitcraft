@@ -9,6 +9,7 @@ mod behaviour;
 pub(crate) use behaviour::{BehaviourCommit, behaviour_commits};
 mod bisect;
 mod branch_health;
+pub(crate) mod bundle_helper;
 mod bundles;
 #[cfg(test)]
 mod clone_tests;
