@@ -26,11 +26,17 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
 - _Resolve all with agent_ on the banner of a merge, rebase, cherry-pick or revert in progress
   (or _Agent → Resolve in background_ in the conflict editor, for that file) hands the conflicted files
   to Claude Code, or to Codex when Settings → AI picks it, running headless. You go on working
-  meanwhile; nothing of the merge changes until you apply the result.
-- _Resolve all with agent_ also puts the merge aside while the agent works, like a stash: the
-  worktree's files, its index as it is (each conflict's sides and what you staged) and the
-  merge itself (`MERGE_HEAD`, its message) are kept, and the worktree goes back to its branch,
-  clean. Check out other branches, commit, anything, in the same worktree. The graph shows the
+  meanwhile. Resolving one file leaves your checkout as it is until you apply the agent's
+  changes; _Resolve all_ puts the merge aside first (below), and brings it back as it was.
+- Files behind the [agent fence](branches-and-worktrees.md#worktrees) never reach the agent: _Resolve all_ leaves them
+  to you (they are put aside with the merge and come back with it), and resolving one of them
+  in the background is refused.
+- _Resolve all with agent_ also tries to put the merge aside before the agent starts, like a
+  stash: the worktree's files, its index as it is (each conflict's sides and what you staged)
+  and the merge itself (`MERGE_HEAD`, its message) are kept, and the worktree is reset to its
+  branch, clean. Check out other branches, commit, anything, in the same worktree. One that
+  can't be put aside (below) stays in the worktree while the agent works: resolve it there
+  rather than switch branches. The graph shows the
   merge put aside above the commit it was on, with the agent's robot: a turning ring and how far
   along it is while it works, a dot and _resolved · bring it back_ once it is done (with a
   notification). _Bring it back_ (the card, or the row's menu) checks out its branch and puts
@@ -56,7 +62,9 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
   _Stop_ ends the agent; what it resolved by then can still be applied.
 - When it is done, the card lists each file: resolved, deleted (as one side did), still
   conflicted, not decided, or changed by you meanwhile (left as you made it). _Apply_ writes
-  the files you tick and marks them resolved; _Discard_ forgets the agent's work.
+  the files you tick and marks them resolved (a file that can't be written stays, with the
+  agent's work on it, to apply again); _Discard_ forgets the agent's work. A conflict editor
+  open on a file applied closes, unless it holds choices you haven't saved: those stay.
 - _Review changes_ (or a file's _Review_) shows what you are applying, in the big area: for
   each conflict its two sides next to each other, named after them, and what the agent wrote
   in its place ("took main", "kept both, main first", "combined in its own words"), with the
