@@ -191,7 +191,7 @@ impl RepoTab {
                 {
                     crate::i18n::message(
                         "repo-core-0906",
-                        &[("title", format!("{}", profile.title()).into())],
+                        &[("title", format!("{}", profile.display_title()).into())],
                     )
                 } else if let Some(host) = &elsewhere {
                     crate::i18n::message("repo-core-0907", &[("host", format!("{}", host).into())])
@@ -248,7 +248,7 @@ impl RepoTab {
                     choices.push((
                         crate::i18n::message(
                             "repo-core-0915",
-                            &[("title", format!("{}", p.title()).into())],
+                            &[("title", format!("{}", p.display_title()).into())],
                         ),
                         name.to_owned(),
                         email.to_owned(),
