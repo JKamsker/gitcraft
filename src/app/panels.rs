@@ -60,7 +60,10 @@ impl App {
                 || self.my_work.open,
             update: self.update_check(),
             check_updates_now: false,
-            previous: self.previous_version.as_ref().map(|p| p.label().to_owned()),
+            previous: self
+                .previous_version
+                .as_ref()
+                .map(|p| p.display_label().to_owned()),
             previous_is_newer: self
                 .previous_version
                 .as_ref()

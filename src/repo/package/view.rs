@@ -129,16 +129,23 @@ fn report_ui(
     registry: &str,
 ) {
     let t = Tokens::get(ui.ctx());
-    if let Some(hint) = &report.hint {
+    if let Some(hint) = report.display_hint() {
         ui.add(egui::Label::new(RichText::new(hint).color(t.warning).small()).wrap());
     }
     notes(
         ui,
+        report,
         "LOOKS SHIPPED BY ACCIDENT",
         &report.accidental,
         t.warning,
     );
-    notes(ui, "USUALLY SHIPPED, LEFT OUT", &report.missing, t.warning);
+    notes(
+        ui,
+        report,
+        "USUALLY SHIPPED, LEFT OUT",
+        &report.missing,
+        t.warning,
+    );
     heading(ui, &format!("COMPARED WITH {}", registry.to_uppercase()));
     match published {
         None => {
@@ -176,13 +183,18 @@ fn report_ui(
     more(ui, report.files.len());
 }
 
-fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
+fn notes(ui: &mut Ui, report: &Report, title: &str, notes: &[Note], color: egui::Color32) {
     heading(ui, &format!("{title} ({})", notes.len()));
     if notes.is_empty() {
         faint(ui, "None found.");
     }
     for n in notes.iter().take(SHOWN) {
-        line(ui, &format!("{} — {}", n.path, n.why), color, "");
+        line(
+            ui,
+            &format!("{} — {}", n.path, report.display_why(n)),
+            color,
+            "",
+        );
     }
     more(ui, notes.len());
 }
@@ -239,4 +251,51 @@ fn buttons(ui: &mut Ui, acts: &mut Vec<Action>, refresh: bool) {
             acts.push(Action::Package(PackageAct::Close));
         }
     });
+}
+
+#[cfg(test)]
+mod package_report_paint_tests {
+    use super::*;
+
+    #[test]
+    fn retained_package_report_repaints_known_reasons_and_hint_without_changing_raw_data() {
+        let report = Report {
+            files: vec![("opaque/on, auf/12345.env".into(), Some(1536 * 1024))],
+            accidental: vec![Note {
+                path: "opaque/on, auf/12345.env".into(),
+                why: "big for a package (1.5 MB)".into(),
+            }, Note {
+                path: "unknown/12345".into(),
+                why: "provider text; package.json has a prepack script".into(),
+            }],
+            missing: vec![],
+            hint: Some("package.json has a prepack script, which npm publish runs first and this listing doesn't: files it builds may show as left out or gone until it has run".into()),
+        };
+        let original = report.clone();
+        let ctx = egui::Context::default();
+        for (locale, reason) in [
+            ("en-US", "big for a package (1.5 MB)"),
+            ("de", "groß für ein Paket (1,5 MB)"),
+            ("en-US", "big for a package (1.5 MB)"),
+        ] {
+            crate::i18n::set_language(locale);
+            let shown = crate::repo::push_preflight::core_guard_paint_tests::paint(&ctx, |ui| {
+                report_ui(ui, &report, Some(&Ok(None)), "registry-12345");
+            });
+            assert!(shown.contains(reason), "{shown}");
+            let hint = if locale == "de" {
+                "package.json enthält ein prepack-Skript"
+            } else {
+                "package.json has a prepack script"
+            };
+            assert!(shown.contains(hint), "{shown}");
+            assert!(shown.contains("opaque/on, auf/12345.env"), "{shown}");
+            assert!(
+                shown.contains("provider text; package.json has a prepack script"),
+                "{shown}"
+            );
+            assert_eq!(report, original);
+        }
+        crate::i18n::set_language("en-US");
+    }
 }
