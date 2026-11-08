@@ -144,7 +144,7 @@ pub struct DiffData {
     /// The runs of changed rows and the changes they make, unified and side by side: worked
     /// out the first time they are needed, not every frame.
     /// The _weakens checks_ evidence of each hunk that has some, by its header's line.
-    pub(super) weakened: std::collections::HashMap<usize, String>,
+    pub(super) weakened: std::collections::HashMap<usize, weakened::HunkSummary>,
     /// Who wrote each added line, as its commit records (a commit's diff only).
     pub(super) authors: Vec<Option<crate::authorship::Who>>,
     hunks: [std::sync::OnceLock<Vec<(usize, usize)>>; 2],

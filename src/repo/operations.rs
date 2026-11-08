@@ -1889,3 +1889,65 @@ mod signout_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod core_guard_paint_tests {
+    use super::*;
+    use crate::repo::push_preflight::core_guard_paint_tests::paint;
+
+    #[test]
+    fn core_guard_paint_reviewed_auth_extracts_original_proof_before_display() {
+        let binding: git::RouteBinding = serde_json::from_value(serde_json::json!({
+            "args": ["push", "--", "remote-12345", "HEAD:refs/heads/topic-12345"],
+            "routes": ["https://push.invalid/team/12345"],
+            "configuration": "opaque-configuration-12345"
+        }))
+        .unwrap();
+        let original = binding.args.clone();
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let receipt =
+                crate::push_preflight::remember_auth_endpoint("https://push.invalid/team/12345");
+            let before = receipt.clone();
+            let control = git::OpControl::new(|| {});
+            let captured = std::cell::Cell::new(false);
+            let result = run_reviewed_push(
+                &original,
+                |args| {
+                    assert_eq!(
+                        args,
+                        original.iter().map(String::as_str).collect::<Vec<_>>()
+                    );
+                    captured.set(true);
+                    Ok(binding.clone())
+                },
+                || {
+                    assert!(captured.get());
+                    Err(receipt.clone())
+                },
+                Some(&control),
+            );
+            assert_eq!(result, Err(before.clone()));
+            let failure = control.auth_failure().expect("typed authentication proof");
+            assert!(failure.confirmed);
+            assert_eq!(failure.binding, Some(binding.clone()));
+            assert_eq!(failure.endpoints, ["https://push.invalid/team/12345"]);
+            assert!(crate::push_preflight::take_auth_endpoint(&receipt).is_none());
+            // Presentation follows actual one-shot extraction; no receipt is sent to a translator.
+            let shown = paint(&egui::Context::default(), |ui| {
+                ui.label(crate::push_preflight::display::reviewed_auth_failure());
+            });
+            assert!(shown.contains(if locale == "de" {
+                "Authentifizierung"
+            } else {
+                "Authentication"
+            }));
+            assert!(!shown.contains("gitcraft-reviewed-auth"));
+            assert!(crate::push_preflight::is_reviewed_auth_error(&receipt));
+            assert_eq!(receipt, before);
+            assert_eq!(crate::push_preflight::APPROVED, "\0push-preflight");
+            assert_eq!(crate::push_preflight::FIX, "\0push-preflight-fix");
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
