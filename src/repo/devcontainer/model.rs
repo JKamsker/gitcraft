@@ -83,6 +83,7 @@ pub(super) fn arguments(config: &Config, verb: &str) -> Vec<String> {
         "--config".into(),
         config.path.join(CONFIG).to_string_lossy().into_owned(),
         "--mount-workspace-git-root=false".into(),
+        "--mount-git-worktree-common-dir=true".into(),
         "--id-label".into(),
         config.label(),
         "--id-label".into(),

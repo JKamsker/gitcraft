@@ -32,6 +32,7 @@ fn per_worktree_up_has_no_global_cleanup_and_positional_arguments() {
     );
     assert!(args.contains(&config.label()));
     assert!(args.contains(&"--mount-workspace-git-root=false".into()));
+    assert!(args.contains(&"--mount-git-worktree-common-dir=true".into()));
     assert!(
         !args
             .iter()
