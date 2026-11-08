@@ -378,6 +378,17 @@ impl Workspace {
         self.close_error = result.as_ref().err().cloned();
         result
     }
+
+    /// Simulate loss of a client after its operations completed, keeping real durable
+    /// owner evidence for the next claimant. This fixture never leaves a live target.
+    #[cfg(test)]
+    pub(super) fn leave_completed_fixture(mut self) -> Result<(), String> {
+        self.closed = true;
+        self.lease
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .close()
+    }
 }
 impl Drop for Workspace {
     fn drop(&mut self) {

@@ -107,7 +107,7 @@ fn a_tool_that_reads_nothing_still_answers() {
     settings.max_diff_kb = 1024;
     let answer = ask_now(&dir, &settings, TIMEOUT);
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(answer.map(|a| a.text), Ok("fix: x".to_owned()));
+    assert!(matches!(answer, Err(RunError::Failed(e)) if e.contains("kept its output open")));
 }
 
 #[test]
@@ -253,16 +253,16 @@ fn a_review_asks_about_what_the_branch_adds() {
     assert!(!prompt.contains("grüße"));
 }
 
-/// A tool that answers but leaves something running that holds its output open still gives
-/// its answer, within moments, and what it left is stopped.
+/// Delivered answer bytes cannot establish complete output while an inherited pipe
+/// remains open. Report the explicit failure within the bounded drain/cleanup interval.
 #[test]
-fn a_tool_that_leaves_something_running_still_answers() {
+fn inherited_open_output_is_reported_instead_of_a_complete_answer() {
     let dir = repo("linger");
     let settings = tool(&dir, "cat >/dev/null\necho 'fix: x'\nsleep 30 &");
     let started = Instant::now();
     let answer = ask_now(&dir, &settings, TIMEOUT);
     let took = started.elapsed();
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(answer.map(|a| a.text), Ok("fix: x".to_owned()));
+    assert!(matches!(answer, Err(RunError::Failed(e)) if e.contains("kept its output open")));
     assert!(took < Duration::from_secs(10), "{took:?}");
 }

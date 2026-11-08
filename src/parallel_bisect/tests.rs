@@ -463,41 +463,110 @@ fn cancelling_stops_the_tests_and_removes_the_worktrees() -> Result<(), String> 
     Ok(())
 }
 
-/// What a crashed bisect left (worktrees, its folder, refs) is cleared by the next one; a
-/// folder another window keeps using is left alone.
+/// Completed durable owners and a released claim let the next claimant recover worktrees
+/// and generation refs; a still-held claim prevents takeover regardless of PID or time.
 #[test]
 fn a_crashed_bisect_is_cleared_up_by_the_next() -> Result<(), String> {
     let dir = scratch("leftovers")?;
     let repo = Repo::with_culprit(&dir.join("repo"), 10, 4)?;
-    let git = |args: &[&str]| git::run(Some(&repo.dir), args);
-    let (base, _) = workspace::base_for(&repo.dir, &Machine::Here)?;
-    let leave_behind = |at: i64| -> Result<(), String> {
-        std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
-        let slot = sh_path(&base.join("bisect-1"));
-        git(&["worktree", "add", "-q", "--detach", &slot, &repo.commits[2]])?;
-        git(&[
-            "update-ref",
-            "refs/gitcraft-bisect/sent-0",
-            &repo.commits[3],
-        ])?;
-        std::fs::write(base.join("owner"), format!("gitcraft 1 {at}\n")).map_err(|e| e.to_string())
+    let leave_behind = || -> Result<workspace::Workspace, String> {
+        let ws = workspace::Workspace::open(&repo.dir, &Machine::Here, None)?;
+        let (_, slot) = ws.slot(1);
+        let limit = Duration::from_secs(60);
+        let added = ws.run_git(
+            &repo.dir,
+            &["worktree", "add", "-q", "--detach", &slot, &repo.commits[2]],
+            limit,
+        )?;
+        assert_eq!(added.code, Some(0), "{:?}", added.stderr);
+        let authority = ws.authority(crate::remote::workspace_authority::FenceMode::Mutation)?;
+        let reference = format!("refs/gitcraft-bisect/{}/sent-0", authority.generation);
+        let published = ws.run_git(
+            &repo.dir,
+            &["update-ref", &reference, &repo.commits[3]],
+            limit,
+        )?;
+        assert_eq!(published.code, Some(0), "{:?}", published.stderr);
+        let mut records = 0;
+        for entry in std::fs::read_dir(&authority.root).map_err(|e| e.to_string())? {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.extension().is_some_and(|ext| ext == "owner") {
+                let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+                let value: serde_json::Value =
+                    serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                assert_eq!(value["v"], 3);
+                assert_eq!(value["generation"], authority.generation);
+                assert_eq!(crate::remote::recover_owner(&path)?, bytes);
+                records += 1;
+            }
+        }
+        assert!(records >= 2, "real operations must publish durable owners");
+        Ok(ws)
     };
-    // A window that is still at it: refused, nothing touched.
-    leave_behind(git::now())?;
+    let ws = leave_behind()?;
+    let base = ws.base.clone();
     let (outcome, _) = bisect(repo.setup(&command(&dir.join("t1")), 2));
     assert!(
-        matches!(&outcome, Outcome::Failed(e) if e.contains("another gitcraft window")),
+        matches!(&outcome, Outcome::Failed(e) if e.contains("another workspace claimant")),
         "{outcome:?}"
     );
     assert!(base.join("bisect-1").exists());
-    // Crashed long ago: cleared when the tab opens…
-    std::fs::write(base.join("owner"), "gitcraft 1 1000\n").map_err(|e| e.to_string())?;
+    ws.leave_completed_fixture()?;
     workspace::clear_leftovers(&repo.dir);
     repo.assert_clean()?;
-    // …or by the next bisect.
-    leave_behind(1000)?;
-    let (outcome, _) = bisect(repo.setup(&command(&dir.join("t2")), 2));
-    assert_eq!(outcome, Outcome::FirstBad(repo.commits[4].clone()));
+    let ws = leave_behind()?;
+    ws.leave_completed_fixture()?;
+    let (outcome, events) = bisect(repo.setup(&command(&dir.join("t2")), 2));
+    assert_eq!(
+        outcome,
+        Outcome::FirstBad(repo.commits[4].clone()),
+        "{events:?}"
+    );
+    repo.assert_clean()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+/// A legacy timestamp/PID file cannot authorize cleanup, even if it looks ancient.
+#[test]
+fn legacy_crash_evidence_is_refused_and_retained() -> Result<(), String> {
+    let dir = scratch("legacy-leftovers")?;
+    let repo = Repo::with_culprit(&dir.join("repo"), 10, 4)?;
+    let (base, _) = workspace::base_for(&repo.dir, &Machine::Here)?;
+    std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let slot = sh_path(&base.join("bisect-1"));
+    git::run(
+        Some(&repo.dir),
+        &["worktree", "add", "-q", "--detach", &slot, &repo.commits[2]],
+    )?;
+    let reference = "refs/gitcraft-bisect/sent-0";
+    git::run(
+        Some(&repo.dir),
+        &["update-ref", reference, &repo.commits[3]],
+    )?;
+    let evidence = b"gitcraft 1 1000\n";
+    std::fs::write(base.join("owner"), evidence).map_err(|e| e.to_string())?;
+    let (outcome, _) = bisect(repo.setup(&command(&dir.join("trees")), 2));
+    assert!(matches!(outcome, Outcome::Failed(e) if e.contains("unresolved legacy evidence")));
+    workspace::clear_leftovers(&repo.dir);
+    assert_eq!(
+        std::fs::read(base.join("owner")).map_err(|e| e.to_string())?,
+        evidence
+    );
+    assert!(base.join("bisect-1").exists());
+    assert_eq!(
+        git::run(Some(&repo.dir), &["rev-parse", reference])?.trim(),
+        repo.commits[3]
+    );
+    // Only this fixture's completed Git operations created these artifacts; no owners
+    // or processes are inferred from the deliberately unauthenticated legacy text.
+    git::run(Some(&repo.dir), &["worktree", "remove", "--force", &slot])?;
+    git::run(
+        Some(&repo.dir),
+        &["update-ref", "-d", reference, &repo.commits[3]],
+    )?;
+    std::fs::remove_file(base.join("owner")).map_err(|e| e.to_string())?;
+    std::fs::remove_dir(&base).map_err(|e| e.to_string())?;
     repo.assert_clean()?;
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())

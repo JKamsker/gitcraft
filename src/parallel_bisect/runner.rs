@@ -28,6 +28,19 @@ r=$?
 tail -c 8192 "$1" 2>/dev/null
 exit $r"#;
 
+// A cancelled queued test may never have opened its log. Only absence is empty;
+// a directory, dangling link or failed read must remain a visible failure.
+const STOPPED_LOG: &str = r#"cd "${1%/*}" || exit 1
+log=${1##*/}
+if [ -f "$log" ] && [ ! -L "$log" ]; then
+  tail -c 8192 "$log"
+elif [ ! -e "$log" ] && [ ! -L "$log" ]; then
+  :
+else
+  printf 'gitcraft: stopped test log is not a regular file\n' >&2
+  exit 1
+fi"#;
+
 /// What a test run came to: how it ended and the end of its output.
 #[derive(Clone, Debug)]
 pub struct Ran {
@@ -71,7 +84,12 @@ pub(super) fn shell_input(
     if exit.code == Some(0) {
         Ok(String::from_utf8_lossy(&exit.stdout).into_owned())
     } else {
-        Err(String::from_utf8_lossy(&exit.stderr).trim().to_owned())
+        let said = String::from_utf8_lossy(&exit.stderr).trim().to_owned();
+        Err(if said.is_empty() {
+            format!("bisect shell ended with status {:?}", exit.code)
+        } else {
+            said
+        })
     }
 }
 
@@ -119,29 +137,17 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
                         });
                     }
                     let exit = result?;
-                    crate::remote::recover_owner(&record)
-                        .map_err(|e| format!("test cleanup unknown; workspace preserved: {e}"))?;
-                    if let Some(reason) = &exit.stopped
-                        && reason != "cancelled"
-                        && reason != "process timed out and was stopped"
-                    {
-                        return Err(reason.clone());
-                    }
-                    let effective = why.or_else(|| exit.stopped.as_ref().map(|_| Ended::TimedOut));
-                    let mut ran = finish(
-                        Ok(git::Exit {
+                    return recovered_run(
+                        git::Exit {
                             code: exit.status.code(),
                             stdout: exit.stdout,
                             stderr: exit.stderr,
-                        }),
-                        effective,
-                    )?;
-                    if effective.is_some() {
-                        let output =
-                            shell(test.control, "tail -c 8192 \"$1\" 2>/dev/null", &[test.log])?;
-                        ran.output = tail(&output, KEEP);
-                    }
-                    return Ok(ran);
+                        },
+                        exit.stopped.as_deref(),
+                        why,
+                        || crate::remote::recover_owner(record).map(|_| ()),
+                        || shell(test.control, STOPPED_LOG, &[test.log]),
+                    );
                 }
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => {
@@ -160,6 +166,29 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
             }
         }
     })
+}
+
+fn recovered_run(
+    exit: git::Exit,
+    stopped: Option<&str>,
+    why: Option<Ended>,
+    recover: impl FnOnce() -> Result<(), String>,
+    read_log: impl FnOnce() -> Result<String, String>,
+) -> Result<Ran, String> {
+    recover().map_err(|e| format!("test cleanup unknown; workspace preserved: {e}"))?;
+    if let Some(reason) = stopped
+        && reason != "cancelled"
+        && reason != "process timed out and was stopped"
+    {
+        return Err(reason.to_owned());
+    }
+    let effective = why.or_else(|| stopped.map(|_| Ended::TimedOut));
+    let mut ran = finish(Ok(exit), effective)?;
+    if effective.is_some() {
+        let output = read_log().map_err(|e| format!("could not read stopped test log: {e}"))?;
+        ran.output = tail(&output, KEEP);
+    }
+    Ok(ran)
 }
 
 /// How a run that came back ended: as it was stopped (`why`), else by its exit code.
@@ -217,5 +246,117 @@ mod tests {
     fn recording_unknown_cleanup_is_not_a_stopped_verdict() {
         assert!(finish(Err("missing owner receipt".into()), Some(Ended::Stopped)).is_err());
         assert!(finish(Err("missing owner receipt".into()), Some(Ended::TimedOut)).is_err());
+    }
+
+    #[test]
+    fn recording_stopped_log_is_read_only_after_recovery() -> Result<(), String> {
+        for ended in [Ended::Stopped, Ended::TimedOut] {
+            let order = std::cell::RefCell::new(Vec::new());
+            let ran = recovered_run(
+                git::Exit {
+                    code: Some(125),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                },
+                Some("cancelled"),
+                Some(ended),
+                || {
+                    order.borrow_mut().push("recovered");
+                    Ok(())
+                },
+                || {
+                    order.borrow_mut().push("absent log");
+                    Ok(String::new())
+                },
+            )?;
+            assert_eq!(ran.ended, ended);
+            assert!(ran.output.is_empty());
+            assert_eq!(*order.borrow(), ["recovered", "absent log"]);
+        }
+        // These are the production shell's only empty-log admission checks.
+        assert!(STOPPED_LOG.starts_with("cd \"${1%/*}\" || exit 1"));
+        assert!(STOPPED_LOG.contains("[ ! -e \"$log\" ] && [ ! -L \"$log\" ]"));
+        assert!(!STOPPED_LOG.contains("2>/dev/null"));
+        Ok(())
+    }
+
+    #[test]
+    fn recording_unknown_recovery_never_reads_or_normalizes_log() {
+        let mut read = false;
+        let result = recovered_run(
+            git::Exit {
+                code: Some(125),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            },
+            Some("cancelled"),
+            Some(Ended::Stopped),
+            || Err("missing terminal proof".into()),
+            || {
+                read = true;
+                Ok(String::new())
+            },
+        );
+        assert!(
+            matches!(result, Err(e) if e.contains("test cleanup unknown") && e.contains("missing terminal proof"))
+        );
+        assert!(!read);
+    }
+
+    #[test]
+    fn recording_stopped_log_errors_survive_and_available_output_is_kept() -> Result<(), String> {
+        for error in ["not a regular file", "Permission denied"] {
+            let result = recovered_run(
+                git::Exit {
+                    code: Some(125),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                },
+                Some("cancelled"),
+                Some(Ended::Stopped),
+                || Ok(()),
+                || Err(error.into()),
+            );
+            assert!(
+                matches!(result, Err(e) if e.contains("could not read stopped test log") && e.contains(error))
+            );
+        }
+        let ran = recovered_run(
+            git::Exit {
+                code: Some(125),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            },
+            Some("cancelled"),
+            Some(Ended::Stopped),
+            || Ok(()),
+            || Ok("partial output\n".into()),
+        )?;
+        assert_eq!(ran.ended, Ended::Stopped);
+        assert_eq!(ran.output, "partial output\n");
+        Ok(())
+    }
+
+    #[test]
+    fn recording_normal_completion_does_not_substitute_log_output() -> Result<(), String> {
+        let mut read = false;
+        let ran = recovered_run(
+            git::Exit {
+                code: Some(0),
+                stdout: b"delivered".to_vec(),
+                stderr: Vec::new(),
+            },
+            None,
+            None,
+            || Ok(()),
+            || {
+                read = true;
+                Ok("wrong output".into())
+            },
+        )?;
+        assert_eq!(ran.ended, Ended::Exited(0));
+        assert_eq!(ran.output, "delivered");
+        assert!(!read);
+        Ok(())
     }
 }

@@ -289,10 +289,11 @@ mod tests {
         Ok(())
     }
 
-    /// A command that leaves something running with its outputs is over when git is.
+    /// Delivered lines remain available, but inherited-open output is an explicit
+    /// incomplete-result failure even after the direct Git child has exited.
     #[cfg(unix)]
     #[test]
-    fn a_command_is_over_when_git_is() -> Result<(), String> {
+    fn inherited_open_output_reports_failure_and_keeps_delivered_lines() -> Result<(), String> {
         let dir = repo("background")?;
         let started = std::time::Instant::now();
         let mut lines = Vec::new();
@@ -304,7 +305,7 @@ mod tests {
         );
         let took = started.elapsed();
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(ended?.code, Some(0));
+        assert!(matches!(ended, Err(e) if e.contains("kept its output open")));
         assert_eq!(lines, ["started"]);
         assert!(took < Duration::from_secs(20), "{took:?}");
         Ok(())
