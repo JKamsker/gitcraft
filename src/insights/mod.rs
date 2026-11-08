@@ -8,6 +8,7 @@
 #![allow(dead_code)]
 
 pub mod history;
+pub mod impact;
 
 /// Where what a view shows came from, and how far it can be trusted: shown above every view.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

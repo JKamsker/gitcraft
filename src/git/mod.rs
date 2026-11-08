@@ -6,8 +6,10 @@ mod attributes;
 pub mod backend;
 mod backlinks;
 mod bisect;
+pub mod blobs;
 mod branch_health;
 mod bundles;
+pub mod changed_lines;
 #[cfg(test)]
 mod clone_tests;
 mod command;
