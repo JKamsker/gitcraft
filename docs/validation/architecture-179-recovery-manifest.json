@@ -1,0 +1,253 @@
+{
+  "pr_head": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+  "notes_commit": "03b9bb8aac7085faee7a22de5c878021e5b91c7c",
+  "artifact_archive_sha256": "df0230ac67403b3e7de6fd4c80873db414cdbe67e9a9a8438722098627f3582b",
+  "temporary_files": [
+    {
+      "name": "gitcraft-178-after-build.log",
+      "bytes": 2057,
+      "sha256": "aa77a4b546a348835bf1e773008497854214940cdf3d6ac56db2f92b64be7a77",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-after-fixed.json",
+      "bytes": 240371,
+      "sha256": "ebf53066111e6f2008567c4d9dfe4a200be9fb163abf68eccbb548df90789474",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-after-tests",
+      "bytes": 145675768,
+      "sha256": "ab6193e9ed1350f9a1f2f880c858d26da84b8b8103d0d2c6a4f2b67ca0753723",
+      "archived": false
+    },
+    {
+      "name": "gitcraft-178-after.json",
+      "bytes": 241355,
+      "sha256": "fca16c2d1858c5278743574343c1d8fc44503e3277012a50a440f876ab2c1b63",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-baseline-build.log",
+      "bytes": 2158,
+      "sha256": "52c85c6c8c0e923f76618da6183a3b815c330d0d21b02401433b7789712a783b",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-baseline-failures.log",
+      "bytes": 2950,
+      "sha256": "902177c9613385aef2fdd655d2b3e9553c3693b638b7096ceb337950b6f54e17",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-baseline.json",
+      "bytes": 243207,
+      "sha256": "e2bba5a0c6efa4ba04185a88423d2f778910eb58912b6984ece93bc6d856d591",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-before-tests",
+      "bytes": 145637672,
+      "sha256": "4b93c52e414f45aaf5412ab595eb98cfa42a7d27ea9f2c058b1873012009c04c",
+      "archived": false
+    },
+    {
+      "name": "gitcraft-178-bench-progress.log",
+      "bytes": 625,
+      "sha256": "caa74c177f2eab65acec415c2e37fd83d301c5a80d1947aa9d0e4df955a7a362",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-bench.py",
+      "bytes": 2285,
+      "sha256": "faf0cb13f7160ceaf30fdc3faae23af8210eb3d5989e225dda7bd7f7364c2dd6",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-callers.py",
+      "bytes": 3397,
+      "sha256": "3e8cde4763596a8240c4093748a0901e6396d9af3b90fc12376331ae797dd1d6",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-clippy-macos.log",
+      "bytes": 253,
+      "sha256": "8c07a62eb9c68f4a8c1f3cf65bc300a8908ca097168f9f9facbc5dc5ec706505",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-clippy-strict.log",
+      "bytes": 2086,
+      "sha256": "65283a31025a0d8eed098119d700d986d8a8f31b913891239a9552c5ffd23675",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-consolidated-delta.json",
+      "bytes": 740,
+      "sha256": "7602142d129141afea28e89ed8dd08935c604f8013d14cd2c2c7569f7914320a",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-consolidated.json",
+      "bytes": 240813,
+      "sha256": "0ea6c8d563cc0305e336d90c2610ffa9d1eebc779a10384a9f7b4b8460776c10",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-doc-tests.log",
+      "bytes": 1497,
+      "sha256": "eec0f64bd6f33d5415293f086a86b8e9f6adae8fb25cccbcb29716941bc74218",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-evidence.py",
+      "bytes": 2667,
+      "sha256": "3c526a87167761f6d1ee1b2d6a060aa740648410a0b72f5c5443ffe42d22df37",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-fallback.log",
+      "bytes": 1745,
+      "sha256": "59ebf73a539c499dbad4c213b68d0d43b408efe5ea91f36111c960016a0aebc3",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-final-review.md",
+      "bytes": 1550,
+      "sha256": "c044fd5f44c5a1887d60c955b5f21fb955925a73263e89eb644384f1c732a482",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-inert-final.log",
+      "bytes": 1778,
+      "sha256": "8b929629929210e86f084209ab8b22ad208ebdd2bc1b134078c5a85ce23ae4c8",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-inert.log",
+      "bytes": 1609,
+      "sha256": "fe30eff93b10f8c4d55673acca7b4fa987a1f49264e560764093d41b520009c9",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-integration.log",
+      "bytes": 2010,
+      "sha256": "ba8d80324127b1d62a5c90d632a1a114ae42f29abc9da548201ed62c7e33a7a4",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-metric-delta.json",
+      "bytes": 740,
+      "sha256": "7602142d129141afea28e89ed8dd08935c604f8013d14cd2c2c7569f7914320a",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-migrate.py",
+      "bytes": 2824,
+      "sha256": "2aba5a67926efb7491a9685eac85755f62c42d534e0d8c75a5964d18bc886c1b",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-os.log",
+      "bytes": 636,
+      "sha256": "5f431bd6abc120a9cc7e6adb000e4effaa960b596661cd68f2f50743d9fe8119",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-pr.md",
+      "bytes": 3433,
+      "sha256": "fb8da04d6e666e3ccb040b976d776c41833c00d7699c0bb837bd5893350710ac",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-python.log",
+      "bytes": 796,
+      "sha256": "3e02f22b08bc9ca6dcc66fd60c0744a797eadb8a6ee35ee4273c0d906c49c13a",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-repeat-stage.py",
+      "bytes": 968,
+      "sha256": "74b62c2f1bafcf8f510490dadcda5706527d4ddf39ecfce7ee2d7fec29bba82c",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-reproduced.json",
+      "bytes": 243207,
+      "sha256": "e2bba5a0c6efa4ba04185a88423d2f778910eb58912b6984ece93bc6d856d591",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-suite.log",
+      "bytes": 295456,
+      "sha256": "86aaa33b87d8f314289579cba816a5cbaceeb2539780302d3c5672251858e51d",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-178-windows-check.log",
+      "bytes": 4428,
+      "sha256": "6402208dcdd12d45c7d0f8e44ac51b6d3912526e3b3c44193c6132e538fca33f",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-body-before-followup.md",
+      "bytes": 4177,
+      "sha256": "83897c08ecc40080c947eb9f920c7e739cec5267bd6f51cb8ea6b68ff5cc9f51",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-body-followup.md",
+      "bytes": 5304,
+      "sha256": "eba716942c449d48bddae845a16c7247500384fa62e1bdc0032229a654b9105a",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-followup-review.md",
+      "bytes": 1542,
+      "sha256": "6f3adef293fcac62fe19812936bf2e36fbb2798e150af590edd3677f93e1e3f3",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-baseline.json",
+      "bytes": 242690,
+      "sha256": "ae7f58a3bf5f3a49047928e377b7f7faf0d90727ad0107c4217fedfed6d04a2a",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-clippy.log",
+      "bytes": 152,
+      "sha256": "32c32d0e08eee0be09da7a4a5b4079a793af3879eeb6372c2376a96d10a64a66",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-handoff.log",
+      "bytes": 1029,
+      "sha256": "63bcb4320fc699b0a455256a6bfefdaa4f8f0c12ce720f23cb191e03555428c5",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-inert.log",
+      "bytes": 1778,
+      "sha256": "ae99d9ddd7a77343b6db83eff2d1c6cac4ae30a7d420d4957ae6c76a588db085",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-python.log",
+      "bytes": 947,
+      "sha256": "f6d8987bb181fd9b468884fa67f7f194bca355b73446119f7c7861ed6bd9f0d0",
+      "archived": true
+    },
+    {
+      "name": "gitcraft-179-review-snapshot.json",
+      "bytes": 240813,
+      "sha256": "0ea6c8d563cc0305e336d90c2610ffa9d1eebc779a10384a9f7b4b8460776c10",
+      "archived": true
+    }
+  ]
+}
