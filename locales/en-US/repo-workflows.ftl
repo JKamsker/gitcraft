@@ -7271,3 +7271,8 @@ repo-workflows-outbox-entry-summary = { $status ->
        *[no] off
     }
 
+repo-workflows-drift-formatting-summary = Formatting only: { $percent }% of { $lines } changed lines ({ $files ->
+        [one] one file with only formatting changes
+       *[other] { $files } files with only formatting changes
+    })
+

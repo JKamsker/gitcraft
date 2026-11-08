@@ -49,10 +49,12 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
                     } else {
                         folder.path.as_str()
                     };
-                    let label = format!(
-                        "{name}  ({} file{})",
-                        folder.files.len(),
-                        if folder.files.len() == 1 { "" } else { "s" }
+                    let label = crate::i18n::message(
+                        "repo-workflows-drift-folder-count",
+                        &[
+                            ("name", (name).into()),
+                            ("count", (folder.files.len()).into()),
+                        ],
                     );
                     item(ui, view, report, &label, &folder.files, acts);
                 }
@@ -112,10 +114,11 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
         },
     );
     let title = crate::i18n::message(
-        "repo-workflows-drift-folder-count",
+        "repo-workflows-drift-formatting-summary",
         &[
-            ("name", (name).into()),
-            ("count", (folder.files.len()).into()),
+            ("percent", (report.formatting_percent()).into()),
+            ("lines", (report.changed_lines).into()),
+            ("files", (report.formatting_files.len()).into()),
         ],
     );
     section(ui, &title, |ui| {

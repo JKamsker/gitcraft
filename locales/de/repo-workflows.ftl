@@ -7269,3 +7269,8 @@ repo-workflows-outbox-entry-summary = { $status ->
        *[no] aus
     }
 
+repo-workflows-drift-formatting-summary = Nur Formatierung: { $percent } % von { $lines } geänderten Zeilen ({ $files ->
+        [one] eine Datei mit ausschließlich Formatierungsänderungen
+       *[other] { $files } Dateien mit ausschließlich Formatierungsänderungen
+    })
+
