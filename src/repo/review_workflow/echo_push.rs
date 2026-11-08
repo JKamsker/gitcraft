@@ -572,7 +572,8 @@ mod integration_tests {
         let expected = crate::push_preflight::push_args(&plan)?;
         let ops = crate::push_preflight::approved_ops(plan);
         let evidence = evidence_steps(&ops, |id| {
-            crate::push_preflight::push_args(&crate::push_preflight::registered(id)?)
+            let registered = crate::push_preflight::registered(id)?;
+            crate::push_preflight::push_args(&registered)
         })?;
         assert_eq!(evidence, vec![ops[0].clone(), expected]);
         let approved = ops.last().ok_or("APPROVED handback missing")?;
