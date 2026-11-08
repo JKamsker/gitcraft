@@ -5,7 +5,7 @@
 //! that crashed is removed the next time one is made.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::git::run;
 use crate::remote;
@@ -26,6 +26,7 @@ pub struct Scratch {
     /// Where it is, in the form the command layer takes (another machine's, encoded).
     pub path: PathBuf,
     removed: bool,
+    preserved: AtomicBool,
 }
 
 impl Scratch {
@@ -62,7 +63,18 @@ impl Scratch {
             repo: repo.to_owned(),
             path,
             removed: false,
+            preserved: AtomicBool::new(false),
         })
+    }
+
+    /// Retain uncertain resolver work across drop and future stale-worktree sweeps.
+    pub(crate) fn preserve(&self) -> Result<(), String> {
+        self.preserved.store(true, Ordering::Release);
+        std::fs::write(
+            self.path.with_extension("preserved"),
+            b"cleanup unconfirmed\n",
+        )
+        .map_err(|e| e.to_string())
     }
 
     /// Checks out `rev` in it, whatever was changed there.
@@ -113,7 +125,7 @@ impl Scratch {
 
 impl Drop for Scratch {
     fn drop(&mut self) {
-        if !self.removed {
+        if !self.removed && !self.preserved.load(Ordering::Acquire) {
             self.removed = true;
             let _ = remove_worktree(&self.repo, &self.path);
         }
@@ -265,6 +277,10 @@ fn sweep_left_over(repo: &Path, root: &Path) {
         let Some(name) = scratch_name_in(printed, &key) else {
             continue;
         };
+        let path = remote::resolve(repo, printed);
+        if path.with_extension("preserved").exists() {
+            continue;
+        }
         if name.machine == me && name.pid != std::process::id() && !process_alive(name.pid) {
             let _ = remove_worktree(repo, &remote::resolve(repo, printed));
         }

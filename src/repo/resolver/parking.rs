@@ -132,9 +132,30 @@ fn keep(
     Ok((kept, results))
 }
 
+/// Save diagnostics without reading/copying files that may still be written by an agent.
+pub(super) fn preserve_uncertain(run: &Run, ws: &Workspace) {
+    // The process service itself may be unavailable: preserve a record without invoking Git.
+    if let Ok(record) = serde_json::to_vec_pretty(&RunRecord::of(run)) {
+        let _ = std::fs::write(ws.dir().with_extension("uncertain-run.json"), record);
+    }
+    if let Ok(dir) = kept_dir(ws.dir(), &run.id) {
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(record) = serde_json::to_vec_pretty(&RunRecord::of(run)) {
+            let _ = std::fs::write(dir.join("uncertain-run.json"), record);
+        }
+        let _ = std::fs::write(
+            dir.join("cleanup-unconfirmed"),
+            ws.dir().to_string_lossy().as_bytes(),
+        );
+    }
+}
+
 /// The run kept for the parked merge `parked`, with its work, if one was.
 fn kept_run(repo: &Path, parked: &Parked) -> Option<Run> {
     let dir = kept_dir(repo, &parked.id).ok()?;
+    if dir.join("cleanup-unconfirmed").exists() {
+        return None;
+    }
     let text = std::fs::read_to_string(dir.join("run.json")).ok()?;
     let record: RunRecord = serde_json::from_str(&text).ok()?;
     let ws = Workspace::load(&dir).ok()?;

@@ -262,6 +262,8 @@ impl RepoTab {
             )));
             return;
         }
+        // Resolver review is read-only; closing it preserves the run and its files.
+        self.resolver_act(super::resolver::ResolverAct::CloseReview, ctx);
         let pr = self.pr_view.as_ref().map(|v| v.number);
         // The page takes the big area: what was open over it closes.
         self.file_comparison = None;

@@ -179,13 +179,12 @@ const CLOCK: Duration = Duration::from_secs(1);
 /// stopped first, and only once it is gone is its folder removed (on Windows a running
 /// program holds it).
 fn clean_up(run: &mut Run) {
-    let agent = run.agent.take();
+    if !confirm_cleanup(run) {
+        return;
+    }
     let workspace = run.workspace.take();
     let mcp_file = run.mcp_file.take();
     std::thread::spawn(move || {
-        if let Some(agent) = agent {
-            agent.stop_now();
-        }
         if let Some(file) = mcp_file {
             let _ = std::fs::remove_file(file);
         }
@@ -197,6 +196,25 @@ fn clean_up(run: &mut Run) {
     });
 }
 
+/// Joining the worker and its typed exit are both required before deleting or using files.
+fn confirm_cleanup(run: &mut Run) -> bool {
+    if run.agent.as_ref().is_none_or(|a| a.stop_now()) {
+        run.agent = None;
+        return true;
+    }
+    run.phase = Phase::Failed;
+    run.picked.clear();
+    run.review = None;
+    run.error = Some(
+        "Agent cleanup could not be confirmed; workspace and recovery artifacts retained".into(),
+    );
+    if let Some(ws) = &run.workspace {
+        let _ = ws.preserve();
+        parking::preserve_uncertain(run, ws);
+    }
+    false
+}
+
 impl Drop for ResolverState {
     /// The tab is closed, or gitcraft is: the agent is stopped before this returns, as a
     /// thread left to do it may never run when the program ends. The rest is removed in the
@@ -204,8 +222,8 @@ impl Drop for ResolverState {
     /// worktree).
     fn drop(&mut self) {
         if let Some(run) = &mut self.run {
-            if let Some(agent) = run.agent.take() {
-                agent.stop_now();
+            if !confirm_cleanup(run) {
+                return;
             }
             // The agent's work kept with a merge still put aside stays with it: the next
             // session shows it again (see `parking`). Only what is this session's goes.
@@ -699,11 +717,7 @@ impl RepoTab {
         else {
             return;
         };
-        let Some(exit) = run
-            .agent
-            .as_ref()
-            .and_then(|a| a.with_feed(|f| f.exit.clone()))
-        else {
+        let Some(exit) = run.agent.as_ref().and_then(|a| a.exit()) else {
             return;
         };
         if let Some(Activity::Ended { text, cost_usd, .. }) = run.agent.as_ref().and_then(|a| {
@@ -719,8 +733,10 @@ impl RepoTab {
             run.cost_usd = cost_usd;
         }
         run.ended = Some(Instant::now());
-        if !exit.safe_to_inspect {
+        if !exit.safe_to_inspect || !run.agent.as_ref().is_some_and(|a| a.stop_now()) {
+            confirm_cleanup(run);
             run.phase = Phase::Failed;
+            run.picked.clear();
             run.error = Some(format!(
                 "Agent cleanup could not be confirmed: {}",
                 exit.stderr

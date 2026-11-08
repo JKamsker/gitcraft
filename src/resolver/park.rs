@@ -361,7 +361,85 @@ pub fn park(repo: &Path, id: &str, files: &[String]) -> Result<Parked, String> {
              it back, or drop it to keep its files on a branch"
         ));
     }
+    // Record the exact clean worktree bytes left by reset, including filter-hidden bytes.
+    // Failure leaves the archive intact; restore then uses the conservative canonical guard.
+    let baseline = clean_baseline(repo)?;
+    let bytes = serde_json::to_vec(&baseline).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("clean-baseline.json"), bytes).map_err(|e| e.to_string())?;
     Ok(parked)
+}
+
+#[derive(Serialize, Deserialize)]
+struct CleanFile {
+    path: String,
+    object: String,
+    bytes: Vec<u8>,
+}
+
+fn head_files(repo: &Path) -> Result<Vec<(String, String)>, String> {
+    run(repo, &["ls-tree", "-r", "-z", "HEAD"])?
+        .split('\0')
+        .filter(|entry| !entry.is_empty())
+        .filter_map(|entry| {
+            let (fields, path) = entry.split_once('\t')?;
+            let mut fields = fields.split_whitespace();
+            let mode = fields.next()?;
+            if !matches!(mode, "100644" | "100755") {
+                return None;
+            }
+            fields.next()?;
+            Some(
+                crate::mcp::args::repo_path(path)
+                    .map(|path| (path.to_owned(), fields.next().unwrap_or("").to_owned())),
+            )
+        })
+        .collect()
+}
+
+fn clean_baseline(repo: &Path) -> Result<Vec<CleanFile>, String> {
+    head_files(repo)?
+        .into_iter()
+        .map(|(path, object)| {
+            let bytes =
+                crate::safe_read::read_inside(repo, &path, u64::MAX - 1).ok_or_else(|| {
+                    format!("Could not record clean bytes of {path}; merge remains put aside")
+                })?;
+            Ok(CleanFile {
+                path,
+                object,
+                bytes,
+            })
+        })
+        .collect()
+}
+
+/// Git status compares filtered content. Prove the raw bytes safe before any checkout,
+/// read-tree, rollback or raw archive write can overwrite a clean-filter-hidden edit.
+fn clean_bytes_guard(repo: &Path, parked: &Parked) -> Result<(), String> {
+    let baseline: Vec<CleanFile> =
+        std::fs::read(folder(repo, &parked.id)?.join("clean-baseline.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+    for (path, object) in head_files(repo)? {
+        let actual = crate::safe_read::read_inside(repo, &path, u64::MAX - 1);
+        let expected = match baseline
+            .iter()
+            .find(|f| f.path == path && f.object == object)
+        {
+            Some(file) => file.bytes.clone(),
+            None => git::run_bytes(
+                Some(repo),
+                &["cat-file", "--filters", &format!("HEAD:{path}")],
+            )?,
+        };
+        if actual.as_deref() != Some(expected.as_slice()) {
+            return Err(format!(
+                "{path} has raw bytes changed outside Git's filtered status; save them elsewhere before bringing the merge back"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Writes all that is kept of the operation in progress into `dir` (made for it): its index
@@ -544,6 +622,9 @@ pub fn blocker(repo: &Path, parked: &Parked) -> Option<String> {
         .unwrap_or(true);
     if dirty {
         return Some("Commit or stash your changes first".to_owned());
+    }
+    if let Err(why) = clean_bytes_guard(repo, parked) {
+        return Some(why);
     }
     let tip = match &parked.branch {
         Some(b) => run(

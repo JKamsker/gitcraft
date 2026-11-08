@@ -380,3 +380,91 @@ fn a_file_behind_the_agent_fence_is_left_to_the_user() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[test]
+fn uncertain_cleanup_preserves_workspace_record_and_blocks_apply() -> Result<(), String> {
+    let repo = conflicted("resolver-uncertain-proof")?;
+    let ws = std::sync::Arc::new(crate::resolver::workspace::Workspace::prepare(
+        repo.path(),
+        &["a.txt".into()],
+    )?);
+    let dir = ws.dir().to_owned();
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.path().to_owned(), &ctx);
+    let mut run = super::look_tests::run(Phase::Ready, Instant::now());
+    run.id = "uncertain-proof".into();
+    run.workspace = Some(ws.clone());
+    run.agent = Some(crate::resolver::process::Running::fake(vec![]));
+    let artifact = dir.with_extension("mcp.json");
+    std::fs::write(&artifact, b"retain me").map_err(|e| e.to_string())?;
+    run.mcp_file = Some(artifact.clone());
+    super::clean_up(&mut run);
+    assert_eq!(run.phase, Phase::Failed);
+    assert!(run.picked.is_empty());
+    assert!(run.workspace.is_some() && run.mcp_file.is_some());
+    let recovery = crate::agent::repo_file(repo.path(), "resolver/uncertain-proof")?;
+    assert!(recovery.join("uncertain-run.json").is_file());
+    assert!(recovery.join("cleanup-unconfirmed").is_file());
+    tab.resolver.run = Some(run);
+    tab.apply(Action::Resolver(ResolverAct::Apply), &ctx);
+    assert!(tab.busy_op.is_none());
+    drop(tab);
+    drop(ws);
+    assert!(dir.is_dir() && artifact.is_file());
+    assert!(dir.with_extension("preserved").is_file());
+    assert!(dir.with_extension("uncertain-run.json").is_file());
+    // Explicit test-owned cleanup only, after verifying preservation.
+    repo.git(&[
+        "worktree",
+        "remove",
+        "--force",
+        "--force",
+        &dir.to_string_lossy(),
+    ])?;
+    std::fs::remove_file(dir.with_extension("preserved")).map_err(|e| e.to_string())?;
+    std::fs::remove_file(artifact).map_err(|e| e.to_string())?;
+    std::fs::remove_file(dir.with_extension("uncertain-run.json")).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[test]
+fn insights_action_closes_only_the_read_only_resolver_review() -> Result<(), String> {
+    let repo = conflicted("resolver-insights-action")?;
+    let ws = std::sync::Arc::new(crate::resolver::workspace::Workspace::prepare(
+        repo.path(),
+        &["a.txt".into()],
+    )?);
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.path().to_owned(), &ctx);
+    let mut run = super::look_tests::run(Phase::Ready, Instant::now());
+    run.workspace = Some(ws.clone());
+    run.review = Some(super::ReviewState {
+        files: Some(vec![]),
+        selected: 0,
+        as_diff: false,
+    });
+    let results = run.results.clone();
+    let picked = run.picked.clone();
+    let id = run.id.clone();
+    tab.resolver.run = Some(run);
+    assert!(tab.resolver.reviewing());
+    tab.apply(
+        Action::Insights(crate::repo::insights::InsightsAct::Open(
+            crate::repo::insights::Kind::Evolution,
+        )),
+        &ctx,
+    );
+    assert!(!tab.resolver.reviewing());
+    assert!(tab.insights.is_some());
+    let run = tab.resolver.run.as_ref().ok_or("lost run")?;
+    assert_eq!(run.id, id);
+    assert_eq!(run.phase, Phase::Ready);
+    assert_eq!(run.results, results);
+    assert_eq!(run.picked, picked);
+    assert!(std::sync::Arc::ptr_eq(
+        run.workspace.as_ref().ok_or("lost workspace")?,
+        &ws
+    ));
+    assert!(ws.dir().is_dir());
+    Ok(())
+}
