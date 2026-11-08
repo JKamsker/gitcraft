@@ -188,6 +188,12 @@ struct Catalogs {
     english: Catalog,
     german: Catalog,
 }
+// The embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids gate
+// validates both complete generated source lists; malformed shipped catalogs fail fast.
+#[expect(
+    clippy::expect_used,
+    reason = "embedded static catalogs are validated by the catalog parity gate"
+)]
 fn catalogs() -> &'static Catalogs {
     static CATALOGS: OnceLock<Catalogs> = OnceLock::new();
     CATALOGS.get_or_init(|| Catalogs {

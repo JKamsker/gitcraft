@@ -55,7 +55,8 @@ fn locale_resolution_uses_preferences_parent_languages_and_explicit_fallback() {
 }
 
 #[test]
-fn actual_fluent_plural_interpolation_number_and_date_render_in_both_languages() {
+fn actual_fluent_plural_interpolation_number_and_date_render_in_both_languages()
+-> Result<(), String> {
     set_language("en-US");
     assert_eq!(
         message("foundation-repositories", &[("count", 1.into())]),
@@ -85,12 +86,12 @@ fn actual_fluent_plural_interpolation_number_and_date_render_in_both_languages()
             "number.ftl",
             "fixed = { NUMBER($n, minimumFractionDigits: 2, maximumFractionDigits: 2) }",
         )],
-    )
-    .unwrap_or_else(|e| panic!("{e}"));
+    )?;
     assert_eq!(
         german.format("fixed", &[("n", 1234.567.into())]).as_deref(),
         Some("1.234,57")
     );
+    Ok(())
 }
 
 #[test]
