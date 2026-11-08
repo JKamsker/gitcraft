@@ -789,10 +789,8 @@ mod fluent_review_tests {
             code: 'R',
             area: Area::Staged,
         });
-        let data = diff::DiffData {
-            header: "rename from old {path}.rs\nrename to new {path}.rs".into(),
-            ..Default::default()
-        };
+        let mut data = diff::DiffData::default();
+        data.header = "rename from old {path}.rs\nrename to new {path}.rs".into();
         let mut acts = vec![];
         for (locale, status, label) in [
             ("en-US", "Status R · Staged", "Open file diff"),

@@ -600,14 +600,14 @@ mod fluent_review_tests {
         let mut state = State::default();
         state.request = 13;
         state.case = Case {
-                base: "refs/heads/base".into(),
-                head: "refs/heads/head".into(),
-                path: "src/{opaque}.rs".into(),
-                line: "1234".into(),
-                objection: "User objection {raw}".into(),
-                source: "#[test] fn opaque() { assert!(true); }".into(),
-                image: "rust:1.95.0".into(),
-                approved: false,
+            base: "refs/heads/base".into(),
+            head: "refs/heads/head".into(),
+            path: "src/{opaque}.rs".into(),
+            line: "1234".into(),
+            objection: "User objection {raw}".into(),
+            source: "#[test] fn opaque() { assert!(true); }".into(),
+            image: "rust:1.95.0".into(),
+            approved: false,
         };
         let before = state.case.clone();
         let mut acts = vec![];

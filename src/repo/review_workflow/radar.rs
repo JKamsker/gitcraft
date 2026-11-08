@@ -613,15 +613,15 @@ mod fluent_review_tests {
         let ctx = egui::Context::default();
         let mut state = State::default();
         state.rows = Some(Ok(vec![Row {
-                name: "fix{raw}".into(),
-                fix: "opaque-fix".into(),
-                target: "refs/heads/release".into(),
-                tip: "1234567890abcdef".into(),
-                patch: Patch::Same("opaque-commit".into()),
-                test: None,
-                coverage: 1,
-                complete: false,
-                error: None,
+            name: "fix{raw}".into(),
+            fix: "opaque-fix".into(),
+            target: "refs/heads/release".into(),
+            tip: "1234567890abcdef".into(),
+            patch: Patch::Same("opaque-commit".into()),
+            test: None,
+            coverage: 1,
+            complete: false,
+            error: None,
         }]));
         let mut acts = vec![];
         for (locale, coverage, patch) in [
