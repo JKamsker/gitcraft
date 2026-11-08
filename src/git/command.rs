@@ -1347,7 +1347,8 @@ mod tests {
         assert!(req.long);
         assert_eq!(req.timeout, Some(TOOL_FOR));
         assert!(
-            req.script.starts_with("exec git 'mergetool'"),
+            req.script
+                .starts_with("exec git '--no-lazy-fetch' 'mergetool'"),
             "{}",
             req.script
         );
