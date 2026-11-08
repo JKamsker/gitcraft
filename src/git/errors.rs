@@ -235,6 +235,12 @@ fn unquote(value: &str) -> String {
 /// Render known application control errors without changing their transport identity.
 /// Provider/Git diagnostics and unknown strings remain opaque.
 pub fn display_error(error: &str) -> String {
+    if let Some(detail) = error.strip_prefix("Contained bundle Git: ") {
+        return crate::i18n::message(
+            "backend-contained-bundle-error",
+            &[("detail", display_error(detail).into())],
+        );
+    }
     let id = match error {
         "Account action cancelled." => "backend-account-action-cancelled-13efa7",
         "Account check cancelled." => "backend-account-check-cancelled-34de37",
@@ -307,6 +313,46 @@ pub fn display_error(error: &str) -> String {
         "Working-folder publication cancelled" => {
             "backend-working-folder-publication-cancelled-a8f541"
         }
+        "cancelled" => "backend-helper-display-8b47045eb7",
+        "Cancelled" => "backend-helper-display-d353a99eb4",
+        "stopped" => "backend-helper-display-8322e87d24",
+        "History investigation cancelled" => "backend-helper-display-f7df6fb542",
+        "DVC is not installed on this repository machine" => "backend-helper-display-219d77f375",
+        "invalid resource helper arguments" => "backend-helper-display-389db1e9f2",
+        "invalid keep retirement arguments" => "backend-helper-display-50ca4f5bd0",
+        "invalid keep hash" => "backend-helper-display-f833fa6387",
+        "invalid keep message" => "backend-helper-display-46b86a42f2",
+        "Input exceeds 128 MiB" => "backend-helper-display-c1a950664d",
+        "Git did not return an exit code" => "backend-helper-display-7f609a6911",
+        "Unsupported resource helper platform" => "backend-helper-display-bcc9225eef",
+        "Bundle unpacking requires Linux hard address-space limits on this host; no pack was opened." => {
+            "backend-helper-display-286c0e8cfe"
+        }
+        "hard resource limit not confirmed" => "backend-helper-display-f0c58d1c8d",
+        "invalid keep ownership" => "backend-helper-display-06729de987",
+        "keep ownership changed; retained" => "backend-helper-display-a3db0ebabc",
+        "keep identity changed; retained" => "backend-helper-display-4b3bf71f7e",
+        "Safe remote staging requires Python 3 standard-library no-follow file and ACL APIs; install python3 on the repository machine" => {
+            "backend-helper-display-18d2a159d4"
+        }
+        "Safe index reads require Perl with Fcntl no-follow support on the repository machine" => {
+            "backend-helper-display-124d998466"
+        }
+        "File comparison requires md5sum (Linux/WSL) or md5 (macOS)" => {
+            "backend-helper-display-f29ce072ac"
+        }
+        "Unsupported MD5 capability" => "backend-helper-display-3135c24fb2",
+        "Create-only recovery needs GNU ln or Perl" => "backend-helper-display-b26048e0e2",
+        "legacy or rewritten remote" => "backend-native-fallback-c3d2b99ca7",
+        "remote has no fetch URL" => "backend-native-fallback-d81c296d75",
+        "remote display requires Git" => "backend-native-fallback-c1ee10596f",
+        "tracking graph exceeds native bound" => "backend-native-fallback-35c9ca76bd",
+        "ambiguous upstream short name" => "backend-native-fallback-08b2647385",
+        "symbolic reference requires Git" => "backend-native-fallback-1b16d9cfdb",
+        "non-commit branch requires Git" => "backend-native-fallback-e1e6d89f7b",
+        "unsupported upstream namespace" => "backend-native-fallback-850e897a1e",
+        "local upstream requires Git" => "backend-native-fallback-bd13f61f25",
+        "feature disabled" => "backend-native-fallback-3369979818",
         _ => return error.to_owned(),
     };
     crate::i18n::text(id).to_owned()
