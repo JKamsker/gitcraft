@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use super::super::{END_OPTS, NO_SIGNATURE, run, run_ok_codes};
+use super::Failure;
 use super::{CANCELLED, Engine, GitVersion, commit_oid, is_oid, scratch, tree_of, with_write_opts};
 
 /// One commit replayed.
@@ -96,17 +97,30 @@ fn lines(out: String) -> Result<Vec<String>, String> {
     Ok(out.lines().map(|l| l.trim().to_owned()).collect())
 }
 
+/// Compatibility String interface; cached previews use [`replay_with_witness`].
+pub fn replay(
+    repo: &Path,
+    onto: &str,
+    base_tip: (&str, &str),
+    picks: &[String],
+    version: GitVersion,
+    cancel: &dyn Fn() -> bool,
+) -> Result<Replay, String> {
+    replay_with_witness(repo, onto, base_tip, picks, version, cancel)
+        .map_err(|failure| failure.display())
+}
+
 /// Replays `picks` (oldest first) onto `onto`, as a rebase of `tip` (the full name of its
 /// branch, `refs/heads/x`) from `base` does. `cancel` is asked between commits; a `true` ends
 /// it with [`CANCELLED`].
-pub fn replay(
+pub(crate) fn replay_with_witness(
     repo: &Path,
     onto: &str,
     (base, tip): (&str, &str),
     picks: &[String],
     version: GitVersion,
     cancel: &dyn Fn() -> bool,
-) -> Result<Replay, String> {
+) -> Result<Replay, Failure> {
     let onto = commit_oid(repo, onto)?;
     if !picks.is_empty() {
         super::not_partial(repo)?;
@@ -133,27 +147,30 @@ pub fn replay(
         }
     }
     if cancel() {
-        return Err(CANCELLED.to_owned());
+        return Err(Failure::Opaque(CANCELLED.to_owned()));
     }
     if version.has_merge_base_option() {
         match stepwise(repo, &onto, picks, cancel) {
             Ok(done) => return Ok(done),
-            Err(e) if e == CANCELLED => return Err(e),
+            Err(e) if e.is_cancelled() => return Err(e),
             Err(e) => {
                 first_error.get_or_insert(e);
             }
         }
     }
-    scratch::replay(repo, &onto, picks, cancel).map_err(|e| match first_error {
-        Some(first) if e != CANCELLED => crate::i18n::message(
-            "backend-first-in-a-scratch-clone-e-5541cd",
-            &[
-                ("first", (first).to_string().into()),
-                ("detail", (e).to_string().into()),
-            ],
-        ),
-        _ => e,
-    })
+    scratch::replay(repo, &onto, picks, cancel)
+        .map_err(|failure| replay_failure(first_error, failure))
+}
+
+/// Retain both explicit witnesses while preserving the cancellation escape.
+pub(super) fn replay_failure(first: Option<Failure>, failure: Failure) -> Failure {
+    match first {
+        Some(first) if !failure.is_cancelled() => Failure::ReplayFallback {
+            first: Box::new(first),
+            scratch: Box::new(failure),
+        },
+        _ => failure,
+    }
 }
 
 /// The format [`with_git_replay`] reads commits with: what a copy keeps of its original.
@@ -192,9 +209,9 @@ fn with_git_replay(
     base: &str,
     tip: &str,
     picks: &[String],
-) -> Result<Option<Replay>, String> {
+) -> Result<Option<Replay>, Failure> {
     if !tip.starts_with("refs/") || base.starts_with('-') {
-        return Err(crate::i18n::text("backend-git-replay-needs-a-branch-f898a0").to_owned());
+        return Err(Failure::ReplayNeedsBranch);
     }
     let range = format!("{base}..{tip}");
     let plain = lines(run(
@@ -202,9 +219,7 @@ fn with_git_replay(
         &["rev-list", "--reverse", "--topo-order", END_OPTS, &range],
     )?)?;
     if plain != picks {
-        return Err(
-            crate::i18n::text("backend-the-commits-aren-t-a-plain-range-b0cf7b").to_owned(),
-        );
+        return Err(Failure::NotPlainRange);
     }
     // From git 2.53, replay moves the branch itself unless told only to print the updates
     // (`--ref-action=print`, which an older git doesn't know; it ignores the config).
@@ -245,7 +260,7 @@ fn with_git_replay(
     let copies = read(&[&new_tip, &format!("^{onto}")])?;
     let first_parent_tree = match originals.first() {
         Some(first) => tree_of(repo, &format!("{}^", first.hash))?,
-        None => return Err(crate::i18n::text("backend-nothing-was-replayed-0e02b4").to_owned()),
+        None => return Err(Failure::NothingReplayed),
     };
     let mut steps = Vec::with_capacity(originals.len());
     let mut tree = tree_of(repo, onto)?;
@@ -268,10 +283,7 @@ fn with_git_replay(
         });
     }
     if next.peek().is_some() {
-        return Err(crate::i18n::text(
-            "backend-git-replay-s-commits-don-t-match-the-originals-b428f7",
-        )
-        .to_owned());
+        return Err(Failure::ReplayMismatch);
     }
     Ok(Some(Replay {
         onto: onto.to_owned(),
@@ -285,7 +297,7 @@ fn with_git_replay(
 fn trees_and_parents(
     repo: &Path,
     hashes: &[String],
-) -> Result<HashMap<String, (String, Vec<String>)>, String> {
+) -> Result<HashMap<String, (String, Vec<String>)>, Failure> {
     let mut found = HashMap::new();
     for chunk in hashes.chunks(100) {
         let mut args = vec![
@@ -310,14 +322,13 @@ fn trees_and_parents(
 
 /// What `git merge-tree --write-tree -z --name-only` printed: the tree, and the files in
 /// conflict (none for a clean merge).
-pub(super) fn parse_merge_tree(out: &str) -> Result<(String, Vec<String>), String> {
+pub(super) fn parse_merge_tree(out: &str) -> Result<(String, Vec<String>), Failure> {
     let mut fields = out.split('\0');
     let tree = fields.next().unwrap_or_default().trim().to_owned();
     if !is_oid(&tree) {
-        return Err(crate::i18n::message(
-            "backend-git-merge-tree-said-9223d7",
-            &[("detail", (out.trim()).to_string().into())],
-        ));
+        return Err(Failure::MergeTree {
+            detail: out.trim().to_owned(),
+        });
     }
     let mut files: Vec<String> = Vec::new();
     for name in fields.take_while(|f| !f.is_empty()) {
@@ -335,7 +346,7 @@ fn stepwise(
     onto: &str,
     picks: &[String],
     cancel: &dyn Fn() -> bool,
-) -> Result<Replay, String> {
+) -> Result<Replay, Failure> {
     let mut info = trees_and_parents(repo, picks)?;
     let parents: Vec<String> = picks
         .iter()
@@ -348,19 +359,13 @@ fn stepwise(
     let mut steps = Vec::with_capacity(picks.len());
     for (step, commit) in picks.iter().enumerate() {
         if cancel() {
-            return Err(CANCELLED.to_owned());
+            return Err(Failure::Opaque(CANCELLED.to_owned()));
         }
-        let (own_tree, parents) = info.get(commit).ok_or_else(|| {
-            crate::i18n::message(
-                "backend-commit-is-not-a-commit-9e1c80",
-                &[("commit", (commit).to_string().into())],
-            )
+        let (own_tree, parents) = info.get(commit).ok_or_else(|| Failure::NotCommit {
+            commit: commit.to_owned(),
         })?;
-        let parent = parents.first().ok_or_else(|| {
-            crate::i18n::message(
-                "backend-is-a-first-commit-with-nothing-to-replay-from-b32065",
-                &[("commit", (short(commit)).to_string().into())],
-            )
+        let parent = parents.first().ok_or_else(|| Failure::FirstCommit {
+            commit: short(commit).to_owned(),
         })?;
         let out = run_ok_codes(
             Some(repo),
@@ -399,10 +404,7 @@ fn stepwise(
             )?;
             let made = made.trim().to_owned();
             if !is_oid(&made) {
-                return Err(crate::i18n::message(
-                    "backend-git-commit-tree-said-made-c61f36",
-                    &[("made", (made).to_string().into())],
-                ));
+                return Err(Failure::CommitTree { made });
             }
             current.clone_from(&made);
             tree.clone_from(&merged);
@@ -430,5 +432,7 @@ fn short(hash: &str) -> &str {
 /// rebase give.
 #[cfg(test)]
 pub(super) fn stepwise_only(repo: &Path, onto: &str, picks: &[String]) -> Result<Replay, String> {
-    stepwise(repo, &commit_oid(repo, onto)?, picks, &|| false)
+    commit_oid(repo, onto)
+        .and_then(|onto| stepwise(repo, &onto, picks, &|| false))
+        .map_err(|failure| failure.display())
 }

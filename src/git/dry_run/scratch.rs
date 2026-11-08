@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::super::run;
+use super::Failure;
 use super::{CANCELLED, Engine, Merge, Replay, Replayed, Stop, WRITE_OPTS};
 
 /// Options for the clone's commands on top of [`WRITE_OPTS`]: Git LFS (from the user's global
@@ -36,7 +37,12 @@ enum Removal {
 }
 
 impl Scratch {
+    #[cfg(test)]
     fn of(repo: &Path) -> Result<Self, String> {
+        Self::of_with_witness(repo).map_err(|failure| failure.display())
+    }
+
+    fn of_with_witness(repo: &Path) -> Result<Self, Failure> {
         static SEQ: AtomicU32 = AtomicU32::new(0);
         let (dir, remove, dest) = match crate::remote::parse(repo) {
             Some(target) => {
@@ -72,12 +78,7 @@ impl Scratch {
                 &dest,
             ],
         )
-        .map_err(|e| {
-            crate::i18n::message(
-                "backend-could-not-make-a-scratch-clone-e-94509c",
-                &[("detail", (e).to_string().into())],
-            )
-        })?;
+        .map_err(|e| Failure::ScratchClone { detail: e })?;
         Ok(scratch)
     }
 
@@ -183,14 +184,14 @@ pub(super) fn replay(
     onto: &str,
     picks: &[String],
     cancel: &dyn Fn() -> bool,
-) -> Result<Replay, String> {
-    let s = Scratch::of(repo)?;
+) -> Result<Replay, Failure> {
+    let s = Scratch::of_with_witness(repo)?;
     s.git(&["checkout", "-q", "--detach", onto])?;
     let mut tree = s.rev(&format!("{onto}^{{tree}}"))?;
     let mut steps = Vec::with_capacity(picks.len());
     for (step, commit) in picks.iter().enumerate() {
         if cancel() {
-            return Err(CANCELLED.to_owned());
+            return Err(Failure::Opaque(CANCELLED.to_owned()));
         }
         let picked = s.git(&[
             "cherry-pick",
@@ -201,7 +202,7 @@ pub(super) fn replay(
         if let Err(e) = picked {
             let files = s.conflicts();
             if files.is_empty() {
-                return Err(e);
+                return Err(Failure::Opaque(e));
             }
             return Ok(Replay {
                 onto: onto.to_owned(),
@@ -240,8 +241,8 @@ pub(super) fn replay(
 }
 
 /// [`super::merge`] in a scratch clone.
-pub(super) fn merge(repo: &Path, ours: &str, theirs: &str) -> Result<Merge, String> {
-    let s = Scratch::of(repo)?;
+pub(super) fn merge(repo: &Path, ours: &str, theirs: &str) -> Result<Merge, Failure> {
+    let s = Scratch::of_with_witness(repo)?;
     s.git(&["checkout", "-q", "--detach", ours])?;
     let merged = s.git(&["merge", "-q", "--no-ff", "--no-commit", "--no-edit", theirs]);
     let conflicts = match merged {
@@ -249,7 +250,7 @@ pub(super) fn merge(repo: &Path, ours: &str, theirs: &str) -> Result<Merge, Stri
         Err(e) => {
             let files = s.conflicts();
             if files.is_empty() {
-                return Err(e);
+                return Err(Failure::Opaque(e));
             }
             files
         }
