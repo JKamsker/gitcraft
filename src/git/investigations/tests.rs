@@ -301,8 +301,26 @@ fn shallow_partial_views_and_pages_do_not_download_or_run_configured_helpers() -
     assert!(!path.join(".git/index").exists());
     assert!(git::run(Some(&path), &["cat-file", "-e", &blob]).is_err());
     assert!(
+        !marker.exists(),
+        "Ordinary object reads must also refuse lazy fetch"
+    );
+    // Exercise the trap only through an explicit fetch to this owned local origin.
+    assert!(
+        git::run(
+            Some(&path),
+            &[
+                "fetch",
+                "--no-tags",
+                "--no-write-fetch-head",
+                "origin",
+                &blob
+            ],
+        )
+        .is_err()
+    );
+    assert!(
         marker.exists(),
-        "Positive control must call configured fetch helper"
+        "Explicit local fetch positive control must call configured fetch helper"
     );
     Ok(())
 }
