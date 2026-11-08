@@ -653,6 +653,14 @@ impl Workspace {
         })
     }
 
+    /// Prevent automatic deletion when process cleanup cannot be proved.
+    pub(crate) fn preserve(&self) -> Result<(), String> {
+        if let Some(scratch) = &self.scratch {
+            scratch.preserve()?;
+        }
+        Ok(())
+    }
+
     /// Removes the scratch worktree (or the work kept) now, saying why if it couldn't be.
     pub fn remove(self) -> Result<(), String> {
         match (self.scratch, self.kept) {

@@ -70,6 +70,19 @@ fn record(feed: &Mutex<Feed>, engine: Engine, dir: &str, line: &str) {
         feed.activities.push_back(activity);
     }
 }
+fn failure_exit(error: crate::processes::Failure) -> Exit {
+    use crate::processes::Failure;
+    Exit {
+        code: None,
+        safe_to_inspect: matches!(
+            error,
+            Failure::CancelledBeforeStart | Failure::TimedOutBeforeStart
+        ),
+        stopped: matches!(error, Failure::CancelledBeforeStart),
+        stderr: error.message(),
+    }
+}
+
 impl Running {
     pub fn start(
         engine: Engine,
@@ -126,12 +139,7 @@ impl Running {
                             String::from_utf8_lossy(&lock(&errors)).into_owned()
                         }),
                     },
-                    Err(error) => Exit {
-                        code: None,
-                        safe_to_inspect: true,
-                        stopped: matches!(error, crate::processes::Failure::CancelledBeforeStart),
-                        stderr: error.message(),
-                    },
+                    Err(error) => failure_exit(error),
                 };
                 lock(&fed).exit = Some(exit);
                 changed();
@@ -143,16 +151,36 @@ impl Running {
             feed,
         })
     }
+    /// A worker panic may leave no feed exit at all; surface it as uncertainty.
+    pub fn exit(&self) -> Option<Exit> {
+        let exit = self.with_feed(|f| f.exit.clone());
+        if exit.is_some() {
+            return exit;
+        }
+        lock(&self.worker)
+            .as_ref()
+            .filter(|w| w.is_finished())
+            .map(|_| {
+                failure_exit(crate::processes::Failure::Failed(
+                    "agent worker ended without cleanup proof".into(),
+                ))
+            })
+    }
+
     pub fn stop(&self) {
         self.cancel.cancel();
     }
-    pub fn stop_now(&self) {
+    pub fn stop_now(&self) -> bool {
         self.stop();
         // Holding this lock through join also waits for another stop already under way.
         let mut worker = lock(&self.worker);
         if let Some(worker) = worker.take() {
-            let _ = worker.join();
+            if worker.join().is_err() {
+                lock(&self.feed).exit = None;
+                return false;
+            }
         }
+        self.with_feed(|f| f.exit.as_ref().is_some_and(|e| e.safe_to_inspect))
     }
     #[cfg(test)]
     pub fn fake(activities: Vec<Activity>) -> Running {
@@ -191,6 +219,26 @@ mod tests {
     use super::*;
     use std::io::Read;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn recording_failure_mapping_and_join_proof_fail_closed() {
+        use crate::processes::Failure;
+        assert!(failure_exit(Failure::CancelledBeforeStart).safe_to_inspect);
+        assert!(failure_exit(Failure::TimedOutBeforeStart).safe_to_inspect);
+        for reason in ["lost service", "owned cleanup failed", "cancelled"] {
+            assert!(!failure_exit(Failure::Failed(reason.into())).safe_to_inspect);
+        }
+        let running = Running::fake(vec![]);
+        assert!(!running.stop_now());
+        lock(&running.feed).exit = Some(failure_exit(Failure::CancelledBeforeStart));
+        assert!(running.stop_now());
+        *lock(&running.worker) = Some(std::thread::spawn(|| panic!("synthetic worker panic")));
+        assert!(!running.stop_now());
+        assert!(
+            !running.stop_now(),
+            "panic invalidates even an earlier safe exit"
+        );
+    }
 
     fn wait_for(running: &Running, until: impl Fn(&Feed) -> bool) -> bool {
         let start = Instant::now();
