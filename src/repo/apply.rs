@@ -405,9 +405,7 @@ impl RepoTab {
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
             Action::RunRebase => self.ask_run_rebase(ctx),
             Action::ConfirmedRebase(id) => {
-                if self.rebase.as_ref().is_some_and(|e| e.id == id) {
-                    self.run_rebase(ctx);
-                }
+                self.confirmed_rebase(id, ctx);
             }
             Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),

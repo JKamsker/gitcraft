@@ -577,28 +577,40 @@ pub(super) fn run_steps_counted(
         .first()
         .is_some_and(|op| op.len() >= 2 && op[0] == "stash" && op[1] == "push");
     let stash_before = pushes_stash.then(|| git::resolve(path, "refs/stash").ok());
-    // Checked before anything runs, so a refused undo changes nothing.
-    if let Err(e) = check_expected(path, ops, control) {
-        return (Err(e), kind, 0);
-    }
-    // Preserve both index and worktree layers before operations that can replace files.
-    if ops.iter().any(|op| {
+    let needs_draft = ops.iter().any(|op| {
         git::subcommand(&op.iter().map(String::as_str).collect::<Vec<_>>())
             .is_some_and(|s| matches!(s, "checkout" | "switch" | "rebase"))
-    }) {
-        let active = || {
-            !crate::tasks::cancellation().is_cancelled()
-                && !control.is_some_and(|c| c.is_cancelled())
-        };
-        let snapshot = (|| {
-            if git::drafts::enabled_while(path, &active)? {
-                git::drafts::capture(path, "Before checkout / rebase", &active)?;
+    });
+    let approved_head = expected.or(head_before.as_ref());
+    let prepared = with_rechecked_preparation(
+        || {
+            check_expected(path, ops, control)?;
+            if let Some(expected) = approved_head
+                && git::head(path) != *expected
+            {
+                return Err("HEAD moved while preparing this operation; reopen its preview. No operation was run.".into());
             }
-            Ok::<_, String>(())
-        })();
-        if let Err(error) = snapshot {
-            return (Err(format!("Working draft safety check: {error}")), kind, 0);
-        }
+            Ok(())
+        },
+        || {
+            if !needs_draft {
+                return Ok(());
+            }
+            let active = || {
+                !crate::tasks::cancellation().is_cancelled()
+                    && !control.is_some_and(|c| c.is_cancelled())
+            };
+            let snapshot = (|| {
+                if git::drafts::enabled_while(path, &active)? {
+                    git::drafts::capture(path, "Before checkout / rebase", &active)?;
+                }
+                Ok::<_, String>(())
+            })();
+            snapshot.map_err(|error| format!("Working draft safety check: {error}"))
+        },
+    );
+    if let Err(error) = prepared {
+        return (Err(error), kind, 0);
     }
     let mut result = Ok(String::new());
     let mut stopped = ops.len();
@@ -683,6 +695,18 @@ pub(super) fn run_steps_counted(
         other => other,
     };
     (result, kind, stopped)
+}
+
+/// Preparation may take minutes and observes its own coherent snapshot. It never
+/// authorizes a changed operation context: retain the original verifier and run
+/// it again after preparation, immediately before command dispatch.
+fn with_rechecked_preparation(
+    mut verify: impl FnMut() -> Result<(), String>,
+    prepare: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    verify()?;
+    prepare()?;
+    verify()
 }
 
 /// Marks a step that runs no git (no argument can hold a NUL).
@@ -885,6 +909,44 @@ mod tests {
     use super::super::{OpKind, Undo, UndoEntry, ops};
     use super::{run_steps, stash_push_args};
     use crate::git;
+
+    #[test]
+    fn recording_safety_draft_cannot_authorize_an_operation_after_its_context_moves() {
+        use std::cell::{Cell, RefCell};
+        let head = Cell::new("approved-head");
+        let branch = Cell::new("approved-branch");
+        let checks = RefCell::new(Vec::new());
+        for change_branch in [false, true] {
+            head.set("approved-head");
+            branch.set("approved-branch");
+            checks.borrow_mut().clear();
+            let mut dispatched = false;
+            let result = super::with_rechecked_preparation(
+                || {
+                    checks.borrow_mut().push((head.get(), branch.get()));
+                    if head.get() == "approved-head" && branch.get() == "approved-branch" {
+                        Ok(())
+                    } else {
+                        Err("original operation context moved".into())
+                    }
+                },
+                || {
+                    if change_branch {
+                        branch.set("another-branch");
+                    } else {
+                        head.set("later-coherent-draft-head");
+                    }
+                    Ok(()) // a coherent successful snapshot of the *new* state
+                },
+            );
+            if result.is_ok() {
+                dispatched = true;
+            }
+            assert!(result.is_err());
+            assert!(!dispatched);
+            assert_eq!(checks.borrow().len(), 2);
+        }
+    }
 
     fn repo(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("gitcraft-ops-{name}-{}", std::process::id()));

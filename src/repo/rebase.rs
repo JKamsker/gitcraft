@@ -103,7 +103,21 @@ pub(crate) struct RebaseEditor {
     /// Move the branches on the commits rewritten along with them (`--update-refs`): the lower
     /// layers of a stack rebased from its top.
     pub update_refs: bool,
+    /// Captured when the editor is opened; approval never rebinds it to a later
+    /// branch at the same commit. None keeps non-UI command builders compatible.
+    pub branch_guard: Option<Vec<String>>,
+    approval: Option<Approval>,
     weather: weather::Weather,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct Approval {
+    branch: Vec<String>,
+    head: String,
+    onto: String,
+    no_ff: bool,
+    update_refs: bool,
+    entries: Vec<(String, Step, String)>,
 }
 
 impl Clone for RebaseEditor {
@@ -120,6 +134,8 @@ impl Clone for RebaseEditor {
             typing: self.typing,
             no_ff: self.no_ff,
             update_refs: self.update_refs,
+            branch_guard: self.branch_guard.clone(),
+            approval: self.approval.clone(),
             weather: weather::Weather::default(),
         }
     }
@@ -152,8 +168,51 @@ impl RebaseEditor {
             typing: false,
             no_ff: false,
             update_refs: false,
+            branch_guard: None,
+            approval: None,
             weather: weather::Weather::default(),
         }
+    }
+
+    fn approval_key(&self, branch: &[String]) -> Approval {
+        Approval {
+            branch: branch.to_vec(),
+            head: self.head.clone(),
+            onto: self.onto.clone(),
+            no_ff: self.no_ff,
+            update_refs: self.update_refs,
+            entries: self
+                .entries
+                .iter()
+                .map(|e| (e.commit.hash.clone(), e.step, e.message.clone()))
+                .collect(),
+        }
+    }
+    pub fn approve(&mut self, branch: &[String]) -> Result<(), String> {
+        if self
+            .branch_guard
+            .as_ref()
+            .is_some_and(|original| original != branch)
+        {
+            return Err(
+                "The checked-out branch changed since this editor opened. Cancel and start again."
+                    .into(),
+            );
+        }
+        self.branch_guard = Some(branch.to_vec());
+        self.approval = Some(self.approval_key(branch));
+        Ok(())
+    }
+    pub fn approved(&self, branch: &[String], head: &str) -> bool {
+        self.head == head
+            && self.branch_guard.as_deref() == Some(branch)
+            && self
+                .approval
+                .as_ref()
+                .is_some_and(|key| key == &self.approval_key(branch))
+    }
+    pub fn has_approval(&self) -> bool {
+        self.approval.is_some()
     }
 
     /// Why the commits listed are no longer the branch's, when HEAD is at `head` now.
