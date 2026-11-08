@@ -57,3 +57,4 @@ interaction-operation-push-to = Push { $branch } to { $remote }
 interaction-operation-merge-into = Merge { $branch } into { $target }
 interaction-operation-rebase-onto = Rebase { $branch } onto { $target }
 interaction-operation-fast-forward = Fast-forward { $branch } to { $target }
+interaction-settings-compact-tip = Lanes closer together, for a narrower graph column

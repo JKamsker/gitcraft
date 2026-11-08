@@ -57,3 +57,4 @@ interaction-operation-push-to = { $branch } nach { $remote } pushen
 interaction-operation-merge-into = { $branch } in { $target } zusammenführen
 interaction-operation-rebase-onto = Rebase von { $branch } auf { $target }
 interaction-operation-fast-forward = { $branch } auf { $target } vorspulen
+interaction-settings-compact-tip = Spuren liegen enger beieinander und verkleinern die Graph-Spalte
