@@ -39,6 +39,9 @@ struct Stage {
     label: String,
     commit: String,
     tree: String,
+    // Missing provenance in older evidence must never reinterpret an explicit user label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    generated_index: Option<usize>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Source {
@@ -90,6 +93,21 @@ fn valid_name(name: &str) -> bool {
         && name.as_bytes()[0].is_ascii_alphabetic()
         && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
+fn stage_input(line: &str, i: usize) -> (String, &str, Option<usize>) {
+    line.split_once('=')
+        .map_or((format!("Stage {i}"), line, Some(i)), |(a, b)| {
+            (a.trim().into(), b.trim(), None)
+        })
+}
+fn display_stage(stage: &Stage) -> String {
+    match stage.generated_index {
+        Some(stage) => crate::i18n::message(
+            "repo-workflows-review-raw-stage-i-53efae",
+            &[("stage", stage.into())],
+        ),
+        None => stage.label.clone(),
+    }
+}
 fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
     if !(2..=6).contains(&plan.components.len()) {
         return Err("Add 2–6 repositories to the release board".into());
@@ -120,11 +138,7 @@ fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
             .filter(|l| !l.is_empty())
             .enumerate()
         {
-            let (label, revision) = line
-                .split_once('=')
-                .map_or((format!("Stage {i}"), line), |(a, b)| {
-                    (a.trim().into(), b.trim())
-                });
+            let (label, revision, generated_index) = stage_input(line, i);
             let commit = contracts::resolve(&path, revision)?;
             let tree = git::run(Some(&path), &["rev-parse", &format!("{commit}^{{tree}}")])?
                 .trim()
@@ -133,6 +147,7 @@ fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
                 label,
                 commit,
                 tree,
+                generated_index,
             });
         }
         if !(2..=4).contains(&stages.len()) {
@@ -596,7 +611,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                     ui.label(format!(
                         "{} → {} ({})",
                         r.sources[i].name,
-                        stage.label,
+                        display_stage(stage),
                         crate::repo::short(&stage.commit)
                     ));
                 }
@@ -607,6 +622,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
             ));
         }
         egui::CollapsingHeader::new(crate::i18n::message("repo-workflows-review-message-count-one-one-combination-and-its-evidence-oth-e7b196", &[("count", (r.states.len()).into())]))
+        .id_salt("review-release-combination-evidence")
         .show(ui, |ui| {
             for combination in &r.states {
                 ui.group(|ui| {
@@ -618,7 +634,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
                                 format!(
                                     "{}={} ({})",
                                     source.name,
-                                    source.stages[i].label,
+                                    display_stage(&source.stages[i]),
                                     crate::repo::short(&source.stages[i].commit)
                                 )
                             })
@@ -659,6 +675,7 @@ mod tests {
                         label: i.to_string(),
                         commit: i.to_string(),
                         tree: i.to_string(),
+                        generated_index: None,
                     })
                     .collect(),
             })
@@ -819,6 +836,163 @@ mod fluent_review_tests {
         assert!(
             matches!(acts.as_slice(), [Action::ReviewTools(ToolsAct::Choreography(Act::Save(plan)))] if plan.components[0].repo == "/opaque/Repo A")
         );
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_r1_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    fn inert_stage(line: &str, i: usize) -> Stage {
+        let (label, revision, generated_index) = stage_input(line, i);
+        Stage {
+            label,
+            commit: revision.into(),
+            tree: format!("tree-{i}"),
+            generated_index,
+        }
+    }
+
+    #[test]
+    fn fluent_review_r1_stage_provenance_preserves_explicit_collisions_and_legacy_labels()
+    -> Result<(), String> {
+        for (locale, generated) in [("en-US", "Stage 1"), ("de", "Stufe 1")] {
+            crate::i18n::set_language(locale);
+            let stage = inert_stage("refs/heads/generated", 1);
+            assert_eq!(stage.label, "Stage 1");
+            assert_eq!(stage.commit, "refs/heads/generated");
+            assert_eq!(stage.generated_index, Some(1));
+            assert_eq!(display_stage(&stage), generated);
+            let reopened: Stage =
+                serde_json::from_str(&serde_json::to_string(&stage).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(display_stage(&reopened), generated);
+            for label in ["Stage1", "Stage 1", "Custom {raw}", "Stufe 1"] {
+                let stage = inert_stage(&format!("{label}= refs/heads/opaque"), 1);
+                assert_eq!(stage.generated_index, None);
+                assert_eq!(stage.label, label);
+                assert_eq!(display_stage(&stage), label);
+                assert_eq!(stage.commit, "refs/heads/opaque");
+                let serialized = serde_json::to_string(&stage).map_err(|e| e.to_string())?;
+                assert!(!serialized.contains("generated_index"));
+            }
+            // Older reports cannot prove whether Stage 1 was generated or entered by a user.
+            let legacy: Stage =
+                serde_json::from_str(r#"{"label":"Stage 1","commit":"oid","tree":"tree"}"#)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(legacy.generated_index, None);
+            assert_eq!(display_stage(&legacy), "Stage 1");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fluent_review_r1_actual_route_evidence_and_count_header_retain_locale_state()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let mut state = State::default();
+        state.report = Some(Report {
+            sources: vec![
+                Source {
+                    name: "backend".into(),
+                    repo: PathBuf::from("/opaque/backend"),
+                    stages: vec![inert_stage("base-oid", 0), inert_stage("next-oid", 1)],
+                },
+                Source {
+                    name: "custom".into(),
+                    repo: PathBuf::from("/opaque/custom"),
+                    stages: vec![
+                        inert_stage("Stage 1=userbase", 0),
+                        inert_stage("Stage1=usernext", 1),
+                    ],
+                },
+            ],
+            rules: vec![],
+            command: "Stage --opaque-command".into(),
+            states: vec![
+                Combination {
+                    stages: vec![0, 0],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+                Combination {
+                    stages: vec![1, 1],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+            ],
+            route: Some(vec![vec![0, 0], vec![1, 0], vec![1, 1]]),
+            tested: false,
+            stopped: false,
+            cleanup: vec![],
+        });
+        let before = serde_json::to_string(state.report.as_ref().ok_or("report")?)
+            .map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        crate::i18n::set_language("en-US");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(text.contains("backend → Stage 1 (next-oid)"), "{text}");
+        assert!(
+            !text.contains("backend=Stage 0"),
+            "evidence should start collapsed: {text}"
+        );
+        click(&ctx, "2 combinations and their evidence", |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        })?;
+        for (locale, generated) in [("en-US", "Stage"), ("de", "Stufe"), ("en-US", "Stage")] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, Path::new("/opaque"), &mut acts)
+            });
+            assert!(
+                text.contains(&format!("backend → {generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 0 (base-oid)")),
+                "evidence expansion lost: {text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains("custom → Stage1 (usernext)")
+                    && text.contains("custom=Stage 1 (userbase)")
+                    && text.contains("custom=Stage1 (usernext)"),
+                "explicit labels changed: {text}"
+            );
+        }
+        assert_eq!(
+            serde_json::to_string(state.report.as_ref().ok_or("report")?)
+                .map_err(|e| e.to_string())?,
+            before
+        );
+        state
+            .report
+            .as_mut()
+            .ok_or("report")?
+            .states
+            .push(Combination {
+                stages: vec![0, 0],
+                allowed: true,
+                observed: None,
+                error: None,
+            });
+        crate::i18n::set_language("de");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(
+            text.contains("3 Kombinationen und ihre Nachweise") && text.contains("backend=Stufe 0"),
+            "count change lost expansion: {text}"
+        );
+        assert!(acts.is_empty());
         Ok(())
     }
 }
