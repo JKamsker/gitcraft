@@ -229,19 +229,18 @@ fn turn_list(ui: &mut Ui, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) 
 fn turn_diff(turn: &Turn, label: &str) -> Action {
     Action::Compare {
         base: turn.parent.clone(),
-        base_label: crate::i18n::message(
-            "repo-workflows-agents-turn-diff-dc601e7b",
-            &[("turn-number-1", (turn.number).clone().into())],
-        ),
+        base_label: format!("before turn {}", turn.number),
         target: Some(turn.commit.clone()),
-        target_label: crate::i18n::message(
-            "repo-workflows-agents-turn-diff-9021b8b9",
-            &[
-                ("turn-number-1", (turn.number).clone().into()),
-                ("label", (label).clone().into()),
-            ],
-        ),
-        captions: [None, None],
+        target_label: format!("turn {}: {label}", turn.number),
+        captions: [
+            Some(crate::repo::state::CompareCaption::BeforeTurn {
+                number: turn.number,
+            }),
+            Some(crate::repo::state::CompareCaption::Turn {
+                number: turn.number,
+                label: label.to_owned(),
+            }),
+        ],
         since_fork: false,
     }
 }
@@ -298,18 +297,7 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
             ))
             .clicked()
             {
-                acts.push(Action::Compare {
-                    base: turn.commit.clone(),
-                    base_label: crate::i18n::message(
-                        "repo-workflows-agents-turn-chip-60c8b8ae",
-                        &[("turn-number-1", (turn.number).clone().into())],
-                    ),
-                    target: None,
-                    target_label: crate::i18n::text("repo-workflows-agents-turn-chip-ed5eb9a3")
-                        .to_owned(),
-                    captions: [None, None],
-                    since_fork: false,
-                });
+                acts.push(after_turn_diff(turn));
             }
         });
 }
@@ -371,5 +359,84 @@ mod tests {
         assert_eq!(shorten("short", 48), "short");
         let long = "ü".repeat(60);
         assert_eq!(shorten(&long, 48).chars().count(), 48);
+    }
+}
+
+fn after_turn_diff(turn: &Turn) -> Action {
+    Action::Compare {
+        base: turn.commit.clone(),
+        base_label: format!("after turn {}", turn.number),
+        target: None,
+        target_label: "now".into(),
+        captions: [
+            Some(crate::repo::state::CompareCaption::AfterTurn {
+                number: turn.number,
+            }),
+            Some(crate::repo::state::CompareCaption::Now),
+        ],
+        since_fork: false,
+    }
+}
+#[cfg(test)]
+mod fluent_r1_caption_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_actual_turn_actions_keep_raw_captions_and_source_metadata() {
+        let turn = Turn {
+            number: 1234,
+            parent: "refs/parent-1234".into(),
+            commit: "refs/commit-1234".into(),
+            label: "now;\nOpaque prompt {$x}".into(),
+            ..Default::default()
+        };
+        for after in [false, true] {
+            crate::i18n::set_language("de");
+            let action = if after {
+                after_turn_diff(&turn)
+            } else {
+                turn_diff(&turn, &turn.label)
+            };
+            let Action::Compare {
+                base,
+                base_label,
+                target,
+                target_label,
+                captions,
+                since_fork,
+            } = action
+            else {
+                panic!("actual source must compare")
+            };
+            assert_eq!(&base, if after { &turn.commit } else { &turn.parent });
+            assert_eq!(
+                target.as_ref(),
+                if after { None } else { Some(&turn.commit) }
+            );
+            assert!(!since_fork);
+            let comparison = crate::repo::Compare {
+                base,
+                base_label: base_label.clone(),
+                target,
+                target_label: target_label.clone(),
+                captions,
+                since_fork,
+                data: None,
+                request: 73,
+            };
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(comparison.base_label, base_label);
+                assert_eq!(comparison.target_label, target_label);
+                assert_eq!(comparison.request, 73);
+                let shown = comparison.display_base_label();
+                assert!(shown.contains("1234"));
+                assert!(!shown.contains("1.234") && !shown.contains("1,234"));
+                assert_eq!(shown == base_label, lang == "en-US");
+                if !after {
+                    assert!(comparison.display_target_label().contains(&turn.label));
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

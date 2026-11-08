@@ -46,10 +46,7 @@ impl RepoTab {
                 state.generation.store(0, Ordering::Relaxed);
                 state.request = 0;
                 state.loading = false;
-                state.pair = Some(Err(crate::i18n::text(
-                    "repo-workflows-file_comparison-file-comparison-view-725513de",
-                )
-                .into()));
+                state.pair = Some(Err("Comparison cancelled. Refresh to try again.".into()));
             }
             if ui
                 .button(crate::i18n::text(
@@ -428,7 +425,9 @@ fn migration(
                         },
                         m.similarity
                             .map(|s| format!("{s}%"))
-                            .unwrap_or_else(|| "unknown".into())
+                            .unwrap_or_else(
+                                || crate::i18n::text("repo-workflows-r1-unknown").into()
+                            )
                     ),
                     egui::FontId::proportional(12.),
                     t.text,
@@ -638,7 +637,7 @@ fn lens(
         }
     });
     for part in &lens.boundaries {
-        if let Some(reason) = &part.reason {
+        if let Some(reason) = part.display_reason() {
             ui.colored_label(t.text_dim, reason);
         }
     }
@@ -775,7 +774,7 @@ pub(super) fn show_pair(ui: &mut egui::Ui, pair: &model::Pair, t: &Tokens) {
         ));
         return;
     }
-    if let Some(reason) = &pair.boundary.reason {
+    if let Some(reason) = pair.boundary.display_reason() {
         ui.label(reason);
         ui.label(crate::i18n::text(
             "repo-workflows-file_comparison-show-pair-06ebe02e",

@@ -222,12 +222,7 @@ impl RepoTab {
         let label = view
             .run
             .as_ref()
-            .map(|r| {
-                crate::i18n::message(
-                    "repo-workflows-release-run-release-fbe3bbf7",
-                    &[("r-plan-tag-1", (r.plan.tag).clone().into())],
-                )
-            })
+            .map(|r| release_operation_label(&r.plan.tag))
             .unwrap_or_default();
         self.busy_op = Some(label);
         self.op_started = Some(std::time::Instant::now());
@@ -329,10 +324,7 @@ impl RepoTab {
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
             return;
         };
-        let label = crate::i18n::message(
-            "repo-workflows-release-release-stopped-fbe3bbf7",
-            &[("run-plan-tag-1", (run.plan.tag).clone().into())],
-        );
+        let label = release_operation_label(&run.plan.tag);
         let local_done = run.done.bump_commit.is_some() || run.done.tag_object.is_some();
         if local_done {
             let (undo, redo) = undo(&run.plan, &run.done);
@@ -488,4 +480,22 @@ fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<Strin
         ));
     }
     None
+}
+
+fn release_operation_label(tag: &str) -> String {
+    format!("Cut release {tag}")
+}
+
+#[cfg(test)]
+mod fluent_r1_operation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_release_busy_and_undo_label_are_raw_in_both_languages() {
+        let tag = "v1234.5/{$x}:日本語";
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(release_operation_label(tag), format!("Cut release {tag}"));
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

@@ -134,7 +134,9 @@ impl State {
             active: None,
             command: None,
             jobs: crate::tasks::Scope(repo.tx.cancel.child()),
-            status: crate::i18n::text("repo-workflows-ssh_setup-new-8633c172").into(),
+            status:
+                "No key, agent, account or network action has run. Choose each step explicitly."
+                    .into(),
         })
     }
     pub fn running(&self) -> bool {
@@ -233,10 +235,9 @@ impl State {
             .and_then(|receive| match receive.try_recv() {
                 Ok(value) => Some(value),
                 Err(mpsc::TryRecvError::Empty) => None,
-                Err(_) => Some(Err(crate::i18n::text(
-                    "repo-workflows-ssh_setup-poll-380743c6",
-                )
-                .into())),
+                Err(_) => Some(Err(
+                    "Setup worker stopped; no later result will be applied.".into(),
+                )),
             });
         if let Some(ready) = ready {
             self.cancel_worker();
@@ -620,7 +621,9 @@ impl RepoTab {
                 .max_height(fields_height)
                 .show(ui, |ui| ui.add_enabled_ui(!busy, |ui| state.fields(ui)));
             ui.separator();
-            ui.label(crate::repo::messages::display_status(&state.status));
+            ui.label(crate::repo::messages::display_status(
+                &crate::repo::activity::display_workflow_error(&state.status),
+            ));
             if busy {
                 ui.label(crate::i18n::text(
                     "repo-workflows-ssh_setup-ssh-setup-window-72a17b9c",
@@ -638,5 +641,28 @@ impl RepoTab {
         if open {
             self.ssh_setup = Some(state);
         }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_status_tests {
+    #[test]
+    fn fluent_partition_r1_ssh_fixed_cached_status_follows_locale_without_account_or_command_replay()
+     {
+        for raw in [
+            "No key, agent, account or network action has run. Choose each step explicitly.",
+            "Setup worker stopped; no later result will be applied.",
+        ] {
+            let retained = raw.to_owned();
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(
+                    crate::repo::activity::display_workflow_error(&retained) == retained,
+                    lang == "en-US"
+                );
+                assert_eq!(retained, raw);
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

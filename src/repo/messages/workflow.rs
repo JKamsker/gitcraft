@@ -4,6 +4,106 @@
 
 pub(super) const TEMPLATES: &[super::TemplateSpec] = &[
     (
+        "(?s)^Use YYYY\\-MM\\-DD dates$",
+        "repo-workflows-atlas-read-atlas-02c42736",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Use YYYY\\-MM\\-DD dates, with start on or before end$",
+        "repo-workflows-atlas-read-atlas-67b18cbf",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Use dates such as 2026\\-11\\-07$",
+        "repo-workflows-history_activity-requested-range-4d18caf5",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^The start date must be on or before the end date$",
+        "repo-workflows-history_activity-requested-range-25f6acd0",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Analysis cancelled\\. Refresh to try again\\.$",
+        "repo-workflows-history_activity-cancel-ddfe1c43",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^No supported forge remote; commit history remains available$",
+        "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history$",
+        "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Trace cancelled$",
+        "repo-workflows-line_dossier-line-dossier-view-a8198076",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Repository changed\\. Refresh the file view\\.$",
+        "repo-workflows-file_comparison-invalidate-81f92ce0",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Invalid comparison sides$",
+        "repo-workflows-file_comparison-prepare-da3978aa",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^More than 20,000 lines in a version; use the normal patch view$",
+        "repo-workflows-file_comparison-boundary-e44610d7",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Git could not align these raw versions$",
+        "repo-workflows-file_comparison-boundary-b861cbb0",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^The raw patch is not UTF\\-8$",
+        "repo-workflows-file_comparison-boundary-5421cc1b",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Git could not produce a raw text patch for these differing bytes; use the normal patch view$",
+        "repo-workflows-file_comparison-boundary-6732715f",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Comparison cancelled\\. Refresh to try again\\.$",
+        "repo-workflows-file_comparison-file-comparison-view-725513de",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^No key, agent, account or network action has run\\. Choose each step explicitly\\.$",
+        "repo-workflows-ssh_setup-new-8633c172",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Setup worker stopped; no later result will be applied\\.$",
+        "repo-workflows-ssh_setup-poll-380743c6",
+        &[],
+    ), // R1 finite source contract
+    (
+        "(?s)^Cut release (.*?)$",
+        "repo-workflows-release-release-stopped-fbe3bbf7",
+        &[("run-plan-tag-1", false)],
+    ), // R1 finite source contract
+    (
+        "(?s)^Clear the flag of (.*?)$",
+        "repo-workflows-doctor-clear-7f76d2cf",
+        &[("one-path-1", false)],
+    ), // R1 finite source contract
+    (
+        "(?s)^Clear the flags of ([0-9]+) files$",
+        "repo-workflows-doctor-clear-e318945b",
+        &[("files-len-1", true)],
+    ), // R1 finite source contract
+    (
         "(?s)^Could not start the selected machine's terminal/tool\\. Check that OpenSSH/WSL is installed\\. A reserved new folder, if any, is retained; existing files were not overwritten\\.$",
         "repo-workflows-ssh_setup-launch-0690e36b",
         &[],

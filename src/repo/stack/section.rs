@@ -55,7 +55,7 @@ impl RepoTab {
         if let Some(e) = &self.stacks.error {
             ui.horizontal_wrapped(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, e);
+                ui.colored_label(t.danger, self.stacks.display_read_error(e));
             });
         }
         self.restack_banner(ui, idle, acts);

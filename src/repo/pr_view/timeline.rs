@@ -156,10 +156,7 @@ fn entry_header(
         let (rect, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
         widgets::avatar(ui, rect.center(), 10.0, &entry.author, "");
         ui.label(RichText::new(&entry.author).font(theme::medium(12.5)));
-        let verb = match &entry.kind {
-            EntryKind::Comment | EntryKind::Inline { .. } => "commented",
-            EntryKind::Review(verdict) => verdict,
-        };
+        let verb = entry_verb(&entry.kind);
         ui.label(RichText::new(verb).color(t.text_dim));
         if let EntryKind::Inline {
             path,
@@ -258,4 +255,34 @@ fn show_in_diff(files: &PrFiles, path: &str, line: u64, side: DiffSide, acts: &m
         line,
         side,
     })));
+}
+
+fn entry_verb(kind: &EntryKind) -> &str {
+    match kind {
+        EntryKind::Comment | EntryKind::Inline { .. } => {
+            crate::i18n::text("repo-workflows-r1-commented")
+        }
+        EntryKind::Review(verdict) => verdict,
+    }
+}
+#[cfg(test)]
+mod fluent_r1_word_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_comment_words_repaint_but_review_provider_words_remain_opaque() {
+        let review = EntryKind::Review("commented;\nprovider 日本語".into());
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(
+                entry_verb(&EntryKind::Comment),
+                if lang == "de" {
+                    "hat kommentiert"
+                } else {
+                    "commented"
+                }
+            );
+            assert_eq!(entry_verb(&review), "commented;\nprovider 日本語");
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

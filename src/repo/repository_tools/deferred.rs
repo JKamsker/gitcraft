@@ -408,20 +408,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             ))
                             .clicked()
                         {
-                            acts.push(Action::Compare {
-                                base: s.old.clone(),
-                                base_label: crate::i18n::message(
-                                    "repo-workflows-repository_tools-show-507eaa08",
-                                    &[("s-branch-1", (s.branch).clone().into())],
-                                ),
-                                target: Some(new.clone()),
-                                target_label: crate::i18n::message(
-                                    "repo-workflows-repository_tools-show-7bd990ec",
-                                    &[("s-branch-1", (s.branch).clone().into())],
-                                ),
-                                captions: [None, None],
-                                since_fork: false,
-                            });
+                            acts.push(candidate_comparison(&s.old, new, &s.branch));
                         }
                     }
                 }
@@ -592,5 +579,71 @@ mod tests {
                 .any(|a| matches!(a,Action::OpenWorktree(p) if p==&path))
         );
         Ok(())
+    }
+}
+
+fn candidate_comparison(original: &str, candidate: &str, branch: &str) -> Action {
+    Action::Compare {
+        base: original.to_owned(),
+        base_label: format!("original {branch}"),
+        target: Some(candidate.to_owned()),
+        target_label: format!("candidate {branch}"),
+        captions: [
+            Some(crate::repo::state::CompareCaption::OriginalBranch {
+                branch: branch.into(),
+            }),
+            Some(crate::repo::state::CompareCaption::CandidateBranch {
+                branch: branch.into(),
+            }),
+        ],
+        since_fork: false,
+    }
+}
+#[cfg(test)]
+mod fluent_r1_caption_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_actual_deferred_action_retains_branch_and_opaque_raw_payload() {
+        let branch = "candidate raw/1234;\n{$x}";
+        crate::i18n::set_language("de");
+        let Action::Compare {
+            base,
+            base_label,
+            target,
+            target_label,
+            captions,
+            since_fork,
+        } = candidate_comparison("raw-original", "raw-candidate", branch)
+        else {
+            panic!("actual source must compare")
+        };
+        assert_eq!(base, "raw-original");
+        assert_eq!(target.as_deref(), Some("raw-candidate"));
+        assert!(!since_fork);
+        assert_eq!(base_label, format!("original {branch}"));
+        assert_eq!(target_label, format!("candidate {branch}"));
+        let comparison = crate::repo::Compare {
+            base,
+            base_label: base_label.clone(),
+            target,
+            target_label: target_label.clone(),
+            captions,
+            since_fork,
+            data: None,
+            request: 29,
+        };
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert!(comparison.display_base_label().contains(branch));
+            assert!(comparison.display_target_label().contains(branch));
+            assert_eq!(
+                comparison.display_base_label() == base_label,
+                lang == "en-US"
+            );
+            assert_eq!(comparison.base_label, base_label);
+            assert_eq!(comparison.target_label, target_label);
+            assert_eq!(comparison.request, 29);
+        }
+        crate::i18n::set_language("en-US");
     }
 }

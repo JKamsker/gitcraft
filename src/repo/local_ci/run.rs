@@ -7,45 +7,14 @@ use std::{
 };
 
 pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), String> {
-    if crate::remote::is_remote(path) {
-        return Err(crate::i18n::text("repo-workflows-local_ci-read-catalog-56e09929").into());
-    }
-    let entries = std::fs::read_dir(path.join(".github/workflows")).map_err(|e| {
-        crate::i18n::message(
-            "repo-workflows-local_ci-read-catalog-e3297274",
-            &[("e", (e).to_string().into())],
-        )
-    })?;
-    let mut files = entries
-        .filter_map(Result::ok)
-        .map(|e| e.file_name())
-        .collect::<Vec<_>>();
-    files.sort();
-    if files.len() > 256 {
-        return Err(crate::i18n::text("repo-workflows-local_ci-read-catalog-4a734aad").into());
-    }
-    let (mut workflows, mut errors) = (Vec::new(), Vec::new());
-    for name in files {
-        let Some(name) = name.to_str() else {
-            continue;
-        };
-        if !name.ends_with(".yml") && !name.ends_with(".yaml") {
-            continue;
-        }
-        let file = format!(".github/workflows/{name}");
-        let parsed = read_source(path, &file).and_then(|s| model::parse(file.clone(), s));
-        match parsed {
-            Ok(w) => workflows.push(w),
-            Err(e) => errors.push(crate::i18n::message(
-                "repo-workflows-local_ci-read-catalog-34bc7dab",
-                &[
-                    ("file", (file).clone().into()),
-                    ("e", (e).to_string().into()),
-                ],
-            )),
-        }
-    }
-    Ok((workflows, errors))
+    read_catalog_with_witness(path)
+        .map(|(workflows, errors)| {
+            (
+                workflows,
+                errors.iter().map(CatalogFailure::display).collect(),
+            )
+        })
+        .map_err(|failure| failure.display())
 }
 fn read_source(path: &Path, file: &str) -> Result<String, String> {
     let bytes = crate::safe_read::read_inside(path, file, model::MAX as u64).ok_or(
@@ -347,5 +316,153 @@ pub(super) fn options(
         stdout: Some(stream(Arc::clone(log), ctx.clone())),
         stderr: Some(stream(Arc::clone(log), ctx.clone())),
         ..Default::default()
+    }
+}
+
+pub(super) fn read_catalog_with_witness(
+    path: &Path,
+) -> Result<(Vec<Workflow>, Vec<CatalogFailure>), CatalogFailure> {
+    if crate::remote::is_remote(path) {
+        return Err(CatalogFailure::Remote.into());
+    }
+    let entries = std::fs::read_dir(path.join(".github/workflows")).map_err(|e| {
+        CatalogFailure::Directory {
+            detail: e.to_string(),
+        }
+    })?;
+    let mut files = entries
+        .filter_map(Result::ok)
+        .map(|e| e.file_name())
+        .collect::<Vec<_>>();
+    files.sort();
+    if files.len() > 256 {
+        return Err(CatalogFailure::TooMany.into());
+    }
+    let (mut workflows, mut errors) = (Vec::new(), Vec::new());
+    for name in files {
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if !name.ends_with(".yml") && !name.ends_with(".yaml") {
+            continue;
+        }
+        let file = format!(".github/workflows/{name}");
+        let parsed = read_source_with_witness(path, &file)
+            .and_then(|s| model::parse_with_witness(file.clone(), s).map_err(SourceFailure::Parse));
+        match parsed {
+            Ok(w) => workflows.push(w),
+            Err(e) => errors.push(CatalogFailure::File { file, cause: e }),
+        }
+    }
+    Ok((workflows, errors))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum SourceFailure {
+    Unsafe,
+    Utf8,
+    Parse(model::ParseFailure),
+}
+impl SourceFailure {
+    pub fn raw(&self) -> String {
+        match self {
+            Self::Unsafe => {
+                "Workflow is missing, linked outside the worktree, unreadable, or exceeds 1 MiB"
+                    .into()
+            }
+            Self::Utf8 => "Workflow is not UTF-8".into(),
+            Self::Parse(p) => p.raw(),
+        }
+    }
+    pub fn display(&self) -> String {
+        match self {
+            Self::Unsafe => {
+                crate::i18n::text("repo-workflows-local_ci-read-source-0066c097").into()
+            }
+            Self::Utf8 => crate::i18n::text("repo-workflows-local_ci-read-source-02772e72").into(),
+            Self::Parse(p) => p.display(),
+        }
+    }
+}
+fn read_source_with_witness(path: &Path, file: &str) -> Result<String, SourceFailure> {
+    let bytes = crate::safe_read::read_inside(path, file, model::MAX as u64)
+        .ok_or(SourceFailure::Unsafe)?;
+    String::from_utf8(bytes).map_err(|_| SourceFailure::Utf8)
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum CatalogFailure {
+    Remote,
+    TooMany,
+    Directory { detail: String },
+    File { file: String, cause: SourceFailure },
+    Stale,
+    Ended,
+}
+impl CatalogFailure {
+    pub fn raw(&self) -> String {
+        match self {
+Self::Remote => "Local Actions needs a worktree on this machine. Use act on the repository's machine for a remote worktree.".into(),
+Self::TooMany => "More than 256 workflow files; narrow the workflow directory first".into(),
+Self::Stale => "Profile changed; the local operation was cancelled. An act run's Docker resources may remain; inspect them before retrying.".into(),
+Self::Ended => "Local operation ended without an answer (cancelled or worker failed). Inspect Docker resources before retrying.".into(),
+
+        Self::Directory{detail}=>format!("Cannot read .github/workflows: {detail}"),
+        Self::File{file,cause}=>format!("{file}: {}",cause.raw()),
+    }
+    }
+    pub fn display(&self) -> String {
+        match self {
+            Self::Remote => {
+                crate::i18n::text("repo-workflows-local_ci-read-catalog-56e09929").into()
+            }
+            Self::TooMany => {
+                crate::i18n::text("repo-workflows-local_ci-read-catalog-4a734aad").into()
+            }
+            Self::Stale => crate::i18n::text("repo-workflows-local_ci-poll-93b6c091").into(),
+            Self::Ended => crate::i18n::text("repo-workflows-local_ci-poll-3b4f1312").into(),
+
+            Self::Directory { detail } => crate::i18n::message(
+                "repo-workflows-local_ci-read-catalog-e3297274",
+                &[("e", detail.as_str().into())],
+            ),
+            Self::File { file, cause } => crate::i18n::message(
+                "repo-workflows-local_ci-read-catalog-34bc7dab",
+                &[
+                    ("file", file.as_str().into()),
+                    ("e", cause.display().into()),
+                ],
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_catalog_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_local_actions_retains_typed_parser_and_opaque_yaml_details() {
+        crate::i18n::set_language("de");
+        let cause = model::parse_with_witness("raw.yml".into(), "on: push\n".into()).unwrap_err();
+        let error = CatalogFailure::File {
+            file: "raw; ;\n{$path}/1234.yml".into(),
+            cause: SourceFailure::Parse(cause),
+        };
+        let raw = error.raw();
+        let mut state = super::super::State::default();
+        state.errors = vec![error.clone()];
+        state.remember_catalog_failure(error.clone());
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(state.errors[0], error);
+            let shown = state.errors[0].display();
+            assert!(shown.contains("raw; ;\n{$path}/1234.yml"));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.display_result_error(&raw), shown);
+            assert_eq!(state.result.as_ref().unwrap().as_ref().unwrap_err(), &raw);
+            assert!(state.pending.is_none());
+        }
+        let lookalike = model::ParseFailure::Opaque("Workflow has no jobs mapping".into());
+        assert_eq!(lookalike.display(), lookalike.raw());
+        crate::i18n::set_language("en-US");
     }
 }

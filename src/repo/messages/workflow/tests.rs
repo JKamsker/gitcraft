@@ -2938,3 +2938,124 @@ fn workflow_checkout_contract_preserves_decimal_pr_and_opaque_owner_in_public_wr
         }
     }
 }
+
+#[test]
+fn workflow_r1_fixed_sentinels_and_raw_operation_templates_project_only_at_paint() {
+    for language in ["en-US", "de", "en-US"] {
+        crate::i18n::set_language(language);
+        for (raw, id) in &[
+            (
+                "History worker stopped",
+                "repo-workflows-saved_views-poll-da12ac51",
+            ),
+            (
+                "History read cancelled",
+                "repo-workflows-saved_views-poll-dc101692",
+            ),
+            (
+                "History worker panicked",
+                "repo-workflows-saved_views-poll-33647b3e",
+            ),
+            (
+                "Use YYYY-MM-DD dates",
+                "repo-workflows-atlas-read-atlas-02c42736",
+            ),
+            (
+                "Use YYYY-MM-DD dates, with start on or before end",
+                "repo-workflows-atlas-read-atlas-67b18cbf",
+            ),
+            (
+                "Use dates such as 2026-11-07",
+                "repo-workflows-history_activity-requested-range-4d18caf5",
+            ),
+            (
+                "The start date must be on or before the end date",
+                "repo-workflows-history_activity-requested-range-25f6acd0",
+            ),
+            (
+                "Analysis cancelled. Refresh to try again.",
+                "repo-workflows-history_activity-cancel-ddfe1c43",
+            ),
+            (
+                "No supported forge remote; commit history remains available",
+                "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+            ),
+            (
+                "Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history",
+                "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+            ),
+            (
+                "Trace cancelled",
+                "repo-workflows-line_dossier-line-dossier-view-a8198076",
+            ),
+            (
+                "Repository changed. Refresh the file view.",
+                "repo-workflows-file_comparison-invalidate-81f92ce0",
+            ),
+            (
+                "Invalid comparison sides",
+                "repo-workflows-file_comparison-prepare-da3978aa",
+            ),
+            (
+                "More than 20,000 lines in a version; use the normal patch view",
+                "repo-workflows-file_comparison-boundary-e44610d7",
+            ),
+            (
+                "Git could not align these raw versions",
+                "repo-workflows-file_comparison-boundary-b861cbb0",
+            ),
+            (
+                "The raw patch is not UTF-8",
+                "repo-workflows-file_comparison-boundary-5421cc1b",
+            ),
+            (
+                "Git could not produce a raw text patch for these differing bytes; use the normal patch view",
+                "repo-workflows-file_comparison-boundary-6732715f",
+            ),
+            (
+                "Comparison cancelled. Refresh to try again.",
+                "repo-workflows-file_comparison-file-comparison-view-725513de",
+            ),
+            (
+                "No key, agent, account or network action has run. Choose each step explicitly.",
+                "repo-workflows-ssh_setup-new-8633c172",
+            ),
+            (
+                "Setup worker stopped; no later result will be applied.",
+                "repo-workflows-ssh_setup-poll-380743c6",
+            ),
+        ] {
+            assert_eq!(
+                crate::repo::messages::display_status(raw),
+                crate::i18n::text(id)
+            );
+        }
+        for raw in [
+            "Cut release tag/$(opaque)\n1234",
+            "Clear the flag of path/{$x}: before\n1234",
+            "Clear the flags of 1234 files",
+        ] {
+            let shown = crate::repo::messages::display_operation(raw);
+            if language == "en-US" && !raw.ends_with(" files") {
+                assert_eq!(shown, raw);
+            }
+            if language == "de" {
+                assert_ne!(shown, raw);
+            }
+        }
+        let private =
+            "Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable";
+        assert_eq!(crate::repo::messages::display_status(private), private);
+        assert_eq!(
+            crate::repo::activity::display_workflow_error(private),
+            private
+        );
+        for opaque in [
+            "provider arbitrary diagnostic",
+            "Cut release",
+            "Clear the flags of 1.234 files",
+        ] {
+            assert_eq!(crate::repo::messages::display_operation(opaque), opaque);
+        }
+    }
+}

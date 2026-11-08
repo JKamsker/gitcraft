@@ -303,36 +303,36 @@ fn value_row(ui: &mut Ui, origin: &Origin, wins: bool, locked: bool, acts: &mut 
 fn remove_confirm(origin: &Origin, op: Vec<String>) -> Action {
     let file = origin.file.clone().unwrap_or_default();
 
-    Action::Doctor(DoctorAct::Confirm(Confirm {
-        title: crate::i18n::message(
-            "repo-workflows-doctor-remove-confirm-9861b6eb",
-            &[("origin-key-1", (origin.key).clone().into())],
-        ),
-        body: crate::i18n::message(
-            "repo-workflows-doctor-remove-setting",
-            &[
-                ("key", (origin.key.as_str()).into()),
-                ("value", (origin.shown_value()).into()),
-                ("file", (file.as_str()).into()),
-                (
-                    "scope",
-                    (match origin.scope {
-                        Scope::Global => "global",
-                        Scope::System => "system",
-                        _ => "local",
-                    })
-                    .into(),
-                ),
-            ],
-        ),
-        button: crate::i18n::text("repo-workflows-doctor-remove-confirm-c3812fc4").to_owned(),
-        label: format!(
-            "Remove {} ({}) from {file}",
-            origin.key,
-            shortened(origin.shown_value())
-        ),
-        ops: vec![op],
-    }))
+    Action::Doctor(DoctorAct::Confirm(
+        Confirm {
+            title: format!("Remove {}?", origin.key),
+            body: format!(
+                "Remove {} = {} from {file}?{} The value isn't kept: to get it back, set it \
+             again.",
+                origin.key,
+                origin.shown_value(),
+                match origin.scope {
+                    Scope::Global => " This applies to all your repositories.",
+                    Scope::System => " This applies to every user of this machine.",
+                    _ => "",
+                }
+            ),
+            button: "Remove".to_owned(),
+            label: format!(
+                "Remove {} ({}) from {file}",
+                origin.key,
+                shortened(origin.shown_value())
+            ),
+            ops: vec![op],
+            presentation: None,
+        }
+        .with_presentation(super::ConfirmKind::Remove {
+            key: origin.key.clone(),
+            value: origin.shown_value().into(),
+            file: file.clone(),
+            scope: origin.scope,
+        }),
+    ))
 }
 
 /// Setting a new value at a chosen scope.
@@ -366,7 +366,7 @@ fn set_row(
         } else {
             egui::ComboBox::from_id_salt(("doctor-value", setting.key))
                 .selected_text(if state.value.is_empty() {
-                    "choose"
+                    crate::i18n::text("repo-workflows-r1-choose")
                 } else {
                     state.value.as_str()
                 })
@@ -403,38 +403,33 @@ fn set_row(
             );
             acts.push(Action::Doctor(match scope {
                 // Beyond this repository: asked first.
-                Scope::Global | Scope::System => DoctorAct::Confirm(Confirm {
-                    title: crate::i18n::message(
-                        "repo-workflows-doctor-set-row-a215cc6f",
-                        &[
-                            ("setting-key-1", (setting.key).clone().into()),
-                            (
-                                "scope-choice-scope-to-lowercase-2",
-                                (scope_choice(scope).to_lowercase()).clone().into(),
-                            ),
-                        ],
-                    ),
-                    body: crate::i18n::message(
-                        "repo-workflows-doctor-set-row-ccc71902",
-                        &[
-                            ("setting-key-1", (setting.key).clone().into()),
-                            ("value", (value).clone().into()),
-                            (
-                                "if-scope-scope-global-your-globa-2",
-                                (if scope == Scope::Global {
-                                    crate::i18n::text("repo-workflows-doctor-set-row-e0a790f9")
-                                } else {
-                                    crate::i18n::text("repo-workflows-doctor-set-row-cc3edd84")
-                                })
-                                .clone()
-                                .into(),
-                            ),
-                        ],
-                    ),
-                    button: crate::i18n::text("repo-workflows-doctor-set-row-b6f6f3ad").to_owned(),
-                    label,
-                    ops: vec![op],
-                }),
+                Scope::Global | Scope::System => DoctorAct::Confirm(
+                    Confirm {
+                        title: format!(
+                            "Set {} for {}?",
+                            setting.key,
+                            scope_identity(scope).to_lowercase()
+                        ),
+                        body: format!(
+                            "{} = {value} goes into {}. The value it replaces there isn't kept.",
+                            setting.key,
+                            if scope == Scope::Global {
+                                "your global git config, for all your repositories"
+                            } else {
+                                "git's system file, for every user of this machine"
+                            }
+                        ),
+                        button: "Set".to_owned(),
+                        label,
+                        ops: vec![op],
+                        presentation: None,
+                    }
+                    .with_presentation(super::ConfirmKind::Set {
+                        key: setting.key.into(),
+                        value: value.clone(),
+                        scope,
+                    }),
+                ),
                 _ => DoctorAct::Run {
                     label,
                     ops: vec![op],
@@ -463,7 +458,7 @@ fn scope_identity(scope: Scope) -> &'static str {
     }
 }
 
-fn scope_choice(scope: Scope) -> &'static str {
+pub(super) fn scope_choice(scope: Scope) -> &'static str {
     match scope {
         Scope::Local => crate::i18n::text("repo-workflows-doctor-scope-choice-38429e22"),
         Scope::Worktree => crate::i18n::text("repo-workflows-doctor-scope-choice-0eb26325"),
@@ -571,5 +566,126 @@ mod accessibility_tests {
             h.get_by_label(&label).accesskit_node().data().is_expanded(),
             Some(true)
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_confirmation_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    fn check_cache(confirm: &Confirm, details: &[&str]) {
+        let raw = (
+            confirm.title.clone(),
+            confirm.body.clone(),
+            confirm.button.clone(),
+            confirm.label.clone(),
+            confirm.ops.clone(),
+        );
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let (title, body, button) = confirm.displayed();
+            assert_eq!(title == raw.0, lang == "en-US");
+            assert_eq!(button == raw.2, lang == "en-US");
+            for detail in details {
+                assert!(body.contains(detail), "{body}");
+            }
+            assert_eq!(
+                (
+                    confirm.title.clone(),
+                    confirm.body.clone(),
+                    confirm.button.clone(),
+                    confirm.label.clone(),
+                    confirm.ops.clone()
+                ),
+                raw
+            );
+        }
+    }
+    #[test]
+    fn fluent_partition_r1_actual_remove_confirmation_keeps_opaque_value_path_and_argv() {
+        for scope in [Scope::Local, Scope::Global, Scope::System] {
+            let origin = Origin {
+                scope,
+                file: Some("raw;\npath/{$x}".into()),
+                key: "user.name".into(),
+                value: Some("Opaque;\nprovider {$x}".into()),
+            };
+            let op = vec![
+                "config".into(),
+                "--file".into(),
+                origin.file.clone().unwrap(),
+                "--unset-all".into(),
+                origin.key.clone(),
+            ];
+            crate::i18n::set_language("de");
+            let Action::Doctor(DoctorAct::Confirm(confirm)) = remove_confirm(&origin, op.clone())
+            else {
+                panic!("remove must confirm")
+            };
+            assert_eq!(confirm.ops, vec![op]);
+            check_cache(
+                &confirm,
+                &[
+                    origin.shown_value(),
+                    origin.file.as_deref().unwrap(),
+                    &origin.key,
+                ],
+            );
+            let mut opaque = confirm.clone();
+            opaque.presentation = None;
+            crate::i18n::set_language("de");
+            assert_eq!(
+                opaque.displayed(),
+                (
+                    opaque.title.clone(),
+                    opaque.body.clone(),
+                    opaque.button.clone()
+                )
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+    #[test]
+    fn fluent_partition_r1_actual_set_click_caches_raw_confirmation_and_projects_scope_at_paint() {
+        for scope in [Scope::Global, Scope::System] {
+            crate::i18n::set_language("de");
+            let state = ConfigState {
+                scope: Some(scope),
+                value: "Opaque; {$x}".into(),
+                ..Default::default()
+            };
+            let setting = config::find("user.name").unwrap();
+            let mut h = Harness::new_ui_state(
+                |ui, state: &mut (ConfigState, Vec<Action>, bool)| {
+                    if !std::mem::replace(&mut state.2, true) {
+                        crate::theme::install_fonts(ui.ctx());
+                        return;
+                    }
+                    set_row(
+                        ui,
+                        &mut state.0,
+                        setting,
+                        &Env::new(1, false, false),
+                        &mut state.1,
+                    );
+                },
+                (state, Vec::new(), false),
+            );
+            h.run();
+            h.get_by_label(crate::i18n::text("repo-workflows-doctor-set-row-b6f6f3ad"))
+                .click();
+            h.run();
+            let actions = std::mem::take(&mut h.state_mut().1);
+            let mut iter = actions.into_iter();
+            let Action::Doctor(DoctorAct::Confirm(confirm)) = iter.next().unwrap() else {
+                panic!("global/system must confirm")
+            };
+            assert!(iter.next().is_none());
+            assert!(confirm.ops[0].contains(&"Opaque; {$x}".into()));
+            check_cache(&confirm, &["user.name", "Opaque; {$x}"]);
+            assert_eq!(h.state().0.scope, Some(scope));
+            assert_eq!(h.state().0.value, "Opaque; {$x}");
+        }
+        crate::i18n::set_language("en-US");
     }
 }

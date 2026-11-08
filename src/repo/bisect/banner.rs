@@ -356,7 +356,10 @@ fn run_log(ui: &mut Ui, run: &RunLog, acts: &mut Vec<Action>) {
             }
             Some(Ok(e)) => {
                 let (text, color) = match e.code {
-                    Some(0) => ("done".to_owned(), t.success),
+                    Some(0) => (
+                        crate::i18n::text("repo-workflows-r1-done").to_owned(),
+                        t.success,
+                    ),
                     Some(c) => (
                         crate::i18n::message(
                             "repo-workflows-bisect-run-log-534a3a34",

@@ -146,11 +146,12 @@ fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
     let Some(confirm) = &doctor.confirm else {
         return;
     };
+    let (title, body, button) = confirm.displayed();
     ask(
         ui,
-        &confirm.title,
-        &confirm.body,
-        &confirm.button,
+        &title,
+        &body,
+        &button,
         crate::i18n::text("repo-workflows-doctor-confirm-modal-19766ed6"),
         |yes| Action::Doctor(DoctorAct::Answer(yes)),
         acts,
@@ -159,7 +160,7 @@ fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
 
 /// A question in a modal: `answer(true)` for its button, `answer(false)` for the other one or
 /// Esc.
-fn ask(
+pub(super) fn ask(
     ui: &mut Ui,
     title: &str,
     body: &str,

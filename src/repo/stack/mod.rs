@@ -62,6 +62,7 @@ pub(crate) struct Stacks {
     pub layers: Vec<Layer>,
     /// Why they couldn't be read, the last time.
     pub error: Option<String>,
+    read_error: Option<ReadError>,
     /// Numbers the reads: only the latest one's answer is taken.
     read: u64,
     pub dialog: Option<BasedOn>,
@@ -138,12 +139,7 @@ impl RepoTab {
                         tab.stacks.pending = pending;
                         tab.stacks.error = None;
                     }
-                    Err(e) => {
-                        tab.stacks.error = Some(crate::i18n::message(
-                            "repo-workflows-stack-read-stacks-4272623a",
-                            &[("e", (e).clone().into())],
-                        ))
-                    }
+                    Err(e) => tab.stacks.remember_read_error(e),
                 }
             },
         );
@@ -316,5 +312,52 @@ impl RepoTab {
             ));
         }
         Some(line)
+    }
+}
+
+#[derive(Clone)]
+struct ReadError {
+    raw: String,
+    detail: String,
+}
+impl Stacks {
+    fn remember_read_error(&mut self, detail: String) {
+        let e = &detail;
+        let raw = format!("Couldn't read the stacks: {e}");
+        self.error = Some(raw.clone());
+        self.read_error = Some(ReadError { raw, detail });
+    }
+    fn display_read_error(&self, raw: &str) -> String {
+        match &self.read_error {
+            Some(receipt) if receipt.raw == raw => crate::i18n::message(
+                "repo-workflows-stack-read-stacks-4272623a",
+                &[("e", receipt.detail.as_str().into())],
+            ),
+            _ => raw.to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_read_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_stack_cached_read_error_preserves_raw_detail_and_generation() {
+        let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = Stacks::default();
+        state.remember_read_error(detail.into());
+        let raw = state.error.clone().unwrap();
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let shown = state.display_read_error(&raw);
+            assert!(shown.contains(detail));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.error.as_ref(), Some(&raw));
+        }
+        state.read_error = None;
+        crate::i18n::set_language("de");
+        assert_eq!(state.display_read_error(&raw), raw);
+        crate::i18n::set_language("en-US");
     }
 }

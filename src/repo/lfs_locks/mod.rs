@@ -28,6 +28,7 @@ pub(in crate::repo) struct LockState {
     read_ok: bool,
     /// Why the last read failed.
     error: Option<String>,
+    read_error: Option<ReadError>,
     /// The server has said it has no locks API: it isn't asked again in the background.
     unsupported: bool,
     /// A read is on its way: it was asked for when.
@@ -337,6 +338,53 @@ mod fluent_identity_tests {
             assert_eq!(lock.id, "server-id");
             assert_eq!(lock.path, "Art/My File.psd");
         }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[derive(Clone)]
+struct ReadError {
+    raw: String,
+    detail: String,
+}
+impl LockState {
+    fn remember_read_error(&mut self, detail: String) {
+        let e = &detail;
+        let raw = format!("Could not read the LFS locks: {e}");
+        self.error = Some(raw.clone());
+        self.read_error = Some(ReadError { raw, detail });
+    }
+    fn display_read_error(&self, raw: &str) -> String {
+        match &self.read_error {
+            Some(receipt) if receipt.raw == raw => crate::i18n::message(
+                "repo-workflows-lfs_locks-locks-read-05347473",
+                &[("e", receipt.detail.as_str().into())],
+            ),
+            _ => raw.to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_read_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_lfs_locks_cached_read_error_preserves_raw_detail_and_generation() {
+        let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = LockState::default();
+        state.remember_read_error(detail.into());
+        let raw = state.error.clone().unwrap();
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let shown = state.display_read_error(&raw);
+            assert!(shown.contains(detail));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.error.as_ref(), Some(&raw));
+        }
+        state.read_error = None;
+        crate::i18n::set_language("de");
+        assert_eq!(state.display_read_error(&raw), raw);
         crate::i18n::set_language("en-US");
     }
 }

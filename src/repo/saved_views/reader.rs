@@ -75,10 +75,7 @@ impl<T: Send + 'static> Reader<T> {
                 }
                 Err(TryRecvError::Disconnected) => {
                     if running.id == self.generation {
-                        answer = Some(Err(crate::i18n::text(
-                            "repo-workflows-saved_views-poll-da12ac51",
-                        )
-                        .into()));
+                        answer = Some(Err(worker_error(WorkerError::Stopped).into()));
                     }
                     self.running = None;
                 }
@@ -101,22 +98,14 @@ impl<T: Send + 'static> Reader<T> {
                     Priority::Background,
                     job.key,
                     Some(Box::new(move || {
-                        let _ = cancelled_tx.send(Err(crate::i18n::text(
-                            "repo-workflows-saved_views-poll-dc101692",
-                        )
-                        .into()));
+                        let _ = cancelled_tx.send(Err(worker_error(WorkerError::Cancelled).into()));
                         cancel_repaint.request_repaint();
                     })),
                     Box::new(move || {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             (job.read)(&|| !token.is_cancelled())
                         }))
-                        .unwrap_or_else(|_| {
-                            Err(
-                                crate::i18n::text("repo-workflows-saved_views-poll-33647b3e")
-                                    .into(),
-                            )
-                        });
+                        .unwrap_or_else(|_| Err(worker_error(WorkerError::Panicked).into()));
                         let _ = tx.send(result);
                         repaint.request_repaint();
                     }),
@@ -175,5 +164,45 @@ mod tests {
             std::thread::yield_now();
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+enum WorkerError {
+    Stopped,
+    Cancelled,
+    Panicked,
+}
+fn worker_error(kind: WorkerError) -> &'static str {
+    match kind {
+        WorkerError::Stopped => "History worker stopped",
+        WorkerError::Cancelled => "History read cancelled",
+        WorkerError::Panicked => "History worker panicked",
+    }
+}
+#[cfg(test)]
+mod fluent_r1_reader_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_saved_reader_retains_raw_result_across_de_en_de() {
+        crate::i18n::set_language("de");
+        for kind in [
+            WorkerError::Stopped,
+            WorkerError::Cancelled,
+            WorkerError::Panicked,
+        ] {
+            let raw = worker_error(kind).to_owned();
+            let mut state = super::super::State::default();
+            state.error = Some(raw.clone());
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                let shown =
+                    crate::repo::activity::display_workflow_error(state.error.as_ref().unwrap());
+                assert_eq!(shown == raw, lang == "en-US");
+                assert_eq!(state.error.as_ref(), Some(&raw));
+                assert!(!state.reader.busy());
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

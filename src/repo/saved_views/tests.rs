@@ -161,6 +161,7 @@ fn pointer_select_save_restart_expand_and_return_to_all_history() -> Result<(), 
 fn persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed() {
     let unknown = Preferences {
         version: 99,
+        generated_active: None,
         saved: vec![],
         active: Some(Preset {
             name: "View".into(),
@@ -176,6 +177,7 @@ fn persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed() {
     };
     let p = Preferences {
         version: 1,
+        generated_active: None,
         saved: vec![bad.clone(); 80],
         active: Some(bad),
     }

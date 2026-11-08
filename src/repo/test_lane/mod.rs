@@ -87,6 +87,7 @@ pub(crate) struct TestLane {
     results: HashMap<String, Verdict>,
     /// Why they couldn't be read the last time.
     error: Option<String>,
+    read_error: Option<ReadError>,
     /// Numbers the reads, so that an older answer doesn't replace a newer one.
     reads: u64,
     shown: u64,
@@ -236,12 +237,7 @@ impl RepoTab {
                         lane.results = results;
                         lane.error = None;
                     }
-                    Err(e) => {
-                        lane.error = Some(crate::i18n::message(
-                            "repo-workflows-test_lane-read-test-lane-46a9cf6f",
-                            &[("e", (e).clone().into())],
-                        ))
-                    }
+                    Err(e) => lane.remember_read_error(e),
                 }
             },
         );
@@ -718,6 +714,53 @@ mod fluent_result_tests {
                     .contains("Opaque error refs/heads/ß")
             );
         }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[derive(Clone)]
+struct ReadError {
+    raw: String,
+    detail: String,
+}
+impl TestLane {
+    fn remember_read_error(&mut self, detail: String) {
+        let e = &detail;
+        let raw = format!("Couldn't read the test results: {e}");
+        self.error = Some(raw.clone());
+        self.read_error = Some(ReadError { raw, detail });
+    }
+    fn display_read_error(&self, raw: &str) -> String {
+        match &self.read_error {
+            Some(receipt) if receipt.raw == raw => crate::i18n::message(
+                "repo-workflows-test_lane-read-test-lane-46a9cf6f",
+                &[("e", receipt.detail.as_str().into())],
+            ),
+            _ => raw.to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_read_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_test_lane_cached_read_error_preserves_raw_detail_and_generation() {
+        let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = TestLane::default();
+        state.remember_read_error(detail.into());
+        let raw = state.error.clone().unwrap();
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let shown = state.display_read_error(&raw);
+            assert!(shown.contains(detail));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.error.as_ref(), Some(&raw));
+        }
+        state.read_error = None;
+        crate::i18n::set_language("de");
+        assert_eq!(state.display_read_error(&raw), raw);
         crate::i18n::set_language("en-US");
     }
 }

@@ -312,7 +312,7 @@ pub(crate) fn checkout(
                 ("info-branch-1", (info.branch).clone().into()),
                 ("info-owner-2", (info.owner).clone().into()),
                 ("info-branch-3", (info.branch).clone().into()),
-                ("info-number-4", (info.number).clone().into()),
+                ("info-number-4", info.number.to_string().into()),
             ],
         )
     })?;
@@ -705,5 +705,43 @@ mod tests {
         ];
         let plan = checkout(&info(), &remotes, &Setup::default(), &[], "main");
         assert!(plan.is_ok_and(|p| p.remote == "annie" && !p.new_remote && p.local == "fix"));
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_identifier_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_collision_names_preserve_decimal_pr_identity_and_planned_argv() {
+        let info = ForkInfo {
+            number: 1234,
+            cross: true,
+            maintainers_can_edit: true,
+            owner: "ann".into(),
+            branch: "fix".into(),
+            clone_https: "https://example.invalid/ann/repo.git".into(),
+            ..Default::default()
+        };
+        let setup = Setup::default();
+        let locals = vec!["fix".into(), "ann/fix".into()];
+        let expected = checkout(&info, &[], &setup, &locals, "previous").unwrap();
+        assert_eq!(expected.local, "pr-1234");
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let planned = checkout(&info, &[], &setup, &locals, "previous").unwrap();
+            assert_eq!(planned.local, expected.local);
+            assert_eq!(planned.steps, expected.steps);
+            assert_eq!(planned.undo, expected.undo);
+            for collision in ["pr-1234", "pr-1234/child"] {
+                let mut occupied = locals.clone();
+                occupied.push(collision.into());
+                let error = checkout(&info, &[], &setup, &occupied, "previous")
+                    .err()
+                    .unwrap();
+                assert!(error.contains("pr-1234"), "{error}");
+                assert!(!error.contains("1.234") && !error.contains("1,234"));
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

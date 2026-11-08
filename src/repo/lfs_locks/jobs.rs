@@ -104,10 +104,7 @@ impl RepoTab {
             Err(e) => {
                 state.unsupported = unsupported(&e);
                 state.read_ok = false;
-                state.error = Some(crate::i18n::message(
-                    "repo-workflows-lfs_locks-locks-read-05347473",
-                    &[("e", (e).clone().into())],
-                ));
+                state.remember_read_error(e);
             }
         }
         if let Some(panel) = &mut state.panel {

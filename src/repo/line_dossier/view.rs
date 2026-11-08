@@ -182,7 +182,10 @@ impl RepoTab {
                     }
                 }
             });
-            ui.label(clip(&result.stopped, 1000));
+            ui.label(clip(
+                &crate::repo::activity::display_workflow_error(&result.stopped),
+                1000,
+            ));
             ui.separator();
             ui.columns(2, |columns| {
                 egui::ScrollArea::vertical()
@@ -312,7 +315,10 @@ impl RepoTab {
         {
             match evidence {
                 Err(error) => {
-                    ui.colored_label(t.warning, clip(error, 1000));
+                    ui.colored_label(
+                        t.warning,
+                        clip(&crate::repo::activity::display_workflow_error(error), 1000),
+                    );
                 }
                 Ok(evidence) => {
                     egui::ScrollArea::vertical().id_salt("dossier-evidence").max_height(280.0).show(ui,|ui|{
@@ -332,9 +338,7 @@ impl RepoTab {
         }
         if cancel {
             self.dossier.reader.cancel();
-            self.dossier.error = Some(
-                crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-a8198076").into(),
-            );
+            self.dossier.error = Some("Trace cancelled".into());
         }
         if let Some(commit) = prepare_ignore {
             self.prepare_dossier_ignore(commit, ui.ctx());
