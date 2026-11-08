@@ -146,7 +146,9 @@ impl RepoTab {
                 .and_then(|h| Some((h, h.forge.provider().pages()?)))
             {
                 Some((hosting, pages)) => pages.details(&path, hosting, number),
-                None => Err("gitcraft can't show this forge's pull requests".to_owned()),
+                None => {
+                    Err(crate::i18n::text("repo-workflows-pr_view-load-pr-f896db8f").to_owned())
+                }
             };
             Msg::PrDetails(request, Box::new(details))
         });
@@ -247,7 +249,13 @@ impl RepoTab {
                                 Err(e) => {
                                     view.relocated = Default::default();
                                     view.relocated.error = Some(e.clone());
-                                    tab.status = Some((format!("Comment relocation: {e}"), true))
+                                    tab.status = Some((
+                                        crate::i18n::message(
+                                            "repo-workflows-pr_view-pr-files-arrived-20be6481",
+                                            &[("e", (e).clone().into())],
+                                        ),
+                                        true,
+                                    ))
                                 }
                             }
                         }
@@ -287,7 +295,13 @@ impl RepoTab {
         if files.to == rev {
             Some(details.head_branch.clone())
         } else if files.from == rev {
-            Some(format!("{} (merge base)", details.base_branch))
+            Some(crate::i18n::message(
+                "repo-workflows-pr_view-pr-name-of-00153418",
+                &[(
+                    "details-base-branch-1",
+                    (details.base_branch).clone().into(),
+                )],
+            ))
         } else {
             None
         }
@@ -297,9 +311,13 @@ impl RepoTab {
 /// Why a pull request can't take the big area now, if it can't.
 fn editor_in_the_way(conflict: bool, rebase: bool) -> Option<&'static str> {
     if conflict {
-        Some("Finish or close the conflict editor first")
+        Some(crate::i18n::text(
+            "repo-workflows-pr_view-editor-in-the-way-08c18016",
+        ))
     } else if rebase {
-        Some("Finish or cancel the interactive rebase first")
+        Some(crate::i18n::text(
+            "repo-workflows-pr_view-editor-in-the-way-d5204b0d",
+        ))
     } else {
         None
     }

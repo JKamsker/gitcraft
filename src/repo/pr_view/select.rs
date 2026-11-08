@@ -26,7 +26,7 @@ impl RepoTab {
         };
         let Some(target) = self.pr_target(&pr) else {
             self.status = Some((
-                "The pull request's branch is not available yet".to_owned(),
+                crate::i18n::text("repo-workflows-pr_view-select-pr-b788526c").to_owned(),
                 true,
             ));
             return;
@@ -183,8 +183,9 @@ fn remote_selection_data(
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<Selection, String> {
-    let remote = pull_request::remote_for(remotes, &pr.url)
-        .ok_or("No remote belongs to this pull request's repository")?;
+    let remote = pull_request::remote_for(remotes, &pr.url).ok_or(crate::i18n::text(
+        "repo-workflows-pr_view-remote-selection-data-60a19c21",
+    ))?;
     let base_ref = format!("refs/heads/{}", pr.base);
     git::run(Some(path), &["check-ref-format", &base_ref])?;
     let listed = git::run_with(
@@ -198,7 +199,9 @@ fn remote_selection_data(
             let (oid, name) = line.split_once('\t')?;
             (name == base_ref).then(|| oid.to_owned())
         })
-        .ok_or("The pull request's base branch is unavailable on its remote")?;
+        .ok_or(crate::i18n::text(
+            "repo-workflows-pr_view-remote-selection-data-f41f1bfc",
+        ))?;
     let details = PrDetails {
         base_branch: pr.base.clone(),
         base_oid,
@@ -231,7 +234,9 @@ fn selection_data(
     let head = git::commits_of(path, std::slice::from_ref(&details.head_oid))?
         .into_iter()
         .next()
-        .ok_or("The pull request's tip could not be read")?;
+        .ok_or(crate::i18n::text(
+            "repo-workflows-pr_view-selection-data-fb954333",
+        ))?;
     Ok(Selection {
         base: details.base_oid.clone(),
         head,

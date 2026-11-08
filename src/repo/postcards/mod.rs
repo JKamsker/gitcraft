@@ -26,23 +26,25 @@ fn clean(value: &str, max: usize) -> String {
 impl Snapshot {
     fn new(state: &State, commits: &[Commit]) -> Self {
         let names: BTreeSet<_> = commits.iter().map(|c| c.author.as_str()).collect();
-        let aliases: BTreeMap<_, _> = names
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (*n, format!("Contributor {}", i + 1)))
-            .collect();
+        let aliases: BTreeMap<_, _> = names.iter().enumerate().map(|(i, n)| (*n, i + 1)).collect();
         let contributors = if state.include_names {
             names
                 .iter()
                 .map(|n| {
                     if state.anonymize {
-                        aliases[n].clone()
+                        crate::i18n::message(
+                            "repo-workflows-postcard-contributor",
+                            &[("index", (aliases[n]).into())],
+                        )
                     } else {
                         let label = clean(n, 256);
                         if label.ends_with('…') {
-                            format!(
-                                "{label} [contributor {}]",
-                                aliases[n].strip_prefix("Contributor ").unwrap_or("?")
+                            crate::i18n::message(
+                                "repo-workflows-postcard-shortened-contributor",
+                                &[
+                                    ("label", (label.as_str()).into()),
+                                    ("index", (aliases[n]).into()),
+                                ],
                             )
                         } else {
                             label
@@ -58,11 +60,17 @@ impl Snapshot {
             .enumerate()
             .map(|(i, c)| {
                 if state.anonymize {
-                    format!("Commit {}", i + 1)
+                    crate::i18n::message(
+                        "repo-workflows-postcards-new-53bf7c37",
+                        &[("i-1-1", (i + 1).clone().into())],
+                    )
                 } else if state.include_messages {
                     clean(&c.summary, 96)
                 } else {
-                    format!("Commit {}", i + 1)
+                    crate::i18n::message(
+                        "repo-workflows-postcards-new-53bf7c37",
+                        &[("i-1-1", (i + 1).clone().into())],
+                    )
                 }
             })
             .collect();
@@ -79,7 +87,10 @@ impl Snapshot {
             name: clean(&state.name, 80),
             date: clean(&state.date, 32),
             range: if state.base.is_empty() {
-                format!("History through {}", state.target)
+                crate::i18n::message(
+                    "repo-workflows-postcards-new-aa1252d7",
+                    &[("state-target-1", (state.target).clone().into())],
+                )
             } else {
                 format!("{}..{}", state.base, state.target)
             },
@@ -123,7 +134,7 @@ impl Default for State {
             context: None,
             base: String::new(),
             target: String::new(),
-            name: "Release history".into(),
+            name: crate::i18n::text("repo-workflows-postcards-default-f952fee7").into(),
             date: String::new(),
             include_names: false,
             include_messages: true,
@@ -146,7 +157,10 @@ impl RepoTab {
         self.postcards.reader.queue(move |owned| {
             let active = || owned() && crate::git::profile_config() == profile;
             if !active() {
-                return Err("Postcard export cancelled".into());
+                return Err(crate::i18n::text(
+                    "repo-workflows-postcards-queue-postcard-export-ce687765",
+                )
+                .into());
             }
             let destination = capture(&path)?;
             destination.publish(&png, &active)?;
@@ -158,7 +172,12 @@ impl RepoTab {
     }
 
     pub(super) fn postcard_button(&mut self, ui: &mut egui::Ui) {
-        if ui.button("History postcard…").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-postcards-postcard-button-457c26a3",
+            ))
+            .clicked()
+        {
             ui.close();
             self.postcards.open = true;
             if self.postcards.target.is_empty() {
@@ -194,8 +213,7 @@ impl RepoTab {
                 self.postcards.commits = None;
                 self.postcards.preview = None;
                 self.postcards.status = Some(
-                    "Profile changed. Read the release range again before composing a postcard."
-                        .into(),
+                    crate::i18n::text("repo-workflows-postcards-poll-postcards-4773e588").into(),
                 );
             }
             return;
@@ -204,7 +222,10 @@ impl RepoTab {
             match answer {
                 Ok(Answer::Range(commits)) => {
                     self.postcards.commits = Some(commits);
-                    self.postcards.status=Some("Pinned release range loaded. Review the disclosure list, then compose the PNG preview.".into());
+                    self.postcards.status = Some(
+                        crate::i18n::text("repo-workflows-postcards-poll-postcards-60ccb94f")
+                            .into(),
+                    );
                 }
                 Ok(Answer::Preview(snapshot, image, png)) => {
                     let texture = ctx.load_texture(
@@ -218,11 +239,15 @@ impl RepoTab {
                         png: Arc::new(png),
                     });
                     self.postcards.status = Some(
-                        "Preview ready. The exported PNG contains exactly this composition; ellipses mark shortened or width-limited text.".into(),
+                        crate::i18n::text("repo-workflows-postcards-poll-postcards-5358001c")
+                            .into(),
                     );
                 }
                 Ok(Answer::Saved) => {
-                    self.postcards.status = Some("PNG saved as a new local file.".into())
+                    self.postcards.status = Some(
+                        crate::i18n::text("repo-workflows-postcards-poll-postcards-10867442")
+                            .into(),
+                    )
                 }
                 Err(error) => self.postcards.status = Some(error),
             }
@@ -239,41 +264,204 @@ impl RepoTab {
         let mut compose = false;
         let mut save = false;
         let mut cancel = false;
-        egui::Window::new("Release history postcard").id(egui::Id::new(("release-postcard",&self.path))).open(&mut open).default_size([780.0,660.0]).vscroll(true).show(ctx,|ui|{
-            ui.label("Choose the excluded base and included release tip. Git reads a pinned range without fetching missing objects (up to 200 commits).");
-            for (label,is_base) in [("Base (excluded; blank means full ancestry)",true),("Release tip (included)",false)] {
+        egui::Window::new(crate::i18n::text(
+            "repo-workflows-postcards-postcard-window-3304153d",
+        ))
+        .id(egui::Id::new(("release-postcard", &self.path)))
+        .open(&mut open)
+        .default_size([780.0, 660.0])
+        .vscroll(true)
+        .show(ctx, |ui| {
+            ui.label(crate::i18n::text(
+                "repo-workflows-postcards-postcard-window-674f7ae2",
+            ));
+            for (label, is_base) in [
+                (
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-2a433807"),
+                    true,
+                ),
+                (
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-07ec4bb7"),
+                    false,
+                ),
+            ] {
                 ui.label(label);
-                let value=if is_base {&mut self.postcards.base}else{&mut self.postcards.target};
-                range_changed|=ui.add(egui::TextEdit::singleline(value).hint_text("Full immutable commit ID").char_limit(64).desired_width(f32::INFINITY)).changed();
-                egui::ComboBox::from_id_salt(("postcard-end",is_base)).selected_text("Choose a loaded tag or branch…").show_ui(ui,|ui|{
-                    for branch in self.refs.tags.iter().chain(&self.refs.local) {
-                        if git::postcards::oid(&branch.target) && ui.selectable_label(*value==branch.target,&branch.name).clicked() { *value=branch.target.clone();range_changed=true; }
-                    }
-                });
+                let value = if is_base {
+                    &mut self.postcards.base
+                } else {
+                    &mut self.postcards.target
+                };
+                range_changed |= ui
+                    .add(
+                        egui::TextEdit::singleline(value)
+                            .hint_text(crate::i18n::text(
+                                "repo-workflows-postcards-postcard-window-5daeb684",
+                            ))
+                            .char_limit(64)
+                            .desired_width(f32::INFINITY),
+                    )
+                    .changed();
+                egui::ComboBox::from_id_salt(("postcard-end", is_base))
+                    .selected_text(crate::i18n::text(
+                        "repo-workflows-postcards-postcard-window-f4dc4046",
+                    ))
+                    .show_ui(ui, |ui| {
+                        for branch in self.refs.tags.iter().chain(&self.refs.local) {
+                            if git::postcards::oid(&branch.target)
+                                && ui
+                                    .selectable_label(*value == branch.target, &branch.name)
+                                    .clicked()
+                            {
+                                *value = branch.target.clone();
+                                range_changed = true;
+                            }
+                        }
+                    });
             }
-            load=ui.add_enabled(!self.postcards.reader.busy()&&git::postcards::oid(&self.postcards.target)&&(self.postcards.base.is_empty()||git::postcards::oid(&self.postcards.base)),egui::Button::new("Read release range")).clicked();
+            load = ui
+                .add_enabled(
+                    !self.postcards.reader.busy()
+                        && git::postcards::oid(&self.postcards.target)
+                        && (self.postcards.base.is_empty()
+                            || git::postcards::oid(&self.postcards.base)),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-postcards-postcard-window-fdf4459d",
+                    )),
+                )
+                .clicked();
             ui.separator();
-            ui.label("Release name");changed|=ui.add(egui::TextEdit::singleline(&mut self.postcards.name).char_limit(80)).changed();
-            ui.label("Release date (as displayed)");changed|=ui.add(egui::TextEdit::singleline(&mut self.postcards.date).char_limit(32).hint_text("YYYY-MM-DD")).changed();
-            changed|=ui.checkbox(&mut self.postcards.include_names,"Include contributors' names (.mailmap applied; first 256 characters)").changed();
-            changed|=ui.checkbox(&mut self.postcards.include_messages,"Include commit subjects (first 96 characters; no message bodies)").changed();
-            changed|=ui.checkbox(&mut self.postcards.anonymize,"Anonymize names and replace all subjects with commit numbers").changed();
-            ui.small("The release title, date and immutable range IDs remain visible when anonymized. Review those fields before sharing.");
-            if let Some(commits)=&self.postcards.commits {
-                let snapshot=Snapshot::new(&self.postcards,commits);
-                ui.collapsing(format!("Disclosure preview: {} subjects · {} contributor names",snapshot.messages.len(),snapshot.contributors.len()),|ui|{
-                    ui.label(format!("Title: {} · Date: {}",snapshot.name,snapshot.date));ui.monospace(&snapshot.range);
-                    ui.label(if snapshot.contributors.is_empty(){"No contributor names included".into()}else{format!("Names: {}",snapshot.contributors.join(", "))});
-                    egui::ScrollArea::vertical().id_salt("postcard-disclosures").max_height(180.0).show(ui,|ui|{for message in &snapshot.messages {ui.label(message);}});
-                });
-                compose=ui.add_enabled(!self.postcards.reader.busy()&&!snapshot.name.is_empty()&&!snapshot.date.is_empty(),egui::Button::new("Compose PNG preview")).clicked();
+            ui.label(crate::i18n::text(
+                "repo-workflows-postcards-postcard-window-85f01282",
+            ));
+            changed |= ui
+                .add(egui::TextEdit::singleline(&mut self.postcards.name).char_limit(80))
+                .changed();
+            ui.label(crate::i18n::text(
+                "repo-workflows-postcards-postcard-window-2a22a9cd",
+            ));
+            changed |= ui
+                .add(
+                    egui::TextEdit::singleline(&mut self.postcards.date)
+                        .char_limit(32)
+                        .hint_text("YYYY-MM-DD"),
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut self.postcards.include_names,
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-5725fbec"),
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut self.postcards.include_messages,
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-15a06afd"),
+                )
+                .changed();
+            changed |= ui
+                .checkbox(
+                    &mut self.postcards.anonymize,
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-7fc35df9"),
+                )
+                .changed();
+            ui.small(crate::i18n::text(
+                "repo-workflows-postcards-postcard-window-cc45ca72",
+            ));
+            if let Some(commits) = &self.postcards.commits {
+                let snapshot = Snapshot::new(&self.postcards, commits);
+                ui.collapsing(
+                    crate::i18n::message(
+                        "repo-workflows-postcards-postcard-window-77a98200",
+                        &[
+                            (
+                                "snapshot-messages-len-1",
+                                (snapshot.messages.len()).clone().into(),
+                            ),
+                            (
+                                "snapshot-contributors-len-2",
+                                (snapshot.contributors.len()).clone().into(),
+                            ),
+                        ],
+                    ),
+                    |ui| {
+                        ui.label(crate::i18n::message(
+                            "repo-workflows-postcards-postcard-window-69241bd8",
+                            &[
+                                ("snapshot-name-1", (snapshot.name).clone().into()),
+                                ("snapshot-date-2", (snapshot.date).clone().into()),
+                            ],
+                        ));
+                        ui.monospace(&snapshot.range);
+                        ui.label(if snapshot.contributors.is_empty() {
+                            crate::i18n::text("repo-workflows-postcards-postcard-window-5db03eee")
+                                .into()
+                        } else {
+                            crate::i18n::message(
+                                "repo-workflows-postcards-postcard-window-3772a00f",
+                                &[(
+                                    "snapshot-contributors-join-1",
+                                    (snapshot.contributors.join(", ")).clone().into(),
+                                )],
+                            )
+                        });
+                        egui::ScrollArea::vertical()
+                            .id_salt("postcard-disclosures")
+                            .max_height(180.0)
+                            .show(ui, |ui| {
+                                for message in &snapshot.messages {
+                                    ui.label(message);
+                                }
+                            });
+                    },
+                );
+                compose = ui
+                    .add_enabled(
+                        !self.postcards.reader.busy()
+                            && !snapshot.name.is_empty()
+                            && !snapshot.date.is_empty(),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-postcards-postcard-window-7f9661c5",
+                        )),
+                    )
+                    .clicked();
             }
-            if self.postcards.reader.busy() { ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());cancel=ui.button("Cancel postcard work").clicked();}); }
-            if let Some(status)=&self.postcards.status {ui.label(status);}
-            if let Some(preview)=&self.postcards.preview {
-                ui.separator();ui.label(format!("Included release: {} · {}",preview.snapshot.name,preview.snapshot.date));
+            if self.postcards.reader.busy() {
+                ui.horizontal(|ui| {
+                    ui.add(crate::spinner::Spinner::new());
+                    cancel = ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-postcards-postcard-window-5c4a8747",
+                        ))
+                        .clicked();
+                });
+            }
+            if let Some(status) = &self.postcards.status {
+                ui.label(status);
+            }
+            if let Some(preview) = &self.postcards.preview {
+                ui.separator();
+                ui.label(crate::i18n::message(
+                    "repo-workflows-postcards-postcard-window-5b3e5c5e",
+                    &[
+                        (
+                            "preview-snapshot-name-1",
+                            (preview.snapshot.name).clone().into(),
+                        ),
+                        (
+                            "preview-snapshot-date-2",
+                            (preview.snapshot.date).clone().into(),
+                        ),
+                    ],
+                ));
                 ui.add(egui::Image::new(&preview.texture).max_width(ui.available_width()));
-                save=ui.add_enabled(!self.postcards.reader.busy(),egui::Button::new("Save preview as new PNG…")).clicked();
+                save = ui
+                    .add_enabled(
+                        !self.postcards.reader.busy(),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-postcards-postcard-window-1aae6bb1",
+                        )),
+                    )
+                    .clicked();
             }
         });
         if !open {
@@ -292,7 +480,8 @@ impl RepoTab {
         }
         if cancel {
             self.postcards.reader.cancel();
-            self.postcards.status = Some("Postcard work cancelled.".into());
+            self.postcards.status =
+                Some(crate::i18n::text("repo-workflows-postcards-postcard-window-b6333aff").into());
         }
         if load {
             self.postcards.preview = None;
@@ -320,9 +509,14 @@ impl RepoTab {
         if save && let Some(preview) = &self.postcards.preview {
             let png = preview.png.clone();
             if let Some(path) = rfd::FileDialog::new()
-                .set_title("Save postcard on this machine (new files only)")
+                .set_title(crate::i18n::text(
+                    "repo-workflows-postcards-postcard-window-06d79850",
+                ))
                 .set_file_name("release-postcard.png")
-                .add_filter("PNG image", &["png"])
+                .add_filter(
+                    crate::i18n::text("repo-workflows-postcards-postcard-window-6ef9788d"),
+                    &["png"],
+                )
                 .save_file()
             {
                 self.queue_postcard_export(path, png, export::Destination::capture);

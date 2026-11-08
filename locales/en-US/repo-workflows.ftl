@@ -3662,9 +3662,370 @@ repo-workflows-partial_stash-run-snapshot-f67020b0 = there are no changes to sav
 
 repo-workflows-partial_stash-stash-8336fbfe = { $label } failed: { $e }
 
+repo-workflows-postcards-bounded-graph-b345a27f = Postcard graph exceeds { $edge-limit } parent edges; choose a range with fewer merge parents
+
+repo-workflows-postcards-bounded-graph-d2afb115 = Invalid postcard size
+
+repo-workflows-postcards-capture-1451a954 = Invalid export filename
+
+repo-workflows-postcards-capture-169c28d7 = Choose an absolute local destination
+
+repo-workflows-postcards-capture-66ecc9df = Destination filename is not UTF-8
+
+repo-workflows-postcards-capture-bda5fa3f = Missing export folder
+
+repo-workflows-postcards-default-f952fee7 = Release history
+
+repo-workflows-postcards-hold-3d6afaad = Missing held export parent
+
+repo-workflows-postcards-hold-62a99718 = Export folder is linked or unavailable
+
+repo-workflows-postcards-hold-8e2e63e6 = Export folder has traversal
+
+repo-workflows-postcards-hold-cad679ce = Export folder is unavailable or linked: { $e }
+
+repo-workflows-postcards-hold-f499eb77 = Held-directory export is unavailable on this platform
+
+repo-workflows-postcards-hold-f60b468c = Export folder must have a physical path without traversal
+
+repo-workflows-postcards-new-41bae901 = { $label } [contributor { $aliases-n-strip-prefix-contribut-1 }]
+
+repo-workflows-postcards-new-53bf7c37 = Commit { $i-1-1 }
+
+repo-workflows-postcards-new-a0ca835b = Contributor { $i-1-1 }
+
+repo-workflows-postcards-new-aa1252d7 = History through { $state-target-1 }
+
+repo-workflows-postcards-poll-postcards-10867442 = PNG saved as a new local file.
+
+repo-workflows-postcards-poll-postcards-4773e588 = Profile changed. Read the release range again before composing a postcard.
+
+repo-workflows-postcards-poll-postcards-5358001c = Preview ready. The exported PNG contains exactly this composition; ellipses mark shortened or width-limited text.
+
+repo-workflows-postcards-poll-postcards-60ccb94f = Pinned release range loaded. Review the disclosure list, then compose the PNG preview.
+
+repo-workflows-postcards-postcard-button-457c26a3 = History postcard…
+
+repo-workflows-postcards-postcard-window-06d79850 = Save postcard on this machine (new files only)
+
+repo-workflows-postcards-postcard-window-07ec4bb7 = Release tip (included)
+
+repo-workflows-postcards-postcard-window-15a06afd = Include commit subjects (first 96 characters; no message bodies)
+
+repo-workflows-postcards-postcard-window-1aae6bb1 = Save preview as new PNG…
+
+repo-workflows-postcards-postcard-window-2a22a9cd = Release date (as displayed)
+
+repo-workflows-postcards-postcard-window-2a433807 = Base (excluded; blank means full ancestry)
+
+repo-workflows-postcards-postcard-window-3304153d = Release history postcard
+
+repo-workflows-postcards-postcard-window-3772a00f = Names: { $snapshot-contributors-join-1 }
+
+repo-workflows-postcards-postcard-window-5725fbec = Include contributors' names (.mailmap applied; first 256 characters)
+
+repo-workflows-postcards-postcard-window-5b3e5c5e = Included release: { $preview-snapshot-name-1 } · { $preview-snapshot-date-2 }
+
+repo-workflows-postcards-postcard-window-5c4a8747 = Cancel postcard work
+
+repo-workflows-postcards-postcard-window-5daeb684 = Full immutable commit ID
+
+repo-workflows-postcards-postcard-window-5db03eee = No contributor names included
+
+repo-workflows-postcards-postcard-window-674f7ae2 = Choose the excluded base and included release tip. Git reads a pinned range without fetching missing objects (up to 200 commits).
+
+repo-workflows-postcards-postcard-window-69241bd8 = Title: { $snapshot-name-1 } · Date: { $snapshot-date-2 }
+
+repo-workflows-postcards-postcard-window-6ef9788d = PNG image
+
+repo-workflows-postcards-postcard-window-77a98200 = Disclosure preview: { $snapshot-messages-len-1 } subjects · { $snapshot-contributors-len-2 } contributor names
+
+repo-workflows-postcards-postcard-window-7f9661c5 = Compose PNG preview
+
+repo-workflows-postcards-postcard-window-7fc35df9 = Anonymize names and replace all subjects with commit numbers
+
+repo-workflows-postcards-postcard-window-85f01282 = Release name
+
+repo-workflows-postcards-postcard-window-b6333aff = Postcard work cancelled.
+
+repo-workflows-postcards-postcard-window-cc45ca72 = The release title, date and immutable range IDs remain visible when anonymized. Review those fields before sharing.
+
+repo-workflows-postcards-postcard-window-f4dc4046 = Choose a loaded tag or branch…
+
+repo-workflows-postcards-postcard-window-fdf4459d = Read release range
+
+repo-workflows-postcards-publish-5678375e = Export exceeds 64 MiB
+
+repo-workflows-postcards-publish-6b87b34f = Could not create PNG; existing destinations are preserved: { $e }
+
+repo-workflows-postcards-publish-bda5fa3f = Missing export folder
+
+repo-workflows-postcards-publish-eef2baa8 = The new PNG may be incomplete; existing files were preserved: { $e }
+
+repo-workflows-postcards-queue-postcard-export-ce687765 = Postcard export cancelled
+
+repo-workflows-postcards-render-1fcca9a6 = Gitcraft · names and commit messages anonymized · immutable range IDs retained
+
+repo-workflows-postcards-render-259a4df4 = Gitcraft · release history postcard
+
+repo-workflows-postcards-render-470fb84c = Unsupported postcard paint callback
+
+repo-workflows-postcards-render-64aa9927 = Invalid font atlas patch
+
+repo-workflows-postcards-render-94fd1b4d = Invalid postcard pixels
+
+repo-workflows-postcards-render-a02e819e = Postcard composition exceeds 12000 pixels; omit contributor names or choose a narrower range
+
+repo-workflows-postcards-render-b861bed6 = Missing base font atlas
+
+repo-workflows-postcards-render-bc1f54db = Contributors: { $contributors }
+
+repo-workflows-postcards-render-d2afb115 = Invalid postcard size
+
+repo-workflows-postcards-render-eb578243 = Missing postcard font texture
+
+repo-workflows-postcards-render-ebb961b0 = { $snapshot-date-1 } · { $snapshot-commits-len-2 } commits
+
+repo-workflows-pr_review-apply-suggestion-2ca103b5 = Apply suggestion
+
+repo-workflows-pr_review-apply-suggestion-d1083ab3 = Commit this change to the pull request's branch
+
+repo-workflows-pr_review-comment-box-44f5e3fb = Comment
+
+repo-workflows-pr_review-comment-box-e5841068 = Leave a comment (Markdown works)
+
+repo-workflows-pr_review-done-0096e38c = Thread resolved
+
+repo-workflows-pr_review-done-10a92a8a = Changes requested
+
+repo-workflows-pr_review-done-11c4a36e = Reply added to your pending review
+
+repo-workflows-pr_review-done-2e093165 = Added to your pending review
+
+repo-workflows-pr_review-done-5f0f1f6d = Pull request merged
+
+repo-workflows-pr_review-done-5f96cd56 = Pull request approved
+
+repo-workflows-pr_review-done-715f6d93 = Reply sent
+
+repo-workflows-pr_review-done-71795437 = Review dismissed
+
+repo-workflows-pr_review-done-a3dcb6a1 = Suggestion committed to the branch
+
+repo-workflows-pr_review-done-b51cb836 = Thread opened again
+
+repo-workflows-pr_review-done-b5d3f2dd = Pending review discarded
+
+repo-workflows-pr_review-done-c5d097b5 = Comment sent
+
+repo-workflows-pr_review-done-d8918a7e = Removed from your pending review
+
+repo-workflows-pr_review-done-f85b4fdd = Review sent
+
+repo-workflows-pr_review-line-buttons-0333c2f4 = Keep it in a pending review, to send with the others
+
+repo-workflows-pr_review-line-buttons-1fe34090 = Comment now
+
+repo-workflows-pr_review-line-buttons-24cfb78f = Add to review
+
+repo-workflows-pr_review-line-buttons-9d793402 = Suggest a change
+
+repo-workflows-pr_review-line-buttons-a75c6121 = Start from the line as it is, for them to apply with a click
+
+repo-workflows-pr_review-line-buttons-c253f451 = Reply
+
+repo-workflows-pr_review-line-buttons-d460759a = You have a pending review: add it to that one
+
+repo-workflows-pr_review-line-panel-8ee64204 = Comment on this line
+
+repo-workflows-pr_review-line-panel-92567ea3 = { " " }(as it was)
+
+repo-workflows-pr_review-line-panel-961b2a04 = Close (Esc)
+
+repo-workflows-pr_review-line-panel-b1446b7b = Reply to this thread
+
+repo-workflows-pr_review-pending-list-761b2619 = Remove the comment on { $thread-path-1 }{ $line } from the review: { $what }
+
+repo-workflows-pr_review-pending-list-d74b2a22 = Remove from the review
+
+repo-workflows-pr_review-post-job-76c33b59 = The change is committed, but the thread wasn't resolved: { $e }
+
+repo-workflows-pr_review-pr-send-73ed2a2f = This pull request can't be acted on from here
+
+repo-workflows-pr_review-resolve-buttons-5be3c2c8 = Resolved
+
+repo-workflows-pr_review-resolve-buttons-c8f193b3 = Resolve
+
+repo-workflows-pr_review-resolve-buttons-ecae00bf = Open again
+
+repo-workflows-pr_review-review-box-9b1f2050 = This one is yours: you can comment, but not approve it.
+
+repo-workflows-pr_review-review-box-a0208868 = What do you think of it as a whole?
+
+repo-workflows-pr_review-show-025733eb = Discussion · { $thread-comments-first-map-or-c-c-1 }{ $coordinate-2 }{ $if-thread-outdated-outdated-posi-3 }{ $if-thread-resolved-resolved-else-4 }
+
+repo-workflows-pr_review-show-05dc48b8 = old side
+
+repo-workflows-pr_review-show-2578675f = { " " }· outdated position
+
+repo-workflows-pr_review-show-39fe3ef4 = new side
+
+repo-workflows-pr_review-show-4535c73b = Reply to this discussion
+
+repo-workflows-pr_review-show-6b7cd0c1 = Reopen discussion
+
+repo-workflows-pr_review-show-a9d6f2cd = { " " }· resolved
+
+repo-workflows-pr_review-show-c40288c7 = Reply to discussion
+
+repo-workflows-pr_review-show-d5c36543 = Resolve discussion
+
+repo-workflows-pr_review-suggestion-scope-3e80b4eb = Replaces lines { $start } to { $end }
+
+repo-workflows-pr_review-suggestion-scope-d3d41027 = Replaces line { $end }
+
+repo-workflows-pr_review-threads-60d238f1 = Types this thread, with its file and line, into the agent's terminal
+
+repo-workflows-pr_review-threads-6550d01e = the forge
+
+repo-workflows-pr_review-threads-77a860cb = Send to agent
+
+repo-workflows-pr_review-threads-98aa61f2 = This thread goes on: the rest is on { $forge }.
+
+repo-workflows-pr_review-threads-9a4877af = the thread
+
+repo-workflows-pr_review-threads-c73affa9 = Earlier comment · relocated across unchanged lines (local navigation)
+
+repo-workflows-pr_review-verdict-buttons-44f5e3fb = Comment
+
+repo-workflows-pr_review-verdict-buttons-6007acbe = Approve
+
+repo-workflows-pr_review-verdict-buttons-6832518c = Throw away the pending review with its comments
+
+repo-workflows-pr_review-verdict-buttons-cb5d9f98 = Request changes
+
 repo-workflows-pr_review-verdict-buttons-eb1a70e3 = Discard
 
+repo-workflows-pr_view-checks-3afaa0c5 = Couldn't read the checks: { $e }
+
+repo-workflows-pr_view-checks-7845db2e = No checks ran on this pull request.
+
+repo-workflows-pr_view-checks-8432e03f = { $check-url-1 }
+    Click to show the run
+
+repo-workflows-pr_view-chips-10a92a8a = Changes requested
+
+repo-workflows-pr_view-chips-87b42e40 = Approved
+
+repo-workflows-pr_view-chips-ab0fbfd3 = Checking for conflicts
+
+repo-workflows-pr_view-chips-dac5ae00 = Has conflicts
+
+repo-workflows-pr_view-chips-e62d2df5 = Behind its base
+
+repo-workflows-pr_view-chips-e72e14ae = No conflicts
+
+repo-workflows-pr_view-chips-f0742e3a = Review required
+
+repo-workflows-pr_view-commits-36f7d679 = no sign-off
+
+repo-workflows-pr_view-commits-a8da9e62 = No sign-off of its author or committer: the DCO check refuses it
+
+repo-workflows-pr_view-dismiss-box-152c5716 = Dismiss review
+
 repo-workflows-pr_view-dismiss-box-19766ed6 = Cancel
+
+repo-workflows-pr_view-dismiss-box-399675ba = Why is this review dismissed?
+
+repo-workflows-pr_view-editor-in-the-way-08c18016 = Finish or close the conflict editor first
+
+repo-workflows-pr_view-editor-in-the-way-d5204b0d = Finish or cancel the interactive rebase first
+
+repo-workflows-pr_view-entry-header-2f765474 = Show it in the diff
+
+repo-workflows-pr_view-entry-header-48845bff = Dismiss
+
+repo-workflows-pr_view-entry-header-a7eac6b5 = Open in the browser
+
+repo-workflows-pr_view-header-25ba72a6 = proposed merging
+
+repo-workflows-pr_view-header-6b847a0e = into
+
+repo-workflows-pr_view-header-9f139e05 = wants to merge
+
+repo-workflows-pr_view-header-bd0a0620 = Merged
+
+repo-workflows-pr_view-header-c21ead06 = Closed
+
+repo-workflows-pr_view-header-ebf12ef4 = Draft
+
+repo-workflows-pr_view-header-ed077f3d = Open
+
+repo-workflows-pr_view-inline-place-0fd6d148 = on { $path }:{ $line }
+
+repo-workflows-pr_view-inline-place-22e25966 = { $place } (resolved)
+
+repo-workflows-pr_view-inline-place-31c12181 = on { $path }
+
+repo-workflows-pr_view-inline-place-b555e94a = { $place } (outdated, resolved)
+
+repo-workflows-pr_view-inline-place-da1b1f25 = { $place } (outdated)
+
+repo-workflows-pr_view-load-pr-f896db8f = gitcraft can't show this forge's pull requests
+
+repo-workflows-pr_view-page-06a69482 = No description.
+
+repo-workflows-pr_view-page-0744b935 = SIGN-OFF (DCO)
+
+repo-workflows-pr_view-page-607d89a5 = COMMENTS ({ $details-timeline-len-1 })
+
+repo-workflows-pr_view-page-7503c27e = BUILD STATUS
+
+repo-workflows-pr_view-page-878ee775 = COMMITS ({ $details-commits-len-1 })
+
+repo-workflows-pr_view-page-9cc35840 = DESCRIPTION
+
+repo-workflows-pr_view-page-bc4bf274 = ADD A COMMENT
+
+repo-workflows-pr_view-page-fc2b737d = MERGE
+
+repo-workflows-pr_view-page-header-38cc20ee = Pull request #{ $view-number-1 }
+
+repo-workflows-pr_view-page-header-80403162 = Back to the graph (Esc)
+
+repo-workflows-pr_view-page-header-a7eac6b5 = Open in the browser
+
+repo-workflows-pr_view-page-header-d62bc4a3 = Load again
+
+repo-workflows-pr_view-pr-files-arrived-20be6481 = Comment relocation: { $e }
+
+repo-workflows-pr_view-pr-files-panel-5d4041aa = Changed files
+
+repo-workflows-pr_view-pr-files-panel-80b9e65e = Couldn't read the changes: { $e }
+
+repo-workflows-pr_view-pr-files-panel-846bc938 = Couldn't tell where the pull requests come from: { $e-lines-next-unwrap-or-default-1 }
+
+repo-workflows-pr_view-pr-name-of-00153418 = { $details-base-branch-1 } (merge base)
+
+repo-workflows-pr_view-pr-view-ui-13197fd2 = { $target-path-1 }:{ $target-line-2 } · unchanged text
+
+repo-workflows-pr_view-pr-view-ui-14efff25 = Earlier comment locations unavailable: { $error }
+
+repo-workflows-pr_view-pr-view-ui-c6f6b4c5 = { $relocated-len-1 } earlier comment anchors relocated
+
+repo-workflows-pr_view-remote-selection-data-60a19c21 = No remote belongs to this pull request's repository
+
+repo-workflows-pr_view-remote-selection-data-f41f1bfc = The pull request's base branch is unavailable on its remote
+
+repo-workflows-pr_view-select-pr-b788526c = The pull request's branch is not available yet
+
+repo-workflows-pr_view-selection-data-fb954333 = The pull request's tip could not be read
+
+repo-workflows-pr_view-stats-78774f9f = Opened { $git-relative-time-d-created-at-n-1 } · updated { $git-relative-time-d-updated-at-n-2 } ·
+
+repo-workflows-pr_view-timeline-b7cba957 = No comments yet.
+
+repo-workflows-pr_view-timeline-e72570a1 = Comments on lines couldn't be read: { $e }
 
 repo-workflows-push-rejected-683768ab = and { $r-behind-named-1 } more
 
@@ -4576,4 +4937,30 @@ repo-workflows-parallel-progress = { $round ->
         [0] { "" }
        *[other] { " · testing " }{ $testing }
     } · { $parallel } at once on { $machine }
+
+repo-workflows-pr-merge-intention = { $author } { $closed ->
+        [yes] proposed merging
+       *[no] wants to merge
+    } { $head } into { $base }
+
+repo-workflows-pr-file-count = { $count ->
+        [one] · { $count } file
+       *[other] · { $count } files
+    }
+
+repo-workflows-pr-check-tally = { $count } { $state ->
+        [failed] failed
+        [running] running
+        [passed] passed
+       *[skipped] skipped
+    }
+
+repo-workflows-pr-pending-comment-count = { $count ->
+        [one] One comment only you can see until you send this:
+       *[other] { $count } comments only you can see until you send this:
+    }
+
+repo-workflows-postcard-contributor = Contributor { $index }
+
+repo-workflows-postcard-shortened-contributor = { $label } [contributor { $index }]
 

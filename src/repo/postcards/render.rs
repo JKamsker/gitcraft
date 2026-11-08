@@ -25,7 +25,7 @@ pub(super) fn render(
     active: &dyn Fn() -> bool,
 ) -> Result<(egui::ColorImage, Vec<u8>), String> {
     if snapshot.commits.is_empty() || snapshot.commits.len() > crate::git::postcards::LIMIT {
-        return Err("Invalid postcard size".into());
+        return Err(crate::i18n::text("repo-workflows-postcards-render-d2afb115").into());
     }
     if !active() {
         return Err("Postcard rendering cancelled".into());
@@ -37,7 +37,7 @@ pub(super) fn render(
     let height =
         (215.0 + snapshot.commits.len() as f32 * PITCH + footer_lines as f32 * 24.0) as usize;
     if height > 12000 {
-        return Err("Postcard composition exceeds 12000 pixels; omit contributor names or choose a narrower range".into());
+        return Err(crate::i18n::text("repo-workflows-postcards-render-a02e819e").into());
     }
     let size = vec2(WIDTH as f32, height as f32);
     let ctx = egui::Context::default();
@@ -65,7 +65,16 @@ pub(super) fn render(
             text(
                 &painter,
                 pos2(54.0, 75.0),
-                &format!("{} · {} commits", snapshot.date, snapshot.commits.len()),
+                &crate::i18n::message(
+                    "repo-workflows-postcards-render-ebb961b0",
+                    &[
+                        ("snapshot-date-1", (snapshot.date).clone().into()),
+                        (
+                            "snapshot-commits-len-2",
+                            (snapshot.commits.len()).clone().into(),
+                        ),
+                    ],
+                ),
                 17.0,
                 DIM,
                 1170.0,
@@ -130,7 +139,10 @@ pub(super) fn render(
                 wrapped_text(
                     &painter,
                     pos2(40.0, footer + 14.0),
-                    &format!("Contributors: {contributors}"),
+                    &crate::i18n::message(
+                        "repo-workflows-postcards-render-bc1f54db",
+                        &[("contributors", (contributors).clone().into())],
+                    ),
                     15.0,
                     DIM,
                     1200.0,
@@ -140,9 +152,9 @@ pub(super) fn render(
                 &painter,
                 pos2(40.0, height as f32 - 24.0),
                 if snapshot.anonymized {
-                    "Gitcraft · names and commit messages anonymized · immutable range IDs retained"
+                    crate::i18n::text("repo-workflows-postcards-render-1fcca9a6")
                 } else {
-                    "Gitcraft · release history postcard"
+                    crate::i18n::text("repo-workflows-postcards-render-259a4df4")
                 },
                 11.0,
                 DIM,
@@ -161,11 +173,13 @@ pub(super) fn render(
         for delta in deltas {
             let egui::ImageData::Color(image) = delta.image;
             if let Some([left, top]) = delta.pos {
-                let texture = std::sync::Arc::make_mut(
-                    textures.get_mut(&id).ok_or("Missing base font atlas")?,
-                );
+                let texture = std::sync::Arc::make_mut(textures.get_mut(&id).ok_or(
+                    crate::i18n::text("repo-workflows-postcards-render-b861bed6"),
+                )?);
                 if left + image.size[0] > texture.size[0] || top + image.size[1] > texture.size[1] {
-                    return Err("Invalid font atlas patch".into());
+                    return Err(
+                        crate::i18n::text("repo-workflows-postcards-render-64aa9927").into(),
+                    );
                 }
                 for y in 0..image.size[1] {
                     let start = (top + y) * texture.size[0] + left;
@@ -184,11 +198,11 @@ pub(super) fn render(
             return Err("Postcard rendering cancelled".into());
         }
         let egui::epaint::Primitive::Mesh(mesh) = primitive.primitive else {
-            return Err("Unsupported postcard paint callback".into());
+            return Err(crate::i18n::text("repo-workflows-postcards-render-470fb84c").into());
         };
-        let texture = textures
-            .get(&mesh.texture_id)
-            .ok_or("Missing postcard font texture")?;
+        let texture = textures.get(&mesh.texture_id).ok_or(crate::i18n::text(
+            "repo-workflows-postcards-render-eb578243",
+        ))?;
         for (index, triangle) in mesh.indices.chunks_exact(3).enumerate() {
             if index % 128 == 0 && !active() {
                 return Err("Postcard rendering cancelled".into());
@@ -205,8 +219,9 @@ pub(super) fn render(
     for pixel in &image.pixels {
         rgba.extend_from_slice(&pixel.to_srgba_unmultiplied());
     }
-    let pixels = image::RgbaImage::from_raw(WIDTH as u32, height as u32, rgba)
-        .ok_or("Invalid postcard pixels")?;
+    let pixels = image::RgbaImage::from_raw(WIDTH as u32, height as u32, rgba).ok_or(
+        crate::i18n::text("repo-workflows-postcards-render-94fd1b4d"),
+    )?;
     let mut png = Cursor::new(Vec::new());
     image::DynamicImage::ImageRgba8(pixels)
         .write_to(&mut png, image::ImageFormat::Png)
@@ -223,7 +238,7 @@ fn bounded_graph(
     active: &dyn Fn() -> bool,
 ) -> Result<crate::graph::Graph, String> {
     if commits.len() > crate::git::postcards::LIMIT {
-        return Err("Invalid postcard size".into());
+        return Err(crate::i18n::text("repo-workflows-postcards-bounded-graph-d2afb115").into());
     }
     let mut remaining = edge_limit;
     for commit in commits {
@@ -231,7 +246,10 @@ fn bounded_graph(
             return Err("Postcard rendering cancelled".into());
         }
         remaining = remaining.checked_sub(commit.parents.len()).ok_or_else(|| {
-            format!("Postcard graph exceeds {edge_limit} parent edges; choose a range with fewer merge parents")
+            crate::i18n::message(
+                "repo-workflows-postcards-bounded-graph-b345a27f",
+                &[("edge-limit", (edge_limit).clone().into())],
+            )
         })?;
     }
     // At most rows + edges lanes can be opened. Layout's non-interruptible
