@@ -1,0 +1,7 @@
+{
+  "candidate": "519e4d9d1fd01f9b6e735e02c8c0b760377a2f07",
+  "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+  "exit_code": 0,
+  "log_sha256": "3671c62a567d734e8b715b0ebd7dee3a1b834803c28a0015b06d269465cc490f",
+  "limits": "Compilation only; existing warnings. No runtime fixtures, full suite or CI. 13 of21 changed feature files byte-identical to reviewed f9; additive common module registrations retain current parent. Azure/Bitbucket auth WIP not imported."
+}
