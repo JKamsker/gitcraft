@@ -44,6 +44,11 @@ pub(super) struct CiStatuses {
 }
 
 impl CiStatuses {
+    /// When they were last read, if they were.
+    pub(super) fn loaded_at(&self) -> Option<Instant> {
+        self.loaded
+    }
+
     /// The repository's builds are now read from `projects` (its remotes or upstreams
     /// changed): what was read from a project no longer among them goes, along with the answer
     /// still on its way. That one keeps the slot until it comes, so the two can't land in the

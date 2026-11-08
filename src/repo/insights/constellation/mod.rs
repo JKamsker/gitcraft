@@ -40,7 +40,12 @@ pub(crate) struct State {
     selected: Option<usize>,
     /// A second branch picked, to compare with the first.
     other: Option<usize>,
+    /// When the tab had read the pull requests and the builds it was drawn with: once the tab
+    /// reads them again, it is drawn again.
+    forge_read: Option<ForgeRead>,
 }
+
+type ForgeRead = (Option<std::time::Instant>, Option<std::time::Instant>);
 
 /// The constellation drawn from what was read and what the forge said.
 struct Built {
@@ -136,6 +141,7 @@ impl RepoTab {
     /// Draws the constellation again from what was read, the forge and the disk sizes.
     fn constellation_build(&mut self) {
         let (forge, forge_note) = self.constellation_forge();
+        let forge_read = self.constellation_forge_read();
         let t = Tokens::default();
         let Some(view) = self.insights.as_mut() else {
             return;
@@ -174,6 +180,11 @@ impl RepoTab {
             provenance,
             forge: forge_note,
         });
+        state.forge_read = Some(forge_read);
+    }
+
+    fn constellation_forge_read(&self) -> ForgeRead {
+        (self.prs_loaded, self.ci.loaded_at())
     }
 
     /// Measures the worktrees' folders in the background (those here; not those on another
@@ -269,6 +280,15 @@ impl RepoTab {
     }
 
     pub(super) fn constellation_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        // Pull requests or builds read since it was drawn: drawn again with them.
+        let forge_read = self.constellation_forge_read();
+        let drawn = self.insights.as_ref().and_then(|v| {
+            let state = &v.constellation;
+            state.built.as_ref().map(|_| state.forge_read)
+        });
+        if drawn.is_some_and(|read| read != Some(forge_read)) {
+            self.constellation_build();
+        }
         // Stale once a branch it read moved (as far as the tab knows: a tab not loaded yet
         // has no branches to tell by).
         let current: HashMap<String, String> = self
