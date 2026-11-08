@@ -141,3 +141,5 @@ dev-baseline-guard-25 = Das abgerufene Ziel weicht von der erfassten Push-Lease 
 dev-baseline-guard-26 = Die erfasste Push-Lease wurde geändert; öffne die ursprüngliche Aktion erneut.
 
 dev-baseline-guard-27 = Die geprüfte Fork-Quelle wurde geändert; öffne die Push-Vorabprüfung erneut
+
+dev-baseline-fold-staged-label = Vorgemerkte Änderungen in einen älteren Commit einarbeiten

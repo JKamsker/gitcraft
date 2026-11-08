@@ -215,12 +215,9 @@ fn prepared(
         }
         args.splice(at..at, ["--repo".to_owned(), target]);
     }
-    cmd.current_dir(if remote {
-        std::env::temp_dir()
-    } else {
-        repo.to_owned()
-    })
-    .args(args);
+    // Hosting and --repo identify the selected repository explicitly. Running inside
+    // its worktree would let a local .glab-cli/config.yml redirect the CLI anyway.
+    cmd.current_dir(std::env::temp_dir()).args(args);
     match forge {
         Forge::GitLab => {
             cmd.env("GITLAB_HOST", &authority)
@@ -1033,7 +1030,10 @@ mod tests {
                 &[],
                 Some(&input)
             ),
-            Err(format!("/recorded/gh input exceeds {INPUT_LIMIT} bytes")),
+            Err(format!(
+                "/recorded/gh input exceeds {} bytes",
+                crate::i18n::number(INPUT_LIMIT)
+            )),
         );
     }
 }

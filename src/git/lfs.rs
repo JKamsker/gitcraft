@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn sizes_people_read() {
         assert_eq!(human_size(0), "0 B");
-        assert_eq!(human_size(1023), "1023 B");
+        assert_eq!(human_size(1023), "1,023 B");
         assert_eq!(human_size(1536), "1.5 KB");
         assert_eq!(human_size(5 * 1024 * 1024), "5.0 MB");
     }

@@ -307,7 +307,7 @@ fn a_rebase_is_refused_when_the_contributor_pushed_commits_not_here() {
         None,
     );
     assert!(checked_out.is_ok());
-    assert!(plan.is_err_and(|e| e.contains("pull them first")));
+    assert!(plan.is_err_and(|e| e.contains("pull it first")));
 }
 
 #[test]
@@ -895,7 +895,7 @@ fn review14_effective_destination_validation_uses_shared_canonical_identity() {
             ("https://forge.example:4000/PROXY/Group/Project.git", false),
             (
                 "https://forge.example:4000/proxy/group/project.git",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             let d = super::guard::Destination {
@@ -2128,7 +2128,7 @@ fn review20_saved_checkout_guard_preserves_authority_prefix_and_gitlab_case()
             ("https://forge.example:4000/PROXY/Group/Repo.git", false),
             (
                 "https://forge.example:4000/proxy/group/repo.git",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             run(&w.me, &["remote", "set-url", "ann", url]);

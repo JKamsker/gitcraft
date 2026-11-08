@@ -397,13 +397,16 @@ mod tests {
         let point = pos2(38.0, 300.0);
         for has_more in [false, true] {
             tab.has_more = has_more;
-            let output = ctx.run_ui(
+            let mut output = ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(rect),
                     ..Default::default()
                 },
                 |ui| tab.history_minimap(ui, rect, 0.0, 300.0),
             );
+            // This headless fixture intentionally does not upload textures. Clear before
+            // assertions as well, so a failure cannot panic again while unwinding.
+            output.textures_delta.clear();
             let update = output
                 .platform_output
                 .accesskit_update
@@ -417,7 +420,7 @@ mod tests {
             assert_eq!(
                 slider.label(),
                 Some(
-                    "Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
+                    "Loaded history minimap. Shape shows all 1 lanes. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
                 )
             );
             assert_eq!(slider.numeric_value(), Some(0.0));

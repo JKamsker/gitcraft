@@ -226,7 +226,7 @@ fn a_huge_file_is_searched_over_frames_not_in_one() {
     assert_eq!(find.count(), 40_000);
     assert_eq!(
         find.summary().map(|(s, _)| s),
-        Some("1 of 40000".to_owned())
+        Some("1 of 40,000".to_owned())
     );
 }
 

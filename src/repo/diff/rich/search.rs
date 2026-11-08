@@ -321,8 +321,8 @@ mod revision_tests {
             .map(|r| r.text.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        assert!(text.contains("Before: a folder of 1729 files"));
-        assert!(text.contains("After: a folder of 1730 files"));
+        assert!(text.contains("Before: a folder of 1,729 files"));
+        assert!(text.contains("After: a folder of 1,730 files"));
         Ok(())
     }
 }

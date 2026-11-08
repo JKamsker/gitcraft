@@ -278,7 +278,9 @@ fn dependency_changes_from_a_repository_and_the_view() -> Result<(), String> {
     assert!(harness.query_by_label("1.0.100 → 1.0.200").is_some());
     assert!(harness.query_by_label("crates.io").is_some());
     assert!(harness.query_by_label("what changed").is_some());
-    harness.get_by_label("serde").click();
+    harness
+        .get_by_label("Package serde. Go to line 3 of the lockfile")
+        .click();
     harness.run();
     assert!(acts.borrow().iter().any(|a| matches!(
         a,

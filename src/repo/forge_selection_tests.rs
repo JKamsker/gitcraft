@@ -491,7 +491,7 @@ fn review12_canonical_repository_rename_preserves_pending_review_completion() {
         let mut after = before.clone();
         after.host = "FORGEJO.example".into();
         after.web = "HTTPS://FORGEJO.example:443/reviews/".into();
-        if forge != Forge::GitLab {
+        if !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket) {
             after.path = "TEAM/REPO".into();
         }
         let mut tab = review12_tab(&ctx, before.clone(), after);

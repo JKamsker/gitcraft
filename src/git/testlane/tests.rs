@@ -331,7 +331,7 @@ fn a_huge_range_is_refused() -> Result<(), String> {
     let err = commits_to_test(repo.path(), "main..feature")
         .err()
         .unwrap_or_default();
-    assert!(err.contains("more than 1000"), "{err}");
+    assert!(err.contains("more than 1,000"), "{err}");
     Ok(())
 }
 

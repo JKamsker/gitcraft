@@ -82,7 +82,11 @@ impl RepoTab {
             .or_else(|| amending.then(|| crate::i18n::text("repo-core-4115").to_owned()));
         let button = ui
             .add_enabled(idle && blocked.is_none(), |ui: &mut Ui| {
-                crate::icons::small_button(ui, "git-merge", crate::i18n::text("repo-core-4116"))
+                crate::icons::small_button(
+                    ui,
+                    "git-merge",
+                    crate::i18n::text("dev-baseline-fold-staged-label"),
+                )
             })
             .on_hover_text(crate::i18n::text("repo-core-4117"));
         let button = match &blocked {

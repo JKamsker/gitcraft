@@ -141,3 +141,5 @@ dev-baseline-guard-25 = The fetched target differs from the captured push lease;
 dev-baseline-guard-26 = The captured push lease changed; reopen its original action.
 
 dev-baseline-guard-27 = The reviewed fork source changed; reopen push preflight
+
+dev-baseline-fold-staged-label = Fold staged changes into an older commit

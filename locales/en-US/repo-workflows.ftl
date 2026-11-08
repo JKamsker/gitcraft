@@ -875,7 +875,7 @@ repo-workflows-bisect-steps-text-2d1513e9 = The last step
 
 repo-workflows-bisect-steps-text-5ccbfd65 = { $n ->
         [one] One commit after this
-       *[other] { $n } commits after this
+       *[other] { $n } commits after this one
     }
 
 repo-workflows-bisect-steps-text-9bbc8458 = 1 commit after this one
