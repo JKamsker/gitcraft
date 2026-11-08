@@ -128,6 +128,15 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
 }
 pub(crate) fn publish(
     runner: &Runner<'_>,
+    manager: Manager,
+    retry: bool,
+) -> Result<Manager, String> {
+    crate::tasks::with_cancellation(runner.control.cancellation(), || {
+        publish_inner(runner, manager, retry)
+    })
+}
+fn publish_inner(
+    runner: &Runner<'_>,
     mut manager: Manager,
     retry: bool,
 ) -> Result<Manager, String> {

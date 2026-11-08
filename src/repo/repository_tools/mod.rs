@@ -313,10 +313,12 @@ impl RepoTab {
             true,
             Err,
             move || {
-                work(&guard::Runner {
-                    repo: &repo,
-                    control: &control,
-                    credentials: credentials.as_ref(),
+                crate::tasks::with_cancellation(control.cancellation(), || {
+                    work(&guard::Runner {
+                        repo: &repo,
+                        control: &control,
+                        credentials: credentials.as_ref(),
+                    })
                 })
             },
             move |tab, result, ctx| {

@@ -17,6 +17,10 @@ pub(crate) struct Histories {
     pub effective: String,
 }
 pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
+    let cancel = crate::tasks::cancellation();
+    let legacy_bytes = graft_bytes(repo, &|| !cancel.is_cancelled())?;
+    let legacy = String::from_utf8(legacy_bytes.clone().unwrap_or_default())
+        .map_err(|_| "Legacy graft metadata is not UTF-8; inspect info/grafts with Git")?;
     let snapshot = Snapshot::capture(repo)?;
     let rows = text(
         repo,
@@ -54,10 +58,6 @@ pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
             parents,
         });
     }
-    let cancel = crate::tasks::cancellation();
-    let legacy_bytes = graft_bytes(repo, &|| !cancel.is_cancelled())?;
-    let legacy = String::from_utf8(legacy_bytes.clone().unwrap_or_default())
-        .map_err(|_| "Legacy graft metadata is not UTF-8; inspect info/grafts with Git")?;
     let args = [
         "--no-pager",
         "log",
@@ -101,10 +101,10 @@ fn graft_bytes(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<Vec<u8>>
 }
 impl Histories {
     fn check(&self, runner: &Runner<'_>) -> Result<(), String> {
-        self.snapshot.check(runner.repo)?;
         if graft_bytes(runner.repo, &|| !runner.control.is_cancelled())? != self.legacy_bytes {
             return Err("Legacy graft file changed; read a fresh history preview".into());
         }
+        self.snapshot.check(runner.repo)?;
         Ok(())
     }
 }

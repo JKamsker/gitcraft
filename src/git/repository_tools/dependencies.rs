@@ -314,6 +314,7 @@ fn advertised(
         return Ok(Vec::new());
     }
     // Ownership finalizer exists before the first command capable of creating refs.
+    budget.take()?;
     let fetch = runner.endpoint(
         &node.repo,
         &node.fetch_url,
@@ -341,7 +342,9 @@ fn advertised(
             .map_err(|_| "Invalid cleanup metadata".into())
         })
     });
-    owned.finish(fetch, cleanup)
+    let tips = owned.finish(fetch, cleanup)?;
+    budget.take()?;
+    Ok(tips)
 }
 fn reachable(
     runner: &Runner<'_>,
@@ -453,7 +456,10 @@ fn inspect_node(
     node.snapshot = Some(Snapshot::capture(&node.repo)?);
     Ok(())
 }
-pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
+pub(crate) fn check(runner: &Runner<'_>, plan: Plan) -> Result<Plan, String> {
+    crate::tasks::with_cancellation(runner.control.cancellation(), || check_inner(runner, plan))
+}
+fn check_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
     let budget = super::ReadBudget::new(2048, std::time::Duration::from_secs(300));
     plan.snapshot.check_publication(runner.repo)?;
     let tip = remote_tip(runner, runner.repo, &plan.parent_url, &plan.parent_branch)?;
@@ -525,7 +531,12 @@ pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String>
     plan.parent_result = None;
     Ok(plan)
 }
-pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
+pub(crate) fn publish(runner: &Runner<'_>, plan: Plan) -> Result<Plan, String> {
+    crate::tasks::with_cancellation(runner.control.cancellation(), || {
+        publish_inner(runner, plan)
+    })
+}
+fn publish_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
     let budget = super::ReadBudget::new(2048, std::time::Duration::from_secs(300));
     if !plan.checked || plan.dependencies.iter().any(|n| n.problem.is_some()) {
         return Err("Check every dependency and resolve its problem before publishing".into());
