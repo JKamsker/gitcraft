@@ -157,6 +157,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
+            source::finish(_source.as_ref(), args, out.code == Some(0))?;
             super::doctor::hook_log::record(dir, args, out.code == Some(0), &out.stderr);
         }
         return result;
@@ -190,6 +191,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         },
     )?
     .complete()?;
+    source::finish(_source.as_ref(), args, out.status.success())?;
     super::doctor::hook_log::record(dir, args, out.status.success(), &out.stderr);
     let failed = !out.status.success();
     Ok(Ran {

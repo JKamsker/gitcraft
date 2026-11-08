@@ -238,12 +238,13 @@ mod tests {
             &format!("url.{}.pushInsteadOf", b.path().display()),
             a.path().to_str().ok_or("path")?,
         ])?;
-        git::run_unattended(
+        let outcome = git::run_unattended(
             Some(source.path()),
             &args.iter().map(String::as_str).collect::<Vec<_>>(),
             None,
-        )?;
-        assert_eq!(a.tip(reference)?, oid);
+        );
+        assert!(outcome.is_err(), "worker must refuse changed configuration");
+        assert!(a.git(&["rev-parse", "--verify", reference]).is_err());
         assert!(b.git(&["rev-parse", "--verify", reference]).is_err());
         assert!(captured.guard(source.path()).is_err());
         source.git(&["remote", "remove", "team"])?;
@@ -255,8 +256,8 @@ mod tests {
                 Some(source.path()),
                 &args.iter().map(String::as_str).collect::<Vec<_>>(),
                 None
-            )?
-            .contains(&oid)
+            )
+            .is_err()
         );
         Ok(())
     }

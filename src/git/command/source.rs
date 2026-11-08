@@ -17,12 +17,15 @@ const MARKER: &str = "gitcraft.commandSource=";
 static SOURCES: OnceLock<Mutex<HashMap<String, Weak<CommandSource>>>> = OnceLock::new();
 static IDS: AtomicU64 = AtomicU64::new(0);
 
+type ExecutionGuard = Box<dyn Fn() -> Result<(), String> + Send + Sync>;
 pub struct CommandSource {
     id: String,
     repo: PathBuf,
     directory: PathBuf,
     env: Vec<(&'static str, String)>,
     configuration: String,
+    initial_refs: Vec<(String, String)>,
+    execution_guard: OnceLock<ExecutionGuard>,
 }
 impl CommandSource {
     pub fn capture(repo: &Path) -> Result<Arc<Self>, String> {
@@ -99,6 +102,14 @@ impl CommandSource {
             env: source_env(&directory, &objects, &index, worktree.as_deref()),
             directory,
             configuration: before,
+            initial_refs: listing
+                .lines()
+                .filter_map(|l| {
+                    l.split_once(' ')
+                        .map(|(oid, r)| (r.to_owned(), oid.to_owned()))
+                })
+                .collect(),
+            execution_guard: OnceLock::new(),
         });
         // The private directory has no links or repository-supplied templates. No init,
         // checkout, filter, hook or extraction command participates in preparation.
@@ -113,16 +124,20 @@ impl CommandSource {
         .map_err(|e| e.to_string())?;
         remote::write(&remote::join(&source.directory, "HEAD"), head.as_bytes())
             .map_err(|e| e.to_string())?;
+        let mut packed = "# pack-refs with: sorted\n".to_owned();
         for line in listing.lines() {
             let (oid, reference) = line.split_once(' ').ok_or("Malformed captured ref")?;
             if !safe_reference(reference) || !object_id(oid) {
                 return Err("Invalid captured ref identity".into());
             }
-            let path = remote::join(&source.directory, reference);
-            let parent = path.parent().ok_or("Captured ref has no parent")?;
-            remote::create_dir_all(parent).map_err(|e| e.to_string())?;
-            remote::write(&path, format!("{oid}\n").as_bytes()).map_err(|e| e.to_string())?;
+            packed.push_str(line);
+            packed.push('\n');
         }
+        remote::write(
+            &remote::join(&source.directory, "packed-refs"),
+            packed.as_bytes(),
+        )
+        .map_err(|e| e.to_string())?;
         SOURCES
             .get_or_init(Default::default)
             .lock()
@@ -130,11 +145,73 @@ impl CommandSource {
             .insert(source.id.clone(), Arc::downgrade(&source));
         Ok(source)
     }
+    /// Additional source-specific evidence must still hold inside the operation worker.
+    pub fn guard_execution(
+        &self,
+        guard: impl Fn() -> Result<(), String> + Send + Sync + 'static,
+    ) -> Result<(), String> {
+        self.execution_guard
+            .set(Box::new(guard))
+            .map_err(|_| "Execution evidence was already bound".into())
+    }
+    fn reconcile_push(&self) -> Result<(), String> {
+        self.check_context()?;
+        let now = self.refs("refs/remotes/")?;
+        let mut transaction = "start\n".to_owned();
+        let mut changes = 0;
+        for (reference, oid) in &now {
+            let old = self
+                .initial_refs
+                .iter()
+                .find(|(r, _)| r == reference)
+                .map(|(_, oid)| oid.clone())
+                .unwrap_or_else(|| "0".repeat(oid.len()));
+            if &old != oid {
+                transaction.push_str(&format!("update {reference} {oid} {old}\n"));
+                changes += 1;
+            }
+        }
+        if changes > 0 {
+            transaction.push_str("prepare\ncommit\n");
+            super::run_input(Some(&self.repo), &["update-ref", "--stdin"], &transaction)?;
+        }
+        // `push -u` wrote the private config. Preserve its normal upstream effect only
+        // after successful publication, with the original routing still matching capture.
+        let before = branch_tracking(parse_config(&self.configuration)?);
+        let args = self.bind(&["config", "--null", "--list"]);
+        let after = branch_tracking(parse_config(&run(
+            Some(&self.repo),
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )?)?);
+        for (key, values) in after {
+            if before.get(&key) == Some(&values) {
+                continue;
+            }
+            let Some((first, rest)) = values.split_first() else {
+                continue;
+            };
+            run(
+                Some(&self.repo),
+                &["config", "--local", "--replace-all", &key, first],
+            )?;
+            for value in rest {
+                run(
+                    Some(&self.repo),
+                    &["config", "--local", "--add", &key, value],
+                )?;
+            }
+        }
+        Ok(())
+    }
     pub fn check_context(&self) -> Result<(), String> {
         if run(Some(&self.repo), &["config", "--null", "--list"])? != self.configuration {
             return Err("Git routing or profile changed during the operation. A completed transfer may already have affected the captured destination; refresh before retrying.".into());
         }
         Ok(())
+    }
+    pub fn owns(&self, args: &[String]) -> bool {
+        args.windows(2)
+            .any(|pair| pair[0] == "-c" && pair[1] == format!("{MARKER}{}", self.id))
     }
     pub fn bind(&self, args: &[&str]) -> Vec<String> {
         [
@@ -307,6 +384,12 @@ pub(super) fn bind(
     if repo != Some(source.repo.as_path()) {
         return Err("Captured command source belongs to another repository".into());
     }
+    if super::goes_over_network(args) {
+        source.check_context()?;
+        if let Some(guard) = source.execution_guard.get() {
+            guard()?;
+        }
+    }
     extra.unset.extend([
         "GIT_CONFIG_COUNT",
         "GIT_CONFIG_PARAMETERS",
@@ -321,6 +404,32 @@ pub(super) fn bind(
     ]);
     extra.env.extend(source.env.clone());
     Ok(Some(source))
+}
+pub(super) fn finish(
+    source: Option<&Arc<CommandSource>>,
+    args: &[&str],
+    success: bool,
+) -> Result<(), String> {
+    if success
+        && super::after_options(args).first() == Some(&"push")
+        && let Some(source) = source
+    {
+        source.reconcile_push().map_err(|e| format!("Push completed at the captured destination, but local tracking metadata could not be reconciled: {e}. Refresh before retrying."))?;
+    }
+    Ok(())
+}
+fn branch_tracking(
+    entries: Vec<(String, String)>,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut map: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (key, value) in entries {
+        let lower = key.to_ascii_lowercase();
+        if lower.starts_with("branch.") && (lower.ends_with(".remote") || lower.ends_with(".merge"))
+        {
+            map.entry(key).or_default().push(value);
+        }
+    }
+    map
 }
 fn freeze_routing(
     mut entries: Vec<(String, String)>,

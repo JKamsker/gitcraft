@@ -231,6 +231,9 @@ pub fn run_watched_recorded(
         return (Err(reason), recorded);
     }
     if ended.code == Some(0) {
+        if let Err(e) = super::source::finish(_source.as_ref(), args, true) {
+            return (Err(e), recorded);
+        }
         return (Ok(ended.stdout), recorded);
     }
     if let Some(t) = &target

@@ -51,10 +51,12 @@ pub(crate) struct State {
     passed: Option<Vec<Vec<String>>>,
     pending_push: Option<Waiting>,
     checking_push: bool,
+    active_source: Option<std::sync::Arc<git::CommandSource>>,
 }
 struct Waiting {
     op: PendingOp,
     stamp: String,
+    source: Option<std::sync::Arc<git::CommandSource>>,
 }
 impl Drop for State {
     fn drop(&mut self) {
@@ -191,21 +193,31 @@ fn outgoing(repo: &Path, book: &Book, steps: &[Vec<String>]) -> Result<Vec<Hit>,
     if !book.enabled || !book.rules.iter().any(|r| r.enabled) {
         return Ok(vec![]);
     }
+    let prepared = echo_push::prepare(repo, steps)?;
+    outgoing_pairs(repo, book, prepared.pairs?, &prepared.source)
+}
+fn outgoing_pairs(
+    repo: &Path,
+    book: &Book,
+    pairs: Vec<(String, String)>,
+    source: &git::CommandSource,
+) -> Result<Vec<Hit>, String> {
     let mut hits = vec![];
-    for (base, head) in echo_push::sources(repo, steps)? {
+    for (base, head) in pairs {
+        let args = source.bind(&[
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            &base,
+            &head,
+            "--",
+        ]);
         let patch = git::run(
             Some(repo),
-            &[
-                "-c",
-                "core.quotePath=false",
-                "diff",
-                "--no-color",
-                "--no-ext-diff",
-                "--no-textconv",
-                &base,
-                &head,
-                "--",
-            ],
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
         )?;
         hits.extend(check_patch(&patch, book)?);
     }
@@ -328,6 +340,22 @@ impl RepoTab {
         {
             return false;
         }
+        // A credential retry keeps the same captured execution evidence. It must not
+        // nest another snapshot around its already-bound argv; the worker guard still runs.
+        if self
+            .review_tools
+            .echo
+            .active_source
+            .as_ref()
+            .is_some_and(|source| {
+                op.ops
+                    .iter()
+                    .filter(|step| echo_push::contains_push(std::slice::from_ref(step)))
+                    .all(|step| source.owns(step))
+            })
+        {
+            return false;
+        }
         if self.review_tools.echo.passed.take().as_ref() == Some(&op.ops) {
             return false;
         }
@@ -344,9 +372,22 @@ impl RepoTab {
         self.then_or(ctx,false,Err,move|| {
             let before=push_stamp(&repo)?;
             let book=load()?;
-            let result=outgoing(&repo,&book,&op.ops);
+            let (op, source, result) = if book.enabled && book.rules.iter().any(|r| r.enabled) {
+                let prepared = echo_push::prepare(&repo, &op.ops)?;
+                let result = prepared.pairs.and_then(|pairs| outgoing_pairs(&repo, &book, pairs, &prepared.source));
+                let mut op = op;
+                op.ops = prepared.steps;
+                (op, Some(prepared.source), result)
+            } else { (op, None, Ok(Vec::new())) };
             if push_stamp(&repo)?!=before {return Err("Push source or remote configuration changed during reviewer echo; start the push again".into());}
-            Ok((Waiting{op,stamp:before},book,result))
+            if let Some(source) = &source {
+                let (guard_repo, expected) = (repo.clone(), before.clone());
+                source.guard_execution(move || {
+                    if push_stamp(&guard_repo)? != expected { return Err("Reviewer echo inputs or rulebook changed before execution; start the push again".into()); }
+                    Ok(())
+                })?;
+            }
+            Ok((Waiting{op,stamp:before,source},book,result))
         },|tab,result,ctx|{
             tab.review_tools.echo.checking_push=false;
             match result {
@@ -373,11 +414,15 @@ impl RepoTab {
         self.review_tools.echo.checking_push = true;
         self.then_or(ctx,false,Err,move|| {
             if push_stamp(&repo)?!=waiting.stamp {return Err("Push source or remote configuration changed after reviewer echo; start the push again".into());}
-            Ok(waiting.op)
+            Ok(waiting)
         },|tab,result,ctx|{
             tab.review_tools.echo.checking_push=false;
             match result {
-                Ok(op)=>{
+                Ok(waiting)=>{
+                    let op = waiting.op;
+                    // Retain the context through execution and sign-in retry. A new push
+                    // replaces last_op and this owner together; expired markers refuse.
+                    tab.review_tools.echo.active_source = waiting.source;
                     tab.review_tools.echo.passed=Some(op.ops.clone());
                     tab.run_ops_ex(&op.label,op.ops,op.refresh,op.kind,op.quiet,ctx);
                     tab.review_tools.echo.passed=None;
@@ -390,6 +435,7 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Reviewer echo");
+    ui.weak("Enabled push checks conservatively scan all lines in every source tree against the empty tree. Cached fetch-server tips are not treated as push-server baselines. Shell/terminal pushes are outside this Git-operation check.");
     ui.label("Opt in to collect your own published comments from pull requests on any supported forge. The personal rulebook is shared by this app's repositories.");
     let mut enabled = s.book.enabled;
     if ui
