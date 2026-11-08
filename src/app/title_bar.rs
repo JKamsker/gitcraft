@@ -1,7 +1,8 @@
 //! Tabs in the title bar (Windows and macOS): the window is made without the system's title bar.
 //! The tab strip takes its place, as in a browser. The strip's empty space moves the window and a
 //! double click on it maximizes it, the caption buttons (minimize, maximize, close) sit at the
-//! strip's end, and the window's edges resize it.
+//! strip's end, and the window's edges resize it. On macOS the maximize button enters
+//! fullscreen instead, as the native green button does.
 //! macOS keeps its native frame with a transparent title bar so the corners stay rounded.
 
 use std::collections::HashMap;
@@ -245,13 +246,19 @@ fn caption_buttons(ui: &mut Ui, t: &Tokens) {
     if caption_button(ui, t, Caption::Close, state.focused).clicked() {
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
-    let size = if state.maximized {
+    let size = if cfg!(target_os = "macos") {
+        Caption::Fullscreen
+    } else if state.maximized {
         Caption::Restore
     } else {
         Caption::Maximize
     };
     if caption_button(ui, t, size, state.focused).clicked() {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!state.maximized));
+        if cfg!(target_os = "macos") {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+        } else {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!state.maximized));
+        }
     }
     if caption_button(ui, t, Caption::Minimize, state.focused).clicked() {
         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
@@ -321,6 +328,7 @@ fn moves_window(ctx: &egui::Context, resp: &Response) {
 enum Caption {
     Minimize,
     Maximize,
+    Fullscreen,
     Restore,
     Close,
 }
@@ -330,6 +338,7 @@ impl Caption {
         match self {
             Caption::Minimize => "Minimize",
             Caption::Maximize => "Maximize",
+            Caption::Fullscreen => "Enter fullscreen",
             Caption::Restore => "Restore down",
             Caption::Close => "Close",
         }
@@ -372,7 +381,7 @@ fn paint_glyph(painter: &egui::Painter, rect: Rect, kind: Caption, color: Color3
         Caption::Minimize => {
             painter.line_segment([pos2(left, c.y), pos2(right, c.y)], stroke);
         }
-        Caption::Maximize => {
+        Caption::Maximize | Caption::Fullscreen => {
             let square = Rect::from_min_max(pos2(left, top), pos2(right, bottom));
             painter.rect_stroke(
                 square,
@@ -459,6 +468,79 @@ fn cursor(dir: ResizeDirection) -> CursorIcon {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Exercise the actual hitboxes and viewport output without opening a native window.
+    fn title_bar_clicks(maximized: bool, caption: bool) -> Vec<egui::ViewportCommand> {
+        let ctx = egui::Context::default();
+        let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(CAPTIONS_W, 28.0));
+        let point = rect.center();
+        let frame = |time, events| {
+            let mut input = egui::RawInput {
+                screen_rect: Some(window()),
+                time: Some(time),
+                events,
+                ..Default::default()
+            };
+            input
+                .viewports
+                .entry(egui::ViewportId::ROOT)
+                .or_default()
+                .maximized = Some(maximized);
+            let mut output = ctx.run_ui(input, |ui| {
+                if caption {
+                    captions(ui, &Tokens::default(), rect);
+                } else {
+                    drag_area(ui, rect, "test");
+                }
+            });
+            let commands = output
+                .viewport_output
+                .remove(&egui::ViewportId::ROOT)
+                .map(|viewport| viewport.commands)
+                .unwrap_or_default();
+            output.drop_without_applying_deltas();
+            commands
+        };
+        let click = |pressed| egui::Event::PointerButton {
+            pos: point,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame(1.0, vec![egui::Event::PointerMoved(point)]);
+        let first = frame(1.1, vec![click(true), click(false)]);
+        if caption {
+            first
+        } else {
+            assert!(
+                first.is_empty(),
+                "a single click must not resize the window"
+            );
+            frame(1.2, vec![click(true), click(false)])
+        }
+    }
+
+    #[test]
+    fn caption_enters_fullscreen_on_macos_even_when_maximized() {
+        for maximized in [false, true] {
+            let commands = title_bar_clicks(maximized, true);
+            if cfg!(target_os = "macos") {
+                assert_eq!(commands, [egui::ViewportCommand::Fullscreen(true)]);
+            } else {
+                assert_eq!(commands, [egui::ViewportCommand::Maximized(!maximized)]);
+            }
+        }
+    }
+
+    #[test]
+    fn drag_bar_double_click_maximizes_and_restores_without_fullscreen() {
+        for maximized in [false, true] {
+            assert_eq!(
+                title_bar_clicks(maximized, false),
+                [egui::ViewportCommand::Maximized(!maximized)]
+            );
+        }
+    }
 
     fn window() -> Rect {
         Rect::from_min_size(pos2(0.0, 0.0), vec2(1400.0, 860.0))

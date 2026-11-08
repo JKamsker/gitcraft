@@ -630,7 +630,7 @@ impl Settings {
                     if cfg!(any(windows, target_os = "macos")) {
                         card.row("Title bar", "window frame caption native tabs", |ui| {
                             ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
-                                .on_hover_text("The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                                .on_hover_text("The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and use the window controls at the end of the strip (fullscreen on macOS).");
                         });
                     }
                     for button in crate::app_buttons::AppButton::ALL {
