@@ -133,6 +133,7 @@ impl CredentialScope {
 /// `Credentials::helper_environment`. Unknown/duplicate fields never broaden a match.
 pub const CREDENTIAL_HELPER: &str = concat!(
     "credential.helper=!f() { test \"$1\" = get || return 0; ",
+    "if test -z \"$GITCRAFT_CREDENTIAL_OWNER\" || test \"$PPID\" != \"$GITCRAFT_CREDENTIAL_OWNER\"; then printf '%s\\n' 'Scoped sign-in is only available to the designated Git HTTP transport. LFS and credential-fill consumers must use their own explicitly selected account.' >&2; printf 'quit=true\\n'; return 0; fi; ",
     "p= h= x= u= sp= sh= sx= su=; while IFS= read -r line && test -n \"$line\"; do case \"$line\" in ",
     "protocol=*) test -z \"$sp\" || return 0; sp=1; p=${line#protocol=};; ",
     "host=*) test -z \"$sh\" || return 0; sh=1; h=${line#host=};; ",

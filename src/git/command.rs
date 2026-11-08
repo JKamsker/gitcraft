@@ -725,9 +725,8 @@ pub struct Credentials {
     pub scope: Option<super::CredentialScope>,
 }
 
-/// A credential helper that answers git's `get` from the environment, so the secret never shows
-/// up in a command line. git tries the user's own helpers first and, when the operation works,
-/// asks them to store what this one gave.
+/// A designated HTTP transport helper; explicit transient accounts replace ambient
+/// helpers and are never automatically stored. Secret values stay out of argv.
 /// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
 /// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
 const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
@@ -816,6 +815,7 @@ pub fn is_auth_error(err: &str) -> bool {
 /// `creds` given to git when there are some.
 fn extra_for(
     dir: Option<&Path>,
+    args: &[&str],
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<Extra, String> {
@@ -825,7 +825,7 @@ fn extra_for(
         Extra::default()
     };
     if let Some(c) = creds {
-        let policy = credential_command_policy(dir, c)?;
+        let policy = credential_command_policy(dir, c, args)?;
         extra.owned_pre.extend(policy.arguments);
         extra.env.extend(policy.environment);
     }
@@ -840,7 +840,7 @@ fn run_inner_extra(
     quiet: bool,
     timeout: Option<std::time::Duration>,
 ) -> Result<String, String> {
-    let mut extra = extra_for(dir, creds, quiet)?;
+    let mut extra = extra_for(dir, args, creds, quiet)?;
     extra.timeout = timeout;
     finish(execute(dir, &extra, args)?, args, ok)
 }
@@ -852,7 +852,7 @@ fn run_extra(
     creds: Option<&Credentials>,
     mut extra: Extra,
 ) -> Result<String, String> {
-    let credentials = extra_for(dir, creds, false)?;
+    let credentials = extra_for(dir, args, creds, false)?;
     extra.pre.extend(credentials.pre);
     extra.owned_pre.extend(credentials.owned_pre);
     extra.env.extend(credentials.env);
@@ -878,7 +878,7 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
-    let extra = extra_for(dir, creds, quiet)?;
+    let extra = extra_for(dir, args, creds, quiet)?;
     finish(execute(dir, &extra, args)?, args, ok)
 }
 
@@ -947,7 +947,7 @@ fn run_inner_recorded(
     quiet: bool,
 ) -> (Result<String, String>, Recorded) {
     let started = std::time::Instant::now();
-    let mut extra = match extra_for(dir, creds, quiet) {
+    let mut extra = match extra_for(dir, args, creds, quiet) {
         Ok(extra) => extra,
         Err(e) => {
             return (
