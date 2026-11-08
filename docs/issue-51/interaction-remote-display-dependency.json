@@ -1,0 +1,16 @@
+{
+  "source_commit": "e585e595798468b8d6b222e563fdb2f8d68abd52",
+  "owner_commit": "9c5f5d8504af0a77c51f2d5c6e795c3756ab6112",
+  "review": "/tmp/gitcraft-51-remote-one-fix-review.md",
+  "scope": "Exact reviewed six-file display/catalog diff only, without unrelated root/remote algorithms or runtime changes",
+  "new_exact_files": {
+    "locales/en-US/interaction-remote.ftl": "8c9f41746e57448d92e6be84215c954ee851ec6fe506b92aa264bfe61742ff74",
+    "locales/de/interaction-remote.ftl": "060d38589008461d06d1eb67938355bf2383a3c538dc8cc4d214f81f4990e3cf",
+    "src/remote/display.rs": "d21ae0a421ef0b1ca1db0915133212f184d48dc2b5d2e3723e764793b48b5b7f",
+    "src/remote/display/composition.rs": "3c422fe69bf2db26948dac01be82d44efbfa7cf6bd8c490c9c5bcd230a02f1f8"
+  },
+  "modified_existing": {
+    "src/remote/mod.rs": "exact one display module declaration",
+    "src/remote/askpass.rs": "exact three-line notice retrieval presentation chain"
+  }
+}

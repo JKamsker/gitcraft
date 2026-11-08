@@ -281,6 +281,9 @@ pub fn take_notices() -> Vec<String> {
     server()
         .map(|server| std::mem::take(&mut lock(&server.state).notices))
         .unwrap_or_default()
+        .into_iter()
+        .map(|notice| super::display::diagnostic(&notice))
+        .collect()
 }
 
 static SECURITY_EPOCH: AtomicU64 = AtomicU64::new(0);
