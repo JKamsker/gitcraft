@@ -16,6 +16,13 @@ fn candidate_view(repo: &Path) -> Result<(View, Candidate), String> {
 fn lifecycle(history: History) -> Result<(), String> {
     let source = Fixture::new()?;
     let original = Fixture::new()?;
+    // The repositories are independent histories, even when initialized within one second.
+    // Fixture::new otherwise gives both identical root tree/author/message/timestamps.
+    source.git(&["commit", "--amend", "-qm", "independent upstream root"])?;
+    assert_ne!(
+        source.git(&["rev-parse", "HEAD"])?,
+        original.git(&["rev-parse", "HEAD"])?
+    );
     let repo = original.path();
     original.git(&[
         "remote",
