@@ -495,6 +495,53 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     }
 }
 
+/// Read-only pack generation for a bisect transfer. Standalone remote supervision keeps
+/// the requested bounded binary capture independent of the pooled shell's 64 MiB frames.
+/// Nonzero Git exits stay distinct from uncertain transport/cancellation errors.
+pub(crate) fn transfer_pack(
+    dir: &Path,
+    revisions: Vec<u8>,
+    thin: bool,
+    limit: usize,
+) -> Result<Exit, String> {
+    let extra = Extra {
+        stdin: Some(revisions),
+        env: vec![("GIT_NO_LAZY_FETCH", "1".into())],
+        timeout: Some(std::time::Duration::from_secs(1800)),
+        ..Default::default()
+    };
+    let mut args = vec![
+        "pack-objects",
+        "--stdout",
+        "--revs",
+        "--delta-base-offset",
+        "--missing=error",
+    ];
+    if thin {
+        args.push("--thin");
+    }
+    let mut options = crate::processes::Options {
+        input: extra.stdin.clone(),
+        background: true,
+        timeout: extra.timeout,
+        output_limit: limit,
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let request = remote_request(&target, &extra, &args);
+        remote::streaming_command_bounded(&target.host, &request, None, None, false, limit)?
+            .configure(&mut options)
+    } else {
+        local_command(Some(dir), &extra, &args)
+    };
+    let out = crate::processes::run(command, options)?.complete()?;
+    Ok(Exit {
+        code: out.status.code(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
+
 /// Save a command's stdout without capturing a local export in memory. Remote exports
 /// retain the existing persistent-shell transport and its binary-output behavior.
 pub fn run_to_file(dir: &Path, args: &[&str], file: &Path) -> Result<(), String> {

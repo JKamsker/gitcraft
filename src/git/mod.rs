@@ -11,7 +11,7 @@ mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
-pub(crate) use command::{WorkspaceCommand, run_workspace_command};
+pub(crate) use command::{WorkspaceCommand, run_workspace_command, transfer_pack};
 mod commit_msg;
 mod commits;
 mod conflict;

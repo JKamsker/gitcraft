@@ -238,7 +238,28 @@ pub(super) fn streaming_with_authority(
     workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
     cleanup: bool,
 ) -> Result<String, String> {
-    let data = request_with_authority(req, nonce, record, workspace, cleanup)?;
+    streaming_bounded(req, nonce, record, workspace, cleanup, 64 << 20)
+}
+pub(super) fn streaming_bounded(
+    req: &Request,
+    nonce: &str,
+    record: Option<&str>,
+    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+    cleanup: bool,
+    output_limit: usize,
+) -> Result<String, String> {
+    if !(1..=(256 << 20)).contains(&output_limit) {
+        return Err("invalid standalone capture limit".into());
+    }
+    let mut value: serde_json::Value = serde_json::from_str(&request_with_authority(
+        req, nonce, record, workspace, cleanup,
+    )?)
+    .map_err(|e| e.to_string())?;
+    value["output_limit"] = output_limit.into();
+    let data = format!(
+        "{}\n",
+        serde_json::to_string(&value).map_err(|e| e.to_string())?
+    );
     let launch = launcher("stream", "\"$T/request\"");
     Ok(format!(
         "{{\numask 077\nT=$(mktemp -d /tmp/gitcraft-launch.XXXXXXXXXX) || exit 125\ncat >\"$T/request\" <<'GITCRAFT_REQUEST_V1'\n{data}GITCRAFT_REQUEST_V1\n{launch}\n}}\n"
@@ -261,6 +282,26 @@ mod recording_tests {
             "ab",
         )
         .ok_or("fixture parse failed".into())
+    }
+    #[test]
+    fn standalone_capture_limit_is_explicit_bounded_and_does_not_raise_pooled_limit() {
+        let req = Request {
+            cwd: None,
+            script: "exec git pack-objects --stdout --revs".into(),
+            env: vec![],
+            unset: vec![],
+            stdin: None,
+            long: true,
+            timeout: Some(std::time::Duration::from_secs(30)),
+            test: false,
+            apart: false,
+        };
+        let default = request(&req, "ab", None).unwrap();
+        assert!(!default.contains("output_limit"));
+        let standalone = streaming_bounded(&req, "ab", None, None, false, 256 << 20).unwrap();
+        assert!(standalone.contains("\"output_limit\":268435456"));
+        assert!(streaming_bounded(&req, "ab", None, None, false, 0).is_err());
+        assert!(streaming_bounded(&req, "ab", None, None, false, (256 << 20) + 1).is_err());
     }
     #[test]
     fn exact_identity_and_full_receipt_are_required() -> Result<(), String> {

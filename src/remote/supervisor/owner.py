@@ -445,6 +445,8 @@ def run(req, controller, stream=False):
         if locks is not None: locks.close()
 
 def run_inner(req, controller, stream=False, locks=None):
+    capture_limit = req.get('output_limit', MAX)
+    if type(capture_limit) is not int or not 0 < capture_limit <= 256 << 20 or (not stream and capture_limit != MAX): raise ValueError('invalid standalone capture bound')
     nonce = req['nonce']
     if not NONCE.fullmatch(nonce): raise ValueError('invalid request nonce')
     duration = req['milliseconds'] / 1000
@@ -577,8 +579,8 @@ def run_inner(req, controller, stream=False, locks=None):
                     else:
                         chunk = os.read(key.fd, 8192)
                         if not chunk: selector.unregister(key.fd); continue
-                        if len(output[which]) + len(chunk) > MAX: stopped = True; delivery = False
-                        output[which].extend(chunk[:max(0, MAX - len(output[which]))])
+                        if len(output[which]) + len(chunk) > capture_limit: stopped = True; delivery = False
+                        output[which].extend(chunk[:max(0, capture_limit - len(output[which]))])
                         if forward and (which!=0 or not req.get('cleanup')) and not forward.add(which, chunk): stopped = True; delivery = False
                 if gate_w is not None:
                     state = handshake.step(stopped, time.monotonic,
@@ -602,7 +604,7 @@ def run_inner(req, controller, stream=False, locks=None):
                     except BlockingIOError:
                         time.sleep(.002); continue
                     if not chunk: eof = True; break
-                    room = max(0, MAX - len(output[index]))
+                    room = max(0, capture_limit - len(output[index]))
                     if len(chunk) > room: delivery = False
                     output[index].extend(chunk[:room])
                     if forward and (index!=0 or not req.get('cleanup')) and not forward.add(index, chunk): delivery = False

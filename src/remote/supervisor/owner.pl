@@ -378,6 +378,8 @@ sub run {
 }
 sub run_inner {
     my ($req, $controller, $stream,$locks) = @_;
+    my $capture_limit = $req->{output_limit} // $MAX;
+    die "invalid standalone capture bound" unless $capture_limit =~ /\A[0-9]+\z/ && $capture_limit > 0 && $capture_limit <= (256 << 20) && ($stream || $capture_limit == $MAX);
     die 'invalid request nonce' unless $req->{nonce} =~ /\A[0-9a-f]{1,96}\z/;
     my $duration = $req->{milliseconds}/1000;
     die 'invalid request deadline' unless $duration > 0 && $duration <= 7*86400;
@@ -475,7 +477,7 @@ sub run_inner {
                 else {
                     my $n = sysread($fd, my $bytes, 8192);
                     if (!$n) { $select->remove($fd); next; }
-                    my $room = $MAX-length($output[$which]); if (length($bytes) > $room) { $stopped=1; $delivery=0; }
+                    my $room = $capture_limit-length($output[$which]); if (length($bytes) > $room) { $stopped=1; $delivery=0; }
                     $output[$which] .= substr($bytes,0,$room);
                     if ($stream && ($which!=0 || !$req->{cleanup}) && !forward_add(\@pending,$which,$bytes)) { $stopped=1; $delivery=0; }
                 }
@@ -500,7 +502,7 @@ sub run_inner {
         while (time() < $end) {
             next unless $select->can_read(.002);
             my $n = sysread($fd,my $bytes,8192); if (defined($n) && !$n) { $eof=1; last; } last unless defined($n);
-            my $room=$MAX-length($output[$index]); $delivery=0 if length($bytes)>$room;
+            my $room=$capture_limit-length($output[$index]); $delivery=0 if length($bytes)>$room;
             $output[$index] .= substr($bytes,0,$room);
             $delivery=0 if $stream && ($index!=0 || !$req->{cleanup}) && !forward_add(\@pending,$index,$bytes);
         }

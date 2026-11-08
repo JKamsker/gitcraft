@@ -20,10 +20,6 @@ const FOLDER: &str = "gitcraft-bisect";
 /// The most history sent to another machine in one go (through its shell).
 const MAX_SEND: usize = 256 << 20;
 
-/// Numbers the bundles made in this process, so that two bisects sending at once never share a
-/// ref.
-static SENDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
 pub struct Workspace {
     pub machine: Machine,
     /// The repository the worktrees are made from, as the app names it.
@@ -210,47 +206,96 @@ impl Workspace {
         if missing.is_empty() {
             return Ok(());
         }
-        let thin = bundle(source, &missing, &present).and_then(|b| self.fetch(&b));
-        match thin {
+        let authority = self.authority(FenceMode::Mutation)?;
+        let transfer = random_transfer()?;
+        let attempt = bundle(source, &missing, &present, &authority.generation, &transfer)
+            .and_then(|bundle| self.fetch(&bundle));
+        match attempt {
             Ok(()) => Ok(()),
-            // The commits it has may lack their own history (a shallow clone…): all of it.
-            Err(_) if !present.is_empty() => {
-                let whole = bundle(source, wanted, &[])?;
-                self.fetch(&whole)
+            // Only a confirmed Git failure may retry with the complete requested history.
+            Err(TransferFailure::Git(_)) if !present.is_empty() => {
+                self.authority(FenceMode::Mutation)?;
+                let whole = bundle(
+                    source,
+                    wanted,
+                    &[],
+                    &authority.generation,
+                    &random_transfer()?,
+                )
+                .map_err(TransferFailure::message)?;
+                self.fetch(&whole).map_err(TransferFailure::message)
             }
-            Err(e) => Err(e),
+            Err(error) => Err(error.message()),
         }
     }
 
-    /// Takes in the commits of `bundle` there, under `refs/gitcraft-bisect/`.
-    fn fetch(&self, bundle: &[u8]) -> Result<(), String> {
-        let file = remote::join(&self.base, "incoming.bundle");
-        remote::write(&file, bundle).map_err(|e| {
-            format!(
-                "could not write the commits to send on {}: {e}",
-                self.machine.label()
-            )
-        })?;
-        let there = format!("{}/incoming.bundle", self.base_there);
-        let refspec = format!("+refs/{FOLDER}/send-*:refs/{FOLDER}/sent-*");
-        let fetched = git::run(
-            Some(&self.repo),
-            &[
-                "fetch",
-                "-q",
-                "--no-tags",
-                "--no-write-fetch-head",
-                &there,
-                &refspec,
-            ],
-        );
-        let _ = runner::shell(&self.repo, "rm -f \"$1\"", &[&there]);
-        fetched.map(|_| ()).map_err(|e| {
-            format!(
-                "could not send the commits to {}: {e}",
-                self.machine.label()
-            )
-        })
+    /// Every chunk and repository mutation reaches the actual owner's generation fence.
+    /// Ref creation is an expected-absent transaction, never a force update of shared refs.
+    fn fetch(&self, bundle: &TransferBundle) -> Result<(), TransferFailure> {
+        let there = format!("{}/incoming-{}.bundle", self.base_there, bundle.nonce);
+        let size = bundle.bytes.len().to_string();
+        let digest = transfer_digest(&bundle.bytes);
+        let mut created = false;
+        let result = (|| {
+            for (index, chunk) in bundle.bytes.chunks(16 << 20).enumerate() {
+                let offset = (index * (16 << 20)).to_string();
+                let end = (index * (16 << 20) + chunk.len()).to_string();
+                self.shell(WRITE_CHUNK, &[&there, &offset, &end], Some(chunk.to_vec()))
+                    .map_err(TransferFailure::Operation)?;
+                created = true;
+            }
+            self.shell(VERIFY_TRANSFER, &[&there, &size, &digest], None)
+                .map_err(TransferFailure::Operation)?;
+            let mut args = vec!["fetch", "-q", "--no-tags", "--no-write-fetch-head", &there];
+            args.extend(bundle.refs.iter().map(|(name, _)| name.as_str()));
+            let fetched = self
+                .run_git(&self.repo, &args, std::time::Duration::from_secs(1800))
+                .map_err(TransferFailure::Operation)?;
+            if fetched.code != Some(0) {
+                return Err(TransferFailure::Git(
+                    String::from_utf8_lossy(&fetched.stderr).into_owned(),
+                ));
+            }
+            let authority = self
+                .authority(FenceMode::Mutation)
+                .map_err(TransferFailure::Operation)?;
+            let record = self
+                .owner_record(&authority)
+                .map_err(TransferFailure::Operation)?;
+            let mut owned = git::WorkspaceCommand::new(&authority);
+            owned.input = Some(bundle.ref_transaction().into_bytes());
+            let published = self
+                .execute(
+                    &self.repo,
+                    &["update-ref", "--stdin"],
+                    &record,
+                    std::time::Duration::from_secs(30),
+                    owned,
+                )
+                .map_err(TransferFailure::Operation)?;
+            if published.code != Some(0) {
+                return Err(TransferFailure::Operation(format!(
+                    "could not create transfer refs: {}",
+                    String::from_utf8_lossy(&published.stderr)
+                )));
+            }
+            Ok(())
+        })();
+        // A failed/uncertain operation retains its primary error. A denied cleanup never
+        // turns it into permission to repeat a Git operation or erase recovery evidence.
+        let removed = if created {
+            self.shell(REMOVE_TRANSFER, &[&there], None)
+        } else {
+            Ok(())
+        };
+        match (result, removed) {
+            (result, Ok(())) => result,
+            (Ok(()), Err(error)) => Err(TransferFailure::Operation(error)),
+            (Err(primary), Err(cleanup)) => Err(TransferFailure::Operation(format!(
+                "{}; transfer cleanup: {cleanup}",
+                primary.message()
+            ))),
+        }
     }
 
     fn clear(&self) -> Result<(), String> {
@@ -603,42 +648,193 @@ fn has_commit(repo: &Path, hash: &str) -> bool {
     .is_ok()
 }
 
-/// A bundle of the commits `with` (and their history), without what `without` reaches. The
-/// refs it needs are made in `source` for a moment.
-fn bundle(source: &Path, with: &[String], without: &[String]) -> Result<Vec<u8>, String> {
-    let names: Vec<String> = (0..with.len())
-        .map(|i| {
-            let seq = SENDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            format!("refs/{FOLDER}/send-{}-{seq}-{i}", std::process::id())
-        })
-        .collect();
-    let made: Result<(), String> = names.iter().zip(with).try_for_each(|(name, hash)| {
-        git::run(Some(source), &["update-ref", name, hash]).map(|_| ())
-    });
-    let mut args: Vec<&str> = vec!["bundle", "create", "-q", "-"];
-    args.extend(names.iter().map(String::as_str));
-    if !without.is_empty() {
-        args.push("--not");
-        args.extend(without.iter().map(String::as_str));
-    }
-    let bytes = made.and_then(|()| git::run_bytes(Some(source), &args));
-    for name in &names {
-        let _ = git::run(Some(source), &["update-ref", "-d", name]);
-    }
-    let bytes = bytes.map_err(|e| format!("could not bundle the commits to send: {e}"))?;
-    if bytes.len() > MAX_SEND {
-        return Err(format!(
-            "the history to send is {} MB, more than gitcraft sends through a shell; clone the \
-             repository there and name its folder instead",
-            bytes.len() >> 20
-        ));
-    }
-    Ok(bytes)
+#[derive(Debug)]
+enum TransferFailure {
+    Git(String),
+    Operation(String),
 }
+impl TransferFailure {
+    fn message(self) -> String {
+        match self {
+            Self::Git(s) | Self::Operation(s) => s,
+        }
+    }
+}
+struct TransferBundle {
+    nonce: String,
+    refs: Vec<(String, String)>,
+    bytes: Vec<u8>,
+}
+impl TransferBundle {
+    fn header(
+        with: &[String],
+        without: &[String],
+        generation: &str,
+        nonce: &str,
+    ) -> Result<Self, String> {
+        let valid_hex = |s: &str, size: usize| {
+            s.len() == size
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        let width = with.first().map_or(0, String::len);
+        if with.is_empty()
+            || with.len() + without.len() > 4096
+            || !matches!(width, 40 | 64)
+            || !with.iter().chain(without).all(|h| valid_hex(h, width))
+            || !valid_hex(generation, 64)
+            || !valid_hex(nonce, 32)
+        {
+            return Err("invalid or excessive transfer commit identifiers".into());
+        }
+        let refs: Vec<_> = with
+            .iter()
+            .enumerate()
+            .map(|(i, h)| {
+                (
+                    format!("refs/{FOLDER}/{generation}/sent-{nonce}-{i}"),
+                    h.clone(),
+                )
+            })
+            .collect();
+        let mut header = if width == 64 {
+            "# v3 git bundle\n@object-format=sha256\n".to_owned()
+        } else {
+            "# v2 git bundle\n".to_owned()
+        };
+        for hash in without {
+            header.push_str(&format!("-{hash} gitcraft prerequisite\n"));
+        }
+        for (name, hash) in &refs {
+            header.push_str(&format!("{hash} {name}\n"));
+        }
+        header.push('\n');
+        Ok(Self {
+            nonce: nonce.into(),
+            refs,
+            bytes: header.into_bytes(),
+        })
+    }
+    fn ref_transaction(&self) -> String {
+        let mut input = String::from("start\n");
+        for (name, hash) in &self.refs {
+            input.push_str(&format!("create {name} {hash}\n"));
+        }
+        input.push_str("prepare\ncommit\n");
+        input
+    }
+}
+fn random_transfer() -> Result<String, String> {
+    let mut random = [0; 16];
+    gitcraft_os::random_bytes(&mut random).map_err(|e| e.to_string())?;
+    Ok(random.iter().map(|b| format!("{b:02x}")).collect())
+}
+fn transfer_digest(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+/// Assemble the documented bundle header around read-only pack output. No source refs
+/// are created, updated or removed, including failure/cancellation paths.
+fn bundle(
+    source: &Path,
+    with: &[String],
+    without: &[String],
+    generation: &str,
+    nonce: &str,
+) -> Result<TransferBundle, TransferFailure> {
+    let mut bundle = TransferBundle::header(with, without, generation, nonce)
+        .map_err(TransferFailure::Operation)?;
+    let mut revisions = with.join("\n");
+    revisions.push('\n');
+    for hash in without {
+        revisions.push_str(&format!("^{hash}\n"));
+    }
+    let pack = git::transfer_pack(
+        source,
+        revisions.into_bytes(),
+        !without.is_empty(),
+        MAX_SEND - bundle.bytes.len(),
+    )
+    .map_err(TransferFailure::Operation)?;
+    if pack.code != Some(0) {
+        return Err(TransferFailure::Git(format!(
+            "could not pack transfer: {}",
+            String::from_utf8_lossy(&pack.stderr)
+        )));
+    }
+    if !pack.stdout.starts_with(b"PACK") || bundle.bytes.len() + pack.stdout.len() > MAX_SEND {
+        return Err(TransferFailure::Operation("invalid pack or history exceeds 256 MiB transfer limit; clone the repository there and name its folder".into()));
+    }
+    bundle.bytes.extend(pack.stdout);
+    Ok(bundle)
+}
+const WRITE_CHUNK: &str = r#"set -eu
+f=$1; offset=$2; end=$3
+[ ! -L "$f" ] || exit 1
+if [ "$offset" = 0 ]; then (umask 077; set -C; : >"$f") || exit 1; fi
+[ -f "$f" ] && [ "$(wc -c <"$f" | tr -d '[:space:]')" = "$offset" ] || exit 1
+cat >>"$f" || exit 1
+[ "$(wc -c <"$f" | tr -d '[:space:]')" = "$end" ] || exit 1
+"#;
+const VERIFY_TRANSFER: &str = r#"set -eu
+[ ! -L "$1" ] && [ -f "$1" ] && [ "$(wc -c <"$1" | tr -d '[:space:]')" = "$2" ] || exit 1
+if command -v sha256sum >/dev/null 2>&1; then digest=$(sha256sum "$1")
+elif command -v shasum >/dev/null 2>&1; then digest=$(shasum -a 256 "$1")
+elif command -v python3 >/dev/null 2>&1; then digest=$(python3 -c 'import hashlib,sys; h=hashlib.sha256(); f=open(sys.argv[1],"rb"); exec("while True:\n b=f.read(1048576)\n if not b: break\n h.update(b)\n"); print(h.hexdigest())' "$1")
+else digest=$(perl -MDigest::SHA -e 'open(my $f,"<",$ARGV[0]) or die $!; binmode($f); print Digest::SHA->new(256)->addfile($f)->hexdigest' "$1"); fi
+case "$digest" in "$3"|"$3 "*) ;; *) printf '%s\n' 'transferred bundle digest differs' >&2; exit 1;; esac
+"#;
+const REMOVE_TRANSFER: &str = r#"set -eu
+[ ! -L "$1" ] || exit 1
+if [ -e "$1" ]; then [ -f "$1" ] && rm -- "$1" || exit 1; fi
+[ ! -e "$1" ] && [ ! -L "$1" ]
+"#;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_transfer_has_no_source_ref_mutations_and_creates_exact_generation_refs() {
+        for width in [40, 64] {
+            let wanted = vec!["a".repeat(width), "b".repeat(width)];
+            let present = vec!["c".repeat(width)];
+            let bundle =
+                TransferBundle::header(&wanted, &present, &"d".repeat(64), &"e".repeat(32))
+                    .unwrap();
+            let header = String::from_utf8(bundle.bytes.clone()).unwrap();
+            assert!(header.starts_with(if width == 40 {
+                "# v2 git bundle\n"
+            } else {
+                "# v3 git bundle\n@object-format=sha256\n"
+            }));
+            assert!(header.contains(&format!("-{} gitcraft prerequisite\n", present[0])));
+            assert!(header.ends_with("\n\n"));
+            for (name, hash) in &bundle.refs {
+                assert!(
+                    name.starts_with(&format!("refs/gitcraft-bisect/{}/sent-", "d".repeat(64)))
+                );
+                assert!(header.contains(&format!("{hash} {name}\n")));
+            }
+            let transaction = bundle.ref_transaction();
+            assert!(transaction.starts_with("start\ncreate refs/gitcraft-bisect/"));
+            assert!(!transaction.contains("update ") && !transaction.contains("delete "));
+            assert!(transaction.ends_with("prepare\ncommit\n"));
+        }
+        for bad in [
+            "HEAD".to_owned(),
+            "a".repeat(39),
+            format!("{}\nrefs/heads/main", "a".repeat(40)),
+        ] {
+            assert!(TransferBundle::header(&[bad], &[], &"d".repeat(64), &"e".repeat(32)).is_err());
+        }
+        assert_eq!(
+            transfer_digest(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
     #[test]
     fn recording_cleanup_requires_exact_generation_and_structured_complete_receipt() {
         let authority = WorkspaceAuthority {

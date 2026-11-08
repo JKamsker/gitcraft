@@ -303,12 +303,29 @@ pub(crate) fn streaming_command_authority(
     workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
     cleanup: bool,
 ) -> Result<Streaming, String> {
+    streaming_command_bounded(host, req, record, workspace, cleanup, 64 << 20)
+}
+pub(crate) fn streaming_command_bounded(
+    host: &Host,
+    req: &Request,
+    record: Option<&str>,
+    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+    cleanup: bool,
+    output_limit: usize,
+) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let (command, attempt) = shell_command(host, false);
     let nonce = nonce();
     let input = format!(
         "{MORE_PATH}\n{}",
-        super::supervisor::streaming_with_authority(req, &nonce, record, workspace, cleanup)?
+        super::supervisor::streaming_bounded(
+            req,
+            &nonce,
+            record,
+            workspace,
+            cleanup,
+            output_limit
+        )?
     )
     .into_bytes();
     Ok(Streaming {
