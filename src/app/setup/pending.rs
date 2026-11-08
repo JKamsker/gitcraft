@@ -14,8 +14,10 @@ pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh
         return false;
     };
     if requirements.ssh_key_reselection_required {
-        ui.label("Select this machine's explicit SSH key file (its matching private key may be in your local agent). Agent-only defaults and SSH-config aliases are not restored; no key is read into the setup file.");
-        if ui.button("Choose local SSH key…").clicked()
+        ui.label(crate::i18n::text("interaction-setup-key-help"));
+        if ui
+            .button(crate::i18n::text("interaction-setup-choose-key"))
+            .clicked()
             && let Some(path) = rfd::FileDialog::new().pick_file()
         {
             fresh.ssh = path.to_string_lossy().into_owned();
@@ -23,25 +25,27 @@ pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh
         ui.label(&fresh.ssh);
     }
     if requirements.signing_key_reselection_required {
-        ui.label("Enter this machine's signing key identifier or local public-key path");
+        ui.label(crate::i18n::text("interaction-setup-signing-help"));
         ui.text_edit_singleline(&mut fresh.signing);
     }
     fresh
         .folders
         .resize(requirements.accounts.len(), String::new());
     for (a, folder) in requirements.accounts.iter().zip(&mut fresh.folders) {
-        ui.label(format!(
-            "Required {:?}: {} on {}",
-            a.provider, a.user_or_alias, a.host
+        ui.label(crate::i18n::message(
+            "interaction-setup-required",
+            &[
+                ("provider", format!("{:?}", a.provider).into()),
+                ("user", a.user_or_alias.as_str().into()),
+                ("host", a.host.as_str().into()),
+            ],
         ));
         if a.provider != Provider::Tea {
-            ui.label(
-                "Optional local CLI authentication folder (empty uses this machine's CLI store)",
-            );
+            ui.label(crate::i18n::text("interaction-setup-cli-folder"));
             ui.text_edit_singleline(folder);
         }
     }
-    ui.button("Verify required setup and enable profile")
+    ui.button(crate::i18n::text("interaction-setup-verify"))
         .clicked()
 }
 fn local_key(path: &str) -> Result<(), String> {
@@ -172,6 +176,69 @@ mod tests {
             String::from_utf8_lossy(&output.stderr)
         );
         std::fs::remove_dir_all(repo.parent().ok_or("root")?).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use crate::portability::{ConnectionRequirements, PublicAccountExpectation};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_required_setup_fields_only_return_the_original_verification_request()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let profile = UserProfile {
+            name: "literal 日本語".into(),
+            pending_setup: Some(ConnectionRequirements {
+                ssh_key_reselection_required: true,
+                signing_key_reselection_required: true,
+                accounts: vec![PublicAccountExpectation {
+                    provider: Provider::Github,
+                    host: "forge.example.invalid".into(),
+                    user_or_alias: "literal-user".into(),
+                    account_user: None,
+                }],
+            }),
+            ..Default::default()
+        };
+        let before = serde_json::to_string(&profile).map_err(|e| e.to_string())?;
+        let fresh = Fresh {
+            ssh: "/opaque/日本語.pub".into(),
+            signing: "literal-key".into(),
+            folders: vec!["/opaque/CLI".into()],
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (UserProfile, Fresh, bool)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                state.2 |= fields(ui, &state.0, &mut state.1);
+            },
+            (profile, fresh, false),
+        );
+        h.run();
+        h.get_by_label("Lokalen SSH-Schlüssel auswählen…");
+        h.get_by_label("Erforderlich für Github: literal-user auf forge.example.invalid");
+        h.get_by_label("Erforderliche Einrichtung prüfen und Profil freigeben")
+            .click();
+        h.run();
+        assert!(h.state().2);
+        assert_eq!(h.state().1.ssh, "/opaque/日本語.pub");
+        assert_eq!(h.state().1.signing, "literal-key");
+        assert_eq!(h.state().1.folders, ["/opaque/CLI"]);
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|e| e.to_string())?,
+            before
+        );
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Choose local SSH key…");
+        h.get_by_label("Verify required setup and enable profile");
         Ok(())
     }
 }

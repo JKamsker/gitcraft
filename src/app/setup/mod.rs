@@ -1,5 +1,7 @@
 //! Portable setup preview and background handoffs. Imported paths never choose destinations.
 mod files;
+#[cfg(test)]
+mod localization_tests;
 mod pending;
 #[cfg(test)]
 mod tests;
@@ -157,6 +159,41 @@ impl SetupWindow {
         self.file = Some(Arc::new(file));
         self.mappings.clear();
         self.applied = false;
+    }
+}
+fn preview_summary(ui: &mut egui::Ui, file: &Setup) {
+    ui.label(crate::i18n::message(
+        "interaction-setup-preview",
+        &[
+            ("profiles", file.profiles.len().into()),
+            ("authors", file.identities.len().into()),
+            ("repositories", file.repositories.len().into()),
+        ],
+    ));
+    for p in &file.profiles {
+        let id = if p.setup.pending() {
+            "interaction-setup-profile-pending"
+        } else {
+            "interaction-setup-profile"
+        };
+        ui.label(crate::i18n::message(
+            id,
+            &[
+                ("name", p.name.as_str().into()),
+                ("author", p.author_name.as_str().into()),
+                ("email", p.author_email.as_str().into()),
+            ],
+        ));
+        for a in &p.setup.accounts {
+            ui.label(crate::i18n::message(
+                "interaction-setup-account",
+                &[
+                    ("provider", format!("{:?}", a.provider).into()),
+                    ("user", a.user_or_alias.as_str().into()),
+                    ("host", a.host.as_str().into()),
+                ],
+            ));
+        }
     }
 }
 impl App {
@@ -350,28 +387,27 @@ impl App {
         let mut verify = None;
         let modal=egui::Modal::new(egui::Id::new("portable-setup")).show(ctx,|ui|{
             ui.set_width(760.0_f32.min((ctx.content_rect().width()-48.0).max(240.0)));
-            ui.heading("New machine, same setup");
-            ui.label("Retries remain available during this app session while the owned clone/config is unchanged. Quitting retains files; finish them manually or choose a fresh destination. LFS content and submodules need separate setup after checkout.");
-            ui.label("One versioned setup file carries public settings and repository descriptions. It contains no credentials, key bytes, authentication folders or executable configuration. Old paths are labels only; working files, stashes and local-only objects need a separate backup. Shell/editor/tool commands, AI tokens and trust grants require local setup. Repository config restores author, tracking branches, line endings, pull/rebase/merge/push preferences and other allowlisted values; executable, trust, credential and path settings are excluded.");
+            ui.heading(crate::i18n::text("interaction-setup-title"));
+            ui.label(crate::i18n::text("interaction-setup-retry-info"));
+            ui.label(crate::i18n::text("interaction-setup-intro"));
             egui::ScrollArea::vertical().max_height((ctx.content_rect().height()*0.72).max(150.0)).show(ui,|ui|{
-                ui.add_enabled_ui(!busy,|ui|{ui.horizontal(|ui|{ui.selectable_value(&mut self.setup.import,false,"Export setup");ui.selectable_value(&mut self.setup.import,true,"Import setup");});
+                ui.add_enabled_ui(!busy,|ui|{ui.horizontal(|ui|{ui.selectable_value(&mut self.setup.import,false,crate::i18n::text("interaction-setup-export"));ui.selectable_value(&mut self.setup.import,true,crate::i18n::text("interaction-setup-import"));});
                     if !self.setup.import {
-                        ui.label("Select recent/open repositories to include. Metadata reads run in the background on each repository's own machine. Cloning from an imported file always targets this machine.");
+                        ui.label(crate::i18n::text("interaction-setup-selection"));
                         for candidate in &mut self.setup.candidates {ui.checkbox(&mut candidate.selected,candidate.path.display().to_string());}
-                        export=ui.button("Build export preview").clicked();
-                    }else{load=ui.button("Load setup file…").clicked();}
+                        export=ui.button(crate::i18n::text("interaction-setup-build")).clicked();
+                    }else{load=ui.button(crate::i18n::text("interaction-setup-load")).clicked();}
                 });
                 if let Some(file)=self.setup.file.clone(){
-                    ui.separator();ui.label(format!("Preview: {} profiles, {} saved authors, {} repositories",file.profiles.len(),file.identities.len(),file.repositories.len()));
-                    for p in &file.profiles {ui.label(format!("Profile: {} — {} <{}>{}",p.name,p.author_name,p.author_email,if p.setup.pending(){" · local authentication/key setup required"}else{""}));for a in &p.setup.accounts{ui.label(format!("  {:?}: {} on {}",a.provider,a.user_or_alias,a.host));}}
-                    ui.add_enabled_ui(!busy,|ui|{if self.setup.import{ui.checkbox(&mut self.setup.preferences,"Restore display, Git workflow and network preferences");let response=ui.add_enabled(!self.setup.applied,egui::Button::new("Add profiles, authors and public settings"));
-                        apply=response.clicked();}else{save=ui.button("Save setup file…").clicked();}});
+                    ui.separator();preview_summary(ui,&file);
+                    ui.add_enabled_ui(!busy,|ui|{if self.setup.import{ui.checkbox(&mut self.setup.preferences,crate::i18n::text("interaction-setup-preferences"));let response=ui.add_enabled(!self.setup.applied,egui::Button::new(crate::i18n::text("interaction-setup-add")));
+                        apply=response.clicked();}else{save=ui.button(crate::i18n::text("interaction-setup-save")).clicked();}});
                     for (index,r) in file.repositories.iter().enumerate(){
                         ui.push_id(index,|ui|{ui.group(|ui|{
-                            ui.label(format!("{} — previous location: {}",r.name,r.previous_path));
-                            ui.label(format!("Checkout: {} · {} linked worktrees · {} hidden branches · {} portable Git config values",r.branch.as_deref().unwrap_or("detached"),r.worktrees.len(),r.hidden.len(),r.config.len()));
-                            if !self.setup.import {for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(format!("Push: {url}"));}}}
-                            for w in &r.worktrees{ui.label(format!("Worktree {}: {} at {} ({})",w.name,w.branch.as_deref().unwrap_or("detached"),w.commit,w.previous_path));}
+                            ui.label(crate::i18n::message("interaction-setup-previous", &[("name", r.name.as_str().into()), ("path", r.previous_path.as_str().into())]));
+                            ui.label(crate::i18n::message("interaction-setup-checkout", &[("branch", r.branch.as_deref().unwrap_or(crate::i18n::text("interaction-setup-detached")).into()), ("worktrees", r.worktrees.len().into()), ("hidden", r.hidden.len().into()), ("config", r.config.len().into())]));
+                            if !self.setup.import {for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(crate::i18n::message("interaction-setup-push", &[("url", url.as_str().into())]));}}}
+                            for w in &r.worktrees{ui.label(crate::i18n::message("interaction-setup-worktree", &[("name", w.name.as_str().into()), ("branch", w.branch.as_deref().unwrap_or(crate::i18n::text("interaction-setup-detached")).into()), ("commit", w.commit.as_str().into()), ("path", w.previous_path.as_str().into())]));}
                             for notice in &r.notices {ui.label(notice);}
                             if self.setup.import {
                                 let matching=r.profile_ids.iter().filter_map(|id|self.setup.mappings.get(id)).copied().collect::<Vec<_>>();
@@ -379,55 +415,55 @@ impl App {
                                 let current_profile=self.settings.profile();
                                 let plan=&mut self.setup.plans[index];
                                 ui.add_enabled_ui(!busy,|ui|{
-                                    ui.checkbox(&mut plan.selected,"Select this repository");
+                                    ui.checkbox(&mut plan.selected,crate::i18n::text("interaction-setup-select"));
                                     ui.add_enabled_ui(plan.receipt.is_none(),|ui|{
-                                        ui.label("Restoration addresses: edit unexported SSH-config aliases to literal server hostnames. Only the selected profile's explicit supported authentication is used; agent-only fallback and ambient URL redirects are not used.");
+                                        ui.label(crate::i18n::text("interaction-setup-addresses"));
                                         let mut changed=false;
                                         for remote in &mut plan.remotes {
-                                            ui.label(format!("Remote {}",remote.name));
-                                            ui.horizontal(|ui|{ui.label("Fetch address");changed|=ui.add(egui::TextEdit::singleline(&mut remote.fetch).char_limit(4096)).changed();});
-                                            for (n,url) in remote.push.iter_mut().enumerate(){ui.horizontal(|ui|{ui.label(format!("Push address {}",n+1));changed|=ui.add(egui::TextEdit::singleline(url).char_limit(4096)).changed();});}
+                                            ui.label(crate::i18n::message("interaction-setup-remote", &[("name", remote.name.as_str().into())]));
+                                            ui.horizontal(|ui|{ui.label(crate::i18n::text("interaction-setup-fetch"));changed|=ui.add(egui::TextEdit::singleline(&mut remote.fetch).char_limit(4096)).changed();});
+                                            for (n,url) in remote.push.iter_mut().enumerate(){ui.horizontal(|ui|{ui.label(crate::i18n::message("interaction-setup-push-address", &[("number", (n+1).into())]));changed|=ui.add(egui::TextEdit::singleline(url).char_limit(4096)).changed();});}
                                         }
                                         if changed {plan.ssh_addresses_confirmed=false;}
                                         if plan.needs_ssh(){
-                                            ui.checkbox(&mut plan.ssh_addresses_confirmed,"I confirmed these SSH addresses use literal hostnames, not unexported SSH aliases");
-                                            if current_profile.connections.ssh_key.is_empty(){ui.label("SSH restoration pending: finish imported profile setup or choose an explicit SSH key file in this profile's Connections. A matching key may be supplied by your local agent; agent-only defaults are not restored.");}
+                                            ui.checkbox(&mut plan.ssh_addresses_confirmed,crate::i18n::text("interaction-setup-confirm-ssh"));
+                                            if current_profile.connections.ssh_key.is_empty(){ui.label(crate::i18n::text("interaction-setup-ssh-pending"));}
                                         }
                                     });
-                                    if plan.source.is_none() && let Some(remote)=plan.remotes.first(){ui.label(format!("Previewed clone source: {}",remote.fetch));}
+                                    if plan.source.is_none() && let Some(remote)=plan.remotes.first(){ui.label(crate::i18n::message("interaction-setup-clone-source", &[("source", remote.fetch.as_str().into())]));}
                                     ui.add_enabled_ui(plan.receipt.is_none(),|ui|{
-                                        ui.horizontal(|ui|{ui.label("New folder name");ui.text_edit_singleline(&mut plan.name);});
-                                        if ui.button("Choose destination parent…").clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.parent=path;}
-                                        if ui.button("Use local source folder on this machine…").clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.source=Some(path);}
-                                        if plan.source.is_some() && ui.button("Use portable remote instead").clicked(){plan.source=None;}
+                                        ui.horizontal(|ui|{ui.label(crate::i18n::text("interaction-setup-folder"));ui.text_edit_singleline(&mut plan.name);});
+                                        if ui.button(crate::i18n::text("interaction-setup-parent")).clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.parent=path;}
+                                        if ui.button(crate::i18n::text("interaction-setup-source")).clicked() && let Some(path)=rfd::FileDialog::new().pick_folder(){plan.source=Some(path);}
+                                        if plan.source.is_some() && ui.button(crate::i18n::text("interaction-setup-use-remote")).clicked(){plan.source=None;}
                                     });
-                                    ui.label(format!("New destination: {}",plan.parent.join(&plan.name).display()));
-                                    if let Some(source)=&plan.source{ui.label(format!("Current-machine source: {}",source.display()));}
-                                    if !r.worktrees.is_empty(){ui.label(format!("New worktree root: {}",plan.parent.join(format!("{}-worktrees",plan.name)).display()));}
-                                    if !permitted {ui.label("Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.");for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()) && ui.button(format!("Activate {}",p.title())).clicked(){activate=Some(*id);}}}
-                                    if ui.add_enabled(plan.selected && permitted && plan.binding_ready(&current_profile) && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){"Retry remaining steps"}else{"Clone and restore selected setup"})).clicked(){restore=Some(index);}
-                                    if plan.receipt.is_some() && ui.button("Choose a new destination instead").clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
-                                    if plan.complete && ui.button("Open restored repository").clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
+                                    ui.label(crate::i18n::message("interaction-setup-destination", &[("path", plan.parent.join(&plan.name).display().to_string().into())]));
+                                    if let Some(source)=&plan.source{ui.label(crate::i18n::message("interaction-setup-current-source", &[("path", source.display().to_string().into())]));}
+                                    if !r.worktrees.is_empty(){ui.label(crate::i18n::message("interaction-setup-worktree-root", &[("path", plan.parent.join(format!("{}-worktrees",plan.name)).display().to_string().into())]));}
+                                    if !permitted {ui.label(crate::i18n::text("interaction-setup-activate-help"));for id in &matching {if let Some(p)=self.settings.user_profiles.iter().find(|p|p.id==*id && !p.pending_setup()) && ui.button(crate::i18n::message("interaction-setup-activate", &[("profile", p.display_title().into())])).clicked(){activate=Some(*id);}}}
+                                    if ui.add_enabled(plan.selected && permitted && plan.binding_ready(&current_profile) && !plan.parent.as_os_str().is_empty() && !plan.complete,egui::Button::new(if plan.receipt.is_some(){crate::i18n::text("interaction-setup-retry")}else{crate::i18n::text("interaction-setup-restore")})).clicked(){restore=Some(index);}
+                                    if plan.receipt.is_some() && ui.button(crate::i18n::text("interaction-setup-new-destination")).clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
+                                    if plan.complete && ui.button(crate::i18n::text("interaction-setup-open")).clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
                                 });
                                 for message in &plan.messages{ui.label(message);}
                             }
                         });});
                     }
                 }
-                ui.separator();ui.heading("Finish profile setup");
-                ui.label("Imported safety expectations remain inactive until all required local selections and account checks pass. No account is switched or signed in automatically.");
-                for profile in self.settings.user_profiles.iter().filter(|p|p.pending_setup()) {ui.push_id(profile.id,|ui|{ui.group(|ui|{ui.label(profile.title());let fresh=self.setup.fresh.entry(profile.id).or_default();ui.add_enabled_ui(!busy,|ui|{if pending::fields(ui,profile,fresh){verify=Some((profile.clone(),fresh.clone()));}});});});}
+                ui.separator();ui.heading(crate::i18n::text("interaction-setup-finish"));
+                ui.label(crate::i18n::text("interaction-setup-pending-help"));
+                for profile in self.settings.user_profiles.iter().filter(|p|p.pending_setup()) {ui.push_id(profile.id,|ui|{ui.group(|ui|{ui.label(profile.display_title());let fresh=self.setup.fresh.entry(profile.id).or_default();ui.add_enabled_ui(!busy,|ui|{if pending::fields(ui,profile,fresh){verify=Some((profile.clone(),fresh.clone()));}});});});}
                 for message in &self.setup.messages{ui.label(message);}
             });
-            if busy {ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label("Working in the background…");if ui.button("Cancel setup operation").clicked() && let Some(job)=&self.setup.job{job.active.store(false,Ordering::Release);job.cancel.cancel();}});}
-            close=ui.add_enabled(!busy,egui::Button::new("Close")).clicked();
+            if busy {ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label(crate::i18n::text("interaction-setup-working"));if ui.button(crate::i18n::text("interaction-setup-cancel")).clicked() && let Some(job)=&self.setup.job{job.active.store(false,Ordering::Release);job.cancel.cancel();}});}
+            close=ui.add_enabled(!busy,egui::Button::new(crate::i18n::text("interaction-setup-close"))).clicked();
         });
         if close || (!busy && modal.should_close()) {
             self.setup.open = false;
         }
         if load
             && let Some(path) = rfd::FileDialog::new()
-                .add_filter("Gitcraft setup", &["json"])
+                .add_filter(crate::i18n::text("interaction-setup-filter"), &["json"])
                 .pick_file()
         {
             self.setup.launch(ctx, move |active| {

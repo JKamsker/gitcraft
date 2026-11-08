@@ -1,0 +1,9 @@
+{
+  "base": "3b59dad6cf4deb399474d0438e0231a7bb143490",
+  "raw_worker_model_auth_restore_dispatch_blocks_unchanged": {
+    "src/app/setup/mod.rs:SetupWindow implementation": "125085b316e3bc18ad00d9ea5db032dcd5d8abd42ae3ab57606dca8921a70094",
+    "src/app/setup/mod.rs:    pub(super) fn show_setup": "aff9e1400522c3f4028e271ebf8ffdf006cda9a68c51530c6026bfea1ab02c36",
+    "src/app/setup/pending.rs:fn local_key": "75f423b5cf6e7829da62a81274aca436444446d8a65b81f2aa6ea152296cb000",
+    "src/app/setup/mod.rs:dispatch tail except filter name": "6fe07e1688d9c78834c429e410f726d50fa5291b1c0cd8d78ad563de597c36c6"
+  }
+}
