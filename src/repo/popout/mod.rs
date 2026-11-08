@@ -14,6 +14,7 @@ mod window;
 #[cfg(test)]
 mod tests;
 
+use crate::repo::terminals::TerminalAct;
 use std::path::Path;
 
 use super::Action;
@@ -144,7 +145,7 @@ pub(crate) fn closes(action: &Action, terminals: usize) -> Option<Panel> {
         Action::CloseDiff => Some(Panel::Diff),
         Action::ClosePr => Some(Panel::Pr),
         Action::CloseCi => Some(Panel::Ci),
-        Action::CloseTerminal(_) if terminals <= 1 => Some(Panel::Terminal),
+        Action::Terminal(TerminalAct::Close(_)) if terminals <= 1 => Some(Panel::Terminal),
         Action::Popout(Request::Close(panel)) => Some(*panel),
         _ => None,
     }

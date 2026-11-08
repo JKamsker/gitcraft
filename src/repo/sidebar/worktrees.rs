@@ -1,5 +1,6 @@
 //! The repository's worktrees.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
 use crate::a11y::labels;
@@ -213,10 +214,10 @@ fn worktree_menu_items(
         acts.push(Action::OpenTab(wt.path.clone()));
     }
     if ui.button("Open terminal here").clicked() {
-        acts.push(Action::NewTerminal {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: Some(wt.path.clone()),
-        });
+        }));
     }
     let openable = crate::remote::openable_here(&wt.path).is_ok();
     if ui

@@ -208,15 +208,9 @@ impl RepoTab {
             PaletteItem::action("Redo", "history", Action::Redo).shortcut("Ctrl+Y"),
             PaletteItem::action("Stash changes", "stash", Action::Dialog(Dialog::stash())),
             PaletteItem::action("Search commits", "graph", Action::ToggleSearch).shortcut("Ctrl+F"),
-            PaletteItem::action("Toggle terminal", "terminal", Action::ToggleTerminal),
-            PaletteItem::action(
-                "New terminal",
-                "terminal",
-                Action::NewTerminal {
-                    shell: None,
-                    cwd: None,
-                },
-            ),
+        ]);
+        items.extend(super::terminals::command_items());
+        items.extend([
             PaletteItem::action("Reload", "repository", Action::Reload).shortcut("F5"),
             PaletteItem::action(reveal_label(), "folder", Action::OpenPath(PathBuf::new())),
             PaletteItem::action(

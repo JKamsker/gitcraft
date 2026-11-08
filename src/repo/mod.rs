@@ -135,7 +135,6 @@ use crate::git::{
     self, Commit, CommitDetail, Identity, Refs, Remote, Stash, Submodule, WorkStatus, Worktree,
 };
 use crate::graph::Graph;
-use crate::terminal::Terminal;
 
 use actions::abort_action;
 pub(crate) use actions::{Action, fast_forward_action, merge_action, rebase_action};
@@ -442,10 +441,7 @@ pub struct RepoTab {
     /// Background network work was paused on the last frame (see `follow_network`).
     network_paused: bool,
 
-    terminals: Vec<Terminal>,
-    active_terminal: usize,
-    terminal_open: bool,
-    terminal_error: Option<String>,
+    terminals: terminals::Terminals,
     /// The views shown in windows of their own.
     popouts: popout::Popouts,
 
@@ -688,10 +684,7 @@ impl RepoTab {
             fetched_at: Default::default(),
             fetch_time_asked: false,
             network_paused: false,
-            terminals: Vec::new(),
-            active_terminal: 0,
-            terminal_open: false,
-            terminal_error: None,
+            terminals: Default::default(),
             popouts: Default::default(),
             watcher: None,
             watches: 0,

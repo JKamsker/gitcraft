@@ -1,5 +1,6 @@
 //! The terminal panel's tab strip.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Rect, Sense, Ui, pos2, vec2};
 
 use super::top_rounded;
@@ -33,10 +34,10 @@ pub fn terminal_tabs(
     ui.add_space(4.0);
     let plus = icons::small_button(ui, "plus", "New terminal");
     if plus.clicked() {
-        acts.push(Action::NewTerminal {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: None,
-        });
+        }));
     }
     egui::Popup::context_menu(&plus)
         .style(crate::theme::menu_style)
@@ -53,7 +54,7 @@ pub fn terminal_tabs(
                 acts.push(Action::Popout(Request::Close(Panel::Terminal)));
             }
         } else if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
-            acts.push(Action::ToggleTerminal);
+            acts.push(Action::Terminal(TerminalAct::Toggle));
         }
         crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
     });
@@ -112,9 +113,9 @@ fn terminal_tab(
     }
     icons::paint(ui, x_rect, "x", 11.0, t.text_faint);
     if x.clicked() {
-        acts.push(Action::CloseTerminal(i));
+        acts.push(Action::Terminal(TerminalAct::Close(i)));
     } else if resp.clicked() {
-        acts.push(Action::SelectTerminal(i));
+        acts.push(Action::Terminal(TerminalAct::Select(i)));
     }
 }
 
@@ -122,10 +123,10 @@ fn terminal_tab(
 fn shell_items(ui: &mut Ui, acts: &mut Vec<Action>) {
     for shell in crate::terminal::available_shells() {
         if ui.button(&shell.label).clicked() {
-            acts.push(Action::NewTerminal {
+            acts.push(Action::Terminal(TerminalAct::New {
                 shell: Some(shell),
                 cwd: None,
-            });
+            }));
         }
     }
 }

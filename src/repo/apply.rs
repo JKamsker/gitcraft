@@ -189,11 +189,8 @@ impl RepoTab {
                 settings.show_detail = !settings.show_detail;
                 settings.set(ctx);
             }
-            Action::ToggleTerminal => self.toggle_terminal(ctx),
+            Action::Terminal(action) => self.terminals.apply(action, &self.path, ctx),
             Action::Popout(request) => self.popout_request(request, ctx),
-            Action::NewTerminal { shell, cwd } => self.start_terminal(shell, cwd, ctx),
-            Action::CloseTerminal(i) => self.close_terminal(i),
-            Action::SelectTerminal(i) => self.active_terminal = i,
             Action::ToggleSearch => self.toggle_search(),
             Action::SearchStep(d) => self.search_step(d, ctx),
             Action::CreatePr {

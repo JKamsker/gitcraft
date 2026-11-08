@@ -185,17 +185,8 @@ impl RepoTab {
         let spawned = launch
             .program(&shell, crate::agent::launch::windows_sh)
             .and_then(|(spec, cwd)| Terminal::spawn(&cwd, &spec, ctx));
-        self.terminal_open = true;
-        match spawned {
-            Ok(term) => {
-                self.terminals.push(term);
-                self.active_terminal = self.terminals.len() - 1;
-                self.terminal_error = None;
-            }
-            Err(e) => {
-                self.terminal_error = Some(format!("Could not start {}: {e}", launch.label));
-            }
-        }
+        self.terminals
+            .opened(spawned.map_err(|e| format!("Could not start {}: {e}", launch.label)));
     }
 
     /// Before an operation runs: when it makes a worktree, notes it, to set it up after.

@@ -97,7 +97,7 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
     // A program that never turned on bracketed paste: refused, the notes stay.
     let plain = agent("Claude Code", format!("exec cat > '{}'", got.display()));
     if let Ok(term) = Terminal::spawn(&dir, &plain, &ctx) {
-        tab.terminals.push(term);
+        tab.terminals.opened(Ok(term));
     }
     add_note(&mut tab, &ctx, "a.rs", 1, "Fix\nthis");
     std::thread::sleep(Duration::from_millis(300));
@@ -118,7 +118,7 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
         ),
     );
     if let Ok(term) = Terminal::spawn(&dir, &pasting, &ctx) {
-        tab.terminals.push(term);
+        tab.terminals.opened(Ok(term));
     }
     let start = Instant::now();
     let mut sent = false;
