@@ -330,7 +330,7 @@ mod tests {
         }
 
         #[test]
-        fn a_failing_pre_push_hook_is_named_and_skip_hooks_pushes_once() {
+        fn a_failing_pre_push_hook_is_named_and_skip_hooks_pushes_once() -> Result<(), String> {
             let dir = repo("push");
             let remote =
                 dir.with_file_name(format!("gitcraft-hooks remote-{}.git", std::process::id()));
@@ -343,12 +343,44 @@ mod tests {
             failing_hook(&dir, "pre-push", "tests failed");
             let ctx = egui::Context::default();
             let mut tab = opened(&dir, &ctx);
-            let failed = run(&mut tab, &ctx, Action::Push);
+            tab.apply(Action::Push, &ctx);
+            let before = git::resolve(&remote, "refs/heads/main");
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| {
+                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
+            });
+            let failed = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
             let not_pushed = git::resolve(&remote, "refs/heads/main");
-            let skipped = run(&mut tab, &ctx, Action::PushSkippingHooks);
+            assert_eq!(not_pushed, before);
+            tab.apply(Action::PushSkippingHooks, &ctx);
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| {
+                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
+            });
+            let skipped = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
             let pushed = git::resolve(&remote, "refs/heads/main");
             let head = git::head(&dir);
             let ticked = tab.skip_hooks.push;
+            git_ok(
+                &dir,
+                &[
+                    "commit",
+                    "-q",
+                    "--allow-empty",
+                    "-m",
+                    "next push runs hooks",
+                ],
+            );
+            tab.reload(&ctx);
+            wait(&mut tab, &ctx, |t| !t.loading);
+            tab.apply(Action::Push, &ctx);
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| {
+                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
+            });
+            let again = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+            assert!(again.contains("pre-push hook stopped it"), "{again}");
+            assert_eq!(git::resolve(&remote, "refs/heads/main"), pushed);
             let _ = std::fs::remove_dir_all(&dir);
             let _ = std::fs::remove_dir_all(&remote);
             assert!(
@@ -359,6 +391,7 @@ mod tests {
             assert_eq!(skipped, "Push: done");
             assert_eq!(pushed, Ok(head));
             assert!(!ticked);
+            Ok(())
         }
     }
 }

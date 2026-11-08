@@ -436,20 +436,66 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
         let actual = "https://actual-push.invalid/other/project.git";
-        let failure = crate::push_preflight::remember_auth_endpoint(actual);
-        for expected in [actual, ""] {
-            tab.op_done(
-                "Push".into(),
-                Err(failure.clone()),
-                Refresh::Status,
-                OpKind::plain(),
-                false,
-                &ctx,
-            );
-            assert!(
-                matches!(&tab.dialog, Some(Dialog::Credentials { url, .. }) if url == expected)
-            );
-        }
+        f.git(&["remote", "set-url", "--push", "origin", actual])?;
+        // An opaque diagnostic alone never authorizes sign-in or a fetch-URL fallback.
+        let proofless = crate::push_preflight::remember_auth_endpoint(actual);
+        tab.op_done(
+            "Push".into(),
+            Err(proofless.clone()),
+            Refresh::Status,
+            OpKind::plain(),
+            false,
+            &ctx,
+        );
+        assert!(tab.dialog.is_none() && tab.https_challenge.is_none());
+        assert!(tab.credentials.is_none() && tab.running.is_none() && tab.busy_op.is_none());
+        assert_eq!(
+            crate::push_preflight::take_auth_endpoint(&proofless).as_deref(),
+            Some(actual)
+        );
+
+        // Capture the actual configured push route, then record an authentication failure
+        // through the same receipt consumer used by APPROVED dispatch. No endpoint is contacted.
+        let original = vec!["push".to_owned(), "origin".into()];
+        let binding = crate::git::RouteBinding::capture(&f.repo, &["push", "origin"])?;
+        let control = tab.follow_op(std::slice::from_ref(&original), false, &ctx);
+        let receipt = crate::push_preflight::remember_auth_endpoint(actual);
+        let failed = crate::repo::run_reviewed_push(
+            &original,
+            |_| Ok(binding.clone()),
+            || Err(receipt.clone()),
+            Some(&control),
+        );
+        tab.op_done(
+            "Push".into(),
+            failed,
+            Refresh::Status,
+            OpKind::plain(),
+            false,
+            &ctx,
+        );
+        assert!(matches!(&tab.dialog, Some(Dialog::Credentials { url, .. }) if url == actual));
+        let ticket = tab
+            .https_challenge
+            .as_ref()
+            .ok_or("No bound sign-in ticket")?;
+        assert_eq!(ticket.binding, Some(binding));
+        assert!(ticket.authorizes_endpoint(actual));
+        assert!(!ticket.authorizes_endpoint(&f.receiver.to_string_lossy()));
+        assert!(crate::push_preflight::take_auth_endpoint(&receipt).is_none());
+
+        // Replaying the consumed diagnostic has no typed route proof and closes sign-in.
+        tab.op_done(
+            "Push".into(),
+            Err(receipt),
+            Refresh::Status,
+            OpKind::plain(),
+            false,
+            &ctx,
+        );
+        assert!(tab.dialog.is_none() && tab.https_challenge.is_none());
+        assert!(tab.credentials.is_none() && tab.running.is_none() && tab.busy_op.is_none());
+        assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
         Ok(())
     }
 
@@ -822,6 +868,73 @@ mod tests {
                 .is_some_and(|(text, error)| *error && text.contains("profile"))
         );
         assert_eq!(f.receiver_head()?, before);
+        Ok(())
+    }
+}
+
+/// Small shared driver for the existing push dialog, used only by workflow fixtures.
+#[cfg(test)]
+pub(in crate::repo) mod test_support {
+    use super::*;
+
+    pub(in crate::repo) fn wait_for(
+        tab: &mut RepoTab,
+        ctx: &egui::Context,
+        done: impl Fn(&RepoTab) -> bool,
+    ) -> Result<(), String> {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !done(tab) && Instant::now() < deadline {
+            tab.poll(ctx);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if done(tab) {
+            Ok(())
+        } else {
+            Err(format!("Workflow did not settle: {:?}", tab.status))
+        }
+    }
+
+    pub(in crate::repo) fn review(tab: &mut RepoTab, ctx: &egui::Context) -> Result<Plan, String> {
+        assert!(matches!(
+            tab.dialog,
+            Some(Dialog::PushLoading { .. } | Dialog::PushPreflight { .. })
+        ));
+        assert!(tab.busy_op.is_none(), "review must precede dispatch");
+        wait_for(tab, ctx, |t| {
+            !matches!(t.dialog, Some(Dialog::PushLoading { .. }))
+        })?;
+        match &mut tab.dialog {
+            Some(Dialog::PushPreflight { plan, acknowledge }) => {
+                assert!(!*acknowledge, "a fresh checklist must require consent");
+                check::push_args(plan)?;
+                *acknowledge = true; // the checklist's explicit user consent
+            }
+            Some(Dialog::PushError(error)) => return Err(error.clone()),
+            _ => return Err("No push checklist arrived".into()),
+        }
+        let Some(Dialog::PushPreflight {
+            plan,
+            acknowledge: true,
+        }) = tab.dialog.take()
+        else {
+            return Err("Checklist consent was lost".into());
+        };
+        Ok(*plan)
+    }
+
+    pub(in crate::repo) fn approve(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
+        let plan = review(tab, ctx)?;
+        let previous = tab.last_op.as_ref().map(|op| op.ops.clone());
+        tab.apply(Action::SubmitPreflight(Box::new(plan)), ctx);
+        wait_for(tab, ctx, |t| {
+            t.last_op.as_ref().is_some_and(|op| {
+                Some(&op.ops) != previous.as_ref()
+                    && op
+                        .ops
+                        .iter()
+                        .any(|step| step.first().is_some_and(|s| s == check::APPROVED))
+            })
+        })?;
         Ok(())
     }
 }
