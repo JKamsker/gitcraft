@@ -192,7 +192,7 @@ pub fn run_watched_recorded(
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
-    let mut extra = match extra_for(dir, creds, quiet) {
+    let mut extra = match extra_for(dir, args, creds, quiet) {
         Ok(extra) => extra,
         Err(e) => return failed(e),
     };

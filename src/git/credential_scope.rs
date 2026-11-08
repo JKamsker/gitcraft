@@ -60,9 +60,14 @@ impl CredentialScope {
         if authority.contains(['?', '#', '\\']) {
             return Err("Invalid credential URL authority".into());
         }
-        let authority = authority
-            .rsplit_once('@')
-            .map_or(authority, |(_, host)| host);
+        let authority = if let Some((userinfo, host)) = authority.rsplit_once('@') {
+            if userinfo.contains(':') || decode(userinfo)? != account {
+                return Err("The URL account does not match the selected account, or embeds a password. Use a credential-free URL and sign in explicitly".into());
+            }
+            host
+        } else {
+            authority
+        };
         let (host, port) = if let Some(ipv6) = authority.strip_prefix('[') {
             let (ip, tail) = ipv6.split_once(']').ok_or("Invalid IPv6 credential host")?;
             ip.parse::<std::net::Ipv6Addr>()
@@ -98,6 +103,12 @@ impl CredentialScope {
         if port == 0 {
             return Err("Invalid credential port".into());
         }
+        let mut path = decode(path.trim_start_matches('/'))?;
+        // Git keeps its first decoded character even when that character is '/'.
+        // Thus encoded slash-only paths remain distinct from an absent root path.
+        while path.len() > 1 && path.ends_with('/') {
+            path.pop();
+        }
         Ok(Self {
             protocol,
             authority: format!("{host}:{port}"),
@@ -106,7 +117,7 @@ impl CredentialScope {
             } else {
                 String::new()
             },
-            path: decode(path)?,
+            path,
             account: account.into(),
         })
     }
@@ -126,6 +137,7 @@ impl CredentialScope {
 /// `Credentials::helper_environment`. Unknown/duplicate fields never broaden a match.
 pub const CREDENTIAL_HELPER: &str = concat!(
     "credential.helper=!f() { test \"$1\" = get || return 0; ",
+    "if test -z \"$GITCRAFT_CREDENTIAL_OWNER\" || test \"$PPID\" != \"$GITCRAFT_CREDENTIAL_OWNER\"; then printf '%s\\n' 'Scoped sign-in is only available to the designated Git HTTP transport. LFS and credential-fill consumers must use their own explicitly selected account.' >&2; printf 'quit=true\\n'; return 0; fi; ",
     "p= h= x= u= sp= sh= sx= su=; while IFS= read -r line && test -n \"$line\"; do case \"$line\" in ",
     "protocol=*) test -z \"$sp\" || return 0; sp=1; p=${line#protocol=};; ",
     "host=*) test -z \"$sh\" || return 0; sh=1; h=${line#host=};; ",
@@ -194,6 +206,32 @@ mod tests {
         ] {
             assert!(!scope.matches_url(url), "{url}");
         }
+        for url in [
+            "https://host-a.invalid/team/repo.git/",
+            "https://host-a.invalid//team/repo.git",
+            "https://host-a.invalid/team/repo.git%2F",
+        ] {
+            assert!(scope.matches_url(url), "{url}");
+        }
+        assert!(
+            CredentialScope::for_url("https://bob@host-a.invalid/team/repo.git", "alice").is_err()
+        );
+        assert!(
+            CredentialScope::for_url(
+                "https://alice:embedded@host-a.invalid/team/repo.git",
+                "alice"
+            )
+            .is_err()
+        );
+        for url in [
+            "https://host-a.invalid/%2F",
+            "https://host-a.invalid/%2F%2F",
+            "https://host-a.invalid/%2F/",
+        ] {
+            let encoded = CredentialScope::for_url(url, "alice")?;
+            assert_eq!(encoded.path, "/");
+            assert!(!encoded.matches_url("https://host-a.invalid/"));
+        }
         assert_ne!(
             scope,
             CredentialScope::for_url("https://host-a.invalid/team/repo.git", "bob")?
@@ -217,65 +255,30 @@ mod tests {
 mod helper_tests {
     use super::*;
     #[test]
-    fn recording_fill_never_offers_a_secret_to_other_push_hosts_paths_accounts_or_lfs()
-    -> Result<(), String> {
+    fn helper_only_installation_records_no_consumer_authority() -> Result<(), String> {
         let credentials = super::super::Credentials::for_url(
             "https://host-a.invalid/team/repo.git",
             "DUMMY_HOST_A_USER".into(),
             "DUMMY_HOST_A_TOKEN".into(),
         )?;
-        for (url, accepted) in [
-            ("https://host-a.invalid/team/repo.git", true),
-            ("https://host-a.invalid:443/team/repo.git", true),
-            ("https://host-b.invalid/team/repo.git", false),
-            ("http://host-a.invalid/team/repo.git", false),
-            ("https://host-a.invalid:444/team/repo.git", false),
-            ("https://host-a.invalid/team/another.git", false),
-            ("https://host-a.invalid/team/repo.git/info/lfs", false),
-            ("https://other-account@host-a.invalid/team/repo.git", false),
-        ] {
-            let mut command = super::super::command::git_cmd();
-            command
-                .args([
-                    "-c",
-                    "credential.helper=",
-                    "-c",
-                    "credential.useHttpPath=true",
-                    "-c",
-                    CREDENTIAL_HELPER,
-                    "credential",
-                    "fill",
-                ])
-                .env("GIT_CONFIG_NOSYSTEM", "1")
-                .env(
-                    "GIT_CONFIG_GLOBAL",
-                    if cfg!(windows) { "NUL" } else { "/dev/null" },
-                );
-            for (name, value) in credentials.helper_environment()? {
-                command.env(name, value);
-            }
-            let output = crate::processes::run(
-                command,
-                crate::processes::Options {
-                    input: Some(format!("url={url}\n\n").into_bytes()),
-                    timeout: Some(std::time::Duration::from_secs(5)),
-                    output_limit: 65536,
-                    ..Default::default()
-                },
-            )?
-            .complete()?;
-            let text = String::from_utf8_lossy(&output.stdout);
-            assert_eq!(
-                output.status.success(),
-                accepted,
-                "{url}: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-            assert_eq!(text.contains("DUMMY_HOST_A_TOKEN"), accepted, "{url}");
-            if accepted {
-                assert!(text.contains("username=DUMMY_HOST_A_USER"));
-            }
-        }
+        let environment = credentials.helper_environment()?;
+        assert!(
+            !environment
+                .iter()
+                .any(|(key, _)| *key == "GITCRAFT_CREDENTIAL_OWNER")
+        );
+        assert_eq!(
+            environment
+                .iter()
+                .find(|(key, _)| *key == "GITCRAFT_CREDENTIAL_PATH")
+                .map(|(_, value)| value.as_str()),
+            Some("team/repo.git")
+        );
+        assert!(CREDENTIAL_HELPER.contains("test -z \"$GITCRAFT_CREDENTIAL_OWNER\""));
+        assert!(CREDENTIAL_HELPER.contains("quit=true"));
+        assert!(!CREDENTIAL_HELPER.contains("DUMMY_HOST_A_TOKEN"));
+        // This records an intentionally unsupported helper-only installation.
+        // Ordinary HTTP/LFS ancestry remains a held, separately authorized fixture.
         Ok(())
     }
 }
