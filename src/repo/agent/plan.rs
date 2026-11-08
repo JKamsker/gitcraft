@@ -503,6 +503,16 @@ impl PartialEq for Ask {
 impl Eq for Ask {}
 
 impl Ask {
+    #[cfg(test)]
+    pub(crate) fn opaque(title: &str, body: &str, undo_note: &str) -> Self {
+        Self {
+            title: title.to_owned(),
+            body: body.to_owned(),
+            undo_note: undo_note.to_owned(),
+            presentation: None,
+        }
+    }
+
     pub(super) fn from_presentation(kind: AskPresentation) -> Self {
         let mut ask = kind.raw();
         ask.presentation = Some(AskReceipt {

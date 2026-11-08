@@ -237,11 +237,11 @@ mod tests {
         let card = CardView {
             agent: "Agent 日本語".into(),
             preview: None,
-            ask: crate::repo::agent::plan::Ask {
-                title: "user supplied title".into(),
-                body: "user supplied body".into(),
-                undo_note: "opaque undo policy".into(),
-            },
+            ask: crate::repo::agent::plan::Ask::opaque(
+                "user supplied title",
+                "user supplied body",
+                "opaque undo policy",
+            ),
             commands: vec!["git push --force-with-lease origin main".into()],
             undoable: false,
             left: std::time::Duration::from_secs(65),
