@@ -63,6 +63,8 @@ use crate::remote::{self, Target};
 mod connection;
 mod credential_policy;
 mod endpoints;
+#[cfg(all(test, unix))]
+mod native_https_fixture;
 pub(crate) use credential_policy::*;
 pub(crate) use endpoints::*;
 mod setup;
