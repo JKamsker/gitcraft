@@ -1,4 +1,4 @@
-//! A recording-testable bounded full native Windows security-descriptor protocol.
+//! A recording-testable bounded, privilege-aware Windows security-descriptor protocol.
 //! Real execution requires the independent static protocol review before Windows fixtures.
 use base64::Engine;
 use std::{path::Path, process::Command};
@@ -16,8 +16,8 @@ try {
   Microsoft.PowerShell.Management\Get-Item -LiteralPath $source -Stream '*' -ErrorAction Stop | Microsoft.PowerShell.Core\ForEach-Object {
     if ($_.Stream -ne ':$DATA' -and $_.Stream -ne '$DATA' -and $_.Stream -ne '::$DATA') { throw 'Named data streams cannot be preserved with the bounded save protocol' }
   }
-  # Request every applicable native component explicitly. Managed FileSecurity's
-  # Access/Owner/Group subset cannot establish mandatory-label or SACL equality.
+  # Try the full descriptor, but normal users cannot request the audit SACL.
+  # Only ERROR_PRIVILEGE_NOT_HELD permits an owner/group/DACL-only retry.
   Microsoft.PowerShell.Core\Import-Module ([IO.Path]::Combine($PSHOME, 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1')) -ErrorAction Stop
   Microsoft.PowerShell.Utility\Add-Type -TypeDefinition @'
 using System;
@@ -26,6 +26,7 @@ using System.Security.AccessControl;
 public static class GitcraftNativePolicy {
   // OWNER|GROUP|DACL|SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER.
   public const uint AllPolicy = 0x000001ff;
+  public const uint BasicPolicy = 0x00000007; // OWNER|GROUP|DACL; always required.
   [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
   static extern uint GetNamedSecurityInfo(string path, uint type, uint info, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
   [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
@@ -43,20 +44,42 @@ public static class GitcraftNativePolicy {
     byte[] normalized = new byte[parsed.BinaryLength]; parsed.GetBinaryForm(normalized,0);
     return normalized;
   }
+  static void GetPolicy(string path, out uint info, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor) {
+    info = AllPolicy;
+    uint error = GetNamedSecurityInfo(path,1,info,out owner,out group,out dacl,out sacl,out descriptor);
+    if (error == 1314) { // ERROR_PRIVILEGE_NOT_HELD, never an unreadable DACL.
+      if (descriptor != IntPtr.Zero) { LocalFree(descriptor); descriptor=IntPtr.Zero; }
+      info = BasicPolicy;
+      error = GetNamedSecurityInfo(path,1,info,out owner,out group,out dacl,out sacl,out descriptor);
+    }
+    Check(error);
+  }
+  static byte[] Snapshot(IntPtr descriptor, uint info) {
+    byte[] raw = Canonical(descriptor);
+    // Bind comparisons to the captured scope: omitted SACL is not an empty SACL.
+    byte[] snapshot = new byte[raw.Length+4];
+    Array.Copy(BitConverter.GetBytes(info),snapshot,4);
+    Array.Copy(raw,0,snapshot,4,raw.Length);
+    return snapshot;
+  }
   public static byte[] Read(string path) {
     IntPtr owner,group,dacl,sacl,descriptor=IntPtr.Zero;
-    try { Check(GetNamedSecurityInfo(path,1,AllPolicy,out owner,out group,out dacl,out sacl,out descriptor)); return Canonical(descriptor); }
+    uint info;
+    try { GetPolicy(path,out info,out owner,out group,out dacl,out sacl,out descriptor); return Snapshot(descriptor,info); }
     finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
   }
   public static void Copy(string source,string target) {
     IntPtr owner,group,dacl,sacl,descriptor=IntPtr.Zero;
     try {
-      Check(GetNamedSecurityInfo(source,1,AllPolicy,out owner,out group,out dacl,out sacl,out descriptor));
-      byte[] before=Canonical(descriptor);
-      RawSecurityDescriptor parsed=new RawSecurityDescriptor(before,0);
+      uint info;
+      GetPolicy(source,out info,out owner,out group,out dacl,out sacl,out descriptor);
+      byte[] before=Snapshot(descriptor,info);
+      RawSecurityDescriptor parsed=new RawSecurityDescriptor(Canonical(descriptor),0);
       uint protection = (parsed.ControlFlags & ControlFlags.DiscretionaryAclProtected) != 0 ? 0x80000000u : 0x20000000u;
-      protection |= (parsed.ControlFlags & ControlFlags.SystemAclProtected) != 0 ? 0x40000000u : 0x10000000u;
-      Check(SetNamedSecurityInfo(target,1,AllPolicy|protection,owner,group,dacl,sacl));
+      // SACL protection flags also require SeSecurityPrivilege. Never set them
+      // when only the basic policy was captured, or pass an unrequested SACL.
+      if ((info & 0x8) != 0) protection |= (parsed.ControlFlags & ControlFlags.SystemAclProtected) != 0 ? 0x40000000u : 0x10000000u;
+      Check(SetNamedSecurityInfo(target,1,info|protection,owner,group,dacl,(info & 0x8) != 0 ? sacl : IntPtr.Zero));
       if (!Convert.ToBase64String(before).Equals(Convert.ToBase64String(Read(target)),StringComparison.Ordinal)) throw new InvalidOperationException("Full native policy differs after copy");
       if (!Convert.ToBase64String(before).Equals(Convert.ToBase64String(Read(source)),StringComparison.Ordinal)) throw new InvalidOperationException("Source policy changed during copy");
     } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
@@ -245,7 +268,7 @@ pub(super) fn snapshot(source: &Path) -> Result<Vec<u8>, String> {
     let descriptor = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|e| e.to_string())?;
-    if descriptor.len() > 1024 * 1024 {
+    if descriptor.len() > 1024 * 1024 + 4 {
         return Err(crate::i18n::text("interaction-standalone-error-access-limit").into());
     }
     Ok(descriptor)
@@ -303,8 +326,13 @@ mod tests {
         );
         assert!(SCRIPT.contains("AllPolicy = 0x000001ff"));
         assert!(SCRIPT.contains("SACL|LABEL|ATTRIBUTE|SCOPE|PROCESS_TRUST_LABEL|ACCESS_FILTER"));
-        assert!(SCRIPT.contains("GetNamedSecurityInfo(path,1,AllPolicy"));
-        assert!(SCRIPT.contains("SetNamedSecurityInfo(target,1,AllPolicy|protection"));
+        assert!(SCRIPT.contains("BasicPolicy = 0x00000007"));
+        assert!(SCRIPT.contains("if (error == 1314)"));
+        assert!(SCRIPT.contains("info = BasicPolicy"));
+        assert!(SCRIPT.contains("GetNamedSecurityInfo(path,1,info"));
+        assert!(SCRIPT.contains("SetNamedSecurityInfo(target,1,info|protection"));
+        assert!(SCRIPT.contains("if ((info & 0x8) != 0) protection |="));
+        assert!(SCRIPT.contains("Array.Copy(BitConverter.GetBytes(info),snapshot,4)"));
         assert!(SCRIPT.contains("SeSecurityPrivilege"));
         assert!(!SCRIPT.contains("[IO.File]::GetAccessControl"));
         assert!(SCRIPT.contains("length > 1048576"));

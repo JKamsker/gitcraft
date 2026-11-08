@@ -236,7 +236,14 @@ pub(super) fn apply(
         transaction::alternate(repo, &candidate_path, &args)?;
         // Git creates the alternate index using core.sharedRepository and the actual
         // process umask. Do not substitute a hard-coded chmod for that policy.
+        #[cfg(not(windows))]
         let file = recovery.read(candidate).map_err(|e| e.to_string())?;
+        // FlushFileBuffers requires GENERIC_WRITE. Open the owned candidate before
+        // copying its DACL; the retained handle also permits later publication.
+        #[cfg(windows)]
+        let file = recovery
+            .read_writable(candidate)
+            .map_err(|e| e.to_string())?;
         #[cfg(unix)]
         let native_mode = file
             .metadata()
