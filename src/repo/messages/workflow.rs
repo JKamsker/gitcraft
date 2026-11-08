@@ -1549,6 +1549,12 @@ pub(super) const TEMPLATES: &[super::TemplateSpec] = &[
         "repo-workflows-operation-here-only",
         &[("operation", false)],
     ), // source entry 339
+    // Additive immutable owner9471 contract; original396 rows retain their indices.
+    (
+        "(?s)^Check out #([0-9]+) to push to (.*?)$",
+        "repo-workflows-forks-checkout-fork-abaaf4c3",
+        &[("number", false), ("info-owner-1", false)],
+    ),
 ];
 
 #[derive(Clone, Copy)]

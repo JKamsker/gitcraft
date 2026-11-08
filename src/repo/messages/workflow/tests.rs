@@ -2575,6 +2575,14 @@ const CASES: &[Case] = &[
         id: "repo-workflows-operation-here-only",
         args: &[("operation", Sample::Text("Push", "Pushen"))],
     }, // supplied entry 339
+    Case {
+        raw: "Check out #1234 to push to raw-owner/ß",
+        id: "repo-workflows-forks-checkout-fork-abaaf4c3",
+        args: &[
+            ("number", Sample::Text("1234", "1234")),
+            ("info-owner-1", Sample::Text("raw-owner/ß", "raw-owner/ß")),
+        ],
+    }, // additive immutable owner9471 contract; original396 entries unchanged
 ];
 
 #[test]
@@ -2875,4 +2883,58 @@ fn workflow_finite_scope_health_noun_and_state_choices_render_each_supplied_cont
         }
     }
     crate::i18n::set_language("en-US");
+}
+
+#[test]
+fn workflow_checkout_contract_preserves_decimal_pr_and_opaque_owner_in_public_wrappers() {
+    for language in ["en-US", "de", "en-US"] {
+        crate::i18n::set_language(language);
+        for number in ["1234", "00001234"] {
+            for owner in [
+                "raw-owner/ß",
+                "Stage1 to push to Continue custom-script: 日本語/00001234",
+                "$(cargo test) --offline",
+            ] {
+                let raw = format!("Check out #{number} to push to {owner}");
+                let stored = raw.clone();
+                let expected = if language == "de" {
+                    format!("#{number} auschecken, um nach {owner} zu pushen")
+                } else {
+                    raw.clone()
+                };
+                assert_eq!(display_operation(&stored), expected);
+                assert_eq!(display_status(&stored), expected);
+                assert!(expected.contains(&format!("#{number}")));
+                assert!(expected.contains(owner));
+                assert!(!expected.contains("#1,234"));
+                assert!(!expected.contains("#1.234"));
+                assert_eq!(stored, raw);
+                let nested = format!("Undo {raw}");
+                let nested_expected = crate::i18n::message(
+                    "interaction-operation-undo",
+                    &[("operation", expected.into())],
+                );
+                assert_eq!(display_operation(&nested), nested_expected);
+                assert_eq!(display_status(&nested), nested_expected);
+            }
+        }
+        for raw in [
+            "Check out #Stage1 to push to raw-owner/ß",
+            "Check out #1,234 to push to raw-owner/ß",
+            "Check out #1.234 to push to raw-owner/ß",
+            "Check out #-1 to push to raw-owner/ß",
+            "Check out #+1 to push to raw-owner/ß",
+            "Check out #1234 to push toward raw-owner/ß",
+            "custom Check out #1234 to push to raw-owner/ß",
+            "Undo Check out #provider to push to raw-owner/ß",
+            "Preparing Check out #provider to push to raw-owner/ß",
+            "Continue custom-script Check out #1234 to push to raw-owner/ß",
+            "Stage1",
+        ] {
+            let stored = raw.to_owned();
+            assert_eq!(display_operation(&stored), raw);
+            assert_eq!(display_status(&stored), raw);
+            assert_eq!(stored, raw);
+        }
+    }
 }

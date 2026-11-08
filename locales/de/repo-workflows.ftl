@@ -753,3 +753,5 @@ repo-workflows-working_drafts-change-working-draft-278865c0 = Arbeitsentwurf
 repo-workflows-working_drafts-poll-working-drafts-7a49e8a4 = Frühere Versionen: { $e }
 
 repo-workflows-working_drafts-save-working-draft-3e48426a = Manuell gespeichert
+
+repo-workflows-forks-checkout-fork-abaaf4c3 = #{ $number } auschecken, um nach { $info-owner-1 } zu pushen
