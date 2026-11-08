@@ -500,3 +500,5 @@ interaction-guards-push-lfs-no-pointer = git-lfs hat keinen Zeiger erzeugt; inst
 interaction-guards-push-default-nothing = push.default=nothing: Wähle einen ausdrücklichen Branch-Push.
 
 interaction-guards-push-lfs-filter = .lfsconfig darf bei der Prüfung der Endpunktkonfiguration keinen Inhaltsfilter durchlaufen.
+
+interaction-guards-checklist-route = { $source } → { $destination } auf { $targets }

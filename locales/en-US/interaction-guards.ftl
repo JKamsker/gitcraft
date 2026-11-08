@@ -500,3 +500,5 @@ interaction-guards-push-lfs-no-pointer = git-lfs did not produce a pointer; inst
 interaction-guards-push-default-nothing = push.default=nothing: choose an explicit branch push.
 
 interaction-guards-push-lfs-filter = .lfsconfig must not pass through a content filter when reviewing endpoint configuration.
+
+interaction-guards-checklist-route = { $source } → { $destination } on { $targets }
