@@ -111,5 +111,38 @@ descendant lifetime boundary or additional canary, and does not duplicate the Da
 anchor/canary fixture. It asserts Unix Command semantics, not native_owner request
 serialization (whose production API intentionally does not capture env_clear/arg0).
 
+### Empty-clear diagnostic follow-up (runtime still held)
+
+Parent-run candidate `3813b0f94105146424e59cb2b73298c50f8a69ca` had byte-equal
+fixture sources to `49a9da66`. Its endpoint and claim/fence fixtures passed; its
+environment fixture failed at outer driver status101. The retained receipts confirm
+inherit/set/remove/clear tracked fields, then empty-clear has all tracked fields absent
+but `empty_environment=false`. PATH cases were not reached. Evidence remains in
+`/tmp/gitcraft-51-native-runtime-3813b0f9/validation.json` and `2.log`; this is a failure,
+not an environment or suite pass.
+
+The diagnostic delta adds sorted raw environment **key names only** to the empty-clear
+receipt. Its expected key list remains empty, and `empty_environment` must still be
+true. Exact receipt/stdout checks remain. Readable escaped names appear in a strict
+receipt assertion; outer driver status/stop failures now include its already capped
+synthetic stdout/stderr, preserving inner assertion details. Unknown values are neither
+recorded nor printed. Other cases omit this optional field and preserve their receipt
+format. No new launch, process-control, parent environment mutation or production change.
+
+Local Rust1.95.0 source: `library/std/src/sys/process/env.rs:24-47` captures no inherited
+entries when clear is set; `library/std/src/sys/process/unix/unix.rs:393-408` installs
+the captured environment for the fork/exec path. `library/test/src/lib.rs:180-183`
+uses the normal static runner; its secondary invoker environment entries belong to the
+separate panic=abort subprocess path at731-734. These reads do not establish which
+unknown key exists in the failed binary.
+
+Apple's published [CFRuntime.c](https://github.com/apple-oss-distributions/CF/blob/main/CFRuntime.c)
+calls `__CFStringGetUserDefaultEncoding` during initialization, and
+[CFStringEncodings.c](https://github.com/apple-oss-distributions/CF/blob/main/CFStringEncodings.c)
+contains its environment-writing implementation. This supports a CoreFoundation startup
+injection hypothesis, not attribution of the installed framework's behavior in this
+failed run. **No startup-key exemption is implemented.** The parent's next reviewed,
+exact invocation should identify the actual keys before any further disposition.
+
 No fixture runtime results are claimed by this document. Build/lint logs and final
 immutable source hashes are handed to the parent outside the repository.
