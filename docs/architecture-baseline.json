@@ -6442,9 +6442,9 @@
         "deleted": 0
       },
       "src/pr_post.rs": {
-        "commits": 4,
+        "commits": 5,
         "added": 869,
-        "deleted": 35
+        "deleted": 869
       },
       "src/pr_post/mod.rs": {
         "commits": 2,
@@ -6457,8 +6457,8 @@
         "deleted": 8
       },
       "src/pr_post/target.rs": {
-        "commits": 1,
-        "added": 65,
+        "commits": 2,
+        "added": 474,
         "deleted": 331
       },
       "src/pr_threads.rs": {
@@ -6847,9 +6847,9 @@
         "deleted": 0
       },
       "src/repo/conflict.rs": {
-        "commits": 3,
+        "commits": 4,
         "added": 662,
-        "deleted": 9
+        "deleted": 662
       },
       "src/repo/conflict/align.rs": {
         "commits": 1,
@@ -6922,8 +6922,8 @@
         "deleted": 0
       },
       "src/repo/conflict/mod.rs": {
-        "commits": 9,
-        "added": 528,
+        "commits": 10,
+        "added": 945,
         "deleted": 54
       },
       "src/repo/conflict/original.rs": {
@@ -7832,13 +7832,13 @@
         "deleted": 308
       },
       "src/repo/file_view.rs": {
-        "commits": 2,
+        "commits": 3,
         "added": 412,
-        "deleted": 7
+        "deleted": 412
       },
       "src/repo/file_view/blame.rs": {
-        "commits": 8,
-        "added": 255,
+        "commits": 9,
+        "added": 463,
         "deleted": 222
       },
       "src/repo/file_view/history.rs": {
@@ -7902,14 +7902,14 @@
         "deleted": 0
       },
       "src/repo/fold/banner.rs": {
-        "commits": 1,
+        "commits": 2,
         "added": 44,
-        "deleted": 0
+        "deleted": 44
       },
       "src/repo/fold/list.rs": {
-        "commits": 1,
+        "commits": 2,
         "added": 232,
-        "deleted": 0
+        "deleted": 232
       },
       "src/repo/fold/mod.rs": {
         "commits": 6,
@@ -7922,18 +7922,33 @@
         "deleted": 0
       },
       "src/repo/fold/rules.rs": {
-        "commits": 1,
+        "commits": 2,
         "added": 209,
-        "deleted": 0
+        "deleted": 209
       },
       "src/repo/fold/tests.rs": {
         "commits": 5,
         "added": 1487,
         "deleted": 504
       },
+      "src/repo/folding/banner.rs": {
+        "commits": 1,
+        "added": 44,
+        "deleted": 0
+      },
+      "src/repo/folding/list.rs": {
+        "commits": 1,
+        "added": 232,
+        "deleted": 0
+      },
       "src/repo/folding/mod.rs": {
         "commits": 1,
         "added": 225,
+        "deleted": 0
+      },
+      "src/repo/folding/rules.rs": {
+        "commits": 1,
+        "added": 209,
         "deleted": 0
       },
       "src/repo/folding/tests.rs": {
@@ -9121,40 +9136,15 @@
         "added": 383,
         "deleted": 0
       },
-      "src/repo/{conflict.rs => conflict/mod.rs}": {
-        "commits": 1,
-        "added": 2,
-        "deleted": 238
-      },
-      "src/repo/{file_view.rs => file_view/blame.rs}": {
-        "commits": 1,
-        "added": 6,
-        "deleted": 203
-      },
-      "src/repo/{fold => folding}/banner.rs": {
-        "commits": 1,
-        "added": 0,
-        "deleted": 0
-      },
-      "src/repo/{fold => folding}/list.rs": {
-        "commits": 1,
-        "added": 0,
-        "deleted": 0
-      },
-      "src/repo/{fold => folding}/rules.rs": {
-        "commits": 1,
-        "added": 0,
-        "deleted": 0
-      },
       "src/safe_read.rs": {
         "commits": 1,
         "added": 243,
         "deleted": 0
       },
       "src/settings.rs": {
-        "commits": 17,
+        "commits": 18,
         "added": 529,
-        "deleted": 11
+        "deleted": 529
       },
       "src/settings/agents.rs": {
         "commits": 2,
@@ -9202,8 +9192,8 @@
         "deleted": 2
       },
       "src/settings/mod.rs": {
-        "commits": 28,
-        "added": 1123,
+        "commits": 29,
+        "added": 1551,
         "deleted": 301
       },
       "src/settings/page.rs": {
@@ -9485,16 +9475,6 @@
         "commits": 1,
         "added": 161,
         "deleted": 0
-      },
-      "src/{pr_post.rs => pr_post/target.rs}": {
-        "commits": 1,
-        "added": 75,
-        "deleted": 500
-      },
-      "src/{settings.rs => settings/mod.rs}": {
-        "commits": 1,
-        "added": 12,
-        "deleted": 102
       },
       "tests/checkpoint_cli.rs": {
         "commits": 1,

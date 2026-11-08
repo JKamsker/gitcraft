@@ -7,17 +7,15 @@ and limitations. Never use its size/branch counts as correctness or CI gates.
 
 import argparse
 import collections
-import io
 import json
 import re
 import statistics
 import subprocess
-import tarfile
 from pathlib import Path
 
 
-def git(*args):
-    return subprocess.check_output(["git", *args])
+def git(*args, input=None):
+    return subprocess.check_output(["git", *args], input=input)
 
 
 def mask(source):
@@ -114,18 +112,38 @@ def source_metrics(path, source):
 
 
 def sources_at(revision):
-    archive = git("archive", "--format=tar", revision, "src", "crates")
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        return {
-            entry.name: tar.extractfile(entry).read().decode("utf-8")
-            for entry in tar
-            if entry.isfile() and entry.name.endswith(".rs")
-        }
+    # Read raw blobs, not an archive: export-ignore/export-subst must not change
+    # the source being measured. Object IDs also handle paths with spaces/newlines.
+    entries = []
+    for entry in git("ls-tree", "-rz", "--full-tree", revision, "--", "src", "crates").split(b"\0"):
+        if not entry:
+            continue
+        metadata, path = entry.split(b"\t", 1)
+        mode, kind, oid = metadata.split()
+        if mode in (b"100644", b"100755") and kind == b"blob" and path.endswith(b".rs"):
+            entries.append((oid, path.decode("utf-8")))
+    if not entries:
+        return {}
+    blobs = git("cat-file", "--batch", input=b"\n".join(oid for oid, _ in entries) + b"\n")
+    sources = {}
+    offset = 0
+    for oid, path in entries:
+        end = blobs.index(b"\n", offset)
+        actual, kind, size = blobs[offset:end].split()
+        if actual != oid or kind != b"blob":
+            raise ValueError(f"Unexpected Git object for {path}")
+        offset = end + 1
+        size = int(size)
+        sources[path] = blobs[offset:offset + size].decode("utf-8")
+        offset += size + 1
+    return sources
 
 
 def history(revision, count):
-    log = git("log", "--first-parent", "--diff-merges=first-parent", f"-{count}",
-              "--format=COMMIT %H", "--numstat", revision).decode("utf-8")
+    log = git("-c", "core.quotePath=true", "log", "--first-parent", "--diff-merges=first-parent",
+              "--no-renames", "--diff-algorithm=myers", "--no-ext-diff", "--no-textconv",
+              "--no-show-signature", f"-{count}", "--format=COMMIT %H", "--numstat",
+              revision, "--").decode("utf-8")
     churn = collections.defaultdict(lambda: {"commits": 0, "added": 0, "deleted": 0})
     commits = []
     sizes = []

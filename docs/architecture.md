@@ -22,7 +22,8 @@ The full [baseline](architecture-baseline.json) binds the source and Git history
 to a commit and tree. Running at that revision reproduces the JSON, with no
 timestamps or machine paths. It includes all tracked Rust under `src/` and
 `crates/`: tests, generated-looking source and all conditional branches included.
-Physical LOC includes comments/blank lines. Function length spans `fn` through
+Sources are raw blobs, so export attributes and uncommitted edits do not change
+them; symlinks are excluded. Physical LOC includes comments/blank lines. Function length spans `fn` through
 its closing brace. Large-function/struct lists are size rankings, not findings.
 
 The scanner masks comments (including nested block comments), strings/raw strings
@@ -36,7 +37,11 @@ results in source. There is deliberately no arbitrary LOC/complexity CI gate.
 
 History uses the most recent 207 first-parent commits reachable from the selected
 revision, including merge deltas against the first parent. Each text file gets a
-commit frequency and added/deleted line count. This window differs from a fixed
+commit frequency and added/deleted line count. Rename detection is explicitly
+disabled; Myers diff, no external diff/textconv and quoted paths are pinned so
+ordinary local diff settings do not change the results. Repository attributes
+and Git's version can still affect text/binary classification and diff results;
+keep those comparable for historical trends. This window differs from a fixed
 calendar range, can include older commits, and does not follow renames. A large
 move inflates churn. Frequency and churn indicate investigation targets; they do
 not establish bugs, ownership or feature boundaries. Median text files changed

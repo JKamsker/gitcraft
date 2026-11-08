@@ -1,8 +1,12 @@
 """Small adversarial fixtures for the lexical survey; no third-party dependencies."""
 
 import unittest
+import subprocess
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
-from architecture import mask, named_fields, source_metrics
+from architecture import history, mask, named_fields, source_metrics, sources_at
 
 
 class MetricsTests(unittest.TestCase):
@@ -48,6 +52,59 @@ pub struct State<'a> {
     }>,
     after: bool,
 '''), ["value", "after"])
+
+
+class GitMetricsTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.git("init", "-q")
+        self.git("config", "user.name", "Architecture fixture")
+        self.git("config", "user.email", "fixture@example.invalid")
+        self.git("config", "commit.gpgsign", "false")
+
+    def git(self, *args, input=None):
+        return subprocess.check_output(["git", "-C", str(self.root), *args], input=input)
+
+    def commit(self):
+        self.git("add", ".")
+        self.git("commit", "-qm", "fixture")
+
+    def test_history_pins_rename_algorithm_and_path_quoting(self):
+        path = self.root / "before ü.rs"
+        path.write_text("\n".join(f"line {i}" for i in range(100)) + "\n")
+        self.commit()
+        path.rename(self.root / "after ü.rs")
+        self.commit()
+        with patch("architecture.git", side_effect=self.git):
+            self.git("config", "diff.renames", "true")
+            self.git("config", "diff.algorithm", "histogram")
+            self.git("config", "core.quotePath", "false")
+            before = history("HEAD", 1)
+            self.git("config", "diff.renames", "false")
+            self.git("config", "diff.algorithm", "patience")
+            self.git("config", "core.quotePath", "true")
+            after = history("HEAD", 1)
+        self.assertEqual(before, after)
+        self.assertEqual(len(after["files"]), 2)
+        self.assertEqual(sum(f["added"] for f in after["files"].values()), 100)
+        self.assertEqual(sum(f["deleted"] for f in after["files"].values()), 100)
+
+    def test_sources_are_raw_tracked_blobs_despite_export_attributes(self):
+        src = self.root / "src"
+        src.mkdir()
+        (src / "hidden.rs").write_text("fn hidden() {}\n")
+        (src / "subst.rs").write_text('// $Format:%H$\nfn raw() {}\n')
+        (src / "spaces ü.rs").write_text("fn spaced() {}\n")
+        (self.root / ".gitattributes").write_text("src/hidden.rs export-ignore\nsrc/subst.rs export-subst\n")
+        self.commit()
+        (src / "hidden.rs").write_text("uncommitted replacement")
+        with patch("architecture.git", side_effect=self.git):
+            result = sources_at("HEAD")
+        self.assertEqual(result["src/hidden.rs"], "fn hidden() {}\n")
+        self.assertIn("$Format:%H$", result["src/subst.rs"])
+        self.assertEqual(result["src/spaces ü.rs"], "fn spaced() {}\n")
 
 
 if __name__ == "__main__":
