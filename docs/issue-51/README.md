@@ -81,3 +81,13 @@ The freed coding slot is correcting setup findings and producing a shared endpoi
 Rich-content review rejected `270a8a3b` with eight P2 findings, now dispatched to its active writer; report and bounded reproductions are under `reviews/rich-round1`. Local `act` feature candidate `052721ed` is preserved with reported focused/recording/fake-tool gates and is under a separate independent review. No actual workflow, Docker execution, hosted CI or PR was started.
 
 The exact WIP merge `a20ebf4a` passed all-target locked compilation and formatting. No tests were run for this merge gate; evidence is under `validation/visualization-dev-merge-a20ebf4a`.
+
+## Latest correction checkpoint
+
+Visual R2 cleared its prior scoped findings but identified three followups: agent-filter minimap invalidation, stale before-HEAD celebration, and postcard parent-edge work bounds. Reports are archived under `reviews/visualization-round2`. Parent fixes `4143becd`, `26061b7a` and `4a9a22c8` are preserved; 21 focused tests across their exact commits and the final all-target check passed. Evidence is under `validation/visual-followups-4a9a22c8`. Independent review of the three fixes is running; this is not final combined acceptance.
+
+Fileviews corrected candidate `be013726` (application `10727c7e`) passed scoped UI R2, but core/content R2 still reject it: standalone lock-release replacement race, Linux remote xattr allocation before budget checks, and SVG nested-marker expansion. Complete reports and bounded evidence are under `reviews/fileviews-round2`. These three corrections are queued. The freed coding slot is now addressing the twelve history findings using the shared scoped credential API.
+
+Local Actions R1 rejected `052721ed` with four P2 findings; `reviews/act-round1` contains the report and pure/recording evidence. Its writer is fixing them. Rich-content corrections are preserved at `53832430` and undergoing independent R2. Setup's shared credential API is preserved at `a1b03673` plus `8796fc1d`; its scoped independent review is running while broader setup corrections continue.
+
+The process prerequisite has advanced to writer-preserved `fb569885`, with additional recording and cross-compilation checks only. Blocked protocol writes, pinned retirement and exclusive bisect claims/checked cleanup remain open. Static FAIL and the runtime/full-suite hold remain in force. The seven machines/imports features have not started. No CI or PR has been started.

@@ -1,0 +1,49 @@
+{
+  "verdict": "FAIL",
+  "application_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+  "candidate_commit": "be013726aa51c270bde95cecff727191a603c785",
+  "test_binary_sha256": "21ea31281ac07bd05a85eebbcd437b8be9172a55274e8639f19d18cd3d6c3af2",
+  "focused_test_count": 16,
+  "real_sops_test_count": 1,
+  "real_sops_skipped": false,
+  "safe_marker_depths_executed": [
+    1,
+    4,
+    8
+  ],
+  "max_expanded_paint_nodes_executed": 511,
+  "large_marker_fixture_executed": false,
+  "process_signal_tests_executed": false,
+  "writer_logs_archive_sha256": "380b8faaea9fd7c1fa0a540f77e4cd8de4ee248553788fc875921c303b809234",
+  "tools_sha256": {
+    "sops-v3.13.3.darwin.arm64": "b97c0d434aab577dc40310e8d22ff9e45eef4c80638ab978daae9b4681c59286",
+    "age-keygen": "c16e229245123d0ad27442317461d63915416cad0294395cd19ca93feb3211ea",
+    "age-v1.3.2-darwin-arm64.tar.gz": "e2020b073c44f692685a24d6abc378817eb81ffaaf49fd0531ef8565f767f2f5"
+  },
+  "artifacts": {
+    "/tmp/gitcraft-fileviews-content-r2-source/src/lib.rs": "82935567ad855e5e11a2c2526b6f281086e3c895bfe3c793126356bc16263da5",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/processes.rs": "dc158a4017a7bdda27280700cdedd9ee882c439dd94b41ed550dc9293a2baf5e",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/svg.rs": "de4104e59ef85e5011cc2e96e2f402f25a6d0929ea10d572628902082386bf12",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/app/mod.rs": "421d4414b59cadda871295d6aad33acdd94f828578e806602455f3931afb5a66",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/git/line_log.rs": "b517424f40d7feb4a0225dafcdddfbbc89f07ac31aa648c290127694d4d29a71",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/git/diff.rs": "51fb9c47041298c6018c6ae26c6bd6c9efbfb573ce984c504e70ee80ee9ce6b5",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/git/file_comparison/lens.rs": "cc1b737b7ccd2b1961246b1963a7a2baeb53c8797a9a2f8c7147811d69e94a4f",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/mod.rs": "ecdcc0a50ab185b69b3f16fe97461c024a5ad47f81483b95c58864c83a40932a",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/images.rs": "cf8f70c4323125f9e640d9f60db6747d9f0cf442ae585b12fd3aa14ed0dac40a",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/view.rs": "ec629d2a2a8c66a1d454ef41f227e892f8e73d2445e8e610c518af178889dadd",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/encrypted/tool.rs": "b15d15a13e66593e54942db99bbf3c28b422dc3a20b9d528493912cba700b814",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/encrypted/mod.rs": "71e59345b51a67daab650749fa96f96284ca262347619dc607b7ca002100bd75",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/encrypted/tests.rs": "942937d498807ef62a3b3ba307b3dfa7fa209db9db53992f3f42ed97b21ebd27",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/encrypted/reader.rs": "e5edeac796332d22456884e7d6d5337dc1045776d142fa7c6bf2c14c3d1a72b0",
+    "/tmp/gitcraft-fileviews-content-r2-source/src/repo/diff/encrypted/view.rs": "b081965f152c8fdfb463fbeff0fc7e2f0b206b9cec574088fb4d1a33a0234504",
+    "/tmp/gitcraft-fileviews-content-r2-focused.log": "babc175cc41005807d5c55e92c3a315a989cf769f04e03162ec6445601cf5aef",
+    "/tmp/gitcraft-fileviews-content-r2-focused.json": "d2ec033a64fd26bdae124a4efb5e1f2b7388408638e1c24a1af47b37c0b10cdd",
+    "/tmp/gitcraft-fileviews-content-r2-real-sops.log": "cf67934eca764c3846e75d9fce60003d0e5386d4de2c6058d167641d54200326",
+    "/tmp/gitcraft-fileviews-content-r2-svg-marker.rs": "706e28f0d6e2894ea15d729de3af9f9e418da639b7d091f009105ce2c0648df4",
+    "/tmp/gitcraft-fileviews-content-r2-svg-marker.log": "20d490a40042c48faf8c3067cfd843c5093a5b8f4473112384be020037130f98",
+    "/tmp/gitcraft-fileviews-content-r2-marker-1.svg": "1a9fdc324798dbfd510b05de5cdd7fe966f3d97dfb77cc2aa9221649beaff02d",
+    "/tmp/gitcraft-fileviews-content-r2-marker-4.svg": "e465c5a83732677386ee47ab0c7a5de95440b2923b177d81320288ad0f269900",
+    "/tmp/gitcraft-fileviews-content-r2-marker-8.svg": "52e5dfb13582b76d24047a05abe47a462ee6c7608160b26913675acc04e7d333",
+    "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/usvg-0.45.1/src/parser/marker.rs": "8ed7d80ac3fdb3ba920cfb666289d9d56027fd9acd66815f95a24939d9565b55"
+  }
+}
