@@ -615,7 +615,7 @@ pub(super) fn show(
         .id_salt("review-intent-quarantine")
         .show(ui, |ui| {
             for warning in &s.quarantine {
-                ui.label(crate::repo::messages::display_status(warning));
+                ui.label(crate::repo::messages::display_intent_warning(warning));
             }
         });
     }

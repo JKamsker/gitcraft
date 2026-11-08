@@ -689,6 +689,10 @@ impl RepoTab {
     }
 }
 
+mod review;
+
+type TemplateSpec = (&'static str, &'static str, &'static [(&'static str, bool)]);
+
 /// Localize finite application-owned operation labels at presentation only.
 /// Raw labels remain the identity used by operations, undo, versions and LFS.
 /// Unknown provider/custom labels are opaque and are returned unchanged.
@@ -697,38 +701,49 @@ pub(crate) fn display_operation(label: &str) -> String {
 }
 
 fn operation_display(label: &str, depth: usize) -> String {
-    let shared = crate::operation_labels::display(label);
-    if shared != label {
-        return shared;
+    operation_display_inner(label, depth, true)
+        .or_else(|| operation_display_inner(label, depth, false))
+        .unwrap_or_else(|| label.to_owned())
+}
+
+fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Option<String> {
+    if let Some(rendered) = review::fixed(label) {
+        return Some(rendered);
     }
-    if depth < 4 {
-        for (prefix, id) in [
-            ("Undo ", "interaction-operation-undo"),
-            ("Redo ", "interaction-operation-redo"),
-            ("Preparing ", "interaction-operation-preparing"),
-            ("Push after ", "interaction-operation-push-after"),
-        ] {
-            if let Some(inner) = label.strip_prefix(prefix) {
-                let rendered = operation_display(inner, depth + 1);
-                if rendered != inner {
-                    return crate::i18n::message(id, &[("operation", rendered.into())]);
+    if !review_only {
+        let shared = crate::operation_labels::display(label);
+        if shared != label {
+            return Some(shared);
+        }
+        if depth < 4 {
+            for (prefix, id) in [
+                ("Undo ", "interaction-operation-undo"),
+                ("Redo ", "interaction-operation-redo"),
+                ("Preparing ", "interaction-operation-preparing"),
+                ("Push after ", "interaction-operation-push-after"),
+            ] {
+                if let Some(inner) = label.strip_prefix(prefix) {
+                    let rendered = operation_display(inner, depth + 1);
+                    if rendered != inner {
+                        return Some(crate::i18n::message(id, &[("operation", rendered.into())]));
+                    }
+                    // A custom inner command must stay opaque as an entire wrapper. Do not
+                    // let a more general label/path template reinterpret its first word.
+                    return Some(label.to_owned());
                 }
-                // A custom inner command must stay opaque as an entire wrapper. Do not
-                // let a more general label/path template reinterpret its first word.
-                return label.to_owned();
             }
         }
-    }
-    for (suffix, id) in [
-        (" (here only)", "repo-core-operation-dco-here"),
-        ("", "repo-core-operation-dco"),
-    ] {
-        if let Some(branch) = label
-            .strip_prefix("Sign off the commits of ")
-            .and_then(|v| v.strip_suffix(suffix))
-            && !branch.is_empty()
-        {
-            return crate::i18n::message(id, &[("branch", branch.into())]);
+        for (suffix, id) in [
+            (" (here only)", "repo-core-operation-dco-here"),
+            ("", "repo-core-operation-dco"),
+        ] {
+            if let Some(branch) = label
+                .strip_prefix("Sign off the commits of ")
+                .and_then(|v| v.strip_suffix(suffix))
+                && !branch.is_empty()
+            {
+                return Some(crate::i18n::message(id, &[("branch", branch.into())]));
+            }
         }
     }
     use std::sync::OnceLock;
@@ -739,7 +754,7 @@ fn operation_display(label: &str, depth: usize) -> String {
     }
     static TEMPLATES: OnceLock<Vec<Template>> = OnceLock::new();
     let templates = TEMPLATES.get_or_init(|| {
-        [
+        review::TEMPLATES.iter().copied().chain([
             ("(?s)^Revision\\ appended\\ to\\ \\.git\\-blame\\-ignore\\-revs;\\ staged\\ contents\\ preserved\\.\\ Ordinary\\ Git\\ blame\\ can\\ use\\ blame\\.ignoreRevsFile=\\.git\\-blame\\-ignore\\-revs\\.$", "repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff", &[][..]),
             ("(?s)^Preview\\ ready\\.\\ The\\ exported\\ PNG\\ contains\\ exactly\\ this\\ composition;\\ ellipses\\ mark\\ shortened\\ or\\ width\\-limited\\ text\\.$", "repo-workflows-postcards-poll-postcards-5358001c", &[][..]),
             ("(?s)^The\\ rebase\\ stopped\\ on\\ conflicts:\\ resolve\\ them\\ and\\ continue\\ it,\\ then\\ gitcraft\\ offers\\ to\\ push\\ it\\ \\(or\\ abort\\ it\\)$", "repo-workflows-forks-forks-op-done-9c338e90", &[][..]),
@@ -1086,13 +1101,19 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Pop\\ (.*?)$", "repo-core-3512", &[("name", false)][..]),
             ("(?s)^(Move|Squash|Fixup)\\ (.*?)\\ (above|below|into)\\ (.*?)$", "repo-core-2447", &[("verb", false), ("hash", false), ("word", false), ("target", false)][..]),
             ("(?s)^(.*?)\\ (.*?)$", "repo-core-2999", &[("label", false), ("path", false)][..]),
-        ].into_iter().map(|(pattern, id, args)| Template {
-            pattern: regex::Regex::new(pattern).expect("fixed operation label pattern"),
-            id, args,
+        ]).map(|(pattern, id, args)| {
+            // Invalid source-owned patterns are bugs, never an opaque-diagnostic fallback.
+            // The exhaustive pure map test initializes every pattern in both locales.
+            #[expect(clippy::expect_used, reason = "fixed source-owned regexes must fail loudly if malformed")]
+            let pattern = regex::Regex::new(pattern).expect("fixed operation label pattern");
+            Template { pattern, id, args }
         }).collect()
     });
     if depth < 4 {
         for template in templates {
+            if review_only && !template.id.starts_with("repo-workflows-review-") {
+                continue;
+            }
             let Some(captures) = template.pattern.captures(label) else {
                 continue;
             };
@@ -1195,10 +1216,10 @@ fn operation_display(label: &str, depth: usize) -> String {
                     (*name, value)
                 })
                 .collect();
-            return crate::i18n::message(template.id, &args);
+            return Some(crate::i18n::message(template.id, &args));
         }
     }
-    label.to_owned()
+    None
 }
 /// Present a status without changing its stored operation/status identity.
 pub(crate) fn display_status(status: &str) -> String {
@@ -1417,4 +1438,17 @@ mod fluent_presentation_tests {
         crate::i18n::set_language("en-US");
         assert_eq!(display_status(crate::git::CANCELLED), crate::git::CANCELLED);
     }
+}
+
+/// Paint source-owned Rust dependency reports without interpreting arbitrary operations.
+pub(crate) fn display_review_dependency(raw: &str) -> String {
+    review::dependency(raw)
+}
+/// Paint the intent collector's quarantine envelope; refs and unknown details stay opaque.
+pub(crate) fn display_intent_warning(raw: &str) -> String {
+    review::intent_warning(raw)
+}
+
+fn review_owned(raw: &str) -> String {
+    operation_display_inner(raw, 0, true).unwrap_or_else(|| raw.to_owned())
 }
