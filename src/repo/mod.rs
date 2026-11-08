@@ -334,6 +334,7 @@ pub struct RepoTab {
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
     https_generation: u64,
+    https_checking: bool,
     https_challenge: Option<https_recovery::Ticket>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
@@ -631,6 +632,7 @@ impl RepoTab {
             connection_context: crate::connections::current(),
             last_op: None,
             https_generation: 0,
+            https_checking: false,
             https_challenge: None,
             error_card: None,
             avatars_hinted: false,

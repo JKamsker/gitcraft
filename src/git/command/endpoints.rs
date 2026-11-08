@@ -87,10 +87,10 @@ impl AuthFailure {
                         .contains("authentication required")
                 })
                 .and_then(|v| v.split_whitespace().next());
-            if let Some(url) = quoted.or(lfs).and_then(safe_http_url) {
-                if !reported.contains(&url) {
-                    reported.push(url);
-                }
+            if let Some(url) = quoted.or(lfs).and_then(safe_http_url)
+                && !reported.contains(&url)
+            {
+                reported.push(url);
             }
         }
         let confirmed = reported.len() == 1;

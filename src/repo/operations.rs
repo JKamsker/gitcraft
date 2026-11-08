@@ -191,6 +191,12 @@ impl RepoTab {
             .as_ref()
             .filter(|ticket| self.https_ticket_current(ticket))
             .and_then(|ticket| ticket.binding.clone());
+        let Some(binding) = binding else {
+            self.invalidate_https_challenge();
+            self.status=Some(("This sign-in has no verified operation route. Run the operation again before switching accounts.".into(),true));
+            return;
+        };
+        let binding = Some(binding);
         let path = self.path.clone();
         self.forget_https_memory(&path, &url);
         crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
@@ -235,14 +241,26 @@ impl RepoTab {
             self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
             return;
         }
-        let ticket = challenge.expect("validated challenge");
-        let binding = ticket.binding.clone();
+        let Some(ticket) = challenge else {
+            return;
+        };
+        let Some(binding) = ticket.binding.clone() else {
+            self.invalidate_https_challenge();
+            self.status = Some((
+                "This sign-in has no verified destination snapshot. Run the operation again."
+                    .into(),
+                true,
+            ));
+            return;
+        };
+        self.https_checking = true;
+        self.status = Some(("Checking the sign-in destination…".into(), false));
         let path = self.path.clone();
         self.then_or(
             ctx,
             true,
             Err,
-            move || binding.as_ref().map_or(Ok(()), |b| b.verify(&path)),
+            move || binding.verify(&path),
             move |tab, result, ctx| {
                 if !tab.https_ticket_current(&ticket) {
                     tab.status = Some((
@@ -251,6 +269,7 @@ impl RepoTab {
                     ));
                     return;
                 }
+                tab.https_checking = false;
                 if let Err(error) = result {
                     tab.invalidate_https_challenge();
                     tab.status = Some((error, true));
@@ -490,7 +509,15 @@ fn run_step(
         return Err(git::CANCELLED.to_owned());
     }
     let binding = if git::goes_over_network(args) {
-        git::RouteBinding::capture(path, args).ok()
+        match git::RouteBinding::capture(path, args) {
+            Ok(binding) => Some(binding),
+            Err(error) => {
+                return Err(format!(
+                    "Could not verify the network operation's destinations; command not started: {}",
+                    crate::diagnostics::crash::scrub(&error)
+                ));
+            }
+        }
     } else {
         None
     };

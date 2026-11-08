@@ -36,38 +36,21 @@ pub(crate) fn credential_command_policy(
             }
         }
     }
-    if let Some(dir) = dir {
-        for url in operation_endpoints(dir, args)? {
-            if let Some((_, rest)) = url.split_once("://")
-                && let Some(authority) = rest.split('/').next()
-                && let Some((userinfo, _)) = authority.rsplit_once('@')
-            {
-                // A URL-supplied password bypasses helper selection entirely.
-                crate::git::CredentialScope::for_url(&url, &credentials.username)?;
-                if userinfo.contains(':') {
-                    return Err(
-                        "Remove embedded remote credentials before using explicit sign-in".into(),
-                    );
-                }
-            }
+    let mut environment = credentials.helper_environment()?;
+    if !dir.is_some_and(remote::is_remote) {
+        let selected = git_cmd().get_program().to_owned();
+        if !Path::new(&selected).is_absolute() {
+            return Err("Could not pin the selected Git executable for explicit sign-in".into());
         }
+        environment.push((
+            "GITCRAFT_GIT_ORIGINAL",
+            selected.to_string_lossy().into_owned(),
+        ));
     }
-    let environment = credentials.helper_environment()?;
-    let keys = connection_read(
-        dir.unwrap_or_else(|| Path::new(".")),
-        &[
-            "config",
-            "--null",
-            "--name-only",
-            "--get-regexp",
-            "^(credential|http)\\.",
-        ],
-    )?;
-    policy_for_keys(
-        credentials,
-        environment,
-        keys.split('\0').filter(|k| !k.is_empty()),
-    )
+    // The owning runner may carry private, command-only remote configuration.
+    // Do not resolve its alias or inspect a different config here. Actual URL
+    // policy is installed by the designated transport at the point of launch.
+    policy_for_keys(credentials, environment, std::iter::empty())
 }
 fn policy_for_keys<'a>(
     credentials: &Credentials,
@@ -103,7 +86,7 @@ fn policy_for_keys<'a>(
                     "{key}={}",
                     CREDENTIAL_HELPER
                         .strip_prefix("credential.helper=")
-                        .expect("fixed helper")
+                        .ok_or("Invalid built-in credential helper definition")?
                 ));
             }
         }
@@ -114,39 +97,51 @@ fn policy_for_keys<'a>(
     arguments.push("gitcraft-credential-transport".into());
     let mut environment = environment;
     environment.push(("GITCRAFT_HTTP_WRAPPER", TRANSPORT_WRAPPER.into()));
+    environment.push(("GITCRAFT_HTTP_NATIVE_ALIAS", NATIVE_HTTP_ALIAS.into()));
+    environment.push(("GITCRAFT_HTTP_HELPER", CREDENTIAL_HELPER.into()));
     Ok(CredentialCommandPolicy {
         arguments,
         environment,
     })
 }
+/// Prefix for custom remote runners using this policy. Resolve on that machine,
+/// before launching the outer Git; never substitute this computer's executable.
+pub(crate) const CREDENTIAL_REMOTE_PIN: &str = "GITCRAFT_GIT_ORIGINAL=$(command -v git) || exit 126\ncase \"$GITCRAFT_GIT_ORIGINAL\" in /*) ;; *) exit 126;; esac\nexport GITCRAFT_GIT_ORIGINAL\n";
 /// Executed on the repository machine by that machine's Git/sh. Only these
 /// native HTTP executables can mint an owner. Standard Git waits for its HTTP
 /// helpers before returning; the private artifact lifetime covers that wait.
 /// Detached user programs deliberately reading/minting credentials are trusted
 /// code, outside this consumer policy. No PID search or signal is involved.
+const NATIVE_HTTP_ALIAS: &str = "alias.gitcraft-http-native=!f() { GITCRAFT_CREDENTIAL_OWNER=$$; export GITCRAFT_CREDENTIAL_OWNER; exec \"$GITCRAFT_PINNED_HTTP\" \"$@\"; }; f";
 const TRANSPORT_WRAPPER: &str = concat!(
     "#!/bin/sh\n",
-    "case \"$0\" in */git-remote-http) transport=$GITCRAFT_HTTP_ORIGINAL;; */git-remote-https) transport=$GITCRAFT_HTTPS_ORIGINAL;; *) exit 126;; esac\n",
-    "case \"$transport\" in /*) ;; *) exit 126;; esac\n",
-    "GITCRAFT_CREDENTIAL_OWNER=$$; export GITCRAFT_CREDENTIAL_OWNER\n",
-    "exec \"$transport\" \"$@\"\n"
+    "case \"$0\" in */git-remote-http) GITCRAFT_PINNED_HTTP=$GITCRAFT_HTTP_ORIGINAL;; */git-remote-https) GITCRAFT_PINNED_HTTP=$GITCRAFT_HTTPS_ORIGINAL;; *) exit 126;; esac\n",
+    "case \"$GITCRAFT_PINNED_HTTP\" in /*) ;; *) exit 126;; esac\n",
+    "test \"$#\" -ge 2 || exit 126\nurl=$2\ncase \"$url\" in http://*|https://*) ;; *) exit 126;; esac\n",
+    "authority=${url#*://}; authority=${authority%%/*}\ncase \"$authority\" in *@*) printf '%s\\n' 'Use a credential-free remote URL with explicit sign-in' >&2; exit 126;; esac\n",
+    // remote-curl::end_url_with_slash feeds precisely this URL to http_init.
+    // An exact actual-URL key is maximally specific even for new includeIf/config.
+    "case \"$url\" in */) ;; *) url=$url/;; esac\n",
+    "helper=${GITCRAFT_HTTP_HELPER#credential.helper=}\nexport GITCRAFT_PINNED_HTTP\n",
+    "exec \"$GITCRAFT_GIT_ORIGINAL\" -c \"http.$url.followRedirects=false\" -c \"credential.$url.helper=\" -c \"credential.$url.helper=$helper\" -c \"credential.$url.username=$GITCRAFT_GIT_USERNAME\" -c \"credential.$url.useHttpPath=true\" -c \"http.$url.extraHeader=\" -c \"$GITCRAFT_HTTP_NATIVE_ALIAS\" gitcraft-http-native \"$@\"\n"
 );
 const TRANSPORT_ALIAS: &str = concat!(
     "alias.gitcraft-credential-transport=!f() { ",
     "unset GITCRAFT_CREDENTIAL_OWNER; ",
     "if test -n \"$GIT_PREFIX\"; then cd \"$GIT_PREFIX\" || return 126; fi; ",
-    "unset GIT_EXEC_PATH; original=$(git --exec-path) || return 126; ",
+    "unset GIT_EXEC_PATH; case \"$GITCRAFT_GIT_ORIGINAL\" in /*) ;; *) printf '%s\\n' 'Selected Git executable was not pinned' >&2; return 126;; esac; export GITCRAFT_GIT_ORIGINAL; ",
+    "original=$(\"$GITCRAFT_GIT_ORIGINAL\" --exec-path) || return 126; ",
     "case \"$original\" in /*) ;; *) printf '%s\\n' 'Credential transport needs an absolute original Git exec-path' >&2; return 126;; esac; ",
     "GITCRAFT_HTTP_ORIGINAL=$original/git-remote-http; GITCRAFT_HTTPS_ORIGINAL=$original/git-remote-https; ",
     "test -x \"$GITCRAFT_HTTP_ORIGINAL\" && test -x \"$GITCRAFT_HTTPS_ORIGINAL\" || return 126; ",
     "export GITCRAFT_HTTP_ORIGINAL GITCRAFT_HTTPS_ORIGINAL; ",
-    "umask 077; owned=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-credential-XXXXXXXX\") || return 126; ",
-    "cleanup() { test -d \"$owned\" && test ! -L \"$owned\" || return; rm -f -- \"$owned/git-remote-http\" \"$owned/git-remote-https\"; rmdir -- \"$owned\"; }; ",
+    "launch_dir=$PWD; umask 077; owned=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-credential-XXXXXXXX\") || return 126; cd \"$owned\" || return 126; owned=$PWD; ",
+    "cleanup() { rm -f -- ./git-remote-http ./git-remote-https; if test \"$owned\" -ef .; then rmdir -- \"$owned\"; fi; }; ",
     "trap cleanup EXIT; ",
-    "(set -C; printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > \"$owned/git-remote-http\" && printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > \"$owned/git-remote-https\") || return 126; ",
-    "chmod 700 \"$owned/git-remote-http\" \"$owned/git-remote-https\" || return 126; ",
+    "(set -C; printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > ./git-remote-http && printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > ./git-remote-https) || return 126; ",
+    "chmod 700 ./git-remote-http ./git-remote-https || return 126; ",
     "GIT_EXEC_PATH=$owned; PATH=$original:$PATH; export GIT_EXEC_PATH PATH; ",
-    "git \"$@\"; result=$?; return \"$result\"; }; f"
+    "\"$GITCRAFT_GIT_ORIGINAL\" -C \"$launch_dir\" \"$@\"; result=$?; return \"$result\"; }; f"
 );
 #[cfg(test)]
 mod tests {
@@ -154,12 +149,19 @@ mod tests {
     #[test]
     fn transport_artifacts_and_consumer_chain_are_explicit_without_process_searches() {
         assert!(TRANSPORT_ALIAS.contains("unset GITCRAFT_CREDENTIAL_OWNER"));
-        assert!(TRANSPORT_ALIAS.contains("unset GIT_EXEC_PATH; original=$(git --exec-path)"));
+        assert!(TRANSPORT_ALIAS.contains("Selected Git executable was not pinned"));
+        assert!(CREDENTIAL_REMOTE_PIN.contains("command -v git"));
         assert!(TRANSPORT_ALIAS.contains("mktemp -d"));
         assert!(TRANSPORT_ALIAS.contains("set -C"));
-        assert!(TRANSPORT_ALIAS.contains("git \"$@\"; result=$?"));
-        assert!(TRANSPORT_WRAPPER.contains("GITCRAFT_CREDENTIAL_OWNER=$$"));
-        assert!(TRANSPORT_WRAPPER.contains("exec \"$transport\" \"$@\""));
+        assert!(
+            TRANSPORT_ALIAS
+                .contains("\"$GITCRAFT_GIT_ORIGINAL\" -C \"$launch_dir\" \"$@\"; result=$?")
+        );
+        assert!(NATIVE_HTTP_ALIAS.contains("GITCRAFT_CREDENTIAL_OWNER=$$"));
+        assert!(NATIVE_HTTP_ALIAS.contains("exec \"$GITCRAFT_PINNED_HTTP\" \"$@\""));
+        assert!(TRANSPORT_WRAPPER.contains("http.$url.followRedirects=false"));
+        assert!(TRANSPORT_WRAPPER.contains("credential.$url.helper="));
+        assert!(TRANSPORT_WRAPPER.contains("credential.$url.username=$GITCRAFT_GIT_USERNAME"));
         assert!(CREDENTIAL_HELPER.contains("$PPID"));
         for forbidden in ["ps ", "pgrep", "pkill", "kill ", "rm -rf"] {
             assert!(!TRANSPORT_ALIAS.contains(forbidden));

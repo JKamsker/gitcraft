@@ -204,14 +204,22 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = repository_command(dir, args);
+    if extra
+        .owned_pre
+        .iter()
+        .any(|arg| arg == "gitcraft-credential-transport")
+    {
+        let selected = cmd.get_program().to_owned();
+        cmd.env("GITCRAFT_GIT_ORIGINAL", selected);
+    }
     cmd.args(&extra.pre).args(&extra.owned_pre);
+    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
+        normalize_connection_command(&mut cmd, args);
+    }
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
     cmd.args(args);
-    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
-        normalize_connection_command(&mut cmd, args);
-    }
     cmd
 }
 
@@ -254,10 +262,23 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         .chain(args.iter().copied())
         .map(remote::sh_quote)
         .collect();
-    let script = if extra.trace_hooks {
-        super::hooks::traced_script(&words.join(" "))
+    let credential_transport = extra
+        .owned_pre
+        .iter()
+        .any(|arg| arg == "gitcraft-credential-transport");
+    let pin = if credential_transport {
+        CREDENTIAL_REMOTE_PIN
     } else {
-        format!("exec git {}", words.join(" "))
+        ""
+    };
+    let script = if extra.trace_hooks {
+        format!("{pin}{}", super::hooks::traced_script(&words.join(" ")))
+    } else {
+        if credential_transport {
+            format!("{pin}exec \"$GITCRAFT_GIT_ORIGINAL\" {}", words.join(" "))
+        } else {
+            format!("exec git {}", words.join(" "))
+        }
     };
     remote::Request {
         cwd: Some(target.path.clone()),
@@ -825,6 +846,7 @@ fn extra_for(
         Extra::default()
     };
     if let Some(c) = creds {
+        extra.normalize_repository = true;
         let policy = credential_command_policy(dir, c, args)?;
         extra.owned_pre.extend(policy.arguments);
         extra.env.extend(policy.environment);
@@ -855,6 +877,7 @@ fn run_extra(
     let credentials = extra_for(dir, args, creds, false)?;
     extra.pre.extend(credentials.pre);
     extra.owned_pre.extend(credentials.owned_pre);
+    extra.normalize_repository |= credentials.normalize_repository;
     extra.env.extend(credentials.env);
     finish(execute(dir, &extra, args)?, args, ok)
 }
@@ -1229,108 +1252,22 @@ mod tests {
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
     #[test]
-    fn credentials_reach_git_as_typed() -> Result<(), String> {
+    fn credentials_preserve_typed_fields_without_authorizing_helper_only_use() -> Result<(), String>
+    {
         let (user, pass) = ("CORP\\nancy", "p\\c%s$x 'q\"");
-        let mut child = git_cmd()
-            // Only this helper: the user's own would answer first.
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_CREDENTIAL_PROTOCOL", "https")
-            .env("GITCRAFT_CREDENTIAL_HOST", "example.invalid:443")
-            .env("GITCRAFT_CREDENTIAL_DEFAULT_HOST", "example.invalid")
-            .env("GITCRAFT_CREDENTIAL_PATH", "")
-            .env("GITCRAFT_GIT_USERNAME", user)
-            .env("GITCRAFT_GIT_PASSWORD", pass)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
+        let credentials =
+            Credentials::for_url("https://example.invalid/", user.into(), pass.into())?;
+        let environment = credentials.helper_environment()?;
+        assert!(environment.contains(&("GITCRAFT_GIT_USERNAME", user.into())));
+        assert!(environment.contains(&("GITCRAFT_GIT_PASSWORD", pass.into())));
         assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
+            !environment
+                .iter()
+                .any(|(key, _)| *key == "GITCRAFT_CREDENTIAL_OWNER")
         );
-        assert!(text.contains(&format!("username={user}\n")), "{text}");
-        assert!(text.contains(&format!("password={pass}\n")), "{text}");
         Ok(())
     }
 
-    #[cfg(unix)]
-    fn scratch(name: &str) -> Result<std::path::PathBuf, String> {
-        let dir = std::env::temp_dir().join(format!("gitcraft-cmd-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        Ok(dir)
-    }
-
-    /// A script that leaves `marker` behind when run, then prints `x` (an askpass answer).
-    #[cfg(unix)]
-    fn marking_script(dir: &Path, marker: &Path) -> Result<std::path::PathBuf, String> {
-        use std::os::unix::fs::PermissionsExt;
-        let script = dir.join("askpass.sh");
-        std::fs::write(
-            &script,
-            format!("#!/bin/sh\ntouch '{}'\necho x\n", marker.display()),
-        )
-        .map_err(|e| e.to_string())?;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| e.to_string())?;
-        Ok(script)
-    }
-
-    /// Whether git, asked for a credential (quietly or not) in an environment that sets
-    /// `SSH_ASKPASS` (KDE's opens a window) and maybe `GIT_ASKPASS` (VS Code's terminal), ran
-    /// the askpass program.
-    #[cfg(unix)]
-    fn askpass_asked(dir: &Path, quiet: bool, git_askpass: bool) -> Result<bool, String> {
-        let marker = dir.join("asked");
-        let _ = std::fs::remove_file(&marker);
-        let script = marking_script(dir, &marker)?;
-        let mut cmd = git_cmd();
-        // Not the user's own config, whose `core.askPass` would stand in for the script.
-        cmd.env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null");
-        // What the app inherited, which `unattended` then has to override.
-        cmd.env("SSH_ASKPASS", &script);
-        if git_askpass {
-            cmd.env("GIT_ASKPASS", &script);
-        } else {
-            cmd.env_remove("GIT_ASKPASS");
-        }
-        if quiet {
-            unattended(&mut cmd);
-        }
-        let mut child = cmd
-            .args(["-c", "credential.helper=", "credential", "fill"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(b"protocol=https\nhost=example.invalid\n\n");
-        }
-        child.wait().map_err(|e| e.to_string())?;
-        Ok(marker.exists())
-    }
-
-    /// The background fetch asks nobody to sign in, every few minutes, through a window: not
-    /// even with a `GIT_ASKPASS` in the environment, which git reads before `core.askPass`.
-    #[cfg(unix)]
     #[test]
     fn a_quiet_operation_opens_no_sign_in_window() -> Result<(), String> {
         let dir = scratch("unattended")?;
@@ -1377,44 +1314,32 @@ mod tests {
     }
 
     /// Credentials typed into the tab still answer a quiet operation.
+    #[cfg(unix)]
     #[test]
-    fn typed_credentials_answer_a_quiet_operation() -> Result<(), String> {
-        let mut cmd = git_cmd();
-        unattended(&mut cmd);
-        let mut child = cmd
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_CREDENTIAL_PROTOCOL", "https")
-            .env("GITCRAFT_CREDENTIAL_HOST", "example.invalid:443")
-            .env("GITCRAFT_CREDENTIAL_DEFAULT_HOST", "example.invalid")
-            .env("GITCRAFT_CREDENTIAL_PATH", "")
-            .env("GITCRAFT_GIT_USERNAME", "nancy")
-            .env("GITCRAFT_GIT_PASSWORD", "secret")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
+    fn quiet_transient_credentials_use_the_shared_transport_policy() -> Result<(), String> {
+        let credentials = Credentials::for_url(
+            "https://example.invalid/",
+            "nancy".into(),
+            "DUMMY_SECRET".into(),
+        )?;
+        let extra = extra_for(None, &["fetch", "origin"], Some(&credentials), true)?;
+        assert!(extra.normalize_repository);
+        assert_eq!(
+            extra.owned_pre.last().map(String::as_str),
+            Some("gitcraft-credential-transport")
         );
-        assert!(text.contains("username=nancy\n"), "{text}");
-        assert!(text.contains("password=secret\n"), "{text}");
+        assert!(
+            extra
+                .env
+                .contains(&("GITCRAFT_GIT_PASSWORD", "DUMMY_SECRET".into()))
+        );
+        assert!(!extra.owned_pre.join(" ").contains("DUMMY_SECRET"));
+        assert!(
+            !extra
+                .env
+                .iter()
+                .any(|(key, _)| *key == "GITCRAFT_CREDENTIAL_OWNER")
+        );
         Ok(())
     }
 

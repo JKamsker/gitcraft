@@ -33,6 +33,7 @@ impl RepoTab {
     pub(super) fn invalidate_https_challenge(&mut self) {
         self.https_generation = self.https_generation.wrapping_add(1);
         self.https_challenge = None;
+        self.https_checking = false;
         if matches!(self.dialog, Some(Dialog::Credentials { .. })) {
             self.dialog = None;
         }
@@ -46,6 +47,11 @@ impl RepoTab {
             || failure.context != crate::connections::current()
         {
             self.status = Some(("The operation used a previous connection. Run it again with the current profile before signing in.".into(), true));
+            return;
+        }
+        if failure.binding.is_none() {
+            self.invalidate_https_challenge();
+            self.status=Some(("The failed operation has no verified destination snapshot. Run it again before signing in; LFS or hook sign-ins require their own explicitly selected account.".into(),true));
             return;
         }
         if failure.endpoints.is_empty() {

@@ -527,7 +527,7 @@ fn finish(tab: &mut super::RepoTab, ctx: &egui::Context) {
 /// it are done, and running them again (the tag made again) would fail before the step that
 /// needed signing in.
 #[test]
-fn signing_in_runs_again_only_the_steps_that_had_not_run() {
+fn signing_in_runs_again_only_the_steps_that_had_not_run() -> Result<(), String> {
     use super::{Action, Refresh, RepoTab};
     let dir = repo("sign-in-retry");
     let ctx = egui::Context::default();
@@ -554,8 +554,7 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     let kept = tab.last_op.as_ref().map(|op| op.ops.clone());
     let creds =
-        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())
-            .expect("scoped dummy credentials");
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     finish(&mut tab, &ctx);
     let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
@@ -564,6 +563,7 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     assert_eq!(kept, Some(push));
     // The push ran again (and needs signing in again), not the tag.
     assert!(status.contains("sign-in needed"), "{status}");
+    Ok(())
 }
 
 /// Aborting a merge or rebase throws away the conflicts resolved so far, with no undo: it asks
@@ -581,7 +581,7 @@ fn aborting_asks_first() {
 /// An undo that needed signing in stays undoable when the sign-in is cancelled, and signing in
 /// runs it again without moving the timeline until it goes through.
 #[test]
-fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
+fn an_undo_whose_sign_in_is_cancelled_stays_undoable() -> Result<(), String> {
     use super::timeline::{Entry, Origin, RefState};
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
@@ -630,8 +630,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     tab.dialog = None;
     let after_cancel = tab.timeline.current;
     let creds =
-        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())
-            .expect("scoped dummy credentials");
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     let retrying = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
@@ -645,6 +644,7 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     // Refused again: still there, still only once.
     assert_eq!(after_retry, Some(id));
     assert_eq!(entries, 1);
+    Ok(())
 }
 
 /// Work that panics (a bug in a dependency) still ends: the tab isn't left busy for good.

@@ -351,7 +351,7 @@ fn classify(success: bool, trace: &str, tls: bool, elapsed: std::time::Duration)
             } else {
                 "completed through the configured transport"
             }
-        } else if completed[i] && !failure.is_some_and(|(step, _)| i == step) {
+        } else if completed[i] && failure.is_none_or(|(step, _)| i != step) {
             "completed earlier in this trace"
         } else if failure.is_some_and(|(step, _)| i < step) {
             "completed before the failure"
