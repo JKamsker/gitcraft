@@ -238,8 +238,8 @@ fn helper_lines(value: &str) -> Vec<String> {
     lines
 }
 /// Render only known app-owned diagnostic prose; external/raw data remains opaque.
-fn display_line(raw: &str) -> &str {
-    match raw {
+fn display_line(raw: &str) -> String {
+    let translated = match raw {
         "This LFS/secondary sign-in is separate from the failed Git operation. Inspect or forget only the endpoint you explicitly select here, select its account in Profile connections or your credential manager, then run the operation again. No automatic retry was authorized." => {
             crate::i18n::text("interaction-accounts-secondary")
         }
@@ -262,8 +262,9 @@ fn display_line(raw: &str) -> &str {
             crate::i18n::text("interaction-accounts-custom-helper")
         }
         "none configured" => crate::i18n::text("interaction-accounts-none-configured"),
-        _ => raw,
-    }
+        _ => return doctor::display_line(raw),
+    };
+    translated.to_owned()
 }
 #[cfg(test)]
 mod tests {
@@ -278,6 +279,8 @@ mod tests {
             lines: vec![
                 "Check cancelled".into(),
                 "external diagnostic 日本語".into(),
+                "TLS chain: NOT verified — certificate verification is disabled in Git's configuration or environment".into(),
+                "ls-remote: failed in 2.34 s".into(),
             ],
             ..State::default()
         }));
@@ -298,6 +301,8 @@ mod tests {
         h.get_by_value("Repository auswählen");
         h.get_by_label("Prüfung abgebrochen");
         h.get_by_label("external diagnostic 日本語");
+        h.get_by_label("TLS-Zertifikatskette: NICHT geprüft — die Zertifikatsprüfung ist in der Git-Konfiguration oder -Umgebung deaktiviert");
+        h.get_by_label("ls-remote: nach 2,34 s fehlgeschlagen");
         assert_eq!(recorded.lock().unwrap().lines[0], "Check cancelled");
         assert!(recorded.lock().unwrap().job.is_none());
         let raw_helpers = helper_lines("manager\n!echo secret");
@@ -313,6 +318,12 @@ mod tests {
         h.step();
         h.get_by_label("Check cancelled");
         assert_eq!(recorded.lock().unwrap().lines[0], "Check cancelled");
+        h.get_by_label("TLS chain: NOT verified — certificate verification is disabled in Git's configuration or environment");
+        h.get_by_label("ls-remote: failed in 2.34 s");
+        assert_eq!(
+            recorded.lock().unwrap().lines[3],
+            "ls-remote: failed in 2.34 s"
+        );
     }
 
     #[test]
