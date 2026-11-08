@@ -216,6 +216,7 @@ fn os_name() -> Option<String> {
 }
 
 /// `PRETTY_NAME` of an os-release file, unquoted.
+#[cfg(any(target_os = "linux", test))]
 pub fn pretty_name(text: &str) -> Option<String> {
     text.lines()
         .find_map(|l| l.strip_prefix("PRETTY_NAME="))

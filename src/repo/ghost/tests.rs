@@ -14,19 +14,21 @@ fn recording_ending_timeline_hover_cancels_only_its_owned_read_scope() {
     let parent = crate::tasks::Cancellation::default();
     let token = parent.child();
     let stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut ghost = super::Ghost::default();
-    ghost.job = Some(super::Job {
-        id: 1,
-        key: super::Key {
-            op: GhostOp::Timeline {
-                state: Default::default(),
-                label: "fixture".into(),
+    let mut ghost = super::Ghost {
+        job: Some(super::Job {
+            id: 1,
+            key: super::Key {
+                op: GhostOp::Timeline {
+                    state: Default::default(),
+                    label: "fixture".into(),
+                },
+                refs: 0,
             },
-            refs: 0,
-        },
-        cancel: stopped.clone(),
-        _scope: crate::tasks::Scope(token.clone()),
-    });
+            cancel: stopped.clone(),
+            _scope: crate::tasks::Scope(token.clone()),
+        }),
+        ..Default::default()
+    };
     ghost.end();
     assert!(token.is_cancelled());
     assert!(!parent.is_cancelled());

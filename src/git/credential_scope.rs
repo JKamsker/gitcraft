@@ -124,6 +124,10 @@ impl CredentialScope {
     pub fn matches_url(&self, url: &str) -> bool {
         Self::for_url(url, &self.account).is_ok_and(|other| other == *self)
     }
+    #[expect(
+        dead_code,
+        reason = "Retained scope label API; labels must not reconstruct a transport URL"
+    )]
     pub fn endpoint(&self) -> String {
         // Labels are not a way to rebuild a transport URL (path is decoded).
         format!("{}://{}/{}", self.protocol, self.authority, self.path)
@@ -131,6 +135,7 @@ impl CredentialScope {
     pub(crate) fn is_https(&self) -> bool {
         self.protocol == "https"
     }
+    #[expect(dead_code, reason = "Retained explicit-account scope inspection API")]
     pub fn account(&self) -> &str {
         &self.account
     }

@@ -42,7 +42,6 @@ pub use session::LOOPBACK;
 pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder};
 pub(crate) use session::{
     Streaming, streaming_command, streaming_command_authority, streaming_command_bounded,
-    streaming_command_record,
 };
 
 /// Authenticate a persisted owner without accepting a process number as authority.

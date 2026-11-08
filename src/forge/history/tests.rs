@@ -221,14 +221,15 @@ fn gitea_and_forgejo_old_side_never_reuse_the_review_head() {
     assert_eq!(p.comments[0].body, "deleted old line");
 }
 #[test]
-fn github_left_side_uses_verified_merge_base_after_the_base_branch_advances() {
+fn github_left_side_uses_verified_merge_base_after_the_base_branch_advances() -> Result<(), String>
+{
     let mut q = query();
     let head = "c".repeat(40);
     let base = "d".repeat(40);
     let old = "e".repeat(40);
     let pr = json!({"head":{"sha":head},"base":{"sha":base}});
     let comparison = json!({"base_commit":{"sha":base},"merge_base_commit":{"sha":old},"status":"diverged","ahead_by":3});
-    let left = github_merge_base(&comparison, &base).unwrap();
+    let left = github_merge_base(&comparison, &base).ok_or("missing merge base")?;
     let comment =
         json!({"path":q.at.path,"side":"LEFT","commit_id":head,"line":7,"body":"deleted old line"});
     q.at.commit = base.clone();
@@ -268,6 +269,7 @@ fn github_left_side_uses_verified_merge_base_after_the_base_branch_advances() {
     ] {
         assert!(github_merge_base(&invalid, &base).is_none());
     }
+    Ok(())
 }
 #[test]
 fn github_lookup_requests_a_pinned_comparison_and_keeps_failed_left_proofs_partial()

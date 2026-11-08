@@ -504,7 +504,12 @@ edition="2021"
         state.accept(1, &original, Ok((Some(generated.clone()), None)));
         assert_eq!(state.case.source, "handwritten test");
         assert_eq!(state.case.objection, "edited objection");
-        assert!(!state.generated.as_ref().expect("separate result").approved);
+        assert!(
+            state
+                .generated
+                .as_ref()
+                .is_some_and(|result| !result.approved)
+        );
         state.request = 2;
         state.case.approved = false;
         state.accept(1, &original, Ok((Some(generated.clone()), None)));
