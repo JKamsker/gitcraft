@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+#[path = "owned_runtime_environment.rs"]
+mod environment;
+
 const MODE: &str = "GITCRAFT_FINITE_FIXTURE_MODE";
 const DIRECTORY: &str = "GITCRAFT_FINITE_FIXTURE_DIRECTORY";
 const HELPER: &str = "remote::native_owner::tests::helper_entrypoint";
@@ -119,6 +122,10 @@ impl Drop for Leaf {
 
 /// Called by the existing exact helper dispatcher, never a standalone validating test.
 pub(super) fn dispatch() -> Result<bool, String> {
+    if environment::is_snapshot() {
+        environment::snapshot().map_err(|e| e.to_string())?;
+        std::process::exit(0);
+    }
     let Some(mode) = std::env::var_os(MODE) else {
         return Ok(false);
     };
@@ -157,6 +164,9 @@ pub(super) fn dispatch() -> Result<bool, String> {
             }
             Some("touch") => {
                 std::fs::write(directory.join("unexpected-effect"), b"stale dispatch")?;
+            }
+            Some("environment-driver") if environment::is_driver() => {
+                environment::driver(&directory)?
             }
             Some("canary") => {
                 let deadline = Instant::now() + Duration::from_secs(60);
