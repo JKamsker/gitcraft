@@ -207,7 +207,7 @@ repo-workflows-review-label-publish-my-intents-cd3137 = Meine Absichten veröffe
 
 repo-workflows-review-label-publish-my-local-storyboard-3ee6c4 = Mein lokales Storyboard veröffentlichen
 
-repo-workflows-review-label-reaches-stage-b0463b = erreicht Stufe
+repo-workflows-review-label-reaches-stage-b0463b = Stufe
 
 repo-workflows-review-label-read-cached-intents-816c85 = Gespeicherte Absichten lesen
 
@@ -237,7 +237,7 @@ repo-workflows-review-label-repository-relative-path-3f3f0a = Pfad relativ zum R
 
 repo-workflows-review-label-repository-relative-path-or-folder-f7f7ab = Pfad oder Ordner relativ zum Repository
 
-repo-workflows-review-label-require-c4d0cf = erfordert
+repo-workflows-review-label-require-c4d0cf = erreicht, benötigt
 
 repo-workflows-review-label-result-6e7d50 = Ergebnis
 
@@ -307,7 +307,7 @@ repo-workflows-review-label-use-open-diff-pr-revisions-9fc2d9 = Geöffnete Diff-
 
 repo-workflows-review-label-use-this-generated-case-approval-required-agai-ee18e0 = Diesen generierten Fall verwenden (erneute Zustimmung erforderlich)
 
-repo-workflows-review-label-when-cf9c7a = Wenn
+repo-workflows-review-label-when-cf9c7a = Sobald
 
 repo-workflows-review-label-your-comment-9fc732 = Dein Kommentar
 
@@ -434,6 +434,9 @@ repo-workflows-review-raw-a-rust-source-is-not-a-blob-5f8d45 = Eine Rust-Quelle 
 
 # Paint-only mapping: A shared storyboard supports at most 256 cards
 repo-workflows-review-raw-a-shared-storyboard-supports-at-most-256-cards-10e700 = Ein geteiltes Storyboard unterstützt höchstens 256 Karten
+
+# Paint-only mapping: Adapted fix
+repo-workflows-review-raw-adapted-fix-194525 = Angepasster Fix
 
 # Paint-only mapping: Add 2–6 repositories to the release board
 repo-workflows-review-raw-add-2-6-repositories-to-the-release-board-4353ee = Füge dem Release-Board 2–6 Repositorys hinzu

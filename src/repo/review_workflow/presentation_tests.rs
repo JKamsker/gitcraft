@@ -6,14 +6,17 @@ pub(super) fn frame(
     events: Vec<Event>,
     draw: &mut impl FnMut(&mut egui::Ui),
 ) -> FullOutput {
-    ctx.run_ui(
+    let mut output = ctx.run_ui(
         RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1800., 4000.))),
             events,
             ..Default::default()
         },
         draw,
-    )
+    );
+    // No renderer is created: acknowledge the atlas update in this inert fixture.
+    output.textures_delta.clear();
+    output
 }
 pub(super) fn text(output: &FullOutput) -> String {
     fn collect(shape: &Shape, out: &mut Vec<String>) {

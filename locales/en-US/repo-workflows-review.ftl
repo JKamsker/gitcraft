@@ -435,6 +435,9 @@ repo-workflows-review-raw-a-rust-source-is-not-a-blob-5f8d45 = A Rust source is 
 # Paint-only mapping: A shared storyboard supports at most 256 cards
 repo-workflows-review-raw-a-shared-storyboard-supports-at-most-256-cards-10e700 = A shared storyboard supports at most 256 cards
 
+# Paint-only mapping: Adapted fix
+repo-workflows-review-raw-adapted-fix-194525 = Adapted fix
+
 # Paint-only mapping: Add 2–6 repositories to the release board
 repo-workflows-review-raw-add-2-6-repositories-to-the-release-board-4353ee = Add 2–6 repositories to the release board
 
