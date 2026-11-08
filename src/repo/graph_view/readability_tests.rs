@@ -84,6 +84,22 @@ fn texts(shapes: &[ClippedShape]) -> Vec<&TextShape> {
     out
 }
 
+/// Locate the visible ink actually painted by the graph, including any headers above it.
+pub(super) fn painted_text_center(shapes: &[ClippedShape], label: &str) -> Pos2 {
+    let matching: Vec<_> = texts(shapes)
+        .into_iter()
+        .filter(|text| text.galley.job.text == label)
+        .collect();
+    assert_eq!(
+        matching.len(),
+        1,
+        "missing or duplicated painted text: {label}"
+    );
+    let bounds = matching[0].visual_bounding_rect();
+    assert!(bounds.is_positive(), "empty painted text: {label}");
+    bounds.center()
+}
+
 #[test]
 fn topology_arrows_enter_history_from_uncommitted_changes_then_follow_parents() {
     let (ctx, mut tab) = fixture(3);
@@ -329,9 +345,8 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     let size = vec2(900.0, 220.0);
     frame(&ctx, &mut tab, size, vec![], 0.0);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
-    let x = header_x(&shapes, "DESCRIPTION") + 30.0;
-    let first_point = egui::pos2(x, 26.0 + ROW_PITCH / 2.0);
-    let second_point = first_point + vec2(0.0, ROW_PITCH);
+    let first_point = painted_text_center(&shapes, &tab.commits[0].summary);
+    let second_point = painted_text_center(&shapes, &tab.commits[1].summary);
     frame(
         &ctx,
         &mut tab,
@@ -350,7 +365,10 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     let wait_for = |tab: &mut RepoTab, hash: &str| -> Result<(), String> {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while tab.graph_messages.message(&path, hash).is_none() {
-            tab.poll(&ctx);
+            // Accept the real tooltip worker's result without starting unrelated readers.
+            while let Ok(msg) = tab.rx.try_recv() {
+                tab.handle(msg, &ctx);
+            }
             if std::time::Instant::now() >= deadline {
                 return Err("message worker did not finish".to_owned());
             }
@@ -531,8 +549,9 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
     Arc::make_mut(&mut tab.commits[0]).refs = vec!["feature".to_owned()];
     tab.rebuild_graph_labels();
     let size = vec2(900.0, 220.0);
-    let point = egui::pos2(25.0, 26.0 + ROW_PITCH / 2.0);
     frame(&ctx, &mut tab, size, vec![], 0.0);
+    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.05);
+    let point = painted_text_center(&shapes, "feature");
     frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 0.1);
     let mut actions = Vec::new();
     for (n, pressed) in [true, false, true, false].into_iter().enumerate() {
