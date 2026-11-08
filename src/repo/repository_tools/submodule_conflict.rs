@@ -39,6 +39,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             ui.monospace(&c.graph);
         });
     ui.label("Known commits containing both sides (you can also paste any full commit ID):");
+    if c.candidates_limited {
+        ui.label("Only the first 100 matching refs were examined. Paste a full commit ID to check another candidate.");
+    }
     for candidate in &c.candidates {
         if ui
             .selectable_label(
