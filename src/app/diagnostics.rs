@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn collecting_diagnostics_cannot_open_a_browser_before_local_review() {
         let ctx = egui::Context::default();
-        let output = ctx.run_ui(Default::default(), |_| {
+        let mut output = ctx.run_ui(Default::default(), |_| {
             stage_report(
                 &ctx,
                 "core.editor = env API_TOKEN=FIXTURE_SECRET nvim\nUNLABELED_DUMMY_PANIC",
@@ -159,5 +159,6 @@ mod tests {
             .unwrap_or_default();
         assert!(!text.contains("FIXTURE_SECRET"));
         assert!(text.contains("UNLABELED_DUMMY_PANIC"));
+        output.textures_delta.clear();
     }
 }
