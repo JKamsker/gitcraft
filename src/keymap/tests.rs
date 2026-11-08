@@ -46,8 +46,11 @@ fn no_binding_takes_a_key_a_view_already_uses() {
                         .filter(|binding| {
                             matches!(binding.command.scope(), Scope::Window | Scope::Repository)
                                 && normalised(binding) == parsed
-                                && (!matches!(*group, "Settings" | "Start page")
-                                    || binding.command.scope() == Scope::Window)
+                                && (!matches!(
+                                    *group,
+                                    "interaction-manual-group-settings"
+                                        | "interaction-manual-group-start-page"
+                                ) || binding.command.scope() == Scope::Window)
                         })
                         .collect();
                     assert!(collisions.is_empty(), "{combo} ({group}: {what})");
