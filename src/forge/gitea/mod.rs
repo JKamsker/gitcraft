@@ -765,14 +765,14 @@ mod tests {
             logins,
             [
                 TeaLogin {
-                    name: String::new(),
+                    name: "codeberg".into(),
                     user: String::new(),
                     url: "https://codeberg.org".into(),
                     token: "abc123".into()
                 },
                 TeaLogin {
-                    name: String::new(),
-                    user: String::new(),
+                    name: "home".into(),
+                    user: "me".into(),
                     url: "https://git.home.example:3000/".into(),
                     token: "def".into()
                 },
