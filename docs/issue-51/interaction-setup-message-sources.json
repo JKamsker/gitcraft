@@ -1,0 +1,16 @@
+{
+  "base": "c8ef09d4c8101e7aec609c8062b0fa33ec0ba152",
+  "unchanged_raw_producer_and_control_files_after_reversing_only_module_export_and_three_paint_adapters": {
+    "src/portability.rs": "7fb16206cfca0e79abf817fff264055af611fe978d3bfb7963b635125686bdb5",
+    "src/portability/config.rs": "81534bd1939a01d4b50fec640042aafcde800489a0b562b7f8c9e07f9e75c93e",
+    "src/portability/repository.rs": "5ec620611918565346384cd4aa3b22288fc0dc4423c40bbc700d2ef0a61ae605",
+    "src/portability/restore.rs": "6b133bf170d1dd89b09e50f3e5154b53203c51756c75ff16fe011d0f1dbfe2ac",
+    "src/portability/url.rs": "9cda6b984784fb3adda55803f28e68c6e5c306c9ae1fd562009bfff1f6a4e5c8",
+    "src/app/setup/mod.rs": "9ad2e75faa011dd4388523be73fe678f1f5d189023165a2714dfbc2a662eb516",
+    "src/app/setup/pending.rs": "29679a67952db495cef194edcd5a8d0f98902f0a47503d11aa2c5e294adea0f2",
+    "src/app/setup/files.rs": "41ef50952932f21c0d61fd394cd45d7d0b5dbc7a8d97667354fa2e64be626f3f"
+  },
+  "finite_records": 104,
+  "mapping_receipt": "/tmp/gitcraft-fluent-setup-message-map.json",
+  "mapping_sha256": "07143d2bcccdcaa1196a5d604eb489ed105fe67b6570d04693245538d23d1085"
+}

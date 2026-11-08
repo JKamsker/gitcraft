@@ -408,7 +408,7 @@ impl App {
                             ui.label(crate::i18n::message("interaction-setup-checkout", &[("branch", r.branch.as_deref().unwrap_or(crate::i18n::text("interaction-setup-detached")).into()), ("worktrees", r.worktrees.len().into()), ("hidden", r.hidden.len().into()), ("config", r.config.len().into())]));
                             if !self.setup.import {for remote in &r.remotes {ui.label(format!("{}: {}",remote.name,remote.fetch));for url in &remote.push{ui.label(crate::i18n::message("interaction-setup-push", &[("url", url.as_str().into())]));}}}
                             for w in &r.worktrees{ui.label(crate::i18n::message("interaction-setup-worktree", &[("name", w.name.as_str().into()), ("branch", w.branch.as_deref().unwrap_or(crate::i18n::text("interaction-setup-detached")).into()), ("commit", w.commit.as_str().into()), ("path", w.previous_path.as_str().into())]));}
-                            for notice in &r.notices {ui.label(notice);}
+                            for notice in &r.notices {ui.label(portability::display_message(notice));}
                             if self.setup.import {
                                 let matching=r.profile_ids.iter().filter_map(|id|self.setup.mappings.get(id)).copied().collect::<Vec<_>>();
                                 let permitted=self.setup.applied && (r.profile_ids.is_empty() || matching.contains(&self.settings.active_profile)) && !self.settings.profile().pending_setup();
@@ -445,7 +445,7 @@ impl App {
                                     if plan.receipt.is_some() && ui.button(crate::i18n::text("interaction-setup-new-destination")).clicked(){plan.receipt=None;plan.complete=false;plan.parent=PathBuf::new();plan.name=format!("{}-retry",r.name);plan.messages.push("Previous clone/worktrees were retained. Choose a new unused destination.".into());}
                                     if plan.complete && ui.button(crate::i18n::text("interaction-setup-open")).clicked(){open=plan.receipt.as_ref().map(|r|r.root.clone());}
                                 });
-                                for message in &plan.messages{ui.label(message);}
+                                for message in &plan.messages{ui.label(portability::display_message(message));}
                             }
                         });});
                     }
@@ -453,7 +453,7 @@ impl App {
                 ui.separator();ui.heading(crate::i18n::text("interaction-setup-finish"));
                 ui.label(crate::i18n::text("interaction-setup-pending-help"));
                 for profile in self.settings.user_profiles.iter().filter(|p|p.pending_setup()) {ui.push_id(profile.id,|ui|{ui.group(|ui|{ui.label(profile.display_title());let fresh=self.setup.fresh.entry(profile.id).or_default();ui.add_enabled_ui(!busy,|ui|{if pending::fields(ui,profile,fresh){verify=Some((profile.clone(),fresh.clone()));}});});});}
-                for message in &self.setup.messages{ui.label(message);}
+                for message in &self.setup.messages{ui.label(portability::display_message(message));}
             });
             if busy {ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label(crate::i18n::text("interaction-setup-working"));if ui.button(crate::i18n::text("interaction-setup-cancel")).clicked() && let Some(job)=&self.setup.job{job.active.store(false,Ordering::Release);job.cancel.cancel();}});}
             close=ui.add_enabled(!busy,egui::Button::new(crate::i18n::text("interaction-setup-close"))).clicked();
