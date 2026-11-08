@@ -238,11 +238,27 @@ pub fn fsmonitor_state(value: &str, unix_there: bool) -> State {
 /// A speed-up the doctor suggests: why, whether it is on, and the commands that turn it on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion {
+    /// Stable suggestion identity used for confirmation and special-case control decisions.
     pub title: &'static str,
     pub why: String,
     pub state: State,
     /// What turns it on, as git commands.
     pub ops: Vec<Vec<String>>,
+}
+
+impl Suggestion {
+    /// Translate only the displayed title; unknown caller-supplied identities stay opaque.
+    pub fn display_title(&self) -> &str {
+        let id = match self.title {
+            "Commit-graph" => "backend-health-commit-graph",
+            "Scheduled maintenance" => "backend-scheduled-maintenance-f688c9",
+            "File system monitor" => "backend-file-system-monitor-bd6322",
+            "Untracked cache" => "backend-untracked-cache-de0942",
+            "Pack the objects" => "backend-pack-the-objects-5a853d",
+            _ => return self.title,
+        };
+        crate::i18n::text(id)
+    }
 }
 
 fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {

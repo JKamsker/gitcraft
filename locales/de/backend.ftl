@@ -182,3 +182,13 @@ backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894 = { $seconds ->
         [one] { $what } wurde nicht innerhalb von { $seconds } Sekunde fertig und wurde gestoppt.
        *[other] { $what } wurde nicht innerhalb von { $seconds } Sekunden fertig und wurde gestoppt.
     }
+
+backend-health-commit-graph = Commit-Graph
+
+backend-scheduled-maintenance-f688c9 = Geplante Wartung
+
+backend-file-system-monitor-bd6322 = Dateisystemmonitor
+
+backend-untracked-cache-de0942 = Cache unversionierter Dateien
+
+backend-pack-the-objects-5a853d = Objekte packen

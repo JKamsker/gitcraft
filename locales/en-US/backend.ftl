@@ -182,3 +182,13 @@ backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894 = { $seconds ->
         [one] { $what } didn't finish within { $seconds } second and was stopped
        *[other] { $what } didn't finish within { $seconds } seconds and was stopped
     }
+
+backend-health-commit-graph = Commit-graph
+
+backend-scheduled-maintenance-f688c9 = Scheduled maintenance
+
+backend-file-system-monitor-bd6322 = File system monitor
+
+backend-untracked-cache-de0942 = Untracked cache
+
+backend-pack-the-objects-5a853d = Pack the objects
