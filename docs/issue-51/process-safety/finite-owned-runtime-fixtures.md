@@ -78,5 +78,38 @@ has no fixed-backend test adapter. Adding an audited test-only backend selector 
 repeating this schedule against that backend would be a separate source-reviewed
 fixture. This native unit deliberately does not add a backend framework or policy.
 
+## Opaque Unix Command environment
+
+Prospective command, **NOT EXECUTED** (same private TMPDIR and clean parent variables):
+
+```sh
+cargo +1.95.0 test --offline --locked -p gitcraft --lib remote::owned_runtime::environment::owned_runtime_opaque_command_environment -- --exact --ignored --test-threads=1 --nocapture
+```
+
+A Service-owned fixed current_exe driver receives synthetic inherited/set/remove keys,
+raw non-UTF-8 key/value bytes and PATH through Command.env. It never calls process-global
+set_var/remove_var. Seven snapshots use the original opaque std Command, directly through
+existing Service/OwnedChild: inherit, override/empty/non-UTF-8 set, remove (including PATH),
+env_clear with new values, truly empty env_clear, inherited PATH lookup and explicit PATH
+lookup after clear. PATH resolves only a fixed-name symlink to current_exe inside the
+exclusive scratch namespace; no external executable or server is involved. Custom UTF-8
+arg0 is checked exactly; non-UTF-8 coverage is for both environment key and value.
+
+Each child returns exact serialized synthetic fields on stdout and an exclusively created,
+synced receipt in its private cwd. Assertions include the fixed libtest stdout prefix,
+exact payload bytes, empty stderr, status0, absent-vs-empty values and empty entire
+environment. The parent rechecks all seven exact receipts and the driver's exact summary.
+Snapshot dispatch uses arg0 so even an entirely cleared environment reaches the child
+body. Driver dispatch requires a distinct arg0, and nested commands remove driver mode:
+an arg0/env regression fails instead of recursively starting another driver.
+
+The retained driver has a 100s budget; snapshots each have 12s budgets and 8KiB output
+limits and immediately exit. Their own retained Service owners clean up each snapshot;
+the driver Service joins before reporting its summary. Parent Ticket/Service Drop cleans
+up on errors, and scratch is retained unless all assertions succeed. This fixture has no
+descendant lifetime boundary or additional canary, and does not duplicate the Darwin
+anchor/canary fixture. It asserts Unix Command semantics, not native_owner request
+serialization (whose production API intentionally does not capture env_clear/arg0).
+
 No fixture runtime results are claimed by this document. Build/lint logs and final
 immutable source hashes are handed to the parent outside the repository.
