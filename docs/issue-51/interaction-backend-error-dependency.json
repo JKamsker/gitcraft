@@ -1,0 +1,838 @@
+{
+  "canonical_source_commit": "88bc97740af01d2137c65c43f34f528c7e137676",
+  "relative_time_original_commit": "1675239cc9ca092e7c5c1b32bdaebfc7e3ebadb3",
+  "scope": "Exact display_error helper, re-export, relative_time function and its pure test module, plus only referenced paired backend entries. No other backend source or control/argv/process policy imported. Canonical full backend files/catalog win integration.",
+  "catalog_pairs_added": 81,
+  "blocks": [
+    {
+      "path": "src/git/errors.rs",
+      "source_block": "/// Render known application control errors without changing their transport identity. to EOF",
+      "sha256": "041ce2da9b37ea463dadcf2c4190c10bc300ba2cd4d40b3deda80c6fe1535c11"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "source_block": "re-export",
+      "sha256": "6d3312208b42e34193b596a90fc1b0ac142d5a80f79aaa4bbc0b404d42da4dcd"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "source_block": "relative_time function",
+      "sha256": "e0546487fbbf1d4cd8edda34957edbb069785f3693da760a24c9e8ccbcc78d9f"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "source_block": "backend_relative_time_tests module (through its closing brace/newline)",
+      "sha256": "ecbc80901479a4999d5b887ce90c166cbc32b91de93a2e072677d9a56d72faa6"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-account-action-cancelled-13efa7",
+      "sha256": "0831659785bd544d597ceb988f0c940b7020eaf62ab9d818eff5bb906685f93f"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-account-check-cancelled-34de37",
+      "sha256": "12921768232ecb5068da71f889c44f7638c0406557ff5b3ade2bbd417726abf9"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-analysis-cancelled-d5fe01",
+      "sha256": "88a4cf2345aa9982006fe8a2f0906bbbac526ea2962e9cc052c3c6ef391bbe3a"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-atlas-cancelled-b9165d",
+      "sha256": "bc15d50b09362467a45bfcc0ed0fe46f3cd83831e83172380ecac34df81af1b6"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7",
+      "sha256": "85c4232e9668283deee4704721e1e16c89c9c0a6a2847f42f14ed923ca5e49aa"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-cancelled-before-this-destination-e79896",
+      "sha256": "0467f0251c38ee7f2883f07fd37bdbfde4c86860cf5a5a24e10176e496af0e97"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-comparison-cancelled-fe0a3c",
+      "sha256": "d595b562d659f38e50c9a21368fb03782246b9c5525d7212edb9c6d7b2644997"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-contained-bundle-error",
+      "sha256": "87d35eac5c2b767341b50616b42da59cb912dfa4fe545abf43e4d199d8f94732"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-content-recovery-cancelled-or-timed-out-b878c7",
+      "sha256": "5b256ef66426d08ee5b0c730da0e360e5a7167dcbecf9e0cf853f916825529aa"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-draft-cancelled-426ba2",
+      "sha256": "f3e7bf0fabff2ab9572ee8606ed0c5aca8cfb41de344df92ddb0286220cafb7e"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-draft-permissions-cancelled-52db5c",
+      "sha256": "65116b22193aa1b54fecb961d89036960ee0ba484cc24d93a55ebf7f30be51e6"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-export-cancelled-dbef83",
+      "sha256": "00a41ba5a5c3a5ed91e07bb58b495712808981fc5a1bb3f9f1f7b4dbc468134b"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-file-preview-cancelled-1db629",
+      "sha256": "3305a28fe3151cbf29a94f9f9c00dd97929f80e9467726f5dcdb8a2a66ad9dd7"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-file-recovery-cancelled-or-exceeds-2-mib-2d111b",
+      "sha256": "004903880d69915d4fb358f4e98475319849f0ea8a717f27eb7c1560d6ade23f"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-forge-history-response-exceeded-its-budget-or-was-cancelled-233e64",
+      "sha256": "7c47af29a489923adb3a582242818cb133336fca12306e7f229a44d9a01cc2aa"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-frame-cancelled-4d6f8f",
+      "sha256": "7f28a2aeac795e57653eb4f6200c7518e5ec8712e91f17f7571870ac18f53dd7"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-gitlab-operation-cancelled-d11bad",
+      "sha256": "cb855f17d80fd08bf5666edfd250742737ac5ed74806e2a1c8a22c007b0dccdf"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-06729de987",
+      "sha256": "efc312011f313a008a30882b8818b7d9f6b93814edcf51c823d0c4400035582c"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-124d998466",
+      "sha256": "f9599aa73271cb455a468110194de33963d73a7a2f3570c7a0464cd3b6439be1"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-18d2a159d4",
+      "sha256": "1b78bc21c6de50693e04ed77a18570549e79066d7989de3831b54f2395812350"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-219d77f375",
+      "sha256": "ef625f9058162ff7e5cebe272ffd34a7bdba2cd9f12ea775a4c02d08c13b7192"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-286c0e8cfe",
+      "sha256": "88356a81b5f39f1e570f46004a000351efd3de2682737058c52faa240e670b87"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-3135c24fb2",
+      "sha256": "2f586cef3656018ffec837ce02836a7d2a84890a9d3abb0441c2440700888468"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-389db1e9f2",
+      "sha256": "00a7ecf457d1ffb3db6235467823eb1c244c1d53cf21bdab90ce481c95a43790"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-46b86a42f2",
+      "sha256": "bf20230c97a0a215c303d7d5359111b3707f00056963d2d63352fbc8423dd69e"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-4b3bf71f7e",
+      "sha256": "5af775b3ff63a8a5647cf44a3a9492d42849c7e010955c5ff0a4b4b71a6f2fb9"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-50ca4f5bd0",
+      "sha256": "0b3b549a702aaef132fdbf34e9b8c0096045198522fd7ec1821c88898a1daa06"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-7f609a6911",
+      "sha256": "ceca57f9fc551bfa1f582be9251233a8c68eb82bfff378f1198538e56c2d0f2c"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-8322e87d24",
+      "sha256": "8c7809854a05d928b16f49ef40106d31adc57d90998de14cfdfc0e783bdb843d"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-8b47045eb7",
+      "sha256": "535a688a7fa431e988c06882925f77aea9656097a1327f1106eb8f8ee03460ef"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-a3db0ebabc",
+      "sha256": "1939cfc8e9ff37fdc731d8ce6caa038ffb735e2b260bd3c29ff258720dea1aa8"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-b26048e0e2",
+      "sha256": "37e86c8b729f444fd77db0abaee2be12e7570ad5c71d8e1e76f260f6a4481c82"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-bcc9225eef",
+      "sha256": "21967210bf21e75a52e26cad74596d24f0c5c1c11d55d0ffbd1dd488cf35abea"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-c1a950664d",
+      "sha256": "5e69392bc98cced9fc4d050d4df8a4c94bc984b5d31f8177aafb668b2f129fd3"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-d353a99eb4",
+      "sha256": "a993989f3122ef204d1022a1317341504e842412b8876884f89531a3238e0796"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-f0c58d1c8d",
+      "sha256": "8325ad3a5916478b0293453f06bec06cd54bfd30d8d4be5e95f5a3b7bbd71126"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-f29ce072ac",
+      "sha256": "916285cce9143cd91d0974f81fe8cd164543338710212acf3f4925dc70bcb865"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-f7df6fb542",
+      "sha256": "4db94a6023933b2d22d6ab88d3a0ecba60590951c751b4cc909416914997db62"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-helper-display-f833fa6387",
+      "sha256": "73ce6a93960f26d7b89b507f3accd3c1933d26622aa83f2422b234af0d4030b5"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d",
+      "sha256": "1e05e68b9f3881e2363d68d366fb737b065dd158f5edb40208ed74eac06379ba"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-history-lookup-cancelled-9533a8",
+      "sha256": "dfdc0784d8d8733e99823a9718f5f83ba31eb6adc1a74fe6e29a7c53bfad2005"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-ignore-edit-cancelled-before-opening-012613",
+      "sha256": "f37bb291503545d8d0cb57a864a84412bb40e92269e73334d6002adc3df65db6"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-ignore-edit-cancelled-before-publication-80ba37",
+      "sha256": "8e542236a468ea59476cb569d29bf0e4d41abdcaa3dfe99f556fa937b1e896ab"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-ignore-preparation-cancelled-a562fd",
+      "sha256": "33a46bd968d81ebc956d49bb4a7147b9e93fa64ffba1bad874584273aff8b935"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-ignore-preview-cancelled-d6374a",
+      "sha256": "e456a505607f788003443cc39fb4e3c60365e0d96aeae8d29a2e90ef13f95560"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-just-now-7ddb44",
+      "sha256": "9be2511c6e504fc1e8097500bbea2ccc9df9da8e5c3f50fd7a50ccbd07c2d360"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-line-history-cancelled-or-exceeded120seconds-7448a3",
+      "sha256": "b5485062c8687bbf3e44b5b574a05add98ad82c82403037290b619acc6a38602"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-08b2647385",
+      "sha256": "20237f6529c95da0bb71b583a478cbe5677a7ba4e6a0fbf3ec01e440b73c8aa7"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-1b16d9cfdb",
+      "sha256": "2b6a84c2f837902f4d14b3ec55c6672137eae0bf37642c7d95377c158f2262da"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-3369979818",
+      "sha256": "a58f96c93050ce6482fe53ea174983a3bdd87499a9800c4416250352bd0436cd"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-35c9ca76bd",
+      "sha256": "2d9a9e48f9e413f2318b1b0ac1230ab8bc809201abec53ae64c53f2a9551b8b3"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-850e897a1e",
+      "sha256": "ad86e84d94b813523de58b4b7a110780c30b99ca005643f82cdef7036e5ad0b5"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-bd13f61f25",
+      "sha256": "6e6137b213bbe7024818da4c431f77c38b4baf1a0720317dedda901a4213403d"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-c1ee10596f",
+      "sha256": "997a80bab19d787879f50949ffd710cbd2df3e3db45d25470b818095d46d9f55"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-c3d2b99ca7",
+      "sha256": "2ad29726eaf11e8a8c8e5bc462e7330fb0b1ad1668cdd5a2f1b6498287473241"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-d81c296d75",
+      "sha256": "28f44faaf0bfe1ae7cae11a9a1390836d6ca7f20fc29dc45e69ca5260755a48b"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-native-fallback-e1e6d89f7b",
+      "sha256": "c2e0f3a5a0d3c3aee2a75c2dbcaec9b8be8bf0837a48bcccb7d0c9364b68384c"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-not-run-cancelled-02b0ef",
+      "sha256": "89acf021b4de57941cd9b991c22e43c9d58befe15313fefd8069dba31fd4e1d1"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-object-inspection-cancelled-e67f16",
+      "sha256": "38f541008e77ef8ae65557b1b650e10590711812d87354af5a459332335237b9"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-provider-request-cancelled-54eb9a",
+      "sha256": "bc0c14f092b4b32d016541122aed326280e0dc40e419ccf2ccda088757cd8809"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-provider-request-cancelled-refresh-to-establish-any-write-outcome-70b94f",
+      "sha256": "d1fcbf23291ebf8627560d0f047d71f00427a1073e6e84a0541dd60fbf94fb42"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-public-key-upload-cancelled-before-sending-eecb8c",
+      "sha256": "8a92d80d6aa2ac888168b8763b6056dff7120739d5c3fa77cc6e65ff0ff6e1af"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3",
+      "sha256": "caa02588e65b65429fd33af18864e85c2917dadae4146383ef82d52deb71575d"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-read-cancelled-045da9",
+      "sha256": "68f7c9498d95a21b01d0dd2107c276df1e572eaab1eaaff9d16088014359afe3"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-recovery-cancelled-before-mutation-922fff",
+      "sha256": "6ef4b3e9e9d358dd658358c87a1276de4946908947879cab38b28b4f518114a8"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-recovery-cancelled-d0dd9f",
+      "sha256": "f6c1f202956f8e4045e6652964cade00fe3ab2590fc82de72cf97f2419fea28b"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-days",
+      "sha256": "f6d47be66f786c78cadf441d2ff96c8c44aafe7c4e318739f58be2aa3461a5b5"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-hours",
+      "sha256": "1b725e9b352b5ea9c2c17b35e594ac28799cbca81857999cd856f004e66abc12"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-minutes",
+      "sha256": "11da01810a641276ba9f878c57aeb80aaf0798d6ed566d2e5b27ee1178ed90dd"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-months",
+      "sha256": "9fb4168b8d17b6a5acd0d7ec1ed640ec02a39b65e37135a3094189edc5d1aa91"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-weeks",
+      "sha256": "c3d455ea36986ef67d45fa21d5a72732f5e01a1531a5cd0df760efc2b0a90492"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-relative-years",
+      "sha256": "5d2a0af0910033493dd8e943ad9797b5a4b12125d82fe9e93da4ca560d2af088"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-replay-cancelled-c6ccd5",
+      "sha256": "88d623778f7a9063818068b7c45cb1bbb3dcf9e76daeb2b54b70733d7ec97734"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-review-cancelled-519921",
+      "sha256": "bcc1d377e35fe988d66ea65f65d9de82f8e4724b395e0736beefdb2160c3bc97"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-saved-graph-view-cancelled-754f0e",
+      "sha256": "dad74aa652a6d7287480977b2adacdc7957e5d050bf50607249e0b71dafc2c97"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-setup-operation-cancelled-cdccbd",
+      "sha256": "b5d491c8d067536d5974408e7892e8838e37a87e140dd1a8d4403077a83360a2"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-symbol-history-cancelled-or-reached-its-time-budget-6f2781",
+      "sha256": "efdcc917caae7eb5dfbd053e37d3b8d5e2548fe69fb04808405e5987c8d4824b"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-9fccaf",
+      "sha256": "3b5d1ea3b2470d76af609f3da6eb71f7ff55db4ea8984fa2b0f69b669e716421"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57",
+      "sha256": "b299d81c58eca0609133618b2550070021a84708b351f9d41f350f1221fba696"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02",
+      "sha256": "851e33c69492fbf17c0c0e66423b15f083d26951b76c8c9ac3338bea6d0c58d3"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "source_block": "backend-working-folder-publication-cancelled-a8f541",
+      "sha256": "4e915c594137625089aca7fef200019aca611d2eb4d22920d4a7ff284aa9aa9f"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-account-action-cancelled-13efa7",
+      "sha256": "813152176b5e9a959cc667ba11342c5e2bcad91a85b2cd078b6e3508bdb551fe"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-account-check-cancelled-34de37",
+      "sha256": "19b16b96bbc7dea4d39fc43f2f10fa34d28663855b13bf632f223db7e5b18d8a"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-analysis-cancelled-d5fe01",
+      "sha256": "9c7788d397b2bf3b3681cf4360574ed85c7adae0cb297aaa04f5504b3a0bab38"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-atlas-cancelled-b9165d",
+      "sha256": "b8bea3f7be7f70a67c1521da0dddd6df2834b60fc7efd9b333d9e32b7c523d70"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7",
+      "sha256": "6d9ea6616eb8c0ca9263df4eb93e8a3c742e04949b2a0f93e4d0a027e7737aeb"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-cancelled-before-this-destination-e79896",
+      "sha256": "bb43ec573ee28cbdcfc7e9b0f86f64ab4dcdabe8ff301d4c27e4f954900e99e7"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-comparison-cancelled-fe0a3c",
+      "sha256": "20571d608064c5dae1a9cbdb4a224747fbe1a13b39b6f066be6bdbd98459d591"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-contained-bundle-error",
+      "sha256": "f8286ebb4b80cef672ec8c778230fb917c5fea91b69d53993726281058dde0f6"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-content-recovery-cancelled-or-timed-out-b878c7",
+      "sha256": "7c7d50536c6dfef1e4b452ccb970d89671072a0313496577692160375f34b733"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-draft-cancelled-426ba2",
+      "sha256": "31e1fe395be962aea2d540aa58a541cc6e817390082927173440b905daa67a58"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-draft-permissions-cancelled-52db5c",
+      "sha256": "f703ed1ad434c5baf9d265633082bacba265382c8353841e79e35e9906bccf86"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-export-cancelled-dbef83",
+      "sha256": "6b278443327e6d55d4134051b8c56a775e30a2c74d5a90c4a279877e2e6ada60"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-file-preview-cancelled-1db629",
+      "sha256": "4a72a2fb710ed9b494ed2d1d87e0c071982640960539e2078a6045166cfc0c4d"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-file-recovery-cancelled-or-exceeds-2-mib-2d111b",
+      "sha256": "70ede6c96e78e1f27ead79be59510b8c3092007fac49d1b4b595aac0fd201836"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-forge-history-response-exceeded-its-budget-or-was-cancelled-233e64",
+      "sha256": "5dc4a12b03fa74f80bf3df452c091366caf0db34b113eb8fef96977fbf1dd680"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-frame-cancelled-4d6f8f",
+      "sha256": "f98cf54a1252dca1386dbe6e5d58ec8e595d18f820cdb234c9c8091400bf7d04"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-gitlab-operation-cancelled-d11bad",
+      "sha256": "163d12868e860d469735357ef635d5e6dc955cfb4b90071bc39953a5c9bc4819"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-06729de987",
+      "sha256": "4177ef4d72a087b9375bed8a95591ad2d20f5150c6c94952d487f9cd86c956e8"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-124d998466",
+      "sha256": "3f92ddb45d421355d07a877c83b472a26aa712e2477c807c8cbe301b730c878d"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-18d2a159d4",
+      "sha256": "b7486e847949d87ab17c8a0d2547bd09a395bacb4eee68064d7e4f2c628c6ab9"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-219d77f375",
+      "sha256": "c234d2269badd3efde278bcc3f58b3a97de261cffa5830910d12ca1b2bba1712"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-286c0e8cfe",
+      "sha256": "f2d97d951fedd47e82a0604fd6d781a8ac529722f722b89c75f9b4b526a2a4f8"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-3135c24fb2",
+      "sha256": "df542e4a5e118500f42b6f084df651378efef4e0ea73583187c375255b28307f"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-389db1e9f2",
+      "sha256": "19d69e902c6377b1e9a208a37a2a5263aa29d981ae98e12ebefe0db9bd3a6e95"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-46b86a42f2",
+      "sha256": "9ec09b60e3db45695181624c27d8f668475f6286b69ffeca03a7fef400091c7e"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-4b3bf71f7e",
+      "sha256": "93936581b80eab72b0fef2070d386cb3e8a2b8f399549dae5efa00e875ba7fa9"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-50ca4f5bd0",
+      "sha256": "becc81137e6b818f7994c5584850db86d84fc52366660f61d14a42a9d34a5160"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-7f609a6911",
+      "sha256": "c0db95e7a4690fd0772d8ad334e62d385a77d91298f98e5ff4c2ad0f0e0f30c8"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-8322e87d24",
+      "sha256": "3ee0c3d9cb448e827b13b646de775968a7fb3a3e3e4f3e313b1550aa3ad6f9e9"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-8b47045eb7",
+      "sha256": "7abc41cb7e2e9ce5691dd8fdee717fc297d1a479e70c9951c9a0b45882611383"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-a3db0ebabc",
+      "sha256": "ea54bf89c608860600c924c291d7f0e778b4d0e56e320c340d22f4c470651e6a"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-b26048e0e2",
+      "sha256": "675184157809fa0eac58d69f4f8cdaab386932642fdf50ce9c5507b6e121a7c5"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-bcc9225eef",
+      "sha256": "f6313d7c6bd620c52046df86b0699e75fcea76dc1a8bb5ae9b959bc7795526e9"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-c1a950664d",
+      "sha256": "f0f860f5e071ed16c2d90dc3b457ae10787590ba1b7b62c29991d971f040045c"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-d353a99eb4",
+      "sha256": "25a03f17e282f52224c07469f44bda0d3c1cf76317bcdfbf93097a54ea7be450"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-f0c58d1c8d",
+      "sha256": "1fcaf87535c3a52fcc7d96a37892ccef3a521939a7a3265b99ff0d72b618233d"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-f29ce072ac",
+      "sha256": "0ff5c87e1435c93e01eae39a12e60ce262e7cc31e8ba76fbfee6a7640742be3a"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-f7df6fb542",
+      "sha256": "40a689c0fe8e7f0f17395bdca0fe0da6a4718e03a4480e108424ae54473d869f"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-helper-display-f833fa6387",
+      "sha256": "51396925d19d090fba5bccfc7e425521d281ae4386588a101c3ebb09c057cecc"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d",
+      "sha256": "492240e4f2b1fb58b2959abe557a91a496d672b3ee695ac0427d6280219aaa9f"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-history-lookup-cancelled-9533a8",
+      "sha256": "dad1b0b03d41cd05b74159290adbe115f423125005b7f28f3271e27402b56d04"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-ignore-edit-cancelled-before-opening-012613",
+      "sha256": "d645d3df0e97a509cfc158477b89c64c6290f540ca71bb0e626e7e20fae3ea1d"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-ignore-edit-cancelled-before-publication-80ba37",
+      "sha256": "75bfe30c974afb5bb1cdf119a1c9cd046a47585055b9968952295c1a069f0cba"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-ignore-preparation-cancelled-a562fd",
+      "sha256": "6b06ec02565e94fbfeb9c81ea705e6cea95b79f7d2401d3b36ba19f1ff11c9bd"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-ignore-preview-cancelled-d6374a",
+      "sha256": "76fb053f8c6b02670bb859390b8a9647b3102afc4c31d669617f473b1ad1c4c2"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-just-now-7ddb44",
+      "sha256": "ceabf7eb4fd73339dca52741637c6ad4fda87e4851fe270abb843ce7861b60ad"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-line-history-cancelled-or-exceeded120seconds-7448a3",
+      "sha256": "01eae6b3529b35dbede01463c8dcef4475fbec3f3ea3ea26027ace46cecf9070"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-08b2647385",
+      "sha256": "e3f031ba82f4049c8de9e1141258d70d0081ff600002c8fdad3b6c8f5cd24947"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-1b16d9cfdb",
+      "sha256": "8a50320bf3969cb2733bb464d4c5b0ecdb4482df73172cf2f0943a84ef809374"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-3369979818",
+      "sha256": "6a72750af3bcb3198c2edbad5b1fdd3c29313a2e97ba5c2dcdac5ecfe746df26"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-35c9ca76bd",
+      "sha256": "590925e3c4cf07577dabf797ba054b73cc2ac25fd70f1e43004d2282ebac91ee"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-850e897a1e",
+      "sha256": "8132dbf56a2b849515b31251a32c32a2593f5989de102b2080b9982b60a371d8"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-bd13f61f25",
+      "sha256": "a1be49aaa8c9e1dd6719d8fa83871afe6dcf2788903b4b51bbdf96c1f4aec0a6"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-c1ee10596f",
+      "sha256": "58534f9fcc080e900e65ba42d14132fdd7f1dc3f2f35287cd7ae777524fba50d"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-c3d2b99ca7",
+      "sha256": "97205897815a8171c606a6fe79ac0e1c1cfac2b4e4edf68e20bc9e6721be549c"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-d81c296d75",
+      "sha256": "9ac1d935f6071294e9575cdf5afa8733ba96ca6dde80f052eef6f6ba8e7caf08"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-native-fallback-e1e6d89f7b",
+      "sha256": "fb4e5df95192addcc4ab5b23a3bc7891c7129e6cdbd5456b6c7d67263fe8be85"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-not-run-cancelled-02b0ef",
+      "sha256": "39397c08624a1a0181a68d52aafdc051ec90889b2ee70f00994f3deaba67feee"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-object-inspection-cancelled-e67f16",
+      "sha256": "74bea009d99dd2e91383f566db88d0a4b7869df841a863be31dc480c4522ce80"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-provider-request-cancelled-54eb9a",
+      "sha256": "adc627e5a84bdbc43c4bee257e17a07682c67e5db854b06c83a19e7042e45b75"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-provider-request-cancelled-refresh-to-establish-any-write-outcome-70b94f",
+      "sha256": "ac61fba0997dfa0ff855088bb105f7891ec79aa353a96be3a74d6fde39c9ffe2"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-public-key-upload-cancelled-before-sending-eecb8c",
+      "sha256": "042230fd9b45b3a627df4f0acc34fd203a1606fa45f1fd977095e3dc67e54ca0"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3",
+      "sha256": "71841eae0917f23f00232a4fc8e88dfe5e35ea1ae2edcc9e7c2ac36ab5066140"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-read-cancelled-045da9",
+      "sha256": "b4f9bdcf08534af9a985870780334a350dfbf295256a225273b04003025869e4"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-recovery-cancelled-before-mutation-922fff",
+      "sha256": "2d7450565ff7a0c9d8370244fcf9225390b103ac178e8a6194ae7882b1203650"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-recovery-cancelled-d0dd9f",
+      "sha256": "2a360ed7e6f2917130a8741a455c39f02212c6e1a1c9f132bbb9a6bcc33382c7"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-days",
+      "sha256": "65534d05eadd63ce60bcb117f519e45761a5eca79766312a220a1e32288b313b"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-hours",
+      "sha256": "8868730e7cfafaf05fd7f2205d815ead28391a2a4310e279edff6c7fb9cc9e36"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-minutes",
+      "sha256": "e299a04f0ed3afbb0584cc98958a5c7d2a648e68cc69ec05e5dd0d988971b7bc"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-months",
+      "sha256": "0ef89cef54e9c5308b46fc670d79b3889a4ee43cdb502a019d105560c553b411"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-weeks",
+      "sha256": "6f9b53de76bd6c1a3c6148b799b00b66b9175ec73687c2442c3e4e130654b297"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-relative-years",
+      "sha256": "6d144f9131a39399ab03d3f27009fd054f68655be4c00108e9b13d6e47897999"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-replay-cancelled-c6ccd5",
+      "sha256": "83b3f09aa534c87fa36305bf6172fb9d7bc3c2a208752b78720d6f63e45eb393"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-review-cancelled-519921",
+      "sha256": "0a522d04c306af9fc704914f87e976b56229acb4d08bd2ac6efbf948a011d3d2"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-saved-graph-view-cancelled-754f0e",
+      "sha256": "46157f295dcf88b140c9629bc9f3fcda6c1f4bda2e4c06e76873c9b8ac4667d4"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-setup-operation-cancelled-cdccbd",
+      "sha256": "022682d710134ba660195d54a9fcfc95166326ae6f8dfc7fab8cf0b728d9a9c6"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-symbol-history-cancelled-or-reached-its-time-budget-6f2781",
+      "sha256": "2f0b3bf6afbcb508b3f5ed6249bd02294da16fdd6e84745ea935cccc3da62147"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-9fccaf",
+      "sha256": "0ed50fa0cf9169733d4ef95bdd7b46b337ceb411f1ab90f6ade7e1ddc8f59a6f"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57",
+      "sha256": "f953f7949bfc4a603a2f4b2b086ff06be0bc362813f435e08339671c25bf4f49"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02",
+      "sha256": "acd098239a2cd26640fe6d7757a05c2e199f2560b39c5f96fb74eef334b5c0d5"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "source_block": "backend-working-folder-publication-cancelled-a8f541",
+      "sha256": "145eef876607be9ca7b2fbe839f08b1168fec59689cf3a38972b16ebf9471e69"
+    }
+  ]
+}

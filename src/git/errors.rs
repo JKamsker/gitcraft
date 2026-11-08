@@ -231,3 +231,129 @@ fn unquote(value: &str) -> String {
         None => value.to_owned(),
     }
 }
+
+/// Render known application control errors without changing their transport identity.
+/// Provider/Git diagnostics and unknown strings remain opaque.
+pub fn display_error(error: &str) -> String {
+    if let Some(detail) = error.strip_prefix("Contained bundle Git: ") {
+        return crate::i18n::message(
+            "backend-contained-bundle-error",
+            &[("detail", display_error(detail).into())],
+        );
+    }
+    let id = match error {
+        "Account action cancelled." => "backend-account-action-cancelled-13efa7",
+        "Account check cancelled." => "backend-account-check-cancelled-34de37",
+        "Analysis cancelled" => "backend-analysis-cancelled-d5fe01",
+        "Atlas cancelled" => "backend-atlas-cancelled-b9165d",
+        "Bounded forge history lookup failed or was cancelled" => {
+            "backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7"
+        }
+        "Cancelled before this destination" => "backend-cancelled-before-this-destination-e79896",
+        "Comparison cancelled" => "backend-comparison-cancelled-fe0a3c",
+        "Content recovery cancelled or timed out" => {
+            "backend-content-recovery-cancelled-or-timed-out-b878c7"
+        }
+        "Draft cancelled" => "backend-draft-cancelled-426ba2",
+        "Draft permissions cancelled" => "backend-draft-permissions-cancelled-52db5c",
+        "Export cancelled" => "backend-export-cancelled-dbef83",
+        "File preview cancelled" => "backend-file-preview-cancelled-1db629",
+        "File recovery cancelled or exceeds 2 MiB" => {
+            "backend-file-recovery-cancelled-or-exceeds-2-mib-2d111b"
+        }
+        "Forge history response exceeded its budget or was cancelled" => {
+            "backend-forge-history-response-exceeded-its-budget-or-was-cancelled-233e64"
+        }
+        "Frame cancelled" => "backend-frame-cancelled-4d6f8f",
+        "GitLab operation cancelled" => "backend-gitlab-operation-cancelled-d11bad",
+        "History evidence request budget reached or cancelled" => {
+            "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d"
+        }
+        "History lookup cancelled" => "backend-history-lookup-cancelled-9533a8",
+        "Ignore edit cancelled before opening" => {
+            "backend-ignore-edit-cancelled-before-opening-012613"
+        }
+        "Ignore edit cancelled before publication" => {
+            "backend-ignore-edit-cancelled-before-publication-80ba37"
+        }
+        "Ignore preparation cancelled" => "backend-ignore-preparation-cancelled-a562fd",
+        "Ignore preview cancelled" => "backend-ignore-preview-cancelled-d6374a",
+        "Line history cancelled or exceeded120seconds" => {
+            "backend-line-history-cancelled-or-exceeded120seconds-7448a3"
+        }
+        "Not run: cancelled" => "backend-not-run-cancelled-02b0ef",
+        "Object inspection cancelled" => "backend-object-inspection-cancelled-e67f16",
+        "Provider request cancelled" => "backend-provider-request-cancelled-54eb9a",
+        "Provider request cancelled; refresh to establish any write outcome" => {
+            "backend-provider-request-cancelled-refresh-to-establish-any-write-outcome-70b94f"
+        }
+        "Public-key upload cancelled before sending." => {
+            "backend-public-key-upload-cancelled-before-sending-eecb8c"
+        }
+        "Push rejected, cancelled or outcome uncertain. Inspect the destination before queueing again." => {
+            "backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3"
+        }
+        "Read cancelled" => "backend-read-cancelled-045da9",
+        "Recovery cancelled" => "backend-recovery-cancelled-d0dd9f",
+        "Recovery cancelled before mutation" => "backend-recovery-cancelled-before-mutation-922fff",
+        "Replay cancelled" => "backend-replay-cancelled-c6ccd5",
+        "Review cancelled" => "backend-review-cancelled-519921",
+        "Saved graph view cancelled" => "backend-saved-graph-view-cancelled-754f0e",
+        "Setup operation cancelled" => "backend-setup-operation-cancelled-cdccbd",
+        "Symbol history cancelled or reached its time budget" => {
+            "backend-symbol-history-cancelled-or-reached-its-time-budget-6f2781"
+        }
+        "Symbol parsing cancelled" => "backend-symbol-parsing-cancelled-9fccaf",
+        "Symbol parsing cancelled or exceeded structural budget" => {
+            "backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57"
+        }
+        "Symbol parsing cancelled or exceeded two seconds" => {
+            "backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02"
+        }
+        "Working-folder publication cancelled" => {
+            "backend-working-folder-publication-cancelled-a8f541"
+        }
+        "cancelled" => "backend-helper-display-8b47045eb7",
+        "Cancelled" => "backend-helper-display-d353a99eb4",
+        "stopped" => "backend-helper-display-8322e87d24",
+        "History investigation cancelled" => "backend-helper-display-f7df6fb542",
+        "DVC is not installed on this repository machine" => "backend-helper-display-219d77f375",
+        "invalid resource helper arguments" => "backend-helper-display-389db1e9f2",
+        "invalid keep retirement arguments" => "backend-helper-display-50ca4f5bd0",
+        "invalid keep hash" => "backend-helper-display-f833fa6387",
+        "invalid keep message" => "backend-helper-display-46b86a42f2",
+        "Input exceeds 128 MiB" => "backend-helper-display-c1a950664d",
+        "Git did not return an exit code" => "backend-helper-display-7f609a6911",
+        "Unsupported resource helper platform" => "backend-helper-display-bcc9225eef",
+        "Bundle unpacking requires Linux hard address-space limits on this host; no pack was opened." => {
+            "backend-helper-display-286c0e8cfe"
+        }
+        "hard resource limit not confirmed" => "backend-helper-display-f0c58d1c8d",
+        "invalid keep ownership" => "backend-helper-display-06729de987",
+        "keep ownership changed; retained" => "backend-helper-display-a3db0ebabc",
+        "keep identity changed; retained" => "backend-helper-display-4b3bf71f7e",
+        "Safe remote staging requires Python 3 standard-library no-follow file and ACL APIs; install python3 on the repository machine" => {
+            "backend-helper-display-18d2a159d4"
+        }
+        "Safe index reads require Perl with Fcntl no-follow support on the repository machine" => {
+            "backend-helper-display-124d998466"
+        }
+        "File comparison requires md5sum (Linux/WSL) or md5 (macOS)" => {
+            "backend-helper-display-f29ce072ac"
+        }
+        "Unsupported MD5 capability" => "backend-helper-display-3135c24fb2",
+        "Create-only recovery needs GNU ln or Perl" => "backend-helper-display-b26048e0e2",
+        "legacy or rewritten remote" => "backend-native-fallback-c3d2b99ca7",
+        "remote has no fetch URL" => "backend-native-fallback-d81c296d75",
+        "remote display requires Git" => "backend-native-fallback-c1ee10596f",
+        "tracking graph exceeds native bound" => "backend-native-fallback-35c9ca76bd",
+        "ambiguous upstream short name" => "backend-native-fallback-08b2647385",
+        "symbolic reference requires Git" => "backend-native-fallback-1b16d9cfdb",
+        "non-commit branch requires Git" => "backend-native-fallback-e1e6d89f7b",
+        "unsupported upstream namespace" => "backend-native-fallback-850e897a1e",
+        "local upstream requires Git" => "backend-native-fallback-bd13f61f25",
+        "feature disabled" => "backend-native-fallback-3369979818",
+        _ => return error.to_owned(),
+    };
+    crate::i18n::text(id).to_owned()
+}
