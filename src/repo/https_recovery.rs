@@ -11,7 +11,21 @@ pub(super) struct Ticket {
     context: crate::connections::Context,
     remotes: Vec<git::Remote>,
 }
+impl Ticket {
+    pub(super) fn authorizes_endpoint(&self, url: &str) -> bool {
+        self.binding
+            .as_ref()
+            .is_some_and(|binding| binding.authorizes_endpoint(url))
+            && git::CredentialScope::for_url(url, "endpoint-check")
+                .is_ok_and(|scope| self.endpoints.iter().any(|e| scope.matches_url(e)))
+    }
+}
 impl RepoTab {
+    pub(super) fn inspect_unbound_https(&mut self, urls: Vec<String>, ctx: &egui::Context) {
+        self.invalidate_https_challenge();
+        self.status=Some(("This endpoint is outside the failed operation's verified routes. Inspect its account separately in HTTPS sign-ins, then run the operation again; no account rejection or retry was authorized.".into(),true));
+        crate::settings::network_page::inspect_secondary(ctx, self.path.clone(), urls);
+    }
     pub(super) fn https_ticket(&self, url: String) -> Ticket {
         Ticket {
             endpoints: vec![url.clone()],
@@ -44,7 +58,7 @@ impl RepoTab {
     }
     pub(super) fn offer_failed_https_signin(
         &mut self,
-        failure: git::AuthFailure,
+        mut failure: git::AuthFailure,
         refused: bool,
         ctx: &egui::Context,
     ) {
@@ -69,6 +83,16 @@ impl RepoTab {
             self.status=Some(("The failed operation has no verified destination snapshot. Run it again before signing in; LFS or hook sign-ins require their own explicitly selected account.".into(),true));
             return;
         }
+        let (bound, foreign): (Vec<_>, Vec<_>) = failure.endpoints.into_iter().partition(|url| {
+            failure
+                .binding
+                .as_ref()
+                .is_some_and(|b| b.authorizes_endpoint(url))
+        });
+        failure.endpoints = bound;
+        if !foreign.is_empty() {
+            crate::settings::network_page::inspect_secondary(ctx, self.path.clone(), foreign);
+        }
         if failure.endpoints.is_empty() {
             self.status = Some(("Git did not report an HTTP(S) sign-in endpoint. Inspect HTTPS sign-ins in Settings, then run the operation again.".into(), true));
             return;
@@ -89,7 +113,7 @@ impl RepoTab {
         self.dialog = Some(dialog);
     }
     pub(super) fn https_rejection_done(&mut self, ticket: Ticket, result: Result<(), String>) {
-        if !self.https_ticket_current(&ticket) {
+        if !self.https_ticket_current(&ticket) || !ticket.authorizes_endpoint(&ticket.url) {
             self.finished.push((format!("Sign-in rejection for the previous connection {}. Current sign-in was not changed.", if result.is_ok() { "finished" } else { "failed" }), result.is_err()));
             return;
         }
@@ -161,6 +185,81 @@ mod tests {
             assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
             assert!(crate::settings::network_page::take_inspection_request(&ctx));
         });
+    }
+    fn recorded_binding() -> Result<git::RouteBinding, String> {
+        serde_json::from_value(serde_json::json!({
+            "args": ["push", "origin"],
+            "routes": ["https://git.invalid/repo", "https://mirror.invalid/repo"],
+            "configuration": "remote.origin.url\nhttps://git.invalid/repo\u{0}"
+        }))
+        .map_err(|e| e.to_string())
+    }
+    #[test]
+    fn mixed_failures_keep_bound_choices_and_separate_independent_routes() -> Result<(), String> {
+        crate::connections::Context::default().run(|| -> Result<(), String> {
+            // An independent route can move while ordinary Git proof is unchanged.
+            // Neither its original nor edited URL acquires ordinary-route authority.
+            let binding = recorded_binding()?;
+            for foreign in ["https://lfs.invalid/old", "https://other-lfs.invalid/new"] {
+                let ctx = egui::Context::default();
+                let mut tab = RepoTab::new_deferred("/nonexistent/mixed-route".into(), &ctx);
+                let error = format!(
+                    "fatal: Authentication failed for 'https://git.invalid/repo'\nfatal: Authentication failed for 'https://mirror.invalid/repo'\nfatal: Authentication failed for '{foreign}'"
+                );
+                let mut failure = git::AuthFailure::from_error(&error, &[]);
+                assert!(!failure.confirmed);
+                failure.binding = Some(binding.clone());
+                tab.offer_failed_https_signin(failure, true, &ctx);
+                let ticket = tab.https_challenge.as_ref().ok_or("Missing normal choices")?;
+                assert!(ticket.url.is_empty());
+                assert_eq!(ticket.endpoints, ["https://git.invalid/repo", "https://mirror.invalid/repo"]);
+                assert!(ticket.authorizes_endpoint("https://git.invalid/repo/"));
+                assert!(ticket.authorizes_endpoint("https://mirror.invalid/repo"));
+                assert!(!ticket.authorizes_endpoint(foreign));
+                assert!(matches!(&tab.dialog, Some(Dialog::Credentials{endpoints,..}) if endpoints == &ticket.endpoints));
+                assert!(crate::settings::network_page::take_inspection_request(&ctx));
+                assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
+                assert!(!tab.https_checking && tab.running.is_none() && tab.busy_op.is_none());
+            }
+            Ok(())
+        })
+    }
+    #[test]
+    fn foreign_selection_cannot_sign_in_or_forget_even_if_ticket_lists_it() -> Result<(), String> {
+        crate::connections::Context::default().run(|| -> Result<(), String> {
+            for sign_in in [true, false] {
+                let ctx = egui::Context::default();
+                let mut tab = RepoTab::new_deferred("/nonexistent/foreign-choice".into(), &ctx);
+                let foreign = "https://secondary.invalid/repo";
+                let mut ticket = tab.https_ticket(foreign.into());
+                ticket.endpoints.push("https://git.invalid/repo".into());
+                ticket.binding = Some(recorded_binding()?);
+                assert!(!ticket.authorizes_endpoint(foreign));
+                tab.https_challenge = Some(ticket);
+                tab.credentials = Some(git::Credentials::for_url(
+                    "https://git.invalid/repo",
+                    "alice".into(),
+                    "DUMMY_RETAINED".into(),
+                )?);
+                if sign_in {
+                    tab.sign_in(
+                        git::Credentials::for_url(foreign, "bob".into(), "DUMMY_FOREIGN".into())?,
+                        &ctx,
+                    );
+                } else {
+                    tab.switch_https(foreign.into(), &ctx);
+                }
+                assert_eq!(
+                    tab.credentials.as_ref().map(|c| c.username.as_str()),
+                    Some("alice")
+                );
+                assert!(!tab.https_checking && tab.running.is_none() && tab.busy_op.is_none());
+                assert!(tab.dialog.is_none() && tab.https_challenge.is_none());
+                assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
+                assert!(crate::settings::network_page::take_inspection_request(&ctx));
+            }
+            Ok(())
+        })
     }
     #[test]
     fn connection_or_operation_changes_discard_old_rejection_completion_and_retry() {

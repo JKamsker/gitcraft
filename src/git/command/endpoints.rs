@@ -85,13 +85,14 @@ impl AuthFailure {
         {
             return true;
         }
-        self.confirmed
-            && self.endpoints.iter().any(|url| {
-                !binding.routes.iter().any(|route| {
-                    crate::git::CredentialScope::for_url(url, "endpoint-check")
-                        .is_ok_and(|scope| scope.matches_url(route))
-                })
-            })
+        // Mixed candidates keep their ordinary bound choices. Foreign entries
+        // are separated before offering the dialog, and selection is checked
+        // again against the proof at both action entry points.
+        !self.endpoints.is_empty()
+            && self
+                .endpoints
+                .iter()
+                .all(|url| !binding.authorizes_endpoint(url))
     }
     /// An explicit URL reported by Git/LFS takes precedence over configured candidates.
     /// Otherwise the UI requires a destination choice; it never guesses a fetch URL.
@@ -172,6 +173,11 @@ impl RouteBinding {
     }
     pub fn urls(&self) -> &[String] {
         &self.routes
+    }
+    /// A reported or explicitly chosen URL cannot enlarge this route proof.
+    pub fn authorizes_endpoint(&self, url: &str) -> bool {
+        crate::git::CredentialScope::for_url(url, "endpoint-check")
+            .is_ok_and(|scope| self.routes.iter().any(|route| scope.matches_url(route)))
     }
     pub fn verify(&self, repo: &Path) -> Result<(), String> {
         let args = self.args.iter().map(String::as_str).collect::<Vec<_>>();

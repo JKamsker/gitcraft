@@ -186,37 +186,39 @@ impl RepoTab {
             ));
             return;
         }
-        let binding = self
+        let challenge = self
             .https_challenge
             .as_ref()
             .filter(|ticket| self.https_ticket_current(ticket))
-            .and_then(|ticket| ticket.binding.clone());
-        let Some(binding) = binding else {
+            .cloned();
+        let Some(binding) = challenge.as_ref().and_then(|ticket| ticket.binding.clone()) else {
             self.invalidate_https_challenge();
             self.status=Some(("This sign-in has no verified operation route. Run the operation again before switching accounts.".into(),true));
             return;
         };
-        let binding = Some(binding);
+        if !challenge
+            .as_ref()
+            .is_some_and(|ticket| ticket.authorizes_endpoint(&url))
+        {
+            self.inspect_unbound_https(vec![url], ctx);
+            return;
+        }
         let path = self.path.clone();
         self.forget_https_memory(&path, &url);
         crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
         let mut ticket = self.https_ticket(url.clone());
-        ticket.binding = binding.clone();
+        ticket.binding = Some(binding.clone());
         let reads = self.reads;
         self.then_or(
             ctx,
             true,
             |error| (Err(error), false),
             move || {
-                if let Some(binding) = &binding
-                    && let Err(error) = binding.verify(&path)
-                {
+                if let Err(error) = binding.verify(&path) {
                     return (Err(error), false);
                 }
                 let result = git::https_reject(&path, &url);
-                let route_current = binding
-                    .as_ref()
-                    .is_none_or(|binding| binding.verify(&path).is_ok());
+                let route_current = binding.verify(&path).is_ok();
                 (result, route_current)
             },
             move |tab, (result, route_current), _| {
@@ -253,6 +255,16 @@ impl RepoTab {
             ));
             return;
         };
+        let selected = ticket.endpoints.iter().find(|url| {
+            creds
+                .scope
+                .as_ref()
+                .is_some_and(|scope| scope.matches_url(url))
+        });
+        if !selected.is_some_and(|url| ticket.authorizes_endpoint(url)) {
+            self.inspect_unbound_https(selected.cloned().into_iter().collect(), ctx);
+            return;
+        }
         self.https_checking = true;
         self.status = Some(("Checking the sign-in destination…".into(), false));
         let path = self.path.clone();
