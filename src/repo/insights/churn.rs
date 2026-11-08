@@ -99,7 +99,7 @@ impl RepoTab {
         let rev = state.rev.clone().unwrap_or_else(|| "HEAD".to_owned());
         let limit = state.limit();
         let path = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 history::read(&path, &rev, limit).map(|h| {
@@ -138,7 +138,7 @@ impl RepoTab {
         let options = state.options.clone();
         let request = state.built.start();
         let path = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 let plan = core::plan(&history, &options);

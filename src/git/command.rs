@@ -146,8 +146,40 @@ pub(super) struct Extra {
 const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
+thread_local! {
+    /// Git runs on this thread are reads that mustn't fetch (see [`offline`]).
+    static OFFLINE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `work` with every git it starts on this thread kept from fetching what a partial
+/// clone lacks (`GIT_NO_LAZY_FETCH`): for views that only read, a missing object is an error
+/// rather than a download written into the repository.
+pub fn offline<T>(work: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            OFFLINE.with(|o| o.set(self.0));
+        }
+    }
+    let _restore = Restore(OFFLINE.with(|o| o.replace(true)));
+    work()
+}
+
+const NO_LAZY_FETCH: &str = "GIT_NO_LAZY_FETCH";
+
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
+    let with_offline;
+    let extra = if OFFLINE.with(std::cell::Cell::get)
+        && !extra.env.iter().any(|(name, _)| *name == NO_LAZY_FETCH)
+    {
+        let mut more = extra.clone();
+        more.env.push((NO_LAZY_FETCH, "1".to_owned()));
+        with_offline = more;
+        &with_offline
+    } else {
+        extra
+    };
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
@@ -474,6 +506,21 @@ pub fn run_env(
             stderr
         })
     }
+}
+
+/// [`run_env`], taking the exit codes `ok` as success.
+pub fn run_env_codes(
+    dir: Option<&Path>,
+    args: &[&str],
+    env: &[(&'static str, &str)],
+    ok: &[i32],
+) -> Result<String, String> {
+    let extra = Extra {
+        pre: Vec::new(),
+        env: env.iter().map(|(n, v)| (*n, (*v).to_owned())).collect(),
+        ..Extra::default()
+    };
+    finish(execute(dir, &extra, args)?, args, ok)
 }
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).

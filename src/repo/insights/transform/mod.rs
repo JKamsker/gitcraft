@@ -170,7 +170,7 @@ impl RepoTab {
         };
         state.asked = Some((of, commit));
         let repo = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 let subject = transform::resolve(&repo, &ask)?;

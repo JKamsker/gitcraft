@@ -90,7 +90,11 @@ pub fn radar(repo: &Path, mut cache: Cache, now: i64) -> Result<(Radar, Cache), 
         ),
         None => format!("{branches} active branches; no default branch found"),
     };
-    let mut provenance = Provenance::new("git merge-tree (in memory), git diff", scope);
+    let mut provenance = Provenance::new(
+        "git merge-tree (no branch or worktree changes; it leaves unreferenced objects that \
+         git gc removes), git diff",
+        scope,
+    );
     provenance.collected = now;
     if let Some(t) = nodes.last().filter(|_| has_target) {
         provenance = provenance.tip(t.name.clone(), t.tip.clone());
@@ -120,16 +124,19 @@ fn compute(repo: &Path, nodes: &[Candidate], todo: &[(usize, usize)]) -> Vec<Pai
     let mut done: Vec<(usize, PairResult)> = std::thread::scope(|s| {
         let workers: Vec<_> = (0..AT_ONCE.min(todo.len()))
             .map(|_| {
+                // Each worker reads without fetching, as the thread that started them does.
                 s.spawn(|| {
-                    let mut mine = Vec::new();
-                    loop {
-                        let k = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(&(i, j)) = todo.get(k) else {
-                            break;
-                        };
-                        mine.push((k, pair(repo, &nodes[i], &nodes[j], &changed)));
-                    }
-                    mine
+                    crate::git::offline(|| {
+                        let mut mine = Vec::new();
+                        loop {
+                            let k = next.fetch_add(1, Ordering::Relaxed);
+                            let Some(&(i, j)) = todo.get(k) else {
+                                break;
+                            };
+                            mine.push((k, pair(repo, &nodes[i], &nodes[j], &changed)));
+                        }
+                        mine
+                    })
                 })
             })
             .collect();
@@ -217,7 +224,7 @@ fn dry_run(repo: &Path, a: &Candidate, b: &Candidate) -> collision::Cell {
         name: c.name.clone(),
         git: c.tip.clone(),
     };
-    collision::merge(repo, &branch(a), &branch(b))
+    collision::merge_offline(repo, &branch(a), &branch(b))
 }
 
 /// The files `tip` changed since `base` (renames as a removal and an addition), at most

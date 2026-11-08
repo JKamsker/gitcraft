@@ -129,7 +129,7 @@ impl RepoTab {
         let request = state.data.start();
         state.selected = None;
         state.test = None;
-        self.then(
+        self.insight_then(
             ctx,
             move || core::analyze(&path, &ask, report.as_deref()).map(Arc::new),
             move |tab, result, ctx| {
@@ -155,7 +155,7 @@ impl RepoTab {
         };
         let test = state.test;
         let request = state.layout.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || -> Result<Arc<Laid>, String> { Ok(Arc::new(picture::build(&data, test, &t))) },
             move |tab, laid, _| {

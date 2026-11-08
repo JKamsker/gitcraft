@@ -174,7 +174,7 @@ impl RepoTab {
         let ask = state.ask.clone().unwrap_or(fallback);
         let request = state.data.start();
         state.selected = None;
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 core::resolve(&path, &ask)
@@ -204,7 +204,7 @@ impl RepoTab {
         };
         let (filter, force) = (state.filter.clone(), state.force);
         let request = state.layout.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || -> Result<Arc<Laid>, String> {
                 Ok(Arc::new(picture::build(&data, &filter, force, &t)))

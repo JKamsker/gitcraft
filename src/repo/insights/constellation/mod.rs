@@ -77,7 +77,7 @@ impl RepoTab {
         };
         let request = view.constellation.read.start();
         let repo = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || read::snapshot(&repo, crate::git::now()),
             move |tab, result, ctx| {
@@ -196,7 +196,7 @@ impl RepoTab {
             .map(|w| w.path.clone())
             .collect();
         let request = state.disk.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 folders

@@ -92,6 +92,12 @@ pub struct PairResult {
 }
 
 impl PairResult {
+    /// It couldn't be worked out (the merge or a read failed: a connection dropped, a lock):
+    /// shown as it is, and worked out again on the next read rather than reused.
+    pub fn failed(&self) -> bool {
+        self.merge.is_err() || (self.changed.is_empty() && self.partial.is_some())
+    }
+
     /// The files the dry-run merge leaves conflicted (none when it couldn't be done).
     pub fn conflicts(&self) -> &[String] {
         match &self.merge {
@@ -149,10 +155,10 @@ impl Cache {
         self.pairs.len()
     }
 
-    /// The pairs (by place in `tips`) not worked out at those tips yet.
+    /// The pairs (by place in `tips`) not worked out at those tips yet, or that failed.
     pub fn missing(&self, tips: &[String]) -> Vec<(usize, usize)> {
         pairs(tips.len())
-            .filter(|&(i, j)| self.get(&tips[i], &tips[j]).is_none())
+            .filter(|&(i, j)| self.get(&tips[i], &tips[j]).is_none_or(PairResult::failed))
             .collect()
     }
 

@@ -228,7 +228,7 @@ impl RepoTab {
         let request = state.read.start();
         let (limit, options) = (state.limit, state.options.clone());
         let repo = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || read(&repo, limit, &options),
             move |tab, found, _| tab.coupling_accept(request, found),
@@ -262,7 +262,7 @@ impl RepoTab {
                     return;
                 };
                 let request = state.read.start();
-                self.then(
+                self.insight_then(
                     ctx,
                     move || Ok(build(history, &options)),
                     move |tab, found, _| tab.coupling_accept(request, found),
@@ -337,7 +337,7 @@ impl RepoTab {
                             let request = state.commit_files.start();
                             let repo = self.path.clone();
                             let of = hash.clone();
-                            self.then(
+                            self.insight_then(
                                 ctx,
                                 move || {
                                     crate::git::commit_detail(&repo, &of).map(|d| {

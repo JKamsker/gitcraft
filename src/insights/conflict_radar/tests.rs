@@ -88,6 +88,32 @@ fn moving_a_tip_invalidates_exactly_its_pairs() {
     assert!(cache.get("a1", "c1").is_some());
 }
 
+/// A pair whose merge or reads failed (a dropped connection) is worked out again on the next
+/// read, its tips unmoved.
+#[test]
+fn failed_pairs_are_worked_out_again() {
+    let tips: Vec<String> = ["a1", "b1", "m1"].iter().map(|s| (*s).to_owned()).collect();
+    let mut cache = Cache::default();
+    cache.insert("a1", "b1", result(&[], &[]));
+    cache.insert(
+        "a1",
+        "m1",
+        PairResult {
+            merge: Err("connection closed".to_owned()),
+            ..result(&[], &[])
+        },
+    );
+    cache.insert(
+        "b1",
+        "m1",
+        PairResult {
+            partial: Some("what changed couldn't be read: timed out".to_owned()),
+            ..result(&[], &[])
+        },
+    );
+    assert_eq!(cache.missing(&tips), [(0, 2), (1, 2)]);
+}
+
 #[test]
 fn the_landing_order_comes_from_the_pairs() {
     let nodes = vec![

@@ -226,6 +226,69 @@ mod tests {
         assert!(commits[0].files.is_empty());
     }
 
+    /// In a partial clone without the files' contents, the history read for a view fetches
+    /// nothing: the repository has as many objects after as before.
+    #[test]
+    fn a_partial_clone_is_read_without_fetching() -> Result<(), String> {
+        // A filtered clone over file:// needs a path git takes as it is: ASCII only.
+        let root = std::env::temp_dir().join(format!("gitcraft-promisor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (origin, clone) = (root.join("origin"), root.join("clone"));
+        std::fs::create_dir_all(&origin).map_err(|e| e.to_string())?;
+        let at = |args: &[&str]| git::run(Some(&origin), args);
+        at(&["init", "-q", "-b", "main"])?;
+        for (key, value) in [
+            ("user.name", "T"),
+            ("user.email", "t@t"),
+            ("commit.gpgSign", "false"),
+            ("uploadpack.allowFilter", "true"),
+        ] {
+            at(&["config", key, value])?;
+        }
+        for (n, text) in [("one", "a\n"), ("two", "a\nb\n")] {
+            std::fs::write(origin.join("a.txt"), text).map_err(|e| e.to_string())?;
+            at(&["add", "a.txt"])?;
+            at(&["commit", "-q", "-m", n])?;
+        }
+        let url = format!("file://{}", origin.display());
+        let clone_path = clone.to_string_lossy().into_owned();
+        git::run(
+            None,
+            &[
+                "clone",
+                "-q",
+                "--filter=blob:none",
+                "--no-checkout",
+                &url,
+                &clone_path,
+            ],
+        )?;
+        let objects = || -> Result<String, String> {
+            let out = git::run(Some(&clone), &["count-objects", "-v"])?;
+            Ok(out
+                .lines()
+                .filter(|l| l.starts_with("count:") || l.starts_with("in-pack:"))
+                .collect::<Vec<_>>()
+                .join(" "))
+        };
+        let missing = git::run(
+            Some(&clone),
+            &["rev-list", "--objects", "--all", "--missing=print"],
+        )?;
+        let before = objects()?;
+        // Without the blobs the line counts can't be worked out: an error, not a download.
+        let read = git::offline(|| read(&clone, "HEAD", 10));
+        let after = objects()?;
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            missing.lines().any(|l| l.starts_with('?')),
+            "a partial clone"
+        );
+        assert_eq!(before, after, "nothing was fetched");
+        assert!(read.is_err(), "{read:?}");
+        Ok(())
+    }
+
     #[test]
     fn a_real_history_is_read_up_to_its_limit() -> Result<(), String> {
         let repo = git::fixture::Repo::new("insights-history")?;

@@ -74,7 +74,7 @@ impl RepoTab {
         };
         let request = state.rewrites.start();
         let path = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || git::rewrites(&path),
             move |tab, list, ctx| {
@@ -153,7 +153,7 @@ impl RepoTab {
         state.selected = None;
         state.patch = Slot::default();
         state.shown_at = None;
-        self.then(
+        self.insight_then(
             ctx,
             move || compare(&path, &source, key.as_deref(), &remotes),
             move |tab, result, _| {
@@ -231,7 +231,7 @@ impl RepoTab {
             state.patch.accept(request, Ok(diff::interdiff_data(&body)));
             return;
         }
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 let body = match read {

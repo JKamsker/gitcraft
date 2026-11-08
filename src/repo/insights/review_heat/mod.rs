@@ -96,7 +96,7 @@ impl RepoTab {
             return;
         };
         let request = state.data.start();
-        self.forge_then(
+        self.insight_forge_then(
             ctx,
             move || {
                 let pages = hosting.forge.provider().pages().ok_or_else(|| {

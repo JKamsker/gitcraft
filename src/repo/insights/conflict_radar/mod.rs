@@ -82,7 +82,7 @@ impl RepoTab {
         let request = state.read.start();
         let cache = state.cache.clone();
         let repo = self.path.clone();
-        self.then(
+        self.insight_then(
             ctx,
             move || read::radar(&repo, cache, crate::git::now()),
             move |tab, result, _| {
@@ -136,7 +136,7 @@ impl RepoTab {
                 state.hunks_for = Some(k);
                 let request = state.hunks.start();
                 let repo = self.path.clone();
-                self.then(
+                self.insight_then(
                     ctx,
                     move || read::conflict_hunks(&repo, &a, &b, &conflicts),
                     move |tab, found, _| {

@@ -120,7 +120,7 @@ impl RepoTab {
             return;
         }
         let request = state.runs.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || {
                 let mut runs = Runs::default();
@@ -192,7 +192,7 @@ impl RepoTab {
         };
         let baseline = state.baseline;
         let request = state.explorer.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || analysis::read(&path, &project, run, baseline, (&name, &sha)),
             move |tab, result: Result<Explorer, String>, _ctx| {

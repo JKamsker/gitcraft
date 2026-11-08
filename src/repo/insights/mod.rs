@@ -338,6 +338,28 @@ impl RepoTab {
         }
     }
 
+    /// [`RepoTab::then`] for a view's read: what it runs fetches nothing (see
+    /// [`crate::git::offline`]).
+    pub(super) fn insight_then<T: Send + 'static>(
+        &self,
+        ctx: &egui::Context,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        self.then(ctx, move || crate::git::offline(work), then);
+    }
+
+    /// [`RepoTab::forge_then`] for a view's read of the forge and the repository: the git it
+    /// runs fetches nothing.
+    pub(super) fn insight_forge_then<T: Send + 'static>(
+        &self,
+        ctx: &egui::Context,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        self.forge_then(ctx, move || crate::git::offline(work), then);
+    }
+
     /// The palette's entries: one per view.
     pub(super) fn insights_palette_items(&self) -> Vec<(String, String, super::Action)> {
         Kind::ALL

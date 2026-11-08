@@ -92,7 +92,7 @@ impl RepoTab {
             return;
         };
         let request = state.flow.start();
-        self.then(
+        self.insight_then(
             ctx,
             move || analysis::read(&path, &project, &sha, (&name, &sha)),
             move |tab, result: Result<Flow, String>, ctx| {
