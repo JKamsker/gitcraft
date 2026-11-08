@@ -197,7 +197,7 @@ impl Ctx<'_> {
             let from = now.branches.get(name).cloned().filter(|s| !s.is_empty());
             let to = state.branches.get(name).cloned().filter(|s| !s.is_empty());
             if to.as_ref().is_some_and(|s| !git::investigations::oid(s)) {
-                return Err("Invalid timeline commit ID".into());
+                return Err("Invalid timeline commit ID".to_owned().into());
             }
             out.moves.push(RefMove {
                 full: local_ref(name),
