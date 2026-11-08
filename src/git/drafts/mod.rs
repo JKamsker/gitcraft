@@ -3,6 +3,7 @@
 mod context;
 pub mod deferred;
 pub mod lists;
+mod native_files;
 mod permissions;
 mod restore;
 #[cfg(test)]

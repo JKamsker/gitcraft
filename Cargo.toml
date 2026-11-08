@@ -55,6 +55,7 @@ raw-window-handle = "0.6"
 rfd = "0.17"
 # Quiet synthesized native earcons; no codec or media-file support. Device opens only on opt-in.
 rodio = { version = "0.21", default-features = false, features = ["playback"] }
+same-file = "=1.0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
@@ -81,9 +82,10 @@ tempfile = "3"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs"] }
+rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+exacl = { version = "=0.13.0", default-features = false, features = ["serde"] }
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }
