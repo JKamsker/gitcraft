@@ -320,28 +320,64 @@ pub(crate) struct Reword {
 
 /// Transient provenance for fixed comparison captions emitted by the review UI.
 /// Raw labels remain the operation/data identity; unmarked user labels stay opaque.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CompareCaption {
     OriginalFix,
     AdaptedFix,
+    BeforeTurn { number: u32 },
+    Turn { number: u32, label: String },
+    AfterTurn { number: u32 },
+    Now,
+    OriginalBranch { branch: String },
+    CandidateBranch { branch: String },
 }
 
 impl CompareCaption {
-    fn display(self, raw: &str) -> String {
-        let (expected, id) = match self {
-            Self::OriginalFix => (
-                "Original fix",
-                "repo-workflows-review-label-original-fix-27d835",
-            ),
-            Self::AdaptedFix => (
-                "Adapted fix",
-                "repo-workflows-review-raw-adapted-fix-194525",
-            ),
+    fn display(&self, raw: &str) -> String {
+        let expected = match self {
+            Self::OriginalFix => "Original fix".to_owned(),
+            Self::AdaptedFix => "Adapted fix".to_owned(),
+            Self::BeforeTurn { number } => format!("before turn {number}"),
+            Self::Turn { number, label } => format!("turn {number}: {label}"),
+            Self::AfterTurn { number } => format!("after turn {number}"),
+            Self::Now => "now".to_owned(),
+            Self::OriginalBranch { branch } => format!("original {branch}"),
+            Self::CandidateBranch { branch } => format!("candidate {branch}"),
         };
-        if raw == expected {
-            crate::i18n::text(id).to_owned()
-        } else {
-            raw.to_owned()
+        if raw != expected {
+            return raw.to_owned();
+        }
+        match self {
+            Self::OriginalFix => {
+                crate::i18n::text("repo-workflows-review-label-original-fix-27d835").to_owned()
+            }
+            Self::AdaptedFix => {
+                crate::i18n::text("repo-workflows-review-raw-adapted-fix-194525").to_owned()
+            }
+            Self::BeforeTurn { number } => crate::i18n::message(
+                "repo-workflows-agents-turn-diff-dc601e7b",
+                &[("turn-number-1", number.to_string().into())],
+            ),
+            Self::Turn { number, label } => crate::i18n::message(
+                "repo-workflows-agents-turn-diff-9021b8b9",
+                &[
+                    ("turn-number-1", number.to_string().into()),
+                    ("label", label.as_str().into()),
+                ],
+            ),
+            Self::AfterTurn { number } => crate::i18n::message(
+                "repo-workflows-agents-turn-chip-60c8b8ae",
+                &[("turn-number-1", number.to_string().into())],
+            ),
+            Self::Now => crate::i18n::text("repo-workflows-agents-turn-chip-ed5eb9a3").to_owned(),
+            Self::OriginalBranch { branch } => crate::i18n::message(
+                "repo-workflows-repository_tools-show-507eaa08",
+                &[("s-branch-1", branch.as_str().into())],
+            ),
+            Self::CandidateBranch { branch } => crate::i18n::message(
+                "repo-workflows-repository_tools-show-7bd990ec",
+                &[("s-branch-1", branch.as_str().into())],
+            ),
         }
     }
 }
@@ -375,14 +411,14 @@ pub(crate) struct CompareData {
 
 impl Compare {
     pub(super) fn display_base_label(&self) -> String {
-        self.captions[0].map_or_else(
+        self.captions[0].as_ref().map_or_else(
             || self.base_label.clone(),
             |kind| kind.display(&self.base_label),
         )
     }
 
     pub(super) fn display_target_label(&self) -> String {
-        self.captions[1].map_or_else(
+        self.captions[1].as_ref().map_or_else(
             || self.target_label.clone(),
             |kind| kind.display(&self.target_label),
         )

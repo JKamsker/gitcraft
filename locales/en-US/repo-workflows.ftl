@@ -755,3 +755,15 @@ repo-workflows-working_drafts-poll-working-drafts-7a49e8a4 = Earlier versions: {
 repo-workflows-working_drafts-save-working-draft-3e48426a = Saved manually
 
 repo-workflows-forks-checkout-fork-abaaf4c3 = Check out #{ $number } to push to { $info-owner-1 }
+
+repo-workflows-agents-turn-diff-dc601e7b = before turn { $turn-number-1 }
+
+repo-workflows-agents-turn-diff-9021b8b9 = turn { $turn-number-1 }: { $label }
+
+repo-workflows-agents-turn-chip-60c8b8ae = after turn { $turn-number-1 }
+
+repo-workflows-agents-turn-chip-ed5eb9a3 = now
+
+repo-workflows-repository_tools-show-507eaa08 = original { $s-branch-1 }
+
+repo-workflows-repository_tools-show-7bd990ec = candidate { $s-branch-1 }

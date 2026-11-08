@@ -435,7 +435,7 @@ impl RepoTab {
                     base_label: c.target_label,
                     target: Some(c.base),
                     target_label: c.base_label,
-                    captions: [c.captions[1], c.captions[0]],
+                    captions: [c.captions[1].clone(), c.captions[0].clone()],
                     data: None,
                     ..c
                 },

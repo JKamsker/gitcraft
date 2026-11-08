@@ -289,4 +289,106 @@ mod caption_tests {
         assert_eq!(c.display_target_label(), "Opaque Original fix user label");
         crate::i18n::set_language("en-US");
     }
+
+    #[test]
+    fn generated_turn_and_branch_captions_repaint_with_owned_fields_and_opaque_lookalikes() {
+        let label = "Opaque: before turn 1234 / {$x}";
+        let branch = "topic-1234/now:{$x}";
+        let cases = [
+            (
+                [
+                    "before turn 1234",
+                    "turn 1234: Opaque: before turn 1234 / {$x}",
+                ],
+                [
+                    Some(CompareCaption::BeforeTurn { number: 1234 }),
+                    Some(CompareCaption::Turn {
+                        number: 1234,
+                        label: label.into(),
+                    }),
+                ],
+                [
+                    "vor Durchgang 1234",
+                    "Durchgang 1234: Opaque: before turn 1234 / {$x}",
+                ],
+            ),
+            (
+                ["after turn 1234", "now"],
+                [
+                    Some(CompareCaption::AfterTurn { number: 1234 }),
+                    Some(CompareCaption::Now),
+                ],
+                ["nach Durchgang 1234", "jetzt"],
+            ),
+            (
+                [
+                    "original topic-1234/now:{$x}",
+                    "candidate topic-1234/now:{$x}",
+                ],
+                [
+                    Some(CompareCaption::OriginalBranch {
+                        branch: branch.into(),
+                    }),
+                    Some(CompareCaption::CandidateBranch {
+                        branch: branch.into(),
+                    }),
+                ],
+                [
+                    "Original topic-1234/now:{$x}",
+                    "Kandidat topic-1234/now:{$x}",
+                ],
+            ),
+        ];
+        for (raw, captions, german) in cases {
+            for typed in [true, false] {
+                let mut comparison = supplied(if typed {
+                    captions.clone()
+                } else {
+                    [None, None]
+                });
+                comparison.base_label = raw[0].into();
+                comparison.target_label = raw[1].into();
+                let mut h = Harness::new_ui_state(
+                    |ui, state: &mut (bool, Compare, Vec<Action>)| {
+                        if !std::mem::replace(&mut state.0, true) {
+                            crate::theme::install_fonts(ui.ctx());
+                            return;
+                        }
+                        compare_summary(ui, &mut state.2, &state.1);
+                    },
+                    (false, comparison, Vec::new()),
+                );
+                for locale in ["en-US", "de", "en-US"] {
+                    crate::i18n::set_language(locale);
+                    h.run();
+                    let expected = if typed && locale == "de" { german } else { raw };
+                    h.get_by_label(expected[0]);
+                    h.get_by_label(expected[1]);
+                    assert_eq!(h.state().1.base_label, raw[0]);
+                    assert_eq!(h.state().1.target_label, raw[1]);
+                    assert_eq!(h.state().1.base, "original-1234");
+                    assert_eq!(h.state().1.target.as_deref(), Some("adapted-5678"));
+                    assert_eq!(h.state().1.request, 7);
+                    assert!(h.state().2.is_empty());
+                }
+                if typed {
+                    crate::i18n::set_language("de");
+                    let state = h.state_mut();
+                    state.1.base_label = "before turn 1234 (user edited)".into();
+                    assert_eq!(
+                        state.1.display_base_label(),
+                        "before turn 1234 (user edited)"
+                    );
+                    state.1.captions.swap(0, 1);
+                    std::mem::swap(&mut state.1.base_label, &mut state.1.target_label);
+                    assert_eq!(state.1.display_base_label(), german[1]);
+                    assert_eq!(
+                        state.1.display_target_label(),
+                        "before turn 1234 (user edited)"
+                    );
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }
