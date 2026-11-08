@@ -870,7 +870,9 @@ mod tests {
     fn a_repositorys_own_setting_wins() {
         let config = parse_config("gitcraft.forge gitea\ngitcraft.github.com.forge github\n");
         assert_eq!(choose("github.com", &config), Some(Forge::Gitea));
-        let nonsense = parse_config("gitcraft.forge bitbucket\n");
+        let bitbucket = parse_config("gitcraft.forge bitbucket\n");
+        assert_eq!(choose("github.com", &bitbucket), Some(Forge::Bitbucket));
+        let nonsense = parse_config("gitcraft.forge unknown-forge\n");
         assert_eq!(choose("github.com", &nonsense), Some(Forge::GitHub));
     }
 

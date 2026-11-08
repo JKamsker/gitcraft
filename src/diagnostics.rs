@@ -323,7 +323,7 @@ mod tests {
             rows,
             [
                 "pull.rebase = false · Repository · config",
-                "core.editor = (a path) · Global · .gitconfig"
+                "core.editor = (configured; value withheld) · Global · .gitconfig"
             ]
         );
         let tools = [
