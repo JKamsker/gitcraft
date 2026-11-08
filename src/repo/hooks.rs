@@ -378,8 +378,16 @@ mod tests {
             let _ = std::fs::remove_dir_all(&dir);
             let _ = std::fs::remove_dir_all(&remote);
             assert!(
-                failed.contains("the pre-push hook stopped it (exit code 3)\ntests failed"),
+                failed.contains("the pre-push hook stopped it (exit code 3)\nHook output withheld"),
                 "{failed}"
+            );
+            assert!(
+                !failed.contains("tests failed"),
+                "hook output must remain private: {failed}"
+            );
+            assert!(
+                again.contains("exit code 3") && !again.contains("tests failed"),
+                "{again}"
             );
             assert_ne!(not_pushed.as_deref(), Ok(head.as_str()));
             assert_eq!(skipped, "Push: done");
