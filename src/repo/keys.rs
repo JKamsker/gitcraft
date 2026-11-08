@@ -280,7 +280,9 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
         for b in crate::keymap::BINDINGS {
             let resolved = tab.key_action(b.command);
-            let tabs = b.command.scope() != crate::keymap::Scope::Window;
+            // Reload has a window shortcut and a direct repository/palette action.
+            let tabs =
+                b.command.scope() != crate::keymap::Scope::Window || b.command == Command::Reload;
             match resolved {
                 Ok(Some(_)) => assert!(tabs, "{:?}", b.command),
                 Ok(None) => assert!(!tabs, "{:?}", b.command),

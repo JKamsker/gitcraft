@@ -13,6 +13,109 @@ struct Case {
 }
 const CASES: &[Case] = &[
     Case {
+        raw: "Use YYYY-MM-DD dates",
+        id: "repo-workflows-atlas-read-atlas-02c42736",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Use YYYY-MM-DD dates, with start on or before end",
+        id: "repo-workflows-atlas-read-atlas-67b18cbf",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Use dates such as 2026-11-07",
+        id: "repo-workflows-history_activity-requested-range-4d18caf5",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "The start date must be on or before the end date",
+        id: "repo-workflows-history_activity-requested-range-25f6acd0",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Analysis cancelled. Refresh to try again.",
+        id: "repo-workflows-history_activity-cancel-ddfe1c43",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "No supported forge remote; commit history remains available",
+        id: "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history",
+        id: "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Trace cancelled",
+        id: "repo-workflows-line_dossier-line-dossier-view-a8198076",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Repository changed. Refresh the file view.",
+        id: "repo-workflows-file_comparison-invalidate-81f92ce0",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Invalid comparison sides",
+        id: "repo-workflows-file_comparison-prepare-da3978aa",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "More than 20,000 lines in a version; use the normal patch view",
+        id: "repo-workflows-file_comparison-boundary-e44610d7",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Git could not align these raw versions",
+        id: "repo-workflows-file_comparison-boundary-b861cbb0",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "The raw patch is not UTF-8",
+        id: "repo-workflows-file_comparison-boundary-5421cc1b",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Git could not produce a raw text patch for these differing bytes; use the normal patch view",
+        id: "repo-workflows-file_comparison-boundary-6732715f",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Comparison cancelled. Refresh to try again.",
+        id: "repo-workflows-file_comparison-file-comparison-view-725513de",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "No key, agent, account or network action has run. Choose each step explicitly.",
+        id: "repo-workflows-ssh_setup-new-8633c172",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Setup worker stopped; no later result will be applied.",
+        id: "repo-workflows-ssh_setup-poll-380743c6",
+        args: &[],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Cut release raw-tag/1234",
+        id: "repo-workflows-release-release-stopped-fbe3bbf7",
+        args: &[(
+            "run-plan-tag-1",
+            Sample::Text("raw-tag/1234", "raw-tag/1234"),
+        )],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Clear the flag of raw/path:1234",
+        id: "repo-workflows-doctor-clear-7f76d2cf",
+        args: &[("one-path-1", Sample::Text("raw/path:1234", "raw/path:1234"))],
+    }, // retained R1 finite contract
+    Case {
+        raw: "Clear the flags of 1234 files",
+        id: "repo-workflows-doctor-clear-e318945b",
+        args: &[("files-len-1", Sample::Number(1234))],
+    }, // retained R1 finite contract
+    Case {
         raw: "Could not start the selected machine's terminal/tool. Check that OpenSSH/WSL is installed. A reserved new folder, if any, is retained; existing files were not overwritten.",
         id: "repo-workflows-ssh_setup-launch-0690e36b",
         args: &[],

@@ -132,7 +132,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     assert_eq!(view.query.through, Some(first));
     assert_eq!(view.summary.as_ref().ok_or("summary")?.selected.len(), 1);
     harness
-        .get_by_label("2026-01-01  aaaaaaaa  first · A")
+        .get_by_label("01/01/2026  aaaaaaaa  first · A")
         .click();
     harness.run_steps(2);
     assert_eq!(

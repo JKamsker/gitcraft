@@ -387,7 +387,8 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert!(texts.contains(&"1 recorded content match(es); inspect each candidate step"));
+        out.textures_delta.clear();
+        assert!(texts.contains(&"1 recorded content match; inspect each candidate step"));
         let p = out
             .shapes
             .iter()

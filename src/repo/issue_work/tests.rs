@@ -616,7 +616,7 @@ fn review13_cases() -> Vec<(crate::forge::Hosting, String, bool)> {
             (
                 "https://forgejo.example:4000/reviews",
                 "team/repo",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             cases.push((h.clone(), format!("{base}/{path}/{marker}/7"), expected));
