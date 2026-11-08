@@ -58,6 +58,12 @@ class PinnedDirectory:
             data = f.read(2049)
         if len(data) > 2048: raise ValueError('oversized receipt')
         return data
+    def artifacts_absent(self):
+        for name in ('input', 'control', 'terminal'):
+            try: os.stat(name, dir_fd=self.fd, follow_symlinks=False)
+            except FileNotFoundError: continue
+            return False
+        return True
     def unlink(self, name):
         try: os.unlink(name, dir_fd=self.fd)
         except FileNotFoundError: pass
@@ -267,10 +273,15 @@ def ledger_merge(entries,entry):
     else: entries[entry['name']]=entry
     if len(entries)>MAX_OWNERS: raise ValueError('workspace recovery exceeds 4096 owners')
 def retire_proven(owner,data):
-    checked_receipt(owner,data)
+    cached=checked_receipt(owner,data)
     try: directory=PinnedDirectory(owner['path'])
     except FileNotFoundError: return
     with directory:
+        try: current=checked_receipt(owner,directory.receipt())
+        except FileNotFoundError:
+            if directory.artifacts_absent(): return
+            raise ValueError('missing pinned terminal with present artifacts; ledger retained')
+        if current != cached: raise ValueError('pinned terminal differs from cached proof; ledger retained')
         for name in ('input','control','terminal'): directory.unlink(name)
 class RecoveryLedger:
     def __init__(self,locks,record,controller,deadline):

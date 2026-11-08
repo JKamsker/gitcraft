@@ -182,10 +182,47 @@ fn bisect(setup: &Setup, cache: &TreeCache, out: &Out, stop: &AtomicBool) -> Out
         Ok(setup) => setup,
         Err(e) => return Outcome::Failed(e),
     };
-    match prepared(&setup, cache, out, stop) {
-        Ok(outcome) => outcome,
-        Err(_) if stop.load(Ordering::Relaxed) => Outcome::Cancelled,
-        Err(e) => Outcome::Failed(e),
+    prepared_outcome(prepared(&setup, cache, out, stop))
+}
+fn prepared_outcome(result: Result<Outcome, String>) -> Outcome {
+    // Errors can contain unknown ownership/cleanup. A late stop flag cannot prove
+    // confirmed cancellation; that arrives explicitly as Ok(Outcome::Cancelled).
+    result.unwrap_or_else(Outcome::Failed)
+}
+fn record_round_result(
+    ended: &mut Option<Result<Outcome, String>>,
+    result: Result<Ran, String>,
+    cancelled: bool,
+    answer: impl FnOnce(Ran) -> Result<Option<Outcome>, String>,
+) -> Option<String> {
+    let ran = match result {
+        Ok(ran) => ran,
+        Err(error) => {
+            if ended.is_some() {
+                return Some(error);
+            }
+            *ended = Some(Err(error));
+            return None;
+        }
+    };
+    if ended.is_some() || cancelled {
+        return None;
+    }
+    match answer(ran) {
+        Err(error) => *ended = Some(Err(error)),
+        Ok(Some(outcome)) => *ended = Some(Ok(outcome)),
+        Ok(None) => {}
+    }
+    None
+}
+fn finish_round(
+    ended: Option<Result<Outcome, String>>,
+    cancelled: bool,
+) -> Result<Option<Outcome>, String> {
+    match ended {
+        Some(result) => result.map(Some),
+        None if cancelled => Ok(Some(Outcome::Cancelled)),
+        None => Ok(None),
     }
 }
 
@@ -538,15 +575,14 @@ impl Run<'_> {
                     Err(RecvTimeoutError::Disconnected) => break,
                 };
                 running.remove(&j);
-                if ended.is_some() || self.stopped() {
-                    continue;
-                }
                 let job = &jobs[j];
-                let answer = result.and_then(|ran| self.answer(job, ran));
-                match answer {
-                    Err(e) => ended = Some(Err(e)),
-                    Ok(Some(outcome)) => ended = Some(Ok(outcome)),
-                    Ok(None) => {}
+                if let Some(error) =
+                    record_round_result(&mut ended, result, self.stopped(), |ran| {
+                        self.answer(job, ran)
+                    })
+                {
+                    self.out
+                        .send(Event::Warning(format!("{}: {error}", short(&job.hash))));
                 }
                 if ended.is_some() {
                     dropped
@@ -568,10 +604,7 @@ impl Run<'_> {
             }
         });
         self.slots = slots;
-        if self.stopped() {
-            return Ok(Some(Outcome::Cancelled));
-        }
-        ended.transpose()
+        finish_round(ended, self.stopped())
     }
 
     /// What a test that came back says: `Some` when it ends the bisect. An exit code of 128 or
@@ -666,5 +699,71 @@ impl Run<'_> {
             )),
             None => Err("the bisect ran out of commits to test before it ended".to_owned()),
         }
+    }
+}
+
+#[cfg(test)]
+mod recording_outcome_tests {
+    use super::*;
+    #[test]
+    fn cancelled_setup_ownership_error_survives_without_workspace() {
+        let stopped = AtomicBool::new(true);
+        let error = "could not finish owned process: recorded failure";
+        assert!(stopped.load(Ordering::Relaxed));
+        assert_eq!(
+            prepared_outcome(Err(error.into())),
+            Outcome::Failed(error.into())
+        );
+    }
+    #[test]
+    fn cancelled_worker_cleanup_failure_survives_final_normalization() {
+        let mut ended = None;
+        assert!(
+            record_round_result(
+                &mut ended,
+                Err("missing cleaned receipt".into()),
+                true,
+                |_| panic!("failed worker has no answer")
+            )
+            .is_none()
+        );
+        assert_eq!(
+            finish_round(ended, true),
+            Err("missing cleaned receipt".into())
+        );
+    }
+    #[test]
+    fn selected_answer_keeps_late_worker_error_as_concrete_warning() {
+        let selected = Outcome::FirstBad("a".repeat(40));
+        let mut ended = Some(Ok(selected.clone()));
+        let warning = record_round_result(
+            &mut ended,
+            Err("owner stop acknowledgement missing".into()),
+            true,
+            |_| panic!("late worker cannot replace answer"),
+        );
+        assert_eq!(
+            warning.as_deref(),
+            Some("owner stop acknowledgement missing")
+        );
+        assert_eq!(finish_round(ended, true), Ok(Some(selected)));
+    }
+    #[test]
+    fn confirmed_normal_cancellation_remains_cancelled() {
+        assert_eq!(prepared_outcome(Ok(Outcome::Cancelled)), Outcome::Cancelled);
+        let mut ended = None;
+        assert!(
+            record_round_result(
+                &mut ended,
+                Ok(Ran {
+                    ended: super::super::verdict::Ended::Stopped,
+                    output: String::new()
+                }),
+                true,
+                |_| panic!("cancelled successful worker is ignored")
+            )
+            .is_none()
+        );
+        assert_eq!(finish_round(ended, true), Ok(Some(Outcome::Cancelled)));
     }
 }

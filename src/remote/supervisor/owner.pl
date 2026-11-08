@@ -249,9 +249,24 @@ sub ledger_remove {
     my ($p,$name,$expected,$limit)=@_;die 'ledger entry changed before pruning' unless ledger_raw_read($p,$name,$limit) eq $expected;
     workspace_relative($p->{locks},sub {unlink($name) or die 'ledger removal failed';});
 }
+sub ledger_artifacts_absent {
+    for my $name ('input','control','terminal') {
+        my @info=lstat($name);return 0 if @info;
+        die 'cannot inspect pinned artifacts; ledger retained' unless $!{ENOENT};
+    }
+    return 1;
+}
 sub ledger_retire_proven {
-    my ($owner,$proof)=@_;checked_terminal($owner,$proof);
-    retire($owner,{pin=>sub {pinned_directory($_[0],$_[1],1);},receipt=>sub {checked_terminal($owner,$proof);},unlink=>sub {my $ok=unlink($_[0]);die 'proven retirement unlink failed' if !$ok && !$!{ENOENT};}});
+    my ($owner,$proof)=@_;my $cached=checked_terminal($owner,$proof);
+    pinned_directory($owner->{path},sub {
+        my $current=terminal($owner,'terminal');
+        if (!defined($current)) {
+            return if ledger_artifacts_absent();
+            die 'missing pinned terminal with present artifacts; ledger retained';
+        }
+        die 'pinned terminal differs from cached proof; ledger retained' unless encode($current) eq encode($cached);
+        for my $name ('input','control','terminal') {my $ok=unlink($name);die 'proven retirement unlink failed' if !$ok && !$!{ENOENT};}
+    },1);
 }
 sub ledger_prepare {
     my ($locks,$record,$controller,$deadline)=@_;(my $own=$record)=~s{.*/}{};
