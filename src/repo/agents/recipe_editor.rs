@@ -299,6 +299,7 @@ mod fluent_recipe_consumer_tests {
             assert!(!h.state().0.recipe().problems().is_empty());
             assert!(
                 h.get_by_label(crate::i18n::text("repo-workflows-agents-ui-1509f561"))
+                    .accesskit_node()
                     .is_disabled()
             );
         }
