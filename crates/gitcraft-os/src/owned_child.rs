@@ -1,5 +1,6 @@
 //! An execution owner, never constructible from a persisted PID. On Unix the direct
-//! child is a packaged live anchor until final signaling, then reaped exactly once.
+//! target joins a separately retained live anchor group. Only that anchor grants group
+//! signal authority; its private Child remains unreaped until final signaling.
 use std::io;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus};
 
@@ -14,7 +15,7 @@ struct Process {
     controller_status: Option<ExitStatus>,
     controller_permit: Option<super::controller_reaper::Permit>,
     #[cfg(unix)]
-    status: Option<super::unix_anchor::Status>,
+    anchor: Option<super::unix_anchor::Anchor>,
     #[cfg(windows)]
     job: Option<super::process_job::ProcessJob>,
 }
@@ -55,26 +56,18 @@ impl OwnedChild {
         } else {
             None
         };
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            if !controller {
-                command.process_group(0);
-            }
-        }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
             command.creation_flags(if controller { 0x0800_0000 } else { 0x0800_0004 });
         }
         #[cfg(unix)]
-        let status = if controller {
-            None
+        let (child, anchor) = if controller {
+            (command.spawn()?, None)
         } else {
-            Some(super::unix_anchor::prepare(&mut command)?)
+            let (child, anchor) = super::unix_anchor::launch(&mut command)?;
+            (child, Some(anchor))
         };
-        #[cfg(unix)]
-        let child = command.spawn()?;
         #[cfg(windows)]
         let (child, job) = if controller {
             (command.spawn()?, None)
@@ -89,7 +82,7 @@ impl OwnedChild {
                 controller_status: None,
                 controller_permit,
                 #[cfg(unix)]
-                status,
+                anchor,
                 #[cfg(windows)]
                 job,
             }),
@@ -126,11 +119,12 @@ impl OwnedChild {
         }
         #[cfg(unix)]
         {
-            process
-                .status
-                .as_mut()
-                .ok_or_else(|| io::Error::other("missing group anchor"))?
-                .observe()
+            if process.anchor.is_none() {
+                return Err(io::Error::other("missing group anchor"));
+            }
+            // Reaping the target cannot recycle the group identity: its distinct anchor
+            // remains retained and unreaped until final group signaling.
+            process.child.try_wait()
         }
         #[cfg(windows)]
         {
@@ -138,7 +132,7 @@ impl OwnedChild {
         }
     }
 
-    /// Finish is idempotent. All group/Job signals precede reaping, including failures.
+    /// Finish is idempotent. Group signals always precede anchor reaping, including failures.
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
         finish(
             &mut self.terminal,
@@ -163,7 +157,13 @@ fn finish(
     }
     let stopped = process.stop();
     let reaped = process.reap();
-    let result = stopped.and(reaped);
+    let result = match (stopped, reaped) {
+        (Ok(()), result) => result,
+        (Err(e), Ok(_)) => Err(e),
+        (Err(stop), Err(reap)) => Err(io::Error::other(format!(
+            "owned group/job stop: {stop}; target/anchor reap: {reap}"
+        ))),
+    };
     // A wait error may mean ownership was lost. Never send another numeric signal after
     // a reaping attempt, and never turn a previous cleanup error into an acknowledgement.
     *terminal = Some(result.as_ref().copied().map_err(ToString::to_string));
@@ -171,8 +171,8 @@ fn finish(
 }
 
 impl Control for Process {
-    /// Stop remaining inherited descendants while ownership is still anchored. Even an
-    /// exited leader is not reaped first. EPERM is an error (including Darwin's zombie-only
+    /// Stop remaining inherited descendants while the distinct identity anchor is held.
+    /// The anchor is never reaped first. EPERM is an error (including Darwin's zombie-only
     /// case): callers must report uncertain cleanup rather than silently claim success.
     fn stop(&mut self) -> io::Result<()> {
         if self.controller {
@@ -183,18 +183,7 @@ impl Control for Process {
         }
         #[cfg(unix)]
         {
-            let pid = i32::try_from(self.child.id()).map_err(io::Error::other)?;
-            if pid <= 1 {
-                return Err(io::Error::other("invalid owned child"));
-            }
-            // SAFETY: spawn established this exact child's group. The private Child has
-            // not been reaped, so the group number cannot refer to a different lifetime.
-            if unsafe { libc::killpg(pid, libc::SIGKILL) } != 0 {
-                let error = io::Error::last_os_error();
-                if error.raw_os_error() != Some(libc::ESRCH) {
-                    return Err(error);
-                }
-            }
+            process_anchor(self)?.stop()?;
         }
         #[cfg(windows)]
         if let Some(job) = &self.job {
@@ -214,8 +203,31 @@ impl Control for Process {
         }
         // Handle-based/direct-child fallback also bounds a refused group signal.
         let _ = self.child.kill();
-        self.child.wait()
+        let target = self.child.wait();
+        #[cfg(unix)]
+        {
+            let anchor = process_anchor(self)?.reap();
+            match (target, anchor) {
+                (Ok(status), Ok(())) => Ok(status),
+                (Err(e), Ok(())) | (Ok(_), Err(e)) => Err(e),
+                (Err(target), Err(anchor)) => Err(io::Error::other(format!(
+                    "target wait: {target}; anchor reap: {anchor}"
+                ))),
+            }
+        }
+        #[cfg(windows)]
+        {
+            target
+        }
     }
+}
+
+#[cfg(unix)]
+fn process_anchor(process: &mut Process) -> io::Result<&mut super::unix_anchor::Anchor> {
+    process
+        .anchor
+        .as_mut()
+        .ok_or_else(|| io::Error::other("missing group anchor"))
 }
 
 // Deliberately has no signal operation: a live native helper is recovery authority.
@@ -268,6 +280,7 @@ mod recording_tests {
     struct Recording {
         events: Vec<&'static str>,
         refuse: bool,
+        reap_refuse: bool,
     }
     impl Control for Recording {
         fn stop(&mut self) -> io::Result<()> {
@@ -280,6 +293,9 @@ mod recording_tests {
         }
         fn reap(&mut self) -> io::Result<ExitStatus> {
             self.events.push("reap anchor");
+            if self.reap_refuse {
+                return Err(io::Error::other("target/anchor reap refused"));
+            }
             #[cfg(unix)]
             {
                 use std::os::unix::process::ExitStatusExt;
@@ -313,5 +329,23 @@ mod recording_tests {
             );
         }
         Ok(())
+    }
+    #[test]
+    fn stop_and_reap_errors_remain_distinct_and_retirement_is_not_retried() {
+        let mut backend = Recording {
+            refuse: true,
+            reap_refuse: true,
+            ..Default::default()
+        };
+        let mut terminal = None;
+        let error = finish(&mut terminal, &mut backend).unwrap_err().to_string();
+        assert!(
+            error.contains("owned group/job stop:") && error.contains("target/anchor reap refused")
+        );
+        assert_eq!(
+            finish(&mut terminal, &mut backend).unwrap_err().to_string(),
+            error
+        );
+        assert_eq!(backend.events.len(), 2);
     }
 }
