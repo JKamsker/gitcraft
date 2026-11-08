@@ -47,29 +47,50 @@ impl View {
     /// already (above a diff), so going to it means closing the diff.
     pub(super) fn label(&self, graph_shown: bool) -> String {
         match self {
-            View::Graph { .. } if graph_shown => "the graph without the diff".to_owned(),
+            View::Graph { .. } if graph_shown => crate::i18n::text("repo-core-2901").to_owned(),
             View::Graph {
                 selected: Some(hash),
-            } if hash == WIP_HASH => "the graph at the changes".to_owned(),
+            } if hash == WIP_HASH => crate::i18n::text("repo-core-2902").to_owned(),
             View::Graph {
                 selected: Some(hash),
-            } => format!("the graph at {}", short(hash)),
-            View::Graph { selected: None } => "the graph".to_owned(),
+            } => crate::i18n::message(
+                "repo-core-2903",
+                &[("hash", format!("{}", short(hash)).into())],
+            ),
+            View::Graph { selected: None } => crate::i18n::text("repo-core-2904").to_owned(),
             View::Diff { key, .. } => diff_label(key),
             View::File { path, rev, tab } => {
                 let what = match tab {
-                    file_view::FileTab::History => "the history",
-                    file_view::FileTab::Blame => "the blame",
-                    file_view::FileTab::File => "the contents",
+                    file_view::FileTab::History => crate::i18n::text("repo-core-2905"),
+                    file_view::FileTab::Blame => crate::i18n::text("repo-core-2512"),
+                    file_view::FileTab::File => crate::i18n::text("repo-core-2906"),
                 };
                 let at = rev
                     .as_deref()
-                    .map(|r| format!(" at {}", short(r)))
+                    .map(|r| {
+                        crate::i18n::message(
+                            "repo-core-2907",
+                            &[("r", format!("{}", short(r)).into())],
+                        )
+                    })
                     .unwrap_or_default();
-                format!("{what} of {}{at}", file_name(path))
+                crate::i18n::message(
+                    "repo-core-2908",
+                    &[
+                        ("what", format!("{}", what).into()),
+                        ("path", format!("{}", file_name(path)).into()),
+                        ("at", format!("{}", at).into()),
+                    ],
+                )
             }
-            View::Pr(number) => format!("pull request #{number}"),
-            View::Ci(sha) => format!("the builds of {}", short(sha)),
+            View::Pr(number) => crate::i18n::message(
+                "repo-core-2909",
+                &[("number", format!("{}", number).into())],
+            ),
+            View::Ci(sha) => crate::i18n::message(
+                "repo-core-2910",
+                &[("sha", format!("{}", short(sha)).into())],
+            ),
         }
     }
 }
@@ -78,20 +99,51 @@ impl View {
 fn diff_label(key: &DiffKey) -> String {
     let name = file_name(key.path());
     match key {
-        DiffKey::Remerge { hash, .. } => format!("{name}, resolution of {}", short(hash)),
-        DiffKey::Commit { hash, .. } => format!("{name} in {}", short(hash)),
+        DiffKey::Remerge { hash, .. } => crate::i18n::message(
+            "repo-core-2911",
+            &[
+                ("name", format!("{}", name).into()),
+                ("hash", format!("{}", short(hash)).into()),
+            ],
+        ),
+        DiffKey::Commit { hash, .. } => crate::i18n::message(
+            "repo-core-2912",
+            &[
+                ("name", format!("{}", name).into()),
+                ("hash", format!("{}", short(hash)).into()),
+            ],
+        ),
         DiffKey::Work(file) => match file.area {
-            Area::Unstaged => format!("the unstaged changes of {name}"),
-            Area::Staged => format!("the staged changes of {name}"),
-            Area::Conflicted => format!("the conflict in {name}"),
-            Area::Untracked => format!("the new file {name}"),
+            Area::Unstaged => {
+                crate::i18n::message("repo-core-2913", &[("name", format!("{}", name).into())])
+            }
+            Area::Staged => {
+                crate::i18n::message("repo-core-2914", &[("name", format!("{}", name).into())])
+            }
+            Area::Conflicted => {
+                crate::i18n::message("repo-core-2915", &[("name", format!("{}", name).into())])
+            }
+            Area::Untracked => {
+                crate::i18n::message("repo-core-2916", &[("name", format!("{}", name).into())])
+            }
         },
         DiffKey::Range {
             from, to: Some(to), ..
-        } => format!("{name} from {} to {}", short(from), short(to)),
-        DiffKey::Range { from, to: None, .. } => {
-            format!("{name} from {} to the working tree", short(from))
-        }
+        } => crate::i18n::message(
+            "repo-core-2917",
+            &[
+                ("name", format!("{}", name).into()),
+                ("from", format!("{}", short(from)).into()),
+                ("to", format!("{}", short(to)).into()),
+            ],
+        ),
+        DiffKey::Range { from, to: None, .. } => crate::i18n::message(
+            "repo-core-2918",
+            &[
+                ("name", format!("{}", name).into()),
+                ("from", format!("{}", short(from)).into()),
+            ],
+        ),
     }
 }
 
@@ -99,10 +151,18 @@ fn diff_label(key: &DiffKey) -> String {
 fn gone_change(file: &git::StatusFile) -> String {
     let path = &file.path;
     match file.area {
-        Area::Unstaged => format!("{path} has no unstaged changes any more"),
-        Area::Staged => format!("{path} has no staged changes any more"),
-        Area::Conflicted => format!("{path} is no longer conflicted"),
-        Area::Untracked => format!("{path} is no longer a new file"),
+        Area::Unstaged => {
+            crate::i18n::message("repo-core-2919", &[("path", format!("{}", path).into())])
+        }
+        Area::Staged => {
+            crate::i18n::message("repo-core-2920", &[("path", format!("{}", path).into())])
+        }
+        Area::Conflicted => {
+            crate::i18n::message("repo-core-2921", &[("path", format!("{}", path).into())])
+        }
+        Area::Untracked => {
+            crate::i18n::message("repo-core-2922", &[("path", format!("{}", path).into())])
+        }
     }
 }
 
@@ -197,7 +257,13 @@ impl RepoTab {
     /// change since staged or committed) are passed over, and said so.
     pub(super) fn navigate(&mut self, step: i32, ctx: &egui::Context) {
         if let Some(editor) = self.navigation_editor_open() {
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some((
+                crate::i18n::message(
+                    "repo-core-2923",
+                    &[("editor", format!("{}", editor).into())],
+                ),
+                true,
+            ));
             return;
         }
         let mut passed = None;
@@ -231,11 +297,11 @@ impl RepoTab {
     /// message being edited in the commit pane.
     fn navigation_editor_open(&self) -> Option<&'static str> {
         if self.conflict.is_some() {
-            Some("conflict editor")
+            Some(crate::i18n::text("repo-core-2924"))
         } else if self.rebase.is_some() {
-            Some("interactive rebase")
+            Some(crate::i18n::text("repo-core-2925"))
         } else if self.reword.is_some() {
-            Some("commit message being edited")
+            Some(crate::i18n::text("repo-core-2926"))
         } else {
             None
         }
@@ -355,7 +421,10 @@ impl RepoTab {
             self.goto(hash, ctx);
         } else {
             self.status = Some((
-                format!("Commit {} is no longer in the graph", short(hash)),
+                crate::i18n::message(
+                    "repo-core-2927",
+                    &[("hash", format!("{}", short(hash)).into())],
+                ),
                 false,
             ));
         }
@@ -377,14 +446,37 @@ impl RepoTab {
     pub(super) fn nav_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let graph_shown = self.diff_beside_graph(ui.ctx());
         for (step, icon, name, command) in [
-            (-1, "arrow-left", "Back", crate::keymap::Command::Back),
-            (1, "arrow-right", "Forward", crate::keymap::Command::Forward),
+            (
+                -1,
+                "arrow-left",
+                crate::i18n::text("repo-core-2929"),
+                crate::keymap::Command::Back,
+            ),
+            (
+                1,
+                "arrow-right",
+                crate::i18n::text("repo-core-2930"),
+                crate::keymap::Command::Forward,
+            ),
         ] {
             let keys = crate::keymap::label(ui.ctx(), command);
             let target = self.nav.peek(step);
             let tip = match target {
-                Some(view) => format!("{name} to {} ({keys})", view.label(graph_shown)),
-                None => format!("Nothing to go {} to ({keys})", name.to_lowercase()),
+                Some(view) => crate::i18n::message(
+                    "repo-core-2931",
+                    &[
+                        ("name", format!("{}", name).into()),
+                        ("graph-shown", format!("{}", view.label(graph_shown)).into()),
+                        ("keys", format!("{}", keys).into()),
+                    ],
+                ),
+                None => crate::i18n::message(
+                    "repo-core-2932",
+                    &[
+                        ("to-lowercase", format!("{}", name.to_lowercase()).into()),
+                        ("keys", format!("{}", keys).into()),
+                    ],
+                ),
             };
             let button =
                 ui.add_enabled_ui(target.is_some(), |ui| icons::small_button(ui, icon, &tip));

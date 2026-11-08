@@ -162,11 +162,7 @@ pub(super) fn files_header(ui: &mut Ui, files: &[ChangedFile], note: Option<&str
     let r = p.text(
         pos2(rect.left() + 14.0, y),
         Align2::LEFT_CENTER,
-        format!(
-            "{} file{} changed",
-            files.len(),
-            if files.len() == 1 { "" } else { "s" }
-        ),
+        crate::i18n::message("repo-core-1146", &[("count", (files.len()).into())]),
         theme::semibold(11.5),
         t.text_dim,
     );

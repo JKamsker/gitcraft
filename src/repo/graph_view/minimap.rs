@@ -54,7 +54,7 @@ fn build(
     let mut bins = vec![Bin::default(); rows.min(BINS)];
     for projected in 0..rows {
         if !active() {
-            return Err("Minimap analysis cancelled".into());
+            return Err(crate::i18n::text("repo-core-2669").into());
         }
         let raw = projected;
         let Some(g) = graph.rows.get(raw) else {
@@ -78,11 +78,18 @@ fn build(
 }
 fn lane_coverage(width: usize) -> String {
     if width > LANES {
-        format!(
-            "Shape shows the first {LANES} of {width} lanes; all rows and HEAD, tag and search markers remain represented."
+        crate::i18n::message(
+            "repo-core-2670",
+            &[
+                ("LANES", format!("{}", LANES).into()),
+                ("width", format!("{}", width).into()),
+            ],
         )
     } else {
-        format!("Shape shows all {} lanes.", width.max(1))
+        crate::i18n::message(
+            "repo-core-2671",
+            &[("max", format!("{}", width.max(1)).into())],
+        )
     }
 }
 impl RepoTab {
@@ -116,8 +123,9 @@ impl RepoTab {
             Sense::click_and_drag(),
         );
         let coverage = lane_coverage(self.graph.width);
-        let label = format!(
-            "Loaded history minimap. {coverage} Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
+        let label = crate::i18n::message(
+            "repo-core-2673",
+            &[("coverage", format!("{}", coverage).into())],
         );
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
@@ -125,9 +133,9 @@ impl RepoTab {
             pos2(rect.center().x, rect.top() + 3.0),
             Align2::CENTER_TOP,
             if self.graph.width > LANES {
-                "History · 24 lanes"
+                crate::i18n::text("repo-core-2674")
             } else {
-                "History"
+                crate::i18n::text("repo-core-2497")
             },
             FontId::proportional(10.0),
             t.text_dim,
@@ -182,9 +190,9 @@ impl RepoTab {
         );
         p.rect_stroke(visible, 1.0, Stroke::new(1.5, t.accent), StrokeKind::Inside);
         let footer_label = if self.has_more {
-            "Older unloaded ↓"
+            crate::i18n::text("repo-core-2675")
         } else {
-            "History ends"
+            crate::i18n::text("repo-core-2676")
         };
         p.line_segment(
             [pos2(map.left(), map.bottom()), map.right_bottom()],
@@ -253,7 +261,25 @@ impl RepoTab {
             self.history_minimap.offset = Some(at);
             ui.ctx().request_repaint();
         }
-        response.on_hover_text(format!("{} projected rows of loaded history. {coverage} Drag to scroll; focused: arrows or Page Up/Down. Blue: HEAD · green: tags · yellow: search hits · grey: collapsed context. {}",self.history_minimap.rows,if self.has_more {"Older history is not loaded; scrolling to the boundary loads another page."} else {"All available history is loaded."}));
+        response.on_hover_text(crate::i18n::message(
+            "repo-core-2677",
+            &[
+                ("rows", format!("{}", self.history_minimap.rows).into()),
+                ("coverage", format!("{}", coverage).into()),
+                (
+                    "loaded",
+                    format!(
+                        "{}",
+                        if self.has_more {
+                            crate::i18n::text("repo-core-2678")
+                        } else {
+                            crate::i18n::text("repo-core-2679")
+                        }
+                    )
+                    .into(),
+                ),
+            ],
+        ));
     }
 }
 #[cfg(test)]

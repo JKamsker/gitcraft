@@ -27,7 +27,7 @@ enum Pick {
 
 impl RepoTab {
     pub(super) fn templates_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "list", "Templates and prepare-commit-msg");
+        let b = icons::small_button(ui, "list", crate::i18n::text("repo-core-1049"));
         let t = Tokens::get(ui.ctx());
         let ctx = ui.ctx().clone();
         // Read only while the menu shows, not on every frame.
@@ -41,31 +41,32 @@ impl RepoTab {
             .width(280.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
-                ui.label(RichText::new("Start from").color(t.text_faint).small());
-                let tip = "Replaces the message with the file commit.template names (Undo brings it back)";
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-core-1050"))
+                        .color(t.text_faint)
+                        .small(),
+                );
+                let tip = crate::i18n::text("repo-core-1051");
                 if ui
                     .add_enabled(template.is_some(), egui::Button::new("commit.template"))
                     .on_hover_text(tip)
-                    .on_disabled_hover_text("This repository sets no commit.template")
+                    .on_disabled_hover_text(crate::i18n::text("repo-core-1053"))
                     .clicked()
                     && let Some(text) = &template
                 {
                     pick = Some(Pick::Text(text.clone()));
                 }
                 if ui
-                    .button("Run prepare-commit-msg")
-                    .on_hover_text(
-                        "Runs the repository's prepare-commit-msg hook on the message, as git \
-                         does before it opens its editor",
-                    )
+                    .button(crate::i18n::text("repo-core-1054"))
+                    .on_hover_text(crate::i18n::text("repo-core-1055"))
                     .clicked()
                 {
                     pick = Some(Pick::Hook);
                 }
                 let store = store.insert(Store::load(&ctx));
                 for (scope, title) in [
-                    (Scope::Repo, "This repository"),
-                    (Scope::Global, "All repositories"),
+                    (Scope::Repo, crate::i18n::text("repo-core-1056")),
+                    (Scope::Global, crate::i18n::text("repo-core-1057")),
                 ] {
                     let list = store.templates(scope, &repo);
                     if list.is_empty() {
@@ -120,16 +121,19 @@ fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Optio
     ui.horizontal(|ui| {
         if ui
             .add(egui::Button::new(&template.name).truncate())
-            .on_hover_text(format!(
-                "Replaces the message (Undo brings it back) with:\n\n{}",
-                template.text
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1058",
+                &[("text", format!("{}", template.text).into())],
             ))
             .clicked()
         {
             *pick = Some(Pick::Text(template.text.clone()));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let delete = format!("Delete the template {}", template.name);
+            let delete = crate::i18n::message(
+                "repo-core-1059",
+                &[("name", format!("{}", template.name).into())],
+            );
             if icons::small_button(ui, "x", &delete).clicked() {
                 *pick = Some(Pick::Delete(scope, template.name.clone()));
             }
@@ -149,26 +153,29 @@ fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Optio
 fn save_form(ui: &mut Ui, saving: &mut SaveState, has_message: bool, pick: &mut Option<Pick>) {
     let t = Tokens::get(ui.ctx());
     ui.label(
-        RichText::new("Save this message as a template")
+        RichText::new(crate::i18n::text("repo-core-1060"))
             .color(t.text_faint)
             .small(),
     );
     ui.horizontal(|ui| {
         let field = ui.add(
             egui::TextEdit::singleline(&mut saving.name)
-                .hint_text("Name")
+                .hint_text(crate::i18n::text("repo-core-1061"))
                 .desired_width(150.0),
         );
         let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         let save = ui
-            .add_enabled(has_message, egui::Button::new("Save"))
-            .on_disabled_hover_text("Write a message first");
+            .add_enabled(
+                has_message,
+                egui::Button::new(crate::i18n::text("repo-core-1062")),
+            )
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1063"));
         if save.clicked() || (enter && has_message) {
             *pick = Some(Pick::Save);
         }
     });
-    ui.checkbox(&mut saving.for_all, "For all repositories")
-        .on_hover_text("Unticked, it is offered in this repository only");
+    ui.checkbox(&mut saving.for_all, crate::i18n::text("repo-core-1064"))
+        .on_hover_text(crate::i18n::text("repo-core-1065"));
     if let Some(e) = &saving.error {
         ui.label(RichText::new(e).color(t.danger).small());
     }

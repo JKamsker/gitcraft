@@ -219,9 +219,9 @@ impl RepoTab {
         crate::a11y::pane(
             &response,
             match pane {
-                Pane::Sidebar => "Repository sidebar",
-                Pane::Graph => "Repository graph or diff",
-                Pane::Detail => "Commit details and changed files",
+                Pane::Sidebar => crate::i18n::text("repo-core-2847"),
+                Pane::Graph => crate::i18n::text("repo-core-2848"),
+                Pane::Detail => crate::i18n::text("repo-core-2849"),
             },
         );
     }
@@ -264,7 +264,16 @@ impl RepoTab {
                 state.focus_requested = false;
             }
             drop(state);
-            crate::a11y::a11y_selected(response, || format!("File {}", key.path()), true);
+            crate::a11y::a11y_selected(
+                response,
+                || {
+                    crate::i18n::message(
+                        "repo-core-2850",
+                        &[("path", format!("{}", key.path()).into())],
+                    )
+                },
+                true,
+            );
         }
         let mut state = self.keyboard.borrow_mut();
         if response.has_focus() && !state.focus_requested && !state.focus_row {
@@ -529,7 +538,7 @@ impl RepoTab {
     /// Capture a dynamic file/hunk target for palette and registry actions. Application still
     /// revalidates the captured read, epoch, file and diff request at execution/confirmation.
     pub(super) fn keyboard_command(&self, command: Command) -> Result<Action, String> {
-        let missing = || "Focus the corresponding file list or working-tree diff first".to_owned();
+        let missing = || crate::i18n::text("repo-core-2851").to_owned();
         if matches!(command, Command::FileNext | Command::FilePrevious) {
             if self.keyboard.borrow().pane != Some(Pane::Detail) {
                 return Err(missing());
@@ -541,7 +550,7 @@ impl RepoTab {
             }));
         }
         if self.loading || self.work_pending != 0 || self.load_error.is_some() {
-            return Err("Wait for a successful repository read before using this selection".into());
+            return Err(crate::i18n::text("repo-core-2852").into());
         }
         let target = if matches!(command, Command::FileOpen | Command::FileToggleStage) {
             if self.keyboard.borrow().pane != Some(Pane::Detail) {
@@ -551,9 +560,7 @@ impl RepoTab {
             if command == Command::FileToggleStage
                 && !matches!(&key, DiffKey::Work(f) if f.area != Area::Conflicted)
             {
-                return Err(
-                    "Only non-conflicted working-tree files can be staged or unstaged".into(),
-                );
+                return Err(crate::i18n::text("repo-core-2853").into());
             }
             Target::File {
                 scope,
@@ -577,21 +584,19 @@ impl RepoTab {
                 || self.conflict.is_some()
                 || self.rebase.is_some()
             {
-                return Err("Use the current ordinary patch with whitespace changes visible to change a hunk".into());
+                return Err(crate::i18n::text("repo-core-2854").into());
             }
             let pick = match (command, file.area) {
                 (Command::HunkStage, Area::Unstaged) => diff::Pick::Stage,
                 (Command::HunkUnstage, Area::Staged) => diff::Pick::Unstage,
                 (Command::HunkDiscard, Area::Unstaged) => diff::Pick::Discard,
                 _ => {
-                    return Err(
-                        "Stage/discard needs an unstaged hunk; unstage needs a staged hunk".into(),
-                    );
+                    return Err(crate::i18n::text("repo-core-2855").into());
                 }
             };
             let lines = diff::hunk_changes(&data.lines, hunk);
             if lines.is_empty() {
-                return Err("This hunk has no editable changed lines".into());
+                return Err(crate::i18n::text("repo-core-2856").into());
             }
             Target::Hunk {
                 key: view.key.clone(),
@@ -658,11 +663,11 @@ impl RepoTab {
                 } else if let DiffKey::Work(file) = key {
                     let (label, steps) = match file.area {
                         Area::Staged => (
-                            "Unstage",
+                            crate::i18n::text("repo-core-0844"),
                             vec![diff::unstage_args(&self.refs.head, &file.path)],
                         ),
                         Area::Unstaged | Area::Untracked => (
-                            "Stage",
+                            crate::i18n::text("repo-core-0836"),
                             ops(&[&["--literal-pathspecs", "add", "--", &file.path]]),
                         ),
                         Area::Conflicted => return,

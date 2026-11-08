@@ -34,7 +34,7 @@ impl RepoTab {
                 .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
             {
                 let name = if badge.kind == BadgeKind::DetachedHead {
-                    "detached".to_owned()
+                    crate::i18n::text("repo-core-2699").to_owned()
                 } else {
                     badge.git_ref()
                 };
@@ -85,7 +85,7 @@ impl RepoTab {
                     self.graph_labels
                         .get(&origin)
                         .cloned()
-                        .unwrap_or_else(|| "detached".to_owned()),
+                        .unwrap_or_else(|| crate::i18n::text("repo-core-2699").to_owned()),
                 )
             })
             .collect();

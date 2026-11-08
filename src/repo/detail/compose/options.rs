@@ -18,7 +18,7 @@ pub(super) struct RuleDraft {
 
 impl RepoTab {
     pub(super) fn options_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "settings", "Message options");
+        let b = icons::small_button(ui, "settings", crate::i18n::text("repo-core-0966"));
         let ctx = ui.ctx().clone();
         let draft = &mut self.compose.rule;
         let forge = self.hosting.as_ref().map(issue_links::forge_rule);
@@ -31,7 +31,7 @@ impl RepoTab {
                 let before = store.clone();
                 let t = Tokens::get(ui.ctx());
                 ui.label(
-                    RichText::new("Type / scope picker")
+                    RichText::new(crate::i18n::text("repo-core-0967"))
                         .color(t.text_faint)
                         .small(),
                 );
@@ -42,12 +42,8 @@ impl RepoTab {
                 });
                 ui.separator();
                 let mut run_hook = !store.no_hook_prefill;
-                ui.checkbox(&mut run_hook, "Prefill from prepare-commit-msg")
-                    .on_hover_text(
-                        "Runs the repository's prepare-commit-msg hook to start an empty \
-                         message. git runs the hook again when committing: untick this if \
-                         yours adds its text twice.",
-                    );
+                ui.checkbox(&mut run_hook, crate::i18n::text("repo-core-0968"))
+                    .on_hover_text(crate::i18n::text("repo-core-0969"));
                 store.no_hook_prefill = !run_hook;
                 ui.separator();
                 rules_ui(ui, &mut store.issue_rules, draft, forge.as_ref());
@@ -66,16 +62,23 @@ fn rules_ui(
     forge: Option<&IssueRule>,
 ) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Issue links").color(t.text_faint).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-0970"))
+            .color(t.text_faint)
+            .small(),
+    );
     let forge_note = match forge {
-        Some(f) => format!("#12 links to {}", f.url.replace("$1", "12")),
-        None => "#12 links to the forge's issue when the repository is hosted on one".to_owned(),
+        Some(f) => crate::i18n::message(
+            "repo-core-0971",
+            &[("replace", format!("{}", f.url.replace("$1", "12")).into())],
+        ),
+        None => crate::i18n::text("repo-core-0972").to_owned(),
     };
     ui.label(RichText::new(forge_note).color(t.text_dim).small());
     let mut remove = None;
     for (i, rule) in rules.iter().enumerate() {
         ui.horizontal(|ui| {
-            if icons::small_button(ui, "x", "Remove this rule").clicked() {
+            if icons::small_button(ui, "x", crate::i18n::text("repo-core-0973")).clicked() {
                 remove = Some(i);
             }
             ui.add(
@@ -93,26 +96,26 @@ fn rules_ui(
     }
     let pattern = ui.add(
         egui::TextEdit::singleline(&mut draft.rule.pattern)
-            .hint_text(r"Pattern, e.g. \bJIRA-\d+\b")
+            .hint_text(crate::i18n::text("repo-core-0974"))
             .desired_width(f32::INFINITY),
     );
     let url = ui.add(
         egui::TextEdit::singleline(&mut draft.rule.url)
-            .hint_text("URL, e.g. https://jira.example.com/browse/$0")
+            .hint_text(crate::i18n::text("repo-core-0975"))
             .desired_width(f32::INFINITY),
     );
     if pattern.changed() || url.changed() {
         draft.error = None;
     }
     ui.horizontal(|ui| {
-        if ui.button("Add").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0976")).clicked() {
             match add_rule(rules, &draft.rule) {
                 Ok(()) => *draft = RuleDraft::default(),
                 Err(e) => draft.error = Some(e),
             }
         }
         ui.label(
-            RichText::new("$0 is what matched, $1, $2… (or ${1}) its groups")
+            RichText::new(crate::i18n::text("repo-core-0977"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -133,10 +136,13 @@ pub fn add_rule(rules: &mut Vec<IssueRule>, rule: &IssueRule) -> Result<(), Stri
     };
     issue_links::check(&rule)?;
     if rules.contains(&rule) {
-        return Err("That rule is already there".to_owned());
+        return Err(crate::i18n::text("repo-core-0978").to_owned());
     }
     if rules.len() >= MAX_RULES {
-        return Err(format!("At most {MAX_RULES} rules; remove one first"));
+        return Err(crate::i18n::message(
+            "repo-core-0979",
+            &[("MAX-RULES", format!("{}", MAX_RULES).into())],
+        ));
     }
     rules.push(rule);
     Ok(())

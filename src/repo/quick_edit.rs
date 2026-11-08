@@ -27,19 +27,28 @@ impl Edit {
 
     fn label(self) -> &'static str {
         match self {
-            Edit::Message => "Edit commit message",
-            Edit::Drop => "Drop commit",
-            Edit::MoveUp => "Move commit up",
-            Edit::MoveDown => "Move commit down",
+            Edit::Message => crate::i18n::text("repo-core-3172"),
+            Edit::Drop => crate::i18n::text("repo-core-3173"),
+            Edit::MoveUp => crate::i18n::text("repo-core-3174"),
+            Edit::MoveDown => crate::i18n::text("repo-core-3175"),
+        }
+    }
+
+    fn operation_label(self) -> &'static str {
+        match self {
+            Self::Message => "Edit commit message",
+            Self::Drop => "Drop commit",
+            Self::MoveUp => "Move commit up",
+            Self::MoveDown => "Move commit down",
         }
     }
 
     fn explain(self) -> &'static str {
         match self {
-            Edit::Message => "Edit the message in the commit's details",
-            Edit::Drop => "Remove the commit and its changes from the branch",
-            Edit::MoveUp => "Swap it with the commit after it",
-            Edit::MoveDown => "Swap it with the commit before it",
+            Edit::Message => crate::i18n::text("repo-core-3176"),
+            Edit::Drop => crate::i18n::text("repo-core-3177"),
+            Edit::MoveUp => crate::i18n::text("repo-core-3178"),
+            Edit::MoveDown => crate::i18n::text("repo-core-3179"),
         }
     }
 
@@ -77,7 +86,7 @@ pub(super) fn first_parents<'a, C: std::borrow::Borrow<Commit>>(
 /// down its first parents.
 pub(super) fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'static str> {
     let Some(pos) = line.iter().position(|c| c.hash == hash) else {
-        return Some("Only commits of the checked-out branch can be edited here");
+        return Some(crate::i18n::text("repo-core-3181"));
     };
     let commit = line[pos];
     // The latest commit's message is amended, which works for any commit.
@@ -85,22 +94,20 @@ pub(super) fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'stat
         return None;
     }
     if line[..pos].iter().any(|c| c.parents.len() > 1) {
-        return Some("Merges came after this commit: rewriting it would flatten them");
+        return Some(crate::i18n::text("repo-core-2522"));
     }
     if commit.parents.len() > 1 {
-        return Some("Merge commits can't be rewritten here");
+        return Some(crate::i18n::text("repo-core-3182"));
     }
     if commit.parents.is_empty() {
-        return Some("The first commit has no parent to rebase from");
+        return Some(crate::i18n::text("repo-core-3183"));
     }
     match edit {
-        Edit::MoveUp if pos == 0 => Some("It is the latest commit already"),
+        Edit::MoveUp if pos == 0 => Some(crate::i18n::text("repo-core-3184")),
         Edit::MoveDown => match line.get(pos + 1) {
-            None => Some("The commit below it isn't loaded"),
-            Some(below) if below.parents.len() > 1 => Some("The commit below it is a merge"),
-            Some(below) if below.parents.is_empty() => {
-                Some("The commit below it is the first one, with nothing to rebase onto")
-            }
+            None => Some(crate::i18n::text("repo-core-3185")),
+            Some(below) if below.parents.len() > 1 => Some(crate::i18n::text("repo-core-3186")),
+            Some(below) if below.parents.is_empty() => Some(crate::i18n::text("repo-core-3187")),
             Some(_) => None,
         },
         _ => None,
@@ -115,21 +122,21 @@ pub(super) fn plan(
     commits: Vec<RebaseCommit>,
 ) -> Result<RebaseEditor, String> {
     if commits.iter().any(|c| c.merge) {
-        return Err("merges came after the commit, which this would flatten".to_owned());
+        return Err(crate::i18n::text("repo-core-2448").to_owned());
     }
     let mut editor = RebaseEditor::new(edit.base(hash), short(hash).to_owned(), commits);
     let i = editor
         .entries
         .iter()
         .position(|e| e.commit.hash == hash)
-        .ok_or("only commits of the checked-out branch can be edited")?;
+        .ok_or(crate::i18n::text("repo-core-3188"))?;
     match edit {
-        Edit::Message => return Err("the message is edited in the commit's details".to_owned()),
+        Edit::Message => return Err(crate::i18n::text("repo-core-3189").to_owned()),
         Edit::Drop => editor.entries[i].step = Step::Drop,
         Edit::MoveUp if i + 1 < editor.entries.len() => editor.entries.swap(i, i + 1),
         Edit::MoveDown if i > 0 => editor.entries.swap(i - 1, i),
-        Edit::MoveUp => return Err("it is the latest commit already".to_owned()),
-        Edit::MoveDown => return Err("there is no commit below it to swap with".to_owned()),
+        Edit::MoveUp => return Err(crate::i18n::text("repo-core-3190").to_owned()),
+        Edit::MoveDown => return Err(crate::i18n::text("repo-core-3191").to_owned()),
     }
     Ok(editor)
 }
@@ -146,11 +153,17 @@ impl RepoTab {
     ) {
         let line = first_parents(&self.commits, &self.index, &self.refs.head);
         let blocked = if self.refs.current.is_none() {
-            Some("HEAD is detached: check out a branch first".to_owned())
+            Some(crate::i18n::text("repo-core-0842").to_owned())
         } else {
-            self.work
-                .in_progress
-                .map(|s| format!("A {} is in progress", s.label().to_lowercase()))
+            self.work.in_progress.map(|s| {
+                crate::i18n::message(
+                    "repo-core-3192",
+                    &[(
+                        "to-lowercase",
+                        format!("{}", s.label().to_lowercase()).into(),
+                    )],
+                )
+            })
         };
         let refusals = Edit::ALL.map(|edit| {
             blocked
@@ -210,13 +223,15 @@ impl RepoTab {
         Action::Dialog(
             Dialog::confirm(
                 "Drop commit",
-                format!(
-                    "Remove {short} ({}) and its changes from {branch}? The commits after it \
-                     are replayed on its parent; if one conflicts, the rebase stops for you to \
-                     resolve it.",
-                    commit.summary
+                crate::i18n::message(
+                    "repo-core-3196",
+                    &[
+                        ("short", format!("{}", short).into()),
+                        ("summary", format!("{}", commit.summary).into()),
+                        ("branch", format!("{}", branch).into()),
+                    ],
                 ),
-                "Drop",
+                crate::i18n::text("repo-core-3197"),
                 Vec::new(),
                 None,
             )
@@ -230,7 +245,10 @@ impl RepoTab {
                     &self.refs.head,
                     self.upstream_ref(branch),
                 ),
-                format!("Leaving {branch}"),
+                crate::i18n::message(
+                    "repo-core-3198",
+                    &[("branch", format!("{}", branch).into())],
+                ),
             ),
         )
     }
@@ -278,10 +296,16 @@ impl RepoTab {
         // not dropped without a word.
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                format!(
-                    "{} {}: {busy} is still running, try again when it's done",
-                    edit.label(),
-                    short(&hash)
+                crate::i18n::message(
+                    "repo-core-3199",
+                    &[
+                        ("label", format!("{}", edit.label()).into()),
+                        ("hash", format!("{}", short(&hash)).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
+                    ],
                 ),
                 true,
             ));
@@ -302,7 +326,7 @@ impl RepoTab {
         result: Result<Vec<RebaseCommit>, String>,
         ctx: &egui::Context,
     ) {
-        let label = format!("{} {}", edit.label(), short(&hash));
+        let label = format!("{} {}", edit.operation_label(), short(&hash));
         match result.and_then(|commits| plan(edit, &hash, commits)) {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.quick_edit_ready(&label, command, ctx);
@@ -322,9 +346,18 @@ impl RepoTab {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
                 self.status = Some((
-                    format!(
-                        "{label}: {} is still running, try again when it's done",
-                        self.busy_op.as_deref().unwrap_or_default()
+                    crate::i18n::message(
+                        "repo-core-2452",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            (
+                                "self",
+                                format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                            ),
+                        ],
                     ),
                     true,
                 ));

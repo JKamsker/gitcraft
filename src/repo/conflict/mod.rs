@@ -290,13 +290,32 @@ fn is_link(file: &Path) -> bool {
 pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
     let file = crate::remote::join(repo, path);
     if let Some(target) = crate::remote::parse(&file) {
-        return save_there(&target, text).map_err(|e| format!("Could not save {path}: {e}"));
+        return save_there(&target, text).map_err(|e| {
+            crate::i18n::message(
+                "repo-core-3786",
+                &[
+                    ("path", format!("{}", path).into()),
+                    ("e", format!("{}", e).into()),
+                ],
+            )
+        });
     }
     // A link put there since it was opened is not written through.
     if is_link(&file) {
-        return Err(format!("{path} is a symbolic link now: not saved"));
+        return Err(crate::i18n::message(
+            "repo-core-3787",
+            &[("path", format!("{}", path).into())],
+        ));
     }
-    std::fs::write(&file, text).map_err(|e| format!("Could not save {path}: {e}"))
+    std::fs::write(&file, text).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-3786",
+            &[
+                ("path", format!("{}", path).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })
 }
 
 /// What the save script ends with when the file is a link, or not a file, now.
@@ -338,7 +357,7 @@ fn save_there(target: &crate::remote::Target, text: &str) -> Result<(), String> 
     )?;
     match out.code {
         0 => Ok(()),
-        NOT_A_PLAIN_FILE => Err("it is a symbolic link, or not a file, now: not saved".to_owned()),
+        NOT_A_PLAIN_FILE => Err(crate::i18n::text("repo-core-3796").to_owned()),
         _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
     }
 }
@@ -396,7 +415,7 @@ impl ConflictEditor {
     pub(crate) fn standalone(text: String) -> Result<Self, String> {
         let editor = Self::from_text("MERGED", text, None);
         if editor.on_disk > 200 {
-            return Err("More than 200 conflicts; choose a whole file".into());
+            return Err(crate::i18n::text("repo-core-3798").into());
         }
         Ok(editor)
     }
@@ -501,10 +520,12 @@ impl ConflictEditor {
     pub fn solved(&self) -> Result<String, String> {
         let left = self.unresolved();
         if left > 0 {
-            return Err(format!(
-                "{left} conflict{} still unresolved in {}",
-                if left == 1 { "" } else { "s" },
-                self.path
+            return Err(crate::i18n::message(
+                "repo-core-3799",
+                &[
+                    ("left", (left).into()),
+                    ("path", format!("{}", self.path).into()),
+                ],
             ));
         }
         Ok(self.result.clone())
@@ -514,13 +535,31 @@ impl ConflictEditor {
     fn side_names(&self) -> (String, String) {
         if self.rebase {
             (
-                format!("Upstream ({})", short(&self.ours_label)),
-                format!("Your commit ({})", short(&self.theirs_label)),
+                crate::i18n::message(
+                    "repo-core-3800",
+                    &[("ours-label", format!("{}", short(&self.ours_label)).into())],
+                ),
+                crate::i18n::message(
+                    "repo-core-3801",
+                    &[(
+                        "theirs-label",
+                        format!("{}", short(&self.theirs_label)).into(),
+                    )],
+                ),
             )
         } else {
             (
-                format!("Ours ({})", short(&self.ours_label)),
-                format!("Theirs ({})", short(&self.theirs_label)),
+                crate::i18n::message(
+                    "repo-core-3802",
+                    &[("ours-label", format!("{}", short(&self.ours_label)).into())],
+                ),
+                crate::i18n::message(
+                    "repo-core-3803",
+                    &[(
+                        "theirs-label",
+                        format!("{}", short(&self.theirs_label)).into(),
+                    )],
+                ),
             )
         }
     }

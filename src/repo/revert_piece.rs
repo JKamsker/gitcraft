@@ -23,7 +23,7 @@ impl RepoTab {
     /// Undoes the changed `lines` (indices into the open commit diff's lines) in the working
     /// tree: a hunk's, or those clicked.
     pub(super) fn revert_lines(&mut self, lines: &BTreeSet<usize>, ctx: &egui::Context) {
-        if self.refused_while_busy("Revert") {
+        if self.refused_while_busy(crate::i18n::text("repo-core-3310")) {
             return;
         }
         let Some(view) = &mut self.diff else { return };
@@ -108,7 +108,19 @@ impl RepoTab {
             return false;
         };
         self.status = Some((
-            format!("{label}: not done, {busy} was still running. Try again once it's done."),
+            crate::i18n::message(
+                "repo-core-3313",
+                &[
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
+                    (
+                        "busy",
+                        crate::repo::messages::display_operation(&busy).into(),
+                    ),
+                ],
+            ),
             true,
         ));
         true
@@ -133,37 +145,60 @@ impl RepoTab {
                 };
                 self.record_undo(label, OpKind::Normal(undo, self.refs.head.clone()), ctx);
                 (
-                    format!(
-                        "{label}: done. The change is in the working tree, to look over before \
-                         committing (Ctrl+Z undoes it)."
+                    crate::i18n::message(
+                        "repo-core-3316",
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     false,
                 )
             }
             Ok((_, Reverted::Merged)) => (
-                format!(
-                    "{label}: the file has changed since, so the revert was merged in with a \
-                     3-way merge and staged. Look it over before committing; Ctrl+Z can't undo \
-                     this one (unstage the file and discard its changes instead)."
+                crate::i18n::message(
+                    "repo-core-3317",
+                    &[(
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    )],
                 ),
                 false,
             ),
             Ok((_, Reverted::Conflicts(files))) => {
                 self.focus_wip = true;
                 let files = if files.is_empty() {
-                    "the file".to_owned()
+                    crate::i18n::text("repo-core-2511").to_owned()
                 } else {
                     files.join(", ")
                 };
                 (
-                    format!(
-                        "{label}: conflicts with changes made since, marked in {files}. Settle \
-                         them under Conflicted, or discard the file's changes to drop the revert."
+                    crate::i18n::message(
+                        "repo-core-3318",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            ("files", format!("{}", files).into()),
+                        ],
                     ),
                     true,
                 )
             }
-            Err(e) => (format!("{label} failed: {e}"), true),
+            Err(e) => (
+                crate::i18n::message(
+                    "repo-core-0270",
+                    &[
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        ),
+                        ("e", format!("{}", e).into()),
+                    ],
+                ),
+                true,
+            ),
         });
         self.reload_status(ctx);
     }

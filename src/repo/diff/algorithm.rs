@@ -32,7 +32,7 @@ pub(in crate::repo) fn keep_algorithm(
 
 /// What the drop-down shows for a file type that uses `algorithm` (`None`: git's default).
 fn shown_label(algorithm: Option<DiffAlgorithm>) -> &'static str {
-    algorithm.map_or("Algorithm", DiffAlgorithm::label)
+    algorithm.map_or(crate::i18n::text("repo-core-1554"), DiffAlgorithm::label)
 }
 
 /// The algorithm drop-down of the diff header for the file at `path`, with a spinner beside it
@@ -51,32 +51,39 @@ pub(in crate::repo) fn algorithm_menu(
         .next()
         .unwrap_or(path);
     let kept_for = match kind.strip_prefix('*') {
-        Some(ext) => format!("{ext} files"),
-        None => format!("files named {name}"),
+        Some(ext) => crate::i18n::message("repo-core-1555", &[("ext", format!("{}", ext).into())]),
+        None => crate::i18n::message("repo-core-1556", &[("name", format!("{}", name).into())]),
     };
     let mut picked = current;
     egui::ComboBox::from_id_salt(("diff-algorithm", path))
         .selected_text(shown_label(current))
         .width(92.0)
         .show_ui(ui, |ui| {
-            ui.selectable_value(&mut picked, None, "Default")
-                .on_hover_text("What your git config says (diff.algorithm), else Myers");
+            ui.selectable_value(&mut picked, None, crate::i18n::text("repo-core-1558"))
+                .on_hover_text(crate::i18n::text("repo-core-1559"));
             for a in DiffAlgorithm::ALL {
                 ui.selectable_value(&mut picked, Some(a), a.label())
                     .on_hover_text(a.about());
             }
         })
         .response
-        .on_hover_text(format!(
-            "Diff algorithm: how the lines of both sides are paired. Kept for {kept_for}; \
-             the repository's config is left as it is."
+        .on_hover_text(crate::i18n::message(
+            "repo-core-1560",
+            &[("kept-for", format!("{}", kept_for).into())],
         ));
     if repairing {
         // Laid out right to left: beside the drop-down, on its left.
         ui.add(crate::spinner::Spinner::new().size(12.0))
-            .on_hover_text(format!(
-                "Reading the diff again with {}; the lines shown are paired the old way",
-                current.map_or("git's default", DiffAlgorithm::label)
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1561",
+                &[(
+                    "label",
+                    format!(
+                        "{}",
+                        current.map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)
+                    )
+                    .into(),
+                )],
             ));
     }
     if picked != current {

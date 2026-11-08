@@ -54,8 +54,8 @@ impl RepoTab {
             .show(ui, |ui| {
                 let mut on = self.all_files.on;
                 let resp = ui
-                    .checkbox(&mut on, "View all files")
-                    .on_hover_text("List every file of the commit, not only those it changed");
+                    .checkbox(&mut on, crate::i18n::text("repo-core-0806"))
+                    .on_hover_text(crate::i18n::text("repo-core-0807"));
                 if resp.changed() {
                     acts.push(Action::ViewAllFiles(on));
                 }
@@ -85,7 +85,10 @@ impl RepoTab {
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     ui.add_space(12.0);
-                    ui.colored_label(t.danger, e);
+                    ui.colored_label(
+                        t.danger,
+                        crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                    );
                 });
                 return;
             }

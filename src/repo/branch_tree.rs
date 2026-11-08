@@ -339,7 +339,14 @@ fn file_key(path: &str) -> (&'static str, &str) {
 pub(super) fn files_toggle(ui: &mut Ui) {
     let mut settings = Settings::get(ui.ctx());
     let on = usize::from(settings.files_as_tree);
-    if let Some(picked) = widgets::switch(ui, &["Path", "Tree"], on) {
+    if let Some(picked) = widgets::switch(
+        ui,
+        &[
+            crate::i18n::text("repo-core-0250"),
+            crate::i18n::text("repo-core-0251"),
+        ],
+        on,
+    ) {
         settings.files_as_tree = picked == 1;
         settings.set(ui.ctx());
     }
@@ -433,7 +440,14 @@ fn folder_row<T>(
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
     crate::a11y::a11y(&resp, egui::WidgetType::CollapsingHeader, || {
         let count = labels::count(folder.leaves(), "item", "items");
-        labels::section(&format!("folder {}", folder.name), &count, open)
+        labels::section(
+            &crate::i18n::message(
+                "repo-core-0255",
+                &[("name", format!("{}", folder.name).into())],
+            ),
+            &count,
+            open,
+        )
     });
     let painter = ui.painter_at(rect);
     if resp.hovered() {

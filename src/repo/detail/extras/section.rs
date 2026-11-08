@@ -103,7 +103,7 @@ pub(super) fn output_box(ui: &mut Ui, title: &str, text: &str) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         faint(ui, title);
-        if icons::small_button(ui, "copy", "Copy").clicked() {
+        if icons::small_button(ui, "copy", crate::i18n::text("repo-core-1133")).clicked() {
             ui.ctx().copy_text(text.to_owned());
         }
     });

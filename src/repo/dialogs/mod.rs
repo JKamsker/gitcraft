@@ -481,8 +481,11 @@ impl RepoTab {
         // What the bisect dialogs say.
         let bisect_blocker = self.bisect_blocker();
         let machine = match crate::remote::parse(&self.path) {
-            Some(target) => format!("on {}", target.host.label()),
-            None => "on this machine".to_owned(),
+            Some(target) => crate::i18n::message(
+                "repo-core-1391",
+                &[("label", format!("{}", target.host.label()).into())],
+            ),
+            None => crate::i18n::text("repo-core-1392").to_owned(),
         };
         let is_remote = crate::remote::is_remote(&self.path);
         let current_branch = self.refs.current.clone();
@@ -520,12 +523,54 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
-                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.add(crate::spinner::Spinner::new());ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}},
-                Dialog::PushPreflight{plan,acknowledge}=>super::push_preflight::dialog(ui,plan,acknowledge),
-                Dialog::PushError(error)=>{ui.heading("Push preflight could not finish");ui.label(error.as_str());if ui.button("Close").clicked(){Outcome::Cancel}else{Outcome::Open}},
-                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
-                Dialog::WorkingDraftHistory { on,versions,error,index } => super::working_drafts::view::history(ui,on,versions,error.as_deref(),index,idle,working_draft_undo),
-                Dialog::WorkingDraftRecovery { preview,selected } => super::working_drafts::view::recovery(ui,preview,selected,idle),
+                Dialog::PushLoading { .. } => {
+                    ui.heading(crate::i18n::text("repo-core-1394"));
+                    ui.add(crate::spinner::Spinner::new());
+                    ui.label(crate::i18n::text("repo-core-1395"));
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
+                }
+                Dialog::PushPreflight { plan, acknowledge } => {
+                    super::push_preflight::dialog(ui, plan, acknowledge)
+                }
+                Dialog::PushError(error) => {
+                    ui.heading(crate::i18n::text("repo-core-1396"));
+                    ui.label(error.as_str());
+                    if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
+                }
+                Dialog::WorkingDraftLoading => {
+                    ui.heading(crate::i18n::text("repo-core-1397"));
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
+                }
+                Dialog::WorkingDraftHistory {
+                    on,
+                    versions,
+                    error,
+                    index,
+                } => super::working_drafts::view::history(
+                    ui,
+                    on,
+                    versions,
+                    error.as_deref(),
+                    index,
+                    idle,
+                    working_draft_undo,
+                ),
+                Dialog::WorkingDraftRecovery { preview, selected } => {
+                    super::working_drafts::view::recovery(ui, preview, selected, idle)
+                }
                 Dialog::ContentRecovery => self.content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
@@ -535,20 +580,41 @@ impl RepoTab {
                     topic,
                     skip_hooks,
                     web_warning,
-                } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks, web_warning.as_deref()),
+                } => gerrit::review(
+                    ui,
+                    remote,
+                    head,
+                    targets,
+                    target,
+                    topic,
+                    *skip_hooks,
+                    web_warning.as_deref(),
+                ),
                 Dialog::RepositoryTools(state) => {
                     super::repository_tools::show(ui, state, acts);
-                    if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
+                    if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
                 }
                 Dialog::Behaviour(form) => form.show(ui),
                 Dialog::LinkedMachines(form) => form.show(ui),
                 Dialog::BundleLoading(_) => {
-                    ui.heading("Reading bundle information…");
-                    ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
+                    ui.heading(crate::i18n::text("repo-core-1398"));
+                    ui.label(crate::i18n::text("repo-core-1399"));
                     ui.add(crate::spinner::Spinner::new());
-                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Open
+                    }
                 }
-                Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
+                Dialog::BundleExport {
+                    refs,
+                    selected,
+                    base,
+                } => bundles::export(ui, refs, selected, base, idle),
                 Dialog::BundleIncoming(form) => form.show(ui),
                 Dialog::CreateBranch {
                     at,
@@ -598,7 +664,9 @@ impl RepoTab {
                     push,
                     release,
                     focus,
-                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, release, focus),
+                } => branch::tag(
+                    ui, enter, at, at_label, name, message, remote, push, release, focus,
+                ),
                 Dialog::RenameBranch { old, new, focus } => {
                     let children = crate::git::stack::children(stack_parents, old);
                     branch::rename_branch(ui, enter, old, new, focus, &children)
@@ -633,7 +701,9 @@ impl RepoTab {
                     username,
                     password,
                     focus,
-                } => remote::credentials(ui, enter, url, endpoints, *refused, username, password, focus),
+                } => remote::credentials(
+                    ui, enter, url, endpoints, *refused, username, password, focus,
+                ),
                 Dialog::CreatePr {
                     noun,
                     branch,
@@ -705,13 +775,24 @@ impl RepoTab {
                 ),
                 Dialog::KeyboardDiscard { request } => {
                     let mut alternative = false;
-                    match confirm::confirm(ui, confirm::Asked {
-                        title: "Discard this hunk?",
-                        body: "This removes the current hunk from the working tree. Ctrl+Z restores it.",
-                        button: "Discard hunk", ops: &[], alternative: &None,
-                        refresh: Refresh::Status, undo: &Undo::None,
-                    }, &mut alternative, &mut WhatItDoes::default(), false) {
-                        Outcome::Done(_) => Outcome::Done(Box::new(Action::Keyboard(request.clone()))),
+                    match confirm::confirm(
+                        ui,
+                        confirm::Asked {
+                            title: crate::i18n::text("repo-core-1400"),
+                            body: crate::i18n::text("repo-core-1401"),
+                            button: crate::i18n::text("repo-core-1402"),
+                            ops: &[],
+                            alternative: &None,
+                            refresh: Refresh::Status,
+                            undo: &Undo::None,
+                        },
+                        &mut alternative,
+                        &mut WhatItDoes::default(),
+                        false,
+                    ) {
+                        Outcome::Done(_) => {
+                            Outcome::Done(Box::new(Action::Keyboard(request.clone())))
+                        }
                         outcome => outcome,
                     }
                 }
@@ -802,7 +883,15 @@ fn buttons(
 ) -> Outcome {
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        if widgets::primary_button(ui, label, valid, 90.0).clicked() || (enter && valid) {
+        if widgets::primary_button(
+            ui,
+            &crate::repo::messages::display_operation(label),
+            valid,
+            90.0,
+        )
+        .clicked()
+            || (enter && valid)
+        {
             outcome = Outcome::Done(Box::new(done()));
         }
         if cancel_button(ui) {
@@ -814,7 +903,7 @@ fn buttons(
 
 /// Whether Cancel was clicked.
 fn cancel_button(ui: &mut egui::Ui) -> bool {
-    ui.add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+    ui.add(egui::Button::new(crate::i18n::text("repo-core-0443")).min_size(egui::vec2(80.0, 30.0)))
         .clicked()
 }
 

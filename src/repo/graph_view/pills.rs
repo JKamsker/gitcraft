@@ -145,17 +145,20 @@ impl RepoTab {
                     .filter_map(|b| self.stack_line(&b.label)),
             );
             let drag = if first.kind == BadgeKind::PullRequest {
-                "Pull request tip; double-click its entry in the left pane to open details"
+                crate::i18n::text("repo-core-2683")
             } else if first.kind == BadgeKind::Branch {
-                "Double-click a pill to check it out, or drag it onto a branch or a commit"
+                crate::i18n::text("repo-core-2684")
             } else {
-                "Double-click a pill to check it out; drag the row to cherry-pick or move the commit"
+                crate::i18n::text("repo-core-2685")
             };
-            let resp = resp.on_hover_text(format!(
-                "{}\nTip commit by {} · {}\n{drag}",
-                lines.join("\n"),
-                row.commit.author,
-                row.commit.date
+            let resp = resp.on_hover_text(crate::i18n::message(
+                "repo-core-2686",
+                &[
+                    ("n", format!("{}", lines.join("\n")).into()),
+                    ("author", format!("{}", row.commit.author).into()),
+                    ("date", crate::i18n::date_iso(&row.commit.date).into()),
+                    ("drag", format!("{}", drag).into()),
+                ],
             ));
             return (resp, hit);
         }
@@ -328,10 +331,10 @@ impl RepoTab {
     /// Clicks on one pill of a row's stack, which act like those on the row's own pill.
     fn stack_slot_clicks(&self, resp: Response, b: &Badge, i: usize, acts: &mut Vec<Action>) {
         let hint = match self.pill_checkout(b) {
-            _ if b.kind == BadgeKind::PullRequest => "pull request tip",
-            _ if b.head => "checked out",
-            Some(Action::Pull) => "double-click to pull",
-            _ => "double-click to check out",
+            _ if b.kind == BadgeKind::PullRequest => crate::i18n::text("repo-core-2690"),
+            _ if b.head => crate::i18n::text("repo-core-2691"),
+            Some(Action::Pull) => crate::i18n::text("repo-core-2692"),
+            _ => crate::i18n::text("repo-core-2693"),
         };
         let resp = resp.on_hover_text(format!("{} ({hint})", b.describe()));
         widgets::a11y(&resp, egui::WidgetType::Button, || b.spoken());

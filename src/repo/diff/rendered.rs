@@ -69,7 +69,7 @@ pub fn load(repo: &Path, key: &DiffKey) -> Result<RenderedMd, String> {
     };
     let (old, new) = (read(&old), read(&new));
     if old.is_none() && new.is_none() {
-        return Err("Couldn't read the file on either side of the change".to_owned());
+        return Err(crate::i18n::text("repo-core-1963").to_owned());
     }
     let mut images = Images::default();
     let mut safe = |side: &Option<(Side, String)>| {
@@ -382,7 +382,7 @@ pub fn show(
                     }
                     if md.blocks.iter().all(|(change, _)| *change == Change::Kept) {
                         ui.label(
-                            egui::RichText::new("The change leaves the rendered text as it was.")
+                            egui::RichText::new(crate::i18n::text("repo-core-1968"))
                                 .color(t.text_dim)
                                 .italics(),
                         );
@@ -432,8 +432,8 @@ fn block(
     ui.painter()
         .line_segment([rect.left_top(), rect.left_bottom()], Stroke::new(3.0, bar));
     let tip = match change {
-        Change::Removed => "Removed",
-        _ => "Added",
+        Change::Removed => crate::i18n::text("repo-core-1969"),
+        _ => crate::i18n::text("repo-core-1970"),
     };
     frame.response.on_hover_text(tip);
     ui.add_space(2.0);

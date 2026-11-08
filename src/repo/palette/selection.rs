@@ -122,9 +122,13 @@ impl RepoTab {
         let deleted = matches!(key, DiffKey::Work(f) if f.code == 'D');
         if !deleted {
             for (label, tab, kind) in [
-                ("View", FileTab::File, "view"),
-                ("File history of", FileTab::History, "history"),
-                ("Blame", FileTab::Blame, "blame"),
+                (crate::i18n::text("repo-core-2996"), FileTab::File, "view"),
+                (
+                    crate::i18n::text("repo-core-2998"),
+                    FileTab::History,
+                    "history",
+                ),
+                (crate::i18n::text("repo-core-2498"), FileTab::Blame, "blame"),
             ] {
                 items.push(
                     PaletteItem::action(
@@ -164,16 +168,16 @@ impl RepoTab {
         match file.area {
             Area::Unstaged | Area::Untracked => {
                 let discard = if file.area == Area::Untracked {
-                    format!("Delete {path}…")
+                    crate::i18n::message("repo-core-3005", &[("path", format!("{}", path).into())])
                 } else {
-                    format!("Discard changes to {path}…")
+                    crate::i18n::message("repo-core-3006", &[("path", format!("{}", path).into())])
                 };
                 vec![
                     PaletteItem::action(
                         format!("Stage {path}"),
                         "file",
                         stage_action(
-                            "Stage",
+                            crate::i18n::text("repo-core-0836"),
                             vec![vec!["--literal-pathspecs", "add", "--", path]],
                         ),
                     )

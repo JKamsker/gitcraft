@@ -59,14 +59,14 @@ pub fn file_menu_with(
         .style(crate::theme::menu_style)
         .show(|ui| {
             let rel = std::path::PathBuf::from(path);
-            if crate::menu_item::MenuItem::new("Open file")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3749"))
                 .icon("eye")
                 .show(ui)
                 .clicked()
             {
                 acts.push(Action::OpenPath(rel.clone()));
             }
-            if crate::menu_item::MenuItem::new("Open in editor")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0113"))
                 .icon("code")
                 .show(ui)
                 .clicked()
@@ -86,7 +86,7 @@ pub fn file_menu_with(
                 ));
             }
             ui.separator();
-            if crate::menu_item::MenuItem::new("View file")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3750"))
                 .icon("eye")
                 .keys_when(crate::keymap::Command::FileContents, shortcuts)
                 .show(ui)
@@ -99,13 +99,13 @@ pub fn file_menu_with(
                 });
             }
             if let Some(rev) = rev
-                && ui.button("Inspect stored object…").clicked()
+                && ui.button(crate::i18n::text("repo-core-3751")).clicked()
             {
                 acts.push(Action::RepositoryTools(
                     crate::repo::repository_tools::Act::Object(format!("{rev}:{path}")),
                 ));
             }
-            if crate::menu_item::MenuItem::new("File history")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3752"))
                 .icon("history")
                 .keys_when(crate::keymap::Command::FileHistory, shortcuts)
                 .show(ui)
@@ -117,7 +117,7 @@ pub fn file_menu_with(
                     tab: FileTab::History,
                 });
             }
-            if crate::menu_item::MenuItem::new("Blame")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2498"))
                 .icon("history")
                 .keys_when(crate::keymap::Command::FileBlame, shortcuts)
                 .show(ui)
@@ -131,13 +131,10 @@ pub fn file_menu_with(
             }
             if revert && let Some(hash) = rev {
                 ui.separator();
-                let b = crate::menu_item::MenuItem::new("Revert changes to this file")
+                let b = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3753"))
                     .icon("undo-2")
                     .show(ui)
-                    .on_hover_text(
-                        "Undo this commit's changes to the file in the working tree, to look over \
-                     before committing",
-                    );
+                    .on_hover_text(crate::i18n::text("repo-core-2381"));
                 if b.clicked() {
                     acts.push(Action::RevertFile {
                         hash: hash.to_owned(),
@@ -147,10 +144,10 @@ pub fn file_menu_with(
             }
             // Of the working tree: its rules and attributes, not a commit's.
             if rev.is_none()
-                && crate::menu_item::MenuItem::new("Ignore rules and attributes")
+                && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3754"))
                     .icon("eye-off")
                     .show(ui)
-                    .on_hover_text("Why it is ignored or not, and how git treats it")
+                    .on_hover_text(crate::i18n::text("repo-core-3755"))
                     .clicked()
             {
                 acts.push(Action::Doctor(crate::repo::doctor::DoctorAct::Ignore(
@@ -158,7 +155,7 @@ pub fn file_menu_with(
                 )));
             }
             if ignorable {
-                crate::menu_item::MenuItem::new("Ignore")
+                crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3756"))
                     .icon("eye-off")
                     .submenu(ui, |ui| {
                         for (label, pattern, untrack) in ignore_patterns(path) {
@@ -176,7 +173,7 @@ pub fn file_menu_with(
                     });
             }
             ui.separator();
-            if crate::menu_item::MenuItem::new("Copy path")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3525"))
                 .icon("copy")
                 .keys_when(crate::keymap::Command::FileCopyPath, shortcuts)
                 .show(ui)
@@ -238,25 +235,20 @@ pub(in crate::repo) fn selection_commands(
 fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
     match tool_item(key) {
         ToolItem::OpenInDiffTool => {
-            if crate::menu_item::MenuItem::new("Open in diff tool")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3757"))
                 .icon("file-diff")
                 .show(ui)
-                .on_hover_text(
-                    "Shows this diff in the diff tool of Settings → Git → External tools",
-                )
+                .on_hover_text(crate::i18n::text("repo-core-3758"))
                 .clicked()
             {
                 acts.push(Action::OpenInDiffTool(key.clone()));
             }
         }
         ToolItem::ResolveInMergeTool => {
-            if crate::menu_item::MenuItem::new("Resolve in merge tool")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0730"))
                 .icon("git-merge")
                 .show(ui)
-                .on_hover_text(
-                    "Opens the conflict in the merge tool of Settings → Git → External tools; \
-                     the file is marked resolved when the tool reports success",
-                )
+                .on_hover_text(crate::i18n::text("repo-core-3759"))
                 .clicked()
             {
                 acts.push(Action::ResolveInMergeTool(key.path().to_owned()));
@@ -272,7 +264,7 @@ fn ignore_patterns(path: &str) -> Vec<(String, String, String)> {
     let mut out = Vec::new();
     if let Some(literal) = ignore_literal(path) {
         out.push((
-            "This file".to_owned(),
+            crate::i18n::text("repo-core-3760").to_owned(),
             format!("/{literal}"),
             path.to_owned(),
         ));
@@ -281,7 +273,7 @@ fn ignore_patterns(path: &str) -> Vec<(String, String, String)> {
         && let Some(literal) = ignore_literal(ext)
     {
         out.push((
-            format!("All .{ext} files"),
+            crate::i18n::message("repo-core-3762", &[("ext", format!("{}", ext).into())]),
             format!("*.{literal}"),
             path.to_owned(),
         ));
@@ -291,7 +283,7 @@ fn ignore_patterns(path: &str) -> Vec<(String, String, String)> {
         && let Some(literal) = ignore_literal(dir)
     {
         out.push((
-            format!("Folder {dir}/"),
+            crate::i18n::message("repo-core-3764", &[("dir", format!("{}", dir).into())]),
             format!("/{literal}/"),
             dir.to_owned(),
         ));

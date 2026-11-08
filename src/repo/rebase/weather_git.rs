@@ -33,7 +33,7 @@ impl ForecastGit {
             active,
         )?;
         if !matches!(format.trim(), "sha1" | "sha256") {
-            return Err("Unknown repository object format".into());
+            return Err(crate::i18n::text("repo-core-3292").into());
         }
         let path = if let Some(target) = remote::parse(repo) {
             let out = git::forecast_remote(&target.host, remote::Request {
@@ -41,10 +41,10 @@ impl ForecastGit {
                 ..Default::default()
             }, active)?;
             if out.code != 0 {
-                return Err("Could not prepare forecast context".into());
+                return Err(crate::i18n::text("repo-core-3294").into());
             }
             let dir =
-                String::from_utf8(out.stdout).map_err(|_| "Invalid forecast temporary path")?;
+                String::from_utf8(out.stdout).map_err(|_| crate::i18n::text("repo-core-3295"))?;
             if !dir.starts_with('/')
                 || dir.contains(['\n', '\r', '\0'])
                 || !dir
@@ -52,7 +52,7 @@ impl ForecastGit {
                     .next()
                     .is_some_and(|name| name.starts_with("gitcraft-weather."))
             {
-                return Err("Invalid forecast temporary path".into());
+                return Err(crate::i18n::text("repo-core-3295").into());
             }
             remote::encode(&target.host, &dir)
         } else {

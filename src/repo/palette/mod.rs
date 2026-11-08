@@ -58,9 +58,9 @@ impl Pick {
     /// The prompt of the second step's field.
     pub(crate) fn placeholder(&self) -> &'static str {
         match self {
-            Pick::Reset(_) => "How to reset…",
-            Pick::Push => "Branch to push…",
-            _ => "Branch…",
+            Pick::Reset(_) => crate::i18n::text("repo-core-4187"),
+            Pick::Push => crate::i18n::text("repo-core-4188"),
+            _ => crate::i18n::text("repo-core-4189"),
         }
     }
 
@@ -86,8 +86,8 @@ impl PaletteItem {
         let label = label.into();
         Self {
             key: label.clone(),
-            label,
-            hint: hint.to_owned(),
+            label: super::messages::display_operation(&label),
+            hint: super::messages::display_operation(hint),
             shortcut: None,
             selection: false,
             run,
@@ -123,6 +123,7 @@ pub(crate) struct PaletteGeneration {
     selected: Option<usize>,
     file: Option<DiffKey>,
     busy: bool,
+    locale: u64,
 }
 
 impl RepoTab {
@@ -135,6 +136,7 @@ impl RepoTab {
             selected: self.selected,
             file: self.diff.as_ref().map(|d| d.key.clone()),
             busy: self.busy_op.is_some(),
+            locale: crate::i18n::generation(),
         }
     }
 

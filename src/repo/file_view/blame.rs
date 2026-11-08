@@ -147,7 +147,13 @@ impl RepoTab {
                 if stop {
                     crate::repo::widgets::a11y(&gutter_resp, egui::WidgetType::Button, || {
                         let short = line.hash.get(..7).unwrap_or(&line.hash);
-                        format!("line {}, go to commit {short}", i + 1)
+                        crate::i18n::message(
+                            "repo-core-2477",
+                            &[
+                                ("i", format!("{}", i + 1).into()),
+                                ("short", format!("{}", short).into()),
+                            ],
+                        )
                     });
                 }
                 if first {
@@ -156,7 +162,7 @@ impl RepoTab {
                         p.text(
                             pos2(gutter.left() + 10.0, mid),
                             Align2::LEFT_CENTER,
-                            "Not committed yet",
+                            crate::i18n::text("repo-core-2478"),
                             small,
                             t.warning,
                         );
@@ -193,11 +199,16 @@ impl RepoTab {
                     }
                 }
                 if !line.uncommitted() {
-                    let gutter_resp = gutter_resp.on_hover_text(format!(
-                        "{} · {}\n{}\nClick to show the commit",
-                        line.author,
-                        git::relative_time(line.time, now),
-                        line.summary
+                    let gutter_resp = gutter_resp.on_hover_text(crate::i18n::message(
+                        "repo-core-2479",
+                        &[
+                            ("author", format!("{}", line.author).into()),
+                            (
+                                "now",
+                                format!("{}", git::relative_time(line.time, now)).into(),
+                            ),
+                            ("summary", format!("{}", line.summary).into()),
+                        ],
                     ));
                     if gutter_resp.clicked() {
                         acts.push(Action::CloseFileView);
@@ -222,7 +233,7 @@ impl RepoTab {
                     .show(|ui| {
                         if !line.uncommitted()
                             && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
-                            && ui.button("Explain history").clicked()
+                            && ui.button(crate::i18n::text("repo-core-2325")).clicked()
                         {
                             acts.push(Action::OpenLineDossier(Some(
                                 git::investigations::dossier::Seed {
@@ -234,7 +245,7 @@ impl RepoTab {
                         }
                         if !line.uncommitted()
                             && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
-                            && ui.button("Symbol biography").clicked()
+                            && ui.button(crate::i18n::text("repo-core-2326")).clicked()
                         {
                             acts.push(Action::OpenSymbolBiography(Some(
                                 git::investigations::dossier::Seed {

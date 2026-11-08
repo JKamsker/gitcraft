@@ -26,12 +26,12 @@ impl RepoTab {
                 Header {
                     key: "submodules",
                     icon: "package",
-                    title: "SUBMODULES",
+                    title: crate::i18n::text("repo-core-3516"),
                     count: self.submodules.len(),
                     default_open: true,
                     button: Some(Button {
                         icon: "refresh-cw",
-                        tooltip: "Update all submodules",
+                        tooltip: crate::i18n::text("repo-core-3517"),
                         action: idle.then(update_all),
                     }),
                 },
@@ -63,26 +63,26 @@ impl RepoTab {
         idle: bool,
         cloned: bool,
     ) {
-        if crate::menu_item::MenuItem::new("Update")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3518"))
             .icon("command")
             .enabled(idle)
             .show(ui)
-            .on_hover_text("Clone it if needed and check out the commit recorded for it")
+            .on_hover_text(crate::i18n::text("repo-core-3519"))
             .clicked()
         {
             acts.push(update_one(&sub.path));
         }
         if sub.state == SubmoduleState::Conflicted
-            && ui.button("Resolve pointer as a graph…").clicked()
+            && ui.button(crate::i18n::text("repo-core-3520")).clicked()
         {
             acts.push(Action::RepositoryTools(
                 crate::repo::repository_tools::Act::SubmoduleConflict(sub.path.clone()),
             ));
         }
         let folder = crate::remote::join(&self.path, &sub.path);
-        if MenuItem::new("Open in a new tab")
+        if MenuItem::new(crate::i18n::text("repo-core-3521"))
             .icon("folder-git-2")
-            .refused((!cloned).then_some("Update it first to clone it"))
+            .refused((!cloned).then_some(crate::i18n::text("repo-core-3522")))
             .show(ui)
             .clicked()
         {
@@ -97,14 +97,14 @@ impl RepoTab {
         };
         if crate::menu_item::MenuItem::new(reveal_label())
             .icon("folder-open")
-            .refused((!revealable).then_some("Update it first, or open it on its own machine"))
+            .refused((!revealable).then_some(crate::i18n::text("repo-core-3524")))
             .show(ui)
             .clicked()
         {
             acts.push(Action::OpenPath(sub.path.clone().into()));
         }
         ui.separator();
-        if crate::menu_item::MenuItem::new("Copy path")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3525"))
             .icon("copy")
             .show(ui)
             .clicked()
@@ -112,7 +112,7 @@ impl RepoTab {
             ui.ctx().copy_text(sub.path.clone());
         }
         if !sub.url.is_empty()
-            && crate::menu_item::MenuItem::new("Copy URL")
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
                 .icon("copy")
                 .show(ui)
                 .clicked()
@@ -149,7 +149,7 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
     let painter = ui.painter_at(rect);
     let (label, color) = match (sub.state, sub.modified) {
         (SubmoduleState::Conflicted, _) => (Some("conflict"), t.danger),
-        (SubmoduleState::UpToDate, true) => (Some("modified"), t.warning),
+        (SubmoduleState::UpToDate, true) => (Some(crate::i18n::text("repo-core-3527")), t.warning),
         (state, _) => (state.label(), if faint { t.text_faint } else { t.warning }),
     };
     let mut right = rect.right() - 8.0;
@@ -185,27 +185,34 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
 fn submodule_tip(sub: &Submodule) -> String {
     let mut tip = sub.path.clone();
     if !sub.url.is_empty() {
-        tip.push_str(&format!("\nFrom {}", sub.url));
+        tip.push_str(&crate::i18n::message(
+            "repo-core-3528",
+            &[("url", format!("{}", sub.url).into())],
+        ));
     }
     let at = match &sub.describe {
         Some(describe) => format!("{} ({describe})", short(&sub.hash)),
         None => short(&sub.hash).to_owned(),
     };
     tip.push_str(&match sub.state {
-        SubmoduleState::UpToDate => format!("\nAt {at}, as recorded"),
+        SubmoduleState::UpToDate => {
+            crate::i18n::message("repo-core-3530", &[("at", format!("{}", at).into())])
+        }
         SubmoduleState::NotInitialized => {
-            format!("\nNot cloned yet; Update clones it at {at}")
+            crate::i18n::message("repo-core-3531", &[("at", format!("{}", at).into())])
         }
         SubmoduleState::OutOfDate => {
-            format!("\nAt {at}, not the commit recorded here; Update checks that one out")
+            crate::i18n::message("repo-core-3532", &[("at", format!("{}", at).into())])
         }
-        SubmoduleState::Conflicted => format!("\nIn conflict; at {at}"),
+        SubmoduleState::Conflicted => {
+            crate::i18n::message("repo-core-3533", &[("at", format!("{}", at).into())])
+        }
     });
     if sub.modified {
-        tip.push_str("\nHas changes of its own");
+        tip.push_str(crate::i18n::text("repo-core-3534"));
     }
     if sub.state != SubmoduleState::NotInitialized {
-        tip.push_str("\nDouble-click to open in a tab");
+        tip.push_str(crate::i18n::text("repo-core-3535"));
     }
     tip
 }

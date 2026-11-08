@@ -16,9 +16,19 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(super) fn changes_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-core-0811"),
+            branch_tree::files_toggle,
+        );
 
-        if ui.button("Earlier versions…").on_hover_text("Opt in to working-tree drafts and recover selected hunks from earlier working or staged versions").clicked() { acts.push(Action::EarlierVersions); }
+        if ui
+            .button(crate::i18n::text("repo-core-0812"))
+            .on_hover_text(crate::i18n::text("repo-core-0813"))
+            .clicked()
+        {
+            acts.push(Action::EarlierVersions);
+        }
         self.review_all_button(
             ui,
             crate::repo::review_workflow::ReviewSource::Working,
@@ -74,17 +84,35 @@ impl RepoTab {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
                     // A fold stopped on a conflict says so: its changes are in the rebase.
                     let what = match self.fold_stopped_here(state) {
-                        Some(fold) => format!("{} in progress (rebase)", fold.label),
-                        None => format!("{} in progress", state.label()),
+                        Some(fold) => crate::i18n::message(
+                            "repo-core-0817",
+                            &[(
+                                "label",
+                                crate::repo::messages::display_operation(&fold.label).into(),
+                            )],
+                        ),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", format!("{}", state.label()).into())],
+                        ),
                     };
                     let title = match restack {
-                        Some(p) => format!(
-                            "Restack paused at {} ({} of {})",
-                            p.current().map_or("", |s| s.branch.as_str()),
-                            p.done + 1,
-                            p.steps.len()
+                        Some(p) => crate::i18n::message(
+                            "repo-core-0819",
+                            &[
+                                (
+                                    "p",
+                                    format!("{}", p.current().map_or("", |s| s.branch.as_str()))
+                                        .into(),
+                                ),
+                                ("done", format!("{}", p.done + 1).into()),
+                                ("count", (p.steps.len()).into()),
+                            ],
                         ),
-                        None => format!("{} in progress", state.label()),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", format!("{}", state.label()).into())],
+                        ),
                     };
                     ui.label(
                         RichText::new(if restack.is_some() { title } else { what })
@@ -94,35 +122,53 @@ impl RepoTab {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if restack.is_some() {
                             if ui
-                                .add_enabled(idle, egui::Button::new("Abort restack"))
-                                .on_hover_text("Every branch back where it was before the restack")
+                                .add_enabled(
+                                    idle,
+                                    egui::Button::new(crate::i18n::text("repo-core-0820")),
+                                )
+                                .on_hover_text(crate::i18n::text("repo-core-0821"))
                                 .clicked()
                             {
                                 acts.push(Action::Stack(
                                     crate::repo::stack::StackAct::AbortRestack,
                                 ));
                             }
-                        } else if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
+                        } else if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text("repo-core-0018")),
+                            )
+                            .clicked()
+                        {
                             acts.push(self.abort_for(state));
                         }
                     });
                 });
                 let hint = if restack.is_some() {
-                    if self.work.conflicted.is_empty() { "All conflicts resolved: Continue restack to go on." } else { "Fix conflicted files, mark resolved, then Continue restack." }
+                    if self.work.conflicted.is_empty() {
+                        crate::i18n::text("repo-core-0822")
+                    } else {
+                        crate::i18n::text("repo-core-0823")
+                    }
                 } else if self.work.conflicted.is_empty() && state == InProgress::Rebase {
-                    "No conflicts: Continue rebase goes on. At a commit it stopped at to edit, what is staged goes into that commit first."
+                    crate::i18n::text("repo-core-0824")
                 } else if self.work.conflicted.is_empty() {
-                    "All conflicts resolved: commit to finish."
+                    crate::i18n::text("repo-core-0825")
                 } else {
-                    "Fix the conflicted files, mark them resolved, then commit."
+                    crate::i18n::text("repo-core-0826")
                 };
                 ui.label(RichText::new(hint).color(t.text_dim).small());
             });
     }
 
     fn conflicted_list(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        list_header(ui, "CONFLICTED", self.work.conflicted.len(), None);
-        let buttons = [("check", "Mark resolved (stage)")];
+        list_header(
+            ui,
+            crate::i18n::text("repo-core-0827"),
+            self.work.conflicted.len(),
+            None,
+        );
+        let buttons = [("check", crate::i18n::text("repo-core-0829"))];
         self.work_list(
             ui,
             acts,
@@ -132,7 +178,7 @@ impl RepoTab {
             |acts, f, click| match click {
                 RowClick::Open => acts.push(Action::OpenDiff(DiffKey::Work(f.clone()))),
                 RowClick::Button(_) => acts.push(stage_action(
-                    "Mark resolved",
+                    crate::i18n::text("repo-core-0179"),
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
                 RowClick::None | RowClick::Pick => {}
@@ -145,13 +191,19 @@ impl RepoTab {
         let unstaged = &self.work.unstaged;
         if list_header(
             ui,
-            "UNSTAGED",
+            crate::i18n::text("repo-core-0831"),
             unstaged.len(),
-            (!unstaged.is_empty() && idle).then_some("Stage all"),
+            (!unstaged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0832")),
         ) {
-            acts.push(stage_action("Stage all", vec![vec!["add", "-A"]]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0832"),
+                vec![vec!["add", "-A"]],
+            ));
         }
-        let buttons = [("undo-2", "Discard changes…"), ("plus", "Stage")];
+        let buttons = [
+            ("undo-2", crate::i18n::text("repo-core-0834")),
+            ("plus", crate::i18n::text("repo-core-0836")),
+        ];
         self.work_list(
             ui,
             acts,
@@ -162,14 +214,14 @@ impl RepoTab {
                 RowClick::Open => acts.push(Action::OpenDiff(DiffKey::Work(f.clone()))),
                 RowClick::Button(0) => acts.push(Action::Dialog(discard_dialog(f))),
                 RowClick::Button(_) => acts.push(stage_action(
-                    "Stage",
+                    crate::i18n::text("repo-core-0836"),
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
                 RowClick::None | RowClick::Pick => {}
             },
         );
         if unstaged.is_empty() {
-            empty_hint(ui, "Nothing to stage");
+            empty_hint(ui, crate::i18n::text("repo-core-0838"));
         }
     }
 
@@ -179,11 +231,14 @@ impl RepoTab {
         let staged = &self.work.staged;
         if list_header(
             ui,
-            "STAGED",
+            crate::i18n::text("repo-core-0839"),
             staged.len(),
-            (!staged.is_empty() && idle).then_some("Unstage all"),
+            (!staged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0840")),
         ) {
-            acts.push(stage_action("Unstage all", vec![unstage_all_args(head)]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0840"),
+                vec![unstage_all_args(head)],
+            ));
         }
         let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
@@ -194,12 +249,10 @@ impl RepoTab {
                     ui.add_space(8.0);
                     ui.add_enabled(
                         idle && attached,
-                        egui::Button::new("Distribute staged fixes…").small(),
+                        egui::Button::new(crate::i18n::text("repo-core-0049")).small(),
                     )
-                    .on_hover_text(
-                        "Put each staged change into the earlier commit of the branch that last changed those lines",
-                    )
-                    .on_disabled_hover_text("HEAD is detached: check out a branch first")
+                    .on_hover_text(crate::i18n::text("repo-core-0841"))
+                    .on_disabled_hover_text(crate::i18n::text("repo-core-0842"))
                     .clicked()
                 })
                 .inner;
@@ -207,7 +260,7 @@ impl RepoTab {
                 acts.push(Action::OpenAbsorb);
             }
         }
-        let buttons = [("minus", "Unstage")];
+        let buttons = [("minus", crate::i18n::text("repo-core-0844"))];
         self.work_list(
             ui,
             acts,
@@ -225,7 +278,7 @@ impl RepoTab {
             },
         );
         if staged.is_empty() {
-            empty_hint(ui, "Stage files to choose what goes in the commit");
+            empty_hint(ui, crate::i18n::text("repo-core-0846"));
         }
     }
 
@@ -424,11 +477,8 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     if f.area == Area::Untracked {
         Dialog::confirm(
             "Delete new file",
-            format!(
-                "Delete “{}”? It isn't tracked by git, so this can't be undone.",
-                f.path
-            ),
-            "Delete file",
+            crate::i18n::message("repo-core-0852", &[("path", format!("{}", f.path).into())]),
+            crate::i18n::text("repo-core-0853"),
             ops(&[&["--literal-pathspecs", "clean", "-f", "-q", "--", &f.path]]),
             None,
         )
@@ -437,15 +487,12 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
             crate::git::PreviewAsk::files(vec![f.path.clone()]),
             String::new(),
         )
-        .files_heading("Deleted")
+        .files_heading(crate::i18n::text("repo-core-0855"))
     } else {
         Dialog::confirm(
             "Discard changes",
-            format!(
-                "Discard the unstaged changes to “{}”? This can't be undone.",
-                f.path
-            ),
-            "Discard",
+            crate::i18n::message("repo-core-0857", &[("path", format!("{}", f.path).into())]),
+            crate::i18n::text("repo-core-0858"),
             // Not `--literal-pathspecs`: restore runs the post-checkout hook, which would get it.
             ops(&[&["restore", "--", &literal_path(&f.path)]]),
             None,
@@ -455,7 +502,7 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
             crate::git::PreviewAsk::files(vec![f.path.clone()]),
             String::new(),
         )
-        .files_heading("Unstaged changes lost")
+        .files_heading(crate::i18n::text("repo-core-0860"))
     }
 }
 

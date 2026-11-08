@@ -28,33 +28,63 @@ pub(super) fn rehearse(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Rehearse",
-        &format!(
-            "Plays it through {machine} in a scratch worktree and says where it stops, which \
-             files conflict and whether the tests pass. Nothing of yours changes until you pick \
-             one."
+        crate::i18n::text("repo-core-1453"),
+        &crate::i18n::message(
+            "repo-core-1454",
+            &[("machine", format!("{}", machine).into())],
         ),
         &t,
     );
     let Some(current) = current else {
-        ui.label(
-            RichText::new("Check out a branch first: rehearsals are of the checked-out one.")
-                .color(t.warning),
-        );
+        ui.label(RichText::new(crate::i18n::text("repo-core-1455")).color(t.warning));
         ui.add_space(12.0);
-        return buttons(ui, "Rehearse", false, false, || {
-            Action::Rehearse(RehearseAct::Stop)
-        });
+        return buttons(
+            ui,
+            crate::i18n::text("repo-core-1453"),
+            false,
+            false,
+            || Action::Rehearse(RehearseAct::Stop),
+        );
     };
-    ui.radio_value(rebase, true, format!("Rebase {current} onto {other}"));
-    ui.radio_value(rebase, false, format!("Merge {other} into {current}"));
-    let the_other = if *rebase { "the merge" } else { "the rebase" };
-    ui.checkbox(compare, format!("Rehearse {the_other} too, to compare"));
+    ui.radio_value(
+        rebase,
+        true,
+        crate::i18n::message(
+            "repo-core-1456",
+            &[
+                ("current", format!("{}", current).into()),
+                ("other", format!("{}", other).into()),
+            ],
+        ),
+    );
+    ui.radio_value(
+        rebase,
+        false,
+        crate::i18n::message(
+            "repo-core-1457",
+            &[
+                ("other", format!("{}", other).into()),
+                ("current", format!("{}", current).into()),
+            ],
+        ),
+    );
+    let the_other = if *rebase {
+        crate::i18n::text("repo-core-1458")
+    } else {
+        crate::i18n::text("repo-core-1459")
+    };
+    ui.checkbox(
+        compare,
+        crate::i18n::message(
+            "repo-core-1460",
+            &[("the-other", format!("{}", the_other).into())],
+        ),
+    );
     ui.add_space(6.0);
-    ui.label(RichText::new("Test the result with (leave empty not to):").color(t.text_dim));
+    ui.label(RichText::new(crate::i18n::text("repo-core-1461")).color(t.text_dim));
     field(ui, command, "cargo test, make check, ./test.sh…", focus);
     ui.add_space(12.0);
-    buttons(ui, "Rehearse", true, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1453"), true, enter, || {
         let first = if *rebase {
             RehearseKind::Rebase
         } else {

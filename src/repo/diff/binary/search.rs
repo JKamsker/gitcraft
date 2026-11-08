@@ -4,15 +4,20 @@ use crate::theme::Tokens;
 
 pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document {
     let mut doc = Document::default();
-    for (label, side) in [("Before", &pair.old), ("After", &pair.new)] {
+    for (before, label, side) in [
+        (true, crate::i18n::text("repo-core-1564"), &pair.old),
+        (false, crate::i18n::text("repo-core-1565"), &pair.new),
+    ] {
         let Some(side) = side else { continue };
         doc.text(
             &format!(
                 "{label} · {} · {}",
-                side.kind.as_deref().unwrap_or("Binary"),
+                side.kind
+                    .as_deref()
+                    .unwrap_or(crate::i18n::text("repo-core-1567")),
                 side.size
                     .map(crate::git::human_size)
-                    .unwrap_or_else(|| "size unavailable".into())
+                    .unwrap_or_else(|| crate::i18n::text("repo-core-1568").into())
             ),
             t.text,
         );
@@ -20,14 +25,7 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
             doc.text(&format!("{key}: {value}"), t.text_dim);
         }
         if let Some(text) = &side.text {
-            doc.text(
-                text,
-                if label == "Before" {
-                    t.danger
-                } else {
-                    t.success
-                },
-            );
+            doc.text(text, if before { t.danger } else { t.success });
         }
         for note in &side.text_gaps {
             doc.text(note, t.warning);
@@ -57,9 +55,27 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
     if let Some(members) = &pair.members {
         for member in members {
             doc.text(
-                &format!(
-                    "{} · {:?} → {:?} bytes",
-                    member.name, member.old, member.new
+                &crate::i18n::message(
+                    "repo-core-1571",
+                    &[
+                        ("name", format!("{}", member.name).into()),
+                        (
+                            "old",
+                            member
+                                .old
+                                .map(crate::git::human_size)
+                                .unwrap_or_else(|| crate::i18n::text("repo-core-2228").to_owned())
+                                .into(),
+                        ),
+                        (
+                            "new",
+                            member
+                                .new
+                                .map(crate::git::human_size)
+                                .unwrap_or_else(|| crate::i18n::text("repo-core-2228").to_owned())
+                                .into(),
+                        ),
+                    ],
                 ),
                 t.text,
             );

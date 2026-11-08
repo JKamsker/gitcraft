@@ -20,8 +20,14 @@ impl RepoTab {
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(match continuing {
-                    Some(s) => format!("CONTINUE {}", s.label().to_uppercase()),
-                    None => "COMMIT".to_owned(),
+                    Some(s) => crate::i18n::message(
+                        "repo-core-0892",
+                        &[(
+                            "to-uppercase",
+                            format!("{}", s.label().to_uppercase()).into(),
+                        )],
+                    ),
+                    None => crate::i18n::text("repo-core-0893").to_owned(),
                 })
                 .font(theme::semibold(10.5))
                 .color(t.text_faint),
@@ -30,11 +36,9 @@ impl RepoTab {
                 let amend = ui
                     .add_enabled(
                         !rebasing && !self.refs.head.is_empty(),
-                        egui::Checkbox::new(&mut amending, "Amend last commit"),
+                        egui::Checkbox::new(&mut amending, crate::i18n::text("repo-core-0894")),
                     )
-                    .on_hover_text(
-                        "Rewrite the last commit with the staged changes and this message",
-                    );
+                    .on_hover_text(crate::i18n::text("repo-core-0895"));
                 // Over an empty box, or what the template and hook put there.
                 amend_started = amend.changed()
                     && amending
@@ -71,11 +75,9 @@ impl RepoTab {
                 .is_some_and(|b| !b.upstream.is_empty() && b.ahead_behind().0 == 0);
             if pushed {
                 ui.label(
-                    RichText::new(
-                        "This commit is already pushed: amending rewrites shared history.",
-                    )
-                    .color(t.warning)
-                    .small(),
+                    RichText::new(crate::i18n::text("repo-core-0896"))
+                        .color(t.warning)
+                        .small(),
                 );
             }
         }
@@ -98,7 +100,7 @@ impl RepoTab {
         }
         if rebasing {
             ui.label(
-                RichText::new("The commit keeps its message: reword it once this is done.")
+                RichText::new(crate::i18n::text("repo-core-0897"))
                     .color(t.text_faint)
                     .small(),
             );
@@ -106,35 +108,44 @@ impl RepoTab {
         let len = self.commit_summary.chars().count();
         if len > 72 {
             ui.label(
-                RichText::new(format!("Summary is {len} characters; 50–72 reads best"))
-                    .color(t.warning)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-core-0898",
+                    &[("len", (len).into())],
+                ))
+                .color(t.warning)
+                .small(),
             );
         }
         if rebasing {
             // `--continue` takes no `--no-verify`: nothing ticked waits for the next commit.
             self.skip_hooks.commit = false;
         } else {
-            ui.checkbox(&mut self.skip_hooks.commit, "Skip hooks")
-                .on_hover_text(
-                    "Commit once without the pre-commit and commit-msg hooks (git commit \
-                     --no-verify); it unticks once the commit runs",
-                );
+            ui.checkbox(
+                &mut self.skip_hooks.commit,
+                crate::i18n::text("repo-core-0899"),
+            )
+            .on_hover_text(crate::i18n::text("repo-core-0900"));
         }
         ui.add_space(4.0);
         let staged = self.work.staged.len();
         let restack = self.stacks.restack_here().is_some()
             && continuing == Some(crate::git::InProgress::Rebase);
         let label = if restack {
-            "Continue restack".to_owned()
+            crate::i18n::text("repo-core-0901").to_owned()
         } else if let Some(s) = continuing {
-            format!("Continue {}", s.label().to_lowercase())
+            crate::i18n::message(
+                "repo-core-0352",
+                &[(
+                    "to-lowercase",
+                    format!("{}", s.label().to_lowercase()).into(),
+                )],
+            )
         } else if self.amend {
-            "Amend last commit".to_owned()
+            crate::i18n::text("repo-core-0894").to_owned()
         } else if staged > 0 {
-            format!("Commit {staged} file{}", if staged == 1 { "" } else { "s" })
+            crate::i18n::message("repo-core-0902", &[("staged", (staged).into())])
         } else {
-            "Stage all and commit".to_owned()
+            crate::i18n::text("repo-core-0903").to_owned()
         };
         // An unchanged template is refused, as git refuses it.
         let untouched = !rebasing && self.unedited_template();
@@ -150,7 +161,7 @@ impl RepoTab {
             acts.push(Action::Commit);
         }
         if untouched {
-            resp.on_hover_text("Edit the message first: it is still the template");
+            resp.on_hover_text(crate::i18n::text("repo-core-0904"));
         } else {
             resp.on_hover_text(keymap::label(ui.ctx(), Command::Commit));
         }
@@ -175,35 +186,51 @@ impl RepoTab {
             let source = |local: bool, value: &str, profile_value: &str| {
                 let profile_value = profile_value.trim();
                 if local {
-                    "this repository".to_owned()
+                    crate::i18n::text("repo-core-0905").to_owned()
                 } else if elsewhere.is_none() && !profile_value.is_empty() && value == profile_value
                 {
-                    format!("profile {}", profile.title())
+                    crate::i18n::message(
+                        "repo-core-0906",
+                        &[("title", format!("{}", profile.display_title()).into())],
+                    )
                 } else if let Some(host) = &elsewhere {
-                    format!("global ({host})")
+                    crate::i18n::message("repo-core-0907", &[("host", format!("{}", host).into())])
                 } else {
-                    "global".to_owned()
+                    crate::i18n::text("repo-core-0908").to_owned()
                 }
             };
             let who = if id.name.is_empty() {
-                "No identity set (git config user.name)".to_owned()
+                crate::i18n::text("repo-core-0909").to_owned()
             } else {
                 let name_from = source(id.local, &id.name, &profile.author_name);
                 let email_from = source(id.local_email, &id.email, &profile.author_email);
                 let source = if name_from == email_from {
                     format!(" · {name_from}")
                 } else {
-                    format!(" · name: {name_from}, email: {email_from}")
+                    crate::i18n::message(
+                        "repo-core-0911",
+                        &[
+                            ("name-from", format!("{}", name_from).into()),
+                            ("email-from", format!("{}", email_from).into()),
+                        ],
+                    )
                 };
-                format!("as {} <{}>{source}", id.name, id.email)
+                crate::i18n::message(
+                    "repo-core-0912",
+                    &[
+                        ("name", format!("{}", id.name).into()),
+                        ("email", format!("{}", id.email).into()),
+                        ("source", format!("{}", source).into()),
+                    ],
+                )
             };
             let resp =
                 ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
             if id.local || id.local_email {
                 resp.on_hover_text(if elsewhere.is_some() {
-                    "Set in this repository's own config, which wins over that machine's global one"
+                    crate::i18n::text("repo-core-0913")
                 } else {
-                    "Set in this repository's own config, which wins over the profile's author"
+                    crate::i18n::text("repo-core-0914")
                 });
             }
             // The saved identities, then the authors of the profiles, each once.
@@ -219,20 +246,23 @@ impl RepoTab {
                     && !choices.iter().any(|(_, n, e)| n == name && e == email)
                 {
                     choices.push((
-                        format!("Profile {}", p.title()),
+                        crate::i18n::message(
+                            "repo-core-0915",
+                            &[("title", format!("{}", p.display_title()).into())],
+                        ),
                         name.to_owned(),
                         email.to_owned(),
                     ));
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let b = icons::small_button(ui, "user-round", "Commit as…");
+                let b = icons::small_button(ui, "user-round", crate::i18n::text("repo-core-0917"));
                 egui::Popup::menu(&b)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
                         if choices.is_empty() {
                             ui.label(
-                                RichText::new("Add identities or profile authors in Settings")
+                                RichText::new(crate::i18n::text("repo-core-0918"))
                                     .color(t.text_faint),
                             );
                         }
@@ -240,7 +270,7 @@ impl RepoTab {
                             let text = format!("{label} — {name} <{email}>");
                             if ui
                                 .add_enabled(idle, egui::Button::new(text))
-                                .on_hover_text("Sets it in this repository's own config")
+                                .on_hover_text(crate::i18n::text("repo-core-0920"))
                                 .clicked()
                             {
                                 acts.push(Action::SetIdentity(name.clone(), email.clone()));
@@ -249,12 +279,11 @@ impl RepoTab {
                         if (id.local || id.local_email) && elsewhere.is_none() {
                             ui.separator();
                             if ui
-                                .add_enabled(idle, egui::Button::new("Use the profile's author"))
-                                .on_hover_text(
-                                    "Takes user.name and user.email out of this repository's \
-                                     own config, so that the profile's (or your global config's) \
-                                     apply",
+                                .add_enabled(
+                                    idle,
+                                    egui::Button::new(crate::i18n::text("repo-core-0154")),
                                 )
+                                .on_hover_text(crate::i18n::text("repo-core-0921"))
                                 .clicked()
                             {
                                 acts.push(Action::ClearIdentity {

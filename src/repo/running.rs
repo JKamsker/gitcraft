@@ -130,9 +130,16 @@ impl RepoTab {
         }
         if self.waiting.len() >= MAX_WAITING {
             self.status = Some((
-                format!(
-                    "{}: not started, {MAX_WAITING} operations already wait for {busy}",
-                    waiter.label()
+                crate::i18n::message(
+                    "repo-core-3347",
+                    &[
+                        ("label", format!("{}", waiter.label()).into()),
+                        ("MAX-WAITING", format!("{}", MAX_WAITING).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
+                    ],
                 ),
                 true,
             ));
@@ -219,7 +226,10 @@ impl RepoTab {
 /// "Fetch failed (Pull not run): …", which is what the toolbar shows of it.
 pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
     let names: Vec<&str> = dropped.iter().map(|w| w.label()).collect();
-    let note = format!(" ({} not run)", names.join(", "));
+    let note = crate::i18n::message(
+        "repo-core-3348",
+        &[("names", format!("{}", names.join(", ")).into())],
+    );
     match msg.split_once(": ") {
         Some((head, rest)) => format!("{head}{note}: {rest}"),
         None => match msg.split_once('\n') {

@@ -40,7 +40,19 @@ impl RepoTab {
             // started, and says so. A quiet one (the background fetch) just comes again later.
             if !quiet {
                 self.status = Some((
-                    format!("{label}: not started, {busy} is still running"),
+                    crate::i18n::message(
+                        "repo-core-2947",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            (
+                                "busy",
+                                crate::repo::messages::display_operation(&busy).into(),
+                            ),
+                        ],
+                    ),
                     true,
                 ));
             }
@@ -50,7 +62,19 @@ impl RepoTab {
         let ops = self.skip_hooks.push_steps(ops);
         if let Some(why) = offline_refusal(&ops) {
             if !quiet {
-                self.status = Some((format!("{label}: not started. {why}"), true));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-core-2948",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            ("why", format!("{}", why).into()),
+                        ],
+                    ),
+                    true,
+                ));
             }
             return;
         }
@@ -242,7 +266,13 @@ impl RepoTab {
         }
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                format!("Wait until {busy} finishes before switching sign-ins"),
+                crate::i18n::message(
+                    "repo-core-2950",
+                    &[(
+                        "busy",
+                        crate::repo::messages::display_operation(&busy).into(),
+                    )],
+                ),
                 true,
             ));
             return;
@@ -254,7 +284,7 @@ impl RepoTab {
             .cloned();
         let Some(binding) = challenge.as_ref().and_then(|ticket| ticket.binding.clone()) else {
             self.invalidate_https_challenge();
-            self.status=Some(("This sign-in has no verified operation route. Run the operation again before switching accounts.".into(),true));
+            self.status = Some((crate::i18n::text("repo-core-2951").into(), true));
             return;
         };
         if !challenge
@@ -301,7 +331,7 @@ impl RepoTab {
                     .as_ref()
                     .is_some_and(|scope| ticket.endpoints.iter().any(|url| scope.matches_url(url)))
         }) {
-            self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
+            self.status = Some((crate::i18n::text("repo-core-2952").into(), true));
             return;
         }
         let Some(ticket) = challenge else {
@@ -309,11 +339,7 @@ impl RepoTab {
         };
         let Some(binding) = ticket.binding.clone() else {
             self.invalidate_https_challenge();
-            self.status = Some((
-                "This sign-in has no verified destination snapshot. Run the operation again."
-                    .into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-2953").into(), true));
             return;
         };
         let selected = ticket.endpoints.iter().find(|url| {
@@ -327,7 +353,7 @@ impl RepoTab {
             return;
         }
         self.https_checking = true;
-        self.status = Some(("Checking the sign-in destination…".into(), false));
+        self.status = Some((crate::i18n::text("repo-core-2954").into(), false));
         let path = self.path.clone();
         self.then_or(
             ctx,
@@ -336,10 +362,7 @@ impl RepoTab {
             move || binding.verify(&path),
             move |tab, result, ctx| {
                 if !tab.https_ticket_current(&ticket) {
-                    tab.status = Some((
-                        "Sign-in was discarded because the operation or connection changed.".into(),
-                        true,
-                    ));
+                    tab.status = Some((crate::i18n::text("repo-core-2955").into(), true));
                     return;
                 }
                 tab.https_checking = false;
@@ -354,11 +377,7 @@ impl RepoTab {
                     match serde_json::to_string(&binding) {
                         Ok(json) => op.ops.insert(0, vec![EXPECT_HTTPS_ROUTE.into(), json]),
                         Err(_) => {
-                            tab.status = Some((
-                                "Could not preserve the sign-in route. Run the operation again."
-                                    .into(),
-                                true,
-                            ));
+                            tab.status = Some((crate::i18n::text("repo-core-2956").into(), true));
                             return;
                         }
                     }
@@ -374,7 +393,19 @@ impl RepoTab {
         {
             // It would not start: say so, rather than drop it.
             self.status = Some((
-                format!("{}: run it again once {busy} is done", op.label),
+                crate::i18n::message(
+                    "repo-core-2957",
+                    &[
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&op.label).into(),
+                        ),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
+                    ],
+                ),
                 true,
             ));
         } else {
@@ -440,7 +471,19 @@ impl RepoTab {
                     && let Some(note) = tried_note(out)
                     && !quiet
                 {
-                    self.status = Some((format!("{label}: done, but {note}"), true));
+                    self.status = Some((
+                        crate::i18n::message(
+                            "repo-core-2959",
+                            &[
+                                (
+                                    "label",
+                                    crate::repo::messages::display_operation(&label).into(),
+                                ),
+                                ("note", format!("{}", note).into()),
+                            ],
+                        ),
+                        true,
+                    ));
                 } else if refresh == Refresh::All && !quiet {
                     self.status = Some((format!("{label}: done"), false));
                 }
@@ -464,15 +507,21 @@ impl RepoTab {
                 // Typed credentials that were refused are forgotten.
                 let typed = self.credentials.take().is_some();
                 let refused = typed || e.contains("401") || e.contains("403");
-                self.status = Some((format!("{label}: sign-in needed"), true));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-core-2962",
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
+                    ),
+                    true,
+                ));
                 // Only a URL reported by the failed step, or its captured destinations.
                 // An absent endpoint must never be replaced with the default fetch URL.
                 if crate::push_preflight::is_reviewed_auth_error(e) && auth_failure.is_none() {
                     self.invalidate_https_challenge();
-                    self.status = Some((
-                        "The reviewed push's sign-in proof is unavailable. Reopen push preflight before signing in.".into(),
-                        true,
-                    ));
+                    self.status = Some((crate::i18n::text("repo-core-2963").into(), true));
                 } else {
                     let failure =
                         auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
@@ -484,7 +533,19 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 // A failed undo stays undoable: the timeline stays where it was.
-                self.status = Some((format!("{label} failed: {e}"), true));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-core-0270",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    ),
+                    true,
+                ));
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }
@@ -502,9 +563,31 @@ impl RepoTab {
         }
         if long && !quiet {
             self.finished.push(match &result {
-                Ok(_) => (format!("{} · {label}: done", self.name), false),
+                Ok(_) => (
+                    crate::i18n::message(
+                        "repo-core-2965",
+                        &[
+                            ("name", format!("{}", self.name).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                        ],
+                    ),
+                    false,
+                ),
                 Err(e) => (
-                    format!("{} · {label} failed: {}", self.name, headline(e)),
+                    crate::i18n::message(
+                        "repo-core-2966",
+                        &[
+                            ("name", format!("{}", self.name).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            ("e", format!("{}", headline(e)).into()),
+                        ],
+                    ),
                     true,
                 ),
             });
@@ -608,9 +691,12 @@ fn run_step(
         match git::RouteBinding::capture(path, args) {
             Ok(binding) => Some(binding),
             Err(error) => {
-                return Err(format!(
-                    "Could not verify the network operation's destinations; command not started: {}",
-                    crate::diagnostics::crash::scrub(&error)
+                return Err(crate::i18n::message(
+                    "repo-core-2967",
+                    &[(
+                        "error",
+                        format!("{}", crate::diagnostics::crash::scrub(&error)).into(),
+                    )],
                 ));
             }
         }
@@ -652,7 +738,7 @@ fn reviewed_operands(op: &[String]) -> Result<(&str, Option<&[String]>), String>
         {
             Ok((id, Some(&op[2..])))
         }
-        _ => Err("Invalid reviewed push execution evidence".into()),
+        _ => Err(crate::i18n::text("repo-core-2969").into()),
     }
 }
 
@@ -705,9 +791,12 @@ pub(crate) fn run_reviewed_push(
     let context = crate::connections::current();
     let args: Vec<_> = original.iter().map(String::as_str).collect();
     let binding = capture(&args).map_err(|error| {
-        format!(
-            "Could not verify the reviewed push's destinations; command not started: {}",
-            crate::diagnostics::crash::scrub(&error)
+        crate::i18n::message(
+            "repo-core-4157",
+            &[(
+                "error",
+                format!("{}", crate::diagnostics::crash::scrub(&error)).into(),
+            )],
         )
     })?;
     let result = execute();
@@ -750,7 +839,7 @@ fn check_https_routes(
             && marker == EXPECT_HTTPS_ROUTE
         {
             let binding = serde_json::from_str::<git::RouteBinding>(json)
-                .map_err(|_| "Invalid sign-in route proof".to_owned())?;
+                .map_err(|_| crate::i18n::text("repo-core-4158").to_owned())?;
             verify(&binding)?;
         }
     }
@@ -800,9 +889,9 @@ pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
     let pause = crate::network::refused()?;
     let network = ops.iter().any(|op| reaches_a_remote(op));
     network.then(|| {
-        format!(
-            "{}: turn it off in the toolbar or Settings → Git.",
-            pause.why()
+        crate::i18n::message(
+            "repo-core-4161",
+            &[("why", format!("{}", pause.why()).into())],
         )
     })
 }
@@ -877,11 +966,12 @@ pub(super) fn run_steps_counted(
         let now = git::head(path);
         if &now != expected {
             return (
-                Err(format!(
-                    "HEAD has moved since (it is at {}, not {}): resetting it would lose what \
-                     was done after",
-                    super::short(&now),
-                    super::short(expected)
+                Err(crate::i18n::message(
+                    "repo-core-4164",
+                    &[
+                        ("now", format!("{}", super::short(&now)).into()),
+                        ("expected", format!("{}", super::short(expected)).into()),
+                    ],
                 )),
                 kind,
                 0,
@@ -909,7 +999,7 @@ pub(super) fn run_steps_counted(
             if let Some(expected) = approved_head
                 && git::head(path) != *expected
             {
-                return Err("HEAD moved while preparing this operation; reopen its preview. No operation was run.".into());
+                return Err(crate::i18n::text("repo-core-4166").into());
             }
             Ok(())
         },
@@ -923,11 +1013,13 @@ pub(super) fn run_steps_counted(
             };
             let snapshot = (|| {
                 if git::drafts::enabled_while(path, &active)? {
-                    git::drafts::capture(path, "Before checkout / rebase", &active)?;
+                    git::drafts::capture(path, crate::i18n::text("repo-core-4167"), &active)?;
                 }
                 Ok::<_, String>(())
             })();
-            snapshot.map_err(|error| format!("Working draft safety check: {error}"))
+            snapshot.map_err(|error| {
+                crate::i18n::message("repo-core-4168", &[("error", format!("{}", error).into())])
+            })
         },
     );
     if let Err(error) = prepared {
@@ -1189,9 +1281,9 @@ fn check_expected(
         .map(|s| s.trim().to_owned())
         .unwrap_or_default();
         if now != tree {
-            return Err(format!(
-                "{rev} isn't what this made any more (it was made again since, with other \
-                 changes): going ahead would lose those"
+            return Err(crate::i18n::message(
+                "repo-core-4178",
+                &[("rev", format!("{}", rev).into())],
             ));
         }
     }
@@ -1206,16 +1298,25 @@ fn check_expected(
         if now.as_deref() != Ok(target) {
             let says = |r: &str| {
                 if r.is_empty() {
-                    "a detached HEAD".to_owned()
+                    crate::i18n::text("repo-core-4179").to_owned()
                 } else {
                     r.strip_prefix("refs/heads/").unwrap_or(r).to_owned()
                 }
             };
-            let now = now.map_or_else(|_| "something else".to_owned(), |r| says(&r));
-            let place = dir.map_or(String::new(), |d| format!(" in the worktree at {d}"));
-            return Err(format!(
-                "{now} is checked out{place} now, not {}: going ahead would change it instead",
-                says(target)
+            let now = now.map_or_else(
+                |_| crate::i18n::text("repo-core-4180").to_owned(),
+                |r| says(&r),
+            );
+            let place = dir.map_or(String::new(), |d| {
+                crate::i18n::message("repo-core-4181", &[("d", format!("{}", d).into())])
+            });
+            return Err(crate::i18n::message(
+                "repo-core-4182",
+                &[
+                    ("now", format!("{}", now).into()),
+                    ("place", format!("{}", place).into()),
+                    ("target", format!("{}", says(target)).into()),
+                ],
             ));
         }
     }
@@ -1224,15 +1325,17 @@ fn check_expected(
         if now != value {
             let what = name.strip_prefix("refs/heads/").unwrap_or(name);
             return Err(if name == "refs/stash" {
-                "The newest stash is not the one this made any more".to_owned()
+                crate::i18n::text("repo-core-4183").to_owned()
             } else if value.is_empty() {
-                format!("{what} has commits now: going ahead would go on top of them")
+                crate::i18n::message("repo-core-4184", &[("what", format!("{}", what).into())])
             } else {
-                format!(
-                    "{what} has moved since (it is at {}, not {}): going ahead would lose \
-                     what was done after",
-                    super::short(&now),
-                    super::short(value)
+                crate::i18n::message(
+                    "repo-core-4185",
+                    &[
+                        ("what", format!("{}", what).into()),
+                        ("now", format!("{}", super::short(&now)).into()),
+                        ("value", format!("{}", super::short(value)).into()),
+                    ],
                 )
             });
         }

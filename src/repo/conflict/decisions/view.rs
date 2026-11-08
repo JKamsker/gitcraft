@@ -59,14 +59,29 @@ pub(in crate::repo) fn test_line(offer: &Offer) -> Option<(String, Option<bool>)
     }
     Some(match &d.last_test {
         Some(run) if run.passed => (
-            format!("Test “{}” passed {}", d.test, ago(run.at)),
+            crate::i18n::message(
+                "repo-core-0524",
+                &[
+                    ("test", format!("{}", d.test).into()),
+                    ("at", format!("{}", ago(run.at)).into()),
+                ],
+            ),
             Some(true),
         ),
         Some(run) => (
-            format!("Test “{}” failed {}", d.test, ago(run.at)),
+            crate::i18n::message(
+                "repo-core-0525",
+                &[
+                    ("test", format!("{}", d.test).into()),
+                    ("at", format!("{}", ago(run.at)).into()),
+                ],
+            ),
             Some(false),
         ),
-        None => (format!("Test “{}”: not run yet", d.test), None),
+        None => (
+            crate::i18n::message("repo-core-0526", &[("test", format!("{}", d.test).into())]),
+            None,
+        ),
     })
 }
 
@@ -92,11 +107,11 @@ fn offer_box(
             ui.horizontal_wrapped(|ui| {
                 crate::icons::inline(ui, "history", 13.0, border);
                 let title = if offer.stale {
-                    "Decided before, but the code around it changed since"
+                    crate::i18n::text("repo-core-0528")
                 } else if applied {
-                    "Resolved as you decided before"
+                    crate::i18n::text("repo-core-0529")
                 } else {
-                    "Decided before"
+                    crate::i18n::text("repo-core-0530")
                 };
                 ui.label(
                     RichText::new(title)
@@ -132,7 +147,10 @@ fn offer_box(
                         .as_ref()
                         .is_some_and(|r| !r.output.is_empty());
                     if has_output {
-                        ui.toggle_value(&mut offer.show_output, "Output");
+                        ui.toggle_value(
+                            &mut offer.show_output,
+                            crate::i18n::text("repo-core-0531"),
+                        );
                     }
                 });
                 if offer.show_output
@@ -153,26 +171,22 @@ fn offer_box(
             }
             if offer.stale {
                 ui.label(
-                    RichText::new(
-                        "Not applied by itself: check that it still fits before you use it.",
-                    )
-                    .color(t.warning)
-                    .small(),
+                    RichText::new(crate::i18n::text("repo-core-0533"))
+                        .color(t.warning)
+                        .small(),
                 );
             }
             ui.horizontal_wrapped(|ui| {
                 if !applied {
                     let label = if offer.stale {
-                        "Use it anyway"
+                        crate::i18n::text("repo-core-0534")
                     } else {
-                        "Use this decision"
+                        crate::i18n::text("repo-core-0535")
                     };
                     if ui
                         .add_enabled(!manual, egui::Button::new(label))
-                        .on_hover_text("Resolve this conflict with the text decided before")
-                        .on_disabled_hover_text(
-                            "The result is edited by hand: Back to choices first",
-                        )
+                        .on_hover_text(crate::i18n::text("repo-core-0536"))
+                        .on_disabled_hover_text(crate::i18n::text("repo-core-0537"))
                         .clicked()
                     {
                         pick = Some(Pick::Use);
@@ -182,17 +196,14 @@ fn offer_box(
                 if draft_empty
                     && has_note
                     && ui
-                        .small_button("Keep its note and test")
-                        .on_hover_text(
-                            "Take its reason and test as yours for this resolution: kept when \
-                             you save, and the test run then if you ask",
-                        )
+                        .small_button(crate::i18n::text("repo-core-0538"))
+                        .on_hover_text(crate::i18n::text("repo-core-0539"))
                         .clicked()
                 {
                     pick = Some(Pick::TakeNote);
                 }
                 if offer.stale {
-                    ui.toggle_value(&mut offer.show_context, "What changed around it");
+                    ui.toggle_value(&mut offer.show_context, crate::i18n::text("repo-core-0540"));
                 }
             });
             if offer.stale && offer.show_context {
@@ -205,14 +216,14 @@ fn offer_box(
 /// The lines around the conflict when the decision was made (`then`), beside those now.
 fn context_ui(ui: &mut Ui, t: &Tokens, k: usize, offer: &Offer) {
     let d = &offer.decision;
-    let marker = "  ⋯ the conflict ⋯\n";
+    let marker = crate::i18n::text("repo-core-0541");
     let then = format!("{}{marker}{}", d.before, d.after);
     let now = format!("{}{marker}{}", offer.now.0, offer.now.1);
     ui.columns(2, |cols| {
-        for (col, (title, text)) in cols
-            .iter_mut()
-            .zip([("Then", then.as_str()), ("Now", now.as_str())])
-        {
+        for (col, (title, text)) in cols.iter_mut().zip([
+            (crate::i18n::text("repo-core-0543"), then.as_str()),
+            (crate::i18n::text("repo-core-0544"), now.as_str()),
+        ]) {
             col.label(RichText::new(title).color(t.text_faint).small());
             egui::ScrollArea::horizontal()
                 .id_salt(("decision-context", k, title))
@@ -230,16 +241,13 @@ fn context_ui(ui: &mut Ui, t: &Tokens, k: usize, offer: &Offer) {
 fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
     if !draft.open {
         let label = if draft.is_empty() {
-            "Note why…"
+            crate::i18n::text("repo-core-0546")
         } else {
-            "Edit the note…"
+            crate::i18n::text("repo-core-0547")
         };
         if ui
             .small_button(label)
-            .on_hover_text(
-                "Keep a note on why it is resolved so, and a command that tests it: when the \
-                 same conflict comes back, it is resolved the same way, with the note shown.",
-            )
+            .on_hover_text(crate::i18n::text("repo-core-0548"))
             .clicked()
         {
             draft.open = true;
@@ -247,9 +255,12 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
         if !draft.is_empty() {
             let note = draft.note.trim();
             let kept = if note.is_empty() {
-                format!("Kept when saved: the test “{}”", one_line(&draft.test))
+                crate::i18n::message(
+                    "repo-core-0549",
+                    &[("test", format!("{}", one_line(&draft.test)).into())],
+                )
             } else {
-                format!("Kept when saved: “{note}”")
+                crate::i18n::message("repo-core-0550", &[("note", format!("{}", note).into())])
             };
             ui.label(RichText::new(kept).color(t.text_faint).small());
         }
@@ -259,17 +270,17 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.label(RichText::new("Why").color(t.text_dim));
+            ui.label(RichText::new(crate::i18n::text("repo-core-0552")).color(t.text_dim));
             ui.add(
                 egui::TextEdit::singleline(&mut draft.note)
-                    .hint_text("keep the new validation, keep the old wire format")
+                    .hint_text(crate::i18n::text("repo-core-0553"))
                     .desired_width(f32::INFINITY),
             );
             ui.end_row();
-            ui.label(RichText::new("Test").color(t.text_dim));
+            ui.label(RichText::new(crate::i18n::text("repo-core-0554")).color(t.text_dim));
             ui.add(
                 egui::TextEdit::singleline(&mut draft.test)
-                    .hint_text("a command that checks it, e.g. cargo test wire_format")
+                    .hint_text(crate::i18n::text("repo-core-0555"))
                     .font(theme::mono(12.0))
                     .desired_width(f32::INFINITY),
             );
@@ -277,11 +288,14 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
         });
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Kept in git with the resolution when you save.")
+            RichText::new(crate::i18n::text("repo-core-0556"))
                 .color(t.text_faint)
                 .small(),
         );
-        if ui.small_button("Done").clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-0557"))
+            .clicked()
+        {
             draft.test = one_line(&draft.test);
             draft.open = false;
         }
@@ -294,7 +308,7 @@ pub(in crate::repo) fn run_tests_switch(ui: &mut Ui, memo: &mut Memo, has_tests:
         return;
     }
     let drafts = &memo.drafts;
-    ui.checkbox(&mut memo.run_tests, "Test after saving")
+    ui.checkbox(&mut memo.run_tests, crate::i18n::text("repo-core-0558"))
         .on_hover_ui(|ui| {
             let mut tests: Vec<String> = drafts
                 .iter()
@@ -303,10 +317,9 @@ pub(in crate::repo) fn run_tests_switch(ui: &mut Ui, memo: &mut Memo, has_tests:
                 .collect();
             tests.sort();
             tests.dedup();
-            ui.label(format!(
-                "Runs the tests you wrote, in the repository's folder, once the file is \
-                 saved:\n{}\nHow each went is kept with its decision.",
-                tests.join("\n")
+            ui.label(crate::i18n::message(
+                "repo-core-0559",
+                &[("n", format!("{}", tests.join("\n")).into())],
             ));
         });
 }

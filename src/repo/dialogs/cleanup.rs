@@ -84,9 +84,9 @@ impl CleanupDialog {
 /// "3 branches", "1 branch".
 fn branches(count: usize) -> String {
     if count == 1 {
-        "1 branch".to_owned()
+        crate::i18n::text("repo-core-1269").to_owned()
     } else {
-        format!("{count} branches")
+        crate::i18n::message("repo-core-1270", &[("count", (count).into())])
     }
 }
 
@@ -94,30 +94,29 @@ fn branches(count: usize) -> String {
 /// origin too)".
 fn delete_label(count: usize, there: Option<(usize, &[&str])>) -> String {
     match there {
-        Some((n, remotes)) => format!(
-            "Delete {} ({n} on {} too)",
-            branches(count),
-            remotes.join(", ")
+        Some((n, remotes)) => crate::i18n::message(
+            "repo-core-1271",
+            &[
+                ("count", format!("{}", branches(count)).into()),
+                ("n", (n).into()),
+                ("remotes", format!("{}", remotes.join(", ")).into()),
+            ],
         ),
-        None => format!("Delete {}", branches(count)),
+        None => crate::i18n::message(
+            "repo-core-1272",
+            &[("count", format!("{}", branches(count)).into())],
+        ),
     }
 }
 
 pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     let t = Tokens::get(ui.ctx());
     ui.set_width(460.0);
-    ui.label(RichText::new("Select stale or merged branches").font(theme::semibold(15.0)));
+    ui.label(RichText::new(crate::i18n::text("repo-core-1273")).font(theme::semibold(15.0)));
     ui.add_space(4.0);
     ui.add(
-        egui::Label::new(
-            RichText::new(
-                "The ticked branches are deleted; Undo brings them back. The checked-out \
-                 branch, the default branch and branches checked out in a worktree are never \
-                 listed.",
-            )
-            .color(t.text_dim),
-        )
-        .wrap(),
+        egui::Label::new(RichText::new(crate::i18n::text("repo-core-1274")).color(t.text_dim))
+            .wrap(),
     );
     if let Some(e) = &dialog.error {
         ui.add_space(6.0);
@@ -126,16 +125,13 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
-            ui.label(
-                RichText::new("Checking which branches are merged; the list fills in when done.")
-                    .color(t.text_dim),
-            );
+            ui.label(RichText::new(crate::i18n::text("repo-core-1275")).color(t.text_dim));
         });
     }
     ui.add_space(10.0);
     if dialog.rows.is_empty() {
         if !dialog.checking {
-            ui.label("No branch is merged, stale or deleted on its remote.");
+            ui.label(crate::i18n::text("repo-core-1276"));
         }
         ui.add_space(14.0);
         return if cancel_button(ui) {
@@ -152,20 +148,19 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     let remotes: Vec<&str> = remotes.iter().map(String::as_str).collect();
     ui.add_space(8.0);
     let also = if remotes.is_empty() {
-        "Also delete their branches on the remote".to_owned()
+        crate::i18n::text("repo-core-1277").to_owned()
     } else {
-        format!(
-            "Also delete {} of the same name on {}",
-            branches(there),
-            remotes.join(", ")
+        crate::i18n::message(
+            "repo-core-1278",
+            &[
+                ("there", format!("{}", branches(there)).into()),
+                ("remotes", format!("{}", remotes.join(", ")).into()),
+            ],
         )
     };
     ui.add_enabled(there > 0, egui::Checkbox::new(&mut dialog.on_remote, also))
-        .on_hover_text(
-            "Deleting a branch on the remote changes it for everyone. Only a remote branch \
-             named like the local one goes, never the default branch.",
-        )
-        .on_disabled_hover_text("None of the ticked branches has a branch of its name on a remote");
+        .on_hover_text(crate::i18n::text("repo-core-1279"))
+        .on_disabled_hover_text(crate::i18n::text("repo-core-1280"));
     ui.add_space(14.0);
     let on_remote = (dialog.on_remote && there > 0).then_some((there, &remotes[..]));
     let mut outcome = Outcome::Open;
@@ -193,11 +188,23 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
 fn select_buttons(ui: &mut Ui, rows: &mut [(Candidate, bool)]) {
     ui.horizontal(|ui| {
         let ticked = rows.iter().filter(|(_, on)| *on).count();
-        ui.label(format!("{ticked} of {} ticked", rows.len()));
-        if ui.small_button("All").clicked() {
+        ui.label(crate::i18n::message(
+            "repo-core-1281",
+            &[
+                ("ticked", format!("{}", ticked).into()),
+                ("count", (rows.len()).into()),
+            ],
+        ));
+        if ui
+            .small_button(crate::i18n::text("repo-core-1282"))
+            .clicked()
+        {
             rows.iter_mut().for_each(|(_, on)| *on = true);
         }
-        if ui.small_button("None").clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-1283"))
+            .clicked()
+        {
             rows.iter_mut().for_each(|(_, on)| *on = false);
         }
     });
@@ -214,7 +221,13 @@ fn checklist(ui: &mut Ui, rows: &mut [(Candidate, bool)], t: &Tokens) {
             for (c, on) in rows.iter_mut() {
                 let mut why: Vec<String> = c.reasons.iter().map(|r| r.describe()).collect();
                 if let Some((remote, name, _)) = &c.remote {
-                    why.push(format!("also on {remote}/{name}"));
+                    why.push(crate::i18n::message(
+                        "repo-core-1285",
+                        &[
+                            ("remote", format!("{}", remote).into()),
+                            ("name", format!("{}", name).into()),
+                        ],
+                    ));
                 }
                 let why = why.join(" · ");
                 ui.horizontal(|ui| {

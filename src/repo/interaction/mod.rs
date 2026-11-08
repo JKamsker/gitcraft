@@ -57,13 +57,10 @@ impl Interactions {
 
 /// The menu entry that opens the dialog for the checked-out branch and `other`.
 pub(crate) fn interaction_item(ui: &mut egui::Ui, acts: &mut Vec<Action>, other: &str) {
-    if crate::menu_item::MenuItem::new("Find the interaction…")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-4149"))
         .icon("command")
         .show(ui)
-        .on_hover_text(
-            "When this branch and the checked-out one pass alone but fail together: tests \
-             subsets of their commits until it finds those that fail together",
-        )
+        .on_hover_text(crate::i18n::text("repo-core-4150"))
         .clicked()
     {
         acts.push(Action::Interaction(InteractionAct::Open {
@@ -121,7 +118,13 @@ impl RepoTab {
             .filter(|b| b.name != current)
             .map(|b| {
                 (
-                    format!("Find the interaction of {current} and {}…", b.name),
+                    crate::i18n::message(
+                        "repo-core-4151",
+                        &[
+                            ("current", format!("{}", current).into()),
+                            ("name", format!("{}", b.name).into()),
+                        ],
+                    ),
                     "interaction combination breaks ddmin delta debugging".to_owned(),
                     Action::Interaction(InteractionAct::Open {
                         other: b.name.clone(),
@@ -133,7 +136,7 @@ impl RepoTab {
 
     fn start_search(&mut self, spec: InteractionSpec, ctx: &egui::Context) {
         if self.interactions.going() {
-            self.status = Some(("A search is going on already".to_owned(), true));
+            self.status = Some((crate::i18n::text("repo-core-4153").to_owned(), true));
             return;
         }
         self.interactions.searches += 1;
@@ -160,7 +163,7 @@ impl RepoTab {
             let found = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 git::find_interaction(&path, &spec, &stop, &tell)
             }))
-            .unwrap_or_else(|_| Err("Internal error: the search stopped".to_owned()));
+            .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-4154").to_owned()));
             let _ = tx.send(Msg::Then(Box::new(move |tab, _| {
                 tab.search_ended(id, found)
             })));
@@ -183,9 +186,13 @@ impl RepoTab {
         if search.started.elapsed() > Duration::from_secs(4) && !stopped {
             let failed = found.is_err();
             self.finished.push((
-                format!(
-                    "{name} · the search of {} and {} is done",
-                    search.spec.a, search.spec.b
+                crate::i18n::message(
+                    "repo-core-4155",
+                    &[
+                        ("name", format!("{}", name).into()),
+                        ("a", format!("{}", search.spec.a).into()),
+                        ("b", format!("{}", search.spec.b).into()),
+                    ],
                 ),
                 failed,
             ));

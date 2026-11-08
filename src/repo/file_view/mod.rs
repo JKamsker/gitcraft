@@ -89,15 +89,18 @@ impl RepoTab {
                     if let Some(rev) = &view.rev {
                         widgets::chip(
                             ui,
-                            &format!("at {}", rev.get(..8).unwrap_or(rev)),
+                            &crate::i18n::message(
+                                "repo-core-2494",
+                                &[("rev", format!("{}", rev.get(..8).unwrap_or(rev)).into())],
+                            ),
                             t.text_dim,
                         );
                     }
                     ui.add_space(12.0);
                     let tabs = [
-                        (FileTab::History, "History"),
-                        (FileTab::Blame, "Blame"),
-                        (FileTab::File, "File"),
+                        (FileTab::History, crate::i18n::text("repo-core-2497")),
+                        (FileTab::Blame, crate::i18n::text("repo-core-2498")),
+                        (FileTab::File, crate::i18n::text("repo-core-2368")),
                     ];
                     for (tab, label) in tabs {
                         let on = view.tab == tab;
@@ -121,7 +124,9 @@ impl RepoTab {
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseFileView);
                         }
                     });
@@ -145,7 +150,7 @@ impl RepoTab {
                 let mut link = |ui: &mut Ui, lines: Lines| {
                     if let Some(rev) = &rev
                         && crate::git::investigations::oid(rev)
-                        && ui.button("Explain history").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2325")).clicked()
                     {
                         acts.push(Action::OpenLineDossier(Some(
                             crate::git::investigations::dossier::Seed {
@@ -157,7 +162,7 @@ impl RepoTab {
                     }
                     if let Some(rev) = &rev
                         && crate::git::investigations::oid(rev)
-                        && ui.button("Symbol biography").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2326")).clicked()
                     {
                         acts.push(Action::OpenSymbolBiography(Some(
                             crate::git::investigations::dossier::Seed {
@@ -215,6 +220,9 @@ fn error(ui: &mut Ui, e: &str) {
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         ui.add_space(12.0);
-        ui.colored_label(t.danger, e);
+        ui.colored_label(
+            t.danger,
+            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+        );
     });
 }

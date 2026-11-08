@@ -253,7 +253,10 @@ pub(super) fn hunk_button(
     hunk: usize,
 ) -> (egui::Response, f32) {
     let t = Tokens::get(ui.ctx());
-    let label = format!("{} hunk", pick.verb());
+    let label = crate::i18n::message(
+        "repo-core-1938",
+        &[("verb", format!("{}", pick.verb()).into())],
+    );
     let color = if matches!(pick, Pick::Discard | Pick::Revert) {
         t.text_dim
     } else {
@@ -262,14 +265,10 @@ pub(super) fn hunk_button(
     let id = ui.id().with(("hunk_btn", hunk, pick.verb()));
     let (resp, left) = text_button(ui, right, y, &label, color, id);
     let tip = match pick {
-        Pick::Stage => {
-            "Stage this hunk. Click lines to stage only some of them (Shift+click for a range)."
-        }
-        Pick::Unstage => {
-            "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
-        }
-        Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
-        Pick::Revert => "Undo this hunk in the working tree, to review before committing.",
+        Pick::Stage => crate::i18n::text("repo-core-1940"),
+        Pick::Unstage => crate::i18n::text("repo-core-1941"),
+        Pick::Discard => crate::i18n::text("repo-core-1942"),
+        Pick::Revert => crate::i18n::text("repo-core-1943"),
     };
     (resp.on_hover_text(tip), left)
 }

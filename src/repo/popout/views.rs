@@ -96,30 +96,49 @@ impl RepoTab {
     fn popout_subject(&self, panel: Panel) -> String {
         match panel {
             Panel::Diff => match &self.diff {
-                Some(view) => format!("Diff of {}", view.key.path()),
-                None => "Diff".to_owned(),
+                Some(view) => crate::i18n::message(
+                    "repo-core-4215",
+                    &[("path", format!("{}", view.key.path()).into())],
+                ),
+                None => crate::i18n::text("repo-core-2367").to_owned(),
             },
             Panel::Terminal => match self.terminals.get(self.active_terminal) {
-                Some(term) if self.terminal_open => format!("Terminal ({})", term.shell),
-                _ => "Terminal".to_owned(),
+                Some(term) if self.terminal_open => crate::i18n::message(
+                    "repo-core-4216",
+                    &[("shell", format!("{}", term.shell).into())],
+                ),
+                _ => crate::i18n::text("repo-core-3669").to_owned(),
             },
             Panel::Pr => match &self.pr_view {
                 Some(view) => match &view.details {
-                    Some(Ok(details)) => {
-                        format!("Pull request #{}: {}", view.number, details.title)
-                    }
-                    _ => format!("Pull request #{}", view.number),
+                    Some(Ok(details)) => crate::i18n::message(
+                        "repo-core-4217",
+                        &[
+                            ("number", format!("{}", view.number).into()),
+                            ("title", format!("{}", details.title).into()),
+                        ],
+                    ),
+                    _ => crate::i18n::message(
+                        "repo-core-4218",
+                        &[("number", format!("{}", view.number).into())],
+                    ),
                 },
-                None => "Pull request".to_owned(),
+                None => crate::i18n::text("repo-core-4219").to_owned(),
             },
             Panel::Ci => {
                 // As the CI view's header says it.
                 let noun = match self.forge() {
-                    Some(Forge::GitLab) => "Pipelines",
-                    _ => "Workflow runs",
+                    Some(Forge::GitLab) => crate::i18n::text("repo-core-4220"),
+                    _ => crate::i18n::text("repo-core-4221"),
                 };
                 match &self.ci_view {
-                    Some(view) => format!("{noun} of {}", crate::repo::short(&view.sha)),
+                    Some(view) => crate::i18n::message(
+                        "repo-core-4222",
+                        &[
+                            ("noun", format!("{}", noun).into()),
+                            ("sha", format!("{}", crate::repo::short(&view.sha)).into()),
+                        ],
+                    ),
                     None => noun.to_owned(),
                 }
             }
@@ -142,7 +161,7 @@ impl RepoTab {
         if !self.view_open(panel) {
             placeholder(ui, panel, absent(panel), acts);
         } else if panel == Panel::Diff && self.conflict.is_some() {
-            let why = "The conflict editor is open in the main window.";
+            let why = crate::i18n::text("repo-core-4223");
             placeholder(ui, panel, why, acts);
         } else {
             match panel {
@@ -277,7 +296,13 @@ impl RepoTab {
                 if self.view_open(panel) {
                     self.popouts.pop_out(panel);
                 } else {
-                    self.status = Some((format!("There's no {} open", panel.noun()), true));
+                    self.status = Some((
+                        crate::i18n::message(
+                            "repo-core-4225",
+                            &[("noun", format!("{}", panel.noun()).into())],
+                        ),
+                        true,
+                    ));
                 }
             }
             Request::Dock(panel) => {
@@ -285,7 +310,7 @@ impl RepoTab {
             }
             Request::DockAll => {
                 if !self.popouts.dock_all() {
-                    self.status = Some(("No view is in a window of its own".to_owned(), true));
+                    self.status = Some((crate::i18n::text("repo-core-4226").to_owned(), true));
                 }
             }
             // Its pop-out went when the action was noted (see `popout_intercept`).
@@ -367,15 +392,15 @@ impl RepoTab {
     /// none otherwise.
     fn shown_poppable(&self) -> Result<Panel, &'static str> {
         if self.conflict.is_some() {
-            return Err("Nothing to pop out: finish or close the conflict editor first");
+            return Err(crate::i18n::text("repo-core-4227"));
         }
         if self.rebase.is_some() {
-            return Err("Nothing to pop out: finish or close the interactive rebase first");
+            return Err(crate::i18n::text("repo-core-4228"));
         }
         let nothing = if self.popouts.any() {
-            "Nothing else to pop out: open a diff, a pull request or the CI view first"
+            crate::i18n::text("repo-core-4229")
         } else {
-            "Nothing to pop out: open a diff, a pull request or the CI view first"
+            crate::i18n::text("repo-core-4230")
         };
         if self.diff.is_some() && self.docked(Panel::Diff) {
             return Ok(Panel::Diff);
@@ -393,10 +418,10 @@ impl RepoTab {
 /// What a pop-out window says while its view isn't open.
 fn absent(panel: Panel) -> &'static str {
     match panel {
-        Panel::Diff => "No diff open. Click a file in the main window to show its diff here.",
-        Panel::Terminal => "The terminal is hidden; its shells keep running.",
-        Panel::Pr => "No pull request open. Open one in the main window to show it here.",
-        Panel::Ci => "No CI view open. Open the builds of a commit to show them here.",
+        Panel::Diff => crate::i18n::text("repo-core-4231"),
+        Panel::Terminal => crate::i18n::text("repo-core-4232"),
+        Panel::Pr => crate::i18n::text("repo-core-4233"),
+        Panel::Ci => crate::i18n::text("repo-core-4234"),
     }
 }
 
@@ -410,10 +435,11 @@ fn placeholder(ui: &mut Ui, panel: Panel, why: &str, acts: &mut Vec<Action>) {
         ui.label(RichText::new(why).color(t.text_dim));
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if panel == Panel::Terminal && ui.button("Show the terminal").clicked() {
+            if panel == Panel::Terminal && ui.button(crate::i18n::text("repo-core-4235")).clicked()
+            {
                 acts.push(Action::ToggleTerminal);
             }
-            if ui.button("Close this window").clicked() {
+            if ui.button(crate::i18n::text("repo-core-4236")).clicked() {
                 acts.push(Action::Popout(Request::Dock(panel)));
             }
         });
@@ -425,13 +451,19 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
     let (icon, tip, request) = if popped {
         (
             "picture-in-picture",
-            format!("Bring the {} back into the main window", panel.noun()),
+            crate::i18n::message(
+                "repo-core-4238",
+                &[("noun", format!("{}", panel.noun()).into())],
+            ),
             Request::Dock(panel),
         )
     } else {
         (
             "picture-in-picture-2",
-            format!("Pop the {} out into its own window", panel.noun()),
+            crate::i18n::message(
+                "repo-core-4239",
+                &[("noun", format!("{}", panel.noun()).into())],
+            ),
             Request::PopOut(panel),
         )
     };
@@ -445,7 +477,11 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
 
 /// The close button's tooltip in a view's header: a popped-out view closes with its window.
 pub(in crate::repo) fn close_tip(popped: bool, docked_tip: &'static str) -> &'static str {
-    if popped { "Close (Esc)" } else { docked_tip }
+    if popped {
+        crate::i18n::text("repo-core-0711")
+    } else {
+        docked_tip
+    }
 }
 
 #[cfg(test)]

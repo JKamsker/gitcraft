@@ -36,7 +36,9 @@ const REMOTE_INDENT: f32 = 18.0;
 impl RepoTab {
     pub(super) fn sidebar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Branches", |ui| self.branch_header_buttons(ui, acts));
+        widgets::panel_header(ui, crate::i18n::text("repo-core-1094"), |ui| {
+            self.branch_header_buttons(ui, acts)
+        });
         // Sized like the commit search bar (Ctrl+F).
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -44,7 +46,7 @@ impl RepoTab {
             icons::inline(ui, "search", 15.0, t.text_faint);
             let filter = ui.add(
                 egui::TextEdit::singleline(&mut self.branch_filter)
-                    .hint_text("Filter branches and tags")
+                    .hint_text(crate::i18n::text("repo-core-3424"))
                     .desired_width(ui.available_width() - 10.0)
                     .margin(egui::Margin::symmetric(8, 4)),
             );
@@ -112,20 +114,28 @@ impl RepoTab {
     fn branch_header_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let idle = self.busy_op.is_none();
         let clean = ui.add_enabled_ui(idle, |ui| {
-            icons::small_button(ui, "brush", "Select stale or merged branches…")
+            icons::small_button(ui, "brush", crate::i18n::text("repo-core-0071"))
         });
-        let clean = clean.inner.on_disabled_hover_text(
-            "Select stale or merged branches… once the running operation is done",
-        );
+        let clean = clean
+            .inner
+            .on_disabled_hover_text(crate::i18n::text("repo-core-3429"));
         if clean.clicked() {
             acts.push(Action::SelectStaleBranches);
         }
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
         let on = usize::from(order.by_date);
-        let sort = ui.scope(|ui| widgets::switch(ui, &["Name", "Recent"], on));
-        sort.response.on_hover_text(
-            "Sort the local branches by name, or by their last commit (newest first)",
-        );
+        let sort = ui.scope(|ui| {
+            widgets::switch(
+                ui,
+                &[
+                    crate::i18n::text("repo-core-1061"),
+                    crate::i18n::text("repo-core-3430"),
+                ],
+                on,
+            )
+        });
+        sort.response
+            .on_hover_text(crate::i18n::text("repo-core-3431"));
         if let Some(picked) = sort.inner {
             order.by_date = picked == 1;
             order.store(ui.ctx(), self.repo_key());
@@ -160,31 +170,44 @@ impl RepoTab {
         // Level with the filter, then with the first section header.
         col.add_space(5.0);
         if icons::tool_button(&mut col, "search", "", true)
-            .named("Filter branches and tags")
-            .on_hover_text("Filter branches and tags")
+            .named(crate::i18n::text("repo-core-3424"))
+            .on_hover_text(crate::i18n::text("repo-core-3424"))
             .clicked()
         {
             acts.push(Action::OpenBranches(None));
         }
         col.add_space(5.0);
         let prs = self.forge().map(|forge| match forge.noun() {
-            "merge request" => "Merge requests",
-            _ => "Pull requests",
+            "merge request" => crate::i18n::text("repo-core-3433"),
+            _ => crate::i18n::text("repo-core-3434"),
         });
-        let tags = (!self.refs.tags.is_empty()).then_some("Tags");
-        let submodules = (!self.submodules.is_empty()).then_some("Submodules");
+        let tags = (!self.refs.tags.is_empty()).then_some(crate::i18n::text("repo-core-1096"));
+        let submodules =
+            (!self.submodules.is_empty()).then_some(crate::i18n::text("repo-core-3435"));
         let top = [
-            ("local", "laptop", Some("Local branches")),
-            ("remotes", "cloud", Some("Remotes")),
+            ("local", "laptop", Some(crate::i18n::text("repo-core-3436"))),
+            (
+                "remotes",
+                "cloud",
+                Some(crate::i18n::text("repo-core-3438")),
+            ),
         ];
         let lower = [
-            ("worktrees", "folder-tree", Some("Worktrees")),
+            (
+                "worktrees",
+                "folder-tree",
+                Some(crate::i18n::text("repo-core-3440")),
+            ),
             ("submodules", "package", submodules),
-            ("stashes", "archive", Some("Stashes")),
+            (
+                "stashes",
+                "archive",
+                Some(crate::i18n::text("repo-core-3443")),
+            ),
             (
                 "recovery",
                 "history",
-                Some("Recovery: reflog and lost commits"),
+                Some(crate::i18n::text("repo-core-3444")),
             ),
             ("prs", "git-pull-request", prs),
             ("tags", "tag", tags),

@@ -61,17 +61,41 @@ pub fn run_test(repo: &std::path::Path, command: &str) -> Result<TestRun, String
 /// What a test's run says, for the toolbar.
 fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) {
     match run {
-        Ok(r) if r.passed => (format!("Test “{command}” passes"), false),
+        Ok(r) if r.passed => (
+            crate::i18n::message(
+                "repo-core-0479",
+                &[("command", format!("{}", command).into())],
+            ),
+            false,
+        ),
         Ok(r) => {
             let last = r
                 .output
                 .lines()
                 .rev()
                 .find(|l| !l.trim().is_empty())
-                .unwrap_or("no output");
-            (format!("Test “{command}” fails: {last}"), true)
+                .unwrap_or(crate::i18n::text("repo-core-0480"));
+            (
+                crate::i18n::message(
+                    "repo-core-0481",
+                    &[
+                        ("command", format!("{}", command).into()),
+                        ("last", format!("{}", last).into()),
+                    ],
+                ),
+                true,
+            )
         }
-        Err(e) => (format!("Test “{command}” could not run: {e}"), true),
+        Err(e) => (
+            crate::i18n::message(
+                "repo-core-0482",
+                &[
+                    ("command", format!("{}", command).into()),
+                    ("e", format!("{}", e).into()),
+                ],
+            ),
+            true,
+        ),
     }
 }
 
@@ -90,8 +114,8 @@ fn record_and_test(repo: &std::path::Path, pending: Pending) -> Vec<(String, boo
     if stored > 0 {
         said.push((
             match stored {
-                1 => "Kept the decision".to_owned(),
-                n => format!("Kept {n} decisions"),
+                1 => crate::i18n::text("repo-core-0483").to_owned(),
+                n => crate::i18n::message("repo-core-0484", &[("n", (n).into())]),
             },
             false,
         ));
@@ -110,9 +134,9 @@ fn record_and_test(repo: &std::path::Path, pending: Pending) -> Vec<(String, boo
         let run = run_test(repo, &command);
         let (mut text, bad) = test_message(&command, &run);
         if bad && others_conflicted > 0 {
-            text.push_str(&format!(
-                " ({others_conflicted} other file{} still had conflicts)",
-                if others_conflicted == 1 { "" } else { "s" }
+            text.push_str(&crate::i18n::message(
+                "repo-core-0485",
+                &[("others-conflicted", (others_conflicted).into())],
             ));
         }
         said.push((text, bad));
@@ -149,9 +173,23 @@ impl RepoTab {
             Act::Sync(remote, send) => {
                 let repo = self.path.clone();
                 self.status = Some((
-                    format!(
-                        "{} conflict decisions with {remote}…",
-                        if send { "Sending" } else { "Fetching" }
+                    crate::i18n::message(
+                        "repo-core-0486",
+                        &[
+                            (
+                                "Fetching",
+                                format!(
+                                    "{}",
+                                    if send {
+                                        crate::i18n::text("repo-core-0487")
+                                    } else {
+                                        crate::i18n::text("repo-core-0488")
+                                    }
+                                )
+                                .into(),
+                            ),
+                            ("remote", format!("{}", remote).into()),
+                        ],
                     ),
                     false,
                 ));
@@ -201,12 +239,10 @@ impl RepoTab {
                         if applied > 0 {
                             tab.status = Some((
                                 match applied {
-                                    1 => "Applied a decision made before: check it, then save"
-                                        .to_owned(),
-                                    n => format!(
-                                        "Applied {n} decisions made before: check them, then \
-                                         save"
-                                    ),
+                                    1 => crate::i18n::text("repo-core-0489").to_owned(),
+                                    n => {
+                                        crate::i18n::message("repo-core-0490", &[("n", (n).into())])
+                                    }
                                 },
                                 false,
                             ));
@@ -257,7 +293,7 @@ impl RepoTab {
             return;
         };
         if pending.run_tests {
-            self.status = Some(("Kept the decisions; running their tests…".to_owned(), false));
+            self.status = Some((crate::i18n::text("repo-core-0491").to_owned(), false));
         }
         let repo = self.path.clone();
         self.then(
@@ -300,12 +336,18 @@ impl RepoTab {
         };
         vec![
             (
-                format!("Send conflict decisions to {remote}"),
+                crate::i18n::message(
+                    "repo-core-0492",
+                    &[("remote", format!("{}", remote).into())],
+                ),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote.clone(), true)),
             ),
             (
-                format!("Get conflict decisions from {remote}"),
+                crate::i18n::message(
+                    "repo-core-0493",
+                    &[("remote", format!("{}", remote).into())],
+                ),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote, false)),
             ),

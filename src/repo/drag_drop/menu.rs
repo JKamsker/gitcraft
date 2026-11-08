@@ -102,18 +102,20 @@ impl RepoTab {
             ) => {
                 let hint = match more {
                     0 => first,
-                    n => format!("{first} · {n} more"),
+                    n => crate::i18n::message(
+                        "repo-core-2417",
+                        &[("first", format!("{}", first).into()), ("n", (n).into())],
+                    ),
                 };
                 (hint, t.accent)
             }
             (None, Some(hover)) => (
-                hover.why.unwrap_or_else(|| "Nothing to do here".to_owned()),
+                hover
+                    .why
+                    .unwrap_or_else(|| crate::i18n::text("repo-core-2418").to_owned()),
                 t.text_faint,
             ),
-            (None, None) => (
-                "Drop on a branch or a commit · Esc cancels".to_owned(),
-                t.text_faint,
-            ),
+            (None, None) => (crate::i18n::text("repo-core-2419").to_owned(), t.text_faint),
         };
         egui::Area::new(egui::Id::new("drag-ghost"))
             .order(egui::Order::Tooltip)

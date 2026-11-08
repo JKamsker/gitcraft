@@ -34,6 +34,14 @@ pub enum CellKind {
 }
 
 impl CellKind {
+    pub(super) fn display_label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Code => "repo-core-cell-kind-code",
+            Self::Markdown => "repo-core-cell-kind-markdown",
+            Self::Raw => "repo-core-cell-kind-raw",
+        })
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             CellKind::Code => "code",
@@ -100,17 +108,18 @@ fn pretty(v: Option<&Value>) -> String {
 /// The notebook in `bytes`, or why it isn't one gitcraft can read.
 pub fn parse(bytes: &[u8]) -> Result<Notebook, String> {
     let doc: Value = serde_json::from_slice(bytes)
-        .map_err(|e| format!("Not a notebook (its JSON doesn't read: {e})"))?;
+        .map_err(|e| crate::i18n::message("repo-core-1864", &[("e", format!("{}", e).into())]))?;
     let major = doc.get("nbformat").and_then(Value::as_i64).unwrap_or(0);
     if major < 4 {
-        return Err(format!(
-            "A notebook of format {major}: gitcraft reads format 4"
+        return Err(crate::i18n::message(
+            "repo-core-1866",
+            &[("major", format!("{}", major).into())],
         ));
     }
     let cells = doc
         .get("cells")
         .and_then(Value::as_array)
-        .ok_or("A notebook without cells")?
+        .ok_or(crate::i18n::text("repo-core-1868"))?
         .iter()
         .map(cell)
         .collect();
@@ -154,7 +163,7 @@ fn output(v: &Value) -> Output {
             name: v
                 .get("ename")
                 .and_then(Value::as_str)
-                .unwrap_or("Error")
+                .unwrap_or(crate::i18n::text("repo-core-1881"))
                 .to_owned(),
             value: v
                 .get("evalue")
@@ -188,7 +197,13 @@ fn cut(text: String) -> String {
     {
         Some((at, _)) => {
             let more = text[at..].lines().count().saturating_sub(1);
-            format!("{}\n… {more} more lines", &text[..at])
+            crate::i18n::message(
+                "repo-core-1884",
+                &[
+                    ("at", format!("{}", &text[..at]).into()),
+                    ("more", format!("{}", more).into()),
+                ],
+            )
         }
         None => text,
     }

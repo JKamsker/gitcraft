@@ -150,7 +150,10 @@ impl RepoTab {
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, err);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(err)),
+                );
             });
             return;
         }
@@ -166,8 +169,7 @@ impl RepoTab {
                     ui.add(crate::spinner::Spinner::new());
                 } else {
                     ui.label(
-                        egui::RichText::new("This repository has no commits yet.")
-                            .color(t.text_dim),
+                        egui::RichText::new(crate::i18n::text("repo-core-4137")).color(t.text_dim),
                     );
                 }
             });
@@ -587,7 +589,7 @@ impl RepoTab {
         };
         let (base, base_label) = end(old)?;
         let (target, target_label) = if self.is_wip(new) {
-            (None, "working tree".to_owned())
+            (None, crate::i18n::text("repo-core-2651").to_owned())
         } else {
             let (hash, label) = end(new)?;
             (Some(hash), label)
@@ -644,7 +646,7 @@ fn loading_row(ui: &mut Ui, t: &Tokens) {
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,
-        "Loading older commits…",
+        crate::i18n::text("repo-core-4142"),
         FontId::proportional(12.0),
         t.text_faint,
     );
@@ -655,7 +657,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
     crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
-            if MenuItem::new("Stage all changes")
+            if MenuItem::new(crate::i18n::text("repo-core-0055"))
                 .icon("check")
                 .enabled(idle)
                 .keys(Command::StageAll)
@@ -668,7 +670,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                     refresh: Refresh::Status,
                 });
             }
-            if MenuItem::new("Stash changes…")
+            if MenuItem::new(crate::i18n::text("repo-core-0054"))
                 .icon("archive")
                 .enabled(idle)
                 .keys(Command::Stash)
@@ -678,11 +680,11 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 acts.push(Action::Dialog(Dialog::stash()));
             }
             ui.separator();
-            if crate::menu_item::MenuItem::new("Apply patch…")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2630"))
                 .icon("file-diff")
                 .enabled(idle)
                 .show(ui)
-                .on_hover_text(APPLY_PATCH_TIP)
+                .on_hover_text(crate::i18n::text(APPLY_PATCH_TIP))
                 .clicked()
             {
                 acts.push(Action::ApplyPatch);
@@ -691,8 +693,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
 }
 
 /// What "Apply patch…" does.
-const APPLY_PATCH_TIP: &str = "A patch from git format-patch becomes commits (git am), any other diff goes on the working \
-     tree (git apply)";
+const APPLY_PATCH_TIP: &str = "repo-core-4143";
 
 /// Menu entries comparing `branch` with `current`: what it would bring in (since they
 /// diverged, as a pull request shows it), and every difference.
@@ -704,19 +705,31 @@ pub(super) fn compare_items(
 ) {
     let name = branch.name;
     let current_ref = BranchRef::local(current);
-    if crate::menu_item::MenuItem::new(format!("Changes {name} adds to {current}"))
-        .icon("command")
-        .show(ui)
-        .on_hover_text("What it changed since the two diverged, as a pull request shows it")
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::message(
+        "repo-core-4144",
+        &[
+            ("name", format!("{}", name).into()),
+            ("current", format!("{}", current).into()),
+        ],
+    ))
+    .icon("command")
+    .show(ui)
+    .on_hover_text(crate::i18n::text("repo-core-3388"))
+    .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, true));
     }
-    if crate::menu_item::MenuItem::new(format!("Compare {current} with {name}"))
-        .icon("file-diff")
-        .show(ui)
-        .on_hover_text("Every difference between the two")
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::message(
+        "repo-core-4145",
+        &[
+            ("current", format!("{}", current).into()),
+            ("name", format!("{}", name).into()),
+        ],
+    ))
+    .icon("file-diff")
+    .show(ui)
+    .on_hover_text(crate::i18n::text("repo-core-4146"))
+    .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, false));
     }
@@ -779,7 +792,7 @@ fn connector_row(
     painter.text(
         egui::pos2(rect.left() + cols.refs + cols.graph + 6.0, mid),
         Align2::LEFT_CENTER,
-        format!("⋯ {count} intervening commits · expand"),
+        crate::i18n::message("repo-core-4147", &[("count", (count).into())]),
         FontId::proportional(12.0),
         if response.hovered() {
             t.text
@@ -787,7 +800,7 @@ fn connector_row(
             t.text_dim
         },
     );
-    response.on_hover_text("Expand this omitted history. Dashed lanes show continuous boundary runs; internal merges remain hidden until expanded.")
+    response.on_hover_text(crate::i18n::text("repo-core-4148"))
 }
 
 #[cfg(test)]

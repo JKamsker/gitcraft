@@ -62,13 +62,28 @@ pub(super) fn urls(
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b".-+_".contains(&b))
     {
-        return Err("Invalid registry package identity".into());
+        return Err(crate::i18n::text("repo-core-3960").into());
     }
     match ecosystem {
-        Ecosystem::Cargo if !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b)) =>
-            Ok((None, format!("https://static.crates.io/crates/{name}/{name}-{version}.crate"))),
-        Ecosystem::Npm if valid_npm(name) => Ok((Some(format!("https://registry.npmjs.org/{}/{version}", name.replace('/', "%2F"))), String::new())),
-        _ => Err("Published licence/changelog lookup is available for crates.io and npm packages; this source is unavailable".into()),
+        Ecosystem::Cargo
+            if !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b)) =>
+        {
+            Ok((
+                None,
+                format!("https://static.crates.io/crates/{name}/{name}-{version}.crate"),
+            ))
+        }
+        Ecosystem::Npm if valid_npm(name) => Ok((
+            Some(format!(
+                "https://registry.npmjs.org/{}/{version}",
+                name.replace('/', "%2F")
+            )),
+            String::new(),
+        )),
+        _ => Err(crate::i18n::text("repo-core-3964").into()),
     }
 }
 fn valid_npm(name: &str) -> bool {
@@ -83,10 +98,10 @@ fn valid_npm(name: &str) -> bool {
 }
 fn get(url: &str) -> Result<Vec<u8>, String> {
     if network::refused().is_some() {
-        return Err("Offline mode blocks package metadata lookup".into());
+        return Err(crate::i18n::text("repo-core-3965").into());
     }
     if tasks::cancellation().is_cancelled() {
-        return Err("cancelled".into());
+        return Err(crate::i18n::text("repo-core-2896").into());
     }
     let agent = crate::forge::http::with_proxy(ureq::AgentBuilder::new(), url)
         .timeout(Duration::from_secs(12))
@@ -98,23 +113,23 @@ fn get(url: &str) -> Result<Vec<u8>, String> {
         ))
         .build();
     let response = agent.get(url).call().map_err(|e| match e {
-        ureq::Error::Status(n, _) => format!("Package registry returned HTTP {n}"),
-        _ => "Package registry request failed".into(),
+        ureq::Error::Status(n, _) => crate::i18n::message("repo-core-3969", &[("n", (n).into())]),
+        _ => crate::i18n::text("repo-core-3970").into(),
     })?;
     if response.status() != 200 {
-        return Err("Package registry redirected the request; refused".into());
+        return Err(crate::i18n::text("repo-core-3971").into());
     }
     let mut bytes = Vec::new();
     response
         .into_reader()
         .take((8 << 20) + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "Could not read package metadata")?;
+        .map_err(|_| crate::i18n::text("repo-core-3972"))?;
     if bytes.len() > 8 << 20 {
-        return Err("Package download exceeds 8 MiB".into());
+        return Err(crate::i18n::text("repo-core-3973").into());
     }
     if tasks::cancellation().is_cancelled() {
-        return Err("cancelled".into());
+        return Err(crate::i18n::text("repo-core-2896").into());
     }
     Ok(bytes)
 }
@@ -136,18 +151,18 @@ fn parse(
                     .skipped
                     .get("Cargo.toml")
                     .cloned()
-                    .unwrap_or_else(|| "Package omits a regular Cargo.toml".into())
+                    .unwrap_or_else(|| crate::i18n::text("repo-core-3974").into())
             })?;
             let doc = manifest
                 .parse::<toml_edit::Document<String>>()
-                .map_err(|_| "Invalid published Cargo.toml")?;
+                .map_err(|_| crate::i18n::text("repo-core-3975"))?;
             let package = doc
                 .get("package")
-                .ok_or("Published manifest omits package")?;
+                .ok_or(crate::i18n::text("repo-core-3976"))?;
             if package.get("name").and_then(|x| x.as_str()) != Some(name)
                 || package.get("version").and_then(|x| x.as_str()) != Some(version)
             {
-                return Err("Published package identity mismatch".into());
+                return Err(crate::i18n::text("repo-core-3977").into());
             }
             if let Some(path) = package.get("license-file").and_then(|x| x.as_str()) {
                 let safe = !path.is_empty()
@@ -162,10 +177,14 @@ fn parse(
                     .join("/");
                 let content = if safe && !normal.is_empty() {
                     let mut selected = archive::texts_with(bytes, Some(&normal))?;
-                    selected.files.remove(&normal).ok_or_else(|| selected.skipped.remove(&normal)
-                        .unwrap_or_else(|| "declared licence file is missing, not a regular file, or unavailable in the archive".into()))
+                    selected.files.remove(&normal).ok_or_else(|| {
+                        selected
+                            .skipped
+                            .remove(&normal)
+                            .unwrap_or_else(|| crate::i18n::text("repo-core-3979").into())
+                    })
                 } else {
-                    Err("declared licence file path is unsafe or outside the package".into())
+                    Err(crate::i18n::text("repo-core-3980").into())
                 };
                 license_file = Some((path.to_owned(), content));
             }
@@ -182,13 +201,13 @@ fn parse(
                         .skipped
                         .get("package.json")
                         .cloned()
-                        .unwrap_or_else(|| "Package omits a regular package.json".into())
+                        .unwrap_or_else(|| crate::i18n::text("repo-core-3981").into())
                 })?)
-                .map_err(|_| "Invalid published package.json")?;
+                .map_err(|_| crate::i18n::text("repo-core-3982"))?;
             if manifest["name"].as_str() != Some(name)
                 || manifest["version"].as_str() != Some(version)
             {
-                return Err("Published package identity mismatch".into());
+                return Err(crate::i18n::text("repo-core-3977").into());
             }
             let value = manifest.get("license").or_else(|| manifest.get("licenses"));
             fn declared(value: &serde_json::Value) -> Option<String> {
@@ -204,11 +223,11 @@ fn parse(
             }
             let license = value.and_then(declared);
             if value.is_some() && license.is_none() {
-                license_note = Some("licence declaration uses an unsupported representation; its meaning is unknown".into());
+                license_note = Some(crate::i18n::text("repo-core-3984").into());
             }
             license
         }
-        _ => return Err("Unsupported package registry".into()),
+        _ => return Err(crate::i18n::text("repo-core-3985").into()),
     };
     files.remove("Cargo.toml");
     files.remove("package.json");
@@ -227,18 +246,18 @@ fn fetch(eco: Ecosystem, registry: &Registry) -> Result<Option<Metadata>, String
     };
     let (manifest, mut url) = urls(eco, name, version)?;
     if let Some(endpoint) = manifest {
-        let json: serde_json::Value =
-            serde_json::from_slice(&get(&endpoint)?).map_err(|_| "Invalid registry metadata")?;
+        let json: serde_json::Value = serde_json::from_slice(&get(&endpoint)?)
+            .map_err(|_| crate::i18n::text("repo-core-3986"))?;
         if json["name"].as_str() != Some(name) || json["version"].as_str() != Some(version) {
-            return Err("Registry package identity mismatch".into());
+            return Err(crate::i18n::text("repo-core-3987").into());
         }
         url = json
             .pointer("/dist/tarball")
             .and_then(|s| s.as_str())
-            .ok_or("Registry omits published archive")?
+            .ok_or(crate::i18n::text("repo-core-3989"))?
             .to_owned();
         if !url.starts_with("https://registry.npmjs.org/") || url.contains(['?', '#', '\\']) {
-            return Err("Registry archive points outside the public npm registry".into());
+            return Err(crate::i18n::text("repo-core-3990").into());
         }
     }
     parse(eco, name, version, url.clone(), &get(&url)?).map(Some)
@@ -250,20 +269,30 @@ impl Metadata {
             terms.push(expression.clone());
         }
         if let Some((path, content)) = &self.license_file {
-            terms.push(format!(
-                "declared file {path}{}",
-                if content.is_err() {
-                    " (content unavailable)"
-                } else {
-                    ""
-                }
+            terms.push(crate::i18n::message(
+                "repo-core-3991",
+                &[
+                    ("path", format!("{}", path).into()),
+                    (
+                        "else",
+                        format!(
+                            "{}",
+                            if content.is_err() {
+                                crate::i18n::text("repo-core-3992")
+                            } else {
+                                ""
+                            }
+                        )
+                        .into(),
+                    ),
+                ],
             ));
         }
         if let Some(note) = &self.license_note {
             terms.push(note.clone());
         }
         if terms.is_empty() {
-            "not declared in published manifest".into()
+            crate::i18n::text("repo-core-3993").into()
         } else {
             terms.join("; ")
         }
@@ -285,37 +314,85 @@ impl Metadata {
         t: &crate::theme::Tokens,
     ) {
         doc.text(
-            &format!("{side}: published archive · {}", self.archive_url),
+            &crate::i18n::message(
+                "repo-core-3994",
+                &[
+                    ("side", format!("{}", side).into()),
+                    ("archive-url", format!("{}", self.archive_url).into()),
+                ],
+            ),
             t.text_dim,
         );
         doc.text(
-            &format!("{side} licence: {}", self.license_summary()),
+            &crate::i18n::message(
+                "repo-core-3995",
+                &[
+                    ("side", format!("{}", side).into()),
+                    (
+                        "license-summary",
+                        format!("{}", self.license_summary()).into(),
+                    ),
+                ],
+            ),
             t.warning,
         );
         if let Some((path, content)) = &self.license_file {
-            doc.text(&format!("{side} declared licence file: {path}"), t.text);
+            doc.text(
+                &crate::i18n::message(
+                    "repo-core-3996",
+                    &[
+                        ("side", format!("{}", side).into()),
+                        ("path", format!("{}", path).into()),
+                    ],
+                ),
+                t.text,
+            );
             match content {
                 Ok(text) => doc.text(text, t.text),
                 Err(error) => doc.text(error, t.warning),
             }
         }
         if self.changelogs.is_empty() {
-            doc.text(&format!("{side}: no readable recognised changelog in retained metadata; other filenames may exist."), t.text_dim);
+            doc.text(
+                &crate::i18n::message("repo-core-3997", &[("side", format!("{}", side).into())]),
+                t.text_dim,
+            );
         }
         for (path, text) in &self.changelogs {
-            doc.text(&format!("{side} changelog: {path}"), t.text);
+            doc.text(
+                &crate::i18n::message(
+                    "repo-core-3998",
+                    &[
+                        ("side", format!("{}", side).into()),
+                        ("path", format!("{}", path).into()),
+                    ],
+                ),
+                t.text,
+            );
             doc.text(text, t.text);
         }
         for (path, reason) in &self.skipped {
-            doc.text(&format!("{side}: {path} · {reason}"), t.warning);
+            doc.text(
+                &crate::i18n::message(
+                    "repo-core-3999",
+                    &[
+                        ("side", format!("{}", side).into()),
+                        ("path", format!("{}", path).into()),
+                        ("reason", format!("{}", reason).into()),
+                    ],
+                ),
+                t.warning,
+            );
         }
     }
 }
 fn side_summary(side: &Side) -> String {
     match side {
         Ok(Some(m)) => m.license_summary(),
-        Ok(None) => "not recorded as a supported public-registry package".into(),
-        Err(error) => format!("unknown ({error})"),
+        Ok(None) => crate::i18n::text("repo-core-4000").into(),
+        Err(error) => {
+            crate::i18n::message("repo-core-4001", &[("error", format!("{}", error).into())])
+        }
     }
 }
 fn changed(answer: &Answer) -> bool {
@@ -365,7 +442,7 @@ impl State {
             .find(|(r, _)| *r == request)
             .map(|(_, a)| a.clone());
         if request.old.is_none() && request.new.is_none() {
-            let error = "Metadata unavailable: the lockfile does not identify a supported public registry; no package name was sent".to_owned();
+            let error = crate::i18n::text("repo-core-4002").to_owned();
             self.result = Some((Err(error.clone()), Err(error)));
             return;
         }
@@ -408,8 +485,8 @@ impl State {
         {
             self.pending = None;
             self.result = Some((
-                Err("Profile changed; select the package again".into()),
-                Err("Profile changed; select the package again".into()),
+                Err(crate::i18n::text("repo-core-4003").into()),
+                Err(crate::i18n::text("repo-core-4003").into()),
             ));
             self.generation = self.generation.wrapping_add(1);
         }
@@ -436,8 +513,8 @@ impl State {
                     self.pending = None;
                     self.generation = self.generation.wrapping_add(1);
                     self.result = Some((
-                        Err("Package metadata task cancelled or stopped".into()),
-                        Err("Package metadata task cancelled or stopped".into()),
+                        Err(crate::i18n::text("repo-core-4004").into()),
+                        Err(crate::i18n::text("repo-core-4004").into()),
                     ));
                 }
                 Err(mpsc::TryRecvError::Empty) => {
@@ -461,30 +538,58 @@ impl State {
             return;
         };
         doc.text(
-            &format!("{name}: published licences and changelogs"),
+            &crate::i18n::message("repo-core-4005", &[("name", format!("{}", name).into())]),
             t.text,
         );
         if self.pending.is_some() {
-            doc.text("Reading the exact published versions…", t.text_dim);
+            doc.text(crate::i18n::text("repo-core-4006"), t.text_dim);
         }
         if let Some(answer) = &self.result {
             doc.text(
-                &format!(
-                    "Licence{}: {} → {}",
-                    if changed(answer) { " changed" } else { "" },
-                    side_summary(&answer.0),
-                    side_summary(&answer.1)
+                &crate::i18n::message(
+                    "repo-core-4007",
+                    &[
+                        (
+                            "else",
+                            format!(
+                                "{}",
+                                if changed(answer) {
+                                    crate::i18n::text("repo-core-4008")
+                                } else {
+                                    ""
+                                }
+                            )
+                            .into(),
+                        ),
+                        ("answer", format!("{}", side_summary(&answer.0)).into()),
+                        ("answer2", format!("{}", side_summary(&answer.1)).into()),
+                    ],
                 ),
                 t.warning,
             );
-            for (side, result) in [("Before", &answer.0), ("After", &answer.1)] {
+            for (side, result) in [
+                (crate::i18n::text("repo-core-1564"), &answer.0),
+                (crate::i18n::text("repo-core-1565"), &answer.1),
+            ] {
                 match result {
                     Ok(Some(m)) => m.append_document(doc, side, t),
                     Ok(None) => doc.text(
-                        &format!("{side}: metadata unavailable for this source"),
+                        &crate::i18n::message(
+                            "repo-core-4009",
+                            &[("side", format!("{}", side).into())],
+                        ),
                         t.text_dim,
                     ),
-                    Err(error) => doc.text(&format!("{side}: {error}"), t.warning),
+                    Err(error) => doc.text(
+                        &crate::i18n::message(
+                            "repo-core-4010",
+                            &[
+                                ("side", format!("{}", side).into()),
+                                ("error", format!("{}", error).into()),
+                            ],
+                        ),
+                        t.warning,
+                    ),
                 }
             }
         }
@@ -496,8 +601,11 @@ impl State {
         };
         let mut retry = false;
         ui.horizontal(|ui| {
-            ui.strong(format!("{name}: published licences and changelogs"));
-            if ui.button("Close / cancel").clicked() {
+            ui.strong(crate::i18n::message(
+                "repo-core-4005",
+                &[("name", format!("{}", name).into())],
+            ));
+            if ui.button(crate::i18n::text("repo-core-4011")).clicked() {
                 self.close();
             }
             if self.pending.is_none()
@@ -505,7 +613,7 @@ impl State {
                     .result
                     .as_ref()
                     .is_some_and(|(a, b)| a.is_err() || b.is_err())
-                && ui.button("Retry metadata").clicked()
+                && ui.button(crate::i18n::text("repo-core-4012")).clicked()
             {
                 retry = true;
             }
@@ -514,37 +622,114 @@ impl State {
             self.start(name, request, ui.ctx(), true);
         }
         if self.pending.is_some() {
-            ui.label("Reading the exact published versions (up to 12 seconds per request)…");
+            ui.label(crate::i18n::text("repo-core-4013"));
         }
         if let Some(answer) = &self.result {
-            ui.label(format!(
-                "Licence{}: {} → {}",
-                if changed(answer) { " changed" } else { "" },
-                side_summary(&answer.0),
-                side_summary(&answer.1)
+            ui.label(crate::i18n::message(
+                "repo-core-4007",
+                &[
+                    (
+                        "else",
+                        format!(
+                            "{}",
+                            if changed(answer) {
+                                crate::i18n::text("repo-core-4008")
+                            } else {
+                                ""
+                            }
+                        )
+                        .into(),
+                    ),
+                    ("answer", format!("{}", side_summary(&answer.0)).into()),
+                    ("answer2", format!("{}", side_summary(&answer.1)).into()),
+                ],
             ));
-            egui::ScrollArea::vertical().id_salt("dependency_metadata").max_height(240.0).show(ui,|ui| {
-                for (side,result) in [("Before",&answer.0),("After",&answer.1)] {
-                    let metadata = match result {
-                        Ok(Some(m))=>m,
-                        Ok(None)=>{ui.label(format!("{side}: metadata unavailable for this source"));continue;},
-                        Err(error)=>{ui.label(format!("{side}: {error}"));continue;},
-                    };
-                    ui.hyperlink_to(format!("{side}: published archive"),&metadata.archive_url);
-                    if let Some((path,content)) = &metadata.license_file {
-                        egui::CollapsingHeader::new(format!("{side} declared licence file: {path}")).id_salt((side,"licence-file")).show(ui,|ui| {
-                            match content {Ok(text)=>{ui.label(text);},Err(error)=>{ui.label(error);}}
-                        });
+            egui::ScrollArea::vertical()
+                .id_salt("dependency_metadata")
+                .max_height(240.0)
+                .show(ui, |ui| {
+                    for (side, result) in [
+                        (crate::i18n::text("repo-core-1564"), &answer.0),
+                        (crate::i18n::text("repo-core-1565"), &answer.1),
+                    ] {
+                        let metadata = match result {
+                            Ok(Some(m)) => m,
+                            Ok(None) => {
+                                ui.label(crate::i18n::message(
+                                    "repo-core-4009",
+                                    &[("side", format!("{}", side).into())],
+                                ));
+                                continue;
+                            }
+                            Err(error) => {
+                                ui.label(crate::i18n::message(
+                                    "repo-core-4010",
+                                    &[
+                                        ("side", format!("{}", side).into()),
+                                        ("error", format!("{}", error).into()),
+                                    ],
+                                ));
+                                continue;
+                            }
+                        };
+                        ui.hyperlink_to(
+                            crate::i18n::message(
+                                "repo-core-4015",
+                                &[("side", format!("{}", side).into())],
+                            ),
+                            &metadata.archive_url,
+                        );
+                        if let Some((path, content)) = &metadata.license_file {
+                            egui::CollapsingHeader::new(crate::i18n::message(
+                                "repo-core-3996",
+                                &[
+                                    ("side", format!("{}", side).into()),
+                                    ("path", format!("{}", path).into()),
+                                ],
+                            ))
+                            .id_salt((side, "licence-file"))
+                            .show(ui, |ui| match content {
+                                Ok(text) => {
+                                    ui.label(text);
+                                }
+                                Err(error) => {
+                                    ui.label(error);
+                                }
+                            });
+                        }
+                        if metadata.changelogs.is_empty() {
+                            ui.label(crate::i18n::message(
+                                "repo-core-4017",
+                                &[("side", format!("{}", side).into())],
+                            ));
+                        }
+                        for (path, reason) in &metadata.skipped {
+                            ui.label(crate::i18n::message(
+                                "repo-core-3999",
+                                &[
+                                    ("side", format!("{}", side).into()),
+                                    ("path", format!("{}", path).into()),
+                                    ("reason", format!("{}", reason).into()),
+                                ],
+                            ));
+                        }
+                        for (path, text) in &metadata.changelogs {
+                            egui::CollapsingHeader::new(crate::i18n::message(
+                                "repo-core-3998",
+                                &[
+                                    ("side", format!("{}", side).into()),
+                                    ("path", format!("{}", path).into()),
+                                ],
+                            ))
+                            .id_salt((side, path))
+                            .show(ui, |ui| {
+                                ui.add(
+                                    egui::Label::new(egui::RichText::new(text).monospace()).wrap(),
+                                );
+                            });
+                        }
                     }
-                    if metadata.changelogs.is_empty() {ui.label(format!("{side}: changelog unavailable — no readable recognised filename in retained metadata; other filenames may exist."));}
-                    for (path,reason) in &metadata.skipped {ui.label(format!("{side}: {path} · {reason}"));}
-                    for (path,text) in &metadata.changelogs {
-                        egui::CollapsingHeader::new(format!("{side} changelog: {path}")).id_salt((side,path)).show(ui,|ui| {
-                            ui.add(egui::Label::new(egui::RichText::new(text).monospace()).wrap());
-                        });
-                    }
-                }
-            });
+                });
         }
         ui.separator();
     }

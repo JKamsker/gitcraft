@@ -44,13 +44,20 @@ impl Reason {
     /// What the checklist and the tooltip say.
     pub fn describe(&self) -> String {
         match self {
-            Reason::Merged(Merged::Into(base)) => format!("merged into {base}"),
-            Reason::Merged(Merged::Rebased(base)) => {
-                format!("its commits are in {base} (rebased or cherry-picked)")
+            Reason::Merged(Merged::Into(base)) => {
+                crate::i18n::message("repo-core-0241", &[("base", format!("{}", base).into())])
             }
-            Reason::Merged(Merged::Pr(n, base)) => format!("#{n} merged it into {base}"),
-            Reason::UpstreamGone => "deleted on the remote".to_owned(),
-            Reason::Stale(days) => format!("no commit for {days} days"),
+            Reason::Merged(Merged::Rebased(base)) => {
+                crate::i18n::message("repo-core-0242", &[("base", format!("{}", base).into())])
+            }
+            Reason::Merged(Merged::Pr(n, base)) => crate::i18n::message(
+                "repo-core-0243",
+                &[("n", (*n).into()), ("base", format!("{}", base).into())],
+            ),
+            Reason::UpstreamGone => crate::i18n::text("repo-core-0244").to_owned(),
+            Reason::Stale(days) => {
+                crate::i18n::message("repo-core-0245", &[("days", (*days).into())])
+            }
         }
     }
 
@@ -314,9 +321,9 @@ impl HealthState {
             Err(e) => {
                 // Asked again on the next change or reload, rather than never.
                 self.asked = None;
-                self.error = Some(format!(
-                    "Could not tell which branches are merged ({e}). Only branches deleted on \
-                     their remote are listed."
+                self.error = Some(crate::i18n::message(
+                    "repo-core-0246",
+                    &[("e", format!("{}", e).into())],
                 ));
             }
         }
@@ -458,5 +465,38 @@ mod tests {
         assert_eq!(short_ref("refs/heads/main"), "main");
         assert_eq!(short_ref("refs/remotes/my/fork/main"), "my/fork/main");
         assert_eq!(short_ref("HEAD"), "HEAD");
+    }
+}
+
+#[cfg(test)]
+mod fluent_reason_tests {
+    use super::*;
+
+    #[test]
+    fn cleanup_reason_interpolates_opaque_branch_and_numeric_counts() {
+        let reason = Reason::Merged(Merged::Pr(1234, "Commit/日本語".to_owned()));
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let shown = reason.describe();
+            assert!(shown.contains("Commit/日本語"));
+            assert!(shown.contains(if language == "de" { "1.234" } else { "1,234" }));
+            assert!(reason.is_merged());
+            assert_eq!(
+                Reason::Stale(1).describe(),
+                if language == "de" {
+                    "seit 1 Tag kein Commit"
+                } else {
+                    "no commit for 1 day"
+                }
+            );
+            let stale = Reason::Stale(1234);
+            assert!(!stale.is_merged());
+            assert!(
+                stale
+                    .describe()
+                    .contains(if language == "de" { "1.234" } else { "1,234" })
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

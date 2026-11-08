@@ -40,14 +40,23 @@ impl PullMode {
     /// What the toolbar's Pull says it does.
     pub fn tip(self, ctx: &egui::Context) -> String {
         let what = match self {
-            PullMode::Merge => "Fast-forward the current branch, or merge when it has diverged",
-            PullMode::FastForwardOnly => "Fast-forward the current branch",
-            PullMode::Rebase => "Rebase the current branch onto its upstream",
+            PullMode::Merge => crate::i18n::text("repo-core-3099"),
+            PullMode::FastForwardOnly => crate::i18n::text("repo-core-3100"),
+            PullMode::Rebase => crate::i18n::text("repo-core-3101"),
         };
-        format!(
-            "{}\ngit {}\nRight-click or the arrow to choose",
-            crate::keymap::tip(ctx, what, crate::keymap::Command::Pull),
-            self.args().join(" ")
+        crate::i18n::message(
+            "repo-core-3102",
+            &[
+                (
+                    "Pull",
+                    format!(
+                        "{}",
+                        crate::keymap::tip(ctx, what, crate::keymap::Command::Pull)
+                    )
+                    .into(),
+                ),
+                ("self", format!("{}", self.args().join(" ")).into()),
+            ],
         )
     }
 }
@@ -70,7 +79,10 @@ pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     let mut settings = Settings::get(ui.ctx());
     for mode in PullMode::ALL {
         let radio = ui
-            .radio(settings.pull_mode == mode, mode.label())
+            .radio(
+                settings.pull_mode == mode,
+                super::messages::display_operation(mode.label()),
+            )
             .on_hover_text(format!("git {}", mode.args().join(" ")));
         super::ghost::offer(&radio, || super::ghost::GhostOp::Pull(mode));
         if radio.clicked() && settings.pull_mode != mode {
@@ -81,10 +93,9 @@ pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     ui.separator();
     if ui
         .add(
-            egui::Button::new("Fetch all").shortcut_text(crate::keymap::label(
-                ui.ctx(),
-                crate::keymap::Command::Fetch,
-            )),
+            egui::Button::new(crate::i18n::text("repo-core-3104")).shortcut_text(
+                crate::keymap::label(ui.ctx(), crate::keymap::Command::Fetch),
+            ),
         )
         .clicked()
     {

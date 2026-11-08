@@ -25,31 +25,33 @@ impl RepoTab {
         is_head: bool,
     ) {
         let hide = if self.branch_shown(full, is_head) {
-            "Hide in the graph"
+            crate::i18n::text("repo-core-3549")
         } else {
-            "Show in the graph"
+            crate::i18n::text("repo-core-3550")
         };
         if MenuItem::new(hide)
             .icon("eye-off")
-            .refused(is_head.then_some("The checked-out branch is always shown"))
+            .refused(is_head.then_some(crate::i18n::text("repo-core-3552")))
             .show(ui)
             .clicked()
         {
             acts.push(Action::BranchVisibility(Change::Toggle(full.to_owned())));
         }
         let solo = if self.visibility.solo.contains(full) {
-            "Unsolo"
+            crate::i18n::text("repo-core-3553")
         } else {
-            "Solo"
+            crate::i18n::text("repo-core-3554")
         };
         if ui
             .button(solo)
-            .on_hover_text("The graph shows only the soloed branches and the checked-out one")
+            .on_hover_text(crate::i18n::text("repo-core-3555"))
             .clicked()
         {
             acts.push(Action::BranchVisibility(Change::Solo(full.to_owned())));
         }
-        if self.visibility.is_filtering() && ui.button("Show all branches").clicked() {
+        if self.visibility.is_filtering()
+            && ui.button(crate::i18n::text("repo-core-3556")).clicked()
+        {
             acts.push(Action::BranchVisibility(Change::ShowAll));
         }
     }
@@ -65,17 +67,27 @@ impl RepoTab {
             ui.add_space(12.0);
             icons::inline(ui, "eye", 14.0, t.text_faint);
             let what = if self.visibility.is_soloing() {
-                "soloed"
+                crate::i18n::text("repo-core-3557")
             } else {
-                "shown"
+                crate::i18n::text("repo-core-3558")
             };
-            ui.label(RichText::new(format!("Viewing {shown} of {all}")).color(t.text_dim))
-                .on_hover_text(format!(
-                    "The graph has the commits of the {what} branches and the checked-out one"
-                ));
+            ui.label(
+                RichText::new(crate::i18n::message(
+                    "repo-core-3559",
+                    &[
+                        ("shown", (shown).into()),
+                        ("all", format!("{}", all).into()),
+                    ],
+                ))
+                .color(t.text_dim),
+            )
+            .on_hover_text(crate::i18n::message(
+                "repo-core-3560",
+                &[("what", format!("{}", what).into())],
+            ));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(10.0);
-                if ui.link("Show all").clicked() {
+                if ui.link(crate::i18n::text("repo-core-3561")).clicked() {
                     acts.push(Action::BranchVisibility(Change::ShowAll));
                 }
             });
@@ -97,9 +109,9 @@ pub(super) fn eye(ui: &Ui, row: &Response, full: &str, shown: bool) -> Option<Ac
     let keyboard = crate::a11y::keyboard_on(row) || ui.memory(|m| m.has_focus(id));
     let resp = ui.interact(rect, id, crate::a11y::list_row_sense(keyboard || !shown));
     let tip = if shown {
-        "Hide in the graph"
+        crate::i18n::text("repo-core-3549")
     } else {
-        "Show in the graph"
+        crate::i18n::text("repo-core-3550")
     };
     crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
         crate::a11y::labels::join([tip, crate::a11y::labels::ref_name(full)])

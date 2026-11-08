@@ -65,7 +65,7 @@ impl Form {
             Box::new(move || {
                 let event = std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
                     .unwrap_or_else(|_| {
-                        Event::Links(Err("Linked-copy inspection failed unexpectedly".into()))
+                        Event::Links(Err(crate::i18n::text("repo-core-1364").into()))
                     });
                 let _ = tx.send(event);
                 ctx.request_repaint();
@@ -88,8 +88,8 @@ impl Form {
             }
         }
         ui.set_width(800.0);
-        ui.heading("Same code across linked copies");
-        ui.label("Save up to eight local, WSL or SSH repository paths. Inspect connects to those copies and runs Git plus five fixed tool-version commands. It reads tracked-file metadata, six Git settings and existing default git-test results. It never requests environment variables, credential settings, remote URLs or file contents.");
+        ui.heading(crate::i18n::text("repo-core-1365"));
+        ui.label(crate::i18n::text("repo-core-1366"));
         let mut remove = None;
         for path in &self.paths {
             ui.horizontal(|ui| {
@@ -100,7 +100,10 @@ impl Form {
                 ));
                 if path != &self.repo
                     && ui
-                        .add_enabled(!self.pending, egui::Button::new("Unlink"))
+                        .add_enabled(
+                            !self.pending,
+                            egui::Button::new(crate::i18n::text("repo-core-1367")),
+                        )
                         .clicked()
                 {
                     remove = Some(path.clone());
@@ -117,13 +120,12 @@ impl Form {
             });
         }
         ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut self.add).on_hover_text(
-                "Absolute local path, //wsl.localhost/Distro/path, or ssh://host/absolute/path",
-            );
+            ui.text_edit_singleline(&mut self.add)
+                .on_hover_text(crate::i18n::text("repo-core-1368"));
             if ui
                 .add_enabled(
                     !self.pending && !self.add.trim().is_empty(),
-                    egui::Button::new("Save link"),
+                    egui::Button::new(crate::i18n::text("repo-core-1369")),
                 )
                 .clicked()
             {
@@ -140,7 +142,7 @@ impl Form {
         if ui
             .add_enabled(
                 !self.pending && !self.paths.is_empty(),
-                egui::Button::new("Inspect linked copies"),
+                egui::Button::new(crate::i18n::text("repo-core-1370")),
             )
             .clicked()
         {
@@ -163,7 +165,7 @@ impl Form {
                 reason = "Keep the existing pending-indicator repaint behavior in this lint-only unit; migrating to the throttled crate spinner requires a separate behavior change"
             )]
             ui.spinner();
-            ui.label("Reading copies; closing this dialog cancels its jobs.");
+            ui.label(crate::i18n::text("repo-core-1371"));
         }
         if let Some(e) = &self.error {
             ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, e);
@@ -175,44 +177,96 @@ impl Form {
             .map(|f| (f.path.as_str(), f))
             .collect();
         let mut open = None;
-        egui::ScrollArea::vertical().max_height(470.0).show(ui, |ui| {
-            for (path, sample) in &self.samples {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.strong(path.display().to_string());
-                    if ui.button("Open copy").clicked() { open = Some(path.clone()); }
-                });
-                match sample {
-                    Err(e) => { ui.label(format!("Unavailable: {e}")); }
-                    Ok(f) => {
-                        if let Some(base) = reference {
-                            ui.label(comparison_label(base, f));
-                            if base.test_command_digest != f.test_command_digest {
-                                ui.label("Default test commands differ; stored outcomes are not comparable.");
+        egui::ScrollArea::vertical()
+            .max_height(470.0)
+            .show(ui, |ui| {
+                for (path, sample) in &self.samples {
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.strong(path.display().to_string());
+                        if ui.button(crate::i18n::text("repo-core-1372")).clicked() {
+                            open = Some(path.clone());
+                        }
+                    });
+                    match sample {
+                        Err(e) => {
+                            ui.label(crate::i18n::message(
+                                "repo-core-1373",
+                                &[("e", format!("{}", e).into())],
+                            ));
+                        }
+                        Ok(f) => {
+                            if let Some(base) = reference {
+                                ui.label(comparison_label(base, f));
+                                if base.test_command_digest != f.test_command_digest {
+                                    ui.label(crate::i18n::text("repo-core-1374"));
+                                }
+                            } else {
+                                ui.label(crate::i18n::text("repo-core-1375"));
                             }
-                        } else { ui.label("Reference copy unavailable; content comparison unknown."); }
-                        ui.label(format!("{} · HEAD {} · stored default test: {}", f.machine, f.head, f.stored_test.as_deref().unwrap_or("untested")));
-                        ui.label("Stored notes can be stale or externally written; inspection does not run tests or certify their command provenance.");
-                        ui.collapsing("Allowlisted facts and differences", |ui| {
-                            ui.label(format!("{} tracked paths · tree {}", f.files.len(), f.tree));
-                            for (key, value) in &f.settings { ui.monospace(format!("{key}: {value}")); }
-                            for (key, value) in &f.versions { ui.monospace(format!("{key}: {value}")); }
-                            ui.label("Potential case collisions (Unicode lowercase comparison):");
-                            for paths in &f.case_collisions { ui.monospace(paths.join(" / ")); }
-                            ui.label("Working-tree mode changes:"); ui.monospace(&f.mode_changes);
-                            for file in &f.files {
-                                let differs = reference_files.get(file.path.as_str()).is_none_or(|b| b.mode != file.mode || b.endings != file.endings);
-                                if differs { ui.monospace(format!("{} · mode {} · {}", file.path, file.mode, file.endings)); }
-                            }
-                        });
+                            ui.label(crate::i18n::message(
+                                "repo-core-1376",
+                                &[
+                                    ("machine", format!("{}", f.machine).into()),
+                                    ("head", format!("{}", f.head).into()),
+                                    (
+                                        "untested",
+                                        format!(
+                                            "{}",
+                                            f.stored_test
+                                                .as_deref()
+                                                .unwrap_or(crate::i18n::text("repo-core-1377"))
+                                        )
+                                        .into(),
+                                    ),
+                                ],
+                            ));
+                            ui.label(crate::i18n::text("repo-core-1378"));
+                            ui.collapsing(crate::i18n::text("repo-core-1379"), |ui| {
+                                ui.label(crate::i18n::message(
+                                    "repo-core-1380",
+                                    &[
+                                        ("count", (f.files.len()).into()),
+                                        ("tree", format!("{}", f.tree).into()),
+                                    ],
+                                ));
+                                for (key, value) in &f.settings {
+                                    ui.monospace(format!("{key}: {value}"));
+                                }
+                                for (key, value) in &f.versions {
+                                    ui.monospace(format!("{key}: {value}"));
+                                }
+                                ui.label(crate::i18n::text("repo-core-1382"));
+                                for paths in &f.case_collisions {
+                                    ui.monospace(paths.join(" / "));
+                                }
+                                ui.label(crate::i18n::text("repo-core-1383"));
+                                ui.monospace(&f.mode_changes);
+                                for file in &f.files {
+                                    let differs =
+                                        reference_files.get(file.path.as_str()).is_none_or(|b| {
+                                            b.mode != file.mode || b.endings != file.endings
+                                        });
+                                    if differs {
+                                        ui.monospace(crate::i18n::message(
+                                            "repo-core-1384",
+                                            &[
+                                                ("path", format!("{}", file.path).into()),
+                                                ("mode", format!("{}", file.mode).into()),
+                                                ("endings", format!("{}", file.endings).into()),
+                                            ],
+                                        ));
+                                    }
+                                }
+                            });
+                        }
                     }
                 }
-            }
-        });
-        ui.label("Matches compare clean tracked Git blob identities. Untracked files are excluded. Symlink targets, submodule worktrees and byte-for-byte checkout equivalence are not certified. Limits: 20,000 paths, 4 MiB per facts response, 120 seconds per facts command.");
+            });
+        ui.label(crate::i18n::text("repo-core-1385"));
         if let Some(path) = open {
             Outcome::Done(Box::new(crate::repo::Action::OpenTab(path)))
-        } else if ui.button("Close").clicked() {
+        } else if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
             Outcome::Cancel
         } else {
             Outcome::Open
@@ -221,16 +275,10 @@ impl Form {
 }
 fn comparison_label(a: &git::MachineFacts, b: &git::MachineFacts) -> &'static str {
     match git::compare_machine_content(a, b) {
-        git::ContentComparison::Match => {
-            "Tracked Git content matches the first copy (modes and checkout line endings may differ)."
-        }
-        git::ContentComparison::Different => "Tracked Git content differs from the first copy.",
-        git::ContentComparison::Changed => {
-            "Tracked changes, skipped index paths or a concurrent change: matching content is unconfirmed."
-        }
-        git::ContentComparison::Incompatible => {
-            "Object formats differ: matching content is unconfirmed."
-        }
+        git::ContentComparison::Match => crate::i18n::text("repo-core-1386"),
+        git::ContentComparison::Different => crate::i18n::text("repo-core-1387"),
+        git::ContentComparison::Changed => crate::i18n::text("repo-core-1388"),
+        git::ContentComparison::Incompatible => crate::i18n::text("repo-core-1389"),
     }
 }
 

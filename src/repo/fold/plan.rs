@@ -33,32 +33,35 @@ pub(crate) fn blocked(
     in_progress: Option<InProgress>,
 ) -> Option<String> {
     if let Some(state) = in_progress {
-        return Some(format!(
-            "A {} is in progress: finish or abort it first",
-            state.label().to_lowercase()
+        return Some(crate::i18n::message(
+            "repo-core-2520",
+            &[(
+                "to-lowercase",
+                format!("{}", state.label().to_lowercase()).into(),
+            )],
         ));
     }
     if branch.is_none() {
-        return Some("HEAD is detached: check out a branch first".to_owned());
+        return Some(crate::i18n::text("repo-core-0842").to_owned());
     }
-    (staged == 0).then(|| "Nothing is staged: stage the changes to fold in first".to_owned())
+    (staged == 0).then(|| crate::i18n::text("repo-core-2521").to_owned())
 }
 
 /// Why the staged changes can't go into `hash`. `line`: the checked-out branch from HEAD down
 /// its first parents.
 pub(crate) fn refusal(line: &[&Commit], hash: &str) -> Option<&'static str> {
     let Some(pos) = line.iter().position(|c| c.hash == hash) else {
-        return Some(OFF_BRANCH);
+        return Some(crate::i18n::text(OFF_BRANCH));
     };
     if line[..pos].iter().any(|c| c.parents.len() > 1) {
-        return Some(MERGES_AFTER);
+        return Some(crate::i18n::text(MERGES_AFTER));
     }
-    (line[pos].parents.len() > 1).then_some(MERGE_TARGET)
+    (line[pos].parents.len() > 1).then_some(crate::i18n::text(MERGE_TARGET))
 }
 
-const MERGES_AFTER: &str = "Merges came after this commit: rewriting it would flatten them";
-const MERGE_TARGET: &str = "A merge commit can't take the staged changes";
-const OFF_BRANCH: &str = "Only commits of the checked-out branch can take the staged changes";
+const MERGES_AFTER: &str = "repo-core-2522";
+const MERGE_TARGET: &str = "repo-core-2523";
+const OFF_BRANCH: &str = "repo-core-2524";
 
 impl Plan {
     /// The fold `read` describes, unless something there stands in its way.
@@ -67,37 +70,37 @@ impl Plan {
             return Err(why);
         }
         if read.root && read.shallow {
-            return Err(format!(
-                "This clone is shallow: the commits before {} aren't here to rebase onto",
-                short(&read.target)
+            return Err(crate::i18n::message(
+                "repo-core-2525",
+                &[("target", format!("{}", short(&read.target)).into())],
             ));
         }
         if let Some(file) = &read.ignored_in_way {
-            return Err(format!(
-                "The ignored {file} is where a commit to rewrite has a file: the rebase would \
-                 write over it. Move it away first"
+            return Err(crate::i18n::message(
+                "repo-core-2526",
+                &[("file", format!("{}", file).into())],
             ));
         }
         if !read.ancestor {
-            return Err(format!(
-                "{} is not on the checked-out branch",
-                short(&read.target)
+            return Err(crate::i18n::message(
+                "repo-core-2527",
+                &[("target", format!("{}", short(&read.target)).into())],
             ));
         }
         // Merges first: they bring in commits of other branches, listed before the target.
         let mut commits = read.commits;
         if commits.iter().any(|c| c.merge && c.hash == read.target) {
-            return Err(MERGE_TARGET.to_owned());
+            return Err(crate::i18n::text(MERGE_TARGET).to_owned());
         }
         if commits.iter().any(|c| c.merge) {
-            return Err(MERGES_AFTER.to_owned());
+            return Err(crate::i18n::text(MERGES_AFTER).to_owned());
         }
         if commits.first().is_none_or(|c| c.hash != read.target) {
-            return Err(OFF_BRANCH.to_owned());
+            return Err(crate::i18n::text(OFF_BRANCH).to_owned());
         }
         let after = commits.split_off(1);
         let Some(target) = commits.pop() else {
-            return Err("the commit could not be read".to_owned());
+            return Err(crate::i18n::text("repo-core-2528").to_owned());
         };
         let pushed = std::iter::once(&target)
             .chain(&after)
@@ -228,7 +231,10 @@ const VERIFY: [&str; 6] = [
 
 /// Whether `error` is the check of [`VERIFY`] failing: the trees differ.
 pub(crate) fn lost_in_rebase(error: &str) -> bool {
-    error.starts_with(&format!("git {} failed", VERIFY.join(" ")))
+    error.starts_with(&crate::i18n::message(
+        "repo-core-2534",
+        &[("VERIFY", format!("{}", VERIFY.join(" ")).into())],
+    ))
 }
 
 /// A fold whose rebase stopped (on a conflict): aborting it goes back to before the fold,
@@ -395,8 +401,8 @@ mod tests {
             .filter_map(|h| at(h))
             .collect();
         assert_eq!(refusal(&line, "e"), None);
-        assert_eq!(refusal(&line, "d"), Some(MERGE_TARGET));
-        assert_eq!(refusal(&line, "c"), Some(MERGES_AFTER));
+        assert_eq!(refusal(&line, "d"), Some(crate::i18n::text(MERGE_TARGET)));
+        assert_eq!(refusal(&line, "c"), Some(crate::i18n::text(MERGES_AFTER)));
         assert!(
             refusal(&line, "x").is_some(),
             "not on the first-parent line"
@@ -450,10 +456,10 @@ mod tests {
         assert!(refused(rebasing).contains("in progress"));
         let mut merged = read("b", &["b", "c", "d"]);
         merged.commits[1].merge = true;
-        assert_eq!(refused(merged), MERGES_AFTER);
+        assert_eq!(refused(merged), crate::i18n::text(MERGES_AFTER));
         let mut merge = read("b", &["b", "c"]);
         merge.commits[0].merge = true;
-        assert_eq!(refused(merge), MERGE_TARGET);
+        assert_eq!(refused(merge), crate::i18n::text(MERGE_TARGET));
         // The commits read don't start at the target.
         assert!(!refused(read("b", &["a", "b"])).is_empty());
     }

@@ -32,15 +32,15 @@ impl Unfinished {
     /// What to call it next to the worktree's name, if anything is going on.
     pub fn label(self) -> Option<&'static str> {
         if self.operation {
-            Some("running")
+            Some(crate::i18n::text("repo-core-0291"))
         } else if self.terminal {
             Some("terminal")
         } else if self.commit_message {
-            Some("commit message")
+            Some(crate::i18n::text("repo-core-4241"))
         } else if self.editor {
-            Some("editor")
+            Some(crate::i18n::text("repo-core-4242"))
         } else if self.review {
-            Some("review draft")
+            Some(crate::i18n::text("repo-core-4243"))
         } else {
             None
         }

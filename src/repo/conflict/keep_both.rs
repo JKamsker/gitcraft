@@ -110,9 +110,12 @@ pub(super) fn free_name(
         }
         passed.push(name);
     }
-    Err(format!(
-        "no free name found for {path}: {} and 99 more are taken",
-        tagged(path, tag)
+    Err(crate::i18n::message(
+        "repo-core-0569",
+        &[
+            ("path", format!("{}", path).into()),
+            ("tag", format!("{}", tagged(path, tag)).into()),
+        ],
     ))
 }
 
@@ -135,7 +138,13 @@ fn exists(file: &Path) -> Result<bool, String> {
         return match std::fs::symlink_metadata(file) {
             Ok(_) => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(format!("could not check {}: {e}", file.display())),
+            Err(e) => Err(crate::i18n::message(
+                "repo-core-0571",
+                &[
+                    ("file", format!("{}", file.display()).into()),
+                    ("e", format!("{}", e).into()),
+                ],
+            )),
         };
     };
     let f = crate::remote::sh_path(&target.path);
@@ -157,14 +166,29 @@ fn exists(file: &Path) -> Result<bool, String> {
 /// submodule, or a side that deleted the file.
 fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a Stage, String> {
     let stage = stage.ok_or_else(|| {
-        format!(
-            "{who} deleted {path}, so there is only one version to keep. To keep it, use \
-             Mark resolved; to drop it, delete the file, then Mark resolved"
+        crate::i18n::message(
+            "repo-core-0573",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
         )
     })?;
     match stage.mode.as_str() {
-        "120000" => Err(format!("{who}'s {path} is a symbolic link, not a file")),
-        "160000" => Err(format!("{who}'s {path} is a submodule, not a file")),
+        "120000" => Err(crate::i18n::message(
+            "repo-core-0574",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
+        )),
+        "160000" => Err(crate::i18n::message(
+            "repo-core-0575",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
+        )),
         _ => Ok(stage),
     }
 }
@@ -174,13 +198,22 @@ fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a S
 pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, String> {
     let stages = git::conflict_stages(repo, path)?;
     if stages.ours.is_none() && stages.theirs.is_none() {
-        return Err(format!("{path} is no longer in conflict"));
+        return Err(crate::i18n::message(
+            "repo-core-0576",
+            &[("path", format!("{}", path).into())],
+        ));
     }
     let rebase = state == Some(InProgress::Rebase);
     let (ours_who, theirs_who) = if rebase {
-        ("Upstream", "Your commit")
+        (
+            crate::i18n::text("repo-core-0577"),
+            crate::i18n::text("repo-core-0578"),
+        )
     } else {
-        ("Ours", "Theirs")
+        (
+            crate::i18n::text("repo-core-0579"),
+            crate::i18n::text("repo-core-0580"),
+        )
     };
     let ours = writable(stages.ours.as_ref(), path, ours_who)?;
     let theirs = writable(stages.theirs.as_ref(), path, theirs_who)?;
@@ -198,8 +231,15 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
                 },
                 oid: stage.oid.clone(),
                 executable: stage.mode == "100755",
-                size: git::checked_out_size(repo, &stage.oid)
-                    .map_err(|e| format!("Could not read the version of {who}: {e}"))?,
+                size: git::checked_out_size(repo, &stage.oid).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-0582",
+                        &[
+                            ("who", format!("{}", who).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })?,
                 ignored: git::is_ignored(repo, &target)?,
                 target,
                 taken,
@@ -225,14 +265,30 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
     let mut written: Option<&str> = None;
     for version in [&plan.ours, &plan.theirs] {
         let done = git::checked_out_blob(repo, &version.oid, &plan.path)
-            .map_err(|e| format!("Could not read the version of {}: {e}", version.origin))
+            .map_err(|e| {
+                crate::i18n::message(
+                    "repo-core-0583",
+                    &[
+                        ("origin", format!("{}", version.origin).into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                )
+            })
             .and_then(|bytes| {
                 create_new(
                     &crate::remote::join(repo, &version.target),
                     &bytes,
                     version.executable,
                 )
-                .map_err(|e| format!("Could not write {}: {e}", version.target))
+                .map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-0584",
+                        &[
+                            ("target", format!("{}", version.target).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })
             });
         if let Err(e) = done {
             if let Some(first) = written {
@@ -246,8 +302,7 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 /// Why a version was not written when something appeared at its name since the preview.
-const APPEARED: &str = "a file appeared there after the preview, so nothing was overwritten \
-                        and nothing is left written. Try again to pick free names";
+const APPEARED: &str = "repo-core-0585";
 
 /// What the create script ends with when something is at the path already.
 const EXISTS: i32 = 17;
@@ -278,7 +333,7 @@ fn create_new(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String>
     )?;
     match out.code {
         0 => Ok(()),
-        EXISTS => Err(APPEARED.to_owned()),
+        EXISTS => Err(crate::i18n::text(APPEARED).to_owned()),
         _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
     }
 }
@@ -289,7 +344,7 @@ fn create_new_here(file: &Path, bytes: &[u8], executable: bool) -> Result<(), St
         .create_new(true)
         .open(file)
         .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AlreadyExists => APPEARED.to_owned(),
+            std::io::ErrorKind::AlreadyExists => crate::i18n::text(APPEARED).to_owned(),
             _ => e.to_string(),
         })?;
     let filled = fill(&mut opened, bytes, executable);
@@ -350,10 +405,13 @@ pub fn still_in_conflict(repo: &Path, plan: &Plan) -> Result<(), String> {
     if same(stages.ours.as_ref(), &plan.ours) && same(stages.theirs.as_ref(), &plan.theirs) {
         Ok(())
     } else {
-        Err(format!(
-            "{} is no longer in the conflict Keep both was opened for, so nothing was staged or \
-             removed. {} and {} are still there to check.",
-            plan.path, plan.ours.target, plan.theirs.target
+        Err(crate::i18n::message(
+            "repo-core-0589",
+            &[
+                ("path", format!("{}", plan.path).into()),
+                ("target", format!("{}", plan.ours.target).into()),
+                ("target2", format!("{}", plan.theirs.target).into()),
+            ],
         ))
     }
 }

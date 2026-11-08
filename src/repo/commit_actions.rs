@@ -46,31 +46,29 @@ pub(crate) struct ResetMode {
 pub(crate) const RESET_MODES: [ResetMode; 4] = [
     ResetMode {
         label: "Soft",
-        short: "Keeps every change, staged",
-        explain: "Keeps every change, staged.",
+        short: "repo-core-0374",
+        explain: "repo-core-0375",
         mode: "--soft",
         undo_mode: "--soft",
     },
     ResetMode {
         label: "Mixed",
-        short: "Keeps every change, unstaged",
-        explain: "Keeps every change, unstaged.",
+        short: "repo-core-0377",
+        explain: "repo-core-0378",
         mode: "--mixed",
         undo_mode: "--mixed",
     },
     ResetMode {
         label: "Keep",
-        short: "Keeps local changes; stops if changed files would be touched",
-        explain: "Moves the branch while preserving uncommitted changes. Stops without moving \
-                  the branch if a file changed locally must also change for this reset.",
+        short: "repo-core-0381",
+        explain: "repo-core-0382",
         mode: "--keep",
         undo_mode: "--keep",
     },
     ResetMode {
         label: "Hard",
-        short: "Throws away uncommitted changes and the commits after this one",
-        explain: "Throws away uncommitted changes and the commits after this one. Uncommitted \
-                  work can't be recovered.",
+        short: "repo-core-0384",
+        explain: "repo-core-0385",
         mode: "--hard",
         undo_mode: "--keep",
     },
@@ -88,8 +86,29 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
     Action::Dialog(
         Dialog::confirm(
             &format!("{} reset", mode.label),
-            format!("Move {target} to {short} ({summary})? {}", mode.explain),
-            &format!("Reset {}", mode.label.to_lowercase()),
+            crate::i18n::message(
+                "repo-core-0388",
+                &[
+                    ("target", format!("{}", target).into()),
+                    ("short", format!("{}", short).into()),
+                    ("summary", format!("{}", summary).into()),
+                    (
+                        "explain",
+                        format!("{}", crate::i18n::text(mode.explain)).into(),
+                    ),
+                ],
+            ),
+            &crate::i18n::message(
+                "repo-core-0389",
+                &[(
+                    "to-lowercase",
+                    format!(
+                        "{}",
+                        super::messages::display_operation(mode.label).to_lowercase()
+                    )
+                    .into(),
+                )],
+            ),
             reset_steps(mode.mode, hash, target, head),
             None,
         )
@@ -136,5 +155,51 @@ mod tests {
         assert_eq!(plan[1], expect_ref_at("HEAD", "expected"));
         assert_eq!(plan[2], vec!["reset", "--keep", "target"]);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fluent_action_tests {
+    use super::*;
+
+    #[test]
+    fn reset_presentation_keeps_raw_title_guards_argv_and_undo_in_both_languages() {
+        let r = Rewrite {
+            hash: "target-hash",
+            short: "target",
+            summary: "Commit provider subject",
+            target: "Commit/日本語",
+            head: "expected-head",
+        };
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let Action::Dialog(Dialog::Confirm {
+                title,
+                body,
+                ops,
+                undo,
+                ..
+            }) = reset_action(&r, &RESET_MODES[2])
+            else {
+                panic!("reset must ask first")
+            };
+            assert_eq!(title, "Keep reset");
+            assert!(body.contains(r.target));
+            assert!(body.contains(r.summary));
+            assert_eq!(ops, reset_steps("--keep", r.hash, r.target, r.head));
+            assert_eq!(ops[0], expect_symref("HEAD", "refs/heads/Commit/日本語"));
+            assert_eq!(ops[1], expect_ref_at("HEAD", "expected-head"));
+            assert_eq!(ops[2], ["reset", "--keep", "target-hash"]);
+            assert_eq!(undo, Undo::HeadMove { mode: "--keep" });
+            assert_eq!(
+                crate::repo::messages::display_operation(&title),
+                if language == "de" {
+                    "Keep-Reset"
+                } else {
+                    "Keep reset"
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

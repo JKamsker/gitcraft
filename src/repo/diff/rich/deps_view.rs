@@ -28,23 +28,26 @@ pub(super) fn show(
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    RichText::new(format!("Dependencies · {}", diff.file))
-                        .font(theme::medium(12.5))
-                        .color(t.text),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-2139",
+                        &[("file", format!("{}", diff.file).into())],
+                    ))
+                    .font(theme::medium(12.5))
+                    .color(t.text),
                 );
                 let parts: Vec<String> = [
-                    (count(Change::Upgraded), "upgraded"),
-                    (count(Change::Downgraded), "downgraded"),
-                    (count(Change::Added), "added"),
-                    (count(Change::Removed), "removed"),
-                    (licences, "with a new licence"),
+                    (count(Change::Upgraded), "repo-core-count-upgraded"),
+                    (count(Change::Downgraded), "repo-core-count-downgraded"),
+                    (count(Change::Added), "repo-core-count-added"),
+                    (count(Change::Removed), "repo-core-count-removed"),
+                    (licences, "repo-core-count-licenses"),
                 ]
                 .iter()
                 .filter(|(n, _)| *n > 0)
-                .map(|(n, what)| format!("{n} {what}"))
+                .map(|(n, what)| crate::i18n::message(what, &[("count", (*n).into())]))
                 .collect();
                 let summary = if parts.is_empty() {
-                    "the same packages and versions".to_owned()
+                    crate::i18n::text("repo-core-2143").to_owned()
                 } else {
                     parts.join(" · ")
                 };
@@ -109,9 +112,14 @@ fn row(
     );
     if let Some((old, new)) = &d.license {
         let text = match (old, new) {
-            (Some(o), Some(n)) => format!("licence {o} → {n}"),
-            (None, Some(n)) => format!("licence {n}"),
-            (Some(o), None) => format!("licence {o} → none given"),
+            (Some(o), Some(n)) => crate::i18n::message(
+                "repo-core-2145",
+                &[("o", format!("{}", o).into()), ("n", (n).into())],
+            ),
+            (None, Some(n)) => crate::i18n::message("repo-core-2146", &[("n", (n).into())]),
+            (Some(o), None) => {
+                crate::i18n::message("repo-core-2147", &[("o", format!("{}", o).into())])
+            }
             _ => String::new(),
         };
         let c = if old.is_some() {
@@ -123,13 +131,19 @@ fn row(
     }
     let tip = match (d.change, d.old_line, d.new_line) {
         (Change::Removed, Some(o), _) => {
-            format!("Go to line {o} of the lockfile before the change")
+            crate::i18n::message("repo-core-2148", &[("o", format!("{}", o).into())])
         }
-        (_, _, Some(n)) => format!("Go to line {n} of the lockfile"),
+        (_, _, Some(n)) => crate::i18n::message("repo-core-2149", &[("n", (n).into())]),
         _ => String::new(),
     };
     crate::a11y::a11y(&name, egui::WidgetType::Button, || {
-        format!("Package {}. {tip}", d.name)
+        crate::i18n::message(
+            "repo-core-2150",
+            &[
+                ("name", format!("{}", d.name).into()),
+                ("tip", format!("{}", tip).into()),
+            ],
+        )
     });
     if name.on_hover_text(tip).clicked() {
         let (old, new) = match d.change {
@@ -153,7 +167,7 @@ fn row(
     {
         let (url, site) = diff.ecosystem.changes(nn, o, n);
         if ui
-            .link("what changed")
+            .link(crate::i18n::text("repo-core-2151"))
             .on_hover_text(format!("{site}: {url}"))
             .clicked()
         {
@@ -164,7 +178,7 @@ fn row(
         diff.ecosystem,
         super::deps::Ecosystem::Cargo | super::deps::Ecosystem::Npm
     ) && (d.registry.0.is_some() || d.registry.1.is_some())
-        && ui.link("Changelog & licences").clicked()
+        && ui.link(crate::i18n::text("repo-core-2153")).clicked()
     {
         metadata.select(diff.ecosystem, d, ui.ctx());
     }

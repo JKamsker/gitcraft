@@ -189,13 +189,13 @@ fn lines_menu(
         .style(crate::theme::menu_style)
         .show(|ui| {
             let selected_text = selected_text();
-            if crate::menu_item::MenuItem::new("Copy")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1133"))
                 .icon("copy")
                 .keys(crate::keymap::Command::SelectionCopy)
                 .refused(
                     selected_text
                         .is_none()
-                        .then_some("Select text to copy first"),
+                        .then_some(crate::i18n::text("repo-core-2324")),
                 )
                 .show(ui)
                 .clicked()
@@ -212,7 +212,7 @@ fn lines_menu(
                         range,
                     } = &action
                         && crate::git::investigations::oid(commit)
-                        && ui.button("Explain history").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2325")).clicked()
                     {
                         acts.push(crate::repo::Action::OpenLineDossier(Some(
                             crate::git::investigations::dossier::Seed {
@@ -228,7 +228,7 @@ fn lines_menu(
                         range,
                     } = &action
                         && crate::git::investigations::oid(commit)
-                        && ui.button("Symbol biography").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2326")).clicked()
                     {
                         acts.push(crate::repo::Action::OpenSymbolBiography(Some(
                             crate::git::investigations::dossier::Seed {
@@ -239,20 +239,17 @@ fn lines_menu(
                         )));
                     }
 
-                    let b = crate::menu_item::MenuItem::new("History of these lines")
+                    let b = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .show(ui)
-                        .on_hover_text(
-                            "Every commit up to this version that changed the selected lines, \
-                         followed back through earlier edits and renames",
-                        );
+                        .on_hover_text(crate::i18n::text("repo-core-2328"));
                     if b.clicked() {
                         acts.push(action);
                     }
                 }
                 Err(why) => {
-                    crate::menu_item::MenuItem::new("History of these lines")
+                    crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .refused(Some(why))

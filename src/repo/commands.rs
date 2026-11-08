@@ -125,10 +125,13 @@ impl RepoTab {
             if let super::Dialog::GerritReview { head, .. } = &mut dialog {
                 *head = b.target.clone();
             }
-            return Some(("Gerrit review".to_owned(), Action::Dialog(dialog)));
+            return Some((
+                crate::i18n::text("repo-core-0345").to_owned(),
+                Action::Dialog(dialog),
+            ));
         }
         Some((
-            "its configured push route".into(),
+            crate::i18n::text("repo-core-0346").into(),
             Action::RepositoryTools(super::repository_tools::Act::PushBranch(
                 b.name.clone(),
                 b.target.clone(),
@@ -191,7 +194,7 @@ impl RepoTab {
 
     pub(super) fn commit(&mut self, ctx: &egui::Context) {
         if !self.work.conflicted.is_empty() {
-            self.status = Some(("Resolve the conflicted files first".to_owned(), true));
+            self.status = Some((crate::i18n::text("repo-core-0351").to_owned(), true));
             return;
         }
         // A restack's rebase goes on as the restack: the layers after it too.
@@ -223,7 +226,7 @@ impl RepoTab {
         }
         let summary = self.commit_summary.trim();
         if summary.is_empty() {
-            self.status = Some(("Write a commit summary first".to_owned(), true));
+            self.status = Some((crate::i18n::text("repo-core-0355").to_owned(), true));
             return;
         }
         let mut commit = vec!["commit".to_owned()];
@@ -407,7 +410,7 @@ pub(super) fn refuse_option_like(name: &str, status: &mut Option<(String, bool)>
     let bad = name.is_empty() || name.starts_with('-');
     if bad {
         *status = Some((
-            format!("Can't check out \"{name}\": not a usable name"),
+            crate::i18n::message("repo-core-0369", &[("name", format!("{}", name).into())]),
             true,
         ));
     }

@@ -79,25 +79,124 @@ impl RepoTab {
         if self.work.staged.is_empty() {
             return;
         }
-        egui::CollapsingHeader::new("What usually comes with this?").id_salt("cochange-hints").default_open(true).show(ui,|ui|{
-        if self.cochanges.reader.busy(){ui.horizontal(|ui|{ui.add(crate::spinner::Spinner::new());ui.label("Reading local change coupling…");});}
-        if let Some(error)=&self.cochanges.error{ui.label(format!("History hints unavailable: {error}"));}
-        if let Some(history)=&self.cochanges.history {for note in &history.notes{ui.small(note);}ui.small(format!("{} qualifying commits; {} bulk/generated/unsupported commits excluded{}",history.records.len(),history.skipped,if history.limited{"; sample is incomplete"}else{""}));}
-        let mut dismissed=None;
-        let mut shown=0;
-        for hint in &self.cochanges.hints{
-            if self.cochanges.dismissed.contains(&(hint.source.clone(),hint.companion.clone())){continue;}
-            shown+=1;
-            ui.group(|ui|{
-                ui.horizontal_wrapped(|ui|{ui.label(format!("{} usually changes with {} ({}/{} source changes, {}%) — it has no working or staged change",hint.companion,hint.source,hint.evidence.len(),hint.source_changes,hint.evidence.len()*100/hint.source_changes));if ui.small_button("Dismiss").clicked(){dismissed=Some((hint.source.clone(),hint.companion.clone()));}});
-                egui::CollapsingHeader::new(format!("Evidence: {} shared commits",hint.evidence.len())).id_salt((&hint.source,&hint.companion)).show(ui,|ui|{for (hash,subject) in &hint.evidence {if ui.button(format!("{} · {}",super::short(hash),subject)).on_hover_text("Open this actual past commit to inspect both file changes").clicked(){acts.push(Action::SelectHash(hash.clone()));}}});
+        egui::CollapsingHeader::new(crate::i18n::text("repo-core-0325"))
+            .id_salt("cochange-hints")
+            .default_open(true)
+            .show(ui, |ui| {
+                if self.cochanges.reader.busy() {
+                    ui.horizontal(|ui| {
+                        ui.add(crate::spinner::Spinner::new());
+                        ui.label(crate::i18n::text("repo-core-0327"));
+                    });
+                }
+                if let Some(error) = &self.cochanges.error {
+                    ui.label(crate::i18n::message(
+                        "repo-core-0328",
+                        &[("error", format!("{}", error).into())],
+                    ));
+                }
+                if let Some(history) = &self.cochanges.history {
+                    for note in &history.notes {
+                        ui.small(note);
+                    }
+                    ui.small(crate::i18n::message(
+                        "repo-core-0329",
+                        &[
+                            ("count", (history.records.len()).into()),
+                            ("skipped", format!("{}", history.skipped).into()),
+                            (
+                                "else",
+                                format!(
+                                    "{}",
+                                    if history.limited {
+                                        crate::i18n::text("repo-core-0330")
+                                    } else {
+                                        ""
+                                    }
+                                )
+                                .into(),
+                            ),
+                        ],
+                    ));
+                }
+                let mut dismissed = None;
+                let mut shown = 0;
+                for hint in &self.cochanges.hints {
+                    if self
+                        .cochanges
+                        .dismissed
+                        .contains(&(hint.source.clone(), hint.companion.clone()))
+                    {
+                        continue;
+                    }
+                    shown += 1;
+                    ui.group(|ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(crate::i18n::message(
+                                "repo-core-0331",
+                                &[
+                                    ("companion", format!("{}", hint.companion).into()),
+                                    ("source", format!("{}", hint.source).into()),
+                                    ("count", (hint.evidence.len()).into()),
+                                    ("source-changes", format!("{}", hint.source_changes).into()),
+                                    (
+                                        "source-changes2",
+                                        format!(
+                                            "{}",
+                                            hint.evidence.len() * 100 / hint.source_changes
+                                        )
+                                        .into(),
+                                    ),
+                                ],
+                            ));
+                            if ui
+                                .small_button(crate::i18n::text("repo-core-0332"))
+                                .clicked()
+                            {
+                                dismissed = Some((hint.source.clone(), hint.companion.clone()));
+                            }
+                        });
+                        egui::CollapsingHeader::new(crate::i18n::message(
+                            "repo-core-0333",
+                            &[("count", (hint.evidence.len()).into())],
+                        ))
+                        .id_salt((&hint.source, &hint.companion))
+                        .show(ui, |ui| {
+                            for (hash, subject) in &hint.evidence {
+                                if ui
+                                    .button(format!("{} · {}", super::short(hash), subject))
+                                    .on_hover_text(crate::i18n::text("repo-core-0334"))
+                                    .clicked()
+                                {
+                                    acts.push(Action::SelectHash(hash.clone()));
+                                }
+                            }
+                        });
+                    });
+                }
+                if let Some(key) = dismissed {
+                    self.cochanges.dismissed.insert(key);
+                }
+                if shown == 0 && !self.cochanges.reader.busy() {
+                    ui.small(crate::i18n::text("repo-core-0335"));
+                }
+                ui.horizontal(|ui| {
+                    if !self.cochanges.dismissed.is_empty()
+                        && ui
+                            .small_button(crate::i18n::text("repo-core-0336"))
+                            .clicked()
+                    {
+                        self.cochanges.dismissed.clear();
+                    }
+                    if ui
+                        .small_button(crate::i18n::text("repo-core-0337"))
+                        .clicked()
+                    {
+                        self.cochanges.head.clear();
+                        self.cochanges.reader.cancel();
+                    }
+                });
             });
-        }
-        if let Some(key)=dismissed{self.cochanges.dismissed.insert(key);}
-        if shown==0&&!self.cochanges.reader.busy(){ui.small("No qualifying undismissed companion-file hints for the staged paths.");}
-        ui.horizontal(|ui|{if !self.cochanges.dismissed.is_empty()&&ui.small_button("Restore dismissed hints").clicked(){self.cochanges.dismissed.clear();}
-if ui.small_button("Refresh history hints").clicked(){self.cochanges.head.clear();self.cochanges.reader.cancel();}});
-    });
     }
 }
 

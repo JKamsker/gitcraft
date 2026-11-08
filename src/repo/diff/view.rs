@@ -30,6 +30,20 @@ use crate::theme::{self, Tokens};
 
 impl RepoTab {
     pub(in crate::repo) fn diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let locale_changed = self.diff.as_mut().is_some_and(|view| {
+            let generation = crate::i18n::generation();
+            if view.presentation_generation == generation {
+                return false;
+            }
+            view.presentation_generation = generation;
+            view.rich = None;
+            view.rich_state = Default::default();
+            true
+        });
+        if locale_changed {
+            self.refresh_diff(ui.ctx());
+            self.load_diff_rich(ui.ctx());
+        }
         let t = Tokens::get(ui.ctx());
         let settings = Settings::get(ui.ctx());
         if let Some(view) = &mut self.diff {
@@ -92,19 +106,40 @@ impl RepoTab {
 
         if matches!(&view.data, Some(Ok(data)) if data.sops) {
             ui.horizontal_wrapped(|ui| {
-                ui.label("SOPS encrypted file");
+                ui.label(crate::i18n::text("repo-core-2344"));
                 if view.lines.is_some() {
-                    ui.label("Decryption compares the complete file versions, not selected history lines.");
+                    ui.label(crate::i18n::text("repo-core-2345"));
                 }
                 let mut encoding = view.encrypted.json_encoding;
-                egui::ComboBox::from_id_salt("sops_json_encoding").selected_text(encoding.label()).show_ui(ui, |ui| {
-                    use super::encrypted::JsonEncoding;
-                    for choice in [JsonEncoding::Ask,JsonEncoding::Document,JsonEncoding::Binary] { ui.selectable_value(&mut encoding,choice,choice.label()); }
-                });
-                if encoding != view.encrypted.json_encoding { acts.push(Action::DiffDecryptedEncoding(encoding)); }
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use super::encrypted::JsonEncoding;
+                        for choice in [
+                            JsonEncoding::Ask,
+                            JsonEncoding::Document,
+                            JsonEncoding::Binary,
+                        ] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    });
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
                 if view.encrypted.enabled {
-                    if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
-                } else if ui.add_enabled(idle && !self.loading && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use local SOPS and keys. SSH/WSL supply only ciphertext. Plaintext is discarded when leaving this view.").clicked() { acts.push(Action::DiffDecrypted(true)); }
+                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
+                        acts.push(Action::DiffDecrypted(false));
+                    }
+                } else if ui
+                    .add_enabled(
+                        idle && !self.loading && view.request == view.data_request,
+                        egui::Button::new(crate::i18n::text("repo-core-2348")),
+                    )
+                    .on_hover_text(crate::i18n::text("repo-core-2349"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffDecrypted(true));
+                }
             });
         }
         if view.encrypted.enabled {
@@ -126,7 +161,10 @@ impl RepoTab {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, e);
+                        ui.colored_label(
+                            t.danger,
+                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                        );
                     });
                 }
                 Some(Ok(md)) => {
@@ -186,7 +224,7 @@ impl RepoTab {
             let pick = |range| picked_in_file(&view.key, old_path.as_deref(), before, range);
             let history = pick((1, 1))
                 .map(|_| ())
-                .ok_or("Untracked and conflicted files have no line history");
+                .ok_or(crate::i18n::text("repo-core-1856"));
             // Lines picked in one version aren't those of another one of the same file.
             let id = ("diff_file", &path, format!("{:?}", view.key));
             if let Some(p) = file_text::show(
@@ -220,7 +258,10 @@ impl RepoTab {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, e);
+                        ui.colored_label(
+                            t.danger,
+                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                        );
                     });
                     return;
                 }
@@ -279,7 +320,7 @@ impl RepoTab {
                 }
                 Some(Err(reason)) => {
                     ui.colored_label(t.warning, reason);
-                    ui.label("Showing the patch. Turn off Syntax to stage changes.");
+                    ui.label(crate::i18n::text("repo-core-2354"));
                     ui.separator();
                 }
             }
@@ -417,15 +458,18 @@ impl RepoTab {
         match key {
             DiffKey::Commit { hash, path } => (
                 path.clone(),
-                format!("Commit {}", hash.get(..8).unwrap_or(hash)),
+                crate::i18n::message(
+                    "repo-core-2355",
+                    &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+                ),
             ),
             DiffKey::Work(file) => (
                 file.path.clone(),
                 match file.area {
-                    Area::Staged => "Staged changes".to_owned(),
-                    Area::Unstaged => "Unstaged changes".to_owned(),
-                    Area::Untracked => "New file".to_owned(),
-                    Area::Conflicted => "Conflicted".to_owned(),
+                    Area::Staged => crate::i18n::text("repo-core-2356").to_owned(),
+                    Area::Unstaged => crate::i18n::text("repo-core-2357").to_owned(),
+                    Area::Untracked => crate::i18n::text("repo-core-2358").to_owned(),
+                    Area::Conflicted => crate::i18n::text("repo-core-2359").to_owned(),
                 },
             ),
             DiffKey::Range { from, to, path } => (path.clone(), self.range_label(from, to)),
@@ -514,10 +558,12 @@ impl RepoTab {
                         matches!(&view.file, Some(Ok(f)) if f.before)
                     };
                     if as_file && before {
-                        widgets::chip(ui, "before the change", t.warning);
+                        widgets::chip(ui, crate::i18n::text("repo-core-2360"), t.warning);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
@@ -540,14 +586,14 @@ impl RepoTab {
                         ui.add_space(8.0);
                         if !as_file && !rendered && !folded && !rich_ready && view.lines.is_none() {
                             if matches!(view.key, DiffKey::Work(_))
-                                && ui.button("Three-state").clicked()
+                                && ui.button(crate::i18n::text("repo-core-2361")).clicked()
                             {
                                 acts.push(Action::OpenFileComparison(
                                     crate::repo::file_comparison::Page::Lens,
                                 ));
                             }
                             if !matches!(view.key, DiffKey::Remerge { .. })
-                                && ui.button("Moves across files").clicked()
+                                && ui.button(crate::i18n::text("repo-core-2362")).clicked()
                             {
                                 acts.push(Action::OpenFileComparison(
                                     crate::repo::file_comparison::Page::CodeMoves,
@@ -590,9 +636,9 @@ impl RepoTab {
                         }
                         if markdown.is_some() {
                             let tip = match (markdown == Some(true), as_file) {
-                                (true, _) => "Show the Markdown as text",
-                                (false, false) => "Show the changes rendered",
-                                (false, true) => "Show the file rendered",
+                                (true, _) => crate::i18n::text("repo-core-2363"),
+                                (false, false) => crate::i18n::text("repo-core-2364"),
+                                (false, true) => crate::i18n::text("repo-core-2365"),
                             };
                             let r = icons::small_button(ui, "eye", tip);
                             if markdown == Some(true) {
@@ -604,7 +650,14 @@ impl RepoTab {
                             ui.add_space(4.0);
                         }
                         let on = usize::from(as_file);
-                        if let Some(i) = widgets::switch(ui, &["Diff", "File"], on) {
+                        if let Some(i) = widgets::switch(
+                            ui,
+                            &[
+                                crate::i18n::text("repo-core-2367"),
+                                crate::i18n::text("repo-core-2368"),
+                            ],
+                            on,
+                        ) {
                             acts.push(Action::DiffAsFile(i == 1));
                         }
                     });
@@ -627,11 +680,11 @@ impl RepoTab {
         let add = || ops(&[&["--literal-pathspecs", "add", "--", &file.path]]);
         let (label, steps) = match file.area {
             Area::Staged => (
-                "Unstage file",
+                crate::i18n::text("repo-core-2369"),
                 vec![unstage_args(&self.refs.head, &file.path)],
             ),
-            Area::Conflicted => ("Mark resolved", add()),
-            _ => ("Stage file", add()),
+            Area::Conflicted => (crate::i18n::text("repo-core-0179"), add()),
+            _ => (crate::i18n::text("repo-core-2370"), add()),
         };
         if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
             acts.push(Action::Ops {
@@ -644,14 +697,10 @@ impl RepoTab {
             && ui
                 .add_enabled(
                     idle && self.keep_both.is_none(),
-                    egui::Button::new("Keep both…"),
+                    egui::Button::new(crate::i18n::text("repo-core-2371")),
                 )
-                .on_hover_text(
-                    "For a file both sides changed that can't be merged (an image, an \
-                     archive…): write each side's version as a file of its own, named after its \
-                     branch. Shows what it would write first.",
-                )
-                .on_disabled_hover_text("Keep both is already open for a file")
+                .on_hover_text(crate::i18n::text("repo-core-2372"))
+                .on_disabled_hover_text(crate::i18n::text("repo-core-2373"))
                 .clicked()
         {
             acts.push(Action::KeepBoth(file.path.clone()));
@@ -662,14 +711,20 @@ impl RepoTab {
             return false;
         }
         ui.add_space(8.0);
-        let lines = if chosen == 1 { "line" } else { "lines" };
+
         let picks: &[Pick] = if file.area == Area::Staged {
             &[Pick::Unstage]
         } else {
             &[Pick::Stage, Pick::Discard]
         };
         for &pick in picks {
-            let b = egui::Button::new(format!("{} {chosen} {lines}", pick.verb()));
+            let b = egui::Button::new(crate::i18n::message(
+                "repo-core-2376",
+                &[
+                    ("verb", format!("{}", pick.verb()).into()),
+                    ("chosen", (chosen).into()),
+                ],
+            ));
             if ui.add(b).clicked() {
                 acts.push(Action::PickLines {
                     pick,
@@ -677,8 +732,8 @@ impl RepoTab {
                 });
             }
         }
-        ui.button("Clear")
-            .on_hover_text("Unselect the lines")
+        ui.button(crate::i18n::text("repo-core-1149"))
+            .on_hover_text(crate::i18n::text("repo-core-2377"))
             .clicked()
     }
 
@@ -698,13 +753,15 @@ impl RepoTab {
         // Laid out right to left. The lines' buttons take the place of the file's, which stays
         // in the file's menu, so the header keeps room for the rest.
         if lines && revertable && chosen > 0 {
-            let noun = if chosen == 1 { "line" } else { "lines" };
             let b = ui
-                .add_enabled(idle, egui::Button::new(format!("Revert {chosen} {noun}")))
-                .on_hover_text(
-                    "Undo only the lines clicked in the working tree, to look over before \
-                     committing. Revert changes to this file is in the file name's menu.",
-                );
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::message(
+                        "repo-core-2378",
+                        &[("chosen", (chosen).into())],
+                    )),
+                )
+                .on_hover_text(crate::i18n::text("repo-core-2379"));
             if b.clicked() {
                 acts.push(Action::PickLines {
                     pick: Pick::Revert,
@@ -712,16 +769,13 @@ impl RepoTab {
                 });
             }
             return ui
-                .button("Clear")
-                .on_hover_text("Unselect the lines")
+                .button(crate::i18n::text("repo-core-1149"))
+                .on_hover_text(crate::i18n::text("repo-core-2377"))
                 .clicked();
         }
         let b = ui
-            .add_enabled(idle, egui::Button::new("Revert file"))
-            .on_hover_text(
-                "Undo this commit's changes to the file in the working tree, to look over \
-                 before committing",
-            );
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-2380")))
+            .on_hover_text(crate::i18n::text("repo-core-2381"));
         if b.clicked() {
             acts.push(Action::RevertFile {
                 hash: hash.to_owned(),
@@ -742,7 +796,10 @@ impl RepoTab {
         };
         match to {
             Some(to) => format!("{} → {}", name(from), name(to)),
-            None => format!("{} → working tree", name(from)),
+            None => crate::i18n::message(
+                "repo-core-2382",
+                &[("from", format!("{}", name(from)).into())],
+            ),
         }
     }
 }
@@ -793,19 +850,21 @@ fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
             }
         })
         .collect();
-    let noun = if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
-        "Line"
-    } else {
-        "Lines"
-    };
-    format!("{noun} {}", parts.join(", "))
+    crate::i18n::message(
+        if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
+            "repo-core-line-range-one"
+        } else {
+            "repo-core-line-range-many"
+        },
+        &[("range", parts.join(", ").into())],
+    )
 }
 
 fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {
     let wrap = crate::settings::Settings::get(ui.ctx()).diff_wrap;
     if ui
-        .selectable_label(wrap, "Wrap")
-        .on_hover_text("Wrap long patch lines in any text file")
+        .selectable_label(wrap, crate::i18n::text("repo-core-1785"))
+        .on_hover_text(crate::i18n::text("repo-core-2387"))
         .clicked()
     {
         acts.push(Action::DiffWrap(!wrap));
@@ -823,9 +882,9 @@ fn view_options(
         ui,
         "pilcrow",
         if ignore_ws {
-            "Show whitespace changes"
+            crate::i18n::text("repo-core-2389")
         } else {
-            "Ignore whitespace changes"
+            crate::i18n::text("repo-core-2390")
         },
     );
     if ignore_ws {
@@ -842,9 +901,9 @@ fn view_options(
         ui,
         "unfold-vertical",
         if whole_file {
-            "Show only the changes"
+            crate::i18n::text("repo-core-2392")
         } else {
-            "Show the whole file"
+            crate::i18n::text("repo-core-2393")
         },
     );
     if whole_file {
@@ -857,7 +916,7 @@ fn view_options(
             whole_file: !whole_file,
         });
     }
-    let s = icons::small_button(ui, "columns-2", "Side by side");
+    let s = icons::small_button(ui, "columns-2", crate::i18n::text("repo-core-2395"));
     if split {
         widgets::active_underline(ui, s.rect, t.accent);
     }
@@ -868,7 +927,7 @@ fn view_options(
             whole_file,
         });
     }
-    let u = icons::small_button(ui, "rows-2", "Unified");
+    let u = icons::small_button(ui, "rows-2", crate::i18n::text("repo-core-2397"));
     if !split {
         widgets::active_underline(ui, u.rect, t.accent);
     }
@@ -886,10 +945,26 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     if icons::small_button(
         ui,
         "arrow-down",
-        &format!(
-            "Next change ({} / {})",
-            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange),
-            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+        &crate::i18n::message(
+            "repo-core-2399",
+            &[
+                (
+                    "NextChange",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)
+                    )
+                    .into(),
+                ),
+                (
+                    "NextChangeAlt",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+                    )
+                    .into(),
+                ),
+            ],
         ),
     )
     .clicked()
@@ -899,10 +974,26 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     if icons::small_button(
         ui,
         "arrow-up",
-        &format!(
-            "Previous change ({} / {})",
-            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange),
-            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+        &crate::i18n::message(
+            "repo-core-2401",
+            &[
+                (
+                    "PreviousChange",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)
+                    )
+                    .into(),
+                ),
+                (
+                    "PreviousChangeAlt",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+                    )
+                    .into(),
+                ),
+            ],
         ),
     )
     .clicked()
@@ -930,7 +1021,10 @@ fn ready_data<'a>(
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             });
             return None;
         }
@@ -951,7 +1045,10 @@ fn ready_data<'a>(
         if let Some(lfs) = &data.lfs {
             find.rendered(ui, identity, |t| {
                 let mut doc = find::rendered::Document::default();
-                for (side, pointer) in [("Before", &lfs.old), ("After", &lfs.new)] {
+                for (side, pointer) in [
+                    (crate::i18n::text("repo-core-1564"), &lfs.old),
+                    (crate::i18n::text("repo-core-1565"), &lfs.new),
+                ] {
                     if let Some(pointer) = pointer {
                         doc.text(
                             &format!(
@@ -968,9 +1065,7 @@ fn ready_data<'a>(
             return None;
         }
         if data.compare.is_some() || data.image.is_some() {
-            ui.label(
-                "Image pixels have no searchable text. Close Find to continue image comparison.",
-            );
+            ui.label(crate::i18n::text("repo-core-2404"));
         }
     }
     if let Some(lfs) = &data.lfs {
@@ -985,12 +1080,15 @@ fn ready_data<'a>(
         if images.svg {
             ui.horizontal(|ui| {
                 if ui
-                    .selectable_label(!view.svg_source, "Rendered SVG")
+                    .selectable_label(!view.svg_source, crate::i18n::text("repo-core-2405"))
                     .clicked()
                 {
                     acts.push(Action::DiffSvgSource(false));
                 }
-                if ui.selectable_label(view.svg_source, "SVG source").clicked() {
+                if ui
+                    .selectable_label(view.svg_source, crate::i18n::text("repo-core-2406"))
+                    .clicked()
+                {
                     acts.push(Action::DiffSvgSource(true));
                 }
             });
@@ -1013,9 +1111,9 @@ fn ready_data<'a>(
     if data.lines.is_empty() {
         ui.centered_and_justified(|ui| {
             let msg = if ignore_ws {
-                "No changes besides whitespace"
+                crate::i18n::text("repo-core-2407")
             } else {
-                "No textual changes"
+                crate::i18n::text("repo-core-2408")
             };
             ui.label(egui::RichText::new(msg).color(t.text_dim));
         });

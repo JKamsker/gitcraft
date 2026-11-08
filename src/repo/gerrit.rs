@@ -56,7 +56,7 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         if let (Some(server), Some(id)) = (&self.gerrit, &commit.change_id)
-            && crate::menu_item::MenuItem::new("Open Gerrit change")
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2582"))
                 .icon("eye")
                 .show(ui)
                 .on_hover_text(id)

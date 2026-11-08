@@ -26,8 +26,11 @@ pub(super) fn set_upstream(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Set upstream",
-        &format!("The upstream {branch} pulls from. Its push route is configured separately."),
+        crate::i18n::text("repo-core-1522"),
+        &crate::i18n::message(
+            "repo-core-1523",
+            &[("branch", format!("{}", branch).into())],
+        ),
         &t,
     );
     if remote_names.len() > 1 {
@@ -49,13 +52,13 @@ pub(super) fn set_upstream(
         .flat_map(|(_, list)| list)
         .filter_map(|b| remote_short(&b.name, remote))
         .collect();
-    field(ui, name, "Branch on the remote", focus);
+    field(ui, name, crate::i18n::text("repo-core-1525"), focus);
     dash_spaces(name);
     if !existing.is_empty() {
         ui.add_space(4.0);
         egui::ComboBox::from_id_salt("upstream-existing")
             .width(ui.available_width())
-            .selected_text("Pick an existing branch")
+            .selected_text(crate::i18n::text("repo-core-1527"))
             .show_ui(ui, |ui| {
                 for b in &existing {
                     if ui.selectable_label(name.trim() == *b, *b).clicked() {
@@ -70,14 +73,31 @@ pub(super) fn set_upstream(
     ui.add_space(6.0);
     if valid {
         let note = if exists {
-            format!("Tracks the existing {remote}/{target}.")
+            crate::i18n::message(
+                "repo-core-1528",
+                &[
+                    ("remote", format!("{}", remote).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            )
         } else {
-            format!("{remote}/{target} doesn't exist yet: pushes {branch} there to create it.")
+            crate::i18n::message(
+                "repo-core-1529",
+                &[
+                    ("remote", format!("{}", remote).into()),
+                    ("target", format!("{}", target).into()),
+                    ("branch", format!("{}", branch).into()),
+                ],
+            )
         };
         ui.label(RichText::new(note).color(t.text_dim));
     }
     ui.add_space(10.0);
-    let button = if exists { "Set upstream" } else { "Push" };
+    let button = if exists {
+        crate::i18n::text("repo-core-1522")
+    } else {
+        crate::i18n::text("repo-core-0032")
+    };
     buttons(ui, button, valid, enter, || {
         let upstream = format!("{remote}/{target}");
         if exists {

@@ -87,12 +87,10 @@ pub(super) fn push_menu(push: &Response, acts: &mut Vec<Action>) {
     crate::menu_item::context(push)
         .style(crate::theme::menu_style)
         .show(|ui: &mut Ui| {
-            if crate::menu_item::MenuItem::new("Push, skipping hooks")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0036"))
                 .icon("arrow-up-from-line")
                 .show(ui)
-                .on_hover_text(
-                    "Pushes once without running the pre-push hook (git push --no-verify)",
-                )
+                .on_hover_text(crate::i18n::text("repo-core-2801"))
                 .clicked()
             {
                 acts.push(Action::PushSkippingHooks);

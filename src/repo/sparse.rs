@@ -52,39 +52,65 @@ impl RepoTab {
         let mut apply = false;
         let mut fetch = false;
         let idle = self.busy_op.is_none() && !state.writing && !state.reader.busy();
-        egui::Window::new("Sparse checkout and downloads").id(egui::Id::new(("sparse", &self.path))).open(&mut open).show(ctx, |ui| {
-            ui.label("Sparse patterns are limited to a regular UTF-8 file of 1 MiB. Remote metadata reads require python3 with nonblocking/no-follow support.");
-            ui.label("Cone mode keeps root files and the selected folders. Back up ignored files first; changes are refused while the worktree is dirty.");
-            ui.label("History reads never download missing objects automatically. A missing-object error means you need to consent here and retry the file/diff. Passive reads require Git with --no-lazy-fetch support (older Git fails closed).");
-            ui.add_enabled_ui(idle, |ui| {
-                ui.checkbox(&mut state.consent, "Allow downloads for this operation (may transfer a large history)");
-                if let Some(before) = &state.before {
-                    if before.enabled && !before.cone { ui.label("Current checkout uses non-cone patterns. Applying will replace them with cone mode."); }
-                    ui.checkbox(&mut state.all, "Check out all folders");
-                    egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
-                        ui.add_enabled_ui(!state.all, |ui| {
-                            for folder in &before.folders {
-                                let mut picked = state.selected.contains(folder);
-                                let depth = folder.bytes().filter(|b| *b == b'/').count();
-                                ui.horizontal(|ui| { ui.add_space((depth as f32 * 12.0).min(120.0));
-                                    if ui.checkbox(&mut picked, folder).changed() {
-                                        if picked { state.selected.insert(folder.clone()); } else { state.selected.remove(folder); }
+        egui::Window::new(crate::i18n::text("repo-core-3603"))
+            .id(egui::Id::new(("sparse", &self.path)))
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.label(crate::i18n::text("repo-core-3605"));
+                ui.label(crate::i18n::text("repo-core-3606"));
+                ui.label(crate::i18n::text("repo-core-3607"));
+                ui.add_enabled_ui(idle, |ui| {
+                    ui.checkbox(&mut state.consent, crate::i18n::text("repo-core-3608"));
+                    if let Some(before) = &state.before {
+                        if before.enabled && !before.cone {
+                            ui.label(crate::i18n::text("repo-core-3609"));
+                        }
+                        ui.checkbox(&mut state.all, crate::i18n::text("repo-core-3610"));
+                        egui::ScrollArea::vertical()
+                            .max_height(260.0)
+                            .show(ui, |ui| {
+                                ui.add_enabled_ui(!state.all, |ui| {
+                                    for folder in &before.folders {
+                                        let mut picked = state.selected.contains(folder);
+                                        let depth = folder.bytes().filter(|b| *b == b'/').count();
+                                        ui.horizontal(|ui| {
+                                            ui.add_space((depth as f32 * 12.0).min(120.0));
+                                            if ui.checkbox(&mut picked, folder).changed() {
+                                                if picked {
+                                                    state.selected.insert(folder.clone());
+                                                } else {
+                                                    state.selected.remove(folder);
+                                                }
+                                            }
+                                        });
                                     }
                                 });
+                            });
+                        if ui.button(crate::i18n::text("repo-core-3611")).clicked() {
+                            apply = true;
+                        }
+                        if before.partial {
+                            ui.separator();
+                            ui.label(crate::i18n::text("repo-core-3612"));
+                            if ui
+                                .add_enabled(
+                                    state.consent,
+                                    egui::Button::new(crate::i18n::text("repo-core-3613")),
+                                )
+                                .clicked()
+                            {
+                                fetch = true;
                             }
-                        });
-                    });
-                    if ui.button("Apply checkout selection").clicked() { apply = true; }
-                    if before.partial {
-                        ui.separator();
-                        ui.label("Download all reachable history from origin to read old files. This explicit fetch also updates origin's remote-tracking refs; it does not deepen a shallow clone. Other promisor remotes require the terminal.");
-                        if ui.add_enabled(state.consent, egui::Button::new("Download history objects from origin")).clicked() { fetch = true; }
+                        }
                     }
+                });
+                if state.writing || state.reader.busy() {
+                    ui.label(crate::i18n::text("repo-core-3614"));
+                }
+                if let Some(error) = &state.error {
+                    ui.colored_label(crate::theme::Tokens::get(ctx).danger, error);
                 }
             });
-            if state.writing || state.reader.busy() { ui.label("Working…"); }
-            if let Some(error) = &state.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, error); }
-        });
         if fetch {
             state.consent = false;
             acts.push(Action::Ops {
@@ -100,7 +126,7 @@ impl RepoTab {
             let credentials = self.credentials.clone();
             state.writing = true;
             state.error = None;
-            self.busy_op = Some("Change sparse checkout".into());
+            self.busy_op = Some(crate::i18n::text("repo-core-3618").into());
             self.then_or(
                 ctx,
                 true,

@@ -34,7 +34,11 @@ pub(in crate::repo::diff) fn notebook_bar(
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                if let Some(i) = widgets::switch(ui, &["Cells", "JSON"], usize::from(json)) {
+                if let Some(i) = widgets::switch(
+                    ui,
+                    &[crate::i18n::text("repo-core-1900"), "JSON"],
+                    usize::from(json),
+                ) {
                     json = i == 1;
                     ui.data_mut(|d| d.insert_temp(key, json));
                 }
@@ -45,7 +49,7 @@ pub(in crate::repo::diff) fn notebook_bar(
             });
             if nb.compared_stripped {
                 ui.label(
-                    RichText::new("Outputs and execution counts aren't compared: they are stripped when staged.")
+                    RichText::new(crate::i18n::text("repo-core-1902"))
                         .color(t.text_faint)
                         .small(),
                 );
@@ -61,29 +65,27 @@ pub(in crate::repo::diff) fn notebook_bar(
 fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>) {
     if let StripState::Other(name) = strip {
         ui.label(
-            RichText::new(format!(
-                "Outputs stripped when committing (by the {name} filter)"
+            RichText::new(crate::i18n::message(
+                "repo-core-1903",
+                &[("name", format!("{}", name).into())],
             ))
             .color(t.text_dim)
             .small(),
         )
-        .on_hover_text(
-            "Set up outside gitcraft (nbstripout --install, or the repository's .gitattributes).",
-        );
+        .on_hover_text(crate::i18n::text("repo-core-1904"));
         return;
     }
     let mut on = matches!(strip, StripState::Ours(_));
     let tool = match strip {
-        StripState::Ours(c) if c == "nbstripout" => " It runs nbstripout.",
-        StripState::Ours(_) => " It runs Python.",
+        StripState::Ours(c) if c == "nbstripout" => crate::i18n::text("repo-core-1905"),
+        StripState::Ours(_) => crate::i18n::text("repo-core-1906"),
         _ => "",
     };
     let r = ui
-        .checkbox(&mut on, "Strip outputs when committing")
-        .on_hover_text(format!(
-            "For this clone only: what is staged of a notebook has no outputs, execution counts or \
-         widget state (a clean filter, like nbstripout), while the file on disk keeps them. \
-         Notebooks that have outputs show as changed until they are committed once so.{tool}"
+        .checkbox(&mut on, crate::i18n::text("repo-core-1907"))
+        .on_hover_text(crate::i18n::message(
+            "repo-core-1908",
+            &[("tool", format!("{}", tool).into())],
         ));
     if r.changed() {
         acts.push(Action::StripNotebookOutputs(on));
@@ -94,24 +96,29 @@ fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>
 pub(super) fn summary(nb: &NotebookData) -> String {
     let count = |s: Status| nb.diff.cells.iter().filter(|c| c.status == s).count();
     let parts: Vec<String> = [
-        (count(Status::Modified), "changed"),
-        (count(Status::Added), "added"),
-        (count(Status::Removed), "removed"),
+        (
+            count(Status::Modified),
+            ("repo-core-cells-changed", "repo-core-count-changed"),
+        ),
+        (
+            count(Status::Added),
+            ("repo-core-cells-added", "repo-core-count-added"),
+        ),
+        (
+            count(Status::Removed),
+            ("repo-core-cells-removed", "repo-core-count-removed"),
+        ),
     ]
     .into_iter()
     .filter(|(n, _)| *n > 0)
     .enumerate()
-    .map(|(i, (n, what))| {
-        if i == 0 {
-            format!("{n} {} {what}", if n == 1 { "cell" } else { "cells" })
-        } else {
-            format!("{n} {what}")
-        }
+    .map(|(i, (n, (full, short)))| {
+        crate::i18n::message(if i == 0 { full } else { short }, &[("count", n.into())])
     })
     .collect();
     match (parts.is_empty(), nb.diff.metadata.is_some()) {
-        (true, true) => "Only the notebook's metadata changed".to_owned(),
-        (true, false) => "No cell changed".to_owned(),
+        (true, true) => crate::i18n::text("repo-core-1912").to_owned(),
+        (true, false) => crate::i18n::text("repo-core-1913").to_owned(),
         (false, _) => parts.join(", "),
     }
 }
@@ -134,7 +141,7 @@ fn cells(ui: &mut Ui, t: &Tokens, nb: &NotebookData) {
             folded(ui, t, &mut unchanged);
             if let Some(meta) = &nb.diff.metadata {
                 egui::CollapsingHeader::new(
-                    RichText::new("The notebook's metadata changed").color(t.text_dim),
+                    RichText::new(crate::i18n::text("repo-core-1915")).color(t.text_dim),
                 )
                 .id_salt("notebook-metadata")
                 .show(ui, |ui| lines(ui, t, meta));
@@ -150,9 +157,9 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
     let cells = std::mem::take(unchanged);
     let first = cells[0].number;
     let text = if cells.len() == 1 {
-        "1 unchanged cell".to_owned()
+        crate::i18n::text("repo-core-1917").to_owned()
     } else {
-        format!("{} unchanged cells", cells.len())
+        crate::i18n::message("repo-core-1918", &[("count", (cells.len()).into())])
     };
     ui.horizontal(|ui| {
         ui.add_space(10.0);
@@ -162,9 +169,15 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
                 for c in cells {
                     let Some(cell) = c.new.as_ref() else { continue };
                     ui.label(
-                        RichText::new(format!("{} cell {}", cell.kind.label(), c.number))
-                            .color(t.text_dim)
-                            .small(),
+                        RichText::new(crate::i18n::message(
+                            "repo-core-1919",
+                            &[
+                                ("label", format!("{}", cell.kind.display_label()).into()),
+                                ("number", format!("{}", c.number).into()),
+                            ],
+                        ))
+                        .color(t.text_dim)
+                        .small(),
                     );
                     for line in cell.source.lines().take(40) {
                         ui.add(
@@ -184,9 +197,9 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
 
 fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
     let (word, color) = match c.status {
-        Status::Added => ("added", t.success),
-        Status::Removed => ("removed", t.danger),
-        Status::Modified => ("changed", t.warning),
+        Status::Added => (crate::i18n::text("repo-core-1702"), t.success),
+        Status::Removed => (crate::i18n::text("repo-core-1703"), t.danger),
+        Status::Modified => (crate::i18n::text("repo-core-1704"), t.warning),
         Status::Unchanged => ("", t.text_dim),
     };
     let either = c.new.as_ref().or(c.old.as_ref());
@@ -200,11 +213,20 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
             ui.horizontal_wrapped(|ui| {
                 widgets::chip(ui, word, color);
                 if c.moved {
-                    widgets::chip(ui, "moved", t.text_dim);
+                    widgets::chip(ui, crate::i18n::text("repo-core-1920"), t.text_dim);
                 }
-                let kind = either.map_or("cell", |c| c.kind.label());
+                let kind = either.map_or(crate::i18n::text("repo-core-1910"), |c| {
+                    c.kind.display_label()
+                });
                 ui.label(
-                    RichText::new(format!("{kind} cell {}", c.number)).font(theme::medium(12.5)),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1921",
+                        &[
+                            ("kind", format!("{}", kind).into()),
+                            ("number", format!("{}", c.number).into()),
+                        ],
+                    ))
+                    .font(theme::medium(12.5)),
                 );
                 let count = |c: &Option<Cell>| {
                     c.as_ref()
@@ -221,7 +243,7 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
                 }
                 if c.metadata_changed {
                     ui.label(
-                        RichText::new("metadata changed")
+                        RichText::new(crate::i18n::text("repo-core-1924"))
                             .color(t.text_faint)
                             .small(),
                     );
@@ -230,22 +252,33 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
             ui.add_space(4.0);
             lines(ui, t, &c.source);
             if c.metadata_changed {
-                egui::CollapsingHeader::new(RichText::new("Metadata").color(t.text_dim).small())
-                    .id_salt(("cell-metadata", c.number, word))
-                    .show(ui, |ui| {
-                        let (a, b) = (
-                            c.old.as_ref().map_or("", |c| c.metadata.as_str()),
-                            c.new.as_ref().map_or("", |c| c.metadata.as_str()),
-                        );
-                        let (a, b): (Vec<&str>, Vec<&str>) =
-                            (a.lines().collect(), b.lines().collect());
-                        let d: Vec<(Edit, String)> =
-                            crate::repo::diff::line_diff::diff_lines(&a, &b)
-                                .into_iter()
-                                .map(|(e, l)| (e, l.to_owned()))
-                                .collect();
-                        lines(ui, t, &d);
-                    });
+                egui::CollapsingHeader::new(
+                    RichText::new(crate::i18n::text("repo-core-1925"))
+                        .color(t.text_dim)
+                        .small(),
+                )
+                .id_salt((
+                    "cell-metadata",
+                    c.number,
+                    match c.status {
+                        Status::Added => "added",
+                        Status::Removed => "removed",
+                        Status::Modified => "changed",
+                        Status::Unchanged => "",
+                    },
+                ))
+                .show(ui, |ui| {
+                    let (a, b) = (
+                        c.old.as_ref().map_or("", |c| c.metadata.as_str()),
+                        c.new.as_ref().map_or("", |c| c.metadata.as_str()),
+                    );
+                    let (a, b): (Vec<&str>, Vec<&str>) = (a.lines().collect(), b.lines().collect());
+                    let d: Vec<(Edit, String)> = crate::repo::diff::line_diff::diff_lines(&a, &b)
+                        .into_iter()
+                        .map(|(e, l)| (e, l.to_owned()))
+                        .collect();
+                    lines(ui, t, &d);
+                });
             }
             outputs(ui, t, c);
         });
@@ -283,11 +316,11 @@ fn outputs(ui: &mut Ui, t: &Tokens, c: &CellChange) {
     let n = c.number;
     if !c.outputs_changed || old.is_empty() || new.is_empty() {
         let (shown, title) = if new.is_empty() {
-            (old, "Outputs (removed)")
+            (old, crate::i18n::text("repo-core-1927"))
         } else if old.is_empty() && c.old.is_some() {
-            (new, "Outputs (added)")
+            (new, crate::i18n::text("repo-core-1928"))
         } else {
-            (new, "Outputs")
+            (new, crate::i18n::text("repo-core-1929"))
         };
         ui.label(RichText::new(title).color(t.text_dim).small());
         for (k, o) in shown.iter().enumerate() {
@@ -295,7 +328,10 @@ fn outputs(ui: &mut Ui, t: &Tokens, c: &CellChange) {
         }
         return;
     }
-    let sides = [("Outputs before", old, 0), ("Outputs after", new, 1)];
+    let sides = [
+        (crate::i18n::text("repo-core-1931"), old, 0),
+        (crate::i18n::text("repo-core-1932"), new, 1),
+    ];
     if ui.available_width() < SIDE_BY_SIDE {
         for (title, list, side) in sides {
             ui.label(RichText::new(title).color(t.text_dim).small());
@@ -332,11 +368,13 @@ fn output(ui: &mut Ui, t: &Tokens, id: (&str, usize, usize), o: &Output) {
         } => {
             ui.add(egui::Label::new(mono(&format!("{name}: {value}")).color(t.danger)).wrap());
             if !traceback.is_empty() {
-                egui::CollapsingHeader::new(RichText::new("Traceback").small())
-                    .id_salt(id)
-                    .show(ui, |ui| {
-                        ui.add(egui::Label::new(mono(traceback)).wrap());
-                    });
+                egui::CollapsingHeader::new(
+                    RichText::new(crate::i18n::text("repo-core-1935")).small(),
+                )
+                .id_salt(id)
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(mono(traceback)).wrap());
+                });
             }
         }
         Output::Image { bytes, uri, .. } => {
@@ -350,9 +388,12 @@ fn output(ui: &mut Ui, t: &Tokens, id: (&str, usize, usize), o: &Output) {
         }
         Output::Other(kinds, _) => {
             let text = if kinds.is_empty() {
-                "(an output gitcraft can't show)".to_owned()
+                crate::i18n::text("repo-core-1936").to_owned()
             } else {
-                format!("({} output)", kinds.join(", "))
+                crate::i18n::message(
+                    "repo-core-1937",
+                    &[("kinds", format!("{}", kinds.join(", ")).into())],
+                )
             };
             ui.label(RichText::new(text).color(t.text_faint).small());
         }

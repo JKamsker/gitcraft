@@ -32,8 +32,11 @@ fn store(ctx: &egui::Context, repo: &Path, order: LogOrder) {
 /// The header's label of the graph column: `GRAPH`, and how it is read when not by default.
 pub(super) fn header_label(order: LogOrder) -> String {
     match order.summary() {
-        Some(summary) => format!("GRAPH · {}", summary.to_uppercase()),
-        None => "GRAPH".to_owned(),
+        Some(summary) => crate::i18n::message(
+            "repo-core-2585",
+            &[("to-uppercase", format!("{}", summary.to_uppercase()).into())],
+        ),
+        None => crate::i18n::text("repo-core-2586").to_owned(),
     }
 }
 
@@ -42,7 +45,11 @@ pub(super) fn header_label(order: LogOrder) -> String {
 pub(super) fn menu_items(ui: &mut Ui, current: LogOrder, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let mut next = current;
-    ui.label(RichText::new("Order").color(t.text_faint).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-2587"))
+            .color(t.text_faint)
+            .small(),
+    );
     for order in Order::ALL {
         if ui
             .radio(next.order == order, order.label())
@@ -53,11 +60,8 @@ pub(super) fn menu_items(ui: &mut Ui, current: LogOrder, acts: &mut Vec<Action>)
         }
     }
     ui.separator();
-    ui.checkbox(&mut next.first_parent, "First parent only")
-        .on_hover_text(
-            "Each merge shows as one commit, without the commits it brought in; search \
-             finds only what is shown (git log --first-parent)",
-        );
+    ui.checkbox(&mut next.first_parent, crate::i18n::text("repo-core-2588"))
+        .on_hover_text(crate::i18n::text("repo-core-2589"));
     if next != current {
         acts.push(Action::GraphOrder(next));
     }

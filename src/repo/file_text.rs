@@ -170,15 +170,21 @@ pub(crate) fn show(
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             });
             return None;
         }
         Some(Ok(data)) => data,
     };
     let note = match data.binary {
-        Some(size) => Some(format!("Binary file, {size} bytes")),
-        None if data.lines.is_empty() => Some("Empty file".to_owned()),
+        Some(size) => Some(crate::i18n::message(
+            "repo-core-2465",
+            &[("size", (size).into())],
+        )),
+        None if data.lines.is_empty() => Some(crate::i18n::text("repo-core-2466").to_owned()),
         None => None,
     };
     if let Some(note) = note {
@@ -260,7 +266,7 @@ pub(crate) fn show(
                 (line.saturating_sub(1) as f32 * LINE_H - 2.0 * LINE_H).max(0.0),
             );
         } else {
-            ui.weak("Pinned line is outside this file revision");
+            ui.weak(crate::i18n::text("repo-core-2470"));
         }
     }
     let found = &*find;
@@ -272,7 +278,12 @@ pub(crate) fn show(
             let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
             crate::a11y::a11y_selected(
                 &resp,
-                || format!("Line {}: {line}", i + 1),
+                || {
+                    crate::i18n::message(
+                        "repo-core-2471",
+                        &[("i", format!("{}", i + 1).into()), ("line", (line).into())],
+                    )
+                },
                 pick.is_some_and(|p| p.contains(i)),
             );
             if resp.drag_started() {
@@ -364,11 +375,17 @@ fn lines_menu(
         .show(|ui| {
             let (start, end) = picked.numbers();
             let which = if start == end {
-                format!("line {start}")
+                crate::i18n::message("repo-core-2472", &[("start", format!("{}", start).into())])
             } else {
-                format!("lines {start}–{end}")
+                crate::i18n::message(
+                    "repo-core-2473",
+                    &[
+                        ("start", format!("{}", start).into()),
+                        ("end", format!("{}", end).into()),
+                    ],
+                )
             };
-            if crate::menu_item::MenuItem::new("Copy")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1133"))
                 .icon("copy")
                 .keys(crate::keymap::Command::SelectionCopy)
                 .show(ui)
@@ -381,20 +398,20 @@ fn lines_menu(
             }
             match history {
                 Ok(()) => {
-                    let b = crate::menu_item::MenuItem::new("History of these lines")
+                    let b = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .show(ui)
-                        .on_hover_text(format!(
-                            "Every commit up to this version that changed {which}, followed back \
-                         through earlier edits and renames"
+                        .on_hover_text(crate::i18n::message(
+                            "repo-core-2474",
+                            &[("which", format!("{}", which).into())],
                         ));
                     if b.clicked() {
                         *asked = Some((start, end));
                     }
                 }
                 Err(why) => {
-                    crate::menu_item::MenuItem::new("History of these lines")
+                    crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .refused(Some(why))

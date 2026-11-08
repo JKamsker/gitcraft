@@ -65,17 +65,19 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
         Some(InProgress::CherryPick) => ("CHERRY_PICK_HEAD", None, Some("CHERRY_PICK_HEAD^")),
         // Reverting applies the change from the commit to its parent.
         Some(InProgress::Revert) => ("REVERT_HEAD", Some("REVERT_HEAD^"), Some("REVERT_HEAD")),
-        Some(InProgress::Am) | None => return Err(NO_OTHER_SIDE.to_owned()),
+        Some(InProgress::Am) | None => return Err(crate::i18n::text(NO_OTHER_SIDE).to_owned()),
     };
     let rev = |name: &str| {
         git::run(Some(repo), &["rev-parse", "--verify", "-q", name])
             .map(|s| s.trim().to_owned())
-            .map_err(|_| format!("{name} can't be read: is the operation still in progress?"))
+            .map_err(|_| {
+                crate::i18n::message("repo-core-0402", &[("name", format!("{}", name).into())])
+            })
     };
     let shown = rev(head)?;
     let base = match base {
         Some(name) => Some(rev(name).map_err(|_| {
-            format!("{head} has no parent (a first commit): there is no history to look into")
+            crate::i18n::message("repo-core-0403", &[("head", format!("{}", head).into())])
         })?),
         None => None,
     };
@@ -87,7 +89,7 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
 }
 
 /// Said when the conflict comes from no other branch (a stash, a patch).
-pub const NO_OTHER_SIDE: &str = "No other branch to compare with";
+pub const NO_OTHER_SIDE: &str = "repo-core-0404";
 
 const FIELD: char = '\x1f';
 const RECORD: char = '\x1e';
@@ -200,7 +202,9 @@ fn one_commit(repo: &Path, hash: &str) -> Result<Step, String> {
         .into_iter()
         .next()
         .map(|(_, s)| s)
-        .ok_or_else(|| format!("{hash} can't be read"))
+        .ok_or_else(|| {
+            crate::i18n::message("repo-core-0416", &[("hash", format!("{}", hash).into())])
+        })
 }
 
 /// Whether merging commits `a` and `b` (from `base`, or their merge base) conflicts in `path`,
@@ -223,11 +227,9 @@ pub fn merge_conflicts(
     args.extend([a, b]);
     let out = git::run_ok_codes(Some(repo), &args, &[0, 1]).map_err(|e| {
         if e.contains("unknown option") || e.contains("usage: git merge-tree") {
-            "Finding where it started needs a newer git: 2.38 for a merge, 2.40 for a rebase, \
-             cherry-pick or revert (merge-tree --write-tree)"
-                .to_owned()
+            crate::i18n::text("repo-core-0425").to_owned()
         } else {
-            format!("The test merge failed: {e}")
+            crate::i18n::message("repo-core-0426", &[("e", format!("{}", e).into())])
         }
     })?;
     // The tree, then each conflicted file.
@@ -261,9 +263,12 @@ pub fn change(repo: &Path, hash: &str, path: &str) -> Result<String, String> {
         return Ok(out);
     }
     let mut kept = lines[..MAX_PATCH_LINES].join("\n");
-    kept.push_str(&format!(
-        "\n… {} more lines not shown",
-        lines.len() - MAX_PATCH_LINES
+    kept.push_str(&crate::i18n::message(
+        "repo-core-0432",
+        &[(
+            "MAX-PATCH-LINES",
+            format!("{}", lines.len() - MAX_PATCH_LINES).into(),
+        )],
     ));
     Ok(kept)
 }

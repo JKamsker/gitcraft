@@ -266,7 +266,7 @@ fn list(ui: &Ui, field: &Response, s: &Suggestions) -> Option<String> {
                     }
                 }
                 ui.label(
-                    RichText::new("↑ ↓ to choose, Tab to complete, Esc to close")
+                    RichText::new(crate::i18n::text("repo-core-0950"))
                         .color(t.text_faint)
                         .small(),
                 );

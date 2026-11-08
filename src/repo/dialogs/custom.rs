@@ -90,13 +90,17 @@ fn ask(
         ui.add_space(6.0);
     }
     *focus = false;
-    ui.label(RichText::new("Runs").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1287"))
+            .color(t.text_dim)
+            .small(),
+    );
     command_line(ui, "custom-ask", &command.command);
     ui.add_space(12.0);
     // Enter runs it only from an answer typed: a confirmation alone wants a click, so that a
     // stray Enter never runs a command.
     let enter = enter && !command.prompts.is_empty();
-    buttons(ui, "Run", true, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1212"), true, enter, || {
         Action::Custom(CustomAct::Run {
             command: Box::new(command.clone()),
             scope: scope.clone(),
@@ -118,7 +122,7 @@ fn about(scope: &Scope) -> String {
     .filter(|p| !p.is_empty())
     .collect();
     if parts.is_empty() {
-        "Custom command".to_owned()
+        crate::i18n::text("repo-core-1289").to_owned()
     } else {
         parts.join(" · ")
     }
@@ -172,18 +176,23 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     ui.set_width(520.0);
     title(
         ui,
-        "Repository commands",
-        &format!(
-            "These come from {} in {repo}. They run on the repository's machine as you: \
-             trust them only if you trust whoever can change this file.",
-            cc::REPO_FILE
+        crate::i18n::text("repo-core-1292"),
+        &crate::i18n::message(
+            "repo-core-1293",
+            &[
+                ("REPO-FILE", format!("{}", cc::REPO_FILE).into()),
+                ("repo", format!("{}", repo).into()),
+            ],
         ),
         &t,
     );
     let commands = match &file.commands {
         Ok(list) => list,
         Err(e) => {
-            ui.colored_label(t.danger, e);
+            ui.colored_label(
+                t.danger,
+                crate::git::display_error(&crate::forge::inbox::display_error(e)),
+            );
             ui.add_space(12.0);
             return if cancel_button(ui) {
                 Outcome::Cancel
@@ -197,7 +206,7 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         .max_height(360.0)
         .show(ui, |ui| {
             if commands.is_empty() {
-                ui.label(RichText::new("It lists no commands.").color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::text("repo-core-1295")).color(t.text_dim));
             }
             for (i, c) in commands.iter().enumerate() {
                 ui.add(
@@ -205,28 +214,39 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                         .wrap(),
                 );
                 ui.label(
-                    RichText::new(format!(
-                        "{} · output: {}",
-                        c.placement.label(),
-                        c.output.label()
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1296",
+                        &[
+                            ("label", format!("{}", c.placement.label()).into()),
+                            ("label2", format!("{}", c.output.label()).into()),
+                        ],
                     ))
                     .color(t.text_faint)
                     .small(),
                 );
                 if !c.confirm && c.prompts.is_empty() {
                     ui.label(
-                        RichText::new("Runs at once when picked, without asking")
+                        RichText::new(crate::i18n::text("repo-core-1297"))
                             .color(t.danger)
                             .small(),
                     );
                 }
                 for p in &c.prompts {
-                    let mut asks = format!("Asks for ${} ({})", p.variable, p.kind.label());
+                    let mut asks = crate::i18n::message(
+                        "repo-core-1298",
+                        &[
+                            ("variable", format!("{}", p.variable).into()),
+                            ("label", format!("{}", p.kind.label()).into()),
+                        ],
+                    );
                     if !p.label.trim().is_empty() {
                         asks.push_str(&format!(": {}", p.label.trim()));
                     }
                     if !p.default.is_empty() {
-                        asks.push_str(&format!(", “{}” by default", p.default));
+                        asks.push_str(&crate::i18n::message(
+                            "repo-core-1299",
+                            &[("default", format!("{}", p.default).into())],
+                        ));
                     }
                     ui.label(RichText::new(asks).color(t.text_dim).small());
                 }
@@ -236,10 +256,16 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         });
     ui.add_space(8.0);
     let (digest, count) = (file.digest.clone(), commands.len());
-    buttons(ui, "Trust and use", true, false, move || {
-        Action::Custom(CustomAct::Trust {
-            digest,
-            commands: count,
-        })
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1300"),
+        true,
+        false,
+        move || {
+            Action::Custom(CustomAct::Trust {
+                digest,
+                commands: count,
+            })
+        },
+    )
 }

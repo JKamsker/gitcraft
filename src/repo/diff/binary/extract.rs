@@ -26,7 +26,7 @@ fn capped(mut text: String) -> String {
             at -= 1;
         }
         text.truncate(at);
-        text.push_str("\n… (the rest of the text isn't shown)");
+        text.push_str(crate::i18n::text("repo-core-1563"));
     }
     text
 }
@@ -54,7 +54,7 @@ pub fn document_text(path: &str, bytes: &[u8]) -> Option<Text> {
     }
     let members = directory.members;
     if !directory.complete {
-        gaps.push("the archive's directory is damaged, so some parts may be missing".to_owned());
+        gaps.push(crate::i18n::text("repo-core-3808").to_owned());
     }
     let mut reader = Reader::new(bytes);
     let ext = path
@@ -81,9 +81,9 @@ pub fn document_text(path: &str, bytes: &[u8]) -> Option<Text> {
 /// The text capped, a gap said when it was cut.
 fn finish(text: String, mut gaps: Vec<String>) -> Text {
     if text.len() > MAX_TEXT {
-        gaps.push(format!(
-            "only its first {} MB of text is compared",
-            MAX_TEXT / (1024 * 1024)
+        gaps.push(crate::i18n::message(
+            "repo-core-3814",
+            &[("MAX-TEXT", format!("{}", MAX_TEXT / (1024 * 1024)).into())],
         ));
     }
     Text {
@@ -156,11 +156,14 @@ fn slides(members: &[Member], reader: &mut Reader<'_>, gaps: &mut Vec<String>) -
     for (i, m) in order.into_iter().enumerate() {
         let n = i + 1;
         let Some(xml) = m.and_then(|m| reader.read(m)) else {
-            gaps.push(format!("slide {n} couldn't be read"));
+            gaps.push(crate::i18n::message("repo-core-3833", &[("n", (n).into())]));
             continue;
         };
         let text = xml_text(&String::from_utf8_lossy(&xml), &Rules::SLIDE);
-        out.push_str(&format!("— Slide {n} —\n{text}\n"));
+        out.push_str(&crate::i18n::message(
+            "repo-core-3834",
+            &[("n", (n).into()), ("text", format!("{}", text).into())],
+        ));
         if out.len() > MAX_TEXT {
             break;
         }
@@ -237,7 +240,7 @@ fn workbook(members: &[Member], reader: &mut Reader<'_>, gaps: &mut Vec<String>)
         Some(x) => shared_strings(&String::from_utf8_lossy(&x)),
         None => {
             if has_strings {
-                gaps.push("its shared strings couldn't be read".to_owned());
+                gaps.push(crate::i18n::text("repo-core-3847").to_owned());
             }
             Vec::new()
         }
@@ -256,10 +259,13 @@ fn workbook(members: &[Member], reader: &mut Reader<'_>, gaps: &mut Vec<String>)
     let mut out = String::new();
     for (n, m) in sheets {
         let Some(xml) = reader.read(m) else {
-            gaps.push(format!("sheet {n} couldn't be read"));
+            gaps.push(crate::i18n::message("repo-core-3849", &[("n", (n).into())]));
             continue;
         };
-        out.push_str(&format!("— Sheet {n} —\n"));
+        out.push_str(&crate::i18n::message(
+            "repo-core-3850",
+            &[("n", (n).into())],
+        ));
         for (cell, value) in cells(&String::from_utf8_lossy(&xml), &strings) {
             out.push_str(&format!("{cell}: {value}\n"));
             if out.len() > MAX_TEXT {
@@ -480,9 +486,12 @@ fn pdf_text_with_gaps(bytes: &[u8], gaps: &mut Vec<String>) -> Option<String> {
         text.len() < MAX_TEXT
     });
     if exhausted {
-        gaps.push(format!(
-            "streams past its first {} MB inflated weren't read",
-            PDF_BUDGET / (1024 * 1024)
+        gaps.push(crate::i18n::message(
+            "repo-core-3873",
+            &[(
+                "PDF-BUDGET",
+                format!("{}", PDF_BUDGET / (1024 * 1024)).into(),
+            )],
         ));
     }
     let text = text.trim().to_owned();

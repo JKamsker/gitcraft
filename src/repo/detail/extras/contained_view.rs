@@ -17,18 +17,18 @@ pub(super) fn section(
     let t = Tokens::get(ui.ctx());
     let summary = match contained {
         None => Summary::Loading,
-        Some(Err(_)) => Summary::Text("Could not be read".to_owned(), t.danger),
+        Some(Err(_)) => Summary::Text(crate::i18n::text("repo-core-1081").to_owned(), t.danger),
         Some(Ok(c)) => Summary::Text(headline(c), t.text_dim),
     };
     let mut again = false;
     section::section(
         ui,
-        "Contained in",
+        crate::i18n::text("repo-core-1082"),
         summary,
         false,
-        Some(("Read again", &mut again)),
+        Some((crate::i18n::text("repo-core-1083"), &mut again)),
         |ui| match contained {
-            None => section::faint(ui, "Looking for the branches and tags that have it…"),
+            None => section::faint(ui, crate::i18n::text("repo-core-1084")),
             Some(Err(e)) => section::error(ui, e),
             Some(Ok(c)) => body(ui, c),
         },
@@ -41,20 +41,21 @@ pub(super) fn section(
 /// "2 branches · 3 tags · first tag v1.0".
 pub(super) fn headline(c: &Containment) -> String {
     let branches = c.local.total + c.remote.total;
-    let mut parts = vec![count(branches, "branch", "branches")];
-    parts.push(count(c.tags.total, "tag", "tags"));
+    let mut parts = vec![crate::i18n::message(
+        "repo-core-contained-branches",
+        &[("count", branches.into())],
+    )];
+    parts.push(crate::i18n::message(
+        "repo-core-contained-tags",
+        &[("count", c.tags.total.into())],
+    ));
     if let Some(tag) = c.first_tag() {
-        parts.push(format!("first tag {tag}"));
+        parts.push(crate::i18n::message(
+            "repo-core-1087",
+            &[("tag", format!("{}", tag).into())],
+        ));
     }
     parts.join(" · ")
-}
-
-fn count(n: usize, one: &str, many: &str) -> String {
-    match n {
-        0 => format!("no {many}"),
-        1 => format!("1 {one}"),
-        n => format!("{n} {many}"),
-    }
 }
 
 fn body(ui: &mut Ui, c: &Containment) {
@@ -62,24 +63,28 @@ fn body(ui: &mut Ui, c: &Containment) {
     match (&c.describe, c.first_tag()) {
         (Some(describe), Some(tag)) => {
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("First tag with it").color(t.text_faint));
-                widgets::chip(ui, tag, t.success)
-                    .on_hover_text(format!("git describe --contains: {describe}"));
+                ui.label(RichText::new(crate::i18n::text("repo-core-1091")).color(t.text_faint));
+                widgets::chip(ui, tag, t.success).on_hover_text(crate::i18n::message(
+                    "repo-core-1092",
+                    &[("describe", format!("{}", describe).into())],
+                ));
             });
         }
-        _ => section::faint(ui, "No tag contains it yet."),
+        _ => section::faint(ui, crate::i18n::text("repo-core-1093")),
     }
-    names(ui, "Branches", &c.local, t.accent);
-    names(ui, "Remote branches", &c.remote, t.text_dim);
-    names(ui, "Tags", &c.tags, t.text_dim);
+    names(ui, crate::i18n::text("repo-core-1094"), &c.local, t.accent);
+    names(
+        ui,
+        crate::i18n::text("repo-core-1095"),
+        &c.remote,
+        t.text_dim,
+    );
+    names(ui, crate::i18n::text("repo-core-1096"), &c.tags, t.text_dim);
     if c.local.total + c.remote.total == 0 {
         if c.tags.total > 0 {
-            section::faint(ui, "No branch has it, only tags.");
+            section::faint(ui, crate::i18n::text("repo-core-1097"));
         } else {
-            section::faint(
-                ui,
-                "No branch or tag has it. Git may delete it when it cleans up; create a branch to keep it.",
-            );
+            section::faint(ui, crate::i18n::text("repo-core-1098"));
         }
     }
 }
@@ -98,9 +103,12 @@ fn names(ui: &mut Ui, title: &str, list: &RefList, color: egui::Color32) {
         }
         if list.hidden() > 0 {
             ui.label(
-                RichText::new(format!("and {} more", list.hidden()))
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-core-1099",
+                    &[("hidden", format!("{}", list.hidden()).into())],
+                ))
+                .color(t.text_faint)
+                .small(),
             );
         }
     });

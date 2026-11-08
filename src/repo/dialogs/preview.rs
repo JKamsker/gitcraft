@@ -44,7 +44,7 @@ impl WhatItDoes {
         WhatItDoes {
             ask,
             heading,
-            files_heading: "Uncommitted changes lost".to_owned(),
+            files_heading: crate::i18n::text("repo-core-1432").to_owned(),
             state: PreviewState::Unread,
             instead: None,
         }
@@ -119,10 +119,10 @@ impl RepoTab {
         moving: Vec<String>,
     ) -> (PreviewAsk, String) {
         let heading = if self.refs.head.is_empty() {
-            "Its commits".to_owned()
+            crate::i18n::text("repo-core-1433").to_owned()
         } else {
             let head = self.refs.current.as_deref().unwrap_or("HEAD");
-            format!("Commits not on {head}")
+            crate::i18n::message("repo-core-1434", &[("head", format!("{}", head).into())])
         };
         (PreviewAsk::delete(tips, &self.refs.head, moving), heading)
     }
@@ -165,15 +165,18 @@ pub(super) fn show(ui: &mut Ui, preview: &WhatItDoes) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new().size(14.0));
-                ui.label(RichText::new("Reading what this changes…").color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::text("repo-core-1435")).color(t.text_dim));
             });
         }
         PreviewState::Failed(e) => {
             ui.add_space(8.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(format!("Couldn't read what this changes: {e}"))
-                        .color(t.text_dim),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1436",
+                        &[("e", format!("{}", e).into())],
+                    ))
+                    .color(t.text_dim),
                 )
                 .wrap(),
             );
@@ -191,7 +194,13 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
     let heading = &preview.heading;
     if preview.ask.leaving.is_some() && found.leaving_total == 0 {
         // Said, so that an empty list doesn't read as a preview that didn't work.
-        section(ui, &format!("{heading}: none"));
+        section(
+            ui,
+            &crate::i18n::message(
+                "repo-core-1437",
+                &[("heading", format!("{}", heading).into())],
+            ),
+        );
     }
     if found.leaving_total > 0 {
         section(ui, &format!("{heading} ({})", found.leaving_total));
@@ -222,7 +231,11 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
         }
         let more = found.lost_total.saturating_sub(found.lost_files.len());
         if more > 0 {
-            more_row(ui, &format!("and {more} more"), t);
+            more_row(
+                ui,
+                &crate::i18n::message("repo-core-1439", &[("more", format!("{}", more).into())]),
+                t,
+            );
         }
     }
 }
@@ -236,9 +249,12 @@ fn section(ui: &mut Ui, title: &str) {
 /// A commit leaving: its short hash, summary, and _only here_ or _still on x_ on the right.
 fn commit_row(ui: &mut Ui, c: &git::LeavingCommit, t: &Tokens) {
     let (where_, color) = match &c.kept {
-        Kept::OnlyHere => ("only here".to_owned(), t.danger),
-        Kept::On(name) => (format!("still on {name}"), t.text_dim),
-        Kept::Elsewhere => ("still on another branch".to_owned(), t.text_dim),
+        Kept::OnlyHere => (crate::i18n::text("repo-core-1440").to_owned(), t.danger),
+        Kept::On(name) => (
+            crate::i18n::message("repo-core-1441", &[("name", format!("{}", name).into())]),
+            t.text_dim,
+        ),
+        Kept::Elsewhere => (crate::i18n::text("repo-core-1442").to_owned(), t.text_dim),
     };
     ui.horizontal(|ui| {
         ui.label(
@@ -272,21 +288,24 @@ fn more_only_here(found: &Preview) -> usize {
 /// `and 340 more`, with how many of those no other ref has.
 fn more_commits(more: usize, only_here: usize) -> String {
     match only_here {
-        0 => format!("and {more} more"),
-        n if n == more => format!("and {more} more, all only here"),
-        n => format!("and {more} more, {n} of them only here"),
+        0 => crate::i18n::message("repo-core-1439", &[("more", format!("{}", more).into())]),
+        n if n == more => {
+            crate::i18n::message("repo-core-1443", &[("more", format!("{}", more).into())])
+        }
+        n => crate::i18n::message(
+            "repo-core-1444",
+            &[("more", format!("{}", more).into()), ("n", (n).into())],
+        ),
     }
 }
 
 /// The commits counted are those the operation rewrites: for a dropped commit, it and every
 /// one after it, more than the list shows.
 fn pushed_note(upstream: &str, commits: usize) -> String {
-    let which = if commits == 1 {
-        "1 commit this rewrites is".to_owned()
-    } else {
-        format!("{commits} commits this rewrites are")
-    };
-    format!("Already pushed: {which} on {upstream}, so pushing it again will need a force push.")
+    crate::i18n::message(
+        "repo-core-1447",
+        &[("commits", commits.into()), ("upstream", upstream.into())],
+    )
 }
 
 /// The commands, folded: `ops` (the expectation steps, which run no git, left out), or
@@ -309,15 +328,17 @@ pub(super) fn commands(
         return;
     }
     ui.add_space(8.0);
-    egui::CollapsingHeader::new(RichText::new("Git commands").font(theme::medium(12.0)))
-        // Folded again for another kind of dialog.
-        .id_salt(("confirm-commands", title))
-        .default_open(false)
-        .show(ui, |ui| {
-            for line in &lines {
-                ui.add(egui::Label::new(RichText::new(line).font(theme::mono(11.5))).wrap());
-            }
-        });
+    egui::CollapsingHeader::new(
+        RichText::new(crate::i18n::text("repo-core-1448")).font(theme::medium(12.0)),
+    )
+    // Folded again for another kind of dialog.
+    .id_salt(("confirm-commands", title))
+    .default_open(false)
+    .show(ui, |ui| {
+        for line in &lines {
+            ui.add(egui::Label::new(RichText::new(line).font(theme::mono(11.5))).wrap());
+        }
+    });
 }
 
 /// `op` as one would type it: `git` and its arguments, quoted where a shell would need it.
@@ -364,10 +385,14 @@ fn undo_text(undo: &Undo, lost_files: bool) -> Option<String> {
     let key = crate::manual::command();
     match undo {
         Undo::None => None,
-        Undo::HeadMove { .. } if lost_files => Some(format!(
-            "{key}+Z moves the branch back, not the uncommitted changes."
+        Undo::HeadMove { .. } if lost_files => Some(crate::i18n::message(
+            "repo-core-1451",
+            &[("key", format!("{}", key).into())],
         )),
-        Undo::HeadMove { .. } | Undo::Custom { .. } => Some(format!("{key}+Z restores this.")),
+        Undo::HeadMove { .. } | Undo::Custom { .. } => Some(crate::i18n::message(
+            "repo-core-1452",
+            &[("key", format!("{}", key).into())],
+        )),
     }
 }
 
@@ -482,3 +507,27 @@ mod tests {
 #[cfg(test)]
 #[path = "preview_tab_tests.rs"]
 mod tab_tests;
+
+#[cfg(test)]
+mod fluent_notes_tests {
+    use super::*;
+
+    #[test]
+    fn rewrite_note_uses_whole_plural_message_and_opaque_upstream() {
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1),
+            "Already pushed: 1 commit this rewrites is on origin/Commit 日本語, so pushing it again will need a force push."
+        );
+        crate::i18n::set_language("de");
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1),
+            "Ein hiervon umgeschriebener Commit wurde bereits nach origin/Commit 日本語 gepusht; erneutes Pushen erfordert daher einen Force-Push."
+        );
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1234),
+            "1.234 hiervon umgeschriebene Commits wurden bereits nach origin/Commit 日本語 gepusht; erneutes Pushen erfordert daher einen Force-Push."
+        );
+        crate::i18n::set_language("en-US");
+    }
+}

@@ -118,31 +118,30 @@ impl RepoTab {
     /// Why a target takes nothing of `item`, said in the ghost over it.
     fn nothing_here(&self, item: &DragItem) -> String {
         match item {
-            _ if self.refs.current.is_none() => {
-                "HEAD is detached: check out a branch first".to_owned()
-            }
-            DragItem::Commit(c) if c.merge => {
-                "Merge commits can't be cherry-picked here".to_owned()
-            }
-            DragItem::Commit(_) => {
-                "Drop it on the checked-out branch to cherry-pick it, or on a commit of that \
-                 branch to move it"
-                    .to_owned()
-            }
-            DragItem::Branch(_) => {
-                "Only the checked-out branch is merged into or rebased here".to_owned()
-            }
+            _ if self.refs.current.is_none() => crate::i18n::text("repo-core-0842").to_owned(),
+            DragItem::Commit(c) if c.merge => crate::i18n::text("repo-core-4081").to_owned(),
+            DragItem::Commit(_) => crate::i18n::text("repo-core-4082").to_owned(),
+            DragItem::Branch(_) => crate::i18n::text("repo-core-4083").to_owned(),
         }
     }
 
     /// Why nothing can be dropped now, if so.
     pub(in crate::repo) fn drop_blocked(&self) -> Option<String> {
         if let Some(op) = &self.busy_op {
-            return Some(format!("{op} is still running, drop when it's done"));
+            return Some(crate::i18n::message(
+                "repo-core-4084",
+                &[("op", crate::repo::messages::display_operation(&op).into())],
+            ));
         }
-        self.work
-            .in_progress
-            .map(|s| format!("Finish or abort the {} first", s.label().to_lowercase()))
+        self.work.in_progress.map(|s| {
+            crate::i18n::message(
+                "repo-core-4085",
+                &[(
+                    "to-lowercase",
+                    format!("{}", s.label().to_lowercase()).into(),
+                )],
+            )
+        })
     }
 
     /// What dropping `payload` on `target` offers now.
@@ -336,7 +335,13 @@ impl Offer {
                 match from {
                     Rev::Branch { name, remote } => merge_action(branch_ref(name, *remote), into),
                     Rev::Commit { hash } => head_move(
-                        format!("Merge {} into {into}", short(hash)),
+                        crate::i18n::message(
+                            "repo-core-2422",
+                            &[
+                                ("hash", format!("{}", short(hash)).into()),
+                                ("into", format!("{}", into).into()),
+                            ],
+                        ),
                         &["merge", "--no-edit", hash],
                     ),
                 },
@@ -348,7 +353,13 @@ impl Offer {
                         rebase_action(branch_ref(name, *remote), branch)
                     }
                     Rev::Commit { hash } => head_move(
-                        format!("Rebase {branch} onto {}", short(hash)),
+                        crate::i18n::message(
+                            "repo-core-2423",
+                            &[
+                                ("branch", format!("{}", branch).into()),
+                                ("hash", format!("{}", short(hash)).into()),
+                            ],
+                        ),
                         &["rebase", hash],
                     ),
                 },
@@ -375,7 +386,13 @@ impl Offer {
                         fast_forward_action(branch_ref(name, *remote), branch)
                     }
                     Rev::Commit { hash } => head_move(
-                        format!("Fast-forward {branch} to {}", short(hash)),
+                        crate::i18n::message(
+                            "repo-core-2425",
+                            &[
+                                ("branch", format!("{}", branch).into()),
+                                ("label", format!("{}", short(hash)).into()),
+                            ],
+                        ),
                         &["merge", "--ff-only", to_tip],
                     ),
                 },

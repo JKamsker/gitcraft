@@ -53,22 +53,25 @@ struct Change {
     content: String,
 }
 
-const BAD_REPORT: &str =
-    "Difftastic returned an incompatible syntax report. Update difft and try again.";
+const BAD_REPORT: &str = "repo-core-2329";
 
 pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, String> {
-    let report: Report = serde_json::from_slice(json).map_err(|_| BAD_REPORT.to_owned())?;
+    let report: Report =
+        serde_json::from_slice(json).map_err(|_| crate::i18n::text(BAD_REPORT).to_owned())?;
     if report.language == "Text" {
-        return Err("Difftastic doesn't support this file's language.".to_owned());
+        return Err(crate::i18n::text("repo-core-2330").to_owned());
     }
     if report.language.starts_with("Text (") {
-        return Err(format!("Difftastic used a text diff: {}.", report.language));
+        return Err(crate::i18n::message(
+            "repo-core-2332",
+            &[("language", format!("{}", report.language).into())],
+        ));
     }
     if report.language == "Binary" {
-        return Err("Difftastic classified this file as binary.".to_owned());
+        return Err(crate::i18n::text("repo-core-2333").to_owned());
     }
     if report.language.is_empty() || report.language.len() > 100 {
-        return Err(BAD_REPORT.to_owned());
+        return Err(crate::i18n::text(BAD_REPORT).to_owned());
     }
     let (before, after): (Vec<_>, Vec<_>) = (old.split('\n').collect(), new.split('\n').collect());
     let mut rows = Vec::new();
@@ -83,12 +86,12 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
         "changed" if !report.chunks.is_empty() => {
             for (i, chunk) in report.chunks.into_iter().enumerate() {
                 if chunk.is_empty() {
-                    return Err(BAD_REPORT.to_owned());
+                    return Err(crate::i18n::text(BAD_REPORT).to_owned());
                 }
                 let (mut left, mut right) = (BTreeMap::new(), BTreeMap::new());
                 for pair in chunk {
                     if pair.lhs.is_none() && pair.rhs.is_none() {
-                        return Err(BAD_REPORT.to_owned());
+                        return Err(crate::i18n::text(BAD_REPORT).to_owned());
                     }
                     if let Some(side) = pair.lhs {
                         collect(side, &before, &mut left)?;
@@ -108,12 +111,12 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
                     }
                     rows.push(Row::Pair(a, b));
                     if rows.len() > MAX_ROWS {
-                        return Err("This syntax comparison has too many lines to show.".to_owned());
+                        return Err(crate::i18n::text("repo-core-2335").to_owned());
                     }
                 }
             }
         }
-        _ => return Err(BAD_REPORT.to_owned()),
+        _ => return Err(crate::i18n::text(BAD_REPORT).to_owned()),
     }
     let longest = rows
         .iter()
@@ -140,16 +143,18 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
 }
 
 fn collect(side: Side, source: &[&str], lines: &mut BTreeMap<usize, Line>) -> Result<(), String> {
-    let text = source.get(side.line_number).ok_or(BAD_REPORT)?;
+    let text = source
+        .get(side.line_number)
+        .ok_or(crate::i18n::text(BAD_REPORT))?;
     if text.len() > 20_000 {
-        return Err("A line is too long for syntax comparison.".to_owned());
+        return Err(crate::i18n::text("repo-core-2336").to_owned());
     }
     let mut changed = Vec::new();
     for change in side.changes {
         if change.start >= change.end
             || text.get(change.start..change.end) != Some(change.content.as_str())
         {
-            return Err(BAD_REPORT.to_owned());
+            return Err(crate::i18n::text(BAD_REPORT).to_owned());
         }
         changed.push(change.start..change.end);
     }
@@ -176,11 +181,11 @@ fn collect(side: Side, source: &[&str], lines: &mut BTreeMap<usize, Line>) -> Re
 
 fn full_side(rows: &mut Vec<Row>, lines: &[&str], old: bool) -> Result<(), String> {
     if lines.len() > MAX_ROWS {
-        return Err("This syntax comparison has too many lines to show.".to_owned());
+        return Err(crate::i18n::text("repo-core-2335").to_owned());
     }
     for (i, &text) in lines.iter().enumerate() {
         if text.len() > 20_000 {
-            return Err("A line is too long for syntax comparison.".to_owned());
+            return Err(crate::i18n::text("repo-core-2336").to_owned());
         }
         let line = Some(Line {
             number: i + 1,

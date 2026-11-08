@@ -38,15 +38,21 @@ impl RepoTab {
 /// One view's chip: its name (raises its window) and Bring back.
 fn chip(ui: &mut egui::Ui, t: &Tokens, panel: Panel, acts: &mut Vec<Action>) {
     icons::inline(ui, "picture-in-picture-2", 13.0, t.text_faint);
-    let text = format!("{} in its own window", capitalized(panel.noun()));
+    let text = crate::i18n::message(
+        "repo-core-3041",
+        &[("noun", format!("{}", capitalized(panel.noun())).into())],
+    );
     let label = ui
         .add(
             egui::Label::new(RichText::new(text).size(12.0).color(t.text_dim))
                 .sense(Sense::click()),
         )
-        .on_hover_text("Show that window");
+        .on_hover_text(crate::i18n::text("repo-core-3042"));
     crate::a11y::a11y(&label, egui::WidgetType::Button, || {
-        format!("Show the {} window", panel.noun())
+        crate::i18n::message(
+            "repo-core-3043",
+            &[("noun", format!("{}", panel.noun()).into())],
+        )
     });
     if label.clicked() {
         acts.push(Action::Popout(Request::Focus(panel)));

@@ -215,9 +215,12 @@ impl RepoTab {
             icons::inline(ui, "folder-git-2", 40.0, t.text_faint);
             ui.add_space(14.0);
             ui.label(
-                egui::RichText::new(format!("Opening {}", self.name))
-                    .font(crate::theme::semibold(18.0))
-                    .color(t.text),
+                egui::RichText::new(crate::i18n::message(
+                    "repo-core-2878",
+                    &[("name", format!("{}", self.name).into())],
+                ))
+                .font(crate::theme::semibold(18.0))
+                .color(t.text),
             );
             ui.add_space(4.0);
             ui.label(
@@ -229,7 +232,7 @@ impl RepoTab {
             ui.add(crate::spinner::Spinner::new().size(22.0));
             ui.add_space(10.0);
             ui.label(
-                egui::RichText::new("Reading branches and history…")
+                egui::RichText::new(crate::i18n::text("repo-core-2879"))
                     .size(12.5)
                     .color(t.text_dim),
             );
@@ -436,9 +439,9 @@ impl RepoTab {
 /// The footer button folding a side panel down to its strip, or opening it back up.
 fn panel_toggle(ui: &mut Ui, icon: &str, name: &str, open: bool) -> bool {
     let tip = if open {
-        format!("Hide the {name} panel")
+        crate::i18n::message("repo-core-2891", &[("name", format!("{}", name).into())])
     } else {
-        format!("Show the {name} panel")
+        crate::i18n::message("repo-core-2892", &[("name", format!("{}", name).into())])
     };
     icons::tool_button(ui, icon, "", true)
         .named(&tip)

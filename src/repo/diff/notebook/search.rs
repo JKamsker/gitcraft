@@ -9,16 +9,39 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
     let mut doc = Document::default();
     for change in &nb.diff.cells {
         doc.text(
-            &format!("Cell {} · {:?}", change.number, change.status),
+            &crate::i18n::message(
+                "repo-core-1894",
+                &[
+                    ("number", format!("{}", change.number).into()),
+                    ("status", change.status.label().into()),
+                ],
+            ),
             t.accent,
         );
-        for (label, cell) in [("Before", &change.old), ("After", &change.new)] {
+        for (label, cell) in [
+            (crate::i18n::text("repo-core-1564"), &change.old),
+            (crate::i18n::text("repo-core-1565"), &change.new),
+        ] {
             let Some(cell) = cell else { continue };
             doc.text(
-                &format!(
-                    "{label} · {} · execution {:?}",
-                    cell.kind.label(),
-                    cell.execution_count
+                &crate::i18n::message(
+                    "repo-core-1895",
+                    &[
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        ),
+                        ("label2", format!("{}", cell.kind.display_label()).into()),
+                        (
+                            "execution-count",
+                            cell.execution_count
+                                .map(crate::i18n::number)
+                                .unwrap_or_else(|| {
+                                    crate::i18n::text("repo-core-not-executed").to_owned()
+                                })
+                                .into(),
+                        ),
+                    ],
                 ),
                 t.text_dim,
             );
@@ -43,11 +66,17 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                         doc.text(&format!("{name}: {value}\n{traceback}"), t.danger);
                     }
                     Output::Image { mime, .. } => doc.text(
-                        &format!("Image output ({mime}); pixels are not searched"),
+                        &crate::i18n::message(
+                            "repo-core-1897",
+                            &[("mime", format!("{}", mime).into())],
+                        ),
                         t.text_dim,
                     ),
                     Output::Other(kinds, _) => doc.text(
-                        &format!("Unsupported output: {}", kinds.join(", ")),
+                        &crate::i18n::message(
+                            "repo-core-1898",
+                            &[("kinds", format!("{}", kinds.join(", ")).into())],
+                        ),
                         t.warning,
                     ),
                 }

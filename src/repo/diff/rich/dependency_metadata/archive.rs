@@ -18,9 +18,9 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
     flate2::read::GzDecoder::new(bytes)
         .take(MAX_EXPANDED + 1)
         .read_to_end(&mut tar)
-        .map_err(|_| "Invalid package archive")?;
+        .map_err(|_| crate::i18n::text("repo-core-2063"))?;
     if tar.len() as u64 > MAX_EXPANDED {
-        return Err("Expanded package exceeds 32 MiB".into());
+        return Err(crate::i18n::text("repo-core-2064").into());
     }
     let mut result = Texts::default();
     let mut at = 0usize;
@@ -33,10 +33,10 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
         let field = |a, b| -> Result<&str, String> {
             std::str::from_utf8(&header[a..b])
                 .map(|s| s.trim_matches(|c: char| c == '\0' || c.is_ascii_whitespace()))
-                .map_err(|_| "Invalid archive header".into())
+                .map_err(|_| crate::i18n::text("repo-core-2065").into())
         };
-        let expected =
-            u64::from_str_radix(field(148, 156)?, 8).map_err(|_| "Invalid archive checksum")?;
+        let expected = u64::from_str_radix(field(148, 156)?, 8)
+            .map_err(|_| crate::i18n::text("repo-core-2066"))?;
         let checksum: u64 = header
             .iter()
             .enumerate()
@@ -49,19 +49,25 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
             })
             .sum();
         if expected != checksum {
-            return Err("Package archive checksum mismatch".into());
+            return Err(crate::i18n::text("repo-core-2067").into());
         }
-        let size =
-            usize::from_str_radix(field(124, 136)?, 8).map_err(|_| "Invalid archive size")?;
-        let data = at.checked_add(512).ok_or("Archive overflow")?;
-        let end = data.checked_add(size).ok_or("Archive overflow")?;
-        let body = tar.get(data..end).ok_or("Truncated package archive")?;
+        let size = usize::from_str_radix(field(124, 136)?, 8)
+            .map_err(|_| crate::i18n::text("repo-core-2068"))?;
+        let data = at
+            .checked_add(512)
+            .ok_or(crate::i18n::text("repo-core-2069"))?;
+        let end = data
+            .checked_add(size)
+            .ok_or(crate::i18n::text("repo-core-2069"))?;
+        let body = tar
+            .get(data..end)
+            .ok_or(crate::i18n::text("repo-core-2070"))?;
         let name = long.take().unwrap_or(field(0, 100)?.to_owned());
         match header[156] {
             b'L' if size <= 4096 => {
                 long = Some(
                     std::str::from_utf8(body)
-                        .map_err(|_| "Invalid long path")?
+                        .map_err(|_| crate::i18n::text("repo-core-2071"))?
                         .trim_end_matches('\0')
                         .to_owned(),
                 )
@@ -76,7 +82,7 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
                 if let Some((_, path)) = name.split_once('/') {
                     if path.split('/').any(|p| matches!(p, "." | ".." | "")) || path.contains('\\')
                     {
-                        return Err("Unsafe package member path".into());
+                        return Err(crate::i18n::text("repo-core-2073").into());
                     }
                     let leaf = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
                     let wanted = Some(path) == extra
@@ -87,20 +93,18 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
                         || leaf.starts_with("release-notes");
                     if wanted {
                         if result.files.contains_key(path) || result.skipped.contains_key(path) {
-                            return Err("Duplicate package metadata member".into());
+                            return Err(crate::i18n::text("repo-core-2079").into());
                         }
                         let manifest = matches!(path, "Cargo.toml" | "package.json");
                         let reason = if size > MAX_TEXT {
-                            Some(format!(
-                                "included, but exceeds the 512 KiB text limit ({size} bytes)"
+                            Some(crate::i18n::message(
+                                "repo-core-2080",
+                                &[("size", (size).into())],
                             ))
                         } else if !manifest
                             && (retained + size > 2 << 20 || result.files.len() >= 16)
                         {
-                            Some(
-                                "included, but exceeds the retained metadata count/byte limit"
-                                    .into(),
-                            )
+                            Some(crate::i18n::text("repo-core-2081").into())
                         } else {
                             None
                         };
@@ -118,7 +122,7 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
                                 Err(_) => {
                                     result.skipped.insert(
                                         path.to_owned(),
-                                        "included, but not UTF-8 text".into(),
+                                        crate::i18n::text("repo-core-2082").into(),
                                     );
                                 }
                             },
@@ -132,9 +136,9 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
             .checked_add(
                 size.div_ceil(512)
                     .checked_mul(512)
-                    .ok_or("Archive overflow")?,
+                    .ok_or(crate::i18n::text("repo-core-2069"))?,
             )
-            .ok_or("Archive overflow")?;
+            .ok_or(crate::i18n::text("repo-core-2069"))?;
     }
     Ok(result)
 }

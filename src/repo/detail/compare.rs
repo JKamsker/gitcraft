@@ -13,8 +13,8 @@ impl RepoTab {
     pub(super) fn compare_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let Some(c) = &self.compare else { return };
-        widgets::panel_header(ui, "Compare", |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+        widgets::panel_header(ui, crate::i18n::text("repo-core-0922"), |ui| {
+            if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
                 acts.push(Action::CloseCompare);
             }
             branch_tree::files_toggle(ui);
@@ -29,7 +29,10 @@ impl RepoTab {
             Some(Err(e)) => {
                 ui.horizontal(|ui| {
                     ui.add_space(14.0);
-                    ui.colored_label(t.danger, e);
+                    ui.colored_label(
+                        t.danger,
+                        crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                    );
                 });
             }
             Some(Ok(d)) => {
@@ -45,7 +48,9 @@ impl RepoTab {
                 if d.files.is_empty() {
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
-                        ui.label(RichText::new("No differences").color(t.text_dim));
+                        ui.label(
+                            RichText::new(crate::i18n::text("repo-core-0923")).color(t.text_dim),
+                        );
                     });
                     return;
                 }
@@ -74,7 +79,7 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
     let target_name = if c.target.is_some() {
         c.target_label.as_str()
     } else {
-        "the working tree"
+        crate::i18n::text("repo-core-0926")
     };
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(14, 12))
@@ -100,45 +105,72 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                             }
                         });
                     };
-                    let note = if c.since_fork { "merge base " } else { "" };
-                    ui.label(RichText::new("From").color(t.text_faint));
+                    let note = if c.since_fork {
+                        crate::i18n::text("repo-core-0929")
+                    } else {
+                        ""
+                    };
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-core-0930")).color(t.text_faint),
+                    );
                     end(ui, &c.base_label, data.map(|d| d.from.as_str()), note);
                     ui.end_row();
-                    ui.label(RichText::new("To").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-core-0931")).color(t.text_faint),
+                    );
                     end(ui, target_name, data.and_then(|d| d.to.as_deref()), "");
                     ui.end_row();
                 });
             if let Some(d) = data {
                 let (behind, ahead) = d.apart;
-                let commits = |n: u32| format!("{n} commit{}", if n == 1 { "" } else { "s" });
+                let commits = |n: u32| crate::i18n::message("repo-core-0932", &[("n", (n).into())]);
                 let other = if c.target.is_some() {
                     target_name
                 } else {
                     "HEAD"
                 };
                 let text = match (ahead, behind) {
-                    (0, 0) => "Same history".to_owned(),
-                    (a, 0) => format!("{other} is {} ahead", commits(a)),
-                    (0, b) => format!("{other} is {} behind", commits(b)),
-                    (a, b) => format!("{other} is {} ahead, {b} behind", commits(a)),
+                    (0, 0) => crate::i18n::text("repo-core-0933").to_owned(),
+                    (a, 0) => crate::i18n::message(
+                        "repo-core-0934",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("a", format!("{}", commits(a)).into()),
+                        ],
+                    ),
+                    (0, b) => crate::i18n::message(
+                        "repo-core-0935",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("b", format!("{}", commits(b)).into()),
+                        ],
+                    ),
+                    (a, b) => crate::i18n::message(
+                        "repo-core-0936",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("a", format!("{}", commits(a)).into()),
+                            ("b", format!("{}", b).into()),
+                        ],
+                    ),
                 };
                 ui.label(RichText::new(text).color(t.text_dim).small());
             }
             ui.horizontal(|ui| {
                 let mut since = c.since_fork;
-                let label = format!("Only what {target_name} changed since they diverged");
+                let label = crate::i18n::message(
+                    "repo-core-0937",
+                    &[("target-name", format!("{}", target_name).into())],
+                );
                 if ui
                     .checkbox(&mut since, label)
-                    .on_hover_text(
-                        "Diff from the merge base, as a pull request shows it, instead of \
-                         every difference between the two",
-                    )
+                    .on_hover_text(crate::i18n::text("repo-core-0938"))
                     .changed()
                 {
                     acts.push(Action::CompareSinceFork(since));
                 }
             });
-            if c.target.is_some() && ui.button("Swap").clicked() {
+            if c.target.is_some() && ui.button(crate::i18n::text("repo-core-0939")).clicked() {
                 acts.push(Action::SwapCompare);
             }
         });

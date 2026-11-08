@@ -28,7 +28,9 @@ impl RepoTab {
                 Msg::Then(Box::new(move |tab, _| {
                     if matches!(&tab.dialog,Some(Dialog::PushLoading{id:current,..}) if *current==id)
                     {
-                        tab.dialog=Some(Dialog::PushError("The preflight worker stopped before completing its checks. No push was run.".into()));
+                        tab.dialog = Some(Dialog::PushError(
+                            crate::i18n::text("repo-core-3105").into(),
+                        ));
                     }
                 }))
             },
@@ -47,7 +49,7 @@ impl RepoTab {
                     Ok(plan)
                 })();
                 let result = if began.elapsed() >= Duration::from_secs(120) {
-                    Err("Push preflight exceeded its two-minute budget. Fetch missing history or split this push, then recheck; nothing was pushed.".into())
+                    Err(crate::i18n::text("repo-core-3106").into())
                 } else {
                     result
                 };
@@ -74,10 +76,7 @@ impl RepoTab {
 
     fn same_preflight_profile(&mut self, plan: &Plan, ctx: &egui::Context) -> bool {
         if Settings::get(ctx).profile() != plan.profile {
-            self.status = Some((
-                "The profile or its identity policy changed. Reopen push preflight.".into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3107").into(), true));
             false
         } else {
             true
@@ -86,10 +85,7 @@ impl RepoTab {
 
     pub(super) fn submit_preflight(&mut self, plan: Plan, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some((
-                "Wait for the current operation, then recheck the push preview.".into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3108").into(), true));
             return;
         }
         if !self.same_preflight_profile(&plan, ctx) {
@@ -99,10 +95,7 @@ impl RepoTab {
             .preflight_timeline
             .is_some_and(|at| at != self.timeline.current)
         {
-            self.status = Some((
-                "The operation timeline changed; reopen push from its original action".into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3109").into(), true));
             return;
         }
         let pending = self.preflight_pending.take().unwrap_or(super::PendingOp {
@@ -127,27 +120,38 @@ impl RepoTab {
         if !self.same_preflight_profile(&plan, ctx) {
             return;
         }
-        let text=match kind{
-            "author"=>format!("Rewrite the listed outgoing author mismatches as {} <{}>. This can change attribution on other contributors' commits; review the checklist first.",plan.expected_name,plan.expected_email),
-            "sign"=>"Recreate the outgoing commits with signatures using your configured signing key. Signing may ask you to unlock that key.".into(),
-            "secrets"=>"Remove every listed likely-secret file from every outgoing commit, and replace entire flagged commit messages. The final working files change too. Review the file list first; recreate safe versions after the repair.".into(),
-            "lfs"=>"Convert all outgoing versions of the listed large regular files to local Git LFS objects and pointers, and add exact path attributes. No LFS data is uploaded or downloaded here. git-lfs must be installed.".into(),
-            "remote"=>"Merge the fetched target commit into this branch, keeping remote history. This may leave conflicts for you to resolve or abort.".into(),
-            _=>return,
+        let text = match kind {
+            "author" => crate::i18n::message(
+                "repo-core-3111",
+                &[
+                    ("expected-name", format!("{}", plan.expected_name).into()),
+                    ("expected-email", format!("{}", plan.expected_email).into()),
+                ],
+            ),
+            "sign" => crate::i18n::text("repo-core-3113").into(),
+            "secrets" => crate::i18n::text("repo-core-3115").into(),
+            "lfs" => crate::i18n::text("repo-core-3116").into(),
+            "remote" => crate::i18n::text("repo-core-3117").into(),
+            _ => return,
         };
         let mut step = check::register(plan);
         step[0] = check::FIX.into();
         step.push(kind.into());
-        self.dialog=Some(Dialog::confirm("Fix outgoing history",format!("{text}\n\nRequires this branch checked out with a clean working tree. Ctrl+Z restores a completed repair; a later push is a separate explicit action."),"Apply repair",vec![step],None).undo(Undo::HeadMove{mode:"--merge"}));
+        self.dialog = Some(
+            Dialog::confirm(
+                "Fix outgoing history",
+                crate::i18n::message("repo-core-3119", &[("text", format!("{}", text).into())]),
+                crate::i18n::text("repo-core-3120"),
+                vec![step],
+                None,
+            )
+            .undo(Undo::HeadMove { mode: "--merge" }),
+        );
     }
 
     pub(super) fn preflight_messages(&mut self, plan: Plan, ctx: &egui::Context) {
         if !plan.is_current_branch() {
-            self.status = Some((
-                "Check out the previewed branch before editing messages, then reopen preflight."
-                    .into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3122").into(), true));
             return;
         }
         if !self.same_preflight_profile(&plan, ctx) {
@@ -159,13 +163,11 @@ impl RepoTab {
             move || -> Result<super::rebase::RebaseEditor, String> {
                 check::check(&repo, &plan)?;
                 if crate::git::forecast_run(&repo, &["rev-parse", "HEAD"], &[], &[0], &|| true)
-                    .map_err(|_| "Could not check the branch")?
+                    .map_err(|_| crate::i18n::text("repo-core-3123"))?
                     .trim()
                     != plan.head
                 {
-                    return Err(
-                        "Check out the previewed branch before editing its messages.".into(),
-                    );
+                    return Err(crate::i18n::text("repo-core-3124").into());
                 }
                 let mut commits = Vec::new();
                 for c in &plan.commits {
@@ -187,7 +189,7 @@ impl RepoTab {
                 }
                 let mut editor = super::rebase::RebaseEditor::new(
                     plan.base.unwrap_or_default(),
-                    "fetched target / root".into(),
+                    crate::i18n::text("repo-core-3127").into(),
                     commits,
                 );
                 editor.branch_guard = Some(super::operations::expect_symref("HEAD", &plan.branch));
@@ -244,11 +246,11 @@ impl RepoTab {
 
 pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool) -> Outcome {
     ui.set_width(640.0);
-    ui.heading("Push preflight");
+    ui.heading(crate::i18n::text("repo-core-3132"));
     ui.label(format!(
         "{} → {} on {}",
         if plan.deleting {
-            "Delete remote ref"
+            crate::i18n::text("repo-core-3134")
         } else {
             &plan.branch
         },
@@ -256,44 +258,83 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         plan.targets.join(", ")
     ));
     if plan.deleting {
-        ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning, format!(
-            "Delete {} only while the server tip is {}. No outgoing objects or LFS payloads are sent.",
-            plan.destination, super::short(plan.base.as_deref().unwrap_or(""))
-        ));
+        ui.colored_label(
+            crate::theme::Tokens::get(ui.ctx()).warning,
+            crate::i18n::message(
+                "repo-core-3135",
+                &[
+                    ("destination", format!("{}", plan.destination).into()),
+                    (
+                        "super",
+                        format!("{}", super::short(plan.base.as_deref().unwrap_or(""))).into(),
+                    ),
+                ],
+            ),
+        );
     }
     for (before, step) in plan.local_steps() {
-        ui.label(format!(
-            "{} reviewed push: {}",
-            if before { "Before" } else { "After" },
-            step
+        ui.label(crate::i18n::message(
+            "repo-core-3136",
+            &[
+                (
+                    "After",
+                    format!(
+                        "{}",
+                        if before {
+                            crate::i18n::text("repo-core-1564")
+                        } else {
+                            crate::i18n::text("repo-core-1565")
+                        }
+                    )
+                    .into(),
+                ),
+                ("step", format!("{}", step).into()),
+            ],
         ));
     }
-    ui.label(format!(
-        "{} outgoing commits ({} have embedded signatures), pinned to {}. Author policy: {} <{}>.",
-        plan.commits.len(),
-        plan.commits.iter().filter(|c| c.signed).count(),
-        super::short(&plan.head),
-        plan.expected_name,
-        plan.expected_email
+    ui.label(crate::i18n::message(
+        "repo-core-3137",
+        &[
+            ("count", (plan.commits.len()).into()),
+            (
+                "count2",
+                (plan.commits.iter().filter(|c| c.signed).count()).into(),
+            ),
+            ("head", format!("{}", super::short(&plan.head)).into()),
+            ("expected-name", format!("{}", plan.expected_name).into()),
+            ("expected-email", format!("{}", plan.expected_email).into()),
+        ],
     ));
     if plan.skip_hooks {
-        ui.label("Skip original pre-push hook for this push (as requested). The reviewed LFS upload guard still runs.");
+        ui.label(crate::i18n::text("repo-core-3138"));
     }
     for (host, account) in &plan.expected_accounts {
-        ui.label(format!("Selected account for {host}: {account} (profile metadata; server identity not queried)."));
+        ui.label(crate::i18n::message(
+            "repo-core-3139",
+            &[
+                ("host", format!("{}", host).into()),
+                ("account", format!("{}", account).into()),
+            ],
+        ));
     }
-    ui.label("Checks use local/fetched history only. Secret detection is heuristic; it does not download or inspect external LFS contents, verify signature trust, or replace a dedicated secret scanner.");
+    ui.label(crate::i18n::text("repo-core-3140"));
     if !plan.lfs_objects.is_empty() {
-        ui.label(format!("{} LFS objects will be uploaded as part of the confirmed push to {}; their external content was not scanned. Endpoint settings use committed .lfsconfig plus inspected Git configuration, ignoring later working-tree edits.",plan.lfs_objects.len(),plan.lfs_targets().join(", ")));
+        ui.label(crate::i18n::message(
+            "repo-core-3141",
+            &[
+                ("count", (plan.lfs_objects.len()).into()),
+                ("plan", format!("{}", plan.lfs_targets().join(", ")).into()),
+            ],
+        ));
     }
     if let Err(reason) = check::push_args(plan) {
         ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning, reason);
     }
     let mut out = Outcome::Open;
     if !plan.deleting && !plan.is_current_branch() {
-        ui.label("Repairs require the underlying branch checked out. The push itself still sends the inspected object.");
+        ui.label(crate::i18n::text("repo-core-3142"));
         if let Some(name) = plan.branch.strip_prefix("refs/heads/")
-            && ui.button("Check out for repairs").clicked()
+            && ui.button(crate::i18n::text("repo-core-3143")).clicked()
         {
             out = Outcome::Done(Box::new(Action::Checkout(name.to_owned())));
         }
@@ -304,45 +345,45 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
             for (kind, title, fix, label) in [
                 (
                     Kind::Transcript,
-                    "Checkpoint / transcript publication",
+                    crate::i18n::text("repo-core-3144"),
                     "",
                     "",
                 ),
                 (
                     Kind::Identity,
-                    "Author matches this profile's host policy",
+                    crate::i18n::text("repo-core-3145"),
                     "author",
-                    "Amend authors…",
+                    crate::i18n::text("repo-core-3146"),
                 ),
                 (
                     Kind::Signature,
-                    "Profile signing policy",
+                    crate::i18n::text("repo-core-3147"),
                     "sign",
-                    "Sign outgoing commits…",
+                    crate::i18n::text("repo-core-3148"),
                 ),
                 (
                     Kind::Message,
-                    "No leftover fixup/WIP subjects",
+                    crate::i18n::text("repo-core-3149"),
                     "messages",
-                    "Autosquash / edit messages…",
+                    crate::i18n::text("repo-core-3151"),
                 ),
                 (
                     Kind::Secret,
-                    "Likely secrets in outgoing objects/messages",
+                    crate::i18n::text("repo-core-3152"),
                     "secrets",
-                    "Remove affected history…",
+                    crate::i18n::text("repo-core-3153"),
                 ),
                 (
                     Kind::Large,
-                    "Large Git blobs (over 5 MiB)",
+                    crate::i18n::text("repo-core-3154"),
                     "lfs",
-                    "Move to LFS…",
+                    crate::i18n::text("repo-core-3155"),
                 ),
                 (
                     Kind::RemoteHistory,
-                    "Remote commits a force push would discard",
+                    crate::i18n::text("repo-core-3156"),
                     "remote",
-                    "Keep remote commits…",
+                    crate::i18n::text("repo-core-3157"),
                 ),
             ] {
                 let found: Vec<_> = plan.findings.iter().filter(|f| f.kind == kind).collect();
@@ -350,11 +391,18 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                 ui.horizontal(|ui| {
                     ui.strong(format!(
                         "{} {title} — {}",
-                        if found.is_empty() { "OK" } else { "Review" },
                         if found.is_empty() {
-                            "clear".into()
+                            "OK"
                         } else {
-                            format!("{} findings", found.len())
+                            crate::i18n::text("repo-core-3160")
+                        },
+                        if found.is_empty() {
+                            crate::i18n::text("repo-core-3161").into()
+                        } else {
+                            crate::i18n::message(
+                                "repo-core-3162",
+                                &[("count", (found.len()).into())],
+                            )
                         }
                     ));
                     if !found.is_empty()
@@ -378,45 +426,39 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                     ));
                 }
                 if found.len() > 100 {
-                    ui.label("More findings exist; repair and recheck before pushing.");
+                    ui.label(crate::i18n::text("repo-core-3163"));
                 }
             }
         });
     if !plan.deleting && !plan.destination.starts_with("refs/for/") {
         ui.add_enabled_ui(plan.base.is_some(), |ui| {
-            ui.checkbox(
-                &mut plan.force,
-                "Rewrite the target with an explicit force-with-lease",
-            );
+            ui.checkbox(&mut plan.force, crate::i18n::text("repo-core-3165"));
         });
         if plan.base.is_none() {
-            ui.label("No fetched target tip is available: force push is disabled. Fetch first to inspect dropped remote commits.");
+            ui.label(crate::i18n::text("repo-core-3166"));
         }
     }
-    ui.checkbox(
-        acknowledge,
-        "I reviewed the exact target and findings, including heuristic limitations",
-    );
+    ui.checkbox(acknowledge, crate::i18n::text("repo-core-3167"));
     ui.horizontal(|ui| {
         if ui
             .add_enabled(
                 *acknowledge && check::push_args(plan).is_ok(),
                 egui::Button::new(if plan.deleting {
-                    "Delete inspected remote ref"
+                    crate::i18n::text("repo-core-3168")
                 } else if plan.force {
-                    "Push with inspected lease"
+                    crate::i18n::text("repo-core-3169")
                 } else {
-                    "Push inspected commit"
+                    crate::i18n::text("repo-core-3170")
                 }),
             )
             .clicked()
         {
             out = Outcome::Done(Box::new(Action::SubmitPreflight(Box::new(plan.clone()))));
         }
-        if ui.button("Recheck").clicked() {
+        if ui.button(crate::i18n::text("repo-core-3171")).clicked() {
             out = Outcome::Done(Box::new(Action::ReloadPreflight(Box::new(plan.clone()))));
         }
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
             out = Outcome::Cancel;
         }
     });

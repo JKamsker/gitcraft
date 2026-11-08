@@ -23,12 +23,12 @@ impl RepoTab {
             Header {
                 key: "stashes",
                 icon: "archive",
-                title: "STASHES",
+                title: crate::i18n::text("repo-core-3503"),
                 count: self.stashes.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Stash changes…",
+                    tooltip: crate::i18n::text("repo-core-0054"),
                     action: can_stash.then(|| Action::Dialog(Dialog::stash())),
                 }),
             },
@@ -135,11 +135,11 @@ fn menu(
     idle: bool,
     steps: impl Fn(StashOp) -> Vec<Vec<String>>,
 ) {
-    if crate::menu_item::MenuItem::new("Apply")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0872"))
         .icon("check")
         .enabled(idle)
         .show(ui)
-        .on_hover_text("Bring the changes back and keep the stash")
+        .on_hover_text(crate::i18n::text("repo-core-3509"))
         .clicked()
     {
         acts.push(Action::Ops {
@@ -148,11 +148,11 @@ fn menu(
             refresh: Refresh::All,
         });
     }
-    if crate::menu_item::MenuItem::new("Pop")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0871"))
         .icon("check")
         .enabled(idle)
         .show(ui)
-        .on_hover_text("Bring the changes back and drop the stash")
+        .on_hover_text(crate::i18n::text("repo-core-3511"))
         .clicked()
     {
         acts.push(Action::Ops {
@@ -162,7 +162,7 @@ fn menu(
         });
     }
     ui.separator();
-    if crate::menu_item::MenuItem::new("Drop…")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3513"))
         .icon("minus")
         .enabled(idle)
         .show(ui)
@@ -170,8 +170,8 @@ fn menu(
     {
         acts.push(Action::Dialog(Dialog::confirm(
             "Drop stash",
-            format!("Delete {name}? Its changes are gone for good."),
-            "Drop",
+            crate::i18n::message("repo-core-3515", &[("name", format!("{}", name).into())]),
+            crate::i18n::text("repo-core-3197"),
             steps(StashOp::Drop),
             None,
         )));

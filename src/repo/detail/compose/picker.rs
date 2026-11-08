@@ -26,7 +26,7 @@ impl RepoTab {
         }
         let tip = match style {
             PrefixStyle::Gitmoji => "Gitmoji",
-            _ => "Type and scope (Conventional Commits)",
+            _ => crate::i18n::text("repo-core-0981"),
         };
         let b = icons::small_button(ui, "tag", tip);
         let used_scopes = self.compose.used.as_ref().map(|(_, s)| s.clone());
@@ -53,7 +53,11 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
         state.read_from = Some(summary.clone());
     }
     let kind = current.as_ref().map(|c| c.kind.clone()).unwrap_or_default();
-    ui.label(RichText::new("Type").color(t.text_faint).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-0982"))
+            .color(t.text_faint)
+            .small(),
+    );
     egui::Grid::new("conventional-types")
         .num_columns(2)
         .spacing([8.0, 2.0])
@@ -62,16 +66,20 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
                 if ui.selectable_label(kind == *name, *name).clicked() {
                     write(summary, name, state);
                 }
-                ui.label(RichText::new(*what).color(t.text_dim).small());
+                ui.label(
+                    RichText::new(crate::i18n::text(what))
+                        .color(t.text_dim)
+                        .small(),
+                );
                 ui.end_row();
             }
         });
     ui.separator();
     ui.horizontal(|ui| {
-        ui.label("Scope");
+        ui.label(crate::i18n::text("repo-core-0984"));
         let field = ui.add(
             egui::TextEdit::singleline(&mut state.scope)
-                .hint_text("optional")
+                .hint_text(crate::i18n::text("repo-core-0985"))
                 .desired_width(150.0),
         );
         if field.changed() && !kind.is_empty() {
@@ -80,7 +88,11 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
     });
     if !used.is_empty() {
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("Used before").color(t.text_faint).small());
+            ui.label(
+                RichText::new(crate::i18n::text("repo-core-0986"))
+                    .color(t.text_faint)
+                    .small(),
+            );
             for scope in used.iter().take(12) {
                 if ui.small_button(scope).clicked() {
                     state.scope = scope.clone();
@@ -92,12 +104,12 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
         });
     }
     let breaking = ui
-        .checkbox(&mut state.breaking, "Breaking change (!)")
-        .on_hover_text("Marks the commit as one that breaks compatibility");
+        .checkbox(&mut state.breaking, crate::i18n::text("repo-core-0987"))
+        .on_hover_text(crate::i18n::text("repo-core-0988"));
     if breaking.changed() && !kind.is_empty() {
         write(summary, &kind, state);
     }
-    if !kind.is_empty() && ui.button("Remove the prefix").clicked() {
+    if !kind.is_empty() && ui.button(crate::i18n::text("repo-core-0989")).clicked() {
         write(summary, "", state);
     }
 }
@@ -135,7 +147,11 @@ fn gitmoji(ui: &mut Ui, summary: &mut String) {
                             *summary = prefix::with_gitmoji(summary, emoji);
                             ui.close();
                         }
-                        ui.label(RichText::new(*what).color(t.text_dim).small());
+                        ui.label(
+                            RichText::new(crate::i18n::text(what))
+                                .color(t.text_dim)
+                                .small(),
+                        );
                         ui.end_row();
                     }
                 });

@@ -34,8 +34,9 @@ impl Matcher {
             return Ok(None);
         }
         if query.text.chars().count() > MAX_PATTERN {
-            return Err(format!(
-                "The text to find is too long (more than {MAX_PATTERN} characters)"
+            return Err(crate::i18n::message(
+                "repo-core-2513",
+                &[("MAX-PATTERN", format!("{}", MAX_PATTERN).into())],
             ));
         }
         let body = if query.regex {
@@ -92,9 +93,7 @@ impl Matcher {
 /// A one-line message for a regular expression that doesn't compile.
 fn regex_error(e: &regex::Error) -> String {
     match e {
-        regex::Error::CompiledTooBig(_) => {
-            "The regular expression is too big; try a simpler one".to_owned()
-        }
+        regex::Error::CompiledTooBig(_) => crate::i18n::text("repo-core-4102").to_owned(),
         // The syntax error's own text ends with a line saying what is wrong, below the pattern
         // and a caret.
         _ => {
@@ -104,8 +103,8 @@ fn regex_error(e: &regex::Error) -> String {
                 .rev()
                 .find_map(|l| l.trim().strip_prefix("error:"))
                 .map(str::trim)
-                .unwrap_or("it can't be read");
-            format!("Not a valid regular expression: {why}")
+                .unwrap_or(crate::i18n::text("repo-core-4103"));
+            crate::i18n::message("repo-core-4104", &[("why", format!("{}", why).into())])
         }
     }
 }
