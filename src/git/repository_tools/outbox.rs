@@ -16,6 +16,65 @@ pub(crate) enum Status {
     Sent,
     Paused(String),
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Consent {
+    pub profile: u64,
+    pub choices: crate::connections::Choices,
+    pub principal: Option<(String, String, String)>, // exact endpoint, account, username; never a password/token
+}
+impl Consent {
+    fn capture(
+        profile: &UserProfile,
+        context: &crate::connections::Context,
+        credentials: Option<&git::Credentials>,
+    ) -> Result<Self, String> {
+        if context.error.is_some() || context.choices != profile.connections {
+            return Err("Selected connection/profile is inconsistent; reopen outbox in the selected profile".into());
+        }
+        let principal = credentials
+            .map(|credentials| {
+                let scope = credentials.scope.as_ref().ok_or(
+                    "Transient sign-in has no exact endpoint/account scope; sign in again",
+                )?;
+                Ok::<_, String>((
+                    scope.endpoint(),
+                    scope.account().into(),
+                    credentials.username.clone(),
+                ))
+            })
+            .transpose()?;
+        Ok(Self {
+            profile: profile.id,
+            choices: context.choices.clone(),
+            principal,
+        })
+    }
+    fn require(saved: Option<&Self>, selected: &Self) -> Result<(), String> {
+        if saved != Some(selected) {
+            return Err("Selected profile/account differs from queued consent, or its legacy witness is missing; review the pinned commit and approve again".into());
+        }
+        Ok(())
+    }
+}
+fn live_consents() -> &'static std::sync::Mutex<
+    std::collections::BTreeMap<(String, String), crate::connections::Context>,
+> {
+    static LIVE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::BTreeMap<(String, String), crate::connections::Context>>,
+    > = std::sync::OnceLock::new();
+    LIVE.get_or_init(Default::default)
+}
+fn live_check(e: &Entry, context: &crate::connections::Context) -> Result<(), String> {
+    if live_consents()
+        .lock()
+        .map_err(|_| "Outbox live consent unavailable")?
+        .get(&(e.identity.clone(), e.id.clone()))
+        .is_some_and(|saved| saved != context)
+    {
+        return Err("Live queued connection/config lease changed; review and approve again".into());
+    }
+    Ok(())
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Entry {
     pub id: String,
@@ -30,6 +89,8 @@ pub(crate) struct Entry {
     pub receipt: String,
     identity: String,
     routing: String,
+    #[serde(default)]
+    pub consent: Option<Consent>,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct Queue {
@@ -47,6 +108,9 @@ pub(crate) struct Prepared {
     pub id: String,
     pub plan: preflight::Plan,
     pub review: bool,
+    pub context: crate::connections::Context,
+    pub consent: Consent,
+    pub ui_generation: Option<u64>,
 }
 fn digest(s: &str) -> String {
     use sha2::{Digest, Sha256};
@@ -138,7 +202,15 @@ fn save(repo: &Path, view: &View, pin: Option<&Entry>) -> Result<(), String> {
     super::read(repo, &["update-ref", "--stdin"], txn.into_bytes(), 65536)?;
     Ok(())
 }
-pub(crate) fn enqueue(repo: &Path, expected: &View, auto: bool) -> Result<String, String> {
+pub(crate) fn enqueue(
+    repo: &Path,
+    expected: &View,
+    auto: bool,
+    profile: &UserProfile,
+    credentials: Option<&git::Credentials>,
+) -> Result<String, String> {
+    let context = crate::connections::current();
+    let consent = Consent::capture(profile, &context, credentials)?;
     if read(repo)?.version != expected.version {
         return Err("Outbox changed; reopen it".into());
     }
@@ -183,11 +255,16 @@ pub(crate) fn enqueue(repo: &Path, expected: &View, auto: bool) -> Result<String
             &["rev-parse", "--path-format=absolute", "--git-common-dir"],
         )?,
         routing: stamp,
+        consent: Some(consent),
     };
     check_source(repo, &entry, false)?;
     let mut view = expected.clone();
     view.queue.entries.push(entry.clone());
     save(repo, &view, Some(&entry))?;
+    live_consents()
+        .lock()
+        .map_err(|_| "Outbox saved; live consent lease could not be retained; review again")?
+        .insert((entry.identity.clone(), entry.id.clone()), context);
     Ok(format!(
         "Queued {} at {}. Later commits are excluded.",
         entry.source, entry.commit
@@ -258,22 +335,37 @@ fn entry<'a>(view: &'a View, id: &str) -> Result<&'a Entry, String> {
         .find(|e| e.id == id)
         .ok_or("Outbox entry disappeared".into())
 }
-pub(crate) fn prepare(repo: &Path, id: &str, profile: UserProfile) -> Result<Prepared, String> {
-    prepare_with(repo, id, profile, false)
+pub(crate) fn prepare(
+    repo: &Path,
+    id: &str,
+    profile: UserProfile,
+    credentials: Option<&git::Credentials>,
+) -> Result<Prepared, String> {
+    prepare_with(repo, id, profile, credentials, false)
 }
 pub(crate) fn review_prepare(
     repo: &Path,
     id: &str,
     profile: UserProfile,
+    credentials: Option<&git::Credentials>,
 ) -> Result<Prepared, String> {
-    prepare_with(repo, id, profile, true)
+    prepare_with(repo, id, profile, credentials, true)
 }
 fn prepare_with(
     repo: &Path,
     id: &str,
     profile: UserProfile,
+    credentials: Option<&git::Credentials>,
     review: bool,
 ) -> Result<Prepared, String> {
+    let context = crate::connections::current();
+    let consent = match Consent::capture(&profile, &context, credentials) {
+        Ok(consent) => consent,
+        Err(error) => {
+            pause(repo, id, &error)?;
+            return Err(error);
+        }
+    };
     let mut view = read(repo)?;
     if review {
         let e = view
@@ -302,8 +394,16 @@ fn prepare_with(
         e.endpoints = endpoints;
         e.status = Status::Ready;
         e.autosend = false;
+        e.consent = Some(consent.clone());
     }
     let e = entry(&view, id)?;
+    if !review
+        && let Err(error) =
+            Consent::require(e.consent.as_ref(), &consent).and_then(|_| live_check(e, &context))
+    {
+        pause(repo, id, &error)?;
+        return Err(error);
+    }
     if e.status != Status::Ready {
         return Err("Entry is paused, in-flight or sent. Inspect its receipt; queue a new push explicitly if appropriate.".into());
     }
@@ -342,6 +442,9 @@ fn prepare_with(
         id: id.into(),
         plan,
         review,
+        context,
+        consent,
+        ui_generation: None,
     })
 }
 fn pause(repo: &Path, id: &str, why: &str) -> Result<(), String> {
@@ -375,6 +478,36 @@ pub(crate) fn send(runner: &Runner<'_>, p: &Prepared, automatic: bool) -> Result
     if e.status != Status::Ready {
         return Err("This entry is no longer ready".into());
     }
+    let selected = match Consent::capture(
+        &p.plan.profile,
+        &crate::connections::current(),
+        runner.credentials,
+    ) {
+        Ok(consent) => consent,
+        Err(error) => {
+            pause(runner.repo, &e.id, &error)?;
+            return Err(error);
+        }
+    };
+    if let Err(error) = Consent::require(e.consent.as_ref(), &selected)
+        .and_then(|_| {
+            if p.context == crate::connections::current() && p.consent == selected {
+                Ok(())
+            } else {
+                Err("Prepared connection changed; prepare and approve again".into())
+            }
+        })
+        .and_then(|_| {
+            if p.review {
+                Ok(())
+            } else {
+                live_check(&e, &p.context)
+            }
+        })
+    {
+        pause(runner.repo, &e.id, &error)?;
+        return Err(error);
+    }
     if automatic && (!e.autosend || !p.plan.findings.is_empty()) {
         pause(
             runner.repo,
@@ -399,6 +532,10 @@ pub(crate) fn send(runner: &Runner<'_>, p: &Prepared, automatic: bool) -> Result
     *slot = e.clone();
     slot.status = Status::Sending;
     save(runner.repo, &view, None)?;
+    live_consents()
+        .lock()
+        .map_err(|_| "Sending intent saved; live consent unavailable, inspect before retry")?
+        .insert((e.identity.clone(), e.id.clone()), p.context.clone());
     let result = preflight::execute_controlled(
         runner.repo,
         &p.plan,
@@ -437,12 +574,18 @@ pub(crate) fn remove(repo: &Path, expected: &View, id: &str) -> Result<String, S
     let mut view = expected.clone();
     view.queue.entries.retain(|e| e.id != id);
     save(repo, &view, None)?;
+    if let Ok(mut live) = live_consents().lock() {
+        live.remove(&(e.identity.clone(), e.id.clone()));
+    }
     Ok("Removed queue entry; protected source commit is retained for recovery".into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn queue(repo: &Path, view: &View, automatic: bool) -> Result<String, String> {
+        enqueue(repo, view, automatic, &UserProfile::default(), None)
+    }
     fn fixture(
         name: &str,
     ) -> Result<(git::fixture::Repo, git::fixture::Repo, std::path::PathBuf), String> {
@@ -459,12 +602,12 @@ mod tests {
     fn durable_exact_oid_excludes_later_commits_and_refuses_duplicate_send() -> Result<(), String> {
         let (r, _host, bare) = fixture("outbox-exact")?;
         let queued = r.rev("HEAD")?;
-        enqueue(r.path(), &read(r.path())?, false)?;
+        queue(r.path(), &read(r.path())?, false)?;
         r.commit("later", &[])?;
         let view = read(r.path())?;
         let e = &view.queue.entries[0];
         assert_eq!(e.commit, queued);
-        let p = prepare(r.path(), &e.id, UserProfile::default())?;
+        let p = prepare(r.path(), &e.id, UserProfile::default(), None)?;
         let control = git::OpControl::new(|| {});
         let runner = Runner {
             repo: r.path(),
@@ -483,15 +626,15 @@ mod tests {
         let (r, _host, _bare) = fixture("outbox-pauses")?;
         let base = r.rev("HEAD")?;
         r.commit("queued", &[])?;
-        enqueue(r.path(), &read(r.path())?, true)?;
+        queue(r.path(), &read(r.path())?, true)?;
         let id = read(r.path())?.queue.entries[0].id.clone();
         r.git(&["reset", "--hard", &base])?;
-        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
+        assert!(prepare(r.path(), &id, UserProfile::default(), None).is_err());
         assert!(matches!(
             read(r.path())?.queue.entries[0].status,
             Status::Paused(_)
         ));
-        enqueue(r.path(), &read(r.path())?, true)?;
+        queue(r.path(), &read(r.path())?, true)?;
         let id = read(r.path())?.queue.entries[1].id.clone();
         r.git(&[
             "remote",
@@ -500,7 +643,7 @@ mod tests {
             "origin",
             "https://example.invalid/new.git",
         ])?;
-        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
+        assert!(prepare(r.path(), &id, UserProfile::default(), None).is_err());
         assert!(matches!(
             read(r.path())?.queue.entries[1].status,
             Status::Paused(_)
@@ -511,13 +654,13 @@ mod tests {
     fn stale_queue_writers_and_uncertain_sends_are_not_retried() -> Result<(), String> {
         let (r, _host, _bare) = fixture("outbox-cas")?;
         let stale = read(r.path())?;
-        enqueue(r.path(), &stale, true)?;
-        assert!(enqueue(r.path(), &stale, false).is_err());
+        queue(r.path(), &stale, true)?;
+        assert!(queue(r.path(), &stale, false).is_err());
         let mut view = read(r.path())?;
         let id = view.queue.entries[0].id.clone();
         view.queue.entries[0].status = Status::Sending;
         save(r.path(), &view, None)?;
-        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
+        assert!(prepare(r.path(), &id, UserProfile::default(), None).is_err());
         assert!(remove(r.path(), &read(r.path())?, &id).is_err());
         Ok(())
     }
@@ -526,9 +669,9 @@ mod tests {
     {
         let (r, _host, bare) = fixture("outbox-renewed")?;
         let queued = r.rev("HEAD")?;
-        enqueue(r.path(), &read(r.path())?, true)?;
+        queue(r.path(), &read(r.path())?, true)?;
         let id = read(r.path())?.queue.entries[0].id.clone();
-        let p = prepare(r.path(), &id, UserProfile::default())?;
+        let p = prepare(r.path(), &id, UserProfile::default(), None)?;
         assert!(
             p.plan.findings.is_empty(),
             "fixture should have a clean plain preflight"
@@ -544,13 +687,13 @@ mod tests {
         assert_eq!(read(r.path())?.queue.entries[0].status, Status::Sent);
         r.commit("second", &[])?;
         let queued2 = r.rev("HEAD")?;
-        enqueue(r.path(), &read(r.path())?, true)?;
+        queue(r.path(), &read(r.path())?, true)?;
         let id = read(r.path())?.queue.entries[1].id.clone();
         r.commit("later excluded", &[])?;
         let url = format!("{}/.", bare.display());
         r.git(&["remote", "set-url", "--push", "origin", &url])?;
-        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
-        let p = review_prepare(r.path(), &id, UserProfile::default())?;
+        assert!(prepare(r.path(), &id, UserProfile::default(), None).is_err());
+        let p = review_prepare(r.path(), &id, UserProfile::default(), None)?;
         assert_eq!(p.view.queue.entries[1].commit, queued2);
         assert!(!p.view.queue.entries[1].autosend);
         assert!(send(&runner, &p, true).is_err());
@@ -566,9 +709,9 @@ mod tests {
     fn automatic_findings_pause_before_transport_and_remote_rejections_stay_paused()
     -> Result<(), String> {
         let (r, _host, bare) = fixture("outbox-reject")?;
-        enqueue(r.path(), &read(r.path())?, true)?;
+        queue(r.path(), &read(r.path())?, true)?;
         let id = read(r.path())?.queue.entries[0].id.clone();
-        let mut p = prepare(r.path(), &id, UserProfile::default())?;
+        let mut p = prepare(r.path(), &id, UserProfile::default(), None)?;
         p.plan.findings.push(preflight::Finding {
             kind: preflight::Kind::Message,
             commit: p.plan.head.clone(),
@@ -587,7 +730,7 @@ mod tests {
             Status::Paused(_)
         ));
         assert!(git::resolve(&bare, &p.plan.destination).is_err());
-        let p = review_prepare(r.path(), &id, UserProfile::default())?;
+        let p = review_prepare(r.path(), &id, UserProfile::default(), None)?;
         // A receiver changes after inspection. Its new ref violates the absent-ref lease.
         let tree = git::run(Some(&bare), &["mktree"])?;
         let remote = git::run(
@@ -617,7 +760,84 @@ mod tests {
             git::run(Some(&bare), &["rev-parse", &p.plan.destination])?.trim(),
             remote.trim()
         );
-        assert!(prepare(r.path(), &id, UserProfile::default()).is_err());
+        assert!(prepare(r.path(), &id, UserProfile::default(), None).is_err());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod consent_tests {
+    use super::*;
+    #[test]
+    fn pure_outbox_consent_distinguishes_profiles_selected_accounts_scopes_and_legacy_without_secrets()
+     {
+        let mut a = UserProfile::default();
+        a.connections.github.user = "alice".into();
+        let ca = crate::connections::Context {
+            choices: a.connections.clone(),
+            ..Default::default()
+        };
+        let credentials = git::Credentials {
+            username: "alice".into(),
+            password: "test-secret-must-never-be-persisted".into(),
+            scope: Some(
+                git::CredentialScope::for_url("https://github.com/team/repo.git", "alice").unwrap(),
+            ),
+        };
+        let saved = Consent::capture(&a, &ca, Some(&credentials)).unwrap();
+        let encoded = serde_json::to_string(&saved).unwrap();
+        assert!(!encoded.contains(&credentials.password));
+        assert!(!encoded.contains("password"));
+        assert_eq!(serde_json::from_str::<Consent>(&encoded).unwrap(), saved);
+        assert!(Consent::require(None, &saved).is_err());
+        let mut b = a.clone();
+        b.id += 1;
+        let other_profile = Consent::capture(&b, &ca, Some(&credentials)).unwrap();
+        assert!(Consent::require(Some(&saved), &other_profile).is_err());
+        b = a.clone();
+        b.connections.github.user = "bob".into();
+        let cb = crate::connections::Context {
+            choices: b.connections.clone(),
+            ..Default::default()
+        };
+        assert!(
+            Consent::require(
+                Some(&saved),
+                &Consent::capture(&b, &cb, Some(&credentials)).unwrap()
+            )
+            .is_err()
+        );
+        assert!(Consent::capture(&b, &ca, Some(&credentials)).is_err());
+        let mut changed = credentials.clone();
+        changed.scope = Some(
+            git::CredentialScope::for_url("https://github.com/other/repo.git", "alice").unwrap(),
+        );
+        assert!(
+            Consent::require(
+                Some(&saved),
+                &Consent::capture(&a, &ca, Some(&changed)).unwrap()
+            )
+            .is_err()
+        );
+        changed = credentials.clone();
+        changed.username = "other".into();
+        assert!(
+            Consent::require(
+                Some(&saved),
+                &Consent::capture(&a, &ca, Some(&changed)).unwrap()
+            )
+            .is_err()
+        );
+        changed = credentials.clone();
+        changed.password = "rotated-secret-not-an-identity".into();
+        assert!(
+            Consent::require(
+                Some(&saved),
+                &Consent::capture(&a, &ca, Some(&changed)).unwrap()
+            )
+            .is_ok()
+        );
+        changed.scope = None;
+        assert!(Consent::capture(&a, &ca, Some(&changed)).is_err());
     }
 }
