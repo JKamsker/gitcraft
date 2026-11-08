@@ -1,6 +1,7 @@
 //! New versions of gitcraft, from its GitHub releases: looked for on every start, downloaded in
 //! the background and parked on disk, then put in place of this build with a restart.
 
+pub(crate) mod display;
 mod install;
 mod previous;
 

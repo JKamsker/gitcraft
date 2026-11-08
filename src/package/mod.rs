@@ -4,6 +4,7 @@
 
 mod archive;
 pub(crate) mod check;
+pub(crate) mod display;
 mod run;
 #[cfg(test)]
 mod tests;

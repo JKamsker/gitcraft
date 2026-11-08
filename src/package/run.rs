@@ -124,3 +124,7 @@ fn finish(
         said
     })
 }
+
+#[cfg(test)]
+#[path = "run/display_tests.rs"]
+mod display_tests;
