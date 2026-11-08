@@ -27,10 +27,11 @@ fn main() -> eframe::Result {
         .any(|flag| a == flag)
     });
     if args.len() == 1 && args.first().is_some_and(|a| a == "--help" || a == "-h") {
+        app::initialize_language();
         println!(
             "{}\n{}",
-            gitcraft::launch::args::USAGE,
-            gitcraft::standalone::USAGE
+            gitcraft::launch::args::usage(),
+            gitcraft::standalone::usage()
         );
         return Ok(());
     }
@@ -65,6 +66,8 @@ fn main() -> eframe::Result {
     if let Some(code) = app::checkpoint_cli() {
         std::process::exit(code);
     }
+    // Presentation only. All protocol/helper exits above stay free of settings/locale reads.
+    app::initialize_language();
     if args
         .first()
         .is_some_and(|a| a == "--diff" || a == "--difftool" || a == "--merge" || a == "--mergetool")
@@ -78,7 +81,7 @@ fn main() -> eframe::Result {
         };
         let options = eframe::NativeOptions {
             viewport: app::window_viewport()
-                .with_title("GitCraft file tools")
+                .with_title(gitcraft::standalone::window_title())
                 .with_inner_size([1400.0, 860.0])
                 .with_icon(app::window_icon()),
             wgpu_options: wgpu_options(),

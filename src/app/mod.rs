@@ -25,6 +25,8 @@ mod resident;
 pub(crate) use resident::notification_body as resident_notification_body;
 mod repo_scan;
 mod setup;
+mod startup_language;
+pub use startup_language::initialize_language;
 mod tab_strip;
 mod tabs;
 mod teleport;

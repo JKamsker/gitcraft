@@ -1363,3 +1363,17 @@ interaction-release-branch-moved = { $branch } ist nicht mehr bei { $commit } au
 interaction-release-files-changed = { $files } wurden seit der Release-Planung geändert: Committe oder stashe zuerst diese Änderungen
 interaction-release-version-missing = Die Version konnte in { $file } nicht gefunden werden
 interaction-release-write-failed = { $file } konnte nicht geschrieben werden: { $reason }
+interaction-startup-usage = Aufruf:
+    { "  " }gitcraft [<folder>]             Repository des Ordners öffnen
+    { "  " }gitcraft log <file>             Verlauf einer Datei
+    { "  " }gitcraft blame <file>[:<line>]  Dateiverantwortung anzeigen, bis zur Zeile gescrollt
+    { "  " }gitcraft blame -- <file>        Dateiverantwortung, Dateiname unverändert übernommen
+    { "  " }gitcraft show <rev>             Commit des Repositorys dieses Ordners
+    { "  " }gitcraft compare <a>..<b>       Unterschiede zwischen zwei Commits
+    { "                                  " }(a...b: Änderungen in b seit der Abzweigung)
+    { "  " }gitcraft <forge link>           Pull Request, Commit oder Datei einer Forge im Klon
+    { "                                  " }(oder gitcraft://open?url=<link>)
+    { "  " }gitcraft -- <folder>            Ordner mit einem Befehlsnamen
+    { "  " }gitcraft --clone | --open     Klondialog oder Ordnerauswahl
+    { "  " }gitcraft --quit               Laufende Instanz speichern und beenden
+    { "  " }gitcraft --help | --version

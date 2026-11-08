@@ -1363,3 +1363,17 @@ interaction-release-branch-moved = { $branch } isn't checked out at { $commit } 
 interaction-release-files-changed = { $files } changed since the release was planned: commit or stash that first
 interaction-release-version-missing = Couldn't find the version in { $file }
 interaction-release-write-failed = Couldn't write { $file }: { $reason }
+interaction-startup-usage = Usage:
+    { "  " }gitcraft [<folder>]             open the repository the folder is in
+    { "  " }gitcraft log <file>             a file's history
+    { "  " }gitcraft blame <file>[:<line>]  a file's blame, scrolled to that line
+    { "  " }gitcraft blame -- <file>        a file's blame, its name taken as it is
+    { "  " }gitcraft show <rev>             a commit of the repository of this folder
+    { "  " }gitcraft compare <a>..<b>       the files that differ between two commits
+    { "                                  " }(a...b: what b changed since they diverged)
+    { "  " }gitcraft <forge link>           a pull request, commit or file of a forge, in its clone
+    { "                                  " }(or gitcraft://open?url=<link>)
+    { "  " }gitcraft -- <folder>            a folder named like a command
+    { "  " }gitcraft --clone | --open     the clone dialog or folder picker
+    { "  " }gitcraft --quit               save and quit the running instance
+    { "  " }gitcraft --help | --version
