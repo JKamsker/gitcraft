@@ -33,6 +33,13 @@ impl RepoTab {
         let Some(run) = self.resolver.run.as_ref().filter(|r| r.review.is_none()) else {
             return;
         };
+        // A merge put aside: its card goes with its row, selected (elsewhere the row's pill
+        // says how far along it is).
+        if run.parked.is_some()
+            && self.selected_parked().map(|p| &p.id) != run.parked.as_ref().map(|p| &p.id)
+        {
+            return;
+        }
         let t = Tokens::get(ctx);
         let folded = self.resolver.folded;
         egui::Area::new(egui::Id::new(("gitcraft-resolver", &self.path)))

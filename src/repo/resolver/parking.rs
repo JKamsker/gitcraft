@@ -307,15 +307,15 @@ impl RepoTab {
         let Some(parked) = self.resolver.parked.iter().find(|p| p.id == id).cloned() else {
             return;
         };
-        // Its agent still at work: stopped first, so what it did is kept and shown.
-        let at_work = self.resolver.run.as_ref().is_some_and(|r| {
-            r.id == id && matches!(r.phase, Phase::Preparing | Phase::Working | Phase::Checking)
-        });
-        if at_work {
-            self.status = Some((
-                "The agent is still at it: stop it first, or wait for it".to_owned(),
-                true,
-            ));
+        // Its agent may go on working (in its own worktree): its work is then checked against
+        // the merge back in the worktree, as in place. Only while the merge is being put aside,
+        // or the agent's work kept with it, does it wait a moment.
+        let settling =
+            self.resolver.run.as_ref().is_some_and(|r| {
+                r.id == id && matches!(r.phase, Phase::Preparing | Phase::Checking)
+            });
+        if settling {
+            self.status = Some(("A moment: try again in a second".to_owned(), true));
             return;
         }
         let repo = self.path.clone();
@@ -347,6 +347,11 @@ impl RepoTab {
             return;
         };
         run.parked = None;
+        // Still at work: its card stays in sight, as for a run in place.
+        self.resolver.folded = false;
+        let Some(run) = self.resolver.run.as_ref() else {
+            return;
+        };
         if run.phase == Phase::Ready && !run.results.is_empty() {
             // What it did, to review and apply now that the merge is here.
             self.resolver.folded = false;

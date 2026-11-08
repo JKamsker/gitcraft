@@ -31,6 +31,8 @@ impl RepoTab {
             self.compare_panel(ui, acts);
         } else if wip {
             self.changes_panel(ui, acts);
+        } else if self.selected_parked().is_some() {
+            self.parked_panel(ui, acts);
         } else {
             self.commit_panel(ui, acts);
         }

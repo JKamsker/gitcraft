@@ -164,7 +164,7 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         if ui
-            .button("Bring it back")
+            .button("Bring it back (double-click)")
             .on_hover_text(
                 "Checks out its branch and puts the merge back as it was, conflicts and \
                  staged files included; the agent's work is then there to review",

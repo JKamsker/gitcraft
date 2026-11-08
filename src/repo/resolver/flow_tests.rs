@@ -19,16 +19,41 @@ use crate::settings::Settings;
 /// The command run in place of the agent, when set.
 pub(super) static STAND_IN: Mutex<Option<CommandLine>> = Mutex::new(None);
 
+/// Held by each test of the flow: they set the stand-in one at a time.
+static SERIAL: Mutex<()> = Mutex::new(());
+
 /// What the stand-in writes in place of the conflicted file.
 const RESOLVED: &str = "a both";
 
 /// A stand-in agent: writes `a.txt` without its conflict, says it is done as Claude Code does.
 fn stand_in() -> CommandLine {
+    slow_stand_in(0)
+}
+
+/// [`stand_in`], taking `secs` seconds first.
+fn slow_stand_in(secs: u32) -> CommandLine {
     let end = r#"{"type":"result","subtype":"success","is_error":false,"result":"kept both"}"#;
     CommandLine::Script {
-        sh: format!("printf '%s\\n' '{RESOLVED}' > a.txt; printf '%s\\n' '{end}'"),
-        cmd: format!("(echo {RESOLVED})> a.txt & echo {end}"),
+        sh: format!("sleep {secs}; printf '%s\\n' '{RESOLVED}' > a.txt; printf '%s\\n' '{end}'"),
+        cmd: format!(
+            "ping -n {} 127.0.0.1 >NUL & (echo {RESOLVED})> a.txt & echo {end}",
+            secs + 1
+        ),
     }
+}
+
+/// A repository in the middle of a merge of `side` into `main` that conflicts in `a.txt`,
+/// and a branch `other` to go to meanwhile.
+fn conflicted(name: &str) -> Result<Repo, String> {
+    let repo = Repo::new(name)?;
+    repo.commit("base", &[("a.txt", Some("a base\n"))])?;
+    repo.git(&["checkout", "-q", "-b", "side"])?;
+    repo.commit("side", &[("a.txt", Some("a side\n"))])?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit("main", &[("a.txt", Some("a main\n"))])?;
+    repo.git(&["branch", "other"])?;
+    assert!(repo.git(&["merge", "-q", "side"]).is_err());
+    Ok(repo)
 }
 
 type H<'a> = Harness<'a, Option<RepoTab>>;
@@ -83,6 +108,9 @@ fn phase(tab: &RepoTab) -> Option<Phase> {
 
 #[test]
 fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String> {
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let repo = Repo::new("resolver flow")?;
     repo.commit("base", &[("a.txt", Some("a base\n"))])?;
     repo.git(&["checkout", "-q", "-b", "side"])?;
@@ -220,5 +248,58 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
     }
     assert!(!kept.exists(), "the agent's kept work is removed");
     assert!(crate::resolver::park::list(&dir)?.is_empty());
+    Ok(())
+}
+
+/// Brought back while its agent still works: the merge is back at once, the agent goes on in
+/// its own worktree, and its work is then checked against the merge in the worktree.
+#[test]
+fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<(), String> {
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let repo = conflicted("resolver flow early")?;
+    if let Ok(mut s) = STAND_IN.lock() {
+        *s = Some(slow_stand_in(8));
+    }
+    let dir = repo.path().to_path_buf();
+    let mut h = harness(dir.clone());
+    assert!(wait(&mut h, |t| !t.opening() && t.work.conflicted.len() == 1));
+    act(&mut h, ResolverAct::Start(None));
+    assert!(wait(&mut h, |t| !t.resolver.parked.is_empty()
+        && phase(t) == Some(Phase::Working)));
+    let id = h
+        .state()
+        .as_ref()
+        .and_then(|t| t.resolver.run.as_ref())
+        .map(|r| r.id.clone())
+        .ok_or("no run")?;
+    repo.git(&["checkout", "-q", "other"])?;
+
+    act(&mut h, ResolverAct::BringBack(id));
+    assert!(
+        wait(&mut h, |t| t.resolver.parked.is_empty()
+            && t.resolver
+                .run
+                .as_ref()
+                .is_some_and(|r| r.parked.is_none())),
+        "brought back at once"
+    );
+    assert!(merging(&dir));
+    assert_eq!(
+        repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(),
+        "main"
+    );
+
+    assert!(
+        wait(&mut h, |t| phase(t) == Some(Phase::Ready)),
+        "the agent ends"
+    );
+    let tab = h.state().as_ref().ok_or("no tab")?;
+    let run = tab.resolver.run.as_ref().ok_or("no run")?;
+    assert!(run.results[0].1.applies(), "{:?}", run.results);
+    if let Ok(mut s) = STAND_IN.lock() {
+        *s = None;
+    }
     Ok(())
 }

@@ -270,15 +270,32 @@ fn the_card_in_each_state() -> Result<(), String> {
         let mut h = harness(repo.path().to_owned(), dark);
         settle(&mut h);
         let head = repo.git(&["rev-parse", "HEAD"])?.trim().to_owned();
-        for (name, phase, folded, review, put_aside) in [
-            ("working", Phase::Working, false, None, false),
-            ("ready", Phase::Ready, false, None, false),
-            ("folded", Phase::Working, true, None, false),
-            ("review", Phase::Ready, false, Some(false), false),
-            ("review-diff", Phase::Ready, false, Some(true), false),
-            ("parked-working", Phase::Working, true, None, true),
-            ("parked-ready", Phase::Ready, false, None, true),
+        // `pick`: the parked row selected (Some(true)), or a commit's (Some(false)).
+        for (name, phase, folded, review, put_aside, pick) in [
+            ("working", Phase::Working, false, None, false, None),
+            ("ready", Phase::Ready, false, None, false, None),
+            ("folded", Phase::Working, true, None, false, None),
+            ("review", Phase::Ready, false, Some(false), false, None),
+            ("review-diff", Phase::Ready, false, Some(true), false, None),
+            (
+                "parked-working",
+                Phase::Working,
+                false,
+                None,
+                true,
+                Some(true),
+            ),
+            ("parked-ready", Phase::Ready, false, None, true, Some(true)),
+            (
+                "parked-elsewhere",
+                Phase::Working,
+                false,
+                None,
+                true,
+                Some(false),
+            ),
         ] {
+            let ctx = h.ctx.clone();
             if let Some(tab) = h.state_mut().as_mut() {
                 let mut run = run(phase, Instant::now());
                 run.review = review.map(under_review);
@@ -288,6 +305,9 @@ fn the_card_in_each_state() -> Result<(), String> {
                     branch: Some("main".into()),
                     head: head.clone(),
                     theirs_name: Some("dev".into()),
+                    // A real commit, for its files to show.
+                    snapshot: head.clone(),
+                    files: vec!["a.txt".into()],
                     at: crate::git::now() - 200,
                     ..Default::default()
                 });
@@ -296,9 +316,21 @@ fn the_card_in_each_state() -> Result<(), String> {
                 tab.resolver.run = Some(run);
                 tab.resolver.folded = folded;
                 tab.rebuild_rows();
+                let parked_row = tab
+                    .commits
+                    .iter()
+                    .position(|c| c.hash.starts_with("\u{0}parked:"));
+                let other = tab.commits.iter().position(|c| c.hash == head);
+                match pick {
+                    Some(true) => parked_row.into_iter().for_each(|i| tab.select(i, &ctx)),
+                    Some(false) => other.into_iter().for_each(|i| tab.select(i, &ctx)),
+                    None => {}
+                }
             }
-            for _ in 0..4 {
+            // The files read in the background come in.
+            for _ in 0..30 {
                 h.step();
+                std::thread::sleep(std::time::Duration::from_millis(20));
             }
             let theme = if dark { "dark" } else { "light" };
             let image = h.render()?;

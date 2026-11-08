@@ -281,6 +281,14 @@ impl RepoTab {
                             .flatten();
                         acts.push(compare.unwrap_or(Action::Select(i)));
                     }
+                    // A merge put aside, double-clicked: brought back (from any branch).
+                    if resp.double_clicked()
+                        && let Some(parked) = self.parked_at(i)
+                    {
+                        acts.push(Action::Resolver(super::resolver::ResolverAct::BringBack(
+                            parked.id.clone(),
+                        )));
+                    }
                     if resp.secondary_clicked() {
                         let hash = self.commits[i].hash.clone();
                         ui.data_mut(|d| d.insert_temp(menu_row_id(), hash));

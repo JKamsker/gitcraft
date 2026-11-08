@@ -59,12 +59,11 @@ impl RepoTab {
             self.drop_extras();
             return;
         }
-        // A merge put aside: its agent's card, nothing to read of a commit.
-        if self.parked_at(row).is_some() {
-            self.detail = None;
-            self.detail_hash = None;
+        // A merge put aside: its agent's card, and its files (as the commit they are kept as).
+        if let Some(snapshot) = self.parked_at(row).map(|p| p.snapshot.clone()) {
             self.drop_extras();
             self.resolver_show();
+            self.fetch_detail(snapshot, ctx);
             return;
         }
         self.load_detail(hash, ctx);
@@ -80,6 +79,15 @@ impl RepoTab {
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
         self.load_extras(&hash, ctx);
+        self.fetch_detail(hash, ctx);
+    }
+
+    /// Reads the commit `hash`'s detail (its message, files…) in the background, without what
+    /// the commit panel adds (its builds, branches, notes): for a merge put aside's files.
+    pub(super) fn fetch_detail(&mut self, hash: String, ctx: &egui::Context) {
+        self.detail = None;
+        self.detail_error = None;
+        self.detail_hash = Some(hash.clone());
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
             let detail = git::commit_detail(&path, &hash);

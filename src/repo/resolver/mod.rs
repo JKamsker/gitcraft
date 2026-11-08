@@ -3,6 +3,7 @@
 //! plan, each step and what it is doing on a card of its own ([`panel`]). Once it is done the
 //! user applies what it resolved: those files are written here and marked resolved.
 
+mod detail;
 mod graph;
 mod panel;
 mod parking;
