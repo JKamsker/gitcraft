@@ -375,6 +375,7 @@ mod tests {
         .set(&ctx);
         crate::audio::take_recorded();
         let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
+        tab.remotes = crate::git::remotes(&f.repo)?;
         tab.life.phase = super::super::lifecycle::Phase::Live;
         tab.loading = true;
         tab.celebration_begin("Commit", &[vec!["commit".into()]], &ctx);
@@ -420,11 +421,13 @@ mod tests {
                     .is_some_and(|s| s == crate::push_preflight::APPROVED)))
         );
         assert!(
-            tab.status
-                .as_ref()
-                .is_some_and(|(text, failed)| *failed && text.contains("stale info")),
+            tab.activity
+                .entries
+                .back()
+                .is_some_and(|entry| matches!(&entry.outcome,
+                super::super::activity::Outcome::Failed(error) if error.contains("stale info"))),
             "{:?}",
-            tab.status
+            tab.activity.entries.back()
         );
         assert_eq!(f.receiver_head()?, theirs);
 
