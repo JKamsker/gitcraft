@@ -1,0 +1,103 @@
+{
+  "commit": "9737efa031d96d6b79f75ee0ef507b4275573b7d",
+  "base": "cea7dfb5ddcc290352958b63566cfd3e515a0d9f",
+  "checks": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 1.78
+    },
+    {
+      "name": "whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.01
+    },
+    {
+      "name": "suite",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--",
+        "--test-threads=4",
+        "--skip",
+        "parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped"
+      ],
+      "exitCode": 0,
+      "seconds": 217.24
+    },
+    {
+      "name": "isolated-timeout",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "-p",
+        "gitcraft",
+        "--lib",
+        "parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped",
+        "--",
+        "--exact"
+      ],
+      "exitCode": 0,
+      "seconds": 4.94
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "exitCode": 0,
+      "seconds": 11.65
+    },
+    {
+      "name": "inventory",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "--",
+        "--list"
+      ],
+      "exitCode": 0,
+      "seconds": 0.3
+    },
+    {
+      "name": "ui-build",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--locked",
+        "--example",
+        "ui_shot"
+      ],
+      "exitCode": 0,
+      "seconds": 0.25
+    }
+  ]
+}

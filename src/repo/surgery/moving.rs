@@ -169,7 +169,7 @@ impl RepoTab {
             self.status = Some((format!("Move changes: {why}"), true));
             return;
         }
-        let line = quick_edit::first_parents(&self.commits, &self.index, &self.refs.head);
+        let line = quick_edit::first_parents(&self.history, &self.history_index, &self.refs.head);
         let Some(depth) = line.iter().position(|c| c.hash == hash) else {
             return;
         };

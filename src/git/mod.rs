@@ -24,6 +24,7 @@ pub mod errors;
 pub mod external_tool;
 mod files;
 mod fold;
+pub mod history_scope;
 mod hooks;
 mod interaction;
 mod lfs;

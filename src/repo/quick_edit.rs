@@ -144,7 +144,7 @@ impl RepoTab {
         idle: bool,
         acts: &mut Vec<Action>,
     ) {
-        let line = first_parents(&self.commits, &self.index, &self.refs.head);
+        let line = first_parents(&self.history, &self.history_index, &self.refs.head);
         let blocked = if self.refs.current.is_none() {
             Some("HEAD is detached: check out a branch first".to_owned())
         } else {
@@ -236,9 +236,7 @@ impl RepoTab {
 
     /// Opens the editor of the message of `hash` in the detail pane, once its detail is in.
     pub(super) fn edit_message(&mut self, hash: String, ctx: &egui::Context) {
-        if let Some(&row) = self.index.get(&hash) {
-            self.select(row, ctx);
-        }
+        self.goto(&hash, ctx);
         let mut settings = crate::settings::Settings::get(ctx);
         if !settings.show_detail {
             settings.show_detail = true;

@@ -320,7 +320,7 @@ fn whole_life(family: &'static GiteaFamily) -> Result<(), String> {
             &other.to_string_lossy(),
         ],
     )?;
-    let files = pull_request::files(&other, d, &git::remotes(&other)?, None)?;
+    let files = pull_request::files(&other, &hosting, d, &git::remotes(&other)?, None)?;
     let mut changed: Vec<&str> = files.files.iter().map(|f| f.path.as_str()).collect();
     changed.sort();
     ensure!(changed == ["a.txt", "b.txt"], "changes {changed:?}");
@@ -766,8 +766,14 @@ fn pull_request_from_a_fork(
     };
     let setup = crate::repo::forks::plan::read_setup(dir)?;
     let locals = vec!["main".to_owned(), "feat".to_owned(), "wip".to_owned()];
-    let plan =
-        crate::repo::forks::plan::checkout(info, &git::remotes(dir)?, &setup, &locals, "main")?;
+    let plan = crate::repo::forks::plan::checkout(
+        info,
+        &git::remotes(dir)?,
+        &setup,
+        &locals,
+        "main",
+        Some(hosting),
+    )?;
     for step in &plan.steps {
         let args: Vec<&str> = step.iter().map(String::as_str).collect();
         git::run_with(Some(dir), &args, Some(&creds))?;

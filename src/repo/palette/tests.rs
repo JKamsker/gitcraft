@@ -127,6 +127,8 @@ fn a_selected_commit_puts_its_actions_first() {
         .enumerate()
         .map(|(i, c)| (c.hash.clone(), i))
         .collect();
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
     tab.selected = Some(1);
     let items = tab.palette_items();
     let got = labels(&items);
@@ -176,6 +178,8 @@ fn the_uncommitted_changes_row_and_merges_offer_less() {
     tab.commits = vec![commit(WIP_HASH, 1), commit(&"b".repeat(40), 2)];
     tab.selected = Some(0);
     assert!(!tab.palette_items().iter().any(|i| i.selection));
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
     tab.selected = Some(1);
     let items = tab.palette_items();
     assert!(!labels(&items).iter().any(|l| l.starts_with("Create patch")));
@@ -257,4 +261,63 @@ fn the_generation_changes_with_the_selection() {
     let opened = tab.palette_generation();
     tab.busy_op = Some("Push".to_owned());
     assert_ne!(opened, tab.palette_generation());
+}
+
+#[test]
+fn area_d_hidden_optional_tools_stay_in_palette_with_selected_commit_scope() {
+    let mut tab = tab_with_branches(1);
+    let head = "a".repeat(40);
+    let selected = "b".repeat(40);
+    let root = "c".repeat(40);
+    tab.commits = vec![
+        std::sync::Arc::new(Commit {
+            hash: head.clone(),
+            parents: vec![selected.clone()],
+            ..Default::default()
+        }),
+        std::sync::Arc::new(Commit {
+            hash: selected.clone(),
+            parents: vec![root.clone()],
+            ..Default::default()
+        }),
+        std::sync::Arc::new(Commit {
+            hash: root,
+            ..Default::default()
+        }),
+    ];
+    tab.index = tab
+        .commits
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.hash.clone(), i))
+        .collect();
+    tab.history = tab.commits.clone();
+    tab.history_index = tab.index.clone();
+    tab.selected = Some(1);
+    let items = tab.palette_items();
+    for key in [
+        "commit:split",
+        "commit:move",
+        "commit:bisect",
+        "commit:parallel-bisect",
+        "commit:test",
+        "commit:release",
+        "pick:rehearse",
+    ] {
+        assert!(
+            items.iter().any(|i| i.key == key),
+            "{key} missing with default (hidden) menu options"
+        );
+    }
+    assert!(items.iter().any(
+        |i| matches!(&i.run, PaletteRun::Action(Action::OpenSplit(hash)) if hash == &selected)
+    ));
+    assert!(items.iter().any(
+        |i| matches!(&i.run, PaletteRun::Action(Action::OpenMove(hash)) if hash == &selected)
+    ));
+    tab.refs.current = None;
+    assert!(!tab.palette_items().iter().any(|i| matches!(
+        &i.run,
+        PaletteRun::Action(Action::OpenSplit(_) | Action::OpenMove(_))
+    )));
 }

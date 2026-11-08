@@ -39,6 +39,24 @@ pub fn log(
     skip: usize,
     limit: usize,
 ) -> Result<Vec<Commit>, String> {
+    log_scoped(
+        repo,
+        from,
+        order,
+        skip,
+        limit,
+        &super::history_scope::default_hidden_namespaces(),
+    )
+}
+
+pub fn log_scoped(
+    repo: &Path,
+    from: Option<&[String]>,
+    order: LogOrder,
+    skip: usize,
+    limit: usize,
+    excluded: &[String],
+) -> Result<Vec<Commit>, String> {
     // No revisions would make git log HEAD.
     if from.is_some_and(|revs| revs.is_empty()) {
         return Ok(Vec::new());
@@ -46,7 +64,11 @@ pub fn log(
     let limit = format!("--max-count={limit}");
     let out = match run(
         Some(repo),
-        &log_args(from, order, skip, Some(&limit)).as_args(),
+        &log_args(from, order, skip, Some(&limit), excluded)
+            .as_args()
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
     ) {
         Ok(out) => out,
         // A freshly initialised repository has no commits yet.
@@ -66,7 +88,7 @@ pub fn log(
 /// reads them. Asked a hundred at a time, so the command line stays short (Windows allows
 /// 32k characters).
 pub fn commits_of(repo: &Path, hashes: &[String]) -> Result<Vec<Commit>, String> {
-    let format = log_args(None, LogOrder::default(), 0, None).format;
+    let format = log_args(None, LogOrder::default(), 0, None, &[]).format;
     let mut commits = Vec::with_capacity(hashes.len());
     for chunk in hashes.chunks(100) {
         let mut args = vec![
@@ -105,6 +127,7 @@ fn log_args<'a>(
     order: LogOrder,
     skip: usize,
     limit: Option<&'a str>,
+    excluded: &'a [String],
 ) -> LogArgs<'a> {
     LogArgs {
         order,
@@ -113,6 +136,7 @@ fn log_args<'a>(
         skip: format!("--skip={skip}"),
         limit,
         from,
+        excluded,
     }
 }
 
@@ -122,16 +146,21 @@ struct LogArgs<'a> {
     skip: String,
     limit: Option<&'a str>,
     from: Option<&'a [String]>,
+    excluded: &'a [String],
 }
 
 impl LogArgs<'_> {
-    fn as_args(&self) -> Vec<&str> {
+    fn as_args(&self) -> Vec<String> {
         let mut args = vec!["log", NO_SIGNATURE, UTF8];
         args.extend(self.order.args());
         args.extend(["--date=format-local:%Y-%m-%d %H:%M", &self.skip]);
         args.extend(self.limit);
         args.push(&self.format);
-        push_revisions(&mut args, self.from);
+        let mut args: Vec<String> = args.into_iter().map(str::to_owned).collect();
+        args.extend(super::history_scope::revision_args(
+            self.from,
+            self.excluded,
+        ));
         args
     }
 }
@@ -205,14 +234,31 @@ struct Paged {
     from: Option<Vec<String>>,
     order: LogOrder,
     skip: usize,
+    excluded: Vec<String>,
 }
 impl LogStream {
     /// The commits of `from` (else every branch) in `order`, after the first `skip`.
+    #[cfg(test)]
     pub fn start(
         repo: &Path,
         from: Option<&[String]>,
         order: LogOrder,
         skip: usize,
+    ) -> Result<Self, String> {
+        Self::start_scoped(
+            repo,
+            from,
+            order,
+            skip,
+            &super::history_scope::default_hidden_namespaces(),
+        )
+    }
+    pub fn start_scoped(
+        repo: &Path,
+        from: Option<&[String]>,
+        order: LogOrder,
+        skip: usize,
+        excluded: &[String],
     ) -> Result<Self, String> {
         Ok(Self {
             paged: if from.is_some_and(|revs| revs.is_empty()) {
@@ -223,6 +269,7 @@ impl LogStream {
                     from: from.map(<[String]>::to_vec),
                     order,
                     skip,
+                    excluded: excluded.to_vec(),
                 })
             },
         })
@@ -232,12 +279,13 @@ impl LogStream {
         let Some(paged) = &mut self.paged else {
             return Ok(Vec::new());
         };
-        let page = log(
+        let page = log_scoped(
             &paged.repo,
             paged.from.as_deref(),
             paged.order,
             paged.skip,
             n,
+            &paged.excluded,
         )?;
         paged.skip += page.len();
         Ok(page)
@@ -413,8 +461,7 @@ pub(super) fn push_revisions<'a>(args: &mut Vec<&'a str>, from: Option<&'a [Stri
             "--exclude=refs/gitcraft/*",
             "--exclude=refs/notes/*",
             "--exclude=refs/prefetch/*",
-            // Agent turns saved by `gitcraft checkpoint`: shown with the changes, not as history.
-            "--exclude=refs/gitcraft/*",
+            "--exclude=refs/t3/*",
             "--all",
         ]),
     }

@@ -96,10 +96,17 @@ fn a_rebase_keeps_both_versions_and_offers_to_compare_them() -> Result<(), Strin
     assert!(wait(&mut tab, &ctx, |t| t.versions.fresh.is_some()));
     let after = git(dir, &["rev-parse", "HEAD"])?;
     let main = git(dir, &["rev-parse", "main"])?;
+    assert!(wait(&mut tab, &ctx, |t| t.status.as_ref().is_some_and(
+        |(s, failed)| { !failed && s.ends_with("(receipt in the timeline, Ctrl+Shift+Z)") }
+    )));
     let status = tab.status.clone();
     assert_eq!(
         status,
-        Some(("Rebase topic onto main: done".to_owned(), false))
+        Some((
+            "Rebase topic onto main: done. Final files differ, authors kept, messages kept (receipt in the timeline, Ctrl+Shift+Z)"
+                .to_owned(),
+            false
+        ))
     );
     let kept = git::rewrites(dir)?;
     assert_eq!(kept.len(), 1);
@@ -298,7 +305,11 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         path: "acme/app".to_owned(),
         web: "https://github.com".to_owned(),
     });
-    let key = "github.com/acme/app";
+    let key = tab
+        .hosting
+        .as_ref()
+        .and_then(|h| h.review_repository_key())
+        .ok_or("missing canonical review key")?;
     let main = git(dir, &["rev-parse", "main"])?;
     let topic = git(dir, &["rev-parse", "topic"])?;
     let base = git(dir, &["merge-base", "main", "topic"])?;
@@ -319,15 +330,15 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         .is_some_and(|v| v.data.is_some())));
     std::thread::sleep(std::time::Duration::from_millis(100));
     tab.poll(&ctx);
-    assert_eq!(git::reviewed(dir, key, 4)?, None);
+    assert_eq!(git::reviewed(dir, &key, 4)?, None);
 
     tab.show_pr_since(since(&topic), &ctx);
-    assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, key, 4)
+    assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, &key, 4)
         .ok()
         .flatten()
         .is_some()));
     assert_eq!(
-        git::reviewed(dir, key, 4)?,
+        git::reviewed(dir, &key, 4)?,
         Some(git::Series::new(&base, &topic))
     );
     assert_eq!(tab.versions.seen_heads.get(&4), Some(&topic));

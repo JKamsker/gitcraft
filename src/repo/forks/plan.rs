@@ -4,7 +4,8 @@
 
 use std::path::Path;
 
-use crate::forge::ForkInfo;
+use super::guard::{CheckoutDestination, Destination};
+use crate::forge::{ForkInfo, Hosting};
 use crate::git::{self, Remote};
 use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
 
@@ -141,16 +142,6 @@ pub(crate) struct Checkout {
     pub undo: Vec<Vec<String>>,
 }
 
-/// Whether two remote URLs are the same repository, however they're written.
-fn same_repository(a: &str, b: &str) -> bool {
-    match (crate::forge::location(a), crate::forge::location(b)) {
-        (Some((ha, pa)), Some((hb, pb))) => {
-            ha.eq_ignore_ascii_case(&hb) && pa.eq_ignore_ascii_case(&pb)
-        }
-        _ => a.trim_end_matches('/') == b.trim_end_matches('/'),
-    }
-}
-
 /// Whether a remote URL is reached over SSH: `ssh://…`, or `user@host:path`.
 fn is_ssh(url: &str) -> bool {
     url.starts_with("ssh://")
@@ -161,12 +152,25 @@ fn is_ssh(url: &str) -> bool {
 }
 
 /// The remote that is `info`'s fork (by its URL, however written), if there is one.
-pub(crate) fn fork_remote(info: &ForkInfo, remotes: &[Remote]) -> Option<String> {
+pub(crate) fn fork_remote(
+    info: &ForkInfo,
+    remotes: &[Remote],
+    hosting: Option<&Hosting>,
+) -> Option<String> {
+    let fork = hosting
+        .filter(|_| !info.repo_path.is_empty())
+        .map(|h| Hosting {
+            path: info.repo_path.clone(),
+            ..h.clone()
+        });
     remotes
         .iter()
         .find(|r| {
-            (!info.clone_https.is_empty() && same_repository(&r.url, &info.clone_https))
-                || (!info.clone_ssh.is_empty() && same_repository(&r.url, &info.clone_ssh))
+            // Exact advertised URLs also support owned local fixtures. Otherwise use the
+            // selected forge's identity; an HTTP remote cannot bypass its port via clone_ssh.
+            [&info.clone_https, &info.clone_ssh].iter().any(|url| {
+                !url.is_empty() && r.url.trim_end_matches('/') == url.trim_end_matches('/')
+            }) || fork.as_ref().is_some_and(|h| h.matches_git_remote(&r.url))
         })
         .map(|r| r.name.clone())
 }
@@ -206,6 +210,7 @@ pub(crate) fn checkout(
     setup: &Setup,
     locals: &[String],
     previous: &str,
+    hosting: Option<&Hosting>,
 ) -> Result<Checkout, String> {
     if !info.cross {
         return Err(format!(
@@ -227,7 +232,8 @@ pub(crate) fn checkout(
     }
     let origin = remotes
         .iter()
-        .find(|r| r.name == "origin")
+        .find(|r| hosting.is_some_and(|h| h.matches_git_remote(&r.url)))
+        .or_else(|| remotes.iter().find(|r| r.name == "origin"))
         .or_else(|| remotes.first());
     let ssh = origin.is_some_and(|r| is_ssh(&r.url));
     let url = if ssh && !info.clone_ssh.is_empty() {
@@ -241,7 +247,16 @@ pub(crate) fn checkout(
             info.owner
         ));
     }
-    let (remote, new_remote) = match fork_remote(info, remotes) {
+    if let Some(hosting) = hosting {
+        let fork = Hosting {
+            path: info.repo_path.clone(),
+            ..hosting.clone()
+        };
+        if !fork.matches_git_remote(&url) {
+            return Err("The advertised fork clone URL does not match this primary forge".into());
+        }
+    }
+    let (remote, new_remote) = match fork_remote(info, remotes, hosting) {
         Some(r) => (r, false),
         None => {
             let base = remote_name(&info.owner);
@@ -263,6 +278,15 @@ pub(crate) fn checkout(
     ]);
     let mut steps = Vec::new();
     let mut undo = Vec::new();
+    if let Some(hosting) = hosting {
+        let fork = Hosting {
+            path: info.repo_path.clone(),
+            ..hosting.clone()
+        };
+        let guard = CheckoutDestination::new(&remote, &url, new_remote, &fork).step();
+        steps.push(guard.clone());
+        undo.push(guard);
+    }
     if new_remote {
         steps.push(strings(&["remote", "add", "--", &remote, &url]));
         steps.push(strings(&[
@@ -357,25 +381,47 @@ pub(crate) struct Rebase {
     pub tracking: String,
     /// The commits the base has that the branch hasn't.
     pub behind: usize,
+    /// Captured effective URLs, rechecked before every step and push.
+    pub(super) destinations: Vec<Destination>,
+    pub(super) base_head: String,
 }
 
 /// Plans rebasing the checked-out branch, set up for `info`'s fork, onto `base` of `upstream`
 /// (fetched first, as is the fork's branch). Refused when the fork's branch has commits the
 /// branch hasn't (the push would throw them away), or with changes not committed.
-pub(crate) fn plan_rebase(
+pub(super) fn plan_rebase(
     repo: &Path,
     info: &ForkInfo,
-    upstream: &str,
+    upstream: &Remote,
     setup: &Setup,
     creds: Option<&git::Credentials>,
+    hosting: Option<&Hosting>,
+    scope: Option<&super::guard::Scope>,
 ) -> Result<Rebase, String> {
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     let remotes = git::remotes(repo)?;
-    let fork = fork_remote(info, &remotes).ok_or_else(|| {
+    if !remotes.iter().any(|r| r == upstream)
+        || hosting.is_some_and(|h| !h.matches_git_remote(&upstream.url))
+    {
+        return Err("The selected primary remote changed; plan the rebase again".into());
+    }
+    let base_destination = Destination::read(repo, &upstream.name)?;
+    base_destination.validate(hosting, false)?;
+    let fork = fork_remote(info, &remotes, hosting).ok_or_else(|| {
         format!(
             "Check out #{}'s branch to push to {} first: no remote is their fork",
             info.number, info.owner
         )
     })?;
+    let fork_destination = Destination::read(repo, &fork)?;
+    let fork_hosting = hosting.map(|h| Hosting {
+        path: info.repo_path.clone(),
+        ..h.clone()
+    });
+    fork_destination.validate(fork_hosting.as_ref(), false)?;
+    fork_destination.validate(fork_hosting.as_ref(), true)?;
     let full = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
     let local = full
         .trim()
@@ -401,27 +447,36 @@ pub(crate) fn plan_rebase(
         return Err("Commit or stash your changes first: this rebases the branch".to_owned());
     }
     let tracking = format!("refs/remotes/{fork}/{}", info.branch);
-    let onto = format!("refs/remotes/{upstream}/{}", info.base);
+    let onto = format!("refs/remotes/{}/{}", upstream.name, info.base);
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     git::run_with(
         Some(repo),
         &[
             "fetch",
             "--",
-            fork.as_str(),
+            &fork_destination.fetch[0],
             &format!("+refs/heads/{}:{tracking}", info.branch),
         ],
         creds,
     )?;
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     git::run_with(
         Some(repo),
         &[
             "fetch",
             "--",
-            upstream,
+            &base_destination.fetch[0],
             &format!("+refs/heads/{}:{onto}", info.base),
         ],
         creds,
     )?;
+    if let Some(scope) = scope {
+        scope.check_remote(repo)?;
+    }
     let head = git::head(repo);
     let seen = git::resolve(repo, &tracking)?;
     let missing = count(repo, &format!("{head}..{seen}"))?;
@@ -433,22 +488,25 @@ pub(crate) fn plan_rebase(
             if missing == 1 { "" } else { "s" }
         ));
     }
-    let behind = count(repo, &format!("{head}..{onto}"))?;
+    let base_head = git::resolve(repo, &onto)?;
+    let behind = count(repo, &format!("{head}..{base_head}"))?;
     if behind == 0 {
         return Err(format!(
-            "{local} already has every commit of {upstream}/{}",
-            info.base
+            "{local} already has every commit of {}/{}",
+            upstream.name, info.base
         ));
     }
     Ok(Rebase {
         local,
         fork,
         branch: info.branch.clone(),
-        onto,
+        onto: onto.clone(),
         head,
         seen,
         tracking,
         behind,
+        base_head,
+        destinations: vec![base_destination, fork_destination],
     })
 }
 
@@ -464,32 +522,33 @@ impl Rebase {
         format!("refs/heads/{}", self.local)
     }
 
+    fn guards(&self) -> Vec<Vec<String>> {
+        self.destinations.iter().map(Destination::step).collect()
+    }
     fn rebase(&self) -> Vec<String> {
-        strings(&["-c", "rebase.updateRefs=false", "rebase", &self.onto])
+        strings(&["-c", "rebase.updateRefs=false", "rebase", &self.base_head])
     }
 
     /// The rebase and the push, only while the branch is where the plan saw it.
     pub(crate) fn steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref_at(&local, &self.head),
-            self.rebase(),
-            self.push(&local, Some(&self.seen)),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref_at(&local, &self.head),
+                self.rebase(),
+                self.push(&local, &self.seen),
+            ])
+            .collect()
     }
 
-    /// The push of `what` to the fork's branch, replacing it only if it is `seen` (or, without
-    /// one, what was last fetched of it).
-    fn push(&self, what: &str, seen: Option<&str>) -> Vec<String> {
+    /// Replace exactly the commit captured for this destination, independent of tracking refs.
+    fn push(&self, what: &str, seen: &str) -> Vec<String> {
         let target = format!("refs/heads/{}", self.branch);
-        let lease = match seen {
-            Some(seen) => format!("--force-with-lease={target}:{seen}"),
-            None => format!("--force-with-lease={target}"),
-        };
         strings(&[
             "push",
-            &lease,
+            &format!("--force-with-lease={target}:{seen}"),
             "--",
             &self.fork,
             &format!("{what}:{target}"),
@@ -498,35 +557,54 @@ impl Rebase {
 
     /// The push alone, of the branch as it is now (after a rebase continued past conflicts, or
     /// to retry after signing in): replacing the fork's branch only if it is still `seen`.
-    pub(crate) fn push_now(&self) -> Vec<Vec<String>> {
-        vec![self.push(&self.local_ref(), Some(&self.seen))]
+    pub(crate) fn push_now(&self, tip: &str) -> Vec<Vec<String>> {
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &self.local_ref()),
+                expect_ref_at(&self.local_ref(), tip),
+                self.push(tip, &self.seen),
+            ])
+            .collect()
     }
 
     /// The fork's branch back as it was, only while it is what was pushed.
     pub(crate) fn fork_undo_steps(&self) -> Vec<Vec<String>> {
-        vec![expect_ref(&self.tracking), self.push(&self.head, None)]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_ref(&self.tracking),
+                self.push(&self.head, super::guard::PUSHED_TIP),
+            ])
+            .collect()
     }
 
     /// Back as it was: on the fork first, then here.
     pub(crate) fn undo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref(&local),
-            expect_ref(&self.tracking),
-            self.push(&self.head, None),
-            strings(&["reset", "--keep", &self.head]),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref(&local),
+                expect_ref(&self.tracking),
+                self.push(&self.head, super::guard::PUSHED_TIP),
+                strings(&["reset", "--keep", &self.head]),
+            ])
+            .collect()
     }
 
     pub(crate) fn redo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();
-        vec![
-            expect_symref("HEAD", &local),
-            expect_ref(&local),
-            self.rebase(),
-            self.push(&local, None),
-        ]
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref(&local),
+                self.rebase(),
+                self.push(&local, &self.head),
+            ])
+            .collect()
     }
 
     /// The undo of a rebase whose push failed: the branch back, here only.
@@ -601,14 +679,76 @@ mod tests {
 
     #[test]
     fn urls_of_the_same_repository_are_the_same() {
-        assert!(same_repository(
-            "git@github.com:Ann/App.git",
-            "https://github.com/ann/app"
-        ));
-        assert!(!same_repository(
-            "git@github.com:ann/app.git",
-            "https://github.com/ann/other"
-        ));
+        let h = Hosting {
+            forge: crate::forge::Forge::GitHub,
+            host: "github.com".into(),
+            path: "ann/app".into(),
+            web: "https://github.com".into(),
+        };
+        assert!(h.matches_git_remote("git@github.com:Ann/App.git"));
+        assert!(!h.matches_git_remote("https://github.com/ann/other"));
+    }
+
+    #[test]
+    fn review13_fork_remote_reuse_keeps_web_authority_and_gitlab_case() {
+        use crate::forge::Forge;
+        for (forge, path) in [
+            (Forge::Forgejo, "Team/Repo"),
+            (Forge::GitLab, "Group/Project"),
+        ] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "upstream/repo".into(),
+                web: "https://forge.example:4000/reviews".into(),
+            };
+            let mut fork = info();
+            fork.repo_path = path.into();
+            fork.clone_https = format!("{}/{path}.git", h.web);
+            fork.clone_ssh = format!("git@forge.example:{path}.git");
+            let remotes = [
+                remote(
+                    "wrong-port",
+                    &format!("https://forge.example:3000/reviews/{path}.git"),
+                ),
+                remote(
+                    "wrong-prefix",
+                    &format!("https://forge.example:4000/{path}.git"),
+                ),
+                remote(
+                    "wrong-prefix-case",
+                    &format!("https://forge.example:4000/REVIEWS/{path}.git"),
+                ),
+                remote("selected", &fork.clone_https),
+            ];
+            assert_eq!(
+                fork_remote(&fork, &remotes, Some(&h)).as_deref(),
+                Some("selected")
+            );
+            let remotes = [
+                remote(
+                    "wrong-case",
+                    "https://forge.example:4000/reviews/group/project.git",
+                ),
+                remote(
+                    "selected",
+                    &format!("ssh://git@forge.example:2222/{path}.git"),
+                ),
+            ];
+            assert_eq!(
+                fork_remote(&fork, &remotes, Some(&h)).as_deref(),
+                Some("selected")
+            );
+        }
+    }
+
+    fn selected_hosting() -> Hosting {
+        Hosting {
+            forge: crate::forge::Forge::GitHub,
+            host: "example.org".into(),
+            path: "acme/app".into(),
+            web: "https://example.org".into(),
+        }
     }
 
     fn info() -> ForkInfo {
@@ -616,6 +756,7 @@ mod tests {
             number: 7,
             cross: true,
             owner: "ann".into(),
+            repo_path: "ann/app".into(),
             clone_https: "https://example.org/ann/app.git".into(),
             clone_ssh: "git@example.org:ann/app.git".into(),
             branch: "fix".into(),
@@ -636,13 +777,13 @@ mod tests {
     fn a_checkout_is_refused_where_the_author_doesnt_allow_it() {
         let mut no = info();
         no.maintainers_can_edit = false;
-        assert!(checkout(&no, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&no, &[], &Setup::default(), &[], "main", None).is_err());
         let mut own = info();
         own.cross = false;
-        assert!(checkout(&own, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&own, &[], &Setup::default(), &[], "main", None).is_err());
         let mut odd = info();
         odd.branch = "-x".into();
-        assert!(checkout(&odd, &[], &Setup::default(), &[], "main").is_err());
+        assert!(checkout(&odd, &[], &Setup::default(), &[], "main", None).is_err());
     }
 
     #[test]
@@ -657,6 +798,7 @@ mod tests {
             &Setup::default(),
             &["fix".into()],
             "main",
+            Some(&selected_hosting()),
         );
         assert!(plan.is_ok(), "{plan:?}");
         let Ok(plan) = plan else { return };
@@ -674,7 +816,14 @@ mod tests {
             remote("origin", "https://example.org/acme/app.git"),
             remote("annie", "https://example.org/ann/app"),
         ];
-        let plan = checkout(&info(), &remotes, &Setup::default(), &[], "main");
+        let plan = checkout(
+            &info(),
+            &remotes,
+            &Setup::default(),
+            &[],
+            "main",
+            Some(&selected_hosting()),
+        );
         assert!(plan.is_ok_and(|p| p.remote == "annie" && !p.new_remote && p.local == "fix"));
     }
 }

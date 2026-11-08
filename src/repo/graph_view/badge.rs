@@ -94,6 +94,7 @@ impl Badge {
 
 /// Turns `git log --format=%D` decorations into pills: `x` and `origin/x` at the same commit
 /// become one pill marked local and remote.
+#[cfg(test)]
 pub(super) fn badges(decorations: &[String], refs: &Refs) -> Vec<Badge> {
     if decorations.is_empty() {
         return Vec::new();

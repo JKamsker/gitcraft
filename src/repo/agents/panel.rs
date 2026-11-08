@@ -49,6 +49,9 @@ impl RepoTab {
         idle: bool,
         sections: &mut Sections,
     ) {
+        if !crate::settings::Settings::get(ui.ctx()).show_agents {
+            return;
+        }
         let open = sections.add(
             ui,
             Header {
@@ -283,5 +286,50 @@ mod tests {
             .openable(),
             "already shown"
         );
+    }
+}
+
+#[cfg(test)]
+mod area_d_tests {
+    use super::*;
+    use crate::settings::Settings;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn area_d_agents_section_hides_empty_and_active_tasks_without_permission_changes() {
+        let ctx = egui::Context::default();
+        let tab = RepoTab::new_deferred("/nonexistent/agent-visibility".into(), &ctx);
+        let mut h = egui_kittest::Harness::builder().build_ui_state(
+            |ui, (tab, settings): &mut (RepoTab, Settings)| {
+                settings.set(ui.ctx());
+                let mut sections = Sections::new(egui::Id::new("area-d-agents"), None);
+                tab.agent_section(ui, &mut Vec::new(), true, &mut sections);
+                sections.show(ui, ui.max_rect(), 0.0, &mut Vec::new());
+            },
+            (tab, Settings::default()),
+        );
+        crate::theme::install_fonts(&h.ctx);
+        h.run();
+        assert!(h.query_all_by_label_contains("AGENTS").next().is_none());
+        for populated in [false, true] {
+            if populated {
+                h.state_mut().0.agents.tasks.push(AgentTask {
+                    branch: "agent/task".into(),
+                    path: "/nonexistent/task".into(),
+                    agent: "codex".into(),
+                    prompt: "A task remains active while hidden".into(),
+                    base: "a".repeat(40),
+                    started: 0,
+                });
+            }
+            h.state_mut().1.show_agents = true;
+            h.run();
+            assert!(h.query_all_by_label_contains("AGENTS").next().is_some());
+            h.state_mut().1.show_agents = false;
+            h.run();
+            assert!(h.query_all_by_label_contains("AGENTS").next().is_none());
+            assert!(h.state().1.agent_writes);
+            assert_eq!(h.state().0.agents.tasks.len(), usize::from(populated));
+        }
     }
 }

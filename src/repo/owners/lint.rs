@@ -47,7 +47,7 @@ impl RepoTab {
                     result: None,
                 });
                 let repo = self.path.clone();
-                self.then(
+                self.forge_then(
                     ctx,
                     move || {
                         let out = crate::git::run(

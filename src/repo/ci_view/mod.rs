@@ -169,7 +169,7 @@ impl RepoTab {
         view.request = next_request();
         view.loading = true;
         let (request, path, sha) = (view.request, self.path.clone(), view.sha.clone());
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             Msg::CiRuns(
                 request,
                 read_builds(projects, |project| ci::runs(&path, project, &sha)),
@@ -195,7 +195,7 @@ impl RepoTab {
         };
         view.loading = true;
         let (request, path) = (view.request, self.path.clone());
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             Msg::CiJobs(request, run, ci::jobs(&path, &project, run))
         });
     }
@@ -337,7 +337,7 @@ impl RepoTab {
                 view.acting = true;
                 let rerun = matches!(act, CiAct::RerunFailed);
                 let path = self.path.clone();
-                spawn(&self.tx, ctx, move || {
+                spawn(&self.forge_sender(), ctx, move || {
                     let what = format!("{} #{}", run.name, run.number);
                     let (label, result) = if rerun {
                         let result = ci::rerun_failed(&path, &project, run.id);
@@ -365,7 +365,7 @@ impl RepoTab {
                 view.log = Some(None);
                 view.log_request = next_request();
                 let (request, path) = (view.log_request, self.path.clone());
-                spawn(&self.tx, ctx, move || {
+                spawn(&self.forge_sender(), ctx, move || {
                     Msg::CiLog(request, ci::failed_log(&path, &project, run, &jobs))
                 });
             }

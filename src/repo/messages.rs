@@ -16,8 +16,20 @@ use crate::settings::Settings;
 #[derive(Clone)]
 pub(super) struct JobSender {
     pub(super) sender: Sender<Msg>,
+    pub(super) forge_generation: Option<u64>,
+    pub(super) forge_operation: bool,
     pub(super) cancel: crate::tasks::Cancellation,
     pub(super) repo: std::path::PathBuf,
+}
+
+impl JobSender {
+    pub(super) fn send(&self, msg: Msg) -> Result<(), Box<std::sync::mpsc::SendError<Msg>>> {
+        let msg = match self.forge_generation {
+            Some(generation) => Msg::ForgeResult(generation, self.forge_operation, Box::new(msg)),
+            None => msg,
+        };
+        self.sender.send(msg).map_err(Box::new)
+    }
 }
 
 impl std::ops::Deref for JobSender {
@@ -44,6 +56,8 @@ pub(super) type Continuation = Box<dyn FnOnce(&mut RepoTab, &egui::Context) + Se
 
 /// Results coming back from background git calls.
 pub(super) enum Msg {
+    /// A hosting job belongs to one selection lifetime, including switching away and back.
+    ForgeResult(u64, bool, Box<Msg>),
     Loaded(Result<Box<Loaded>, String>),
     /// The submodules, from the read numbered so (see `RepoTab::reads`).
     Submodules(u64, Vec<git::Submodule>),
@@ -69,7 +83,7 @@ pub(super) enum Msg {
     Watcher(u64, Option<Box<notify::RecommendedWatcher>>),
     /// A further page of history, read while `history_gen` was so: a reload since may have
     /// moved the commits it skipped, so then it no longer fits.
-    More(u64, Result<Vec<Commit>, String>),
+    More(u64, Vec<String>, Result<Vec<Commit>, String>),
     /// The working tree, from the read numbered so (see `RepoTab::reads`).
     Status(u64, Result<WorkStatus, String>),
     Detail(String, Result<CommitDetail, String>),
@@ -104,7 +118,7 @@ pub(super) enum Msg {
         result: Result<Vec<git::RebaseCommit>, String>,
     },
     /// Results for a query, searched in the code (`true`) or in the messages.
-    Search(String, bool, Result<Vec<String>, String>),
+    Search(Vec<String>, String, bool, Result<Vec<String>, String>),
     /// A comparison's files, for the request numbered so.
     Compare(u64, Result<CompareData, String>),
     /// The open pull requests, as asked for at that moment (see `RepoTab::prs_loaded`).
@@ -370,6 +384,7 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
+        self.sync_forge_selection(ctx);
         if let Some(poller) = &mut self.poller {
             poller.tick(ctx);
         }
@@ -450,6 +465,25 @@ impl RepoTab {
 
     pub(super) fn handle(&mut self, msg: Msg, ctx: &egui::Context) {
         match msg {
+            Msg::ForgeResult(generation, operation, msg) => {
+                // A review sent before a same-repository rename still has to settle its
+                // posting editor. It is safe only if no repository move occurred since it
+                // was sent; A→B→A cannot revive that old review. All reads stay invalidated.
+                let same_review = matches!(msg.as_ref(), Msg::PrPosted { hosting, .. }
+                    if generation >= self.forge_repository_generation
+                        && super::load::same_repository(Some(hosting.as_ref()), self.hosting.as_ref()));
+                if generation == self.forge_generation || same_review {
+                    self.handle(*msg, ctx);
+                } else if operation {
+                    self.stale_fork_operation_finished();
+                    // The mutation used its captured old target. Let the busy slot go, but
+                    // never run old continuations (or retries) against the new hosting.
+                    self.busy_op = None;
+                    self.op_started = None;
+                    self.status = Some(("The operation on the previous primary forge finished; refresh that repository to check its result".into(), true));
+                    self.reload(ctx);
+                }
+            }
             Msg::Loaded(result) => self.loaded(result, ctx),
             Msg::Submodules(read, list) => {
                 if Self::newer(read, &mut self.submodules_read) {
@@ -486,8 +520,14 @@ impl RepoTab {
                     self.reload(ctx);
                 }
             }
-            Msg::More(generation, _) if generation != self.history_gen => {}
-            Msg::More(_, result) => self.more_loaded(result, ctx),
+            Msg::More(generation, _, _) if generation != self.history_gen => {}
+            Msg::More(_, excluded, _)
+                if excluded != super::history_filter::rules(ctx, self.repo_key()).excludes() =>
+            {
+                self.loading_more = false;
+                self.log_stream = Default::default();
+            }
+            Msg::More(_, _, result) => self.more_loaded(result, ctx),
             // Older than the working tree shown (a reload started since came in first).
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => match result {
@@ -625,7 +665,11 @@ impl RepoTab {
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
             Msg::JobPanicked(e) => self.status = Some((e, true)),
             Msg::Then(then) => then(self, ctx),
-            Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
+            Msg::Search(excluded, query, code, result) => {
+                if super::history_filter::rules(ctx, self.repo_key()).excludes() == excluded {
+                    self.search_done(query, code, result, ctx);
+                }
+            }
             // Asked before the list asked for last (one read before a merge answering after
             // the one read since), or of the forge the remotes no longer point to.
             Msg::Prs(asked, _) if self.prs_loaded != Some(asked) => {}

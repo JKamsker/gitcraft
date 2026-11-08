@@ -25,7 +25,12 @@ fn notes_refs(repo: &Path) -> Result<(bool, bool), String> {
 }
 
 /// `git log` of every branch with `format`, `notes` the notes ref `%N` reads (none: `None`).
-fn log(repo: &Path, format: &str, notes: Option<&str>) -> Result<String, String> {
+fn log(
+    repo: &Path,
+    format: &str,
+    notes: Option<&str>,
+    excluded: &[String],
+) -> Result<String, String> {
     let max = format!("--max-count={MOST}");
     let format = format!("--format={format}");
     let notes = notes.map(|n| format!("--notes={n}"));
@@ -34,12 +39,11 @@ fn log(repo: &Path, format: &str, notes: Option<&str>) -> Result<String, String>
         "i18n.logOutputEncoding=UTF-8",
         "log",
         "--no-show-signature",
-        // The notes' own history isn't the repository's.
-        "--exclude=refs/notes/*",
-        "--all",
         &max,
         &format,
     ];
+    let revisions = crate::git::history_scope::revision_args(None, excluded);
+    args.extend(revisions.iter().map(String::as_str));
     args.extend(notes.as_deref());
     if notes.is_none() {
         args.push("--no-notes");
@@ -49,7 +53,18 @@ fn log(repo: &Path, format: &str, notes: Option<&str>) -> Result<String, String>
 
 /// What every commit (the newest [`MOST`] of every branch) records of its authorship, by hash;
 /// commits that record nothing left out.
+#[cfg(test)]
 pub fn all(repo: &Path) -> Result<HashMap<String, Attribution>, String> {
+    all_scoped(
+        repo,
+        &crate::git::history_scope::default_hidden_namespaces(),
+    )
+}
+
+pub fn all_scoped(
+    repo: &Path,
+    excluded: &[String],
+) -> Result<HashMap<String, Attribution>, String> {
     let failed = |e: String| format!("Could not read who wrote the commits: {e}");
     let (git_ai, agent_trace) = notes_refs(repo).map_err(failed)?;
     // Fields ended by NULs, which no message or note can hold: each commit is so many of them.
@@ -57,10 +72,11 @@ pub fn all(repo: &Path) -> Result<HashMap<String, Attribution>, String> {
         repo,
         "%H%x00%an%x00%ae%x00%B%x00%N%x00",
         git_ai.then_some(GIT_AI),
+        excluded,
     )
     .map_err(failed)?;
     let traces: HashMap<String, String> = if agent_trace {
-        let out = log(repo, "%H%x00%N%x00", Some(AGENT_TRACE)).map_err(failed)?;
+        let out = log(repo, "%H%x00%N%x00", Some(AGENT_TRACE), excluded).map_err(failed)?;
         records(&out, 2)
             .filter(|f| !f[1].trim().is_empty())
             .map(|f| (f[0].to_owned(), f[1].to_owned()))

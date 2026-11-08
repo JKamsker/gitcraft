@@ -9,7 +9,7 @@ use crate::git::{Branch, Remote};
 use crate::icons;
 use crate::repo::actions::BranchRef;
 use crate::repo::branch_tree::{self, LeafRow, TreeView};
-use crate::repo::branch_visibility::remote_ref;
+use crate::repo::branch_visibility::{Change, remote_ref};
 use crate::repo::conflict_check::Op;
 use crate::repo::graph_view;
 use crate::repo::pinned_sections::{Button, Header, Sections};
@@ -61,6 +61,8 @@ impl RepoTab {
             return;
         }
         for remote in &self.remotes {
+            let hidden = self.visibility.sidebar_remotes.contains(&remote.name);
+            let primary = self.primary_forge_remote() == Some(remote.name.as_str());
             let branches: Vec<&Branch> = self
                 .remote_branches(&remote.name)
                 .filter(|b| matches(filter, b))
@@ -72,18 +74,76 @@ impl RepoTab {
             let (rect, r) = widgets::keyed_row(ui, ROW_H, ("remote-row", &remote.name));
             widgets::a11y(&r, egui::WidgetType::CollapsingHeader, || {
                 let count = labels::count(branches.len(), "branch", "branches");
-                labels::section(&format!("remote {}", remote.name), &count, expanded)
+                let name = labels::with_notes(
+                    &format!("remote {}", remote.name),
+                    &[
+                        (primary, "primary forge"),
+                        (hidden, "branches hidden in sidebar"),
+                        (
+                            self.visibility.graph_remotes.contains(&remote.name),
+                            "branches hidden in graph",
+                        ),
+                    ],
+                );
+                labels::section(&name, &count, expanded && !hidden)
             });
             if r.clicked() {
                 expanded = !expanded;
                 ui.data_mut(|d| d.insert_persisted(id, expanded));
             }
-            paint_remote_header(ui, rect, &r, remote, branches.len(), expanded);
-            let r = r.on_hover_text(&remote.url);
+            paint_remote_header(
+                ui,
+                rect,
+                &r,
+                remote,
+                branches.len(),
+                RemoteDisplay {
+                    expanded: expanded && !hidden,
+                    primary,
+                    hidden,
+                },
+            );
+            let r = r.on_hover_text(format!(
+                "{}\n{}{}{}\nRight-click for primary forge and branch visibility",
+                remote.name,
+                remote.url,
+                if primary {
+                    "\nPrimary forge: PRs, issues and builds"
+                } else {
+                    ""
+                },
+                if hidden {
+                    "\nBranches hidden in sidebar; right-click to show"
+                } else {
+                    ""
+                }
+            ));
             egui::Popup::context_menu(&r)
                 .style(crate::theme::menu_style)
-                .show(|ui| remote_menu_items(ui, acts, remote, idle));
-            if !expanded {
+                .show(|ui| self.remote_menu_items(ui, acts, remote, idle));
+            let menu_rect = Rect::from_center_size(
+                pos2(rect.right() - 43.0, rect.center().y),
+                vec2(22.0, ROW_H),
+            );
+            let menu = ui.interact(menu_rect, r.id.with("actions"), egui::Sense::click());
+            widgets::a11y(&menu, egui::WidgetType::Button, || {
+                format!("Remote actions for {}", remote.name)
+            });
+            icons::paint(
+                ui,
+                menu_rect.shrink(4.0),
+                "settings",
+                13.0,
+                Tokens::get(ui.ctx()).text_faint,
+            );
+            let menu = menu.on_hover_text(format!(
+                "Actions for {}: primary forge and branch visibility",
+                remote.name
+            ));
+            egui::Popup::menu(&menu)
+                .style(crate::theme::menu_style)
+                .show(|ui| self.remote_menu_items(ui, acts, remote, idle));
+            if !expanded || hidden {
                 continue;
             }
             let tree = branch_tree::build(branches.iter().map(|b| {
@@ -118,7 +178,8 @@ impl RepoTab {
         idle: bool,
     ) {
         let short = remote_short(&b.name, remote).unwrap_or(&b.name);
-        let has_pr = self.prs.iter().any(|p| p.branch == short);
+        let has_pr = self.primary_forge_remote() == Some(remote)
+            && self.prs.iter().any(|p| !p.from_fork && p.branch == short);
         let full = remote_ref(&b.name);
         let shown = self.branch_shown(&full, false);
         let r = remote_row(ui, &full, row, has_pr, !shown);
@@ -251,14 +312,25 @@ pub(in crate::repo) fn remote_of<'r>(name: &str, remotes: &[&'r str]) -> Option<
 
 /// The collapsible row of a remote at `rect`: chevron, icon, name and how many branches it
 /// shows.
+struct RemoteDisplay {
+    expanded: bool,
+    primary: bool,
+    hidden: bool,
+}
+
 fn paint_remote_header(
     ui: &Ui,
     rect: Rect,
     r: &Response,
     remote: &Remote,
     count: usize,
-    expanded: bool,
+    display: RemoteDisplay,
 ) {
+    let RemoteDisplay {
+        expanded,
+        primary,
+        hidden,
+    } = display;
     let t = Tokens::get(ui.ctx());
     if r.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
@@ -278,19 +350,29 @@ fn paint_remote_header(
     icons::paint(
         ui,
         Rect::from_center_size(pos2(rect.left() + 40.0, y), vec2(14.0, 14.0)),
-        "cloud",
+        if primary {
+            "star"
+        } else if hidden {
+            "eye-off"
+        } else {
+            "cloud"
+        },
         13.0,
-        t.icon,
+        if primary { t.accent } else { t.icon },
     );
-    let p = ui.painter_at(rect);
+    let p = ui.painter_at(rect.with_max_x(rect.right() - 60.0));
     p.text(
         pos2(rect.left() + 54.0, y),
         Align2::LEFT_CENTER,
-        &remote.name,
+        if hidden {
+            format!("{} (hidden)", remote.name)
+        } else {
+            remote.name.clone()
+        },
         theme::medium(12.5),
         t.text,
     );
-    p.text(
+    ui.painter_at(rect).text(
         pos2(rect.right() - 10.0, y),
         Align2::RIGHT_CENTER,
         count.to_string(),
@@ -299,38 +381,117 @@ fn paint_remote_header(
     );
 }
 
-fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle: bool) {
-    if ui
-        .add_enabled(idle, egui::Button::new(format!("Fetch {}", remote.name)))
-        .clicked()
-    {
-        acts.push(Action::Ops {
-            label: format!("Fetch {}", remote.name),
-            ops: ops(&[&["fetch", "--prune", &remote.name]]),
-            refresh: Refresh::All,
-        });
-    }
-    if ui.add_enabled(idle, egui::Button::new("Edit…")).clicked() {
-        acts.push(Action::Dialog(Dialog::remote(Some((
-            remote.name.clone(),
-            remote.url.clone(),
-        )))));
-    }
-    if ui.button("Copy URL").clicked() {
-        ui.ctx().copy_text(remote.url.clone());
-    }
-    ui.separator();
-    if ui.add_enabled(idle, egui::Button::new("Remove…")).clicked() {
-        acts.push(Action::Dialog(Dialog::confirm(
-            "Remove remote",
-            format!(
-                "Remove the remote “{}” ({})? Its branches disappear from this repository; nothing changes on the server.",
-                remote.name, remote.url
-            ),
-            "Remove",
-            ops(&[&["remote", "remove", &remote.name]]),
-            None,
-        )));
+impl RepoTab {
+    fn remote_menu_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle: bool) {
+        let before = acts.len();
+        // Popup placement can move a menu, but cannot shrink an unbroken menu label.
+        // Wrap within the logical viewport at high UI scales and on narrow windows.
+        ui.set_max_width((ui.ctx().content_rect().width() - 16.0).clamp(32.0, 280.0));
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+        let primary = self.primary_forge_remote() == Some(remote.name.as_str());
+        let usable = self
+            .forge_remotes
+            .iter()
+            .any(|(name, _)| name == &remote.name);
+        let label = if primary {
+            "Primary forge ✓"
+        } else {
+            "Set as primary forge"
+        };
+        let tip = if usable {
+            "Use this repository for PRs, issues, builds and default links. Does not change Git push/fetch settings."
+        } else {
+            "This URL is not on a recognized forge. Configure gitcraft.forge for a self-hosted forge."
+        };
+        if ui
+            .add_enabled(
+                usable && !self.forge_change_blocked(),
+                egui::Button::new(label),
+            )
+            .on_hover_text(tip)
+            .on_disabled_hover_text(if self.forge_change_blocked() {
+                "Wait for the running operation or review to finish"
+            } else {
+                tip
+            })
+            .clicked()
+        {
+            acts.push(Action::PrimaryForge(Some(remote.name.clone())));
+        }
+        if !self.forge_selection.name.is_empty()
+            && ui
+                .add_enabled(
+                    !self.forge_change_blocked(),
+                    egui::Button::new("Use automatic forge selection"),
+                )
+                .clicked()
+        {
+            acts.push(Action::PrimaryForge(None));
+        }
+        let sidebar_hidden = self.visibility.sidebar_remotes.contains(&remote.name);
+        if ui
+            .button(if sidebar_hidden {
+                "Show remote branches in sidebar"
+            } else {
+                "Hide remote branches in sidebar"
+            })
+            .clicked()
+        {
+            acts.push(Action::BranchVisibility(Change::RemoteSidebar(
+                remote.name.clone(),
+            )));
+        }
+        let graph_hidden = self.visibility.graph_remotes.contains(&remote.name);
+        let label = if graph_hidden {
+            "Show remote branches in graph"
+        } else {
+            "Hide remote branches in graph"
+        };
+        if ui.button(label)
+            .on_hover_text("Display only. Keeps local HEAD and soloed branches; fetching and upstreams are unchanged.")
+            .clicked()
+        {
+            acts.push(Action::BranchVisibility(Change::RemoteGraph(remote.name.clone())));
+        }
+        ui.separator();
+        if ui
+            .add_enabled(idle, egui::Button::new(format!("Fetch {}", remote.name)))
+            .clicked()
+        {
+            acts.push(Action::Ops {
+                label: format!("Fetch {}", remote.name),
+                ops: ops(&[&["fetch", "--prune", &remote.name]]),
+                refresh: Refresh::All,
+            });
+        }
+        if ui.add_enabled(idle, egui::Button::new("Edit…")).clicked() {
+            acts.push(Action::Dialog(Dialog::remote(Some((
+                remote.name.clone(),
+                remote.url.clone(),
+            )))));
+        }
+        if ui.button("Copy URL").clicked() {
+            ui.ctx().copy_text(remote.url.clone());
+            ui.close();
+        }
+        ui.separator();
+        if ui.add_enabled(idle, egui::Button::new("Remove…")).clicked() {
+            let confirmation = Dialog::confirm(
+                "Remove remote",
+                format!(
+                    "Remove the remote “{}” ({})? Its branches disappear from this repository; nothing changes on the server.",
+                    remote.name, remote.url
+                ),
+                "Remove",
+                ops(&[&["remote", "remove", &remote.name]]),
+                None,
+            );
+            acts.push(Action::Dialog(confirmation));
+        }
+        // Pointer clicks close a Popup automatically; keyboard activation must close too.
+        if acts.len() != before {
+            ui.close();
+        }
     }
 }
 
@@ -403,3 +564,7 @@ mod tests {
         assert_eq!(remote_of("gone/main", &remotes), None);
     }
 }
+
+#[cfg(test)]
+#[path = "remotes_ui_tests.rs"]
+mod ui_tests;

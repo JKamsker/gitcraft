@@ -271,15 +271,28 @@ impl RepoTab {
         );
     }
 
+    pub(in crate::repo) fn backlinks_scope_changed(&mut self, ctx: &egui::Context) {
+        self.extras.backlinks = None;
+        self.want(Kind::Backlinks, ctx);
+    }
+
     fn load_backlinks(&mut self, hash: String, ctx: &egui::Context) {
+        let excluded = crate::repo::history_filter::rules(ctx, self.repo_key()).excludes();
         let path = self.path.clone();
         let asked = hash.clone();
+        let requested_excluded = excluded.clone();
         self.then(
             ctx,
-            move || git::backlinks(&path, &asked),
+            move || git::backlinks_scoped(&path, &asked, &excluded),
             move |tab, result, ctx| {
                 if tab.read_done(Kind::Backlinks, &hash, ctx) {
-                    tab.extras.backlinks = Some(result);
+                    if crate::repo::history_filter::rules(ctx, tab.repo_key()).excludes()
+                        == requested_excluded
+                    {
+                        tab.extras.backlinks = Some(result);
+                    } else {
+                        tab.want(Kind::Backlinks, ctx);
+                    }
                 }
             },
         );

@@ -70,9 +70,12 @@ impl RepoTab {
         }
         self.owners.suggest.asked_for = Some(key.clone());
         let repo = self.path.clone();
-        let remote = self.default_remote();
+        let remote = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
         let forge = self.forge();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 reviewers_for(&repo, &key.0, &key.1, remote.as_deref(), forge).map(|r| (key, r))

@@ -238,6 +238,41 @@ pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     resp.on_hover_text(tooltip)
 }
 
+/// A compact toggle with an accessible selected state and a persistent accent when on.
+pub fn toggle_button(ui: &mut Ui, icon: &str, label: &str, on: bool) -> Response {
+    let t = Tokens::get(ui.ctx());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::click());
+    crate::a11y::a11y_selected(&resp, label, on);
+    if on || resp.hovered() {
+        ui.painter().rect_filled(
+            rect,
+            t.radius_sm,
+            if on { t.row_selected } else { t.pressed },
+        );
+    }
+    paint(
+        ui,
+        rect,
+        icon,
+        14.0,
+        if !ui.is_enabled() {
+            t.text_faint
+        } else if on {
+            t.accent
+        } else {
+            t.icon
+        },
+    );
+    if on {
+        ui.painter().hline(
+            rect.x_range().shrink(3.0),
+            rect.bottom() - 1.0,
+            egui::Stroke::new(2.0, t.accent),
+        );
+    }
+    resp.on_hover_text(format!("{label} · {}", if on { "On" } else { "Off" }))
+}
+
 /// An icon laid out inline, like a label.
 pub fn inline(ui: &mut Ui, name: &str, size: f32, tint: Color32) {
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());

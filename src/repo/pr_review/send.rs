@@ -142,7 +142,7 @@ impl RepoTab {
         let (repo, details) = (self.path.clone(), details.clone());
         draft.posting = true;
         draft.error = None;
-        spawn(&self.tx, ctx, move || Msg::PrPosted {
+        spawn(&self.forge_sender(), ctx, move || Msg::PrPosted {
             hosting: Box::new(hosting.clone()),
             number,
             what,

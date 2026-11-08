@@ -12,7 +12,7 @@ use crate::pr_post::{
     LineComment, MergeMethod, Suggestion, Target, Verdict, apply_lines, check_path, decode_file,
     encode_path, may_delete_branch,
 };
-use crate::pull_request::{DiffSide, PrDetails, at, repo_of_url};
+use crate::pull_request::{DiffSide, PrDetails, at};
 
 /// A pull request on a Forgejo or Gitea to say something on.
 pub(super) struct GiteaTarget {
@@ -35,13 +35,13 @@ impl GiteaTarget {
         hosting: &Hosting,
         details: &PrDetails,
     ) -> Option<GiteaTarget> {
-        // The repository as the forge names it, which the remote may spell otherwise; the remote's
-        // own only when the pull request's address doesn't say.
-        let path = repo_of_url(&details.url).map_or_else(|| hosting.path.clone(), |(_, path)| path);
+        if !hosting.matches_pull_request(&details.url) {
+            return None;
+        }
         Some(GiteaTarget {
             api,
             name,
-            path,
+            path: hosting.path.clone(),
             number: details.number,
             head_oid: details.head_oid.clone(),
             head_branch: details.head_branch.clone(),
@@ -363,6 +363,73 @@ fn branch_tip(branch: &Value) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn review13_gitea_targets_reject_another_web_instance() {
+        for forge in [crate::forge::Forge::Gitea, crate::forge::Forge::Forgejo] {
+            for prefix in ["", "/reviews"] {
+                let h = Hosting {
+                    forge,
+                    host: "forge.example".into(),
+                    path: "Team/Repo".into(),
+                    web: format!("https://forge.example:4000{prefix}"),
+                };
+                for (base, path, expected) in [
+                    ("https://forge.example:3000", "Team/Repo", false),
+                    ("https://forge.example:4000", "Team/Repo", prefix.is_empty()),
+                    (
+                        "https://forge.example:4000/reviews",
+                        "team/repo",
+                        !prefix.is_empty(),
+                    ),
+                    ("https://forge.example:4000/REVIEWS", "Team/Repo", false),
+                ] {
+                    let details = PrDetails {
+                        number: 7,
+                        url: format!("{base}/{path}/pulls/7"),
+                        ..Default::default()
+                    };
+                    let api = Api::new("Gitea", &h.web, &h.host, None);
+                    let target = GiteaTarget::of(api, "Gitea", &h, &details);
+                    assert_eq!(target.is_some(), expected, "{h:?} {}", details.url);
+                    if let Some(target) = target {
+                        assert!(
+                            target.path.eq_ignore_ascii_case(&h.path),
+                            "proxy prefix must stay in API base only"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn provider_boundary_stale_details_cannot_retarget_gitea_or_forgejo() {
+        for forge in [crate::forge::Forge::Gitea, crate::forge::Forge::Forgejo] {
+            let h = Hosting {
+                forge,
+                host: "forge.test".into(),
+                path: "fork/project".into(),
+                web: "https://forge.test".into(),
+            };
+            for (url, expected) in [
+                ("https://forge.test/fork/project/pulls/7", true),
+                ("https://forge.test/upstream/project/pulls/7", false),
+                ("https://other.test/fork/project/pulls/7", false),
+            ] {
+                let details = PrDetails {
+                    number: 7,
+                    url: url.into(),
+                    ..Default::default()
+                };
+                let api = Api::new("Gitea", &h.web, &h.host, None);
+                assert_eq!(
+                    GiteaTarget::of(api, "Gitea", &h, &details).is_some(),
+                    expected
+                );
+            }
+        }
+    }
 
     /// Only "still testing it" is waited out; any other refusal of a merge is said at once.
     #[test]

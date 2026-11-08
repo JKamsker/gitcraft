@@ -1,0 +1,58 @@
+{
+  "commit": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6",
+  "base": "a1ff67a41d58b7832028b9b0bba9c0b83d098f4d",
+  "branch": "t3/forge-identity-release-preflight",
+  "remote_sha": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "status": "validated (bounded focused checks); combined gates parent-owned",
+  "clean_worktree": true,
+  "scope": "One guarded_fork condition and one actual timeline restore regression; no other changes",
+  "reviewed_source_binding": {
+    "src/repo/operations.rs": {
+      "base": "fa4341ccdcc326513ff5aa9415cb1ab38f506b0d",
+      "reviewed": "fa4341ccdcc326513ff5aa9415cb1ab38f506b0d"
+    },
+    "src/repo/timeline/tab_tests.rs": {
+      "base": "cf00ce636a49f16d1a247e5d4775d4a28b31270d",
+      "reviewed": "cf00ce636a49f16d1a247e5d4775d4a28b31270d"
+    }
+  },
+  "checks": {
+    "before": "1 failed: actual main -> feat -> reset F1 restore rejected HEAD expectation",
+    "after": "89 timeline/fork tests passed, including new regression and all review20 external-C/replay tests",
+    "strict_clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code: passed",
+    "fmt": "passed",
+    "whitespace": "passed"
+  },
+  "rust": "1.95.0",
+  "jobs": 3,
+  "test_threads": 1,
+  "target": "/tmp/gitcraft-review12/identity-fix/target",
+  "manifest_path": "/Users/jonas/.t3/worktrees/gitcraft/t3-42d3ab85/Cargo.toml",
+  "fresh": false,
+  "inventory": 3336,
+  "binary_sha256": "5381bfb94087321f005367ba61da19f1151a67979060d0744c66b7a5b07dd355",
+  "before_binary_sha256": "fcdf13b7634612195677e92a7a4ed43e507a7dcdfb6cfac5c37afb2a5140a3e0",
+  "source_blobs": {
+    "src/repo/operations.rs": "d5eac6d15b833f9680f8e9e83813a051c2ccd02d",
+    "src/repo/timeline/tab_tests.rs": "6a3a34abc9ebeb1c1d86d29e68339790a79ebedb"
+  },
+  "whole_suite_executed": false,
+  "evidence_sha256": {
+    "before-regression.log": "dbe81d40b20118f9e9d958b600df0f7bca572695ff9fec95f1ff9e76af38b60a",
+    "before-source.patch": "3a1fa7f5e2380298df6afb84b6552998cec17d2166d5ffaace2f2545ea093780",
+    "before-build.jsonl": "b4f18b27b0eb4c8a1cc0b98cca1d3cb90169eff5721964af01ff778f887e2c1d",
+    "before-build.log": "c4dafbf97ccd253824f235d6b46fa4d7d7b574a85136b14a2b2783827d8f9611",
+    "before-artifact.json": "8e86cc3758f0c00a8a0ed4c626c39a78d2f633677aabc885ae609c4b3d9a0a78",
+    "after-build.jsonl": "0015af29e59b75e9fb652992e555746aa98ce758d3b0e15e653b8c4a827fc029",
+    "after-build.log": "7faeed145f187c964eac38e5eafdecc97718a650ce34d1b2b0ee804be0d81b83",
+    "final-artifact.json": "8e86cc3758f0c00a8a0ed4c626c39a78d2f633677aabc885ae609c4b3d9a0a78",
+    "final-inventory.txt": "6c898f317bfdf3c8f92a2a2b2f84c11eee91bbfde09dd86dc72bfe31d35710fe",
+    "final.patch": "6eb21327da763c31e4e0f440ba64b306a9908c535d9286f178e687259aa80549",
+    "final-focused.log": "33316537e40972512ab650960d152714cd5f20059b11f50b5528575ba3ce2ac7",
+    "strict-clippy.log": "a11d743d6a0e56b563c1a1ddb1c9f32658733e853be57cfcd95ad444c24a2176",
+    "final-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-whitespace.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scope.md": "ffb220ee910ce5a5904aa95837dfad0148d16490907aab75dd09fa54264c4e4b"
+  }
+}
