@@ -72,3 +72,15 @@ mod connection_doctor;
 pub(crate) mod push_preflight;
 
 mod portability;
+/// Packaged process endpoint used for durable local operations, before UI startup.
+pub fn owned_endpoint_helper() -> Option<i32> {
+    match std::env::args_os()
+        .nth(1)
+        .as_deref()
+        .and_then(|v| v.to_str())
+    {
+        Some("--gitcraft-owned-endpoint") => Some(remote::native_owner::entrypoint()),
+        Some("--gitcraft-workspace-claim") => Some(remote::workspace_claim::entrypoint()),
+        _ => None,
+    }
+}

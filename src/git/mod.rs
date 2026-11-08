@@ -14,6 +14,7 @@ mod bundles;
 mod clone_tests;
 mod command;
 mod credential_scope;
+pub(crate) use command::{WorkspaceCommand, run_workspace_command, transfer_pack};
 pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
 mod commit_msg;
 mod commits;

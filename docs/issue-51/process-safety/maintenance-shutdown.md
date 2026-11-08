@@ -1,0 +1,7 @@
+# Maintenance shutdown and failed cleanup admission — WIP checkpoint
+
+Startup leftover cleanup now uses the existing bounded shared task pool, background priority and repository mutation key. Queue rejection preserves leftovers. Its nested commands receive the pool's ambient cancellation token, and task shutdown cancels and joins this work before process and remote services shut down. The idle-shell maintenance thread now has a retained JoinHandle and condition-variable stop; remote shutdown wakes and joins it before closing remaining pools and SSH transports. Workspace heartbeat threads remain unchanged pending replacement by the claim protocol; no blanket shutdown acceptance is claimed.
+
+The actual Service stop branch now explicitly handles cleanup-worker admission failure as well as worker failure and rejected acknowledgement. Every such path preserves the original reason, appends unconfirmed cleanup and sets typed uncertainty. It cannot silently display bare cancellation when the cleanup worker was unavailable.
+
+`CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib recording -- --nocapture` passed 17 application and 9 OS tests, including injected cleanup capacity/worker/receipt failures and confirmed cancellation. `CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets` and `git diff --check` passed. No maintenance thread, actual task pool, process/helper/transport fixture, native Windows/SSH/WSL, full suite or CI was executed. The cross-process claim design and static review/runtime holds remain open.

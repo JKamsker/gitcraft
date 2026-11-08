@@ -1963,6 +1963,7 @@ dependencies = [
 name = "gitcraft-os"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "libc",
  "windows 0.62.2",
 ]

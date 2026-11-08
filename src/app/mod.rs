@@ -142,6 +142,7 @@ pub struct App {
     connecting: Vec<Connecting>,
     /// The teleport dialog, and the teleport it runs.
     teleport: Option<teleport::TeleportForm>,
+    teleport_drag: Option<teleport::DragTargets>,
     /// ssh's question being answered (a password, a new host key).
     askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
@@ -301,6 +302,7 @@ impl App {
             remote_form: None,
             connecting: Vec::new(),
             teleport: None,
+            teleport_drag: None,
             askpass: Default::default(),
             update: None,
             update_rx: None,
@@ -984,8 +986,11 @@ fn on_path(name: &str) -> bool {
 pub fn after_exit() {
     crate::tasks::shutdown();
     crate::parallel_bisect::shutdown();
+    crate::processes::shutdown_leases();
     crate::processes::shutdown();
     crate::remote::shutdown();
+    crate::processes::shutdown_cleanup();
+    gitcraft_os::retire_process_helpers();
     crate::instance::shut_down();
     update::relaunch();
 }

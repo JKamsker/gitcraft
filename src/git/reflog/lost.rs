@@ -3,17 +3,9 @@
 //! one, so it can be cancelled.
 
 use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, Read};
 use std::path::Path;
-use std::process::Child;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
 
 use crate::git::{END_OPTS, NO_SIGNATURE, UTF8, run};
-
-/// How long what git said is waited for once it has ended: over SSH, a proxy ssh started can
-/// keep the error output open after it.
-const SAID_WITHIN: Duration = Duration::from_secs(2);
 
 /// A commit found unreachable.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,33 +29,13 @@ pub const CANCELLED: &str = "Cancelled";
 /// Stops a running [`lost_commits`] from another thread: the git it runs is ended, and it
 /// returns [`CANCELLED`].
 #[derive(Clone, Default)]
-pub struct Cancel(Arc<Mutex<CancelState>>);
-
-#[derive(Default)]
-struct CancelState {
-    cancelled: bool,
-    /// The `git fsck` running, while it runs.
-    child: Option<Child>,
-}
-
+pub struct Cancel(crate::git::stream::Stopper);
 impl Cancel {
     pub fn cancel(&self) {
-        let mut state = self.lock();
-        state.cancelled = true;
-        if let Some(child) = &mut state.child {
-            let _ = child.kill();
-        }
+        self.0.stop();
     }
-
     pub fn is_cancelled(&self) -> bool {
-        self.lock().cancelled
-    }
-
-    /// A panic elsewhere while it was held leaves nothing half-done here.
-    fn lock(&self) -> MutexGuard<'_, CancelState> {
-        self.0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.0.stopped()
     }
 
     fn check(&self) -> Result<(), String> {
@@ -159,41 +131,30 @@ fn unreachable_commits(repo: &Path, cancel: &Cancel) -> Result<Vec<String>, Stri
         "--no-reflogs",
         "--no-progress",
     ];
-    let mut child = super::super::command::spawn_piped(repo, &args)?;
-    let stdout = child.stdout.take().ok_or("could not read git fsck")?;
-    let (said_tx, said) = std::sync::mpsc::channel();
-    if let Some(mut stderr) = child.stderr.take() {
-        // Unread, a full pipe would stop git.
-        std::thread::spawn(move || {
-            let mut text = String::new();
-            let _ = stderr.read_to_string(&mut text);
-            let _ = said_tx.send(text);
-        });
-    }
-    {
-        let mut state = cancel.lock();
-        if state.cancelled {
-            let _ = child.kill();
-        }
-        state.child = Some(child);
-    }
     let mut hashes = Vec::new();
-    for line in std::io::BufReader::new(stdout).lines() {
-        let Ok(line) = line else { break };
-        hashes.extend(unreachable_commit(&line).map(str::to_owned));
+    let mut said = String::new();
+    let result = crate::git::stream::stream(repo, &args, &cancel.0, |line| {
+        if let Some(hash) = unreachable_commit(&line) {
+            hashes.push(hash.to_owned());
+        } else if said.len() < 65536 {
+            said.push_str(&line);
+            said.push('\n');
+        }
+    });
+    let ended = scan_completion(result, cancel)?;
+    if ended.code == Some(0) || !hashes.is_empty() {
+        Ok(hashes)
+    } else {
+        Err(failed(&said, &format!("exit status: {:?}", ended.code)))
     }
-    let child = cancel.lock().child.take();
-    let status = child.map(|mut c| c.wait());
-    let said = said.recv_timeout(SAID_WITHIN).unwrap_or_default();
+}
+fn scan_completion(
+    result: Result<crate::git::stream::Ended, String>,
+    cancel: &Cancel,
+) -> Result<crate::git::stream::Ended, String> {
+    let ended = result?;
     cancel.check()?;
-    match status {
-        Some(Ok(status)) if status.success() => Ok(hashes),
-        // fsck also fails on a corrupt object: what it found unreachable is still found.
-        Some(Ok(_)) if !hashes.is_empty() => Ok(hashes),
-        Some(Ok(status)) => Err(failed(&said, &status.to_string())),
-        Some(Err(e)) => Err(format!("could not run git fsck: {e}")),
-        None => Err("could not run git fsck".to_owned()),
-    }
+    Ok(ended)
 }
 
 /// What a failed fsck said, or how it ended when it said nothing.
@@ -258,6 +219,25 @@ fn parse_commit(record: &[&str; FIELDS]) -> Option<LostCommit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_cancel_does_not_replace_failed_cleanup() {
+        let cancel = Cancel::default();
+        cancel.cancel();
+        assert_eq!(
+            scan_completion(Err("native finish failed".into()), &cancel),
+            Err("native finish failed".into())
+        );
+        assert_eq!(
+            scan_completion(
+                Ok(crate::git::stream::Ended {
+                    code: None,
+                    stopped: true
+                }),
+                &cancel
+            ),
+            Err(CANCELLED.into())
+        );
+    }
 
     #[test]
     fn only_unreachable_commits_are_taken() {

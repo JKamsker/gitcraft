@@ -1,20 +1,11 @@
 //! Running a git command that goes over the network (fetch, pull, push, clone) so that it can
-//! be followed and stopped: its error output is read as it comes (with `--progress`, git says
-//! "Receiving objects: 45%" there), and a cancel stops it, with everything it started, the way
-//! a command that hung on another machine is stopped (see [`remote::stop_script`]).
-//!
-//! On another machine it runs in a process of its own ([`remote::spawn`]) rather than in a
-//! kept-open shell, whose answer only comes once the command has ended; that process says the
-//! command's process number there first, for stopping it.
+//! be followed and stopped. Both local execution and SSH/WSL transports use the shared
+//! process service. Remote commands establish an authenticated owner before Git runs;
+//! cancellation waits for stop/reap acknowledgement before retiring the local transport.
 
-#[cfg(all(test, unix))]
-use std::io::Read;
 use std::path::Path;
 #[cfg(all(test, unix))]
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU32, Ordering};
-#[cfg(all(test, unix))]
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 #[cfg(all(test, unix))]
 use std::time::Duration;
@@ -138,22 +129,6 @@ fn with_progress(args: &[&str]) -> Vec<String> {
         out.insert(at + 1, "--progress".to_owned());
     }
     out
-}
-
-/// What the process run on another machine starts its error output with: then the process
-/// number of git there.
-const PID_MARKER: &str = "__GITCRAFT_GIT_PID__";
-
-/// The request that runs git with `args` in `target`'s folder, saying its process number
-/// first: a shell that prints its own and then becomes git (`exec`), so that the marker comes
-/// before anything git says, and what came before it (a server's login banner) is told apart.
-fn watched_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
-    let mut req = super::remote_request(target, extra, args);
-    req.script = format!(
-        "printf '\\n%s %s\\n' {PID_MARKER} \"$$\" >&2\n{}",
-        req.script
-    );
-    req
 }
 
 /// How a followed command ended.
@@ -318,34 +293,19 @@ fn follow_command(
     target: Option<&Target>,
     control: &Arc<OpControl>,
 ) -> Result<Ended, String> {
-    let remote_pid = Arc::new(AtomicU32::new(0));
-    let reader = Arc::new(Mutex::new(if target.is_some() {
-        ProgressReader::with_marker(PID_MARKER)
-    } else {
-        ProgressReader::default()
-    }));
+    let reader = Arc::new(Mutex::new(ProgressReader::default()));
     let mut options = crate::processes::Options {
         background: true,
         ..Default::default()
     };
     let command = match target {
         Some(target) => {
-            let streaming =
-                remote::streaming_command(&target.host, &watched_request(target, extra, args))?;
-            options.input = Some(streaming.input);
-            options.stdout_ready = Some(streaming.ready);
+            let streaming = remote::streaming_command(
+                &target.host,
+                &super::remote_request(target, extra, args),
+            )?;
             options.timeout = Some(remote::NETWORK_LIMIT);
-            options.ready = streaming.connected;
-            let (host, pid) = (target.host.clone(), Arc::clone(&remote_pid));
-            options.stop_remote = Some(Box::new(move || {
-                let pid = pid.load(Ordering::SeqCst);
-                if pid != 0 {
-                    remote::stop_now(&host, pid);
-                }
-            }));
-            let pid = Arc::clone(&remote_pid);
-            options.stop_ready = Some(Box::new(move || pid.load(Ordering::SeqCst) != 0));
-            streaming.command
+            streaming.configure(&mut options)
         }
         None => local_command(dir, extra, args),
     };
@@ -353,16 +313,12 @@ fn follow_command(
     options.cancelled = Some(Box::new(move || followed.is_cancelled()));
     let followed = Arc::clone(control);
     let reading = Arc::clone(&reader);
-    let pid = Arc::clone(&remote_pid);
     options.stderr = Some(Box::new(move |chunk| {
         let mut reader = reading
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if reader.feed(chunk) {
             followed.set_progress(reader.latest().cloned());
-        }
-        if let Some(n) = reader.marked().and_then(|n| n.parse().ok()) {
-            pid.store(n, Ordering::SeqCst);
         }
     }));
     let out = crate::processes::run(command, options)?;
@@ -574,86 +530,61 @@ mod tests {
         assert_eq!(result, Err(CANCELLED.to_owned()));
         Ok(())
     }
-    /// Runs the script a watched command is sent elsewhere with, here, in `dir`, as the shell
-    /// there would (its variables set), reading its error output as `follow` does.
+    /// Exercise the same owned streaming dispatcher used by watched Git.
     #[cfg(unix)]
     fn run_there_here(
         dir: &Path,
         args: &[&str],
         stop_after: Option<Duration>,
-    ) -> Result<(Option<i32>, Option<u32>), String> {
+    ) -> Result<(Option<i32>, bool), String> {
         let target = Target {
-            host: Host::Ssh("example".to_owned()),
+            host: Host::Ssh(remote::LOOPBACK.into()),
             path: dir.to_string_lossy().into_owned(),
         };
-        let req = watched_request(&target, &Extra::default(), args);
-        let mut child = std::process::Command::new("sh")
-            .arg("-c")
-            .arg(&req.script)
-            .current_dir(dir)
-            .envs(req.env.iter().map(|(n, v)| (n.as_str(), v.as_str())))
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let mut stderr = child.stderr.take().ok_or("no stderr")?;
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let mut reader = ProgressReader::with_marker(PID_MARKER);
-            let mut buf = [0u8; 512];
-            while let Ok(n @ 1..) = stderr.read(&mut buf) {
-                reader.feed(&buf[..n]);
-                if let Some(pid) = reader.marked().and_then(|m| m.parse::<u32>().ok()) {
-                    let _ = tx.send(Some(pid));
-                }
-            }
-            let _ = tx.send(None);
+        let req = super::super::remote_request(&target, &Extra::default(), args);
+        let streaming = remote::streaming_command(&target.host, &req)?;
+        let lease = streaming.lease.clone();
+        let token = crate::tasks::Cancellation::default();
+        let stop = token.clone();
+        let canceller = stop_after.map(|after| {
+            std::thread::spawn(move || {
+                std::thread::sleep(after);
+                stop.cancel();
+            })
         });
-        let pid = rx.recv_timeout(Duration::from_secs(10)).ok().flatten();
-        if let (Some(after), Some(pid)) = (stop_after, pid) {
-            std::thread::sleep(after);
-            std::process::Command::new("sh")
-                .arg("-c")
-                .arg(remote::stop_script(pid))
-                .status()
-                .map_err(|e| e.to_string())?;
+        let mut options = crate::processes::Options {
+            cancel: token,
+            timeout: Some(Duration::from_secs(15)),
+            ..Default::default()
+        };
+        let command = streaming.configure(&mut options);
+        let result = crate::processes::run(command, options)?;
+        if let Some(canceller) = canceller {
+            canceller.join().map_err(|_| "canceller panicked")?;
         }
-        let status = child.wait().map_err(|e| e.to_string())?;
-        Ok((status.code(), pid))
+        if let Some(reason) = &result.stopped {
+            assert!(!reason.contains("unconfirmed"), "{reason}");
+        }
+        Ok((result.status.code(), lease.endpoint().is_some()))
     }
 
-    /// Elsewhere, git's process number comes first, and the process ends as git did.
     #[cfg(unix)]
     #[test]
-    fn the_script_run_elsewhere_says_whom_to_stop_and_ends_as_git_did() -> Result<(), String> {
+    fn the_script_run_elsewhere_has_an_owner_and_ends_as_git_did() -> Result<(), String> {
         let dir = scratch("there")?;
         run(Some(&dir), &["init", "-q"])?;
         let ok = run_there_here(&dir, &["status", "--short"], None)?;
         let failed = run_there_here(&dir, &["fetch", "/no/such/repo here"], None)?;
-        // A fetch that hangs, stopped by the process number it said.
-        let ssh = dir.join("hang.sh");
-        std::fs::write(&ssh, "#!/bin/sh\nexec sleep 60\n").map_err(|e| e.to_string())?;
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| e.to_string())?;
-        }
-        let config = format!("core.sshCommand={}", ssh.display());
-        let started = Instant::now();
         let stopped = run_there_here(
             &dir,
-            &["-c", &config, "fetch", "ssh://example.invalid/r.git"],
+            &["-c", "alias.wait=!sleep 60", "wait"],
             Some(Duration::from_millis(300)),
         )?;
-        let took = started.elapsed();
-        let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(ok.0, Some(0));
-        assert!(ok.1.is_some());
-        assert_eq!(failed.0, Some(128));
-        assert!(stopped.1.is_some());
+        std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+        assert_eq!(ok, (Some(0), true));
+        assert_eq!(failed, (Some(128), true));
+        assert!(stopped.1);
         assert_ne!(stopped.0, Some(0));
-        assert!(took < Duration::from_secs(15), "took {took:?}");
         Ok(())
     }
     #[cfg(unix)]

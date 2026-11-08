@@ -689,6 +689,52 @@ mod r2_inert_tests {
         Ok(())
     }
 }
+/// Read-only pack generation for a bisect transfer. Standalone remote supervision keeps
+/// the requested bounded binary capture independent of the pooled shell's 64 MiB frames.
+/// Nonzero Git exits stay distinct from uncertain transport/cancellation errors.
+pub(crate) fn transfer_pack(
+    dir: &Path,
+    revisions: Vec<u8>,
+    thin: bool,
+    limit: usize,
+) -> Result<Exit, String> {
+    let extra = Extra {
+        stdin: Some(revisions),
+        env: vec![("GIT_NO_LAZY_FETCH", "1".into())],
+        timeout: Some(std::time::Duration::from_secs(1800)),
+        ..Default::default()
+    };
+    let mut args = vec![
+        "pack-objects",
+        "--stdout",
+        "--revs",
+        "--delta-base-offset",
+        "--missing=error",
+    ];
+    if thin {
+        args.push("--thin");
+    }
+    let mut options = crate::processes::Options {
+        input: extra.stdin.clone(),
+        background: true,
+        timeout: extra.timeout,
+        output_limit: limit,
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let request = remote_request(&target, &extra, &args);
+        remote::streaming_command_bounded(&target.host, &request, None, None, false, limit)?
+            .configure(&mut options)
+    } else {
+        local_command(Some(dir), &extra, &args)
+    };
+    let out = crate::processes::run(command, options)?.complete()?;
+    Ok(Exit {
+        code: out.status.code(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
+}
 
 /// Save a command's stdout without capturing a local export in memory. Remote exports
 /// retain the existing persistent-shell transport and its binary-output behavior.
@@ -766,22 +812,6 @@ pub(super) fn run_coded(dir: &Path, args: &[&str]) -> Result<(i32, Vec<u8>), Str
     }
 }
 
-/// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
-pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
-    if let Some(target) = remote::parse(dir) {
-        return remote::spawn(
-            &target.host,
-            &remote_request(&target, &Extra::default(), args),
-        );
-    }
-    let mut cmd = repository_command(Some(dir), args);
-    cmd.args(args);
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    cmd.spawn().map_err(|e| format!("could not run git: {e}"))
-}
-
 /// What a [`run_call`] is run with besides its arguments.
 #[derive(Default)]
 pub struct Call {
@@ -828,8 +858,18 @@ pub struct Exit {
 /// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
 /// stops it (see `parallel_bisect::runner`).
 pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
+    run_for_test_input(dir, args, limit, None)
+}
+
+pub(crate) fn run_for_test_input(
+    dir: &Path,
+    args: &[&str],
+    limit: std::time::Duration,
+    stdin: Option<Vec<u8>>,
+) -> Result<Exit, String> {
     let extra = Extra {
         test: Some(limit),
+        stdin,
         ..Extra::default()
     };
     let out = execute(Some(dir), &extra, args)?;
@@ -838,6 +878,94 @@ pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Re
         stdout: out.stdout,
         stderr: out.stderr,
     })
+}
+
+/// Immutable actual-machine authority for one durable workspace operation.
+pub(crate) struct WorkspaceCommand<'a> {
+    pub authority: &'a remote::workspace_authority::WorkspaceAuthority,
+    pub input: Option<Vec<u8>>,
+    pub cleanup: bool,
+    pub directory: Option<&'a Path>,
+}
+impl<'a> WorkspaceCommand<'a> {
+    pub fn new(authority: &'a remote::workspace_authority::WorkspaceAuthority) -> Self {
+        Self {
+            authority,
+            input: None,
+            cleanup: false,
+            directory: None,
+        }
+    }
+}
+pub(crate) fn run_owned_test(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+    authority: &remote::workspace_authority::WorkspaceAuthority,
+) -> Result<crate::processes::Output, String> {
+    run_workspace_command(
+        dir,
+        args,
+        record,
+        limit,
+        cancel,
+        WorkspaceCommand::new(authority),
+    )
+}
+pub(crate) fn run_workspace_command(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+    owned: WorkspaceCommand<'_>,
+) -> Result<crate::processes::Output, String> {
+    let extra = Extra {
+        test: Some(limit),
+        stdin: owned.input.clone(),
+        ..Default::default()
+    };
+    let mut options = crate::processes::Options {
+        cancel,
+        background: true,
+        timeout: Some(limit),
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let record =
+            remote::parse(record).ok_or("remote owner record is on a different machine")?;
+        if record.host != target.host {
+            return Err("remote owner record is on a different machine".into());
+        }
+        if owned.directory.is_some() {
+            return Err("remote private directories use their fenced shell operation".into());
+        }
+        let request = remote_request(&target, &extra, args);
+        remote::streaming_command_authority(
+            &target.host,
+            &request,
+            Some(&record.path),
+            Some(owned.authority),
+            owned.cleanup,
+        )?
+        .configure(&mut options)
+    } else {
+        if remote::parse(record).is_some() {
+            return Err("native owner record is on a different machine".into());
+        }
+        remote::native_owner::command_with_authority(
+            local_command(Some(dir), &extra, args),
+            record,
+            limit,
+            Some(owned.authority.clone()),
+        )?
+        .with_input(owned.input.as_deref(), owned.cleanup)?
+        .with_directory(owned.directory)?
+        .configure(&mut options)
+    };
+    crate::processes::run(command, options)
 }
 
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
