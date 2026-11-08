@@ -20,7 +20,7 @@ impl RepoTab {
                 ui.horizontal_wrapped(|ui| {
                     ui.strong(crate::i18n::message(
                         "repo-core-3062",
-                        &[("title", session.scenario.title().to_string().into())],
+                        &[("title", session.scenario.display_title().into())],
                     ));
                     ui.label(crate::i18n::text("repo-core-3063"))
                         .on_hover_text(self.path.display().to_string());
@@ -31,11 +31,11 @@ impl RepoTab {
                         )
                         .clicked();
                 });
-                ui.label(session.scenario.goal());
+                ui.label(session.scenario.display_goal());
                 egui::CollapsingHeader::new(crate::i18n::text("repo-core-3065"))
                     .id_salt("practice-hint")
                     .show(ui, |ui| {
-                        ui.label(session.scenario.hint());
+                        ui.label(session.scenario.display_hint());
                     });
                 if self.practice_checking {
                     ui.horizontal(|ui| {
@@ -55,7 +55,7 @@ impl RepoTab {
                                 t.danger,
                                 crate::i18n::message(
                                     "repo-core-3070",
-                                    &[("error", error.to_string().into())],
+                                    &[("error", crate::practice::display_error(error).into())],
                                 ),
                             );
                         }

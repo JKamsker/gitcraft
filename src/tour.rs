@@ -1,5 +1,6 @@
 //! A first-day repository page. Everything here is observed from a bounded snapshot; it is
 //! never an inferred contribution policy, and no project hook or script is executed.
+pub(crate) mod presentation;
 #[cfg(test)]
 mod tests;
 use crate::git;
@@ -28,6 +29,9 @@ pub(crate) struct Workflow {
 pub(crate) struct Folder {
     pub path: Vec<u8>,
     pub authors: Vec<(String, String, usize)>,
+    // Provenance for the synthetic root label; a real directory with the same bytes
+    // must still be shown as user content. This does not change the grouping key.
+    root_files: bool,
 }
 pub(crate) struct Tour {
     pub history: Arc<History>,
@@ -253,6 +257,7 @@ fn recent(
     let mut folders: FolderCounts = BTreeMap::new();
     let mut files: BTreeMap<Vec<u8>, usize> = BTreeMap::new();
     let mut count = 0;
+    let mut named_folders = BTreeSet::new();
     for c in &history.commits {
         if !active() {
             return Err("Repository tour cancelled".into());
@@ -268,6 +273,9 @@ fn recent(
                 .iter()
                 .position(|b| *b == b'/')
                 .map_or_else(|| b"(root files)".to_vec(), |at| path[..at].to_vec());
+            if path.contains(&b'/') {
+                named_folders.insert(folder.clone());
+            }
             touched.insert(folder);
         }
         for folder in touched {
@@ -288,7 +296,12 @@ fn recent(
                 .collect();
             authors.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
             authors.truncate(5);
-            Folder { path, authors }
+            let root_files = path == b"(root files)" && !named_folders.contains(&path);
+            Folder {
+                path,
+                authors,
+                root_files,
+            }
         })
         .collect();
     let mut hot: Vec<_> = files.into_iter().collect();
