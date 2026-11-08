@@ -216,6 +216,8 @@ pub(crate) fn pr_url(hosting: &Hosting, n: u64) -> String {
     let base = format!("{}/{}", hosting.web, hosting.path);
     match hosting.forge {
         Forge::GitHub => format!("{base}/pull/{n}"),
+        Forge::Azure => format!("{base}/pullrequest/{n}"),
+        Forge::Bitbucket => format!("{base}/pull-requests/{n}"),
         Forge::GitLab => format!("{base}/-/merge_requests/{n}"),
         Forge::Forgejo | Forge::Gitea => format!("{base}/pulls/{n}"),
     }

@@ -6,6 +6,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+type Recording =
+    std::sync::Arc<dyn Fn(&str, &str, Option<&Value>) -> Result<Value, String> + Send + Sync>;
+
 pub(super) struct Api {
     pub repo: PathBuf,
     pub hosting: Hosting,
@@ -13,9 +17,7 @@ pub(super) struct Api {
     deadline: Instant,
     bytes: AtomicUsize,
     #[cfg(test)]
-    pub record: Option<
-        std::sync::Arc<dyn Fn(&str, &str, Option<&Value>) -> Result<Value, String> + Send + Sync>,
-    >,
+    pub record: Option<Recording>,
 }
 impl Api {
     pub fn new(repo: &Path, hosting: &Hosting) -> Result<Self, String> {

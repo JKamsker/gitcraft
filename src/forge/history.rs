@@ -161,6 +161,7 @@ pub(crate) fn lookup(
     query: &Query,
     active: &dyn Fn() -> bool,
 ) -> Result<Evidence, String> {
+    check_provider(hosting.forge)?;
     if !oid(&query.at.commit)
         || !oid(&query.file_oid)
         || query.at.line == 0
@@ -275,12 +276,22 @@ fn list(value: Value) -> Result<Vec<Value>, String> {
         .cloned()
         .ok_or_else(|| "Forge history API did not return a list".into())
 }
+fn check_provider(forge: Forge) -> Result<(), String> {
+    match forge {
+        Forge::GitHub | Forge::GitLab | Forge::Gitea | Forge::Forgejo => Ok(()),
+        Forge::Azure | Forge::Bitbucket => Err(format!(
+            "Commit-to-PR history evidence is not supported for {}; open its pull request page for native review",
+            forge.name()
+        )),
+    }
+}
 fn lookup_with(
     h: &Hosting,
     q: &Query,
     get: &mut dyn FnMut(&str) -> Result<Value, String>,
     prove: &mut dyn FnMut(&str, &str) -> bool,
 ) -> Result<Evidence, String> {
+    check_provider(h.forge)?;
     let base = match h.forge {
         Forge::GitLab => format!("projects/{}", component(&h.path)),
         _ => format!("repos/{}", project(h)),
@@ -425,6 +436,9 @@ fn lookup_with(
                         }
                         Err(error) => Err(error),
                     }
+                }
+                Forge::Azure | Forge::Bitbucket => {
+                    return Err("This forge does not support commit-to-PR history evidence".into());
                 }
             };
             match fetched {

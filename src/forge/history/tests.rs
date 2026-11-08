@@ -1,5 +1,32 @@
 use super::*;
 use serde_json::json;
+#[test]
+fn merge_pure_native_review_providers_refuse_unsupported_history_before_requests() {
+    for forge in [Forge::Azure, Forge::Bitbucket] {
+        let hosting = Hosting {
+            forge,
+            host: "recorded.invalid".into(),
+            path: "org/repo".into(),
+            web: "https://recorded.invalid".into(),
+        };
+        let mut requests = 0;
+        let mut proofs = 0;
+        let result = lookup_with(
+            &hosting,
+            &query(),
+            &mut |_| {
+                requests += 1;
+                Ok(json!([]))
+            },
+            &mut |_, _| {
+                proofs += 1;
+                true
+            },
+        );
+        assert!(result.is_err_and(|error| error.contains("open its pull request page")));
+        assert_eq!((requests, proofs), (0, 0));
+    }
+}
 fn query() -> Query {
     Query {
         at: Seed {

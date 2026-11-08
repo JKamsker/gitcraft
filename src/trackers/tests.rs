@@ -1,6 +1,6 @@
 use super::*;
 #[test]
-fn jira_cursor_account_adf_and_custom_criteria_are_preserved() {
+fn jira_cursor_account_adf_and_custom_criteria_are_preserved() -> Result<(), String> {
     let a = Account {
         origin: "https://company.atlassian.net".into(),
         user: "me@example.org".into(),
@@ -26,11 +26,14 @@ fn jira_cursor_account_adf_and_custom_criteria_are_preserved() {
             }
         },
     };
-    let list = c.listed().unwrap();
+    let list = c.listed()?;
     drop(c);
     assert_eq!(calls.len(), 3);
     assert!(calls[1].1.ends_with("search/jql"));
-    assert_eq!(calls[2].2.as_ref().unwrap()["nextPageToken"], "next");
+    assert_eq!(
+        calls[2].2.as_ref().ok_or("missing fixture value")?["nextPageToken"],
+        "next"
+    );
     let issue = &list[0];
     assert_eq!(issue.key(), "APP-42");
     assert_eq!(issue.branch_name(), "app-42-fix-login");
@@ -41,10 +44,15 @@ fn jira_cursor_account_adf_and_custom_criteria_are_preserved() {
         link.pull_request_text().1,
         "Relates to APP-42: https://company.atlassian.net/browse/APP-42"
     );
-    assert!(!serde_json::to_string(&a).unwrap().contains("token"));
+    assert!(
+        !serde_json::to_string(&a)
+            .map_err(|e| e.to_string())?
+            .contains("token")
+    );
+    Ok(())
 }
 #[test]
-fn linear_stable_ids_pagination_and_graphql_errors() {
+fn linear_stable_ids_pagination_and_graphql_errors() -> Result<(), String> {
     let a = Account {
         origin: "https://api.linear.app".into(),
         user: "me@example.org".into(),
@@ -57,7 +65,9 @@ fn linear_stable_ids_pagination_and_graphql_errors() {
         send: |_: &str, path: &str, b: Option<&Value>| {
             assert_eq!(path, "/graphql");
             n += 1;
-            let q = b.unwrap()["query"].as_str().unwrap();
+            let q = b.ok_or("missing request")?["query"]
+                .as_str()
+                .ok_or("missing query")?;
             if q.contains("viewer { id email }") {
                 return Ok(json!({"data":{"viewer":{"id":"uuid-v","email":"me@example.org"}}}));
             }
@@ -68,17 +78,22 @@ fn linear_stable_ids_pagination_and_graphql_errors() {
             )
         },
     };
-    let list = c.listed().unwrap();
-    assert_eq!(list[0].tracker.as_ref().unwrap().id, "uuid-i");
+    let list = c.listed()?;
+    assert_eq!(
+        list[0].tracker.as_ref().ok_or("missing fixture value")?.id,
+        "uuid-i"
+    );
     assert_eq!(list[0].key(), "ENG-9");
     assert!(
         graph(json!({"data":{"issues":[]},"errors":[{"message":"secret"}]}))
-            .unwrap_err()
+            .err()
+            .ok_or("expected fixture error")?
             .contains("no partial")
     );
+    Ok(())
 }
 #[test]
-fn wrong_viewer_foreign_origin_and_refresh_identity_are_refused() {
+fn wrong_viewer_foreign_origin_and_refresh_identity_are_refused() -> Result<(), String> {
     let a = Account {
         origin: "https://api.linear.app".into(),
         user: "me@example.org".into(),
@@ -91,7 +106,12 @@ fn wrong_viewer_foreign_origin_and_refresh_identity_are_refused() {
             Ok(json!({"data":{"viewer":{"id":"other","email":"other@example.org"}}}))
         },
     };
-    assert!(c.listed().unwrap_err().contains("different account"));
+    assert!(
+        c.listed()
+            .err()
+            .ok_or("expected fixture error")?
+            .contains("different account")
+    );
     assert!(
         Account {
             origin: "https://api.linear.app.evil".into(),
@@ -124,12 +144,18 @@ fn wrong_viewer_foreign_origin_and_refresh_identity_are_refused() {
         id: "uuid".into(),
         key: "ENG-9".into(),
     };
-    assert!(c.one(&identity).unwrap_err().contains("origin and account"));
+    assert!(
+        c.one(&identity)
+            .err()
+            .ok_or("expected fixture error")?
+            .contains("origin and account")
+    );
+    Ok(())
 }
 #[test]
-fn unknown_adf_is_visible_and_depth_is_not_silently_truncated() {
+fn unknown_adf_is_visible_and_depth_is_not_silently_truncated() -> Result<(), String> {
     assert_eq!(
-        adf(&json!({"type":"newNode","content":[{"type":"text","text":"kept"}]})).unwrap(),
+        adf(&json!({"type":"newNode","content":[{"type":"text","text":"kept"}]}))?,
         "[Unsupported Jira node: newNode] kept"
     );
     let mut v = json!({"type":"text","text":"tail"});
@@ -137,10 +163,11 @@ fn unknown_adf_is_visible_and_depth_is_not_silently_truncated() {
         v = json!({"type":"paragraph","content":[v]});
     }
     assert!(adf(&v).is_err());
+    Ok(())
 }
 
 #[test]
-fn linked_jira_and_linear_refresh_exact_stable_ids() {
+fn linked_jira_and_linear_refresh_exact_stable_ids() -> Result<(), String> {
     for kind in Kind::ALL {
         let origin = if kind == Kind::Jira {
             "https://site.atlassian.net"
@@ -171,25 +198,32 @@ fn linked_jira_and_linear_refresh_exact_stable_ids() {
                         assert!(path.starts_with("/rest/api/3/issue/stable-id?fields="));
                         Ok(issue)
                     }
-                } else if body.unwrap()["query"]
+                } else if body.ok_or("missing request")?["query"]
                     .as_str()
-                    .unwrap()
+                    .ok_or("missing query")?
                     .contains("viewer { id email }")
                 {
                     Ok(json!({"data":{"viewer":{"id":"viewer-id","email":"me@example.org"}}}))
                 } else {
-                    assert_eq!(body.unwrap()["variables"]["id"], "stable-id");
+                    assert_eq!(
+                        body.ok_or("missing request")?["variables"]["id"],
+                        "stable-id"
+                    );
                     Ok(json!({"data":{"issue":issue}}))
                 }
             },
         };
-        let issue = c.one(&identity).unwrap();
+        let issue = c.one(&identity)?;
         assert_eq!(issue.title, "Updated");
-        assert_eq!(issue.tracker.as_ref().unwrap(), &identity);
+        assert_eq!(
+            issue.tracker.as_ref().ok_or("missing fixture value")?,
+            &identity
+        );
     }
+    Ok(())
 }
 #[test]
-fn jira_repeated_and_missing_continuations_are_errors() {
+fn jira_repeated_and_missing_continuations_are_errors() -> Result<(), String> {
     for missing in [false, true] {
         let mut c = Client {
             kind: Kind::Jira,
@@ -211,10 +245,11 @@ fn jira_repeated_and_missing_continuations_are_errors() {
         };
         assert!(c.listed().is_err());
     }
+    Ok(())
 }
 
 #[test]
-fn configured_jira_criteria_take_precedence_through_link_and_card_data() {
+fn configured_jira_criteria_take_precedence_through_link_and_card_data() -> Result<(), String> {
     let row = json!({"id":"908","key":"APP-42","fields":{"summary":"Fix","description":{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Acceptance criteria"}]},{"type":"paragraph","content":[{"type":"text","text":"old description requirement"}]}]},"customfield_10001":{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"New requirements"}]},{"type":"taskList","content":[{"type":"taskItem","attrs":{"state":"TODO"},"content":[{"type":"text","text":"selected custom-field requirement"}]}]}]}}});
     let mut client = Client {
         kind: Kind::Jira,
@@ -225,10 +260,10 @@ fn configured_jira_criteria_take_precedence_through_link_and_card_data() {
             ..Default::default()
         },
         send: |_: &str, _: &str, _: Option<&Value>| -> Result<Value, String> {
-            panic!("parse must not perform I/O")
+            Err("parse must not perform I/O".into())
         },
     };
-    let parsed = client.parse(&row, "viewer").unwrap();
+    let parsed = client.parse(&row, "viewer")?;
     assert!(parsed.body.contains("old description requirement"));
     let link = crate::repo::issue_work::link::IssueLink::of(&parsed);
     assert_eq!(link.kept, crate::repo::issue_work::criteria::Kept::Criteria);
@@ -240,20 +275,20 @@ fn configured_jira_criteria_take_precedence_through_link_and_card_data() {
     assert!(rendered.iter().any(|l|matches!(l,crate::repo::issue_work::criteria::Line::Task{text,..} if text=="selected custom-field requirement")));
     assert!(!link.criteria.contains("old description requirement"));
     client.account.acceptance_field.clear();
-    let fallback =
-        crate::repo::issue_work::link::IssueLink::of(&client.parse(&row, "viewer").unwrap());
+    let fallback = crate::repo::issue_work::link::IssueLink::of(&client.parse(&row, "viewer")?);
     assert_eq!(fallback.criteria, "old description requirement");
     client.account.acceptance_field = "customfield_10001".into();
     let mut empty = row.clone();
     empty["fields"]["customfield_10001"] = Value::Null;
     assert!(
-        crate::repo::issue_work::link::IssueLink::of(&client.parse(&empty, "viewer").unwrap())
+        crate::repo::issue_work::link::IssueLink::of(&client.parse(&empty, "viewer")?)
             .criteria
             .is_empty()
     );
     empty["fields"]
         .as_object_mut()
-        .unwrap()
+        .ok_or("missing fields")?
         .remove("customfield_10001");
     assert!(client.parse(&empty, "viewer").is_err());
+    Ok(())
 }

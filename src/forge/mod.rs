@@ -7,7 +7,10 @@
 //! - Forgejo and Gitea share one API, which gitcraft calls itself with the login `tea` (or git's
 //!   credential helper) already has for the host. See [`gitea`].
 
+mod azure;
+mod bitbucket;
 mod cli;
+pub(crate) mod cloud;
 pub(crate) use cli::tool_location;
 mod forks;
 pub(crate) use cli::{ToolReport, tool_report};
@@ -37,10 +40,19 @@ pub enum Forge {
     GitLab,
     Forgejo,
     Gitea,
+    Azure,
+    Bitbucket,
 }
 
 impl Forge {
-    pub const ALL: [Forge; 4] = [Forge::GitHub, Forge::GitLab, Forge::Forgejo, Forge::Gitea];
+    pub const ALL: [Forge; 6] = [
+        Forge::GitHub,
+        Forge::GitLab,
+        Forge::Forgejo,
+        Forge::Gitea,
+        Forge::Azure,
+        Forge::Bitbucket,
+    ];
 
     /// The module that does the work.
     pub fn provider(self) -> &'static dyn Provider {
@@ -49,6 +61,8 @@ impl Forge {
             Forge::GitLab => &gitlab::GitLab,
             Forge::Forgejo => &gitea::FORGEJO,
             Forge::Gitea => &gitea::GITEA,
+            Forge::Azure => &azure::Azure,
+            Forge::Bitbucket => &bitbucket::Bitbucket,
         }
     }
 
@@ -82,6 +96,8 @@ impl Forge {
             Forge::GitLab => "gitlab",
             Forge::Forgejo => "forgejo",
             Forge::Gitea => "gitea",
+            Forge::Azure => "azure",
+            Forge::Bitbucket => "bitbucket",
         }
     }
 
@@ -451,9 +467,13 @@ fn detect_with(
                 .then_some(Forge::GitLab)
         })?;
     // An SSH remote says nothing of the web server; `tea`'s login for the host does.
-    let web = match web_base(&remote.url) {
-        Some(web) => web,
-        None => tea_web(&host).unwrap_or_else(|| format!("https://{host}")),
+    let web = if forge == Forge::Azure {
+        "https://dev.azure.com".into()
+    } else {
+        match web_base(&remote.url) {
+            Some(web) => web,
+            None => tea_web(&host).unwrap_or_else(|| format!("https://{host}")),
+        }
     };
     Some(Hosting {
         forge,
@@ -527,6 +547,9 @@ fn without_port(authority: &str) -> &str {
 /// The web host and `owner/repo` path of a remote URL: `https://host/owner/repo.git`,
 /// `git@host:owner/repo.git` or `ssh://git@host[:port]/owner/repo`.
 pub fn location(url: &str) -> Option<(String, String)> {
+    if let Some(location) = azure::location(url) {
+        return Some(location);
+    }
     let url = url.trim();
     let (host, path) = match url.split_once("://") {
         Some((_, rest)) => {
@@ -557,6 +580,12 @@ pub fn location(url: &str) -> Option<(String, String)> {
 /// The web page of the repository at remote `url`: `https://github.com/owner/repo` for
 /// `git@github.com:owner/repo.git`. `None` for a local path, which has no page.
 pub fn web_url(url: &str) -> Option<String> {
+    if let Some((host, path)) = azure::location(url) {
+        return Some(format!(
+            "https://{host}/{}",
+            crate::pr_post::encode_path(&path)
+        ));
+    }
     let (host, path) = location(url)?;
     // `C:/repos/x` reads as host `c`; a host that serves pages has a domain.
     if !host.contains('.') {
@@ -573,7 +602,7 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
     let tool = match forge {
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
-        Forge::Forgejo | Forge::Gitea => {
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
             return Err(format!("gitcraft has no tool for {}", forge.name()));
         }
     };
