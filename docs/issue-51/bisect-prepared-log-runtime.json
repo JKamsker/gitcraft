@@ -1,0 +1,119 @@
+{
+  "candidate": "49ee74ba7505d4c49e798271af4797dc92463280",
+  "private": "/private/tmp/gitcraft51-bis-r1-2-owned-lkwgtzwv",
+  "scope": "four exact affected local bisect regressions, sequential, stop first failure; BIS-R1-2 only",
+  "stock_template": "/opt/homebrew/share/git-core/templates",
+  "stock_hooks": [
+    "applypatch-msg.sample",
+    "commit-msg.sample",
+    "fsmonitor-watchman.sample",
+    "post-update.sample",
+    "pre-applypatch.sample",
+    "pre-commit.sample",
+    "pre-merge-commit.sample",
+    "pre-push.sample",
+    "pre-rebase.sample",
+    "pre-receive.sample",
+    "prepare-commit-msg.sample",
+    "push-to-checkout.sample",
+    "sendemail-validate.sample",
+    "update.sample"
+  ],
+  "adapter_sha256": "a7e20b7da45b48f99afb4cae69669800ca7afc6030e82f5f0bd7444409161087",
+  "results": [
+    {
+      "name": "parallel_bisect::tests::a_test_that_fails_on_both_ends_is_reported",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::a_test_that_fails_on_both_ends_is_reported",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 10.082,
+      "log": "/private/tmp/gitcraft51-bis-r1-2-owned-lkwgtzwv/01.log",
+      "sha256": "6a9221664f4bb741d4888b30b432580f2701d9b15965e30c885171fca0d71108"
+    },
+    {
+      "name": "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 24.826,
+      "log": "/private/tmp/gitcraft51-bis-r1-2-owned-lkwgtzwv/02.log",
+      "sha256": "4d4cd2541e3a40e35d1d51843af41db9c5ab6119d3f7aa71264712b7fcc23a0f"
+    },
+    {
+      "name": "parallel_bisect::tests::finds_what_git_bisect_run_finds_across_merges",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::finds_what_git_bisect_run_finds_across_merges",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 19.933,
+      "log": "/private/tmp/gitcraft51-bis-r1-2-owned-lkwgtzwv/03.log",
+      "sha256": "999057e6e70b22aab39e1b4c3c40c4c379f135b03fbaeca2e9fec29320fe7eea"
+    },
+    {
+      "name": "parallel_bisect::tests::more_at_once_takes_fewer_rounds",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::more_at_once_takes_fewer_rounds",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 19.304,
+      "log": "/private/tmp/gitcraft51-bis-r1-2-owned-lkwgtzwv/04.log",
+      "sha256": "fcb706eabb735e927fc442066c55964d00e62213f3a74a457a4fa48512c723c2"
+    }
+  ],
+  "status": "PASS: four exact affected local macOS bisect tests at49ee74ba; no broader acceptance inferred",
+  "receipt_source_sha256": "2918fdabc00073922ba8ff13fc8a0c92d0c3ae665b8b376deece47b9ee2abdc8",
+  "application_sha256": {
+    "src/parallel_bisect/runner.rs": "e3ec88e8fe51cccbacda400e384324ba8ca04f70437c07af0db57f3b30576dba",
+    "src/parallel_bisect/session.rs": "dff1a9e496a0d16a712cff098e571b59f64a6e943d03c10037bf045074b5c059",
+    "src/parallel_bisect/workspace.rs": "822f805905885b25e4d2642870c9684bd521143182db244f348526847e11ac5e"
+  },
+  "environment": "Fresh private physical HOME/TMP/XDG/config/template root; same inspected-stock sample-only hooks, no symlinks; external GIT/GITCRAFT/SSH opt-ins cleared before explicit private overrides, GIT_CONFIG_NOSYSTEM=1, GIT_TERMINAL_PROMPT=0, GIT_SSH_COMMAND=/usr/bin/false; CARGO_BUILD_JOBS=2; PATH=/tmp/gitcraft-integration-tools:$PATH; SHELL=/tmp/gitcraft-integration-tools/validation-shell.",
+  "preservation": "49ee74ba7505d4c49e798271af4797dc92463280 committed with required Jonas author/committer, pushed JKamsker origin and remote SHA verified before runtime.",
+  "limits": "BIS-R1-2 only; sequential exact tests, no full module/suite, transport/platform runtime or actual EIO fault injection. Prior b7 echo pass and215 eight passes not rerun; preserved separately. Independent delta acceptance pending."
+}

@@ -177,6 +177,15 @@ impl Workspace {
         }
     }
 
+    /// Prepare under actual-machine mutation authority, before the test can queue.
+    /// A cancelled queued target can then return a real empty log, without an absence
+    /// fallback. Failed creation/truncation is a setup error and admits no dispatch.
+    pub(super) fn prepare_test_log(&self, n: usize) -> Result<String, String> {
+        let log = format!("{}/{}.log", self.base_there, n);
+        self.shell(": > \"$1\"", &[&log], None)?;
+        Ok(log)
+    }
+
     /// Worktree `n`'s folder: as the app names it, and as a path there.
     pub fn slot(&self, n: usize) -> (PathBuf, String) {
         let name = format!("bisect-{n}");
@@ -377,6 +386,17 @@ impl Workspace {
         };
         self.close_error = result.as_ref().err().cloned();
         result
+    }
+
+    /// Simulate loss of a client after its operations completed, keeping real durable
+    /// owner evidence for the next claimant. This fixture never leaves a live target.
+    #[cfg(test)]
+    pub(super) fn leave_completed_fixture(mut self) -> Result<(), String> {
+        self.closed = true;
+        self.lease
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .close()
     }
 }
 impl Drop for Workspace {

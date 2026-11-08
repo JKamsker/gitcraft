@@ -1,0 +1,228 @@
+{
+  "candidate": "21515616cac7fab68790c6e68352131f5d6ce883",
+  "private": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d",
+  "scope": "eight exact local regressions, sequential, stop first failure",
+  "stock_template": "/opt/homebrew/share/git-core/templates",
+  "stock_hooks": [
+    "applypatch-msg.sample",
+    "commit-msg.sample",
+    "fsmonitor-watchman.sample",
+    "post-update.sample",
+    "pre-applypatch.sample",
+    "pre-commit.sample",
+    "pre-merge-commit.sample",
+    "pre-push.sample",
+    "pre-rebase.sample",
+    "pre-receive.sample",
+    "prepare-commit-msg.sample",
+    "push-to-checkout.sample",
+    "sendemail-validate.sample",
+    "update.sample"
+  ],
+  "adapter_sha256": "c77430f6228543cff4bba738156237eb3b3959b872ebf0c95bf958992cd233b3",
+  "results": [
+    {
+      "name": "parallel_bisect::tests::a_test_that_fails_on_both_ends_is_reported",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::a_test_that_fails_on_both_ends_is_reported",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 16.617,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/01.log",
+      "sha256": "177066333c485337f89914d15be96c1d4ca1d626a22e818affe6020ecd4fb79c"
+    },
+    {
+      "name": "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 21.396,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/02.log",
+      "sha256": "f770108f9b45f0022bdb76d45547d1bb0d5965d8100a822bb027e8b5d1107588"
+    },
+    {
+      "name": "parallel_bisect::tests::finds_what_git_bisect_run_finds_across_merges",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::finds_what_git_bisect_run_finds_across_merges",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 16.253,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/03.log",
+      "sha256": "a1cc89f2f08d9c9d29d3c4286a42fef776ea1b20053de439a4a49e88aa9e7b0f"
+    },
+    {
+      "name": "parallel_bisect::tests::more_at_once_takes_fewer_rounds",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::more_at_once_takes_fewer_rounds",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 20.545,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/04.log",
+      "sha256": "81bfef4f213d51c3579ebdbc4164fdb085e5abdf5aaf7833abfe0ada14ecbd74"
+    },
+    {
+      "name": "parallel_bisect::tests::a_crashed_bisect_is_cleared_up_by_the_next",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::a_crashed_bisect_is_cleared_up_by_the_next",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 7.713,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/05.log",
+      "sha256": "33fbceabb2c9a7781e4dc4c7b8ed266b6c0c8e5dee0737c247889c3cd513e509"
+    },
+    {
+      "name": "parallel_bisect::tests::legacy_crash_evidence_is_refused_and_retained",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "parallel_bisect::tests::legacy_crash_evidence_is_refused_and_retained",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 2.905,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/06.log",
+      "sha256": "52da3eaba44ac54d90407a93b571a69b4ff44c6b2ca5713813580d0e71b7a4dc"
+    },
+    {
+      "name": "ai::ask::tests::inherited_open_output_is_reported_instead_of_a_complete_answer",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "ai::ask::tests::inherited_open_output_is_reported_instead_of_a_complete_answer",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 2.984,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/07.log",
+      "sha256": "2855994aa8ac35b4121053f6a1644ad1f82d1d0f3705f6afbcd3aae958bb6d5f"
+    },
+    {
+      "name": "git::stream::tests::inherited_open_output_reports_failure_and_keeps_delivered_lines",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "git::stream::tests::inherited_open_output_reports_failure_and_keeps_delivered_lines",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 0.823,
+      "log": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/08.log",
+      "sha256": "fefd8316ee4a430db6434aa2d2cb819f3195aa0afb852fd9d369e11458a58a16"
+    }
+  ],
+  "status": "PASS: 8 exact local runtime regressions; broader suite/platform scope not run",
+  "authorization": "Root explicit release after root19 suite finished; candidate committed, pushed and remote SHA verified first.",
+  "environment": {
+    "HOME": "private home",
+    "TMPDIR": "private physical /private/tmp/.../tmp",
+    "XDG_CONFIG_HOME": "private",
+    "XDG_DATA_HOME": "private",
+    "XDG_CACHE_HOME": "private",
+    "GIT_CONFIG_GLOBAL": "private empty file",
+    "GIT_CONFIG_SYSTEM": "private empty file",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_TEMPLATE_DIR": "private copy of inspected stock template; all hooks regular *.sample; no symlinks",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_SSH_COMMAND": "/usr/bin/false",
+    "CARGO_BUILD_JOBS": "2",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "inherited_GIT_GITCRAFT_SSH_XDG_variables": "removed before explicit private assignments"
+  },
+  "receipt_source": {
+    "path": "/private/tmp/gitcraft51-bisect19-owned-5wdsuw3d/results.json",
+    "sha256": "3046302e728e2c132c60e059615c792a246a11d4ae2a97a82928b83f559557c5"
+  },
+  "original_failure_evidence": {
+    "path": "/tmp/gitcraft-51-local-suite-19b39cae/suite.log",
+    "sha256": "a8648c834061d72f45581896f863d07f5368751c3120644b21a5c5ea817a0cca",
+    "result": "3915 passed; 78 failed; 21 ignored; 1226.61s; preserved read-only"
+  },
+  "application_sha256": {
+    "src/parallel_bisect/runner.rs": "6c61fd60609bf5c298149bd0015b50042a85add1e8234c59feb1546af36e488c",
+    "src/parallel_bisect/workspace.rs": "6acf61e0ea3a1acf6cf9d4506f388d77fe79765182e3208c2b6996d9f996d966",
+    "src/parallel_bisect/tests.rs": "c4bee4a2c3ff4b5129ae79f0335e1f5c35199dafd7ad8e068f70d5034c240009",
+    "src/ai/ask/tests.rs": "c3a89f6cda1f66bcbafcdda16cfdd216efe47a792d01d0441efcbbf102906ef6",
+    "src/git/stream.rs": "9c36967e36b29174b5295cc8392d3b0a7d95a54ef0f7b35f66157c031a1906cb"
+  }
+}

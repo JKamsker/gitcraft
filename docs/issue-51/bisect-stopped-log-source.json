@@ -1,0 +1,39 @@
+{
+  "implementation_parent": "57af996709a6fea3340895951ce703bcbb3055bc",
+  "root_failure_candidate": "19b39cae1e39fd7c84048e719e2eb9f0379958b4",
+  "original_evidence": {
+    "path": "/tmp/gitcraft-51-local-suite-19b39cae/suite.log",
+    "first_lines": 1990,
+    "prefix_sha256": "188e56b3e543b81defe5b2eb70b0422dd6f6370a28346c84980e020dba6ca2cc",
+    "preserved_read_only": true
+  },
+  "source_sha256": {
+    "src/parallel_bisect/runner.rs": "6c61fd60609bf5c298149bd0015b50042a85add1e8234c59feb1546af36e488c",
+    "src/parallel_bisect/workspace.rs": "6acf61e0ea3a1acf6cf9d4506f388d77fe79765182e3208c2b6996d9f996d966",
+    "src/parallel_bisect/tests.rs": "c4bee4a2c3ff4b5129ae79f0335e1f5c35199dafd7ad8e068f70d5034c240009",
+    "src/ai/ask/tests.rs": "c3a89f6cda1f66bcbafcdda16cfdd216efe47a792d01d0441efcbbf102906ef6",
+    "src/git/stream.rs": "9c36967e36b29174b5295cc8392d3b0a7d95a54ef0f7b35f66157c031a1906cb"
+  },
+  "gates": {
+    "recording": {
+      "command": "CARGO_BUILD_JOBS=2 TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:$PATH SHELL=/tmp/gitcraft-integration-tools/validation-shell cargo +1.95.0 test --locked --offline parallel_bisect::runner::tests::recording -- --test-threads=1 --nocapture",
+      "result": "PASS: 5 pure tests; 0 actual process fixtures",
+      "log": "/tmp/gitcraft51-bisect19-recording.log",
+      "sha256": "c65b855ffe9609304bc104bb0664f0ba5a616d89f6554359baeffd4de2ea0787"
+    },
+    "check": {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --offline --all-targets",
+      "result": "PASS",
+      "log": "/tmp/gitcraft51-bisect19-check.log",
+      "sha256": "5cae6488bd7636a7fa2758a59088b32a1e8f922a0b87c1fee56c20ce58d4e24a"
+    },
+    "build": {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked --offline",
+      "result": "PASS",
+      "log": "/tmp/gitcraft51-bisect19-build.log",
+      "sha256": "b7782d6f7a8db0b2547d82ecd5cdec8494ed1d52dc5398d017e2cd52a2695bd0"
+    }
+  },
+  "actual_runtime": "PASS: 8 exact local regressions at 21515616cac7fab68790c6e68352131f5d6ce883; see bisect-stopped-log-runtime.json; no broader release inferred",
+  "root_source_comparison": "Unix retained-anchor production is identical at implementation_parent and root19. Root-only held env/endpoint fixtures are not needed for these local corrections and were not ported. Preserve root19 runner connections::inherit when integrating this semantic delta."
+}

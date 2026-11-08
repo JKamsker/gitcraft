@@ -28,11 +28,31 @@ r=$?
 tail -c 8192 "$1" 2>/dev/null
 exit $r"#;
 
+// Fenced setup creates even a queued test's log before dispatch. Never infer absence
+// from shell predicates: missing files and metadata/read errors all fail this read.
+const STOPPED_LOG: &str = r#"cd "${1%/*}" || exit 1
+log=${1##*/}
+if [ -f "$log" ] && [ ! -L "$log" ]; then
+  tail -c 8192 "$log"
+else
+  printf 'gitcraft: stopped test log unavailable or not a regular file\n' >&2
+  exit 1
+fi"#;
+
 /// What a test run came to: how it ended and the end of its output.
 #[derive(Clone, Debug)]
 pub struct Ran {
     pub ended: Ended,
     pub output: String,
+}
+
+/// Queue no test until its fenced setup has successfully created an empty log.
+pub(super) fn with_prepared_log(
+    prepare: impl FnOnce() -> Result<String, String>,
+    dispatch: impl FnOnce(&str) -> Result<Ran, String>,
+) -> Result<Ran, String> {
+    let log = prepare().map_err(|e| format!("could not prepare bisect test log: {e}"))?;
+    dispatch(&log)
 }
 
 /// The arguments that have git run `script` (with `args` as `$1`…) with `sh`, under the
@@ -71,7 +91,12 @@ pub(super) fn shell_input(
     if exit.code == Some(0) {
         Ok(String::from_utf8_lossy(&exit.stdout).into_owned())
     } else {
-        Err(String::from_utf8_lossy(&exit.stderr).trim().to_owned())
+        let said = String::from_utf8_lossy(&exit.stderr).trim().to_owned();
+        Err(if said.is_empty() {
+            format!("bisect shell ended with status {:?}", exit.code)
+        } else {
+            said
+        })
     }
 }
 
@@ -119,29 +144,17 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
                         });
                     }
                     let exit = result?;
-                    crate::remote::recover_owner(record)
-                        .map_err(|e| format!("test cleanup unknown; workspace preserved: {e}"))?;
-                    if let Some(reason) = &exit.stopped
-                        && reason != "cancelled"
-                        && reason != "process timed out and was stopped"
-                    {
-                        return Err(reason.clone());
-                    }
-                    let effective = why.or_else(|| exit.stopped.as_ref().map(|_| Ended::TimedOut));
-                    let mut ran = finish(
-                        Ok(git::Exit {
+                    return recovered_run(
+                        git::Exit {
                             code: exit.status.code(),
                             stdout: exit.stdout,
                             stderr: exit.stderr,
-                        }),
-                        effective,
-                    )?;
-                    if effective.is_some() {
-                        let output =
-                            shell(test.control, "tail -c 8192 \"$1\" 2>/dev/null", &[test.log])?;
-                        ran.output = tail(&output, KEEP);
-                    }
-                    return Ok(ran);
+                        },
+                        exit.stopped.as_deref(),
+                        why,
+                        || crate::remote::recover_owner(record).map(|_| ()),
+                        || shell(test.control, STOPPED_LOG, &[test.log]),
+                    );
                 }
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => {
@@ -160,6 +173,29 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
             }
         }
     })
+}
+
+fn recovered_run(
+    exit: git::Exit,
+    stopped: Option<&str>,
+    why: Option<Ended>,
+    recover: impl FnOnce() -> Result<(), String>,
+    read_log: impl FnOnce() -> Result<String, String>,
+) -> Result<Ran, String> {
+    recover().map_err(|e| format!("test cleanup unknown; workspace preserved: {e}"))?;
+    if let Some(reason) = stopped
+        && reason != "cancelled"
+        && reason != "process timed out and was stopped"
+    {
+        return Err(reason.to_owned());
+    }
+    let effective = why.or_else(|| stopped.map(|_| Ended::TimedOut));
+    let mut ran = finish(Ok(exit), effective)?;
+    if effective.is_some() {
+        let output = read_log().map_err(|e| format!("could not read stopped test log: {e}"))?;
+        ran.output = tail(&output, KEEP);
+    }
+    Ok(ran)
 }
 
 /// How a run that came back ended: as it was stopped (`why`), else by its exit code.
@@ -217,5 +253,164 @@ mod tests {
     fn recording_unknown_cleanup_is_not_a_stopped_verdict() {
         assert!(finish(Err("missing owner receipt".into()), Some(Ended::Stopped)).is_err());
         assert!(finish(Err("missing owner receipt".into()), Some(Ended::TimedOut)).is_err());
+    }
+
+    #[test]
+    fn recording_prepared_empty_log_is_read_only_after_recovery() -> Result<(), String> {
+        for ended in [Ended::Stopped, Ended::TimedOut] {
+            let order = std::cell::RefCell::new(Vec::new());
+            let ran = with_prepared_log(
+                || {
+                    order.borrow_mut().push("fenced empty log prepared");
+                    Ok("/synthetic/1.log".into())
+                },
+                |log| {
+                    assert_eq!(log, "/synthetic/1.log");
+                    order.borrow_mut().push("dispatch queued then cancelled");
+                    recovered_run(
+                        git::Exit {
+                            code: Some(125),
+                            stdout: Vec::new(),
+                            stderr: Vec::new(),
+                        },
+                        Some("cancelled"),
+                        Some(ended),
+                        || {
+                            order.borrow_mut().push("recovered");
+                            Ok(())
+                        },
+                        || {
+                            order.borrow_mut().push("read prepared empty log");
+                            Ok(String::new())
+                        },
+                    )
+                },
+            )?;
+            assert_eq!(ran.ended, ended);
+            assert!(ran.output.is_empty());
+            assert_eq!(
+                *order.borrow(),
+                [
+                    "fenced empty log prepared",
+                    "dispatch queued then cancelled",
+                    "recovered",
+                    "read prepared empty log"
+                ]
+            );
+        }
+        assert!(STOPPED_LOG.starts_with("cd \"${1%/*}\" || exit 1"));
+        assert!(!STOPPED_LOG.contains("elif"));
+        assert!(!STOPPED_LOG.contains("[ ! -e"));
+        assert!(!STOPPED_LOG.contains("2>/dev/null"));
+        Ok(())
+    }
+
+    #[test]
+    fn recording_failed_log_preparation_admits_no_dispatch() {
+        for error in [
+            std::io::Error::from(std::io::ErrorKind::NotFound),
+            std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+            std::io::Error::other("Input/output error"),
+            std::io::Error::other("workspace mutation cleanup unconfirmed"),
+        ] {
+            let message = error.to_string();
+            let mut dispatched = false;
+            let result = with_prepared_log(
+                || Err(message.clone()),
+                |_| {
+                    dispatched = true;
+                    Err("must not queue".into())
+                },
+            );
+            assert!(
+                matches!(result, Err(e) if e.starts_with("could not prepare bisect test log:") && e.contains(&message))
+            );
+            assert!(!dispatched);
+        }
+    }
+
+    #[test]
+    fn recording_unknown_recovery_never_reads_or_normalizes_log() {
+        let mut read = false;
+        let result = recovered_run(
+            git::Exit {
+                code: Some(125),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            },
+            Some("cancelled"),
+            Some(Ended::Stopped),
+            || Err("missing terminal proof".into()),
+            || {
+                read = true;
+                Ok(String::new())
+            },
+        );
+        assert!(
+            matches!(result, Err(e) if e.contains("test cleanup unknown") && e.contains("missing terminal proof"))
+        );
+        assert!(!read);
+    }
+
+    #[test]
+    fn recording_stopped_log_errors_survive_and_available_output_is_kept() -> Result<(), String> {
+        for error in [
+            "No such file or directory",
+            "not a regular file",
+            "Permission denied",
+            "Input/output error",
+        ] {
+            let result = recovered_run(
+                git::Exit {
+                    code: Some(125),
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                },
+                Some("cancelled"),
+                Some(Ended::Stopped),
+                || Ok(()),
+                || Err(error.into()),
+            );
+            assert!(
+                matches!(result, Err(e) if e.contains("could not read stopped test log") && e.contains(error))
+            );
+        }
+        let ran = recovered_run(
+            git::Exit {
+                code: Some(125),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            },
+            Some("cancelled"),
+            Some(Ended::Stopped),
+            || Ok(()),
+            || Ok("partial output\n".into()),
+        )?;
+        assert_eq!(ran.ended, Ended::Stopped);
+        assert_eq!(ran.output, "partial output\n");
+        Ok(())
+    }
+
+    #[test]
+    fn recording_normal_completion_does_not_substitute_log_output() -> Result<(), String> {
+        let mut read = false;
+        let ran = recovered_run(
+            git::Exit {
+                code: Some(0),
+                stdout: b"delivered".to_vec(),
+                stderr: Vec::new(),
+            },
+            None,
+            None,
+            || Ok(()),
+            || {
+                read = true;
+                Ok("wrong output".into())
+            },
+        )?;
+        assert_eq!(ran.ended, Ended::Exited(0));
+        assert_eq!(ran.output, "delivered");
+        assert!(!read);
+        Ok(())
     }
 }

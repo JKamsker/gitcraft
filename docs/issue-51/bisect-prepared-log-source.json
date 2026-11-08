@@ -1,0 +1,39 @@
+{
+  "implementation_parent": "de475c3222db787e91ffc6a55c0f52f2aab32460",
+  "finding": "BIS-R1-2 only",
+  "review": {
+    "path": "/tmp/gitcraft-51-bisect-runtime-correction-review.md",
+    "sha256": "d6d8524c4dcb318f5a686476b1ab164e114c72e99b81f18335b045aeef6108be",
+    "manifest_sha256": "2146e294327bd957c4ea53e08e84ca11f02f99b12bd6a35163126e05de484004"
+  },
+  "approach": "Precreate/truncate the slot log using existing Workspace shell with Mutation authority and durable owner record, then admit Dispatch. Remove stopped-reader absence fallback; failed lookup/read never establishes empty output. No errno/absence classification is needed.",
+  "source_sha256": {
+    "src/parallel_bisect/runner.rs": "e3ec88e8fe51cccbacda400e384324ba8ca04f70437c07af0db57f3b30576dba",
+    "src/parallel_bisect/session.rs": "dff1a9e496a0d16a712cff098e571b59f64a6e943d03c10037bf045074b5c059",
+    "src/parallel_bisect/workspace.rs": "822f805905885b25e4d2642870c9684bd521143182db244f348526847e11ac5e"
+  },
+  "gates": {
+    "recording": {
+      "command": "CARGO_BUILD_JOBS=2 TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:$PATH SHELL=/tmp/gitcraft-integration-tools/validation-shell cargo +1.95.0 test --locked --offline parallel_bisect::runner::tests::recording -- --test-threads=1 --nocapture",
+      "result": "PASS: 6 pure tests",
+      "log": "/tmp/gitcraft51-bis-r1-2-recording.log",
+      "sha256": "3e07af02a22f41ebf951275e4159812003403e716e194c6a45c2cb123a7c8101"
+    },
+    "check": {
+      "command": "CARGO_BUILD_JOBS=2 TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:$PATH SHELL=/tmp/gitcraft-integration-tools/validation-shell cargo +1.95.0 check --locked --offline --all-targets",
+      "result": "PASS",
+      "log": "/tmp/gitcraft51-bis-r1-2-check.log",
+      "sha256": "d267e3c2a231f66e9378ca6ce49ebfbf8fe62edc193d738643e836a172aac515"
+    },
+    "build": {
+      "command": "CARGO_BUILD_JOBS=2 TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:$PATH SHELL=/tmp/gitcraft-integration-tools/validation-shell cargo +1.95.0 build --locked --offline",
+      "result": "PASS",
+      "log": "/tmp/gitcraft51-bis-r1-2-build.log",
+      "sha256": "faab639dd5a8272a3b0e6b9ee64de60084ffab8bd6280727f054af81be80ca64"
+    }
+  },
+  "inert_scope": "Production sequence callbacks injected with preparation success and NotFound/PermissionDenied/EIO/cleanup-unknown failures; late missing/nonregular/permission/EIO read failures, recovery uncertainty and normal output. No subprocess or filesystem fault injection.",
+  "actual_runtime": "PASS: four exact affected local macOS bisect tests at49ee74ba7505d4c49e798271af4797dc92463280; see bisect-prepared-log-runtime.json; no wider acceptance.",
+  "prior_evidence": "b7de0442 echo-only PASS and historical215 eight PASS retained at their exact candidates; no new combined all-pass inference.",
+  "integration": "Keep root runner connections::inherit and accepted root context changes; apply semantic delta only."
+}
