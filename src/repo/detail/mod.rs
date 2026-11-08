@@ -106,6 +106,7 @@ impl RepoTab {
                 false,
                 Some(&key(&f.path)),
                 &links,
+                self.keyboard_file_selected(&key(&f.path)),
                 acts,
             );
             if r.row.clicked() {

@@ -413,6 +413,7 @@ impl RepoTab {
                         ignorable,
                         (!view.structural.enabled).then_some(&view.key),
                         &links,
+                        false,
                         acts,
                         |ui, acts| {
                             self.lock_menu_items(ui, path, rev, acts);

@@ -79,6 +79,13 @@ pub(crate) enum Command {
     SelectionCopy,
     SelectionAll,
     SelectionHistory,
+    GraphCopyHash,
+    GraphCopyMessage,
+    GraphCopyBranch,
+    FileHistory,
+    FileBlame,
+    FileContents,
+    FileCopyPath,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
@@ -133,7 +140,10 @@ impl Command {
             Command::SelectionCopy | Command::SelectionAll | Command::SelectionHistory => {
                 Scope::Selection
             }
-            Command::GraphPrevious
+            Command::GraphCopyHash
+            | Command::GraphCopyMessage
+            | Command::GraphCopyBranch
+            | Command::GraphPrevious
             | Command::GraphNext
             | Command::GraphLeft
             | Command::GraphRight => Scope::Graph,
@@ -178,7 +188,11 @@ impl Command {
             | Command::FocusSidebar
             | Command::FocusGraph
             | Command::FocusDetail => Scope::Repository,
-            Command::FileNext
+            Command::FileHistory
+            | Command::FileBlame
+            | Command::FileContents
+            | Command::FileCopyPath
+            | Command::FileNext
             | Command::FilePrevious
             | Command::FileToggleStage
             | Command::FileOpen => Scope::Files,
@@ -193,6 +207,13 @@ impl Command {
     /// Stable IDs are persisted independently of translated labels.
     pub(crate) fn id(self) -> &'static str {
         match self {
+            Self::GraphCopyHash => "graph_copy_hash",
+            Self::GraphCopyMessage => "graph_copy_message",
+            Self::GraphCopyBranch => "graph_copy_branch",
+            Self::FileHistory => "file_history",
+            Self::FileBlame => "file_blame",
+            Self::FileContents => "file_contents",
+            Self::FileCopyPath => "file_copy_path",
             Self::FindNext => "find_next",
             Self::FindPrevious => "find_previous",
             Self::SelectionCopy => "selection_copy",
@@ -401,7 +422,16 @@ pub(crate) const BINDINGS: &[Binding] = &[
 ];
 
 /// Optional actions appear in the same editor/manual registry and start unbound.
-pub(crate) const UNBOUND_COMMANDS: &[Command] = &[Command::SelectionHistory];
+pub(crate) const UNBOUND_COMMANDS: &[Command] = &[
+    Command::SelectionHistory,
+    Command::GraphCopyHash,
+    Command::GraphCopyMessage,
+    Command::GraphCopyBranch,
+    Command::FileHistory,
+    Command::FileBlame,
+    Command::FileContents,
+    Command::FileCopyPath,
+];
 
 /// The command `key` with `modifiers` held does, if any.
 #[cfg(test)]
@@ -560,6 +590,22 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
 ];
 
 pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(
+        &[Command::GraphCopyHash],
+        "Graph: copy selected commit hash",
+    ),
+    row(
+        &[Command::GraphCopyMessage],
+        "Graph: copy selected commit message",
+    ),
+    row(
+        &[Command::GraphCopyBranch],
+        "Graph: copy selected commit's first branch",
+    ),
+    row(&[Command::FileHistory], "Files: history of selected file"),
+    row(&[Command::FileBlame], "Files: blame selected file"),
+    row(&[Command::FileContents], "Files: view selected file"),
+    row(&[Command::FileCopyPath], "Files: copy selected path"),
     row(&[Command::FindNext], "Find: next match"),
     row(&[Command::FindPrevious], "Find: previous match"),
     row(&[Command::SelectionCopy], "Copy selected lines"),

@@ -22,6 +22,14 @@ pub(super) fn pill_menu_id(hash: &str) -> egui::Id {
 }
 
 impl RepoTab {
+    pub(super) fn copy_branch(&self, i: usize) -> Option<String> {
+        let commit = self.commits.get(i)?;
+        badges(&commit.refs, &self.refs)
+            .into_iter()
+            .find(|b| b.kind == BadgeKind::Branch)
+            .map(|b| b.git_ref())
+    }
+
     /// Right-click menu of a commit row.
     pub(super) fn commit_menu(
         &self,
@@ -61,12 +69,8 @@ impl RepoTab {
         let summary = commit.summary.clone();
         let is_head = hash == self.refs.head;
         // The right-clicked branch, else the commit's first branch, for copying.
-        let branch_name = pill.clone().or_else(|| {
-            badges(&commit.refs, &self.refs)
-                .into_iter()
-                .find(|b| b.kind == BadgeKind::Branch)
-                .map(|b| b.git_ref())
-        });
+        let first_branch = self.copy_branch(i);
+        let branch_name = pill.clone().or_else(|| first_branch.clone());
         let target = self
             .refs
             .current
@@ -133,7 +137,14 @@ impl RepoTab {
         ui.separator();
         self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
         self.gerrit_menu(ui, commit, acts);
-        copy_items(ui, &hash, &summary, branch_name.as_deref());
+        copy_items(
+            ui,
+            &hash,
+            &summary,
+            branch_name.as_deref(),
+            self.selected == Some(i),
+            branch_name == first_branch,
+        );
         let scope = self.commit_scope(&hash, branch_name.as_deref());
         crate::repo::custom_commands::menu_items(
             ui,
@@ -543,9 +554,17 @@ fn reset_steps(mode: &str, hash: &str, target: &str, head: &str) -> Vec<Vec<Stri
 }
 
 /// Copying the commit's hash, message, and `branch` when there is one.
-fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
+fn copy_items(
+    ui: &mut Ui,
+    hash: &str,
+    summary: &str,
+    branch: Option<&str>,
+    selected: bool,
+    first_branch: bool,
+) {
     if crate::menu_item::MenuItem::new("Copy commit hash")
         .icon("copy")
+        .keys_when(crate::keymap::Command::GraphCopyHash, selected)
         .show(ui)
         .clicked()
     {
@@ -553,6 +572,7 @@ fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
     }
     if crate::menu_item::MenuItem::new("Copy message")
         .icon("copy")
+        .keys_when(crate::keymap::Command::GraphCopyMessage, selected)
         .show(ui)
         .clicked()
     {
@@ -561,6 +581,10 @@ fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
     if let Some(name) = branch
         && crate::menu_item::MenuItem::new(format!("Copy branch name ({name})"))
             .icon("copy")
+            .keys_when(
+                crate::keymap::Command::GraphCopyBranch,
+                selected && first_branch,
+            )
             .show(ui)
             .clicked()
     {
@@ -726,5 +750,49 @@ mod tests {
         );
         assert_eq!(head, two);
         assert_eq!(kept, "mine, not committed\n");
+    }
+}
+
+#[cfg(test)]
+mod registry_menu_tests {
+    use super::*;
+    use crate::keymap::{Command, Stroke};
+    use egui::{Key, Modifiers};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn graph_copy_menu_hints_match_selected_commit_and_first_branch_only() {
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut (bool, bool, bool)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    egui_extras::install_image_loaders(ui.ctx());
+                    let mut settings = crate::settings::Settings::default();
+                    for (command, key) in [
+                        (Command::GraphCopyHash, Key::F8),
+                        (Command::GraphCopyMessage, Key::F9),
+                        (Command::GraphCopyBranch, Key::F10),
+                    ] {
+                        settings
+                            .key_bindings
+                            .insert(command.id().into(), vec![Stroke::new(key, Modifiers::NONE)]);
+                    }
+                    settings.put_for_test(ui.ctx());
+                }
+                copy_items(ui, "recorded", "message", Some("main"), state.1, state.2);
+            },
+            (false, true, true),
+        );
+        h.run();
+        h.get_by_label("Copy commit hash F8");
+        h.get_by_label("Copy message F9");
+        h.get_by_label("Copy branch name (main) F10");
+        h.state_mut().2 = false;
+        h.run();
+        h.get_by_label("Copy branch name (main)");
+        h.get_by_label("Copy commit hash F8");
+        h.state_mut().1 = false;
+        h.run();
+        h.get_by_label("Copy commit hash");
+        h.get_by_label("Copy message");
     }
 }

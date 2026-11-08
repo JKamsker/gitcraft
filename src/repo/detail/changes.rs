@@ -345,6 +345,7 @@ impl RepoTab {
                 true,
                 Some(&key),
                 &links,
+                self.keyboard_file_selected(&key),
                 acts,
                 |ui, acts| {
                     self.lock_menu_items(ui, &f.path, None, acts);

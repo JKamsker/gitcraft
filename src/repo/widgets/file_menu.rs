@@ -14,6 +14,7 @@ use crate::repo::{Action, DiffKey};
 /// history and blame start there);
 /// `ignorable`: whether the file can be ignored; `diff`: the external tool target.
 /// `links`: forge destinations, read when the menu opens.
+#[allow(clippy::too_many_arguments)]
 pub fn file_menu(
     resp: &Response,
     path: &str,
@@ -21,9 +22,20 @@ pub fn file_menu(
     ignorable: bool,
     diff: Option<&DiffKey>,
     links: &dyn Fn() -> Option<LinkMenu>,
+    shortcuts: bool,
     acts: &mut Vec<Action>,
 ) {
-    file_menu_with(resp, path, rev, ignorable, diff, links, acts, |_, _| {});
+    file_menu_with(
+        resp,
+        path,
+        rev,
+        ignorable,
+        diff,
+        links,
+        shortcuts,
+        acts,
+        |_, _| {},
+    );
 }
 
 /// File menu with additional actions such as LFS locks and stashing.
@@ -35,9 +47,13 @@ pub fn file_menu_with(
     ignorable: bool,
     diff: Option<&DiffKey>,
     links: &dyn Fn() -> Option<LinkMenu>,
+    shortcuts: bool,
     acts: &mut Vec<Action>,
     more: impl FnOnce(&mut Ui, &mut Vec<Action>),
 ) {
+    if shortcuts && resp.has_focus() && !crate::a11y::keyboard_taken(&resp.ctx) {
+        selection_commands(&resp.ctx, path, rev, acts);
+    }
     let revert = matches!(diff, Some(DiffKey::Commit { hash, .. }) if rev == Some(hash.as_str()));
     crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
@@ -72,6 +88,7 @@ pub fn file_menu_with(
             ui.separator();
             if crate::menu_item::MenuItem::new("View file")
                 .icon("eye")
+                .keys_when(crate::keymap::Command::FileContents, shortcuts)
                 .show(ui)
                 .clicked()
             {
@@ -83,6 +100,7 @@ pub fn file_menu_with(
             }
             if crate::menu_item::MenuItem::new("File history")
                 .icon("history")
+                .keys_when(crate::keymap::Command::FileHistory, shortcuts)
                 .show(ui)
                 .clicked()
             {
@@ -94,6 +112,7 @@ pub fn file_menu_with(
             }
             if crate::menu_item::MenuItem::new("Blame")
                 .icon("history")
+                .keys_when(crate::keymap::Command::FileBlame, shortcuts)
                 .show(ui)
                 .clicked()
             {
@@ -152,6 +171,7 @@ pub fn file_menu_with(
             ui.separator();
             if crate::menu_item::MenuItem::new("Copy path")
                 .icon("copy")
+                .keys_when(crate::keymap::Command::FileCopyPath, shortcuts)
                 .show(ui)
                 .clicked()
             {
@@ -178,6 +198,33 @@ pub fn file_menu_with(
             }
             more(ui, acts);
         });
+}
+
+/// Read-only actions capture the selected path/revision and use the same normal actions as
+/// the context menu. No file/Git/process work is performed while reading keyboard input.
+pub(in crate::repo) fn selection_commands(
+    ctx: &egui::Context,
+    path: &str,
+    rev: Option<&str>,
+    acts: &mut Vec<Action>,
+) {
+    use crate::keymap::{self, Command};
+    for (command, tab) in [
+        (Command::FileContents, FileTab::File),
+        (Command::FileHistory, FileTab::History),
+        (Command::FileBlame, FileTab::Blame),
+    ] {
+        if keymap::take(ctx, command) {
+            acts.push(Action::FileView {
+                path: path.to_owned(),
+                rev: rev.map(str::to_owned),
+                tab,
+            });
+        }
+    }
+    if keymap::take(ctx, Command::FileCopyPath) {
+        ctx.copy_text(path.to_owned());
+    }
 }
 
 /// _Open in diff tool_ or, for a conflicted file, _Resolve in merge tool_.
@@ -305,5 +352,64 @@ mod tests {
     #[test]
     fn a_nested_repository_is_ignored_as_a_folder() {
         assert_eq!(patterns("lib/sub/"), ["/lib/sub/", "/lib/"]);
+    }
+}
+
+#[cfg(test)]
+mod registry_menu_tests {
+    use super::*;
+    use crate::keymap::{self, Command, Scope, Stroke};
+    use egui::{Key, Modifiers};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_file_menu_shows_only_targeted_shortcuts_and_captures_history() {
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut (bool, bool, Vec<Action>)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    egui_extras::install_image_loaders(ui.ctx());
+                    let mut settings = crate::settings::Settings::default();
+                    settings.key_bindings.insert(
+                        Command::FileHistory.id().into(),
+                        vec![Stroke::new(Key::F8, Modifiers::NONE)],
+                    );
+                    settings.put_for_test(ui.ctx());
+                }
+                keymap::active(
+                    ui.ctx(),
+                    vec![Scope::Window, Scope::Repository, Scope::Files],
+                );
+                let response = ui.button("File row");
+                file_menu(
+                    &response,
+                    "recorded.txt",
+                    Some("recorded-revision"),
+                    false,
+                    None,
+                    &|| None,
+                    state.1,
+                    &mut state.2,
+                );
+            },
+            (false, true, Vec::new()),
+        );
+        h.run();
+        h.key_press(Key::Tab);
+        h.run();
+        h.key_press_modifiers(Modifiers::SHIFT, Key::F10);
+        h.run();
+        h.get_by_label("File history F8");
+        h.state_mut().1 = false;
+        h.run();
+        h.get_by_label("File history");
+        assert!(
+            h.query_by_label("File history F8").is_none(),
+            "another row's shortcut must not be promised"
+        );
+        h.get_by_label("File history").click();
+        h.run();
+        assert!(
+            matches!(h.state().2.as_slice(), [Action::FileView { path, rev, tab: FileTab::History }] if path == "recorded.txt" && rev.as_deref() == Some("recorded-revision"))
+        );
     }
 }
