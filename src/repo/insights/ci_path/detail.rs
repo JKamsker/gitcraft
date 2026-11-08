@@ -263,7 +263,7 @@ pub(super) fn job(
         }
     });
     let mut facts = vec![
-        format!("{}", state_word(job.state)),
+        state_word(job.state).to_string(),
         format!("queued {}", seconds(queued(job))),
         format!("ran {}", seconds(ran(job))),
     ];
