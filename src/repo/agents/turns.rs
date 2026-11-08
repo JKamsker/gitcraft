@@ -148,14 +148,33 @@ fn session_title(session: &[Turn]) -> String {
 fn session_header(ui: &mut Ui, title: &str, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) {
     let r = ui.label(RichText::new(title).small().color(t.text_dim));
     session_menu(&r, session, acts);
+    if ui.small_button("Review since last looked…").clicked()
+        && let Some(action) = aggregate_action(session)
+    {
+        acts.push(action);
+    }
 }
 
+fn aggregate_action(session: &[Turn]) -> Option<Action> {
+    let last = session.last()?;
+    Some(Action::RepositoryTools(
+        crate::repo::repository_tools::Act::AggregateTurn(
+            last.session.clone(),
+            last.commit.clone(),
+        ),
+    ))
+}
 fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
     let Some(first) = session.first() else {
         return;
     };
     let id = first.session.clone();
     r.context_menu(|ui| {
+        if ui.button("Review everything since last looked…").clicked()
+            && let Some(action) = aggregate_action(session)
+        {
+            acts.push(action);
+        }
         if ui
             .button("Delete this session's turns")
             .on_hover_text("The saved turns go; the files stay as they are")

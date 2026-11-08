@@ -37,6 +37,7 @@ enum Tool {
     Sharing,
     Outbox,
     Turn,
+    AggregateTurn,
     Lists,
     Virtuals,
     Deferred,
@@ -73,6 +74,8 @@ pub(crate) enum Act {
     CommitList(Box<crate::git::drafts::lists::View>, String),
     ShelveList(Box<crate::git::drafts::lists::View>, String, bool),
     Turn(String, String, String),
+    AggregateTurn(String, String),
+    FinishAggregate(Box<crate::git::drafts::turn::Review>),
     MarkTurn(Box<crate::git::drafts::turn::Review>, Vec<usize>),
     PreviewInverse(Box<crate::git::drafts::turn::Review>),
     RevertTurn(Box<crate::git::drafts::turn::Inverse>),
@@ -303,6 +306,10 @@ impl RepoTab {
             | Act::CommitVirtual(..) => return,
             Act::Lists => (String::new(), Tool::Lists),
             Act::EditList(..) | Act::CommitList(..) | Act::ShelveList(..) => return,
+            Act::AggregateTurn(session, endpoint) => {
+                (format!("{endpoint}\0{session}"), Tool::AggregateTurn)
+            }
+            Act::FinishAggregate(..) => return,
             Act::Turn(parent, turn, session) => {
                 (format!("{parent}\0{turn}\0{session}"), Tool::Turn)
             }
@@ -377,6 +384,15 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Lists),
+                Tool::AggregateTurn => {
+                    let (endpoint, session) = query
+                        .split_once('\0')
+                        .ok_or("Missing aggregate endpoint/session")?;
+                    crate::git::drafts::turn::aggregate_review(&path, session, endpoint, &|| {
+                        !crate::tasks::cancellation().is_cancelled()
+                    })
+                    .map(Data::Turn)
+                }
                 Tool::Turn => {
                     let parts = query.splitn(3, '\0').collect::<Vec<_>>();
                     if parts.len() != 3 {
@@ -493,7 +509,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         lists::show(ui, state, acts);
         return;
     }
-    if state.tool == Tool::Turn {
+    if matches!(state.tool, Tool::Turn | Tool::AggregateTurn) {
         turns::show(ui, state, acts);
         return;
     }

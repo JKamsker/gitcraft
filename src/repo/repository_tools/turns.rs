@@ -6,43 +6,13 @@ use crate::{
 pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Act> {
     match act {
         Act::MarkTurn(review, selected) => {
-            let repo = tab.path.clone();
-            let expected = repo.clone();
-            let request = match &tab.dialog {
-                Some(Dialog::RepositoryTools(s)) => s.id,
-                _ => return None,
-            };
-            let marked = selected.clone();
-            tab.then_or(
-                ctx,
-                true,
-                Err,
-                move || {
-                    logic::mark_reviewed(&repo, &review, &selected, &|| {
-                        !crate::tasks::cancellation().is_cancelled()
-                    })?;
-                    Ok(())
-                },
-                move |tab, result: Result<(), String>, _| {
-                    if tab.path == expected
-                        && let Some(Dialog::RepositoryTools(s)) = &mut tab.dialog
-                        && s.id == request
-                    {
-                        match result {
-                            Ok(()) => {
-                                if let Some(Ok(Data::Turn(r))) = &mut s.result {
-                                    for i in &marked {
-                                        if let Some(h) = r.hunks.get_mut(*i) {
-                                            h.reviewed = true;
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => tab.status = Some((e, true)),
-                        }
-                    }
-                },
-            );
+            update_marks(tab,*review,Some(selected),ctx);
+        }
+        Act::FinishAggregate(review)=>{
+            update_marks(tab,*review,None,ctx);
+        }
+        Act::PreviewInverse(review) if review.aggregate.is_some()=>{
+            tab.status=Some(("Choose one saved turn to preview its inverse".into(),true));
         }
         Act::PreviewInverse(review) => {
             let repo = tab.path.clone();
@@ -86,6 +56,48 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
     }
     None
 }
+fn update_marks(
+    tab: &mut RepoTab,
+    review: logic::Review,
+    selected: Option<Vec<usize>>,
+    ctx: &egui::Context,
+) {
+    let repo = tab.path.clone();
+    let expected = repo.clone();
+    let expected_review = review.clone();
+    let request = match &tab.dialog {
+        Some(Dialog::RepositoryTools(state)) => state.id,
+        _ => return,
+    };
+    tab.then_or(
+        ctx,
+        true,
+        Err,
+        move || {
+            let active = || !crate::tasks::cancellation().is_cancelled();
+            if let Some(selected) = selected {
+                logic::mark_reviewed(&repo, &review, &selected, &active)
+            } else {
+                logic::finish_aggregate(&repo, &review, &active)
+            }
+        },
+        move |tab, result, _| {
+            if tab.path == expected
+                && let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
+                && state.id == request
+                && matches!(&state.result,Some(Ok(Data::Turn(current))) if current.same_snapshot(&expected_review))
+            {
+                match result {
+                    Ok(review) => {
+                        state.result = Some(Ok(Data::Turn(review)));
+                        state.acknowledged = false;
+                    }
+                    Err(error) => tab.status = Some((error, true)),
+                }
+            }
+        },
+    );
+}
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.heading("Review saved agent turn");
     ui.label("Reviewed identical hunks stay hidden across this session's turns. Changed hunks reappear. Marks stay local. Reverting checks the inverse against current files and retains later non-overlapping changes and staged contents.");
@@ -127,7 +139,45 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     unreviewed,
                 )));
             }
-            if ui.button("Preview reverting only this turn…").clicked() {
+            if let Some(aggregate) = &review.aggregate {
+                ui.strong("Everything since last looked · saved turns only");
+                ui.label(format!("Session {} · {} saved turn(s) · fixed base {} → endpoint {}. Later saved turns and current unsaved files are excluded.",aggregate.session,aggregate.saved_turns,review.parent,review.turn));
+                ui.label(format!(
+                    "Last-looked boundary: {}",
+                    aggregate
+                        .last_looked
+                        .as_deref()
+                        .unwrap_or("initial parent of this session")
+                ));
+                if ui.button("Reload this fixed saved endpoint").clicked() {
+                    acts.push(Action::RepositoryTools(Act::AggregateTurn(
+                        aggregate.session.clone(),
+                        review.turn.clone(),
+                    )));
+                }
+                if aggregate.last_looked.as_deref() != Some(review.turn.as_str()) {
+                    ui.checkbox(
+                        &mut state.acknowledged,
+                        "I reviewed this saved snapshot through the displayed endpoint",
+                    );
+                    if ui
+                        .add_enabled(
+                            state.acknowledged,
+                            egui::Button::new(
+                                "Mark snapshot reviewed and save last-looked boundary",
+                            ),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::FinishAggregate(Box::new(
+                            review.clone(),
+                        ))));
+                    }
+                }
+            }
+            if review.aggregate.is_none()
+                && ui.button("Preview reverting only this turn…").clicked()
+            {
                 acts.push(Action::RepositoryTools(Act::PreviewInverse(Box::new(
                     review.clone(),
                 ))));
@@ -281,5 +331,81 @@ mod tests {
             |a| matches!(a,Action::RepositoryTools(Act::MarkTurn(_,indices)) if indices==&vec![1])
         ));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod aggregate_tests {
+    use super::*;
+    #[test]
+    fn pure_aggregate_review_panel_names_its_endpoint_and_keeps_boundary_approval_explicit() {
+        let mut state = State {
+            id: 1,
+            query: String::new(),
+            result: Some(Ok(Data::Turn(logic::recorded_aggregate_fixture()))),
+            filter: String::new(),
+            tool: super::super::Tool::AggregateTurn,
+            acknowledged: true,
+            compatible: false,
+            parent: String::new(),
+            effective: true,
+        };
+        let ctx = egui::Context::default();
+        let mut acts = Vec::new();
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1400.0, 1400.0),
+                )),
+                ..Default::default()
+            },
+            |ui| show(ui, &mut state, &mut acts),
+        );
+        let texts = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let position = output.shapes.iter().find_map(|shape| match &shape.shape {
+            egui::Shape::Text(text)
+                if text.galley.text() == "Mark snapshot reviewed and save last-looked boundary" =>
+            {
+                Some(text.pos + text.galley.size() / 2.0)
+            }
+            _ => None,
+        });
+        output.textures_delta.clear();
+        assert!(texts.contains("saved turns only"));
+        assert!(texts.contains("current unsaved files are excluded"));
+        assert!(!texts.contains("Preview reverting only this turn"));
+        let position = position.expect("explicit saved-endpoint approval action");
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                events: vec![
+                    egui::Event::PointerMoved(position),
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: false,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+                ..Default::default()
+            },
+            |ui| show(ui, &mut state, &mut acts),
+        );
+        output.textures_delta.clear();
+        assert!(acts.iter().any(|act|matches!(act,Action::RepositoryTools(Act::FinishAggregate(review)) if review.turn=="c".repeat(40))));
     }
 }
