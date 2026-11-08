@@ -105,6 +105,9 @@ pub(super) fn display_failure(error: &str) -> Option<String> {
         )
     };
     let (name, code) = rest.strip_suffix(')')?.rsplit_once(marker)?;
+    if !STOPPING.contains(&name) && name != "post-checkout" {
+        return None;
+    }
     code.parse::<i64>().ok()?;
     let mut display = crate::i18n::message(id, &[("name", name.into()), ("code", code.into())]);
     if !detail.is_empty() {
@@ -537,8 +540,12 @@ mod backend_fluent_identity_tests {
                     assert_eq!(display, raw);
                 }
             }
-            let opaque = "fatal: provider hook output";
-            assert_eq!(crate::git::display_error(opaque), opaque);
+            for opaque in [
+                "fatal: provider hook output",
+                "the unknown-provider hook stopped it (exit code 7)",
+            ] {
+                assert_eq!(crate::git::display_error(opaque), opaque);
+            }
         }
         crate::i18n::set_language("en-US");
         Ok(())

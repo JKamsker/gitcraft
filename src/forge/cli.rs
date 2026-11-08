@@ -957,8 +957,12 @@ mod backend_fluent_identity_tests {
             } else {
                 assert_eq!(display, raw);
             }
-            let opaque = "provider says it isn't signed in to elsewhere";
-            assert_eq!(crate::forge::inbox::display_error(opaque), opaque);
+            for opaque in [
+                "provider says it isn't signed in to elsewhere",
+                "provider isn't signed in to host: `provider auth login --hostname host` to use it",
+            ] {
+                assert_eq!(crate::forge::inbox::display_error(opaque), opaque);
+            }
         }
         crate::i18n::set_language("en-US");
     }

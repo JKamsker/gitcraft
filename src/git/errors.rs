@@ -244,7 +244,9 @@ pub fn display_error(error: &str) -> String {
             &[("path", path.into())],
         );
     }
-    if let Some((path, target)) = error.rsplit_once(" isn't a folder on ") {
+    if let Some((path, target)) = error.rsplit_once(" isn't a folder on ")
+        && (target.starts_with("SSH · ") || target.starts_with("WSL · "))
+    {
         return crate::i18n::message(
             "backend-isn-t-a-folder-on-859699",
             &[("path", path.into()), ("target", target.into())],
@@ -252,6 +254,7 @@ pub fn display_error(error: &str) -> String {
     }
     if let Some(rest) = error.strip_suffix(" seconds and was stopped")
         && let Some((what, seconds)) = rest.rsplit_once(" didn't finish within ")
+        && what.starts_with("git ")
         && let Ok(seconds) = seconds.parse::<u64>()
     {
         return crate::i18n::message(

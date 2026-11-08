@@ -524,6 +524,12 @@ mod backend_fluent_adapter_tests {
             assert!(raw.contains("cancelled"));
             assert_eq!(display_error(&raw), cancelled);
             assert_eq!(display_error(opaque), opaque);
+            for unknown in [
+                "provider isn't a folder on opaque remote",
+                "provider didn't finish within 3 seconds and was stopped",
+            ] {
+                assert_eq!(display_error(unknown), unknown);
+            }
             let helper = "Contained bundle Git: invalid keep hash";
             assert_eq!(
                 display_error(helper),

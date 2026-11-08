@@ -145,6 +145,7 @@ pub fn is_no_login(err: &str) -> bool {
 /// error remains available to retry/login control flow through `gives_up`/`is_no_login`.
 pub fn display_error(error: &str) -> String {
     if let Some((tool, rest)) = error.split_once(" isn't signed in to ")
+        && matches!(tool, "gh" | "glab")
         && let Some((host, command)) = rest.split_once(": `")
         && command == format!("{tool} auth login --hostname {host}` to use it")
     {
