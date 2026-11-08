@@ -1,0 +1,200 @@
+{
+  "changes": [
+    {
+      "path": "src/icons.rs",
+      "before": "format!(\"{label} \u00b7 {}\", if on { \"On\" } else { \"Off\" })",
+      "after": "crate::i18n::message(\"dev-baseline-toggle\", &[(\"label\", label.into()), (\"state\", (if on { crate::i18n::text(\"dev-baseline-on\") } else { crate::i18n::text(\"dev-baseline-off\") }).into())])"
+    },
+    {
+      "path": "src/settings/context_menus.rs",
+      "before": "\"Keep common branch and commit actions close at hand. Optional tools stay available \\\n             in the command palette when hidden here; select a commit first to act on it.\"",
+      "after": "crate::i18n::text(\"dev-baseline-optional-tip\")"
+    },
+    {
+      "path": "src/settings/context_menus.rs",
+      "before": "\"Show bisect and commit tests\"",
+      "after": "crate::i18n::text(\"dev-baseline-optional-0\")"
+    },
+    {
+      "path": "src/settings/context_menus.rs",
+      "before": "\"Show split and move changes\"",
+      "after": "crate::i18n::text(\"dev-baseline-optional-1\")"
+    },
+    {
+      "path": "src/settings/context_menus.rs",
+      "before": "\"Show rehearsal and interaction tools\"",
+      "after": "crate::i18n::text(\"dev-baseline-optional-2\")"
+    },
+    {
+      "path": "src/settings/context_menus.rs",
+      "before": "\"Show Cut release\"",
+      "after": "crate::i18n::text(\"dev-baseline-optional-3\")"
+    },
+    {
+      "path": "src/settings/agents.rs",
+      "before": "\"Task visibility does not change agent permissions or stop running tasks.\"",
+      "after": "crate::i18n::text(\"dev-baseline-agents-tip\")"
+    },
+    {
+      "path": "src/settings/agents.rs",
+      "before": "ui.checkbox(&mut self.show_agents, \"Show Agents section\")",
+      "after": "ui.checkbox(&mut self.show_agents, crate::i18n::text(\"dev-baseline-agents-show\"))"
+    },
+    {
+      "path": "src/settings/page.rs",
+      "before": "egui::CollapsingHeader::new(\"Preview\")",
+      "after": "egui::CollapsingHeader::new(crate::i18n::text(\"dev-baseline-preview\")).id_salt(\"settings-preview-above-header\")"
+    },
+    {
+      "path": "src/repo/detail/compose/picker.rs",
+      "before": "\"The commits being replayed keep their own messages\"",
+      "after": "crate::i18n::text(\"dev-baseline-replay-message\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Hide T3 Code checkpoint identity\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-0\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Exact author name T3 Code and email t3code@users.noreply.github.com. Co-writer badges never hide commits.\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-1\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Excluded author names\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-2\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Exact names, one per line; case-sensitive\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-3\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Excluded author emails\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-4\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Exact emails, one per line; case-insensitive\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-5\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Hidden ref namespaces\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-6\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Full refs/ patterns, one per line (e.g. refs/t3/*)\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-7\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Display only. Tips, selection, search targets and page boundaries remain accessible.\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-8\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"History filters\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-9\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Override global history filters\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-10\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Off: add these rules to Settings \u2192 Commit graph. On: use only these rules.\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-11\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Reset repository filters\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-12\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Show hidden\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-13\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "\"Temporarily reveal excluded authors and ref namespaces in this repository. No Git data is changed.\"",
+      "after": "crate::i18n::text(\"dev-baseline-filter-14\")"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "format!(\"Ignored invalid ref patterns: {}\", invalid.join(\", \"))",
+      "after": "crate::i18n::message(\"dev-baseline-filter-invalid\", &[(\"patterns\", invalid.join(\", \").into())])"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": ".map_or_else(|| \"\u2026\".to_owned(), |n| n.to_string())",
+      "after": ".map_or_else(|| \"\u2026\".to_owned(), crate::i18n::number)"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "format!(\"{} author rows hidden in loaded history\", self.history_filter.hidden_loaded)",
+      "after": "crate::i18n::message(\"dev-baseline-filter-hidden\", &[(\"count\", self.history_filter.hidden_loaded.into())])"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "format!(\"{namespaces} commits reachable only from excluded namespaces\")",
+      "after": "crate::i18n::message(\"dev-baseline-filter-namespace\", &[(\"count\", namespaces.as_str().into())])"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "format!(\"{} matching commits kept: tips, selection, search or page boundaries\", self.history_filter.kept_loaded)",
+      "after": "crate::i18n::message(\"dev-baseline-filter-kept\", &[(\"count\", self.history_filter.kept_loaded.into())])"
+    },
+    {
+      "path": "src/repo/history_filter.rs",
+      "before": "format!(\"{} author rows hidden in loaded history; {namespaces} namespace-only commits excluded. Open to edit global additions or repository overrides.\", self.history_filter.hidden_loaded)",
+      "after": "crate::i18n::message(\"dev-baseline-filter-summary\", &[(\"authors\", self.history_filter.hidden_loaded.into()), (\"namespaces\", namespaces.as_str().into())])"
+    }
+  ],
+  "catalogs": {
+    "dev-baseline-toggle": "{ $label } \u00b7 { $state }",
+    "dev-baseline-on": "On",
+    "dev-baseline-off": "Off",
+    "dev-baseline-settings-label-0": "Optional tools",
+    "dev-baseline-settings-label-1": "History / diagnostics",
+    "dev-baseline-settings-label-2": "Commit surgery",
+    "dev-baseline-settings-label-3": "Branch rehearsal",
+    "dev-baseline-settings-label-4": "Sidebar",
+    "dev-baseline-settings-label-5": "Show Agents section",
+    "dev-baseline-optional-tip": "Keep common branch and commit actions close at hand. Optional tools stay available in the command palette when hidden here; select a commit first to act on it.",
+    "dev-baseline-optional-0": "Show bisect and commit tests",
+    "dev-baseline-optional-1": "Show split and move changes",
+    "dev-baseline-optional-2": "Show rehearsal and interaction tools",
+    "dev-baseline-optional-3": "Show Cut release",
+    "dev-baseline-agents-tip": "Task visibility does not change agent permissions or stop running tasks.",
+    "dev-baseline-agents-show": "Show Agents section",
+    "dev-baseline-preview": "Preview",
+    "dev-baseline-replay-message": "The commits being replayed keep their own messages",
+    "dev-baseline-filter-0": "Hide T3 Code checkpoint identity",
+    "dev-baseline-filter-1": "Exact author name T3 Code and email t3code@users.noreply.github.com. Co-writer badges never hide commits.",
+    "dev-baseline-filter-2": "Excluded author names",
+    "dev-baseline-filter-3": "Exact names, one per line; case-sensitive",
+    "dev-baseline-filter-4": "Excluded author emails",
+    "dev-baseline-filter-5": "Exact emails, one per line; case-insensitive",
+    "dev-baseline-filter-6": "Hidden ref namespaces",
+    "dev-baseline-filter-7": "Full refs/ patterns, one per line (e.g. refs/t3/*)",
+    "dev-baseline-filter-8": "Display only. Tips, selection, search targets and page boundaries remain accessible.",
+    "dev-baseline-filter-9": "History filters",
+    "dev-baseline-filter-10": "Override global history filters",
+    "dev-baseline-filter-11": "Off: add these rules to Settings \u2192 Commit graph. On: use only these rules.",
+    "dev-baseline-filter-12": "Reset repository filters",
+    "dev-baseline-filter-13": "Show hidden",
+    "dev-baseline-filter-14": "Temporarily reveal excluded authors and ref namespaces in this repository. No Git data is changed.",
+    "dev-baseline-filter-invalid": "Ignored invalid ref patterns: { $patterns }",
+    "dev-baseline-filter-hidden": "{ $count } author rows hidden in loaded history",
+    "dev-baseline-filter-namespace": "{ $count } commits reachable only from excluded namespaces",
+    "dev-baseline-filter-kept": "{ $count } matching commits kept: tips, selection, search or page boundaries",
+    "dev-baseline-filter-summary": "{ $authors } author rows hidden in loaded history; { $namespaces } namespace-only commits excluded. Open to edit global additions or repository overrides."
+  },
+  "retained": "Raw row/page keys, algorithms and worker/error producers unchanged; paint-only new #177 UI localization"
+}

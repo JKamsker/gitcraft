@@ -1,0 +1,26 @@
+{
+  "map": {
+    "The primary remote changed or was removed; plan the fork action again": "Die primäre Remote wurde geändert oder entfernt; plane die Fork-Aktion erneut",
+    "The effective primary fetch URL changed; plan the fork action again": "Die tatsächlich verwendete Fetch-URL der primären Remote hat sich geändert; plane die Fork-Aktion erneut",
+    "The contributor's fork remote was removed; plan the action again": "Die Fork-Remote des Mitwirkenden wurde entfernt; plane die Aktion erneut",
+    "The contributor's fork remote changed; plan the action again": "Die Fork-Remote des Mitwirkenden wurde geändert; plane die Aktion erneut",
+    "The primary forge changed; plan this fork action again. Any completed local rewrite remains undoable.": "Die primäre Forge wurde geändert; plane diese Fork-Aktion erneut. Abgeschlossene lokale Umschreibungen bleiben rückgängig machbar.",
+    "Unknown saved checkout forge": "Unbekannte Forge im gespeicherten Checkout",
+    "This saved fork checkout has no captured destination; check out the pull request again": "Dieser gespeicherte Fork-Checkout enthält kein festgehaltenes Ziel; checke den Pull Request erneut aus",
+    "The saved fork checkout has no initial effective destination; check out the pull request again": "Der gespeicherte Fork-Checkout enthält kein ursprüngliches tatsächliches Ziel; checke den Pull Request erneut aus",
+    "The saved fork remote is missing; check out the pull request again": "Die gespeicherte Fork-Remote fehlt; checke den Pull Request erneut aus",
+    "The saved fork destination changed; check out the pull request again": "Das gespeicherte Fork-Ziel hat sich geändert; checke den Pull Request erneut aus",
+    "Missing fork push destination": "Push-Ziel für den Fork fehlt",
+    "Fork push requires an explicit expected commit": "Ein Fork-Push benötigt einen ausdrücklich festgelegten erwarteten Commit",
+    "Fork push has no recorded expected commit; plan the action again": "Für den Fork-Push wurde kein erwarteter Commit festgehalten; plane die Aktion erneut",
+    "The rebased branch changed before its push; plan the action again": "Der neu aufgebaute Branch wurde vor dem Push geändert; plane die Aktion erneut",
+    "Missing fork push refspec": "Refspec für den Fork-Push fehlt",
+    "This issue belongs to another primary forge; choose it again": "Dieses Issue gehört zu einer anderen primären Forge; wähle es erneut aus",
+    "This issue belongs to another forge repository; open its saved URL to view it": "Dieses Issue gehört zu einem anderen Forge-Repository; öffne seine gespeicherte URL",
+    "No primary forge is selected": "Keine primäre Forge ausgewählt",
+    "The primary forge remote is unavailable; refresh before opening this pull request": "Die primäre Forge-Remote ist nicht verfügbar; aktualisiere vor dem Öffnen dieses Pull Requests",
+    "Publication needs the release's push destination": "Zum Veröffentlichen wird das Push-Ziel des Releases benötigt",
+    "The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge.": "Die primäre Forge wurde während dieses Releases geändert; die Veröffentlichung wurde gestoppt. Lokale Änderungen bleiben rückgängig machbar. Schließe dieses Release, bevor du eines auf der neuen Forge beginnst."
+  },
+  "limits": "Exact fixed application sentinels only; no dynamic/provider/path suffix parser. All #177 producer spellings retained."
+}

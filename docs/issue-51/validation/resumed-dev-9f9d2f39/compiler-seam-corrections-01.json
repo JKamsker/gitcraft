@@ -1,0 +1,127 @@
+[
+  {
+    "path": "src/repo/graph_view/menu.rs",
+    "old": "use super::badge::{BadgeKind, badges};",
+    "new": "use super::badge::BadgeKind;",
+    "count": 1
+  },
+  {
+    "path": "src/repo/graph_view/menu.rs",
+    "old": "badges(&commit.refs, &self.refs)",
+    "new": "self.graph_badges(commit)",
+    "count": 1
+  },
+  {
+    "path": "src/repo/graph_view/menu.rs",
+    "old": "group(ui, \"Advanced\", |ui| {",
+    "new": "crate::menu_item::group_named(ui, \"Advanced\", crate::i18n::text(\"dev-integration-ui-advanced\"), |ui| {",
+    "count": 1
+  },
+  {
+    "path": "src/repo/sidebar/branches.rs",
+    "old": "        use crate::menu_item::group;\n",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "src/git/commits.rs",
+    "old": "log_args(Some(tips), order, skip, Some(&max))",
+    "new": "log_args(Some(tips), order, skip, Some(&max), &[])",
+    "count": 1
+  },
+  {
+    "path": "src/git/commits.rs",
+    "old": "reader.run(&args.as_args(), Vec::new(), &[0])?",
+    "new": "reader.run(&args.as_args().iter().map(String::as_str).collect::<Vec<_>>(), Vec::new(), &[0])?",
+    "count": 1
+  },
+  {
+    "path": "src/git/commits.rs",
+    "old": "log_args(None, LogOrder::default(), 0, None).format",
+    "new": "log_args(None, LogOrder::default(), 0, None, &[]).format",
+    "count": 1
+  },
+  {
+    "path": "src/repo/branch_visibility.rs",
+    "old": "            hidden: hidden.iter().cloned().collect(),\n            solo: Default::default(),",
+    "new": "            hidden: hidden.iter().cloned().collect(),\n            ..Default::default()",
+    "count": 1
+  },
+  {
+    "path": "src/connections/tests.rs",
+    "old": "crate::forge::tool(crate::forge::Forge::GitHub, &repo, &[\"pr\", \"list\"])",
+    "new": "crate::forge::tool(&crate::forge::Hosting { forge: crate::forge::Forge::GitHub, host: \"github.com\".into(), path: \"team/app\".into(), web: \"https://github.com\".into() }, &repo, &[\"pr\", \"list\"])",
+    "count": 1
+  },
+  {
+    "path": "src/repo/messages.rs",
+    "kind": "status tuple wrapped plain",
+    "count": 1
+  },
+  {
+    "path": "src/repo/forge_selection_tests.rs",
+    "kind": "status tuple wrapped plain",
+    "count": 3
+  },
+  {
+    "path": "src/repo/forge_selection_tests.rs",
+    "kind": "raw Notice field read",
+    "count": 1
+  },
+  {
+    "path": "src/repo/forks/tests.rs",
+    "kind": "raw Notice field read",
+    "count": 1
+  },
+  {
+    "path": "src/repo/issue_work/tests.rs",
+    "kind": "raw Notice field read",
+    "count": 3
+  },
+  {
+    "path": "src/repo/release/tests.rs",
+    "old": "is_some_and(|(s, error)| {\n        *error && s.contains(",
+    "new": "is_some_and(|n| {\n        n.1 && n.0.contains(",
+    "count": 1
+  },
+  {
+    "path": "src/repo/forks/plan.rs",
+    "kind": "test optional captured hosting None",
+    "count": 2
+  },
+  {
+    "path": "src/repo/forks/plan.rs",
+    "kind": "test optional captured hosting None",
+    "count": 1
+  },
+  {
+    "path": "src/repo/history_filter.rs",
+    "old": "self.search.matches.clear();",
+    "new": "self.search.matches = Default::default();",
+    "count": 1
+  },
+  {
+    "path": "src/repo/pr_view/mod.rs",
+    "old": "            number: 7,\n            request: 1,",
+    "new": "            number: 7,\n            storyboard: Default::default(),\n            freshness: Default::default(),\n            relocated: Default::default(),\n            files_request: 0,\n            request: 1,",
+    "count": 1
+  },
+  {
+    "path": "src/repo/release/view.rs",
+    "old": "                recorded: false,\n            });",
+    "new": "                recorded: false,\n                hosting: None,\n                forge_repository_generation: 0,\n            });",
+    "count": 1
+  },
+  {
+    "path": "src/forge/identity.rs",
+    "old": "Forge::GitLab => self.path == path,",
+    "new": "Forge::GitLab | Forge::Azure | Forge::Bitbucket => self.path == path,",
+    "count": 1
+  },
+  {
+    "path": "src/forge/identity.rs",
+    "old": "let path = if self.forge == Forge::GitLab {",
+    "new": "let path = if matches!(self.forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket) {",
+    "count": 1
+  }
+]

@@ -1,0 +1,138 @@
+[
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "selected_pass": null,
+    "seconds": 13.194,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-00.log",
+    "sha256": "fc1518b6a77bfe9ef9302534379cc381c195d27dd81180a1ad095d7729437452"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "settings::page::merge_regressions::compact_page_picker_repaints_both_languages_and_keeps_enum_selection",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 62.798,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-01.log",
+    "sha256": "9e0a2038d1650a60bbd421966222bf41f34f4937dfc71b287467c60f68a8289f"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::graph_view::minimap::merge_regressions::reserved_minimap_is_painted_outside_horizontal_graph_clip",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.335,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-02.log",
+    "sha256": "07000486cf4343a37d8bb5eb7150a1b711ae8f86f1269210479ce1a04cd3266b"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::history_filter::tests::filter_editor_repaints_languages_without_changing_rules_or_ref_patterns",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.293,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-03.log",
+    "sha256": "ed54600f9e7d1a4382fb318e5e0442fef7bed12a8e2b55ce4bed6b20fa729892"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.356,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-04.log",
+    "sha256": "fc4a457167ced81715c63c696e31d78aeec696348b21330aa42b6a96217f270a"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::forks::tests::invalidated_fork_scope_keeps_raw_guard_while_error_paint_tracks_locale",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.289,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-05.log",
+    "sha256": "50cbc801f6224168b7a388875a7103d452e6405e06d8ecbbe502241e309b943d"
+  },
+  {
+    "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::identity::integration_tests::added_forges_keep_case_sensitive_paths_and_exact_web_instances",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.311,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-06.log",
+    "sha256": "5461d84770079791943a555e134b57e7cb8a6593f612292bcf5af42e31015e17"
+  }
+]

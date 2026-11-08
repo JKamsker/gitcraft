@@ -1,0 +1,220 @@
+{
+  "application": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+  "status": "UI corrections independently STATIC PASS; baseline fork guard findings still open pending separate source correction",
+  "latest_ui_check": "all-target compiler check and six exact inert tests PASS",
+  "qualified_lint": "1994266 only: -D warnings -A dead_code PASS, not strict without allowance",
+  "earlier_failures": "all selected failure logs preserved; initial build/query/trait/font fixture failures corrected without removing assertions",
+  "runtime": "No resumed combined/full suite, native, Git-under-test, process, network, CI or PR acceptance",
+  "files": [
+    {
+      "path": "clean-ui-localization.json",
+      "bytes": 9983,
+      "sha256": "07075939228b638bd6ec0ba76079f64612657485a01013e1f078e7fc6947c002"
+    },
+    {
+      "path": "clippy-01.log",
+      "bytes": 1044,
+      "sha256": "2197a4519d96519da53c040f34548f8380bab6ae298f906b5215d2de5709fcd1"
+    },
+    {
+      "path": "compiler-seam-corrections-01.json",
+      "bytes": 4102,
+      "sha256": "44551b347e8879dee1bd9b187ebf2ed2c91604f6c6aca15b69a4c026c34434d7"
+    },
+    {
+      "path": "fixed-guard-display.json",
+      "bytes": 3529,
+      "sha256": "2a187b91971d10c0bc42c55c924a8d726be3a3d2a5d80dbc0ce4d9410739ca3d"
+    },
+    {
+      "path": "guard-review/report.md",
+      "bytes": 2873,
+      "sha256": "ad68ec048f77b9152f2580c3a1f3a9345df1d67b2d37a69fa2f916807c41bbe0"
+    },
+    {
+      "path": "guard-review/review.json",
+      "bytes": 22685,
+      "sha256": "386dfed3a9d7b97e446e63e744fbea0775b7e67554b4ebd1ee571a640f5cc93f"
+    },
+    {
+      "path": "immutable-inert-00.log",
+      "bytes": 19873,
+      "sha256": "9f9d644911c24e4e035ed8b5600b31974c1466e395eb9ef3b62c76ed2ff829c5"
+    },
+    {
+      "path": "immutable-inert-01.log",
+      "bytes": 6907,
+      "sha256": "1afc254b6fcd6017a7abb16a0844a0870878e0d369a61af38397836e26e492c3"
+    },
+    {
+      "path": "immutable-inert-02.log",
+      "bytes": 6890,
+      "sha256": "8aa48dc92edf322ae6289b95005007e1a7a9a95adb119d6bc91ffc3b0db72adb"
+    },
+    {
+      "path": "immutable-inert-03.log",
+      "bytes": 6027,
+      "sha256": "cd71a221ec1b743c84f18e4171b17da211205150ea287106723779e105b5371e"
+    },
+    {
+      "path": "immutable-inert-04.log",
+      "bytes": 6027,
+      "sha256": "d29802307102a5edcb2f61d6121f312c5e7a7e8c13ef0fec63e154c90f8536c2"
+    },
+    {
+      "path": "immutable-inert-05.log",
+      "bytes": 6035,
+      "sha256": "9aac5c8d1b283e2cbd67356938128833927261106060d46289fbc62980a8f0d3"
+    },
+    {
+      "path": "immutable-inert-06.log",
+      "bytes": 6014,
+      "sha256": "2ac86905454053e09d6841cf9a678366a0e7791b743bfa9ec6644b2b2dfd42ae"
+    },
+    {
+      "path": "immutable-inert-07.log",
+      "bytes": 6014,
+      "sha256": "6ea1d99206c8771db0c363a216eb7d5141e5202fdbdcde06114a45f3fda6c0e7"
+    },
+    {
+      "path": "immutable-inert-08.log",
+      "bytes": 6029,
+      "sha256": "c3c01fe5ed1a5785c7926f32f64b2eac2c9e25d1bea7d3d45d0df69c9eeb88f6"
+    },
+    {
+      "path": "immutable-inert-09.log",
+      "bytes": 6742,
+      "sha256": "470dc1b35d12c89555489b0ae1c54f50ab5046b98832d3f6e31c206c6546c9f3"
+    },
+    {
+      "path": "immutable-inert-gates.json",
+      "bytes": 5644,
+      "sha256": "23bbdd52db4890668feb7c7059f3e2da547b8cffc7861969a5f488900ac6cce4"
+    },
+    {
+      "path": "preserved-source.json",
+      "bytes": 32487,
+      "sha256": "18bb4a842efce07573401ebec9207d0d076fe1b76623e446a5075ec0927cef88"
+    },
+    {
+      "path": "ui-correction-inert-00.log",
+      "bytes": 19873,
+      "sha256": "8daa9ad159f8fe1cd0455b064b2f3ea197daf463052a6551248d54509c2b779f"
+    },
+    {
+      "path": "ui-correction-inert-01.log",
+      "bytes": 11208,
+      "sha256": "7febc15197f6ab3634b5677124e5cd728b6dae35adf219ebb3a9afe1e24abe4f"
+    },
+    {
+      "path": "ui-correction-inert-gates.json",
+      "bytes": 1031,
+      "sha256": "ed39f229f90022e7bad6c15e49f3a3a36cb8770a59873cfb1260694c5401fdd8"
+    },
+    {
+      "path": "ui-correction-review/HANDOFF.md",
+      "bytes": 310,
+      "sha256": "ad2bc8a4416730d3b5ecca47cf8180c57486d59b077132a361ec79479f56dd81"
+    },
+    {
+      "path": "ui-correction-review/report.md",
+      "bytes": 4405,
+      "sha256": "bee1255dbdff39d39e2daa7d02f49e0151e51cfbed0bea3663585bc7e7a94ac0"
+    },
+    {
+      "path": "ui-correction-review/review.json",
+      "bytes": 13636,
+      "sha256": "eb5ae4798c9db07c375afd90dac3e60282911f4d937419fd90abbe90baa48fdb"
+    },
+    {
+      "path": "ui-correction2-inert-00.log",
+      "bytes": 18850,
+      "sha256": "d9e9bf8875b63c64dfce26fc3b3ffb3375952a4cc7a6fa134112f24d99724e92"
+    },
+    {
+      "path": "ui-correction2-inert-gates.json",
+      "bytes": 440,
+      "sha256": "1b00c6e28e7ae0c57b27e183efdf583ed569e47ed47cdc386226e24b68ea2a81"
+    },
+    {
+      "path": "ui-correction3-inert-00.log",
+      "bytes": 19873,
+      "sha256": "90890054b0e58f6bb035eb6bc3750c885456c7c0f2880952bce0628f7f3083cb"
+    },
+    {
+      "path": "ui-correction3-inert-01.log",
+      "bytes": 6914,
+      "sha256": "4fc1e8d81f4ec8af51d80937d7ecbf9f7eb9b323d6d0fbfecbb531470d1fc3a1"
+    },
+    {
+      "path": "ui-correction3-inert-02.log",
+      "bytes": 6502,
+      "sha256": "0e4a00214b58fbabb2cea453608c187dc6668d2d098a59a7b5d9c5b19a9244c4"
+    },
+    {
+      "path": "ui-correction3-inert-gates.json",
+      "bytes": 1623,
+      "sha256": "e32881a4ae34e8702b304113001536d23954d9e671a6e87c44bb3b0e38474822"
+    },
+    {
+      "path": "ui-correction4-inert-00.log",
+      "bytes": 19873,
+      "sha256": "fc1518b6a77bfe9ef9302534379cc381c195d27dd81180a1ad095d7729437452"
+    },
+    {
+      "path": "ui-correction4-inert-01.log",
+      "bytes": 6914,
+      "sha256": "9e0a2038d1650a60bbd421966222bf41f34f4937dfc71b287467c60f68a8289f"
+    },
+    {
+      "path": "ui-correction4-inert-02.log",
+      "bytes": 6030,
+      "sha256": "07000486cf4343a37d8bb5eb7150a1b711ae8f86f1269210479ce1a04cd3266b"
+    },
+    {
+      "path": "ui-correction4-inert-03.log",
+      "bytes": 6027,
+      "sha256": "ed54600f9e7d1a4382fb318e5e0442fef7bed12a8e2b55ce4bed6b20fa729892"
+    },
+    {
+      "path": "ui-correction4-inert-04.log",
+      "bytes": 6012,
+      "sha256": "fc4a457167ced81715c63c696e31d78aeec696348b21330aa42b6a96217f270a"
+    },
+    {
+      "path": "ui-correction4-inert-05.log",
+      "bytes": 6017,
+      "sha256": "50cbc801f6224168b7a388875a7103d452e6405e06d8ecbbe502241e309b943d"
+    },
+    {
+      "path": "ui-correction4-inert-06.log",
+      "bytes": 6025,
+      "sha256": "5461d84770079791943a555e134b57e7cb8a6593f612292bcf5af42e31015e17"
+    },
+    {
+      "path": "ui-correction4-inert-gates.json",
+      "bytes": 3947,
+      "sha256": "66f74703dd989930c1b281b2167c95f4edbffc7c94b4e2ba9c567a3926c21c09"
+    },
+    {
+      "path": "ui-font-fixture-check-02.log",
+      "bytes": 19007,
+      "sha256": "05128373786266b714ee8fd937542a42da5426a40806300eb2644c9473982c0a"
+    },
+    {
+      "path": "ui-font-fixture-check.log",
+      "bytes": 19561,
+      "sha256": "ed579bd36b2001854665a8aeab081ebc8aa662cac7c0c15af28114e11b965e78"
+    },
+    {
+      "path": "ui-review/review.json",
+      "bytes": 15846,
+      "sha256": "5841f7d8edb58df616bf9eb8c00b2f700b0df1681e9a6a9df716d7fbc98b6a55"
+    },
+    {
+      "path": "ui-review/review.md",
+      "bytes": 1460,
+      "sha256": "5d159aa80924ba3c32e2e3595b2b87842a2f6e0dcaaafc1b71d274d2cc2d8f46"
+    }
+  ]
+}

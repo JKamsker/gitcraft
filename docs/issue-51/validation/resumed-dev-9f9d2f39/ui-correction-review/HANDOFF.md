@@ -1,0 +1,1 @@
+Scoped STATIC PASS for `9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb`; no correction blockers. Read `report.md` for findings and limits, `review.json` for exact source/evidence SHA-256 bindings. No tests/builds/runtime/network or repository mutation performed. Parent alone owns repository changes and acceptance.

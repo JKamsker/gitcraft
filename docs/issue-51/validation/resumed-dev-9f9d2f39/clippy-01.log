@@ -1,0 +1,27 @@
+    Blocking waiting for file lock on build directory
+   Compiling ring v0.17.14
+   Compiling onig_sys v69.9.3
+    Checking rustls-webpki v0.103.16
+   Compiling rustls v0.23.46
+   Compiling gitcraft-os v0.1.0 (/Volumes/RAMDisk/g51/crates/gitcraft-os)
+   Compiling mac-notification-sys v0.6.15
+    Checking ureq v3.5.1
+   Compiling tree-sitter v0.25.10
+    Checking ehttp v0.7.2
+    Checking egui_extras v0.36.2
+    Checking onig v6.5.3
+    Checking syntect v5.3.0
+   Compiling tree-sitter-rust v0.24.2
+   Compiling tree-sitter-python v0.25.0
+   Compiling tree-sitter-cpp v0.23.4
+   Compiling tree-sitter-javascript v0.25.0
+   Compiling tree-sitter-go v0.25.0
+   Compiling tree-sitter-c v0.24.2
+   Compiling tree-sitter-typescript v0.23.2
+    Checking egui_commonmark_backend v0.25.0
+    Checking ureq v2.12.1
+    Checking notify-rust v4.18.2
+    Checking egui_commonmark v0.25.0
+   Compiling gitcraft v0.3.4 (/Volumes/RAMDisk/g51)
+    Checking two-face v0.5.2+bat-0.26.1
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 14s

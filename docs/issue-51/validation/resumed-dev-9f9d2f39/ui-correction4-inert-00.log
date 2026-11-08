@@ -1,0 +1,664 @@
+   Compiling ring v0.17.14
+   Compiling onig_sys v69.9.3
+    Checking rustls-webpki v0.103.16
+   Compiling rustls v0.23.46
+   Compiling gitcraft-os v0.1.0 (/Volumes/RAMDisk/g51/crates/gitcraft-os)
+   Compiling mac-notification-sys v0.6.15
+    Checking ureq v3.5.1
+   Compiling tree-sitter v0.25.10
+    Checking ehttp v0.7.2
+    Checking egui_extras v0.36.2
+    Checking onig v6.5.3
+    Checking syntect v5.3.0
+   Compiling tree-sitter-c v0.24.2
+   Compiling tree-sitter-go v0.25.0
+   Compiling tree-sitter-python v0.25.0
+   Compiling tree-sitter-cpp v0.23.4
+   Compiling tree-sitter-rust v0.24.2
+   Compiling tree-sitter-javascript v0.25.0
+   Compiling tree-sitter-typescript v0.23.2
+    Checking egui_commonmark_backend v0.25.0
+    Checking ureq v2.12.1
+    Checking notify-rust v4.18.2
+    Checking egui_commonmark v0.25.0
+   Compiling gitcraft v0.3.4 (/Volumes/RAMDisk/g51)
+    Checking two-face v0.5.2+bat-0.26.1
+warning: method `label` is never used
+  --> src/across/discover.rs:38:12
+   |
+37 | impl Machine {
+   | ------------ method in this implementation
+38 |     pub fn label(&self) -> String {
+   |            ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `label` is never used
+  --> src/app/recent_status.rs:49:19
+   |
+47 | impl RecentStatus {
+   | ----------------- method in this implementation
+48 |     /// The words the start page shows for it, after the name: the branch, or what is wrong.
+49 |     pub(super) fn label(&self) -> String {
+   |                   ^^^^^
+
+warning: method `describe` is never used
+  --> src/authorship/mod.rs:84:12
+   |
+69 | impl Attribution {
+   | ---------------- method in this implementation
+...
+84 |     pub fn describe(&self) -> String {
+   |            ^^^^^^^^
+
+warning: function `diagnostic` is never used
+ --> src/authorship/display.rs:6:8
+  |
+6 | pub fn diagnostic(raw: &str) -> String {
+  |        ^^^^^^^^^^
+
+warning: function `dynamic` is never used
+  --> src/authorship/display.rs:10:4
+   |
+10 | fn dynamic(raw: &str) -> Option<String> {
+   |    ^^^^^^^
+
+warning: function `toast_text` is never used
+   --> src/custom_commands/program.rs:133:8
+    |
+133 | pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    |        ^^^^^^^^^^
+
+warning: function `display_toast_text` is never used
+   --> src/custom_commands/program.rs:138:8
+    |
+138 | pub fn display_toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: method `headline` is never used
+  --> src/drift/mod.rs:79:12
+   |
+65 | impl Report {
+   | ----------- method in this implementation
+...
+79 |     pub fn headline(&self) -> String {
+   |            ^^^^^^^^
+
+warning: function `plural` is never used
+   --> src/drift/mod.rs:107:4
+    |
+107 | fn plural(n: usize, one: &str, many: &str) -> String {
+    |    ^^^^^^
+
+warning: method `display_label` is never used
+   --> src/fence/display.rs:311:12
+    |
+310 | impl super::check::How {
+    | ---------------------- method in this implementation
+311 |     pub fn display_label(self) -> &'static str {
+    |            ^^^^^^^^^^^^^
+
+warning: function `gitlab_takes_repo` is never used
+   --> src/forge/cli.rs:275:4
+    |
+275 | fn gitlab_takes_repo(args: &[&str]) -> bool {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: method `display_web_warning` is never used
+  --> src/gerrit/display.rs:31:19
+   |
+30 | impl Server {
+   | ----------- method in this implementation
+31 |     pub(crate) fn display_web_warning(&self) -> Option<String> {
+   |                   ^^^^^^^^^^^^^^^^^^^
+
+warning: function `stack_error` is never used
+   --> src/gerrit/display.rs:165:15
+    |
+165 | pub(crate) fn stack_error(raw: &str, recorded_log: &str) -> String {
+    |               ^^^^^^^^^^^
+
+warning: function `check_bundle` is never used
+   --> src/git/bundles.rs:232:15
+    |
+232 | pub(crate) fn check_bundle(
+    |               ^^^^^^^^^^^^
+
+warning: method `bind_git` is never used
+  --> src/git/command/credential_policy.rs:12:12
+   |
+ 9 | impl CredentialCommandPolicy {
+   | ---------------------------- method in this implementation
+...
+12 |     pub fn bind_git(&mut self, selected: &Path) -> Result<(), String> {
+   |            ^^^^^^^^
+
+warning: function `replay` is never used
+   --> src/git/dry_run/picks.rs:101:8
+    |
+101 | pub fn replay(
+    |        ^^^^^^
+
+warning: function `merge` is never used
+   --> src/git/dry_run/reach.rs:187:8
+    |
+187 | pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
+    |        ^^^^^
+
+warning: function `unreachable` is never used
+   --> src/git/dry_run/reach.rs:190:8
+    |
+190 | pub fn unreachable(
+    |        ^^^^^^^^^^^
+
+warning: function `unreachable_bounded` is never used
+   --> src/git/dry_run/reach.rs:199:15
+    |
+199 | pub(crate) fn unreachable_bounded(
+    |               ^^^^^^^^^^^^^^^^^^^
+
+warning: function `leaving` is never used
+   --> src/git/dry_run/reach.rs:209:8
+    |
+209 | pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
+    |        ^^^^^^^
+
+warning: associated function `of` is never used
+  --> src/git/dry_run/version.rs:31:12
+   |
+11 | impl GitVersion {
+   | --------------- associated function in this implementation
+...
+31 |     pub fn of(repo: &Path) -> Result<Self, String> {
+   |            ^^
+
+warning: function `group` is never used
+   --> src/menu_item.rs:223:15
+    |
+223 | pub(crate) fn group(ui: &mut Ui, label: &str, content: impl FnOnce(&mut Ui)) {
+    |               ^^^^^
+
+warning: function `packages` is never used
+  --> src/package/mod.rs:81:15
+   |
+81 | pub(crate) fn packages(repo: &Path) -> Result<Vec<Package>, String> {
+   |               ^^^^^^^^
+
+warning: function `report` is never used
+  --> src/package/mod.rs:94:15
+   |
+94 | pub(crate) fn report(repo: &Path, pkg: &Package) -> Result<Report, String> {
+   |               ^^^^^^
+
+warning: function `published` is never used
+   --> src/package/mod.rs:118:15
+    |
+118 | pub(crate) fn published(
+    |               ^^^^^^^^^
+
+warning: function `list` is never used
+  --> src/package/archive.rs:25:15
+   |
+25 | pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
+   |               ^^^^
+
+warning: function `missing` is never used
+   --> src/package/run.rs:109:4
+    |
+109 | fn missing(program: &str) -> String {
+    |    ^^^^^^^
+
+warning: function `finish` is never used
+   --> src/package/run.rs:142:4
+    |
+142 | fn finish(
+    |    ^^^^^^
+
+warning: function `packages` is never used
+  --> src/package/tools.rs:13:15
+   |
+13 | pub(crate) fn packages(repo: &Path, cargo: bool, npm: bool) -> Result<Vec<Package>, String> {
+   |               ^^^^^^^^
+
+warning: function `parse_cargo_metadata` is never used
+  --> src/package/tools.rs:75:15
+   |
+75 | pub(crate) fn parse_cargo_metadata(json: &str, root: &str) -> Result<Vec<Package>, String> {
+   |               ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `files` is never used
+   --> src/package/tools.rs:180:15
+    |
+180 | pub(crate) fn files(repo: &Path, pkg: &Package) -> Result<Vec<(String, Option<u64>)>, String> {
+    |               ^^^^^
+
+warning: function `parse_npm_pack` is never used
+   --> src/package/tools.rs:219:15
+    |
+219 | pub(crate) fn parse_npm_pack(json: &str) -> Result<Vec<(String, Option<u64>)>, String> {
+    |               ^^^^^^^^^^^^^^
+
+warning: function `published` is never used
+   --> src/package/tools.rs:249:15
+    |
+249 | pub(crate) fn published(pkg: &Package) -> Result<Option<(String, String)>, String> {
+    |               ^^^^^^^^^
+
+warning: function `published_files` is never used
+   --> src/package/tools.rs:318:15
+    |
+318 | pub(crate) fn published_files(url: &str) -> Result<Vec<String>, String> {
+    |               ^^^^^^^^^^^^^^^
+
+warning: methods `into_raw` and `display` are never used
+  --> src/package/witness.rs:85:19
+   |
+73 | impl CargoFailure {
+   | ----------------- methods in this implementation
+...
+85 |     pub(crate) fn into_raw(self) -> String {
+   |                   ^^^^^^^^
+...
+96 |     pub(crate) fn display(&self) -> String {
+   |                   ^^^^^^^
+
+warning: methods `raw` and `into_raw` are never used
+   --> src/package/witness.rs:177:19
+    |
+176 | impl Failure {
+    | ------------ methods in this implementation
+177 |     pub(crate) fn raw(&self) -> &str {
+    |                   ^^^
+...
+194 |     pub(crate) fn into_raw(self) -> String {
+    |                   ^^^^^^^^
+
+warning: function `run` is never used
+  --> src/parallel_bisect/bundle.rs:16:15
+   |
+16 | pub(crate) fn run(
+   |               ^^^
+
+warning: function `pipeline` is never used
+   --> src/parallel_bisect/bundle.rs:185:4
+    |
+185 | fn pipeline(
+    |    ^^^^^^^^
+
+warning: constant `EXACT` is never used
+ --> src/parallel_bisect/display.rs:5:7
+  |
+5 | const EXACT: &[(&str, &str)] = &[
+  |       ^^^^^
+
+warning: constant `DETAIL` is never used
+   --> src/parallel_bisect/display.rs:317:7
+    |
+317 | const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
+    |       ^^^^^^
+
+warning: function `diagnostic` is never used
+   --> src/parallel_bisect/display.rs:515:15
+    |
+515 | pub(crate) fn diagnostic(raw: &str) -> String {
+    |               ^^^^^^^^^^
+
+warning: function `envelope` is never used
+   --> src/parallel_bisect/display.rs:550:4
+    |
+550 | fn envelope(raw: &str) -> Option<String> {
+    |    ^^^^^^^^
+
+warning: function `machine_name` is never used
+   --> src/parallel_bisect/display.rs:688:15
+    |
+688 | pub(crate) fn machine_name(raw: &str) -> &str {
+    |               ^^^^^^^^^^^^
+
+warning: function `verdict` is never used
+   --> src/parallel_bisect/display.rs:697:15
+    |
+697 | pub(crate) fn verdict(verdict: super::Verdict) -> &'static str {
+    |               ^^^^^^^
+
+warning: function `scalar` is never used
+   --> src/parallel_bisect/display.rs:707:15
+    |
+707 | pub(crate) fn scalar(value: f64) -> String {
+    |               ^^^^^^
+
+warning: function `warning` is never used
+   --> src/parallel_bisect/display.rs:713:15
+    |
+713 | pub(crate) fn warning(raw: &str) -> String {
+    |               ^^^^^^^
+
+warning: function `observation_detail` is never used
+   --> src/parallel_bisect/display.rs:734:4
+    |
+734 | fn observation_detail(raw: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `trailing_envelope` is never used
+   --> src/parallel_bisect/display.rs:759:4
+    |
+759 | fn trailing_envelope(raw: &str) -> Option<String> {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `known_observation_detail` is never used
+   --> src/parallel_bisect/display.rs:842:4
+    |
+842 | fn known_observation_detail(raw: &str) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `run` is never used
+   --> src/parallel_bisect/observe.rs:160:15
+    |
+160 | pub(crate) fn run(
+    |               ^^^
+
+warning: function `start` is never used
+   --> src/parallel_bisect/session.rs:140:8
+    |
+140 | pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'static) -> Handle {
+    |        ^^^^^
+
+warning: method `word` is never used
+  --> src/parallel_bisect/verdict.rs:22:12
+   |
+15 | impl Verdict {
+   | ------------ method in this implementation
+...
+22 |     pub fn word(self) -> &'static str {
+   |            ^^^^
+
+warning: method `send` is never used
+   --> src/parallel_bisect/workspace.rs:209:12
+    |
+ 40 | impl Workspace {
+    | -------------- method in this implementation
+...
+209 |     pub fn send(&self, source: &Path, wanted: &[String]) -> Result<(), String> {
+    |            ^^^^
+
+warning: methods `title`, `goal`, and `hint` are never used
+  --> src/practice.rs:28:12
+   |
+20 | impl Scenario {
+   | ------------- methods in this implementation
+...
+28 |     pub fn title(self) -> &'static str {
+   |            ^^^^^
+...
+37 |     pub fn goal(self) -> &'static str {
+   |            ^^^^
+...
+54 |     pub fn hint(self) -> &'static str {
+   |            ^^^^
+
+warning: method `preview` is never used
+   --> src/release/mod.rs:302:19
+    |
+281 | impl Plan {
+    | --------- method in this implementation
+...
+302 |     pub(crate) fn preview(&self, forge: Option<Forge>) -> Vec<(Step, String)> {
+    |                   ^^^^^^^
+
+warning: function `execution_error` is never used
+    --> src/remote/display.rs:1658:8
+     |
+1658 | pub fn execution_error(raw: &str, command: &str, host: &super::Host) -> String {
+     |        ^^^^^^^^^^^^^^^
+
+warning: function `python_exception` is never used
+    --> src/remote/display.rs:1686:8
+     |
+1686 | pub fn python_exception(kind: &str, detail: &str) -> String {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: function `perl_exception` is never used
+    --> src/remote/display.rs:1696:8
+     |
+1696 | pub fn perl_exception(detail: &str, location: &str) -> String {
+     |        ^^^^^^^^^^^^^^
+
+warning: function `ui_thread_debug` is never used
+    --> src/remote/display.rs:1708:8
+     |
+1708 | pub fn ui_thread_debug(command: &str, detail: &str) -> String {
+     |        ^^^^^^^^^^^^^^^
+
+warning: method `into_raw` is never used
+   --> src/repo/notice.rs:130:19
+    |
+ 39 | impl Notice {
+    | ----------- method in this implementation
+...
+130 |     pub(super) fn into_raw(self) -> (String, bool) {
+    |                   ^^^^^^^^
+
+warning: function `commits_count` is never used
+  --> src/repo/dco/view.rs:80:4
+   |
+80 | fn commits_count(n: usize) -> String {
+   |    ^^^^^^^^^^^^^
+
+warning: variant `Frame` is never constructed
+  --> src/repo/dialogs/behaviour.rs:20:5
+   |
+18 | enum Event {
+   |      ----- variant in this enum
+19 |     Loaded(Vec<git::BehaviourCommit>),
+20 |     Frame(usize, Result<Observation, String>),
+   |     ^^^^^
+
+warning: method `legacy` is never used
+   --> src/repo/ghost/mod.rs:278:8
+    |
+258 | impl PreviewFailure {
+    | ------------------- method in this implementation
+...
+278 |     fn legacy(&self) -> String {
+    |        ^^^^^^
+
+warning: function `approval_preview` is never used
+   --> src/repo/ghost/mod.rs:570:24
+    |
+570 | pub(in crate::repo) fn approval_preview(
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: function `plan` is never used
+  --> src/repo/ghost/plan.rs:83:15
+   |
+83 | pub(crate) fn plan(
+   |               ^^^^
+
+warning: function `parse` is never used
+  --> src/repo/local_ci/model.rs:41:15
+   |
+41 | pub(super) fn parse(file: String, source: String) -> Result<Workflow, String> {
+   |               ^^^^^
+
+warning: function `read_catalog` is never used
+ --> src/repo/local_ci/run.rs:9:15
+  |
+9 | pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), String> {
+  |               ^^^^^^^^^^^^
+
+warning: function `capital` is never used
+   --> src/repo/parallel_bisect/marks.rs:124:4
+    |
+124 | fn capital(word: &str) -> String {
+    |    ^^^^^^^
+
+warning: constant `COMPACT_TIP` is never used
+   --> src/settings/mod.rs:273:11
+    |
+273 | pub const COMPACT_TIP: &str = "Lanes closer together, for a narrower graph column";
+    |           ^^^^^^^^^^^
+
+warning: method `label` is never used
+   --> src/teleport/mod.rs:192:12
+    |
+190 | impl Step {
+    | --------- method in this implementation
+191 |     /// What the dialog says meanwhile.
+192 |     pub fn label(self) -> String {
+    |            ^^^^^
+
+warning: constant `EXACT` is never used
+ --> src/terminal/display.rs:5:7
+  |
+5 | const EXACT: &[(&str, &str)] = &[
+  |       ^^^^^
+
+warning: constant `DETAIL` is never used
+  --> src/terminal/display.rs:16:7
+   |
+16 | const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
+   |       ^^^^^^
+
+warning: function `diagnostic` is never used
+  --> src/terminal/display.rs:36:15
+   |
+36 | pub(crate) fn diagnostic(raw: &str) -> String {
+   |               ^^^^^^^^^^
+
+warning: function `shell_label` is never used
+  --> src/terminal/display.rs:62:15
+   |
+62 | pub(crate) fn shell_label(raw: &str) -> &str {
+   |               ^^^^^^^^^^^
+
+warning: method `display_label` is never used
+  --> src/update/display.rs:10:12
+   |
+ 7 | impl Channel {
+   | ------------ method in this implementation
+...
+10 |     pub fn display_label(self) -> &'static str {
+   |            ^^^^^^^^^^^^^
+
+warning: variant `CopyNew` is never constructed
+  --> src/update/display.rs:95:5
+   |
+81 | pub(crate) enum Diagnostic<'a> {
+   |                 ---------- variant in this enum
+...
+95 |     CopyNew,
+   |     ^^^^^^^
+   |
+   = note: `Diagnostic` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `download` is never used
+   --> src/update/install.rs:175:4
+    |
+175 | fn download(url: &str, to: &Path) -> Result<(), String> {
+    |    ^^^^^^^^
+
+warning: function `unpack` is never used
+   --> src/update/install.rs:197:4
+    |
+197 | fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
+    |    ^^^^^^
+
+warning: function `install` is never used
+   --> src/update/install.rs:238:8
+    |
+238 | pub fn install(new: &Path) -> Result<PathBuf, String> {
+    |        ^^^^^^^
+
+warning: function `go_back` is never used
+   --> src/update/install.rs:264:8
+    |
+264 | pub fn go_back() -> Result<(PathBuf, Previous), String> {
+    |        ^^^^^^^
+
+warning: function `move_into` is never used
+   --> src/update/install.rs:280:4
+    |
+280 | fn move_into(from: &Path, to: &Path) -> Result<(), String> {
+    |    ^^^^^^^^^
+
+warning: function `replace_keeping` is never used
+  --> src/update/previous.rs:91:15
+   |
+91 | pub(super) fn replace_keeping(
+   |               ^^^^^^^^^^^^^^^
+
+warning: function `swap_back` is never used
+   --> src/update/previous.rs:122:15
+    |
+122 | pub(super) fn swap_back(target: &Path, current: &str) -> Result<Previous, String> {
+    |               ^^^^^^^^^
+
+warning: method `into_raw` is never used
+  --> src/update/witness.rs:36:12
+   |
+30 | impl PlacementFailure {
+   | --------------------- method in this implementation
+...
+36 |     pub fn into_raw(self) -> String {
+   |            ^^^^^^^^
+
+warning: constant `BADGE` is never used
+  --> src/weakened/mod.rs:26:11
+   |
+26 | pub const BADGE: &str = "weakens checks";
+   |           ^^^^^
+
+warning: method `summary` is never used
+   --> src/weakened/mod.rs:111:12
+    |
+109 | impl FileFlags {
+    | -------------- method in this implementation
+110 |     /// The whole list as a hover text: each reason once, then its evidence.
+111 |     pub fn summary(&self) -> String {
+    |            ^^^^^^^
+
+warning: function `reviewed_auth_failure` is never used
+   --> src/push_preflight/display.rs:518:15
+    |
+518 | pub(crate) fn reviewed_auth_failure() -> &'static str {
+    |               ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `target` is never used
+   --> src/push_preflight/display.rs:523:15
+    |
+523 | pub(crate) fn target(url: &str) -> String {
+    |               ^^^^^^
+
+warning: `gitcraft` (lib) generated 88 warnings
+warning: method `display_label` is never used
+   --> src/fence/display.rs:311:12
+    |
+310 | impl super::check::How {
+    | ---------------------- method in this implementation
+311 |     pub fn display_label(self) -> &'static str {
+    |            ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `display` is never used
+  --> src/package/witness.rs:96:19
+   |
+73 | impl CargoFailure {
+   | ----------------- method in this implementation
+...
+96 |     pub(crate) fn display(&self) -> String {
+   |                   ^^^^^^^
+
+warning: variant `Fallback` is never constructed
+  --> src/tray/mod.rs:28:5
+   |
+24 | pub(crate) enum Availability {
+   |                 ------------ variant in this enum
+...
+28 |     Fallback(String),
+   |     ^^^^^^^^
+   |
+   = note: `Availability` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: `gitcraft` (lib test) generated 27 warnings (24 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.14s

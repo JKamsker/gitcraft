@@ -1,0 +1,264 @@
+{
+  "status": "SCOPED STATIC PASS",
+  "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+  "baseline": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+  "blockers": [],
+  "scope": "Corrections to UI-1 and UI-2 only; production diffs and their two new inert fixtures in the three requested files. Supporting unchanged source/catalog/library reads establish geometry, identity and inertness.",
+  "resolved_findings": [
+    {
+      "id": "UI-1",
+      "anchors": [
+        "src/repo/graph_view/mod.rs:169",
+        "src/repo/graph_view/mod.rs:236",
+        "src/repo/graph_view/mod.rs:287",
+        "src/repo/graph_view/mod.rs:478",
+        "src/repo/graph_view/mod.rs:482",
+        "src/repo/graph_view/minimap.rs:117"
+      ],
+      "conclusion": "Parent paint and interaction share the original reserved absolute strip outside the horizontal content clip; actual vertical geometry and ghost gate retained."
+    },
+    {
+      "id": "UI-2",
+      "anchors": [
+        "src/settings/page.rs:85",
+        "src/settings/page.rs:465",
+        "src/settings/page.rs:468",
+        "src/settings/page.rs:472",
+        "src/settings/page.rs:475"
+      ],
+      "conclusion": "All selected and option captions use finite localized projection; raw enum/salt/search/page identities and query clearing retained."
+    }
+  ],
+  "changed_paths": [
+    "src/repo/graph_view/minimap.rs",
+    "src/repo/graph_view/mod.rs",
+    "src/settings/page.rs"
+  ],
+  "production_fix_commit": "47c3a97a9dcdeb2ce931ecb18079261dadf47912",
+  "fixture_only_followups": [
+    "3bf4d6bbec28b8cef8d46da457dee0bd6a551053",
+    "4befbf80cb91e25edeb910b083e22454c680c7cc",
+    "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb"
+  ],
+  "evidence_validation": {
+    "performed_by": "independent reviewer: static log/hash inspection only",
+    "parent_gate_manifest": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-gates.json",
+    "all_seven_hashes_match": true,
+    "all_target_check_exit": 0,
+    "six_exact_tests_each_selected_pass": 1,
+    "gate_records": [
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "check",
+          "--locked",
+          "--offline",
+          "--all-targets"
+        ],
+        "exit": 0,
+        "selected_pass": null,
+        "seconds": 13.194,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-00.log",
+        "sha256": "fc1518b6a77bfe9ef9302534379cc381c195d27dd81180a1ad095d7729437452"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "settings::page::merge_regressions::compact_page_picker_repaints_both_languages_and_keeps_enum_selection",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 62.798,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-01.log",
+        "sha256": "9e0a2038d1650a60bbd421966222bf41f34f4937dfc71b287467c60f68a8289f"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::graph_view::minimap::merge_regressions::reserved_minimap_is_painted_outside_horizontal_graph_clip",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 0.335,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-02.log",
+        "sha256": "07000486cf4343a37d8bb5eb7150a1b711ae8f86f1269210479ce1a04cd3266b"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::history_filter::tests::filter_editor_repaints_languages_without_changing_rules_or_ref_patterns",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 0.293,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-03.log",
+        "sha256": "ed54600f9e7d1a4382fb318e5e0442fef7bed12a8e2b55ce4bed6b20fa729892"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 0.356,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-04.log",
+        "sha256": "fc4a457167ced81715c63c696e31d78aeec696348b21330aa42b6a96217f270a"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::forks::tests::invalidated_fork_scope_keeps_raw_guard_while_error_paint_tracks_locale",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 0.289,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-05.log",
+        "sha256": "50cbc801f6224168b7a388875a7103d452e6405e06d8ecbbe502241e309b943d"
+      },
+      {
+        "candidate": "9f9d2f3982743f3cdbcf9675df1bcf8a6e1622cb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "forge::identity::integration_tests::added_forges_keep_case_sensitive_paths_and_exact_web_instances",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "selected_pass": 1,
+        "seconds": 0.311,
+        "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-06.log",
+        "sha256": "5461d84770079791943a555e134b57e7cb8a6593f612292bcf5af42e31015e17"
+      }
+    ]
+  },
+  "inertness": {
+    "production_calls": [
+      "graph_rows_view",
+      "compact_page_picker",
+      "minimap::build"
+    ],
+    "no_jobs_readers_or_discovery_started": "Supported by fixture state and unchanged production gates; no test executed by reviewer. Minimap reader is clean and dirty=false, graph commits have <=1 parent, has_more=false, no pointer input, show_test_lane=false, graph_lane_walk=false. Deferred tab is never started.",
+    "filesystem_caveat": "new_deferred performs inherited mutation-key read/canonicalize probes against the supplied nonexistent path; do not claim zero filesystem I/O."
+  },
+  "limitations": [
+    "Scoped static correction pass only, not global/native/runtime acceptance.",
+    "Minimap regression records one-size paint/clip geometry, without forced horizontal overflow, pointer input, or ghost mode.",
+    "Selector regression drives General/Appearance and an initially empty query; nonempty-query clearing and all 15 captions are established by shared production loop/source/catalog inspection, not exhaustive new interaction tests.",
+    "Parent results are inspected evidence, not tests/builds run by reviewer; original baseline gates are not fresh executions.",
+    "Fork guards are outside this correction review."
+  ],
+  "constraints_observed": [
+    "No source edits",
+    "No build/test/native/runtime/process-control execution",
+    "No Git-under-test",
+    "No network/CI/PR",
+    "No agents",
+    "Only read-only Git inspection",
+    "Writes only to evidence/ui-correction-review"
+  ],
+  "source_hashes_sha256": {
+    "AGENTS.md": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+    "src/repo/graph_view/mod.rs": "0efe030034208f9dec2dd21b4e45abd10186a770eabcc8c4221b49145d5fd1f4",
+    "src/repo/graph_view/minimap.rs": "4d206ae4b7806c7f660496157b90ea3c99dda7d9ba47745fcc6b60c3570ee78a",
+    "src/settings/page.rs": "7c342a6ab7c9e9c87c6fbd34ce348b47123560f2cf6019d8e97fd6e8ef8c8e42",
+    "src/settings/mod.rs": "21ee63a057d37d54b05f8b7a3cfd3374c86551491dd7b4787217bcb20681914b",
+    "src/settings/labels.rs": "c7f72c57000d15310ccf654d2e1f675e07d2d45e2bd9839387de2f162ceddda9",
+    "src/repo/mod.rs": "c4bd29fc4b702e5cfa27c98bfc55c2e791f483c4112d5059572584a796340843",
+    "src/repo/history_reader.rs": "566da32b1d0f9d76f9f981f5c9d4d45b089491decf40c2b2c917267eda544993",
+    "src/repo/messages.rs": "bee7e254bcfc25c631aa57a0046b3f6d3fcb4c1ec2e4321404cfe0530cceec09",
+    "src/repo/watch.rs": "828456492c0585e0fd42e5b94da75525c34bda49f4cf6efef6cbff85091e7865",
+    "src/repo/branch_bands.rs": "5c9974b57e76c47e0f25a40453f95a644cc0f596b24ce3446c733aef35e3175d",
+    "src/repo/remerge/mod.rs": "204f5fe49122d60f0203b55a26b849282daecf1c7c768c55236910d919695c1f",
+    "src/repo/test_lane/mod.rs": "73436ece5fcaca095df5635875a421f525cc89b9ba69c7697dfb3bd68ebae0bb",
+    "src/repo/graph_walk.rs": "7a6354efa71a319182c7454c791dc6ea11e1698b7d4c686c49f1fca0dc053c8e",
+    "src/repo/celebration.rs": "bc6ab91293f052d6fbcb1d414bf53155a039cf30ef0f9c547ab425229f0419c3",
+    "src/repo/guide/mod.rs": "f65089d188312f9238bfc2f6c593285de034ed3e317f0ca72dca2070108d1f5e",
+    "src/repo/guide/tip_line.rs": "1e2e49c294021f17dbd34eed10f9eb79203640bf567ceae8ee53d6f0a13e10b0",
+    "src/repo/stack/graph.rs": "3167efc451fb5aa418febea78f302f2009467d8cd573b890d15cce4c9ff07e44",
+    "src/repo/graph_view/row.rs": "ae2c911699ead6300b6b37d6822849d29ec5ed80100eb70ba3e2c8e1e8b39d45",
+    "src/repo/graph_view/readability.rs": "778eee3a5822c2a10daf22914f258ec83804faececb87361159a976f2b71b862",
+    "src/repo/graph_view/message_tooltip.rs": "645a83d7bb0fb3337d245eacc5136d8d99f5798c366a1fa0e27f978925da7556",
+    "src/theme/test_paint.rs": "a92cb6423fe145f05d98c401b8f1fb8dafdc0a963ae42e40d774bce495b19f01",
+    "src/theme/mod.rs": "16f9715abc9dc430651f789897557db98f38a34aa37d5f543d347c8d9be831e4",
+    "locales/de/interaction.ftl": "3b9b6c25aff6eaac82a7be6009163779ff74c63f99bcc1579ec95bec08cbf1f3",
+    "locales/en-US/interaction.ftl": "fb1dcb118cfe5b61334f41c8459d0091aa95933ce075815927d375bd9bdbf34b",
+    "locales/de/dev-integration-ui.ftl": "1db8b792c158af4d046d4d5a169927fb94b36f4ac6fa374110c4b6f8df64c5d4",
+    "locales/en-US/dev-integration-ui.ftl": "b18725f7192bf799a7268fc90942503851e8c04897812ad263eb10eb29d5a8c1"
+  },
+  "dependency_hashes_sha256": {
+    "/Volumes/RAMDisk/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-0.36.2/src/ui.rs": "a5d33efd46dadebf973cb9bbcdab25808281c48ee5c02f2f84db6f849314fc85",
+    "/Volumes/RAMDisk/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-0.36.2/src/containers/scroll_area.rs": "46494f517e708f38dbcd76d32d6c7b11a56596ca447ddb6159bad6c54ea3f321"
+  },
+  "evidence_hashes_sha256": {
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-review/review.md": "5d159aa80924ba3c32e2e3595b2b87842a2f6e0dcaaafc1b71d274d2cc2d8f46",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-review/review.json": "5841f7d8edb58df616bf9eb8c00b2f700b0df1681e9a6a9df716d7fbc98b6a55",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-gates.json": "66f74703dd989930c1b281b2167c95f4edbffc7c94b4e2ba9c567a3926c21c09",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction3-inert-gates.json": "e32881a4ae34e8702b304113001536d23954d9e671a6e87c44bb3b0e38474822",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction2-inert-gates.json": "1b00c6e28e7ae0c57b27e183efdf583ed569e47ed47cdc386226e24b68ea2a81",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction-inert-01.log": "7febc15197f6ab3634b5677124e5cd728b6dae35adf219ebb3a9afe1e24abe4f",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction2-inert-00.log": "d9e9bf8875b63c64dfce26fc3b3ffb3375952a4cc7a6fa134112f24d99724e92",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction3-inert-02.log": "0e4a00214b58fbabb2cea453608c187dc6668d2d098a59a7b5d9c5b19a9244c4",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-00.log": "fc1518b6a77bfe9ef9302534379cc381c195d27dd81180a1ad095d7729437452",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-01.log": "9e0a2038d1650a60bbd421966222bf41f34f4937dfc71b287467c60f68a8289f",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-02.log": "07000486cf4343a37d8bb5eb7150a1b711ae8f86f1269210479ce1a04cd3266b",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-03.log": "ed54600f9e7d1a4382fb318e5e0442fef7bed12a8e2b55ce4bed6b20fa729892",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-04.log": "fc4a457167ced81715c63c696e31d78aeec696348b21330aa42b6a96217f270a",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-05.log": "50cbc801f6224168b7a388875a7103d452e6405e06d8ecbbe502241e309b943d",
+    "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction4-inert-06.log": "5461d84770079791943a555e134b57e7cb8a6593f612292bcf5af42e31015e17"
+  },
+  "report_sha256": "bee1255dbdff39d39e2daa7d02f49e0151e51cfbed0bea3663585bc7e7a94ac0"
+}

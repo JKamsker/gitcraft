@@ -1,0 +1,570 @@
+{
+  "status": "STATIC_FINDINGS",
+  "candidate_commit": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+  "candidate_tree": "66d5d80e1084eb9202c641cb6e28ff5d63c78649",
+  "inputs": {
+    "ours": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "dev": "760c79bb69ffc3af5401612bd9c48dcd254eca54",
+    "base": "cea7dfb5ddcc290352958b63566cfd3e515a0d9f",
+    "rationale": [
+      {
+        "path": "/Volumes/RAMDisk/gitcraft-evidence/dev-backend-proposal/HANDOFF.md",
+        "sha256": "ceb69b24dc8243a8f9394c33d7246028c97926b2aeb2a5f1f57ff1d2301ea129"
+      },
+      {
+        "path": "/Volumes/RAMDisk/gitcraft-evidence/dev-backend-proposal/manifest.json",
+        "sha256": "c63c01c9f944789f1076979a72237b657bd6215a7897be771e98672ad50d0a1d"
+      },
+      {
+        "path": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/compiler-seam-corrections-01.json",
+        "sha256": "44551b347e8879dee1bd9b187ebf2ed2c91604f6c6aca15b69a4c026c34434d7"
+      },
+      {
+        "path": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/fixed-guard-display.json",
+        "sha256": "2a187b91971d10c0bc42c55c924a8d726be3a3d2a5d80dbc0ce4d9410739ca3d"
+      }
+    ]
+  },
+  "review_scope": "Forge/provider routing and guarded mutation source integration, with push preflight source read to trace the dispatch seam. Core changed production paths and focused test harness integration reviewed; hashes bind the requested scope and supporting files, not a claim of exhaustive line coverage.",
+  "findings": [
+    {
+      "id": "G1",
+      "severity": "P1",
+      "title": "Retain the captured fork force-push lease through preflight",
+      "location": {
+        "path": "src/repo/operations.rs",
+        "line": 1157
+      },
+      "support": [
+        {
+          "path": "src/repo/forks/plan.rs",
+          "lines": [
+            575,
+            595
+          ]
+        },
+        {
+          "path": "src/push_preflight.rs",
+          "lines": [
+            183,
+            187
+          ]
+        },
+        {
+          "path": "src/push_preflight.rs",
+          "lines": [
+            510,
+            594
+          ]
+        },
+        {
+          "path": "src/push_preflight.rs",
+          "lines": [
+            1331,
+            1364
+          ]
+        },
+        {
+          "path": "src/repo/forks/guard.rs",
+          "lines": [
+            331,
+            381
+          ]
+        }
+      ],
+      "trigger": "A fork push-only continuation captures expected remote tip S; the fork advances to T and its tracking ref is refreshed before the preflight scan. Approve the resulting push preview.",
+      "impact": "The scanner retains only force=true for a nondeletion --force-with-lease argument, obtains base=T from the tracking ref, and generates a new lease for T. APPROVED replaces the literal push before guard::prepare_push, so the captured lease S is not enforced and the old continuation can overwrite newer fork commits.",
+      "recommendation": "Carry the fork expected OID into the reviewed plan, refuse a different advertised/tracked tip, and retain worker push evidence for bind_leases. Do not relax the preflight or fork guards.",
+      "qualification": "Static source trace. The full rebase-and-push entry is separately blocked by G2; this applies to the push-only continuation and must be preserved when integrating that entry."
+    },
+    {
+      "id": "G2",
+      "severity": "P1",
+      "title": "Integrate fork rebase plans with the reviewed push boundary",
+      "location": {
+        "path": "src/repo/operations.rs",
+        "line": 105
+      },
+      "support": [
+        {
+          "path": "src/repo/forks/mod.rs",
+          "lines": [
+            405,
+            424
+          ]
+        },
+        {
+          "path": "src/repo/forks/plan.rs",
+          "lines": [
+            557,
+            572
+          ]
+        },
+        {
+          "path": "src/repo/push_preflight.rs",
+          "lines": [
+            43,
+            45
+          ]
+        },
+        {
+          "path": "src/push_preflight.rs",
+          "lines": [
+            247,
+            268
+          ]
+        }
+      ],
+      "trigger": "Confirm Rebase #N onto <base> and push for an otherwise valid fork plan.",
+      "impact": "run_ops_ex sends the combined plan to scan, which rejects its -c rebase.updateRefs=false rebase step as neither a NUL expectation nor a supported companion branch operation. The worker and new fork rebase guards are never reached; the user receives Complete this local operation first, then preview its push separately.",
+      "recommendation": "Use a guarded staged continuation: complete the captured local rewrite, retain its worker-owned tip and undo evidence, then build the reviewed push for that exact tip and captured lease/lifetime. Keep refusal of arbitrary mixed local commands.",
+      "qualification": "The restrictive preflight behavior was inherited from ours; the combined candidate still fails to expose dev guarded rebase-and-push via the normal UI. No runtime execution claimed."
+    },
+    {
+      "id": "G3",
+      "severity": "P2",
+      "title": "Execute new checkout guard markers through the guard interpreter in live tests",
+      "location": {
+        "path": "src/forge/gitea/live.rs",
+        "line": 778
+      },
+      "support": [
+        {
+          "path": "src/repo/forks/plan.rs",
+          "lines": [
+            284,
+            295
+          ]
+        },
+        {
+          "path": "src/repo/forks/guard.rs",
+          "lines": [
+            225,
+            240
+          ]
+        }
+      ],
+      "trigger": "Run the native Forgejo/Gitea whole-life test through its fork checkout with Some(hosting).",
+      "impact": "checkout now prepends a NUL fork-checkout marker, but this test still dispatches every plan step directly with git::run_with. The marker is passed as Git argv and the checkout fails before validating the fork round trip.",
+      "recommendation": "Run the checkout plan through the same guarded operation interpreter used by the application, or explicitly interpret and validate the guard in the test. Merely dropping the marker would lose the intended destination check.",
+      "qualification": "Static test-harness integration defect; native test was not run."
+    }
+  ],
+  "source_bindings": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "git_blob": "efbec4a859c6b36c7d22113a045d28bcd287e8e7",
+      "sha256": "71cdfee62b0d469416d19628d955e94ab64e381591a2b27d7763e98fa5e5ddc2"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "git_blob": "004ec5aa42db6a486e0db1ce73870c65aa1e0126",
+      "sha256": "2b6c7ad0bdd317e838d39fa1a96bd379a9dfcff71099e29da2ac17f6f602a86f"
+    },
+    {
+      "path": ".github/workflows/windows-tests.yml",
+      "git_blob": "efa733906a4a7f41efec121c5c14d00f956f1dad",
+      "sha256": "100334f8ddfe31a88172ef717f22a08b37e26d1badad0a519b1c4191ef5933e9"
+    },
+    {
+      "path": "AGENTS.md",
+      "git_blob": "66af36bac88105ef58ab8b6f6f551b6a354ed708",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d"
+    },
+    {
+      "path": "src/ci/github.rs",
+      "git_blob": "fc830143c65a7b178d63378b069cec83d2b04ae0",
+      "sha256": "8f6c6cfd0562c132c29e274e3a14398d365f957d449eb094bc03954c6c090b6b"
+    },
+    {
+      "path": "src/ci/gitlab.rs",
+      "git_blob": "cac186e0719bca031ddc23c0cc2f9bcf0ef2bc02",
+      "sha256": "b3f8c0991e56fd6b48f57cc1cb00decaad83b4feb66c9a52bf05236c343c7fc2"
+    },
+    {
+      "path": "src/ci/mod.rs",
+      "git_blob": "349582fa36d3657ef2736393bb9d453424501a2d",
+      "sha256": "3e9826e23f1b890d1a620e8b267110eccf8934d4f04729a8fd4644992a3a4c71"
+    },
+    {
+      "path": "src/ci/route.rs",
+      "git_blob": "ab9ef6d7f5722a9f23b8ca092ba410501a6d32b6",
+      "sha256": "49a28491864241da0ef2eb310a588ce0aa3b8075fe29d605919262b72b552fcd"
+    },
+    {
+      "path": "src/forge/azure/details.rs",
+      "git_blob": "943781ee6f0368b433bbdc58dafc75717b249c70",
+      "sha256": "214b5ee2deb6d0663a635dd44d28494b4fe4e75457e4011be7158be6637ad798"
+    },
+    {
+      "path": "src/forge/azure/mod.rs",
+      "git_blob": "9ffa03c0e164cfbc6a8fec675a8584eba6d76ba6",
+      "sha256": "a713a7420e0e1a7706cbb8b8e8238168e8baa191991a7dbc8771e596302ab058"
+    },
+    {
+      "path": "src/forge/azure/post.rs",
+      "git_blob": "32c09e0f6c896d7c1c1f4925da87a037a94883a8",
+      "sha256": "c37536017387a5f7b90db12235c43634e4c30ba0928ac7dd8b4d2ea02eea8839"
+    },
+    {
+      "path": "src/forge/azure/tests.rs",
+      "git_blob": "66440849a0830e93d907743df9e93b31a834cfc9",
+      "sha256": "e648e14a794ee5d1863c4c6bf6306afe1e4fda1f4690c813e45e418a51ea02d6"
+    },
+    {
+      "path": "src/forge/bitbucket/details.rs",
+      "git_blob": "f01b348b05c9979e2c93f0bce5bf88782f938450",
+      "sha256": "8e13fbd3123125b2e4567b7d8351f4c8abf027c2de471b005b4048726c122b8f"
+    },
+    {
+      "path": "src/forge/bitbucket/mod.rs",
+      "git_blob": "1db80578afc0ae2533896c1bc10c8237a0db95f3",
+      "sha256": "ff4bfb8d63cb80db09a3eb0666d2a7d9a431bfa64b3afbd9b44a4df7583931af"
+    },
+    {
+      "path": "src/forge/bitbucket/post.rs",
+      "git_blob": "230044faef47fef2801345f285715c23626d5002",
+      "sha256": "40e4556628370dac3b08bf8acde8dee84340d97b10ee73ad08a0250332ad96b1"
+    },
+    {
+      "path": "src/forge/bitbucket/tests.rs",
+      "git_blob": "f0ec8fedb3cd7c5d9f6ab1c7532d04750a5aff64",
+      "sha256": "ec8f58cd955b6fc38062fb02c9bb523e78290f1281fb9ed52ee6396a62b1eaea"
+    },
+    {
+      "path": "src/forge/cli.rs",
+      "git_blob": "41a547badbfbcc1a7d8a47d9f5bcebe58afb9efc",
+      "sha256": "987e6a5064ae40ae0830bfc34e48415b6385430035b0691d0c935aaf7b3a8042"
+    },
+    {
+      "path": "src/forge/cloud/mod.rs",
+      "git_blob": "4f9d4fa454008c2988053120c28bad3ef39f9d02",
+      "sha256": "bf61de70a08a7bb194211bc95300d27a7cb75bf83dc284cf37d36cb399cd42b0"
+    },
+    {
+      "path": "src/forge/cloud/ui.rs",
+      "git_blob": "b0cd7ee05e7024babcf9e6b14b0e8e0010da9ad5",
+      "sha256": "d5b21d097147ac520a2222c7c27419f163718346e4dd53bc7019eb488c6ba2ba"
+    },
+    {
+      "path": "src/forge/forks.rs",
+      "git_blob": "448e35a422da01e59d2bc7a4d34d218acf7a7e04",
+      "sha256": "fc68fb887638528ad2c72328100230a751ad45d9764eb1f2063cae5afbdb7ac1"
+    },
+    {
+      "path": "src/forge/gitea/details.rs",
+      "git_blob": "4a4b0e46994a601440c14f9318bfbe65e46caa48",
+      "sha256": "d7b8a8c7d40c013ab5bfd990d7938e23af59aa4f27c9fc1b833ff8b4b38572ad"
+    },
+    {
+      "path": "src/forge/gitea/inbox.rs",
+      "git_blob": "beed6ee6b955956f754f4dd7403a0f7dc5fe8407",
+      "sha256": "b696ea781e0006132067aa29ea5a9b2af634ccc8f305bdc013fd01963d8c84ee"
+    },
+    {
+      "path": "src/forge/gitea/issues.rs",
+      "git_blob": "a5c03e12d3acdb179c38657c45be51a0ebd1963f",
+      "sha256": "2e1ded3aba30e2874b9a323ae930ba01398d6676a58dc47ab605ff729f45a5a9"
+    },
+    {
+      "path": "src/forge/gitea/live.rs",
+      "git_blob": "0666e84f59b711116fa24e11173aaae03b494ff6",
+      "sha256": "281786b19db90a3fc7f13daf5e89e94e88176bd1c4ef0d46d49501e41f8a23bd"
+    },
+    {
+      "path": "src/forge/gitea/live_inbox.rs",
+      "git_blob": "014e41843946fc4383e8389f6ee5d880125c3278",
+      "sha256": "aa750ff5d034aa9166563fb80585076b4bfe8425ce60411d4b8c02ee886ae73e"
+    },
+    {
+      "path": "src/forge/gitea/live_issues.rs",
+      "git_blob": "f2a4d7487f2029e5591812996e716eb07207cef8",
+      "sha256": "abcf5c59058960c1e818c5e480dc8f54c3a635374c815f8c057aaa5699d140c2"
+    },
+    {
+      "path": "src/forge/gitea/mod.rs",
+      "git_blob": "a783d558b5da8da1535e412f745a4e86826e06fd",
+      "sha256": "78190f66796d398aa94127840f9cb259d5c9bd32aa438be64899ba1147f6de72"
+    },
+    {
+      "path": "src/forge/gitea/post.rs",
+      "git_blob": "ada7d3ef5a11fcd9a02b5d6c6dfb69adc2c1fa12",
+      "sha256": "960c70621bda0900e0dee6b43f8600d276e4487ed3b7e8c2b0300acc7c4062ff"
+    },
+    {
+      "path": "src/forge/github/details.rs",
+      "git_blob": "5c360ca61df4c7afefd4ff4f6fc3b8372390d6c4",
+      "sha256": "15c9e3fadbebfae13b2cc49bb84bf72429cb5997461931fd27d19f199253076b"
+    },
+    {
+      "path": "src/forge/github/issues.rs",
+      "git_blob": "c6f53ed69011197285fe31a507a3f96b8853e1bf",
+      "sha256": "e01fc7a4e6d7fb503f5c97c5e02569f8346ce035d7e6140db205587b04dc40bc"
+    },
+    {
+      "path": "src/forge/github/mod.rs",
+      "git_blob": "12ecb0b8456fe856a77d155d14c0c7d9129ed062",
+      "sha256": "a24f0f91984518b26a6edc582165531f290441cb8e489ccb653572deefbc3075"
+    },
+    {
+      "path": "src/forge/github/post.rs",
+      "git_blob": "f4a5baef2a7f9439327f9035240ef069d3415009",
+      "sha256": "48404b10b472a5f663c425c4894eeca456c9830d0eafcdb5be2d3847df78379a"
+    },
+    {
+      "path": "src/forge/github/threads.rs",
+      "git_blob": "b098deede448402b3db16f924dfe0d091106d575",
+      "sha256": "b1802c9acf97a55c3056c8c25d4ea676706e4ca7b110610d39672e03a5ae0e08"
+    },
+    {
+      "path": "src/forge/gitlab/api.rs",
+      "git_blob": "1cfba71f6f3b465ddbfcd42dcb6a128965faf551",
+      "sha256": "f4cff216649eb89863327d2f7cb9b27d9b7a60506e25dcfe0201a1f074209b65"
+    },
+    {
+      "path": "src/forge/gitlab/details.rs",
+      "git_blob": "648adf856020f97fd55f659e82223c36dc48e6a7",
+      "sha256": "9165f96ad5450070d804960610d4bb9cb22b56d781cdd066991453573f6f9fdf"
+    },
+    {
+      "path": "src/forge/gitlab/mod.rs",
+      "git_blob": "426088ce6bafa9c3a299c578e623452703b991bf",
+      "sha256": "33cfea9ab5e280632c8e2dccc162135cc9560fb81efc767864c0f4ea77ebf28b"
+    },
+    {
+      "path": "src/forge/gitlab/native_tests.rs",
+      "git_blob": "0b401d321662a069c2ce17377616ba86e388c563",
+      "sha256": "e42d7a008570ff256ac08e8e5c9fbef39e1aa5dbc5b904301effe605e12e3f2c"
+    },
+    {
+      "path": "src/forge/gitlab/post.rs",
+      "git_blob": "af26688b4a639fa5dc650d493a634ab864d32836",
+      "sha256": "7cc3a9e00bf9741788fccbea6755c5887f08dbe5786efd9016da388b694f62b6"
+    },
+    {
+      "path": "src/forge/history.rs",
+      "git_blob": "01b4d66a10ba508b468a7b89d074eb28a9d82602",
+      "sha256": "03f64d3a4319e3167b940b9d2fb9c25ec6ed1a983c5b946c598d2f5e8a754ef1"
+    },
+    {
+      "path": "src/forge/history/tests.rs",
+      "git_blob": "37dca2909ccc55b7c12c18e115505471e7ceca35",
+      "sha256": "840f49653ff9eec2c06a5c02e58f91c1d539dc2b5d83d23e0c836a2d8dfbf68f"
+    },
+    {
+      "path": "src/forge/http.rs",
+      "git_blob": "80f458169db6bb720433da9453f618a74bb3e085",
+      "sha256": "69ba40a742d04211aa9569974bc0c9d933defe34e9ce3cc8e940bc5d86199af8"
+    },
+    {
+      "path": "src/forge/identity.rs",
+      "git_blob": "23293f8468d4263ee76ed1ee1b76d9d470d4ab7c",
+      "sha256": "d899bcb4aa33c595b031d87097e26bbff7507481dc63e3ae5f7c25bf716d82da"
+    },
+    {
+      "path": "src/forge/inbox.rs",
+      "git_blob": "557dfe90310c74afe259c49a16e9eb7bd00cff02",
+      "sha256": "2a382add946f3d504570f4b546b81424a05977e7f2c3fcceae8d51c6e77e824b"
+    },
+    {
+      "path": "src/forge/inbox_tests.rs",
+      "git_blob": "66a586bd64840bbcdbfc17f1f39a6d65e12a7ca4",
+      "sha256": "ce85484139b56d97f9bf0ce0ea9957ef25a226e78c909f0926622e856b1068f1"
+    },
+    {
+      "path": "src/forge/links/mod.rs",
+      "git_blob": "fa38cc22171f6f74f449afa5a24de105b2691bf8",
+      "sha256": "7ccb7aa09145718dbd43227a4b2fc1a877cbb8e5b37c7016c5653fd4acc8b0e5"
+    },
+    {
+      "path": "src/forge/links/remote.rs",
+      "git_blob": "602ee9ec05910f4541150535de4cf520e35b5e53",
+      "sha256": "dd970403a959a540536f363bc5bbc78d6b9a734fc96c8799d114518d63fb2fc8"
+    },
+    {
+      "path": "src/forge/links/resolve.rs",
+      "git_blob": "6c6e39c2e9d50decddc8c6e067e06242071eccd1",
+      "sha256": "2d874f2d7141f55b88552c7431cb4421f5c69bca95aa14d9c69b2822e7e8b16f"
+    },
+    {
+      "path": "src/forge/links/tests.rs",
+      "git_blob": "1813bda3ee860688471dd43d9a9382ec3becad66",
+      "sha256": "1f9578be10518dadb901ed27d17b4dc2a4393eb142f714480c76638cda5b13fb"
+    },
+    {
+      "path": "src/forge/mod.rs",
+      "git_blob": "d8ce2a146a25ef645c6e7d8d4e76d2b454e4d276",
+      "sha256": "cba2d877d9aefe201f1fd5dfcf1177f3992edb3e57bc4cb463d9974e7f08f189"
+    },
+    {
+      "path": "src/forge/routing_tests.rs",
+      "git_blob": "fb2d191026b8e248b75963170d6deb886a746067",
+      "sha256": "a319a6c5cbfb160f7441d145d24d39d76cdefc0b8f8dacf63496d2929f38fd71"
+    },
+    {
+      "path": "src/forge/ssh_keys.rs",
+      "git_blob": "0bd70ac1caf34d8edf2732321aae632652112bab",
+      "sha256": "00a4ab1356b71016196c1e7327250104390d0fdb1ac15af28632e34468b85c8b"
+    },
+    {
+      "path": "src/forge/ssh_keys/public_key.rs",
+      "git_blob": "aa99341ed0147de88b939a3a23f2a1ed25c6ffc3",
+      "sha256": "1ad35facf44befd7fa4dcdd297b091c3db9a04f03c3645a74727dbc00931c0be"
+    },
+    {
+      "path": "src/forge/stack.rs",
+      "git_blob": "5b1fd5766d6a538ebcd2cffd6c82addd20072e6c",
+      "sha256": "44d20ca775b55805be1506a62ec84003bb701333a618237d7b8d059bc58cb819"
+    },
+    {
+      "path": "src/forge/stack_tests.rs",
+      "git_blob": "cf741ca5ab8659e060cb283f65463c4fb8ee3458",
+      "sha256": "681fb3e54c5dc19f024425e4a3179610d134d33d2a1c107ef7065c4aa3a0c939"
+    },
+    {
+      "path": "src/git/backlinks.rs",
+      "git_blob": "95f3fd800623b0732e6d5ef2aa2b603bec0f4ecb",
+      "sha256": "5c9c249ef8f4bfdc648b1dbf41788b97d9d353dfbc96ec275e3a23a09ec40e19"
+    },
+    {
+      "path": "src/git/commits.rs",
+      "git_blob": "4a162eafb530a1941628ff77f6d1f410f7b759a0",
+      "sha256": "da1c4e2ed364b80d0717be80ce90d66c5883747039001ec3aaedfbdb5991e0b0"
+    },
+    {
+      "path": "src/pull_request/mod.rs",
+      "git_blob": "24cfbc7086b559aa8aea1b4e500450b843a2effc",
+      "sha256": "7a2efee3a493b28419a206acb215ced13f368435a30ea4c6ed3f31019fe1ac04"
+    },
+    {
+      "path": "src/push_preflight.rs",
+      "git_blob": "614fa727afb3e6e8b09cf61008728f10ab2af99c",
+      "sha256": "1f91deeadff511895cd7617f350d8e770b1dd3ff1fc2048cd984a330ed388aba"
+    },
+    {
+      "path": "src/repo/forge_selection.rs",
+      "git_blob": "8450471dc4261fd22cb74755c745ea850349a422",
+      "sha256": "0b6268d0ac10e9db9896c05f47637e5194cf70e0a6feb62aeec5d910d4cb8e78"
+    },
+    {
+      "path": "src/repo/forge_selection_tests.rs",
+      "git_blob": "8d98aaa71221f4f65507e33d7b5e720e0be96ef9",
+      "sha256": "3008eb513182369b1d561d14726c98e24c8afdc334b49cd2ac6222014f7c1d69"
+    },
+    {
+      "path": "src/repo/forks/guard.rs",
+      "git_blob": "544cf272214b5b6a3df9cc95194cc7994aa4c2bd",
+      "sha256": "fafe56b46bd98fe509165b49b9149a620f4c1ba323bda72515cf0684135390ff"
+    },
+    {
+      "path": "src/repo/forks/mod.rs",
+      "git_blob": "ebce16f2dd1740efdf1c4d2f99fcf6cac0655b78",
+      "sha256": "ca7dd08ad52df49d72d277eead24969d179f2ff94c99f4b1c1b9190c51df2f5e"
+    },
+    {
+      "path": "src/repo/forks/plan.rs",
+      "git_blob": "9144e995b89848fe0ab17146f28107a87eee0d73",
+      "sha256": "cb9f28084bc0e40c92c6782a5204a9e3fcf4d89b16b460dfb20b34eb13b1c10f"
+    },
+    {
+      "path": "src/repo/forks/tests.rs",
+      "git_blob": "bcbb9a694409ee74a3b7eacbc795af4e9dbb647a",
+      "sha256": "2014b5cc6b13230d241e0683e6c46e84ca395461123ec94fb2aefb759859c305"
+    },
+    {
+      "path": "src/repo/forks/view.rs",
+      "git_blob": "4a7dbeef815d4b32b3ddde28184bfa9d5b3f5721",
+      "sha256": "54e5d4377cb5d6bab910953deb9781fd6b994a7e531af4a813fdff17383cb5f3"
+    },
+    {
+      "path": "src/repo/issue_work/card.rs",
+      "git_blob": "203b3d74c2c32bcaf8b0f6c3d3a7ce7789590769",
+      "sha256": "d46a70819bc952f94b1d5098b430aeedb4c6e3200a2b7a5f042eadcbcd2537ab"
+    },
+    {
+      "path": "src/repo/issue_work/criteria.rs",
+      "git_blob": "bb31f188551ea0feaa56e27be2fe00de028609e5",
+      "sha256": "6c6bc391e3aa86ec94e0a1e16901633e7820376a84c369aea452e703034efe3b"
+    },
+    {
+      "path": "src/repo/issue_work/link.rs",
+      "git_blob": "24e7c8f40f2afb58be41890e27ee47a0b120dd65",
+      "sha256": "67bfad81936973f6f90c0d28890daa8f36b567f160ebb04f923fb86d57d1440d"
+    },
+    {
+      "path": "src/repo/issue_work/mod.rs",
+      "git_blob": "07cc7d4d1de623d301a3ccf6085a3eae47b50926",
+      "sha256": "39aead122d3aa94fce1ca9c5dffc80a08a2ca0f65a03390c3f3c9c34b2114e3f"
+    },
+    {
+      "path": "src/repo/issue_work/naming.rs",
+      "git_blob": "1b448d992975eb71e037e8d6381d4bef9241c38f",
+      "sha256": "bd7cffe9c958f79584e1dff69560326a98f56bcacef602dc185b3d9bfbb5a5f5"
+    },
+    {
+      "path": "src/repo/issue_work/picker.rs",
+      "git_blob": "59d53678157f722726fa1a2df41c4678ae665227",
+      "sha256": "ad05295d8f0441175957ea2cf03dbfaed97cdf95c0e4cfcfb7a2ef5cf5fa8691"
+    },
+    {
+      "path": "src/repo/issue_work/tests.rs",
+      "git_blob": "d4536ad17c0b31e2de6cd6ba9f0ab708219dcd73",
+      "sha256": "9c6dd19d8f02daf84fe15fb103041348ce25100cce647fed14a7794e23fe275b"
+    },
+    {
+      "path": "src/repo/load.rs",
+      "git_blob": "d757909047483a8dd0c1d2dda55d81f7bc7848ac",
+      "sha256": "36afec5b5c5eea9aa6b4869ca9c70e499332e9201e725531a075b92fb8d8cd2f"
+    },
+    {
+      "path": "src/repo/messages.rs",
+      "git_blob": "abc44c49d87deaef6aee9307fbb7dfe0d8b697bc",
+      "sha256": "bee7e254bcfc25c631aa57a0046b3f6d3fcb4c1ec2e4321404cfe0530cceec09"
+    },
+    {
+      "path": "src/repo/operations.rs",
+      "git_blob": "881bc893c7e03614ccf4834eab3e8f095755ed73",
+      "sha256": "6d8c58088b7c692d4a436272da9ee709391f8011878a6f74766f137d38748082"
+    },
+    {
+      "path": "src/repo/push_preflight.rs",
+      "git_blob": "0c3ba22d69166edd6fe68cd9acc384d284da6d17",
+      "sha256": "c0d7a9c4e98089620ae46de8ff5f8e8c9e9029f9aab0cb7bc3e64547659b096c"
+    },
+    {
+      "path": "src/repo/release/mod.rs",
+      "git_blob": "d8fcb6b0292f6f809f6815f35a166327044c1a13",
+      "sha256": "98fcda6a64096f3414c9dd0de7a7f590408cb017a9aa2bc221327aa689f14127"
+    },
+    {
+      "path": "src/repo/release/tests.rs",
+      "git_blob": "d003ec86f1726f311afe307cabb664059af64e81",
+      "sha256": "a47f50a4814878e1f389cae301c4888b518599ba7a8b3b59ab47b909f1d923aa"
+    },
+    {
+      "path": "src/repo/release/view.rs",
+      "git_blob": "b7a04a74bc3809b05b79c04f17b4eb87a3c45503",
+      "sha256": "2c70658961f7e8f5ba3aefc59d73410496270a7415b82f607fdb8ab5b508cffb"
+    },
+    {
+      "path": "src/repo/stack/publish.rs",
+      "git_blob": "b15a89c4659535fb811e0b8a59a64a05c38f133a",
+      "sha256": "4857ec868527b34f9703be9f7808a2352c0544b567211f9bc6418664d7a7f326"
+    }
+  ],
+  "execution": {
+    "source_edits": false,
+    "git_mutation": false,
+    "network": false,
+    "compiler": false,
+    "tests": false,
+    "runtime": false,
+    "ci": false,
+    "pr": false
+  },
+  "limitations": [
+    "Source review only; no new execution evidence.",
+    "No full issue completion claim.",
+    "G1 push-only continuation is reviewed independently of G2, which blocks the ordinary combined rebase entry."
+  ]
+}

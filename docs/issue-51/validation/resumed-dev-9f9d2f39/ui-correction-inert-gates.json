@@ -1,0 +1,38 @@
+[
+  {
+    "candidate": "47c3a97a9dcdeb2ce931ecb18079261dadf47912",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "selected_pass": null,
+    "seconds": 13.849,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction-inert-00.log",
+    "sha256": "8daa9ad159f8fe1cd0455b064b2f3ea197daf463052a6551248d54509c2b779f"
+  },
+  {
+    "candidate": "47c3a97a9dcdeb2ce931ecb18079261dadf47912",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "settings::page::merge_regressions::compact_page_picker_repaints_both_languages_and_keeps_enum_selection",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "selected_pass": 0,
+    "seconds": 82.911,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction-inert-01.log",
+    "sha256": "7febc15197f6ab3634b5677124e5cd728b6dae35adf219ebb3a9afe1e24abe4f"
+  }
+]

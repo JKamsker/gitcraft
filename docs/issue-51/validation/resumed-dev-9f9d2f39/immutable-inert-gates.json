@@ -1,0 +1,198 @@
+[
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "selected_pass": null,
+    "seconds": 16.207,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-00.log",
+    "sha256": "9f9d644911c24e4e035ed8b5600b31974c1466e395eb9ef3b62c76ed2ff829c5"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_github_every_provider_action_uses_selected_repo_and_host",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 111.461,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-01.log",
+    "sha256": "1afc254b6fcd6017a7abb16a0844a0870878e0d369a61af38397836e26e492c3"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_gitlab_every_provider_action_uses_selected_repo_and_host",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 81.57,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-02.log",
+    "sha256": "8aa48dc92edf322ae6289b95005007e1a7a9a95adb119d6bc91ffc3b0db72adb"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_github_details_and_all_review_actions_keep_the_captured_fork",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.439,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-03.log",
+    "sha256": "cd71a221ec1b743c84f18e4171b17da211205150ea287106723779e105b5371e"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_ssh_selects_cross_host_secondary_and_checks_configured_login",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.351,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-04.log",
+    "sha256": "d29802307102a5edcb2f61d6121f312c5e7a7e8c13ef0fec63e154c90f8536c2"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_ssh_rejects_untrusted_invalid_and_removed_targets_without_forge_call",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.424,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-05.log",
+    "sha256": "9aac5c8d1b283e2cbd67356938128833927261106060d46289fbc62980a8f0d3"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_ci_reads_and_mutations_use_the_selected_project",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.26,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-06.log",
+    "sha256": "2ac86905454053e09d6841cf9a678366a0e7791b743bfa9ec6644b2b2dfd42ae"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_gitlab_port_is_kept_for_api_and_release_targets",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.261,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-07.log",
+    "sha256": "6ea1d99206c8771db0c363a216eb7d5141e5202fdbdcde06114a45f3fda6c0e7"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::provider_boundary_creation_url_cannot_override_selected_repository_for_reviewers",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.351,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-08.log",
+    "sha256": "c3c01fe5ed1a5785c7926f32f64b2eac2c9e25d1bea7d3d45d0df69c9eeb88f6"
+  },
+  {
+    "candidate": "1994266ee33ef98baca7ecb29493454f0b7f3e2d",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "forge::routing_tests::review13_creation_and_review_targets_validate_the_web_instance",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "selected_pass": 0,
+    "seconds": 0.366,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/immutable-inert-09.log",
+    "sha256": "470dc1b35d12c89555489b0ae1c54f50ab5046b98832d3f6e31c206c6546c9f3"
+  }
+]

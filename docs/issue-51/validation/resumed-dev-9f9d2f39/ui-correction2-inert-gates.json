@@ -1,0 +1,18 @@
+[
+  {
+    "candidate": "3bf4d6bbec28b8cef8d46da457dee0bd6a551053",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 101,
+    "selected_pass": null,
+    "seconds": 4.329,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction2-inert-00.log",
+    "sha256": "d9e9bf8875b63c64dfce26fc3b3ffb3375952a4cc7a6fa134112f24d99724e92"
+  }
+]

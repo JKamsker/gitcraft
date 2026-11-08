@@ -1,0 +1,58 @@
+[
+  {
+    "candidate": "4befbf80cb91e25edeb910b083e22454c680c7cc",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "selected_pass": null,
+    "seconds": 24.341,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction3-inert-00.log",
+    "sha256": "90890054b0e58f6bb035eb6bc3750c885456c7c0f2880952bce0628f7f3083cb"
+  },
+  {
+    "candidate": "4befbf80cb91e25edeb910b083e22454c680c7cc",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "settings::page::merge_regressions::compact_page_picker_repaints_both_languages_and_keeps_enum_selection",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 64.984,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction3-inert-01.log",
+    "sha256": "4fc1e8d81f4ec8af51d80937d7ecbf9f7eb9b323d6d0fbfecbb531470d1fc3a1"
+  },
+  {
+    "candidate": "4befbf80cb91e25edeb910b083e22454c680c7cc",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::graph_view::minimap::merge_regressions::reserved_minimap_is_painted_outside_horizontal_graph_clip",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "selected_pass": 0,
+    "seconds": 0.36,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/dev-integration/ui-correction3-inert-02.log",
+    "sha256": "0e4a00214b58fbabb2cea453608c187dc6668d2d098a59a7b5d9c5b19a9244c4"
+  }
+]
