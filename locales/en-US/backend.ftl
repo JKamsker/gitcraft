@@ -117,3 +117,68 @@ backend-native-fallback-c1ee10596f = remote display requires Git
 backend-native-fallback-c3d2b99ca7 = legacy or rewritten remote
 backend-native-fallback-d81c296d75 = remote has no fetch URL
 backend-native-fallback-e1e6d89f7b = non-commit branch requires Git
+
+backend-helper-display-15fb4e0da4 = base64 is missing
+
+backend-helper-display-2287177378 = Explicit transient HTTPS sign-in requires recognized Git 2.46 or newer on the repository machine; use the profile credential manager otherwise.
+
+backend-helper-display-24d299539e = Use a credential-free remote URL with explicit sign-in
+
+backend-helper-display-2c92424593 = Selected Git executable was not pinned
+
+backend-helper-display-675478fd62 = Explicit transient sign-in requires HTTPS
+
+backend-helper-display-7ed9b0c2ef = Scoped sign-in is only available to the designated Git HTTP transport. LFS and credential-fill consumers must use their own explicitly selected account.
+
+backend-helper-display-caef832ec9 = Bundle output exceeds the size limit
+
+backend-helper-display-dbf94596ef = Credential transport needs an absolute original Git exec-path
+
+backend-is-not-inside-a-git-repository-116bc9 = { $path } is not inside a git repository
+
+backend-isn-t-a-folder-on-859699 = { $path } isn't a folder on { $target }
+
+backend-it-was-done-but-the-name-hook-failed-afterwards-exit-code-code-ce81ed = it was done, but the { $name } hook failed afterwards (exit code { $code })
+
+backend-just-now-7ddb44 = just now
+
+backend-relative-days = { $count ->
+        [one] { $count } day ago
+       *[other] { $count } days ago
+    }
+
+backend-relative-hours = { $count ->
+        [one] { $count } hour ago
+       *[other] { $count } hours ago
+    }
+
+backend-relative-minutes = { $count ->
+        [one] { $count } minute ago
+       *[other] { $count } minutes ago
+    }
+
+backend-relative-months = { $count ->
+        [one] { $count } month ago
+       *[other] { $count } months ago
+    }
+
+backend-relative-weeks = { $count ->
+        [one] { $count } week ago
+       *[other] { $count } weeks ago
+    }
+
+backend-relative-years = { $count ->
+        [one] { $count } year ago
+       *[other] { $count } years ago
+    }
+
+backend-right-click-push-for-push-skipping-hooks-to-push-once-without-it-4b9ac1 = Right-click Push for Push, skipping hooks, to push once without it.
+
+backend-the-name-hook-stopped-it-exit-code-code-cc1a4c = the { $name } hook stopped it (exit code { $code })
+
+backend-tick-skip-hooks-in-the-commit-box-to-commit-once-without-them-cab006 = Tick Skip hooks in the commit box to commit once without them.
+
+backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894 = { $seconds ->
+        [one] { $what } didn't finish within { $seconds } second and was stopped
+       *[other] { $what } didn't finish within { $seconds } seconds and was stopped
+    }

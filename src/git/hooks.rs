@@ -461,3 +461,49 @@ mod tests {
         );
     }
 }
+
+pub(super) fn display_failure(error: &str) -> Option<String> {
+    let (header, detail) = error.split_once('\n').unwrap_or((error, ""));
+    let (rest, marker, id) = if let Some(rest) = header.strip_prefix("it was done, but the ") {
+        (
+            rest,
+            " hook failed afterwards (exit code ",
+            "backend-it-was-done-but-the-name-hook-failed-afterwards-exit-code-code-ce81ed",
+        )
+    } else {
+        (
+            header.strip_prefix("the ")?,
+            " hook stopped it (exit code ",
+            "backend-the-name-hook-stopped-it-exit-code-code-cc1a4c",
+        )
+    };
+    let (name, code) = rest.strip_suffix(')')?.rsplit_once(marker)?;
+    if !STOPPING.contains(&name) && name != "post-checkout" {
+        return None;
+    }
+    code.parse::<i64>().ok()?;
+    let mut display = crate::i18n::message(id, &[("name", name.into()), ("code", code.into())]);
+    if !detail.is_empty() {
+        let (said, last) = detail.rsplit_once('\n').unwrap_or(("", detail));
+        let hint_id = match last {
+            "Tick Skip hooks in the commit box to commit once without them." => {
+                Some("backend-tick-skip-hooks-in-the-commit-box-to-commit-once-without-them-cab006")
+            }
+            "Right-click Push for Push, skipping hooks, to push once without it." => Some(
+                "backend-right-click-push-for-push-skipping-hooks-to-push-once-without-it-4b9ac1",
+            ),
+            _ => None,
+        };
+        display.push('\n');
+        if let Some(hint_id) = hint_id {
+            if !said.is_empty() {
+                display.push_str(said);
+                display.push('\n');
+            }
+            display.push_str(crate::i18n::text(hint_id));
+        } else {
+            display.push_str(detail);
+        }
+    }
+    Some(display)
+}

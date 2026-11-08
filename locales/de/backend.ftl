@@ -117,3 +117,68 @@ backend-native-fallback-c1ee10596f = Die Remote-Anzeige erfordert Git.
 backend-native-fallback-c3d2b99ca7 = alter oder umgeschriebener Remote
 backend-native-fallback-d81c296d75 = Der Remote hat keine Abruf-URL.
 backend-native-fallback-e1e6d89f7b = Ein Branch ohne Commitobjekt erfordert Git.
+
+backend-helper-display-15fb4e0da4 = base64 fehlt.
+
+backend-helper-display-2287177378 = Eine ausdrückliche vorübergehende HTTPS-Anmeldung erfordert eine erkannte Git-Version ab 2.46 auf dem Repository-Rechner; andernfalls den Anmeldedatenmanager des Profils verwenden.
+
+backend-helper-display-24d299539e = Bei ausdrücklicher Anmeldung eine Remote-URL ohne Anmeldedaten verwenden.
+
+backend-helper-display-2c92424593 = Die ausgewählte Git-Programmdatei wurde nicht fest gebunden.
+
+backend-helper-display-675478fd62 = Eine ausdrückliche vorübergehende Anmeldung erfordert HTTPS.
+
+backend-helper-display-7ed9b0c2ef = Die eingegrenzte Anmeldung ist nur für den vorgesehenen Git-HTTP-Transport verfügbar. LFS und credential-fill müssen ihr eigenes ausdrücklich ausgewähltes Konto verwenden.
+
+backend-helper-display-caef832ec9 = Die Bundle-Ausgabe überschreitet das Größenlimit.
+
+backend-helper-display-dbf94596ef = Der Anmeldedatentransport benötigt einen absoluten ursprünglichen Git-Programmpfad.
+
+backend-is-not-inside-a-git-repository-116bc9 = { $path } liegt nicht in einem Git-Repository.
+
+backend-isn-t-a-folder-on-859699 = { $path } ist kein Ordner auf { $target }.
+
+backend-it-was-done-but-the-name-hook-failed-afterwards-exit-code-code-ce81ed = Der Vorgang wurde ausgeführt, aber der Hook { $name } ist danach fehlgeschlagen (Exit-Code { $code }).
+
+backend-just-now-7ddb44 = Gerade eben
+
+backend-relative-days = { $count ->
+        [one] vor { $count } Tag
+       *[other] vor { $count } Tagen
+    }
+
+backend-relative-hours = { $count ->
+        [one] vor { $count } Stunde
+       *[other] vor { $count } Stunden
+    }
+
+backend-relative-minutes = { $count ->
+        [one] vor { $count } Minute
+       *[other] vor { $count } Minuten
+    }
+
+backend-relative-months = { $count ->
+        [one] vor { $count } Monat
+       *[other] vor { $count } Monaten
+    }
+
+backend-relative-weeks = { $count ->
+        [one] vor { $count } Woche
+       *[other] vor { $count } Wochen
+    }
+
+backend-relative-years = { $count ->
+        [one] vor { $count } Jahr
+       *[other] vor { $count } Jahren
+    }
+
+backend-right-click-push-for-push-skipping-hooks-to-push-once-without-it-4b9ac1 = Push rechtsklicken und „Push ohne Hooks“ auswählen, um einmal ohne Hook zu pushen.
+
+backend-the-name-hook-stopped-it-exit-code-code-cc1a4c = Der Hook { $name } hat den Vorgang gestoppt (Exit-Code { $code }).
+
+backend-tick-skip-hooks-in-the-commit-box-to-commit-once-without-them-cab006 = „Hooks überspringen“ im Commit-Feld aktivieren, um einmal ohne sie zu committen.
+
+backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894 = { $seconds ->
+        [one] { $what } wurde nicht innerhalb von { $seconds } Sekunde fertig und wurde gestoppt.
+       *[other] { $what } wurde nicht innerhalb von { $seconds } Sekunden fertig und wurde gestoppt.
+    }

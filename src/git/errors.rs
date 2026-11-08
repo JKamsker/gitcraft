@@ -235,6 +235,33 @@ fn unquote(value: &str) -> String {
 /// Render known application control errors without changing their transport identity.
 /// Provider/Git diagnostics and unknown strings remain opaque.
 pub fn display_error(error: &str) -> String {
+    if let Some(display) = super::hooks::display_failure(error) {
+        return display;
+    }
+    if let Some(path) = error.strip_suffix(" is not inside a git repository") {
+        return crate::i18n::message(
+            "backend-is-not-inside-a-git-repository-116bc9",
+            &[("path", path.into())],
+        );
+    }
+    if let Some((path, target)) = error.rsplit_once(" isn't a folder on ")
+        && (target.starts_with("SSH · ") || target.starts_with("WSL · "))
+    {
+        return crate::i18n::message(
+            "backend-isn-t-a-folder-on-859699",
+            &[("path", path.into()), ("target", target.into())],
+        );
+    }
+    if let Some(rest) = error.strip_suffix(" seconds and was stopped")
+        && let Some((what, seconds)) = rest.rsplit_once(" didn't finish within ")
+        && what.starts_with("git ")
+        && let Ok(seconds) = seconds.parse::<u64>()
+    {
+        return crate::i18n::message(
+            "backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894",
+            &[("what", what.into()), ("seconds", seconds.into())],
+        );
+    }
     if let Some(detail) = error.strip_prefix("Contained bundle Git: ") {
         return crate::i18n::message(
             "backend-contained-bundle-error",
@@ -353,6 +380,22 @@ pub fn display_error(error: &str) -> String {
         "unsupported upstream namespace" => "backend-native-fallback-850e897a1e",
         "local upstream requires Git" => "backend-native-fallback-bd13f61f25",
         "feature disabled" => "backend-native-fallback-3369979818",
+        "Explicit transient sign-in requires HTTPS" => "backend-helper-display-675478fd62",
+        "Use a credential-free remote URL with explicit sign-in" => {
+            "backend-helper-display-24d299539e"
+        }
+        "Selected Git executable was not pinned" => "backend-helper-display-2c92424593",
+        "Explicit transient HTTPS sign-in requires recognized Git 2.46 or newer on the repository machine; use the profile credential manager otherwise." => {
+            "backend-helper-display-2287177378"
+        }
+        "Credential transport needs an absolute original Git exec-path" => {
+            "backend-helper-display-dbf94596ef"
+        }
+        "Scoped sign-in is only available to the designated Git HTTP transport. LFS and credential-fill consumers must use their own explicitly selected account." => {
+            "backend-helper-display-7ed9b0c2ef"
+        }
+        "Bundle output exceeds the size limit" => "backend-helper-display-caef832ec9",
+        "base64 is missing" => "backend-helper-display-15fb4e0da4",
         _ => return error.to_owned(),
     };
     crate::i18n::text(id).to_owned()
