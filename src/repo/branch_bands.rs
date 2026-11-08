@@ -193,6 +193,10 @@ impl RepoTab {
                 settings.set(ui.ctx());
             }
 
+            if ui.button("Sparse checkout and downloads…").clicked() {
+                self.open_sparse();
+                ui.close();
+            }
             self.postcard_button(ui);
             if ui.button("Watch the repository grow…").clicked() {
                 self.open_growth();

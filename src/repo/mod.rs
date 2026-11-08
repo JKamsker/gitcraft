@@ -121,6 +121,7 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod sparse;
 mod ssh_setup;
 mod stack;
 mod state;
@@ -457,6 +458,7 @@ pub struct RepoTab {
     graph_narration: graph_walk::Narration,
     postcards: postcards::State,
     growth: Option<growth::State>,
+    sparse: Option<sparse::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
@@ -741,6 +743,7 @@ impl RepoTab {
             graph_narration: Default::default(),
             postcards: Default::default(),
             growth: None,
+            sparse: None,
             atlas: None,
             history_activity: None,
             history_minimap: Default::default(),

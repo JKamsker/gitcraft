@@ -10,8 +10,10 @@ mod backlinks;
 mod bisect;
 mod branch_health;
 mod bundles;
+mod clone_options;
 #[cfg(test)]
 mod clone_tests;
+pub use clone_options::*;
 mod command;
 mod credential_scope;
 pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
