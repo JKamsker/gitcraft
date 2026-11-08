@@ -188,10 +188,16 @@ fn stash_banner(ui: &mut Ui, acts: &mut Vec<Action>, stash: &Stash, idle: bool) 
                 ui.label(RichText::new(&stash.name).font(theme::medium(12.5)));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     for (label, op) in [
-                        (crate::i18n::text("repo-core-0871"), sidebar::StashOp::Pop),
-                        (crate::i18n::text("repo-core-0872"), sidebar::StashOp::Apply),
+                        ("Pop", sidebar::StashOp::Pop),
+                        ("Apply", sidebar::StashOp::Apply),
                     ] {
-                        if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
+                        if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::repo::messages::display_operation(label)),
+                            )
+                            .clicked()
+                        {
                             acts.push(Action::Ops {
                                 label: format!("{label} {}", stash.name),
                                 ops: sidebar::stash_ops(stash, op),

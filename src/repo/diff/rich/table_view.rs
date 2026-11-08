@@ -368,7 +368,10 @@ fn row(
     let tip = if tip.is_empty() {
         where_
     } else {
-        format!("{tip}\n{where_}")
+        crate::i18n::message(
+            "repo-core-2266",
+            &[("tip", tip.into()), ("where-", where_.into())],
+        )
     };
     if resp.on_hover_text(tip).clicked() {
         let (old, new) = match r.change {

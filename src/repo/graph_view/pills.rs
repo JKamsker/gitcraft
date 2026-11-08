@@ -156,7 +156,7 @@ impl RepoTab {
                 &[
                     ("n", format!("{}", lines.join("\n")).into()),
                     ("author", format!("{}", row.commit.author).into()),
-                    ("date", format!("{}", row.commit.date).into()),
+                    ("date", crate::i18n::date_iso(&row.commit.date).into()),
                     ("drag", format!("{}", drag).into()),
                 ],
             ));

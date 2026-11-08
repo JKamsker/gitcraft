@@ -3050,3 +3050,6 @@ repo-core-fold-staged = { $fixup ->
            *[other] The { $count } staged files will be folded into this commit:
         }
     }
+
+repo-core-operation-dco = Sign off the commits of { $branch }
+repo-core-operation-dco-here = Sign off the commits of { $branch } (here only)

@@ -697,6 +697,38 @@ pub(crate) fn display_operation(label: &str) -> String {
 }
 
 fn operation_display(label: &str, depth: usize) -> String {
+    let shared = crate::operation_labels::display(label);
+    if shared != label {
+        return shared;
+    }
+    if depth < 4 {
+        for (prefix, id) in [
+            ("Undo ", "interaction-operation-undo"),
+            ("Redo ", "interaction-operation-redo"),
+            ("Preparing ", "interaction-operation-preparing"),
+            ("Push after ", "interaction-operation-push-after"),
+        ] {
+            if let Some(inner) = label.strip_prefix(prefix) {
+                let rendered = operation_display(inner, depth + 1);
+                if rendered != inner {
+                    return crate::i18n::message(id, &[("operation", rendered.into())]);
+                }
+            }
+        }
+    }
+    for (suffix, id) in [
+        (" (here only)", "repo-core-operation-dco-here"),
+        ("", "repo-core-operation-dco"),
+    ] {
+        if let Some(branch) = label
+            .strip_prefix("Sign off the commits of ")
+            .and_then(|v| v.strip_suffix(suffix))
+        {
+            if !branch.is_empty() {
+                return crate::i18n::message(id, &[("branch", branch.into())]);
+            }
+        }
+    }
     use std::sync::OnceLock;
     struct Template {
         pattern: regex::Regex,
@@ -748,7 +780,6 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Distribute\\ staged\\ fixes…$", "repo-core-0049", &[][..]),
             ("(?s)^fetch\\ push\\ mapping\\ prune$", "repo-core-0093", &[][..]),
             ("(?s)^How\\ an\\ object\\ is\\ stored…$", "repo-core-0098", &[][..]),
-            ("(?s)^Use\\ the\\ profile's\\ author$", "repo-core-0154", &[][..]),
             ("(?s)^Pull\\ \\(fast\\-forward\\ only\\)$", "repo-core-3094", &[][..]),
             ("(?s)^Code\\ moved\\ across\\ files$", "repo-core-0022", &[][..]),
             ("(?s)^network\\ offline\\ metered$", "repo-core-0065", &[][..]),
@@ -763,7 +794,6 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Push\\ reviewed\\ history$", "repo-core-3110", &[][..]),
             ("(?s)^data\\ download\\ remote$", "repo-core-0021", &[][..]),
             ("(?s)^refactor\\ moved\\ block$", "repo-core-0023", &[][..]),
-            ("(?s)^Push,\\ skipping\\ hooks$", "repo-core-0036", &[][..]),
             ("(?s)^First\\ commit\\ created$", "repo-core-0278", &[][..]),
             ("(?s)^Fix\\ outgoing\\ history$", "repo-core-3118", &[][..]),
             ("(?s)^Delete\\ remote\\ branch$", "repo-core-3491", &[][..]),
@@ -791,7 +821,6 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Background\\ fetch$", "repo-core-2899", &[][..]),
             ("(?s)^Show\\ that\\ window$", "repo-core-3042", &[][..]),
             ("(?s)^Move\\ commit\\ down$", "repo-core-3175", &[][..]),
-            ("(?s)^Push\\ for\\ review$", "repo-core-0031", &[][..]),
             ("(?s)^Toggle\\ terminal$", "repo-core-0061", &[][..]),
             ("(?s)^network\\ offline$", "repo-core-0063", &[][..]),
             ("(?s)^Working\\ changes$", "repo-core-0079", &[][..]),
@@ -815,7 +844,6 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Create\\ branch…$", "repo-core-4203", &[][..]),
             ("(?s)^LFS:\\ Storage…$", "repo-core-0132", &[][..]),
             ("(?s)^Create\\ branch$", "repo-core-0140", &[][..]),
-            ("(?s)^Mark\\ resolved$", "repo-core-0179", &[][..]),
             ("(?s)^Use\\ it\\ anyway$", "repo-core-0534", &[][..]),
             ("(?s)^Stash\\ changes$", "repo-core-1492", &[][..]),
             ("(?s)^Pull\\ \\(rebase\\)$", "repo-core-3095", &[][..]),
@@ -823,7 +851,6 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Remove\\ remote$", "repo-core-3500", &[][..]),
             ("(?s)^New\\ terminal$", "repo-core-0068", &[][..]),
             ("(?s)^Cut\\ release…$", "repo-core-0139", &[][..]),
-            ("(?s)^Set\\ identity$", "repo-core-0148", &[][..]),
             ("(?s)^Add\\ worktree$", "repo-core-1535", &[][..]),
             ("(?s)^Apply\\ patch…$", "repo-core-2630", &[][..]),
             ("(?s)^LFS:\\ Locks…$", "repo-core-0131", &[][..]),
@@ -832,49 +859,40 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Go\\ offline$", "repo-core-0064", &[][..]),
             ("(?s)^LFS:\\ Fetch$", "repo-core-0126", &[][..]),
             ("(?s)^Create\\ tag$", "repo-core-0141", &[][..]),
+            ("(?s)^Use\\ theirs$", "repo-core-0725", &[][..]),
             ("(?s)^Hard\\ reset$", "repo-core-3355", &[][..]),
-            ("(?s)^Drop\\ stash$", "repo-core-3514", &[][..]),
             ("(?s)^Delete\\ tag$", "repo-core-3546", &[][..]),
-            ("(?s)^DVC:\\ Pull$", "repo-core-0020", &[][..]),
             ("(?s)^Go\\ online$", "repo-core-0062", &[][..]),
             ("(?s)^conflicts$", "repo-core-0120", &[][..]),
             ("(?s)^submodule$", "repo-core-0123", &[][..]),
             ("(?s)^LFS:\\ Pull$", "repo-core-0129", &[][..]),
             ("(?s)^Note\\ why…$", "repo-core-0546", &[][..]),
-            ("(?s)^Stage\\ all$", "repo-core-0832", &[][..]),
             ("(?s)^machines$", "repo-core-0041", &[][..]),
             ("(?s)^recovery$", "repo-core-0059", &[][..]),
             ("(?s)^terminal$", "repo-core-0069", &[][..]),
             ("(?s)^settings$", "repo-core-0125", &[][..]),
+            ("(?s)^Use\\ mine$", "repo-core-0727", &[][..]),
             ("(?s)^staging$", "repo-core-0027", &[][..]),
             ("(?s)^release$", "repo-core-0138", &[][..]),
-            ("(?s)^Unstage$", "repo-core-0844", &[][..]),
-            ("(?s)^Discard$", "repo-core-0858", &[][..]),
             ("(?s)^remote$", "repo-core-0034", &[][..]),
             ("(?s)^absorb$", "repo-core-0050", &[][..]),
-            ("(?s)^Commit$", "repo-core-0056", &[][..]),
             ("(?s)^Reflog$", "repo-core-0058", &[][..]),
-            ("(?s)^Reload$", "repo-core-0070", &[][..]),
             ("(?s)^doctor$", "repo-core-0104", &[][..]),
             ("(?s)^folder$", "repo-core-0112", &[][..]),
             ("(?s)^owners$", "repo-core-0117", &[][..]),
             ("(?s)^builds$", "repo-core-0136", &[][..]),
             ("(?s)^Squash$", "repo-core-2444", &[][..]),
-            ("(?s)^Revert$", "repo-core-3310", &[][..]),
+            ("(?s)^Unlock$", "repo-core-3591", &[][..]),
             ("(?s)^Search$", "repo-core-4193", &[][..]),
             ("(?s)^files$", "repo-core-0025", &[][..]),
-            ("(?s)^Fetch$", "repo-core-0029", &[][..]),
             ("(?s)^stash$", "repo-core-0047", &[][..]),
             ("(?s)^agent$", "repo-core-0106", &[][..]),
             ("(?s)^issue$", "repo-core-0134", &[][..]),
-            ("(?s)^Amend$", "repo-core-0358", &[][..]),
             ("(?s)^Mixed$", "repo-core-0376", &[][..]),
-            ("(?s)^Stage$", "repo-core-0836", &[][..]),
+            ("(?s)^Apply$", "repo-core-0872", &[][..]),
             ("(?s)^above$", "repo-core-2442", &[][..]),
             ("(?s)^below$", "repo-core-2443", &[][..]),
             ("(?s)^Fixup$", "repo-core-2446", &[][..]),
-            ("(?s)^Pull$", "repo-core-0030", &[][..]),
-            ("(?s)^Push$", "repo-core-0032", &[][..]),
             ("(?s)^Undo$", "repo-core-0051", &[][..]),
             ("(?s)^Redo$", "repo-core-0052", &[][..]),
             ("(?s)^Soft$", "repo-core-0373", &[][..]),
@@ -884,71 +902,49 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^from$", "repo-core-1101", &[][..]),
             ("(?s)^Move$", "repo-core-2441", &[][..]),
             ("(?s)^into$", "repo-core-2445", &[][..]),
+            ("(?s)^Lock$", "repo-core-3593", &[][..]),
             ("(?s)^log$", "repo-core-0067", &[][..]),
             ("(?s)^lfs$", "repo-core-0127", &[][..]),
+            ("(?s)^Pop$", "repo-core-0871", &[][..]),
             ("(?s)^Add$", "repo-core-0976", &[][..]),
             ("(?s)^to$", "repo-core-1102", &[][..]),
             ("(?s)^Go\\ to\\ line\\ (.*?)\\ of\\ the\\ file\\ before\\ the\\ change$", "repo-core-2040", &[("o", false)][..]),
-            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\((.*?)\\)$", "repo-core-0121", &[("unused", true)][..]),
-            ("(?s)^(.*?)\\ \\(where\\ the\\ repository\\ is\\)$", "repo-core-1418", &[("label", false)][..]),
+            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\(([0-9]+))$", "repo-core-0121", &[("unused", true)][..]),
             ("(?s)^Interactive\\ rebase\\ (.*?)\\ onto\\ (.*?)…$", "repo-core-2988", &[("target", false), ("at", false)][..]),
             ("(?s)^Interactive\\ rebase\\ onto\\ (.*?)$", "repo-core-3342", &[("onto-label", false)][..]),
             ("(?s)^Revert\\ a\\ hunk\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3311", &[("path", false), ("hash", false)][..]),
             ("(?s)^Keep\\ both\\ versions\\ of\\ (.*?)$", "repo-core-0590", &[("path", false)][..]),
             ("(?s)^Revert\\ (.*?)\\ as\\ changed\\ in\\ (.*?)$", "repo-core-3309", &[("path", false), ("hash", false)][..]),
-            ("(?s)^Revert\\ (.*?)\\ line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("s", false), ("path", false), ("hash", false)][..]),
+            ("(?s)^Revert\\ ([0-9]+) line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("s", false), ("path", false), ("hash", false)][..]),
             ("(?s)^(.*?)\\ \\(its\\ fixup!\\ commit\\)$", "repo-core-2538", &[("label", false)][..]),
             ("(?s)^Rebase\\ commit\\ (.*?),\\ (.*?),\\ (.*?),\\ (.*?)$", "repo-core-3249", &[("hash", false), ("summary", false), ("author", false), ("label", false)][..]),
             ("(?s)^Edit\\ the\\ message\\ of\\ (.*?)$", "repo-core-3321", &[("hash", false)][..]),
-            ("(?s)^Create\\ release\\ tag\\ (.*?)$", "repo-core-1227", &[("name", false)][..]),
             ("(?s)^Create\\ patch\\ from\\ (.*?)…$", "repo-core-2994", &[("at", false)][..]),
-            ("(?s)^Checkout\\ and\\ pull\\ (.*?)$", "repo-core-0340", &[("branch", false)][..]),
             ("(?s)^Commit\\ fixup!\\ for\\ (.*?)$", "repo-core-2529", &[("hash", false)][..]),
             ("(?s)^Create\\ branch\\ at\\ (.*?)…$", "repo-core-2990", &[("at", false)][..]),
-            ("(?s)^Fast\\-forward\\ (.*?)\\ to\\ (.*?)$", "repo-core-0011", &[("current", false), ("name", false)][..]),
             ("(?s)^Export\\ bundle\\ to\\ (.*?)$", "repo-core-0267", &[("file", false)][..]),
-            ("(?s)^Fast\\-forward\\ (.*?)\\ to\\ (.*?)$", "repo-core-2425", &[("branch", false), ("label", false)][..]),
             ("(?s)^Update\\ submodule\\ (.*?)$", "repo-core-2844", &[("path", false)][..]),
             ("(?s)^Reset\\ (.*?)\\ to\\ here…$", "repo-core-2986", &[("target", false)][..]),
             ("(?s)^Create\\ tag\\ at\\ (.*?)…$", "repo-core-2992", &[("at", false)][..]),
             ("(?s)^Open\\ (.*?)\\ in\\ editor$", "repo-core-3001", &[("path", false)][..]),
-            ("(?s)^Stop\\ tracking\\ (.*?)$", "repo-core-0348", &[("upstream", false)][..]),
-            ("(?s)^Create\\ branch\\ (.*?)$", "repo-core-1218", &[("name", false)][..]),
-            ("(?s)^Rebase\\ (.*?)\\ onto\\ (.*?)$", "repo-core-0013", &[("current", false), ("name", false)][..]),
-            ("(?s)^Merge\\ (.*?)\\ into\\ (.*?)$", "repo-core-0006", &[("name", false), ("current", false)][..]),
-            ("(?s)^Cherry\\-pick\\ (.*?)$", "repo-core-0014", &[("hash", false)][..]),
-            ("(?s)^Cherry\\-pick\\ (.*?)$", "repo-core-0370", &[("short", false)][..]),
-            ("(?s)^(.*?)\\ picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("s", false)][..]),
-            ("(?s)^Cherry\\-pick\\ (.*?)$", "repo-core-2982", &[("at", false)][..]),
-            ("(?s)^(.*?)\\ notes\\ “(.*?)”\\ (.*?)\\ (.*?)$", "repo-core-1100", &[("Push", false), ("namespace", false), ("to", false), ("remote", false)][..]),
-            ("(?s)^Create\\ tag\\ (.*?)$", "repo-core-1228", &[("name", false)][..]),
+            ("(?s)^([0-9]+) picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("s", false)][..]),
+            ("(?s)^(.*?)\\ notes\\ “(.*?)”\\ (.*?)\\ (.*?)$", "repo-core-1100", &[("Push", false), ("namespace", false), ("", false), ("remote", false)][..]),
             ("(?s)^Rename\\ (.*?)\\ to\\ (.*?)$", "repo-core-1233", &[("old", false), ("new", false)][..]),
-            ("(?s)^Go\\ to\\ line\\ (.*?)$", "repo-core-2039", &[("n", true)][..]),
-            ("(?s)^Push\\ after\\ (.*?)$", "repo-core-2949", &[("label", false)][..]),
-            ("(?s)^(.*?)\\ (.*?)\\ line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("s", false), ("path", false)][..]),
+            ("(?s)^Go\\ to\\ line\\ ([0-9]+)", "repo-core-2039", &[("n", true)][..]),
+            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+) line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("s", false), ("path", false)][..]),
             ("(?s)^Fold\\ into\\ (.*?)$", "repo-core-2530", &[("hash", false)][..]),
             ("(?s)^(.*?)\\ worktree\\ (.*?)$", "repo-core-3595", &[("label", false), ("name", false)][..]),
-            ("(?s)^Checkout\\ (.*?)$", "repo-core-0339", &[("target", false)][..]),
-            ("(?s)^Checkout\\ (.*?)$", "repo-core-0341", &[("local", false)][..]),
-            ("(?s)^Continue\\ (.*?)$", "repo-core-0352", &[("to-lowercase", false)][..]),
-            ("(?s)^Push\\ (.*?)\\ to\\ (.*?)$", "repo-core-1533", &[("branch", false), ("upstream", false)][..]),
             ("(?s)^Push\\ tag\\ (.*?)$", "repo-core-3541", &[("name", false)][..]),
             ("(?s)^Doctor:\\ (.*?)$", "repo-core-0114", &[("title", false)][..]),
             ("(?s)^Unstage\\ (.*?)$", "repo-core-3010", &[("path", false)][..]),
-            ("(?s)^Ignore\\ (.*?)$", "repo-core-0155", &[("pattern", false)][..]),
-            ("(?s)^Create\\ (.*?)$", "repo-core-0360", &[("noun", false)][..]),
-            ("(?s)^Revert\\ (.*?)$", "repo-core-0371", &[("short", false)][..]),
+            ("(?s)^Create\\ (pull request|merge request)$", "repo-core-0360", &[("noun", false)][..]),
             ("(?s)^Remote\\ (.*?)$", "repo-core-1468", &[("name", false)][..]),
-            ("(?s)^Revert\\ (.*?)$", "repo-core-2984", &[("at", false)][..]),
-            ("(?s)^Abort\\ (.*?)$", "repo-core-0016", &[("what", false)][..]),
             ("(?s)^(.*?):\\ done$", "repo-core-0269", &[("label", false)][..]),
-            ("(?s)^(.*?)\\ reset$", "repo-core-0387", &[("label", false)][..]),
+            ("(?s)^(Soft|Mixed|Keep|Hard)\\ reset$", "repo-core-0387", &[("label", false)][..]),
             ("(?s)^Track\\ (.*?)$", "repo-core-1532", &[("upstream", false)][..]),
-            ("(?s)^(.*?)\\ reset$", "repo-core-2659", &[("label", false)][..]),
+            ("(?s)^(Soft|Mixed|Keep|Hard)\\ reset$", "repo-core-2659", &[("label", false)][..]),
             ("(?s)^Stage\\ (.*?)$", "repo-core-3007", &[("path", false)][..]),
-            ("(?s)^Apply\\ (.*?)$", "repo-core-3026", &[("file", false)][..]),
             ("(?s)^Fetch\\ (.*?)$", "repo-core-3495", &[("name", false)][..]),
-            ("(?s)^Apply\\ (.*?)$", "repo-core-3510", &[("name", false)][..]),
             ("(?s)^(.*?)\\ for\\ (.*?)$", "repo-core-0729", &[("label", false), ("path", false)][..]),
             ("(?s)^Open\\ (.*?)$", "repo-core-3003", &[("path", false)][..]),
             ("(?s)^Pop\\ (.*?)$", "repo-core-3512", &[("name", false)][..]),
@@ -964,17 +960,37 @@ fn operation_display(label: &str, depth: usize) -> String {
             let Some(captures) = template.pattern.captures(label) else {
                 continue;
             };
+            // A template whose leading value is another operation must recognize it.
+            // This prevents generic label/path forms from translating custom commands.
+            if !matches!(template.id, "repo-core-0164" | "repo-core-2447")
+                && template
+                    .args
+                    .first()
+                    .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
+            {
+                let inner = captures.get(1).map_or("", |v| v.as_str());
+                if crate::i18n::language() == crate::i18n::Language::German
+                    && operation_display(inner, depth + 1) == inner
+                {
+                    continue;
+                }
+            }
             let args: Vec<(&str, crate::i18n::Value<'_>)> = template
                 .args
                 .iter()
                 .enumerate()
+                .filter(|(_, (name, _))| !name.is_empty())
                 .map(|(i, (name, numeric))| {
                     let raw = captures.get(i + 1).map_or("", |v| v.as_str());
                     let value = if *numeric {
                         raw.parse::<f64>()
                             .map(Into::into)
                             .unwrap_or_else(|_| raw.into())
-                    } else if matches!(*name, "label" | "verb" | "what" | "to-lowercase") {
+                    } else if !matches!(
+                        template.id,
+                        "repo-core-0164" | "repo-core-2447" | "repo-core-1100"
+                    ) && matches!(*name, "label" | "verb" | "what" | "to-lowercase")
+                    {
                         operation_display(raw, depth + 1).into()
                     } else {
                         raw.into()
@@ -994,7 +1010,11 @@ pub(crate) fn display_status(status: &str) -> String {
         return rendered;
     }
     match status.split_once(": ") {
-        Some((label, detail)) => format!("{}: {detail}", display_operation(label)),
-        None => status.to_owned(),
+        Some((label, detail)) => format!(
+            "{}: {}",
+            display_operation(label),
+            crate::git::display_error(&crate::forge::inbox::display_error(detail))
+        ),
+        None => crate::git::display_error(&crate::forge::inbox::display_error(status)),
     }
 }

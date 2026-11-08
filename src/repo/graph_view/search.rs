@@ -4,7 +4,7 @@
 use egui::{Key, Modifiers, Stroke, Ui};
 
 use super::suggest::{self, Listing};
-use crate::git::search_query::{DATE_FORMATS, Operator};
+use crate::git::search_query::{Operator, date_formats};
 use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
@@ -318,7 +318,7 @@ fn operators_help() -> String {
     }
     help.push_str(&crate::i18n::message(
         "repo-core-2726",
-        &[("DATE-FORMATS", format!("{}", DATE_FORMATS).into())],
+        &[("DATE-FORMATS", date_formats().into())],
     ));
     help
 }

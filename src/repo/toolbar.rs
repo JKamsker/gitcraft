@@ -733,8 +733,6 @@ pub(super) fn headline(msg: &str) -> String {
     let (label, body) = msg.split_once(": ").unwrap_or(("", msg));
     let conflicts = body.lines().filter(|l| l.starts_with("CONFLICT")).count();
     if conflicts > 0 {
-        let files = if conflicts == 1 { "file" } else { "files" };
-        let them = |n: usize| if n == 1 { "it" } else { "them" };
         return match super::conflict::rerere::reused_count(body) {
             0 => crate::i18n::message(
                 "repo-core-3702",

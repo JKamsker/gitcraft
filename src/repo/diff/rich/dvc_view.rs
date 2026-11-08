@@ -119,7 +119,6 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
             };
             ui.label(RichText::new(size).font(theme::semibold(16.0)));
             if let Some(files) = x.files {
-                let s = if files == 1 { "" } else { "s" };
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-2180",

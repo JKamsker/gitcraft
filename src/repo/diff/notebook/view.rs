@@ -180,7 +180,7 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         egui::CollapsingHeader::new(RichText::new(text).color(t.text_faint).small())
-            .id_salt((crate::i18n::text("repo-core-0610"), first))
+            .id_salt(("unchanged", first))
             .show(ui, |ui| {
                 for c in cells {
                     let Some(cell) = c.new.as_ref() else { continue };
@@ -271,7 +271,16 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
                         .color(t.text_dim)
                         .small(),
                 )
-                .id_salt(("cell-metadata", c.number, word))
+                .id_salt((
+                    "cell-metadata",
+                    c.number,
+                    match c.status {
+                        Status::Added => "added",
+                        Status::Removed => "removed",
+                        Status::Modified => "changed",
+                        Status::Unchanged => "",
+                    },
+                ))
                 .show(ui, |ui| {
                     let (a, b) = (
                         c.old.as_ref().map_or("", |c| c.metadata.as_str()),

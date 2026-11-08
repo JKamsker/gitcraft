@@ -705,7 +705,7 @@ impl RepoTab {
             return false;
         }
         ui.add_space(8.0);
-        let lines = if chosen == 1 { "line" } else { "lines" };
+
         let picks: &[Pick] = if file.area == Area::Staged {
             &[Pick::Unstage]
         } else {
@@ -747,7 +747,6 @@ impl RepoTab {
         // Laid out right to left. The lines' buttons take the place of the file's, which stays
         // in the file's menu, so the header keeps room for the rest.
         if lines && revertable && chosen > 0 {
-            let noun = if chosen == 1 { "line" } else { "lines" };
             let b = ui
                 .add_enabled(
                     idle,

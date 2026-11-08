@@ -166,7 +166,7 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             &[
                 ("hash", format!("{}", short(&link.hash)).into()),
                 ("author", format!("{}", link.author).into()),
-                ("date", format!("{}", link.date).into()),
+                ("date", crate::i18n::date_iso(&link.date).into()),
                 ("text", format!("{}", link.text).into()),
             ],
         ));
@@ -175,7 +175,7 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
     ui.ctx().accesskit_node_builder(resp.id, |node| {
         node.set_description(crate::a11y::labels::join([
             link.author.as_str(),
-            link.date.as_str(),
+            &crate::i18n::date_iso(&link.date),
             link.text.as_str(),
         ]));
     });

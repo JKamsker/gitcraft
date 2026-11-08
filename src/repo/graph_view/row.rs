@@ -540,7 +540,7 @@ fn trailing_columns(ui: &Ui, painter: &Painter, t: &Tokens, row: &Row, now: i64)
         painter.text(
             pos2(rect.right() - cols.date, mid),
             Align2::LEFT_CENTER,
-            &commit.date,
+            crate::i18n::date_iso(&commit.date),
             theme::mono(11.0),
             t.text_faint,
         );

@@ -75,7 +75,7 @@ impl RepoTab {
                                     let text = format!("{} <{}>", a.name, a.email);
                                     let r =
                                         ui.add_enabled(!busy, egui::Button::new(text).truncate());
-                                    let plural = if a.commits == 1 { "" } else { "s" };
+
                                     if r.on_hover_text(crate::i18n::message(
                                         "repo-core-0945",
                                         &[("commits", (a.commits).into())],

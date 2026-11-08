@@ -3050,3 +3050,6 @@ repo-core-fold-staged = { $fixup ->
            *[other] Die { $count } bereitgestellten Dateien werden in diesen Commit eingearbeitet:
         }
     }
+
+repo-core-operation-dco = Commits von { $branch } mit Signed-off-by versehen
+repo-core-operation-dco-here = Commits von { $branch } mit Signed-off-by versehen (nur hier)

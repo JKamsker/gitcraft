@@ -263,6 +263,7 @@ impl Form {
                 let mapping =
                     crate::git::import_mapping(&self.preview.refs, &self.selected, &self.prefix);
                 egui::CollapsingHeader::new(crate::i18n::text("repo-core-1258"))
+                    .id_salt("Exact new refs (existing names refuse the transaction)")
                     .default_open(true)
                     .show(ui, |ui| {
                         egui::ScrollArea::vertical()

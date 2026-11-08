@@ -307,17 +307,11 @@ fn worktree_menu_items(
     if !wt.main {
         ui.separator();
         let (label, args) = if wt.locked.is_some() {
-            (
-                crate::i18n::text("repo-core-3591"),
-                vec!["worktree", "unlock", path.as_str()],
-            )
+            ("Unlock", vec!["worktree", "unlock", path.as_str()])
         } else {
-            (
-                crate::i18n::text("repo-core-3593"),
-                vec!["worktree", "lock", path.as_str()],
-            )
+            ("Lock", vec!["worktree", "lock", path.as_str()])
         };
-        if crate::menu_item::MenuItem::new(label)
+        if crate::menu_item::MenuItem::new(crate::repo::messages::display_operation(label))
             .icon("command")
             .enabled(idle)
             .show(ui)

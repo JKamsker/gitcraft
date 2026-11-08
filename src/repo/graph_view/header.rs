@@ -90,7 +90,7 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             let mut compact = next.compact_graph;
             if ui
                 .checkbox(&mut compact, crate::i18n::text("repo-core-2620"))
-                .on_hover_text(settings::COMPACT_TIP)
+                .on_hover_text(settings::compact_tip())
                 .changed()
             {
                 next.set_compact_graph(compact);

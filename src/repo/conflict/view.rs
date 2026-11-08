@@ -177,19 +177,14 @@ impl ConflictEditor {
             }
         }
         for (label, side, tip) in [
-            (
-                crate::i18n::text("repo-core-0725"),
-                theirs,
-                crate::i18n::text("repo-core-0726"),
-            ),
-            (
-                crate::i18n::text("repo-core-0727"),
-                mine,
-                crate::i18n::text("repo-core-0728"),
-            ),
+            ("Use theirs", theirs, crate::i18n::text("repo-core-0726")),
+            ("Use mine", mine, crate::i18n::text("repo-core-0728")),
         ] {
             if ui
-                .add_enabled(idle, egui::Button::new(label))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::repo::messages::display_operation(label)),
+                )
                 .on_hover_text(tip)
                 .clicked()
             {
