@@ -128,7 +128,9 @@ fn missing_donor_and_stale_alternate_are_diagnosed_without_detaching() -> Result
     {
         // The prepared plan owns the alternate without write/delete sharing.
         // A stale writer must be refused by the kernel before changing any bytes.
-        let error = std::fs::write(&alt, &changed).expect_err("Prepared alternate must be locked");
+        let error = std::fs::write(&alt, &changed)
+            .err()
+            .ok_or("Prepared alternate must be locked")?;
         assert_eq!(error.raw_os_error(), Some(32));
         assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, old);
         drop(model);

@@ -344,8 +344,9 @@ mod tests {
         #[cfg(windows)]
         {
             let before = std::fs::read(r.path().join(".git/index")).map_err(|e| e.to_string())?;
-            let error =
-                resolve(&runner, &conflict, &tag).expect_err("Windows publisher is unsupported");
+            let error = resolve(&runner, &conflict, &tag)
+                .err()
+                .ok_or("Windows publisher is unsupported")?;
             assert_eq!(Some(error.as_str()), conflict.recording_blocker.as_deref());
             assert!(error.contains("requires the shared macOS/Linux native publisher"));
             assert_eq!(
