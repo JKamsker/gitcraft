@@ -10,21 +10,27 @@
 pub(crate) mod bundle;
 mod cache;
 mod dag;
+pub(crate) mod display;
 mod machine;
 pub(crate) mod observe;
+pub(crate) mod presentation;
 mod runner;
 mod search;
 mod session;
 mod verdict;
 mod workspace;
+#[cfg(test)]
+pub(crate) use workspace::{close_finished, supplied_transfer};
 
 #[cfg(test)]
 mod tests;
 
 pub use cache::TreeCache;
 pub use machine::Machine;
-pub(crate) use session::shutdown;
 pub use session::{Event, Handle, Outcome, Setup, start};
+#[cfg(test)]
+pub(crate) use session::{cleanup_warning, done_with_presentation};
+pub(crate) use session::{shutdown, start_with_presentation};
 pub use verdict::Verdict;
 
 /// The most commits tested at once.

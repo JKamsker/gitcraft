@@ -1,5 +1,6 @@
 use super::Outcome;
 use crate::git::{BundlePreview, BundleRef};
+use crate::parallel_bisect::presentation::{self, Presentation};
 use crate::repo::Action;
 use crate::theme::Tokens;
 use egui::Ui;
@@ -70,6 +71,7 @@ pub(super) fn export(
 
 enum Event {
     Done(bool, Result<Vec<BundleRef>, String>),
+    DoneWithPresentation(bool, Result<Vec<BundleRef>, String>, Option<Presentation>),
 }
 pub struct Form {
     repo: std::path::PathBuf,
@@ -86,6 +88,7 @@ pub struct Form {
     verified: bool,
     imported: Vec<BundleRef>,
     error: Option<String>,
+    error_presentation: Option<Presentation>,
 }
 impl super::Dialog {
     pub(in crate::repo) fn bundle_incoming(
@@ -111,11 +114,13 @@ impl super::Dialog {
             verified: false,
             imported: Vec::new(),
             error: None,
+            error_presentation: None,
         }))
     }
 }
 impl Form {
     fn start(&mut self, import: bool, ctx: &egui::Context) {
+        self.error_presentation = None;
         let pool = match crate::tasks::pool() {
             Ok(pool) => pool,
             Err(e) => {
@@ -145,11 +150,23 @@ impl Form {
                 failed_ctx.request_repaint();
             })),
             Box::new(move || {
+                let mut presentation = None;
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    crate::git::check_bundle(&repo, &preview, &selected, &prefix, import)
+                    crate::git::check_bundle_with_presentation(
+                        &repo,
+                        &preview,
+                        &selected,
+                        &prefix,
+                        import,
+                        &mut presentation,
+                    )
                 }))
-                .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1242").into()));
-                let _ = tx.send(Event::Done(import, result));
+                .unwrap_or_else(|_| {
+                    presentation = None;
+                    Err(crate::i18n::text("repo-core-1242").into())
+                });
+                presentation::retain_error(&result, &mut presentation);
+                let _ = tx.send(Event::DoneWithPresentation(import, result, presentation));
                 ctx.request_repaint();
             }),
         );
@@ -162,8 +179,16 @@ impl Form {
             Err(e) => self.error = Some(e.into()),
         }
     }
+    fn painted_error(&self, error: &str) -> String {
+        if self.error_presentation.is_some() {
+            presentation::error(error, self.error_presentation.as_ref())
+        } else {
+            crate::git::display_error(&crate::forge::inbox::display_error(error))
+        }
+    }
     fn receive(&mut self) {
-        while let Ok(Event::Done(import, result)) = self.rx.try_recv() {
+        while let Ok(event) = self.rx.try_recv() {
+            let (import, result) = incoming(event, &mut self.error_presentation);
             self.active = None;
             // Preserve ownership/cleanup failures even after the user pressed Stop.
             match result {
@@ -303,10 +328,7 @@ impl Form {
                     }
                 }
                 if let Some(error) = &self.error {
-                    ui.colored_label(
-                        t.danger,
-                        crate::git::display_error(&crate::forge::inbox::display_error(error)),
-                    );
+                    ui.colored_label(t.danger, self.painted_error(error));
                 }
                 if self.active.is_some() {
                     ui.add(crate::spinner::Spinner::new());
@@ -537,5 +559,176 @@ mod recording_import_ui_tests {
         assert!(form.active.is_none(), "rendering must not submit a job");
         assert!(!form.consent && !form.confirm && !form.verified);
         Ok(())
+    }
+}
+
+// The actual event-to-form receipt seam; raw errors stay in Form.error.
+fn incoming(
+    event: Event,
+    receipt: &mut Option<Presentation>,
+) -> (bool, Result<Vec<BundleRef>, String>) {
+    let (import, result, mut presentation) = match event {
+        Event::Done(import, result) => (import, result, None),
+        Event::DoneWithPresentation(import, result, presentation) => (import, result, presentation),
+    };
+    presentation::retain_error(&result, &mut presentation);
+    *receipt = presentation;
+    (import, result)
+}
+
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    use crate::parallel_bisect::{bundle, close_finished};
+    fn form() -> Box<Form> {
+        let super::super::Dialog::BundleIncoming(form) = super::super::Dialog::bundle_incoming(
+            "/supplied/repo".into(),
+            Default::default(),
+            "supplied".into(),
+            BundlePreview {
+                refs: vec![],
+                prerequisites: vec![],
+                verification_error: None,
+                bytes: std::sync::Arc::new(vec![]),
+                digest: "opaque".into(),
+                repository: "opaque".into(),
+            },
+        ) else {
+            unreachable!()
+        };
+        form
+    }
+    #[test]
+    fn execution_bridge_bundle_captures_real_aggregates_through_event_form_and_paint() {
+        let primary =
+            "Contained Git failed (1): provider; quarantine cleanup failed: provider detail";
+        let cleanup = "cleanup; quarantine cleanup failed: repeated); $HOME {raw}\nunknown";
+        let mut receipt = None;
+        let mut cases = Vec::new();
+        let raw = bundle::completed_with_presentation(
+            Err(primary.into()),
+            Err(cleanup.into()),
+            false,
+            &mut receipt,
+            None,
+        )
+        .expect_err("aggregate");
+        cases.push((
+            raw,
+            receipt.take(),
+            "die Quarantäne konnte nicht bereinigt werden",
+        ));
+        let keep =
+            bundle::keep_retained(primary.into(), "opaque-hash; pack-user.keep", &mut receipt);
+        let raw = bundle::completed_with_presentation(Err(keep), Ok(()), true, &mut receipt, None)
+            .expect_err("keep");
+        cases.push((raw, receipt.take(), "die eigene Schutzmarkierung"));
+        let lease = close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
+            .expect_err("lease");
+        for import in [false, true] {
+            let raw = bundle::completed_with_presentation(
+                Ok(()),
+                Err(lease.clone()),
+                import,
+                &mut None,
+                receipt.clone(),
+            )
+            .expect_err("completion");
+            let mut output = None;
+            let result = bundle::completed_with_presentation(
+                Ok(()),
+                Err(lease.clone()),
+                import,
+                &mut output,
+                receipt.clone(),
+            );
+            assert_eq!(result, Err(raw.clone()));
+            cases.push((raw, output, "Freigabe der Besitzreservierung"));
+        }
+        // An outer aggregate replaces the keep receipt and keeps its primary opaque.
+        let keep = bundle::keep_retained(primary.into(), "hash", &mut receipt);
+        let raw = bundle::completed_with_presentation(
+            Err(keep.clone()),
+            Err(cleanup.into()),
+            true,
+            &mut receipt,
+            None,
+        )
+        .expect_err("outer");
+        cases.push((
+            raw,
+            receipt.take(),
+            "die Quarantäne konnte nicht bereinigt werden",
+        ));
+        for (raw, receipt, german) in cases {
+            let mut form = form();
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    Err(raw.clone()),
+                    receipt.clone(),
+                ))
+                .expect("inert channel");
+            form.receive();
+            assert_eq!(form.error.as_deref(), Some(raw.as_str()));
+            let mut paints = Vec::new();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let painted = form.painted_error(form.error.as_deref().expect("raw state"));
+                assert!(painted.contains(primary));
+                if locale == "de" {
+                    assert!(painted.contains(german), "{painted}");
+                }
+                paints.push(painted);
+            }
+            assert_eq!(paints[0], paints[2]);
+            assert_ne!(paints[0], paints[1]);
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    Err("stale unrelated".into()),
+                    receipt,
+                ))
+                .expect("channel");
+            form.receive();
+            assert!(form.error_presentation.is_none());
+            form.tx
+                .send(Event::Done(false, Ok(vec![])))
+                .expect("channel");
+            form.receive();
+            assert!(form.error.is_none() && form.error_presentation.is_none());
+        }
+        for unknown in [
+            "provider text; workspace cleanup: provider detail",
+            "provider; quarantine cleanup failed: provider detail",
+            "provider; transfer cleanup: provider detail",
+            "provider; lease release: provider detail",
+            "provider; owned pack-hash.keep retained",
+        ] {
+            let mut receipt = None;
+            let result = bundle::completed_with_presentation(
+                Err(unknown.into()),
+                Ok(()),
+                false,
+                &mut receipt,
+                None,
+            );
+            let mut form = form();
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    result.map(|()| vec![]),
+                    receipt,
+                ))
+                .expect("channel");
+            form.receive();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert_eq!(
+                    form.painted_error(form.error.as_deref().expect("raw")),
+                    unknown
+                );
+            }
+        }
     }
 }

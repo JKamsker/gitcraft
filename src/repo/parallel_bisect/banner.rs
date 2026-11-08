@@ -35,7 +35,11 @@ impl RepoTab {
         });
         if let Some(warning) = &view.warning {
             let t = Tokens::get(ui.ctx());
-            ui.label(RichText::new(warning).small().color(t.warning));
+            ui.label(
+                RichText::new(self.parallel.paint.warning(warning))
+                    .small()
+                    .color(t.warning),
+            );
         }
     }
 
@@ -132,6 +136,7 @@ impl RepoTab {
                 );
             }
             Outcome::Failed(e) => {
+                let e = self.parallel.paint.error(e);
                 let first = e.lines().next().unwrap_or_default();
                 ui.add(egui::Label::new(RichText::new(first).color(t.danger)).truncate())
                     .on_hover_text(e.as_str());

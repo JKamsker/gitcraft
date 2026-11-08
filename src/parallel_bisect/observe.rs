@@ -164,6 +164,18 @@ pub(crate) fn run(
     mode: Mode,
     timeout: Duration,
 ) -> Result<Observation, String> {
+    run_with_presentation(repo, hash, command, mode, timeout, &mut None)
+}
+
+pub(crate) fn run_with_presentation(
+    repo: &Path,
+    hash: &str,
+    command: &str,
+    mode: Mode,
+    timeout: Duration,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<Observation, String> {
+    *presentation = None;
     if !matches!(hash.len(), 40 | 64) || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("A pinned full commit ID is required".into());
     }
@@ -253,7 +265,9 @@ pub(crate) fn run(
         }
         Ok(repeated(values.remove(0), values.remove(0)))
     })();
-    finish(result, ws.close())
+    let mut cleanup_presentation = None;
+    let cleanup = ws.close_with_presentation(&mut cleanup_presentation);
+    finish_with_presentation(result, cleanup, presentation, cleanup_presentation)
 }
 fn successful(exit: git::Exit) -> Result<(), String> {
     if exit.code == Some(0) {
@@ -268,6 +282,29 @@ fn successful(exit: git::Exit) -> Result<(), String> {
         ))
     }
 }
+pub(crate) fn finish_with_presentation(
+    result: Result<Observation, String>,
+    cleanup: Result<(), String>,
+    presentation: &mut Option<super::presentation::Presentation>,
+    cleanup_presentation: Option<super::presentation::Presentation>,
+) -> Result<Observation, String> {
+    use super::presentation::{Cleanup, Presentation};
+    *presentation = match (&result, &cleanup) {
+        (Err(primary), Err(cleanup)) => Some(Presentation::capture(
+            format!("{primary}; workspace cleanup: {cleanup}"),
+            Cleanup::ObservationFinish {
+                primary: primary.clone(),
+                cleanup: cleanup.clone(),
+            },
+        )),
+        (Ok(_), Err(_)) => cleanup_presentation,
+        _ => None,
+    };
+    let result = finish(result, cleanup);
+    super::presentation::retain_error(&result, presentation);
+    result
+}
+
 fn finish(
     result: Result<Observation, String>,
     cleanup: Result<(), String>,
@@ -405,6 +442,61 @@ mod tests {
             Observation::Stable(a.into())
         );
         assert!(parse(Mode::Png, &png(1025, &vec![0; 1025 * 4])?).is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod execution_fluent_r1_tests {
+    use super::{Observation, finish};
+    use crate::parallel_bisect::display::{CleanupContext, cleanup_diagnostic, diagnostic};
+
+    #[test]
+    fn actual_finish_results_need_separate_cleanup_context_for_presentation() -> Result<(), String>
+    {
+        // Supplied Result states only: no parse/run/workspace, sample discovery or cleanup.
+        for (locale, statement) in [
+            ("en-US", "workspace cleanup"),
+            ("de", "Bereinigung des Arbeitsbereichs"),
+        ] {
+            crate::i18n::set_language(locale);
+            for primary in [
+                "Observation checkout failed: object denied",
+                "Observation checkout failed: object denied; workspace cleanup: provider detail (exit 7); stderr: raw\n",
+            ] {
+                let cleanup = "cleanup denied; workspace cleanup: provider detail\n$HOME {detail}";
+                let raw = finish(Err(primary.into()), Err(cleanup.into()))
+                    .err()
+                    .ok_or("expected combined failure")?;
+                assert_eq!(raw, format!("{primary}; workspace cleanup: {cleanup}"));
+                let shown = cleanup_diagnostic(
+                    &raw,
+                    CleanupContext::ObservationFinish { primary, cleanup },
+                );
+                assert_eq!(shown, format!("{primary}; {statement}: {cleanup}"));
+                assert!(shown.contains(primary) && shown.contains(cleanup));
+                assert_eq!(raw, format!("{primary}; workspace cleanup: {cleanup}"));
+            }
+            for unknown in [
+                "provider text; quarantine cleanup failed: provider detail",
+                "provider text; workspace cleanup: provider detail",
+                "provider text; owned pack-01234567.keep retained",
+            ] {
+                for result in [Err(unknown.into()), Ok(Observation::Inconsistent)] {
+                    let cleanup = if result.is_ok() {
+                        Err(unknown.into())
+                    } else {
+                        Ok(())
+                    };
+                    let raw = finish(result, cleanup)
+                        .err()
+                        .ok_or("expected propagated detail")?;
+                    assert_eq!(raw, unknown);
+                    assert_eq!(diagnostic(&raw), unknown);
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
         Ok(())
     }
 }

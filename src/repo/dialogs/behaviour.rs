@@ -1,5 +1,6 @@
 use super::{Outcome, RepoTab};
 use crate::parallel_bisect::observe::{self, Cache, Key, Mode, Observation, Value};
+use crate::parallel_bisect::presentation::{self, Presentation};
 use crate::{git, tasks};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -12,11 +13,14 @@ enum Frame {
     Queued,
     Observed(Observation),
     Failed(String),
+    FailedWithPresentation(String, Presentation),
 }
 enum Event {
     Loaded(Vec<git::BehaviourCommit>),
     Frame(usize, Result<Observation, String>),
     Done(Result<(), String>),
+    FrameWithPresentation(usize, Result<Observation, String>, Option<Presentation>),
+    DoneWithPresentation(Result<(), String>, Option<Presentation>),
 }
 pub struct Form {
     repo: PathBuf,
@@ -37,6 +41,7 @@ pub struct Form {
     configuration: (String, Mode),
     loaded_selection: Option<(String, usize)>,
     error: Option<String>,
+    error_presentation: Option<Presentation>,
     texture: Option<egui::TextureHandle>,
 }
 impl RepoTab {
@@ -75,6 +80,7 @@ impl Form {
             configuration: (String::new(), Mode::Text),
             loaded_selection: None,
             error: None,
+            error_presentation: None,
             texture: None,
         }
     }
@@ -119,6 +125,17 @@ impl Form {
         mutation: bool,
         work: impl FnOnce(&Sender<Event>) -> Result<(), String> + Send + 'static,
     ) {
+        self.submit_with_presentation(ctx, mutation, move |tx, _| work(tx));
+    }
+    fn submit_with_presentation(
+        &mut self,
+        ctx: &egui::Context,
+        mutation: bool,
+        work: impl FnOnce(&Sender<Event>, &mut Option<Presentation>) -> Result<(), String>
+        + Send
+        + 'static,
+    ) {
+        self.error_presentation = None;
         let pool = match tasks::pool() {
             Ok(p) => p,
             Err(e) => {
@@ -142,9 +159,16 @@ impl Form {
                 cancelled_ctx.request_repaint();
             })),
             Box::new(move || {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&tx)))
-                    .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1160").into()));
-                let _ = tx.send(Event::Done(result));
+                let mut presentation = None;
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    work(&tx, &mut presentation)
+                }))
+                .unwrap_or_else(|_| {
+                    presentation = None;
+                    Err(crate::i18n::text("repo-core-1160").into())
+                });
+                presentation::retain_error(&result, &mut presentation);
+                let _ = tx.send(Event::DoneWithPresentation(result, presentation));
                 ctx.request_repaint();
             }),
         );
@@ -163,11 +187,22 @@ impl Form {
             }
         }
     }
+    fn painted_error(&self, raw: &str) -> String {
+        presentation::error(raw, self.error_presentation.as_ref())
+    }
     fn poll(&mut self) {
         let mut changed = false;
         while let Ok(event) = self.rx.try_recv() {
             changed = true;
+            let Some(event) = incoming(event, &mut self.frames, &mut self.error_presentation)
+            else {
+                self.texture = None;
+                continue;
+            };
             match event {
+                Event::FrameWithPresentation(..) | Event::DoneWithPresentation(..) => {
+                    unreachable!("presentation events were consumed")
+                }
                 Event::Loaded(commits) => {
                     self.loaded_selection = Some((self.revision.clone(), self.count));
                     self.commits = commits;
@@ -293,30 +328,46 @@ impl Form {
             let timeout = Duration::from_secs(self.timeout);
             let mut work = Vec::new();
             for i in 0..self.commits.len() {
-                if matches!(self.frames[i], Frame::Unknown | Frame::Failed(_)) {
+                if matches!(
+                    self.frames[i],
+                    Frame::Unknown | Frame::Failed(_) | Frame::FailedWithPresentation(..)
+                ) {
                     self.frames[i] = Frame::Queued;
                     work.push((i, self.commits[i].clone(), self.key(&self.commits[i].tree)));
                 }
             }
             let cache = self.cache.clone();
             let repaint = ui.ctx().clone();
-            self.submit(ui.ctx(), true, move |tx| {
+            self.submit_with_presentation(ui.ctx(), true, move |tx, done_presentation| {
                 for (i, commit, key) in work {
                     if tasks::cancellation().is_cancelled() {
                         break;
                     }
+                    let mut presentation = None;
                     let result = match cache.get(&key) {
                         Some(observation) => Ok(observation),
-                        None => observe::run(&repo, &commit.hash, &command, mode, timeout),
+                        None => observe::run_with_presentation(
+                            &repo,
+                            &commit.hash,
+                            &command,
+                            mode,
+                            timeout,
+                            &mut presentation,
+                        ),
                     };
                     if let Ok(observation) = &result {
                         cache.put(key, observation.clone());
                     }
                     // Publish concrete worker/ownership errors before checking cancellation.
                     let error = result.as_ref().err().cloned();
-                    let _ = tx.send(Event::Frame(i, result));
+                    let _ = tx.send(Event::FrameWithPresentation(
+                        i,
+                        result,
+                        presentation.clone(),
+                    ));
                     repaint.request_repaint();
                     if let Some(error) = error {
+                        *done_presentation = presentation;
                         return Err(error);
                     }
                 }
@@ -340,7 +391,10 @@ impl Form {
             }
         });
         if let Some(e) = &self.error {
-            ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, e);
+            ui.colored_label(
+                crate::theme::Tokens::get(ui.ctx()).danger,
+                self.painted_error(e),
+            );
         }
         if !self.commits.is_empty() {
             if self.mode == Mode::Number {
@@ -380,7 +434,9 @@ impl Form {
                         let status = match frame {
                             Frame::Unknown => crate::i18n::text("repo-core-1181"),
                             Frame::Queued => crate::i18n::text("repo-core-1182"),
-                            Frame::Failed(_) => crate::i18n::text("repo-core-1183"),
+                            Frame::Failed(_) | Frame::FailedWithPresentation(..) => {
+                                crate::i18n::text("repo-core-1183")
+                            }
                             Frame::Observed(Observation::Inconsistent) => {
                                 crate::i18n::text("repo-core-1184")
                             }
@@ -407,8 +463,11 @@ impl Form {
                 Frame::Queued => {
                     ui.label(crate::i18n::text("repo-core-1188"));
                 }
+                Frame::FailedWithPresentation(e, receipt) => {
+                    ui.label(frame_error(e, Some(receipt)));
+                }
                 Frame::Failed(e) => {
-                    ui.label(e);
+                    ui.label(frame_error(e, None));
                 }
                 Frame::Observed(Observation::Inconsistent) => {
                     ui.label(crate::i18n::text("repo-core-1189"));
@@ -619,5 +678,162 @@ mod tests {
         assert_eq!(form.error.as_deref(), Some("workspace cleanup unknown"));
         assert!(form.active.is_none());
         Ok(())
+    }
+}
+
+// Real poll seam, pure over supplied event/state. Success caches never hold receipts.
+fn incoming(
+    event: Event,
+    frames: &mut [Frame],
+    receipt: &mut Option<Presentation>,
+) -> Option<Event> {
+    match event {
+        Event::FrameWithPresentation(i, result, mut presentation) => {
+            presentation::retain_error(&result, &mut presentation);
+            if let Some(frame) = frames.get_mut(i) {
+                *frame = match (result, presentation) {
+                    (Ok(observation), _) => Frame::Observed(observation),
+                    (Err(raw), Some(p)) => Frame::FailedWithPresentation(raw, p),
+                    (Err(raw), None) => Frame::Failed(raw),
+                };
+            }
+            None
+        }
+        Event::DoneWithPresentation(result, mut presentation) => {
+            presentation::retain_error(&result, &mut presentation);
+            *receipt = presentation;
+            Some(Event::Done(result))
+        }
+        event => {
+            // A legacy/unrelated done cannot reuse a previous operation's receipt.
+            if matches!(event, Event::Done(_) | Event::Loaded(_)) {
+                *receipt = None;
+            }
+            Some(event)
+        }
+    }
+}
+
+fn frame_error(raw: &str, receipt: Option<&Presentation>) -> String {
+    presentation::error(raw, receipt)
+}
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    use crate::parallel_bisect::close_finished;
+    #[test]
+    fn execution_bridge_observation_reaches_both_failed_states_and_repaints() {
+        let primary = "Observation checkout failed: provider; workspace cleanup: provider detail";
+        let cleanup =
+            "cleanup); recovery evidence was retained. $HOME; workspace cleanup: repeated";
+        let mut cases = Vec::new();
+        let mut receipt = None;
+        let result = observe::finish_with_presentation(
+            Err(primary.into()),
+            Err(cleanup.into()),
+            &mut receipt,
+            None,
+        );
+        cases.push((result, receipt.take(), "Bereinigung des Arbeitsbereichs"));
+        let lease = close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
+            .expect_err("lease");
+        let result = observe::finish_with_presentation(
+            Ok(Observation::Inconsistent),
+            Err(lease),
+            &mut None,
+            receipt.clone(),
+        );
+        cases.push((result, receipt.take(), "Freigabe der Besitzreservierung"));
+        for (result, receipt, german) in cases {
+            let raw = result.as_ref().expect_err("raw error").clone();
+            let mut form = Form::new(
+                "/supplied/repo".into(),
+                Default::default(),
+                Default::default(),
+                "HEAD".into(),
+            );
+            form.frames = vec![Frame::Queued];
+            form.tx
+                .send(Event::FrameWithPresentation(0, result, receipt.clone()))
+                .expect("inert channel");
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    Err(raw.clone()),
+                    receipt.clone(),
+                ))
+                .expect("channel");
+            form.poll();
+            assert_eq!(form.error.as_deref(), Some(raw.as_str()));
+            let Frame::FailedWithPresentation(frame_raw, frame_receipt) = &form.frames[0] else {
+                panic!("receipt lost")
+            };
+            assert_eq!(frame_raw, &raw);
+            let mut paints = Vec::new();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let paint = frame_error(frame_raw, Some(frame_receipt));
+                assert_eq!(
+                    paint,
+                    form.painted_error(form.error.as_deref().expect("raw"))
+                );
+                assert!(paint.contains(primary) && paint.contains(cleanup));
+                if locale == "de" {
+                    assert!(paint.contains(german));
+                }
+                paints.push(paint);
+            }
+            assert_eq!(paints[0], paints[2]);
+            assert_ne!(paints[0], paints[1]);
+            form.tx
+                .send(Event::FrameWithPresentation(
+                    0,
+                    Err("stale".into()),
+                    receipt.clone(),
+                ))
+                .expect("channel");
+            form.tx
+                .send(Event::DoneWithPresentation(Err("stale".into()), receipt))
+                .expect("channel");
+            form.poll();
+            assert!(matches!(&form.frames[0], Frame::Failed(raw) if raw == "stale"));
+            assert!(form.error_presentation.is_none());
+            form.tx
+                .send(Event::FrameWithPresentation(
+                    0,
+                    Ok(Observation::Inconsistent),
+                    None,
+                ))
+                .expect("channel");
+            form.tx.send(Event::Done(Ok(()))).expect("channel");
+            form.poll();
+            assert!(matches!(form.frames[0], Frame::Observed(_)));
+            assert!(form.error_presentation.is_none());
+        }
+        for unknown in [
+            "provider text; workspace cleanup: provider detail",
+            "provider; owned pack-hash.keep retained",
+        ] {
+            let mut receipt = None;
+            let result =
+                observe::finish_with_presentation(Err(unknown.into()), Ok(()), &mut receipt, None);
+            let mut form = Form::new(
+                "/supplied".into(),
+                Default::default(),
+                Default::default(),
+                "HEAD".into(),
+            );
+            form.frames = vec![Frame::Queued];
+            form.tx
+                .send(Event::FrameWithPresentation(0, result, receipt))
+                .expect("channel");
+            form.poll();
+            let Frame::Failed(raw) = &form.frames[0] else {
+                panic!("unknown acquired provenance")
+            };
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert_eq!(frame_error(raw, None), unknown);
+            }
+        }
     }
 }

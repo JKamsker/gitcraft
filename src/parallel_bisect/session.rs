@@ -86,6 +86,9 @@ pub enum Event {
     /// Something went wrong that doesn't change the answer (the clean-up).
     Warning(String),
     Done(Outcome),
+    /// Opt-in paint receipt beside the unchanged raw outcome.
+    DoneWithPresentation(Outcome, Option<super::presentation::Presentation>),
+    WarningWithPresentation(String, super::presentation::CleanupWarning),
 }
 
 /// How a bisect ended.
@@ -135,6 +138,21 @@ impl Drop for Handle {
 /// Starts bisecting as `setup` says, results kept in `cache`; `wake` is called after each
 /// event (to have the window drawn again).
 pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'static) -> Handle {
+    start_impl(setup, cache, wake, false)
+}
+pub(crate) fn start_with_presentation(
+    setup: Setup,
+    cache: TreeCache,
+    wake: impl Fn() + Send + Sync + 'static,
+) -> Handle {
+    start_impl(setup, cache, wake, true)
+}
+fn start_impl(
+    setup: Setup,
+    cache: TreeCache,
+    wake: impl Fn() + Send + Sync + 'static,
+    with_presentation: bool,
+) -> Handle {
     let (tx, events) = channel();
     let stop = Arc::new(AtomicBool::new(false));
     let handle = Handle {
@@ -146,12 +164,21 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
         let out = Out {
             tx: Mutex::new(tx),
             wake: Box::new(wake),
+            with_presentation,
         };
+        let mut presentation = None;
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            bisect(&setup, &cache, &out, &stop)
+            bisect(&setup, &cache, &out, &stop, &mut presentation)
         }))
-        .unwrap_or_else(|_| Outcome::Failed("the bisect stopped on an error in gitcraft".into()));
-        out.send(Event::Done(outcome));
+        .unwrap_or_else(|_| {
+            presentation = None;
+            Outcome::Failed("the bisect stopped on an error in gitcraft".into())
+        });
+        out.send(if with_presentation {
+            done_with_presentation(outcome, presentation)
+        } else {
+            Event::Done(outcome)
+        });
     });
     let mut sessions = SESSIONS.lock().unwrap_or_else(PoisonError::into_inner);
     sessions.retain(|(_, thread)| !thread.is_finished());
@@ -163,6 +190,7 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
 struct Out {
     tx: Mutex<Sender<Event>>,
     wake: Box<dyn Fn() + Send + Sync>,
+    with_presentation: bool,
 }
 
 impl Out {
@@ -177,12 +205,19 @@ impl Out {
     }
 }
 
-fn bisect(setup: &Setup, cache: &TreeCache, out: &Out, stop: &AtomicBool) -> Outcome {
+fn bisect(
+    setup: &Setup,
+    cache: &TreeCache,
+    out: &Out,
+    stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Outcome {
+    *presentation = None;
     let setup = match resolved(setup).and_then(|s| check(&s).map(|()| s)) {
         Ok(setup) => setup,
         Err(e) => return Outcome::Failed(e),
     };
-    prepared_outcome(prepared(&setup, cache, out, stop))
+    prepared_outcome(prepared(&setup, cache, out, stop, presentation))
 }
 fn prepared_outcome(result: Result<Outcome, String>) -> Outcome {
     // Errors can contain unknown ownership/cleanup. A late stop flag cannot prove
@@ -261,18 +296,23 @@ fn prepared(
     cache: &TreeCache,
     out: &Out,
     stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
 ) -> Result<Outcome, String> {
     let label = setup.machine.label();
     out.step(format!("Setting up on {label}…"));
     let mut ws = Workspace::open(&setup.repo, &setup.machine, setup.repo_there.as_deref())?;
-    let result = run_in(&ws, setup, cache, out, stop);
+    let result = run_in(&ws, setup, cache, out, stop, presentation);
     out.step("Removing the worktrees…");
-    if let Err(e) = ws.close() {
-        out.send(Event::Warning(format!(
-            "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
-             Resolve the reported ownership or removal failure before trying again."
-        )));
+    let mut cleanup_presentation = None;
+    if let Err(e) = ws.close_with_presentation(&mut cleanup_presentation) {
+        out.send(cleanup_warning(
+            label,
+            e,
+            cleanup_presentation,
+            out.with_presentation,
+        ));
     }
+    super::presentation::retain_error(&result, presentation);
     result
 }
 
@@ -282,13 +322,15 @@ fn run_in(
     cache: &TreeCache,
     out: &Out,
     stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
 ) -> Result<Outcome, String> {
     let mut wanted = vec![setup.bad.clone()];
     wanted.extend(setup.good.iter().cloned());
     if !crate::remote::same_dir(&setup.repo, &ws.repo) {
         out.step(format!("Sending the commits to {}…", ws.machine.label()));
     }
-    ws.send(&setup.repo, &wanted)?;
+    ws.send_with_presentation(&setup.repo, &wanted, presentation)?;
+    *presentation = None;
     out.step("Reading the commits to bisect…");
     let dag = load_range(setup)?;
     let mut search = Search::new(dag, &setup.bad)?;
@@ -785,5 +827,34 @@ mod recording_outcome_tests {
         );
         assert_eq!(finish_round(ended, true), Ok(Some(Outcome::Cancelled)));
         assert!(!answered, "unexpected answer callback");
+    }
+}
+
+pub(crate) fn done_with_presentation(
+    outcome: Outcome,
+    presentation: Option<super::presentation::Presentation>,
+) -> Event {
+    let presentation = match &outcome {
+        Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
+        _ => None,
+    };
+    Event::DoneWithPresentation(outcome, presentation)
+}
+pub(crate) fn cleanup_warning(
+    label: String,
+    e: String,
+    child: Option<super::presentation::Presentation>,
+    with_presentation: bool,
+) -> Event {
+    let raw = format!(
+        "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
+         Resolve the reported ownership or removal failure before trying again."
+    );
+    if with_presentation {
+        let presentation =
+            super::presentation::CleanupWarning::capture(raw.clone(), label, e, child);
+        Event::WarningWithPresentation(raw, presentation)
+    } else {
+        Event::Warning(raw)
     }
 }

@@ -33,6 +33,7 @@ pub struct Workspace {
     lease: Mutex<Lease>,
     uncertain: AtomicBool,
     close_error: Option<String>,
+    close_presentation: Option<super::presentation::Presentation>,
     closed: bool,
 }
 
@@ -66,6 +67,7 @@ impl Workspace {
             uncertain: AtomicBool::new(false),
             closed: true,
             close_error: None,
+            close_presentation: None,
         };
         ws.clear()?;
         ws.make_private()?;
@@ -205,6 +207,15 @@ impl Workspace {
     /// `source` and lacks some of them: as a bundle, with only what it lacks when it has the
     /// rest, else whole.
     pub fn send(&self, source: &Path, wanted: &[String]) -> Result<(), String> {
+        self.send_with_presentation(source, wanted, &mut None)
+    }
+    pub(crate) fn send_with_presentation(
+        &self,
+        source: &Path,
+        wanted: &[String],
+        presentation: &mut Option<super::presentation::Presentation>,
+    ) -> Result<(), String> {
+        *presentation = None;
         if remote::same_dir(source, &self.repo) {
             return Ok(());
         }
@@ -218,11 +229,12 @@ impl Workspace {
         let authority = self.authority(FenceMode::Mutation)?;
         let transfer = random_transfer()?;
         let attempt = bundle(source, &missing, &present, &authority.generation, &transfer)
-            .and_then(|bundle| self.fetch(&bundle));
+            .and_then(|bundle| self.fetch_with_presentation(&bundle, presentation));
         match attempt {
             Ok(()) => Ok(()),
             // Only a confirmed Git failure may retry with the complete requested history.
             Err(TransferFailure::Git(_)) if !present.is_empty() => {
+                *presentation = None;
                 self.authority(FenceMode::Mutation)?;
                 let whole = bundle(
                     source,
@@ -232,7 +244,8 @@ impl Workspace {
                     &random_transfer()?,
                 )
                 .map_err(TransferFailure::message)?;
-                self.fetch(&whole).map_err(TransferFailure::message)
+                self.fetch_with_presentation(&whole, presentation)
+                    .map_err(TransferFailure::message)
             }
             Err(error) => Err(error.message()),
         }
@@ -240,7 +253,12 @@ impl Workspace {
 
     /// Every chunk and repository mutation reaches the actual owner's generation fence.
     /// Ref creation is an expected-absent transaction, never a force update of shared refs.
-    fn fetch(&self, bundle: &TransferBundle) -> Result<(), TransferFailure> {
+    fn fetch_with_presentation(
+        &self,
+        bundle: &TransferBundle,
+        presentation: &mut Option<super::presentation::Presentation>,
+    ) -> Result<(), TransferFailure> {
+        *presentation = None;
         let there = format!("{}/incoming-{}.bundle", self.base_there, bundle.nonce);
         let size = bundle.bytes.len().to_string();
         let digest = transfer_digest(&bundle.bytes);
@@ -297,14 +315,7 @@ impl Workspace {
         } else {
             Ok(())
         };
-        match (result, removed) {
-            (result, Ok(())) => result,
-            (Ok(()), Err(error)) => Err(TransferFailure::Operation(error)),
-            (Err(primary), Err(cleanup)) => Err(TransferFailure::Operation(format!(
-                "{}; transfer cleanup: {cleanup}",
-                primary.message()
-            ))),
-        }
+        transfer_finished(result, removed, presentation)
     }
 
     fn clear(&self) -> Result<(), String> {
@@ -365,8 +376,15 @@ impl Workspace {
         }
     }
     pub fn close(&mut self) -> Result<(), String> {
+        self.close_with_presentation(&mut None)
+    }
+    pub(crate) fn close_with_presentation(
+        &mut self,
+        presentation: &mut Option<super::presentation::Presentation>,
+    ) -> Result<(), String> {
+        *presentation = None;
         if self.closed {
-            return self.close_error.clone().map_or(Ok(()), Err);
+            return replay_close(&self.close_error, &self.close_presentation, presentation);
         }
         self.closed = true;
         let cleared = if self.uncertain.load(Ordering::Acquire) {
@@ -379,12 +397,9 @@ impl Workspace {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .close();
-        let result = match (cleared, released) {
-            (Ok(()), Ok(())) => Ok(()),
-            (Err(e), Ok(())) | (Ok(()), Err(e)) => Err(e),
-            (Err(primary), Err(release)) => Err(format!("{primary}; lease release: {release}")),
-        };
+        let result = close_finished(cleared, released, presentation);
         self.close_error = result.as_ref().err().cloned();
+        self.close_presentation = presentation.clone();
         result
     }
 
@@ -458,6 +473,7 @@ pub fn clear_leftovers(repo: &Path) {
         uncertain: AtomicBool::new(false),
         closed: true,
         close_error: None,
+        close_presentation: None,
     };
     let _ = ws.clear();
     let _ = ws
@@ -872,5 +888,115 @@ mod tests {
         assert!(!cleaned_receipt(&serde_json::to_vec(&receipt)?, &authority));
         assert!(!cleaned_receipt(b"true", &authority));
         Ok(())
+    }
+}
+
+// Pure finishing seams used by the actual transfer and close branches.
+fn transfer_finished(
+    result: Result<(), TransferFailure>,
+    removed: Result<(), String>,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), TransferFailure> {
+    *presentation = None;
+    match (result, removed) {
+        (result, Ok(())) => result,
+        (Ok(()), Err(error)) => Err(TransferFailure::Operation(error)),
+        (Err(primary), Err(cleanup)) => {
+            let primary = primary.message();
+            let raw = format!("{primary}; transfer cleanup: {cleanup}");
+            *presentation = Some(super::presentation::Presentation::capture(
+                raw.clone(),
+                super::presentation::Cleanup::WorkspaceTransfer { primary, cleanup },
+            ));
+            Err(TransferFailure::Operation(raw))
+        }
+    }
+}
+pub(crate) fn close_finished(
+    cleared: Result<(), String>,
+    released: Result<(), String>,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    *presentation = None;
+    match (cleared, released) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(e), Ok(())) | (Ok(()), Err(e)) => Err(e),
+        (Err(primary), Err(release)) => {
+            let raw = format!("{primary}; lease release: {release}");
+            *presentation = Some(super::presentation::Presentation::capture(
+                raw.clone(),
+                super::presentation::Cleanup::WorkspaceLeaseRelease { primary, release },
+            ));
+            Err(raw)
+        }
+    }
+}
+
+fn replay_close(
+    error: &Option<String>,
+    saved: &Option<super::presentation::Presentation>,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    let result = error.clone().map_or(Ok(()), Err);
+    *presentation = saved.clone();
+    super::presentation::retain_error(&result, presentation);
+    result
+}
+#[cfg(test)]
+pub(crate) fn supplied_transfer(
+    primary: &str,
+    cleanup: Option<&str>,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    transfer_finished(
+        Err(TransferFailure::Operation(primary.into())),
+        cleanup.map_or(Ok(()), |e| Err(e.into())),
+        presentation,
+    )
+    .map_err(TransferFailure::message)
+}
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    #[test]
+    fn execution_bridge_close_replays_only_matching_error_and_clears_other_results() {
+        let mut receipt = None;
+        let result = close_finished(
+            Err("owner; lease release: provider".into()),
+            Err("lease); framing".into()),
+            &mut receipt,
+        );
+        let saved = receipt.clone();
+        for _ in 0..2 {
+            assert_eq!(
+                replay_close(&result.as_ref().err().cloned(), &saved, &mut receipt),
+                result
+            );
+            assert!(receipt.is_some());
+        }
+        assert!(replay_close(&None, &saved, &mut receipt).is_ok());
+        assert!(receipt.is_none());
+        assert!(replay_close(&Some("unrelated".into()), &saved, &mut receipt).is_err());
+        assert!(receipt.is_none());
+        let mut receipt = saved;
+        assert!(
+            transfer_finished(
+                Err(TransferFailure::Git("git denied".into())),
+                Ok(()),
+                &mut receipt
+            )
+            .is_err()
+        );
+        assert!(receipt.is_none());
+        assert!(matches!(
+            transfer_finished(
+                Err(TransferFailure::Git("git denied".into())),
+                Ok(()),
+                &mut receipt
+            ),
+            Err(TransferFailure::Git(_))
+        ));
+        assert!(transfer_finished(Ok(()), Ok(()), &mut receipt).is_ok());
+        assert!(receipt.is_none());
     }
 }

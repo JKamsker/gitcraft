@@ -43,6 +43,7 @@ pub(crate) enum ParallelAct {
 #[derive(Default)]
 pub(super) struct Parallel {
     handle: Option<Handle>,
+    paint: PresentationState,
     view: Option<View>,
     /// Answers by tree, for as long as the tab is open.
     cache: TreeCache,
@@ -157,6 +158,8 @@ impl View {
             Event::Dropped(hash) => {
                 self.testing.remove(&hash);
             }
+            Event::DoneWithPresentation(outcome, _) => self.take(Event::Done(outcome)),
+            Event::WarningWithPresentation(warning, _) => self.take(Event::Warning(warning)),
             Event::Warning(warning) => self.warning = Some(warning),
             Event::Done(outcome) => {
                 self.step = None;
@@ -233,6 +236,7 @@ impl RepoTab {
             ParallelAct::Close => {
                 if !self.parallel.running() {
                     self.parallel.view = None;
+                    self.parallel.paint = PresentationState::default();
                     self.parallel.handle = None;
                 }
             }
@@ -249,10 +253,11 @@ impl RepoTab {
             return;
         }
         self.status = None;
+        self.parallel.paint = PresentationState::default();
         self.parallel.view = Some(View::new(&setup));
         self.parallel.last = Some(setup.clone());
         let repaint = ctx.clone();
-        let handle = pb::start(setup, self.parallel.cache.clone(), move || {
+        let handle = pb::start_with_presentation(setup, self.parallel.cache.clone(), move || {
             repaint.request_repaint();
         });
         self.parallel.handle = Some(handle);
@@ -269,6 +274,7 @@ impl RepoTab {
         };
         let mut ended = None;
         for event in events {
+            let event = self.parallel.paint.take(event);
             if let Event::Done(outcome) = &event {
                 ended = Some(outcome.clone());
             }
@@ -279,6 +285,8 @@ impl RepoTab {
         };
         self.parallel.handle = None;
         let long = view.started.elapsed() > LONG_RUN;
+        // These foreign caches still carry raw status/notification identities. Their
+        // owners must retain the typed outcome/receipt and resolve at final paint.
         let (message, failed) = outcome_message(&outcome, &view.machine);
         if long {
             self.finished
@@ -424,4 +432,159 @@ pub(super) fn machines(repo: &std::path::Path) -> Vec<Machine> {
         add(Machine::There(crate::remote::Host::Ssh(host)));
     }
     list
+}
+
+#[derive(Default)]
+struct PresentationState {
+    failed: Option<pb::presentation::Presentation>,
+    warning: Option<pb::presentation::CleanupWarning>,
+}
+impl PresentationState {
+    fn take(&mut self, event: Event) -> Event {
+        match event {
+            Event::DoneWithPresentation(outcome, presentation) => {
+                self.failed = match &outcome {
+                    Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
+                    _ => None,
+                };
+                Event::Done(outcome)
+            }
+            Event::WarningWithPresentation(raw, presentation) => {
+                self.warning = Some(presentation);
+                Event::Warning(raw)
+            }
+            Event::Done(outcome) => {
+                self.failed = None;
+                Event::Done(outcome)
+            }
+            Event::Warning(raw) => {
+                self.warning = None;
+                Event::Warning(raw)
+            }
+            other => other,
+        }
+    }
+    fn error(&self, raw: &str) -> String {
+        pb::presentation::error(raw, self.failed.as_ref())
+    }
+    fn warning(&self, raw: &str) -> String {
+        self.warning
+            .as_ref()
+            .map_or_else(|| raw.into(), |p| p.render(raw))
+    }
+}
+
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    #[test]
+    fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_state() {
+        let primary = "provider; transfer cleanup: provider detail; lease release: inner";
+        let cleanup =
+            "cleanup); recovery evidence was retained. (repeated); transfer cleanup: $HOME {raw}";
+        let mut receipt = None;
+        let raw =
+            pb::supplied_transfer(primary, Some(cleanup), &mut receipt).expect_err("transfer");
+        let mut state = PresentationState::default();
+        assert!(
+            matches!(state.take(pb::done_with_presentation(Outcome::Failed(raw.clone()), receipt.clone())), Event::Done(Outcome::Failed(ref value)) if value == &raw)
+        );
+        // Foreign generic caches retain their raw identity. Their typed final-paint
+        // integration remains a root-owned seam; this test exercises banner paint.
+        let cached_status = outcome_message(&Outcome::Failed(raw.clone()), "opaque machine");
+        let mut paints = Vec::new();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            assert_eq!(
+                outcome_message(&Outcome::Failed(raw.clone()), "opaque machine"),
+                cached_status
+            );
+            let painted = state.error(&raw);
+            assert!(painted.contains(primary) && painted.contains(cleanup));
+            if locale == "de" {
+                assert!(painted.contains("Bereinigung der Übertragung"));
+            }
+            let (status, failed) =
+                outcome_message(&Outcome::Failed(painted.clone()), "opaque machine");
+            assert!(failed && status.contains(&painted));
+            paints.push(painted);
+        }
+        assert_eq!(paints[0], paints[2]);
+        assert_ne!(paints[0], paints[1]);
+        state.take(pb::done_with_presentation(
+            Outcome::Failed("unrelated".into()),
+            receipt.clone(),
+        ));
+        assert!(state.failed.is_none());
+        state.take(pb::done_with_presentation(
+            Outcome::Cancelled,
+            receipt.clone(),
+        ));
+        assert!(state.failed.is_none());
+        for unknown in [
+            "provider text; workspace cleanup: provider detail",
+            "provider; owned pack-hash.keep retained",
+        ] {
+            let result = pb::supplied_transfer(unknown, None, &mut receipt);
+            let raw = result.expect_err("forwarded");
+            assert!(receipt.is_none());
+            state.take(pb::done_with_presentation(
+                Outcome::Failed(raw.clone()),
+                receipt.clone(),
+            ));
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert_eq!(state.error(&raw), unknown);
+            }
+        }
+        let lease = pb::close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
+            .expect_err("lease");
+        let Event::Warning(raw_warning) = state.take(pb::cleanup_warning(
+            "opaque host; )".into(),
+            lease.clone(),
+            receipt.clone(),
+            true,
+        )) else {
+            panic!("warning")
+        };
+        let mut paints = Vec::new();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            let painted = state.warning(&raw_warning);
+            assert!(
+                painted.contains(primary)
+                    && painted.contains(cleanup)
+                    && painted.contains("opaque host; )")
+            );
+            if locale == "de" {
+                assert!(
+                    painted.contains("Freigabe der Besitzreservierung")
+                        && painted.contains("Wiederherstellungsnachweise")
+                );
+            }
+            paints.push(painted);
+        }
+        assert_eq!(paints[0], paints[2]);
+        assert_ne!(paints[0], paints[1]);
+        assert_eq!(state.warning("stale warning"), "stale warning");
+        state.take(Event::Warning("unrelated".into()));
+        assert!(state.warning.is_none());
+        state.take(Event::Done(Outcome::Cancelled));
+        assert!(state.failed.is_none());
+        let Event::Warning(raw_warning) = state.take(pb::cleanup_warning(
+            "opaque host".into(),
+            "provider; lease release: unknown".into(),
+            None,
+            true,
+        )) else {
+            panic!("warning")
+        };
+        crate::i18n::set_language("de");
+        assert!(
+            state
+                .warning(&raw_warning)
+                .contains("provider; lease release: unknown")
+        );
+        crate::i18n::set_language("en-US");
+    }
 }

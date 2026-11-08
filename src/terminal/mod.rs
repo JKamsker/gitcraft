@@ -1,6 +1,7 @@
 //! An integrated terminal: the user's shell in a pseudo-terminal (ConPTY on Windows), its output
 //! interpreted by `vt100` and painted with egui.
 
+pub(crate) mod display;
 mod keys;
 mod palette;
 mod shells;
