@@ -709,6 +709,7 @@ fn filtered_clean_edit_after_parking_is_refused_before_any_writes() -> Result<()
             .is_file()
     );
     write(repo.path(), "notes.txt", "notes\n")?;
+    repo.git(&["add", "notes.txt"])?;
     bring_back(repo.path(), &parked)?;
     Ok(())
 }
