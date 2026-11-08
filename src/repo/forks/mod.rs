@@ -47,6 +47,8 @@ pub(crate) struct Forks {
     scope_label: Option<String>,
     /// A rebase that stopped on conflicts: once it is continued, its push is offered.
     after_conflict: Option<plan::Rebase>,
+    /// The completed conflict continuation captured when offering its confirmation.
+    push_tip: Option<String>,
     /// The pull request whose runs "Approve and run" was chosen for once: chosen again, they
     /// are approved.
     approve_armed: Option<u64>,
@@ -361,6 +363,7 @@ impl RepoTab {
         }
         self.forks.running = None;
         self.forks.after_conflict = None;
+        self.forks.push_tip = None;
         self.forks.scope_label = None;
         self.forks.scope = Some(scope);
     }
@@ -388,15 +391,17 @@ impl RepoTab {
         let Some((label, plan)) = self.forks.running.clone() else {
             return;
         };
-        let (steps, undo) = if push_only {
-            (plan.push_now(), plan.fork_undo_steps())
+        let (steps, undo, redo) = if push_only {
+            let Some(tip) = &self.forks.push_tip else {
+                return;
+            };
+            (
+                plan.push_now(tip),
+                plan.fork_undo_steps(),
+                plan.push_now(tip),
+            )
         } else {
-            (plan.steps(), plan.undo_steps())
-        };
-        let redo = if push_only {
-            plan.push_now()
-        } else {
-            plan.redo_steps()
+            (plan.steps(), plan.undo_steps(), plan.redo_steps())
         };
         self.run_undoable(
             &label,
@@ -545,6 +550,8 @@ impl RepoTab {
         if !here || self.refs.head == plan.head {
             return;
         }
+        let tip = self.refs.head.clone();
+        self.forks.push_tip = Some(tip.clone());
         let label = format!("Push the rebased {} to {}", plan.local, plan.fork);
         self.dialog = Some(
             Dialog::confirm(
@@ -556,13 +563,13 @@ impl RepoTab {
                     plan.local, plan.fork, plan.branch
                 ),
                 "Push",
-                plan.push_now(),
+                plan.push_now(&tip),
                 None,
             )
             .instead_ops(super::Action::Fork(ForkAct::ConfirmPush(id)))
             .undo(Undo::Custom {
                 undo: plan.fork_undo_steps(),
-                redo: plan.push_now(),
+                redo: plan.push_now(&tip),
             }),
         );
         self.forks.scope_label = Some(label.clone());
@@ -676,82 +683,70 @@ impl RepoTab {
                 self.dialog = None;
             }
         }
-        let auth = crate::git::is_auth_error(error);
-        let conflicts = error.contains("CONFLICT") || error.contains("could not apply");
-        let repo = self.path.clone();
-        let local = format!("refs/heads/{}", plan.local);
-        self.then(
-            ctx,
-            move || crate::git::resolve(&repo, &local).unwrap_or_default(),
-            move |tab, now, ctx| {
-                // Stopped by its conflicts: once they are resolved and the rebase continued,
-                // the push is offered.
-                let current = scope.as_ref().is_some_and(|s| {
-                    s.check().is_ok()
-                        && s.generation == tab.forge_generation
-                        && generation == tab.forge_generation
-                });
-                if conflicts && current {
-                    tab.forks.after_conflict = Some(plan);
-                    tab.status = Some((
-                        "The rebase stopped on conflicts: resolve them and continue it, then \
-                         gitcraft offers to push it (or abort it)"
-                            .to_owned(),
-                        true,
-                    ));
-                    return;
-                }
-                // Stopped before the rebase: nothing rewritten to undo.
-                if now.is_empty() || now == plan.head {
-                    return;
-                }
-                let (undo, redo) = plan.local_undo(&now);
-                tab.push_undo(
-                    UndoEntry {
-                        id: 0,
-                        agent: None,
-                        label: format!("{asked} (here only)"),
-                        undo,
-                        redo,
-                        heads: None,
-                    },
-                    ctx,
-                );
-
-                tab.status = Some((
-                    format!(
-                        "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",
-                        plan.local, plan.fork
-                    ),
-                    true,
-                ));
-                if !current && tab.last_op.as_ref().is_some_and(|o| o.label == asked) {
-                    tab.last_op = None;
-                }
-                if auth
-                    && current
-                    && let Some(op) = &mut tab.last_op
-                    && op.label == asked
-                {
-                    // Undoable on the fork too once pushed; the rewrite here has its own entry.
-                    let label = format!("Push {} to {}", plan.local, plan.fork);
-                    tab.forks.scope_label = Some(label.clone());
-                    *op = PendingOp {
-                        label,
-                        ops: plan.push_now(),
-                        refresh: Refresh::All,
-                        kind: OpKind::Normal(
-                            Undo::Custom {
-                                undo: plan.fork_undo_steps(),
-                                redo: plan.push_now(),
-                            },
-                            String::new(),
-                        ),
-                        quiet: false,
-                    };
-                }
+        let Some(rewrite) = scope.as_ref().and_then(guard::Scope::rewrite) else {
+            return;
+        };
+        if rewrite.branch != format!("refs/heads/{}", plan.local) || rewrite.before != plan.head {
+            return;
+        }
+        let current = scope.as_ref().is_some_and(|s| {
+            s.check().is_ok()
+                && s.generation == self.forge_generation
+                && generation == self.forge_generation
+        });
+        if rewrite.conflicts && current {
+            self.forks.after_conflict = Some(plan);
+            self.status = Some((
+                "The rebase stopped on conflicts: resolve them and continue it, then gitcraft offers to push it (or abort it)".into(), true,
+            ));
+            return;
+        }
+        if rewrite.tip.is_empty() || rewrite.tip == plan.head {
+            return;
+        }
+        let (undo, redo) = plan.local_undo(&rewrite.tip);
+        self.push_undo(
+            UndoEntry {
+                id: 0,
+                agent: None,
+                label: format!("{asked} (here only)"),
+                undo,
+                redo,
+                heads: None,
             },
+            ctx,
         );
+        self.status = Some((
+            format!(
+                "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",
+                plan.local, plan.fork,
+            ),
+            true,
+        ));
+        if !current && self.last_op.as_ref().is_some_and(|o| o.label == asked) {
+            self.last_op = None;
+        }
+        if crate::git::is_auth_error(error)
+            && current
+            && let Some(op) = &mut self.last_op
+            && op.label == asked
+        {
+            let label = format!("Push {} to {}", plan.local, plan.fork);
+            self.forks.scope_label = Some(label.clone());
+            *op = PendingOp {
+                label,
+                ops: plan.push_now(&rewrite.tip),
+                refresh: Refresh::All,
+                kind: OpKind::Normal(
+                    Undo::Custom {
+                        undo: plan.fork_undo_steps(),
+                        redo: plan.push_now(&rewrite.tip),
+                    },
+                    String::new(),
+                ),
+                quiet: false,
+            };
+        }
     }
 }
 

@@ -384,7 +384,7 @@ pub(crate) struct Rebase {
 /// Plans rebasing the checked-out branch, set up for `info`'s fork, onto `base` of `upstream`
 /// (fetched first, as is the fork's branch). Refused when the fork's branch has commits the
 /// branch hasn't (the push would throw them away), or with changes not committed.
-pub(crate) fn plan_rebase(
+pub(super) fn plan_rebase(
     repo: &Path,
     info: &ForkInfo,
     upstream: &Remote,
@@ -533,22 +533,17 @@ impl Rebase {
                 expect_symref("HEAD", &local),
                 expect_ref_at(&local, &self.head),
                 self.rebase(),
-                self.push(&local, Some(&self.seen)),
+                self.push(&local, &self.seen),
             ])
             .collect()
     }
 
-    /// The push of `what` to the fork's branch, replacing it only if it is `seen` (or, without
-    /// one, what was last fetched of it).
-    fn push(&self, what: &str, seen: Option<&str>) -> Vec<String> {
+    /// Replace exactly the commit captured for this destination, independent of tracking refs.
+    fn push(&self, what: &str, seen: &str) -> Vec<String> {
         let target = format!("refs/heads/{}", self.branch);
-        let lease = match seen {
-            Some(seen) => format!("--force-with-lease={target}:{seen}"),
-            None => format!("--force-with-lease={target}"),
-        };
         strings(&[
             "push",
-            &lease,
+            &format!("--force-with-lease={target}:{seen}"),
             "--",
             &self.fork,
             &format!("{what}:{target}"),
@@ -557,12 +552,13 @@ impl Rebase {
 
     /// The push alone, of the branch as it is now (after a rebase continued past conflicts, or
     /// to retry after signing in): replacing the fork's branch only if it is still `seen`.
-    pub(crate) fn push_now(&self) -> Vec<Vec<String>> {
+    pub(crate) fn push_now(&self, tip: &str) -> Vec<Vec<String>> {
         self.guards()
             .into_iter()
             .chain([
                 expect_symref("HEAD", &self.local_ref()),
-                self.push(&self.local_ref(), Some(&self.seen)),
+                expect_ref_at(&self.local_ref(), tip),
+                self.push(tip, &self.seen),
             ])
             .collect()
     }
@@ -571,7 +567,10 @@ impl Rebase {
     pub(crate) fn fork_undo_steps(&self) -> Vec<Vec<String>> {
         self.guards()
             .into_iter()
-            .chain([expect_ref(&self.tracking), self.push(&self.head, None)])
+            .chain([
+                expect_ref(&self.tracking),
+                self.push(&self.head, super::guard::PUSHED_TIP),
+            ])
             .collect()
     }
 
@@ -584,7 +583,7 @@ impl Rebase {
                 expect_symref("HEAD", &local),
                 expect_ref(&local),
                 expect_ref(&self.tracking),
-                self.push(&self.head, None),
+                self.push(&self.head, super::guard::PUSHED_TIP),
                 strings(&["reset", "--keep", &self.head]),
             ])
             .collect()
@@ -598,7 +597,7 @@ impl Rebase {
                 expect_symref("HEAD", &local),
                 expect_ref(&local),
                 self.rebase(),
-                self.push(&local, None),
+                self.push(&local, &self.head),
             ])
             .collect()
     }
