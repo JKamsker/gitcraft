@@ -3,6 +3,8 @@
 //! the task doesn't mention apart), new dependencies, public signatures changed, the share of
 //! the change that is formatting only. Matching with an LLM is optional (see [`llm`]).
 
+pub mod display;
+
 mod deps;
 pub mod llm;
 mod signatures;

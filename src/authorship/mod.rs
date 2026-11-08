@@ -9,6 +9,8 @@
 //! A line or commit no source speaks of has no known author ([`Who::Unknown`]): no stripe, no
 //! badge, and it counts for neither side.
 
+pub mod display;
+
 pub mod agents;
 pub mod branch;
 pub mod gitai;

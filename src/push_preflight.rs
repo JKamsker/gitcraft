@@ -1,6 +1,8 @@
 //! Explicit push previews. Reads are local, bounded and never ask a credential helper.
 //! Findings contain object IDs, paths and line numbers, never matched secret values.
 
+pub(crate) mod display;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
