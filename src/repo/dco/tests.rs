@@ -349,12 +349,11 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     settle(&mut tab, &ctx);
     assert!(
         tab.activity
-            .entries
-            .back()
+            .last()
             .is_some_and(|entry| matches!(&entry.outcome,
         crate::repo::activity::Outcome::Failed(error) if error.contains("stale info"))),
         "{:?}",
-        tab.activity.entries.back()
+        tab.activity.last()
     );
     wait(&mut tab, &ctx, |tab| {
         !tab.timeline.entries.iter().all(|e| e.undo.is_none())

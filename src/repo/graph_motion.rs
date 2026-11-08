@@ -268,12 +268,11 @@ mod tests {
         );
         assert!(
             tab.activity
-                .entries
-                .back()
+                .last()
                 .is_some_and(|entry| matches!(&entry.outcome,
                 super::super::activity::Outcome::Failed(error) if error.contains("stale info"))),
             "{:?}",
-            tab.activity.entries.back()
+            tab.activity.last()
         );
         assert_eq!(f.receiver_head()?, theirs);
 
