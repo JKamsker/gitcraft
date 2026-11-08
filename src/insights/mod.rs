@@ -9,6 +9,7 @@
 
 pub mod ci_path;
 pub mod deploy;
+pub mod evolution;
 pub mod history;
 
 /// Where what a view shows came from, and how far it can be trusted: shown above every view.
