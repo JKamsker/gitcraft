@@ -80,13 +80,11 @@ pub(crate) fn migrate(
             "--format=%gD%x00%H%x00%gn%x00%ge%x00%gs",
         ],
     )?;
-    expected.snapshot.check(runner.repo)?;
-    runner.run(&[
-        "refs",
-        "migrate",
-        &format!("--ref-format={target}"),
-        "--reflog",
-    ])?;
+    verified_migration(
+        target,
+        |args| runner.run(args),
+        || expected.snapshot.check(runner.repo),
+    )?;
     let after = inspect(runner.repo)?;
     if after.format != target || ref_witness(runner.repo)? != refs {
         return Err("Migration completed but ref verification differs. Do not continue writing; inspect git refs verify and the migration output.".into());
@@ -117,6 +115,24 @@ pub(crate) fn migrate(
     ))
 }
 
+fn verified_migration(
+    target: &str,
+    mut run: impl FnMut(&[&str]) -> Result<String, String>,
+    recheck: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    // Git can accept an invalid symbolic target in the files backend but omit
+    // its root when migrating. Refuse that graph before changing its backend.
+    run(&["refs", "verify", "--strict"])?;
+    recheck()?;
+    run(&[
+        "refs",
+        "migrate",
+        &format!("--ref-format={target}"),
+        "--reflog",
+    ])?;
+    Ok(())
+}
+
 fn ref_witness(repo: &Path) -> Result<Vec<super::all_refs::Reference>, String> {
     let (refs, fallback) = super::all_refs::references(repo)?;
     if fallback {
@@ -128,6 +144,57 @@ fn ref_witness(repo: &Path) -> Result<Vec<super::all_refs::Reference>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_strict_verification_and_snapshot_refusal_precede_migration() {
+        for failure in 0..3 {
+            let calls = std::cell::RefCell::new(Vec::new());
+            let result = verified_migration(
+                "reftable",
+                |args| {
+                    calls
+                        .borrow_mut()
+                        .push(args.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+                    if failure == 1 {
+                        Err("badReferentName".into())
+                    } else {
+                        Ok(String::new())
+                    }
+                },
+                || {
+                    calls.borrow_mut().push(vec!["snapshot-check".into()]);
+                    if failure == 2 {
+                        Err("snapshot changed".into())
+                    } else {
+                        Ok(())
+                    }
+                },
+            );
+            let calls = calls.into_inner();
+            assert_eq!(calls[0], ["refs", "verify", "--strict"]);
+            match failure {
+                1 => {
+                    assert_eq!(result, Err("badReferentName".into()));
+                    assert_eq!(calls.len(), 1);
+                }
+                2 => {
+                    assert_eq!(result, Err("snapshot changed".into()));
+                    assert_eq!(calls.len(), 2);
+                }
+                _ => {
+                    assert_eq!(result, Ok(()));
+                    assert_eq!(calls.len(), 3);
+                    assert_eq!(
+                        calls[2],
+                        ["refs", "migrate", "--ref-format=reftable", "--reflog"]
+                    );
+                }
+            }
+            if failure != 1 {
+                assert_eq!(calls[1], ["snapshot-check"]);
+            }
+        }
+    }
+
     #[test]
     fn round_trip_preserves_refs_and_refuses_linked_or_stale() -> Result<(), String> {
         let r = crate::git::fixture::Repo::new("reftable-migration")?;
@@ -145,8 +212,38 @@ mod tests {
             control: &control,
             credentials: None,
         };
-        let refs = refs?;
-        migrate(&runner, &before, "reftable")?;
+        let invalid_refs = refs?;
+        let error = migrate(&runner, &before, "reftable")
+            .err()
+            .ok_or("Invalid symbolic root target was migrated")?;
+        assert!(error.contains("badReferentName"), "{error}");
+        assert_eq!(inspect(r.path())?.format, "files");
+        assert_eq!(ref_witness(r.path())?, invalid_refs);
+        assert_eq!(Snapshot::capture(r.path())?, before.snapshot);
+        assert_eq!(r.rev("APP_ROOT")?, commit);
+        assert_eq!(
+            r.git(&["symbolic-ref", "--no-recurse", "refs/gitcraft/root"])?
+                .trim(),
+            "APP_ROOT"
+        );
+        // Preserve the original invalid graph as the negative control above;
+        // a supported root name must still migrate successfully in both ways.
+        r.git(&["update-ref", "APP_HEAD", &commit])?;
+        r.git(&["symbolic-ref", "refs/gitcraft/root", "APP_HEAD"])?;
+        r.git(&["update-ref", "--no-deref", "-d", "APP_ROOT", &commit])?;
+        let refs = ref_witness(r.path())?;
+        assert!(refs.iter().any(|r| r.name == "APP_HEAD" && r.oid == commit));
+        assert!(
+            refs.iter()
+                .any(|r| r.name == "refs/gitcraft/root" && r.symbolic == "APP_HEAD")
+        );
+        let before = inspect(r.path())?;
+        migrate(&runner, &before, "reftable").map_err(|error| {
+            format!(
+                "{error}\nRef witness before migration: {refs:#?}\nRef witness after migration: {:#?}",
+                ref_witness(r.path())
+            )
+        })?;
         assert_eq!(ref_witness(r.path())?, refs);
         assert_eq!(inspect(r.path())?.format, "reftable");
         assert!(migrate(&runner, &before, "reftable").is_err());

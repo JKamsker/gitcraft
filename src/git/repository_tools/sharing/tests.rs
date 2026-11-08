@@ -162,12 +162,15 @@ fn symlink_and_hardlink_metadata_cannot_be_detached() -> Result<(), String> {
     let alt = clone.join(".git/objects/info/alternates");
     let saved = root.path().join("saved alternate");
     std::fs::rename(&alt, &saved).map_err(|e| e.to_string())?;
+    let original = std::fs::read(&saved).map_err(|e| e.to_string())?;
     symlink(&saved, &alt).map_err(|e| e.to_string())?;
-    let linked = inspect(&clone)?;
-    assert!(linked.plan.is_none());
+    assert!(inspect(&clone).is_err());
+    assert_eq!(std::fs::read_link(&alt).map_err(|e| e.to_string())?, saved);
+    assert_eq!(std::fs::read(&saved).map_err(|e| e.to_string())?, original);
     std::fs::remove_file(&alt).map_err(|e| e.to_string())?;
     std::fs::hard_link(&saved, &alt).map_err(|e| e.to_string())?;
     let linked = inspect(&clone)?;
+    assert!(linked.plan.is_none());
     assert!(
         linked
             .blocked
@@ -175,6 +178,8 @@ fn symlink_and_hardlink_metadata_cannot_be_detached() -> Result<(), String> {
             .is_some_and(|s| s.contains("hard-linked"))
     );
     assert!(saved.exists());
+    assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, original);
+    assert_eq!(std::fs::read(&saved).map_err(|e| e.to_string())?, original);
     Ok(())
 }
 
