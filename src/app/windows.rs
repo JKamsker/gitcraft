@@ -795,8 +795,10 @@ mod tests {
         let alpha = identity(&app.tabs[0]);
         let gamma = identity(&app.tabs[2]);
         if let Tab::Repo(r) = &mut app.tabs[0] {
-            r.finished
-                .push(("completion queued before detaching".into(), false));
+            r.finished.push(crate::repo::Notice::plain((
+                "completion queued before detaching".into(),
+                false,
+            )));
         }
         app.move_to_window(0, None, Some(egui::pos2(-1000.0, 60.0)), &ctx);
         let first = *app.windows.parked.keys().next().ok_or("no window")?;
@@ -962,10 +964,16 @@ mod tests {
             ),
         );
         if let Tab::Repo(r) = &mut app.tabs[0] {
-            r.finished.push(("root completion".into(), false));
+            r.finished.push(crate::repo::Notice::plain((
+                "root completion".into(),
+                false,
+            )));
         }
         if let Tab::Repo(r) = &mut app.windows.parked.get_mut(&id).ok_or("no child")?.tabs[0] {
-            r.finished.push(("child completion".into(), true));
+            r.finished.push(crate::repo::Notice::plain((
+                "child completion".into(),
+                true,
+            )));
         }
         let before = app.toasts.len();
         let passes = ctx.cumulative_pass_nr();
