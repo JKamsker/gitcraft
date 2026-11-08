@@ -2,15 +2,16 @@
 //! Never re-open the source by name; never replace an existing destination.
 use std::fs::File;
 use std::io;
-use std::os::windows::io::AsRawHandle;
+use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
 
-/// Rename the actual `source` file into the actual retained `directory`.
+/// Rename the actual `source` file to a path derived from the retained `directory`.
 ///
 /// Microsoft documents FILE_RENAME_INFO.ReplaceIfExists=false as an error when
-/// the target exists, and RootDirectory as the base handle for a relative name:
+/// the target exists. Resolve the absolute target through the held directory handle:
 /// https://learn.microsoft.com/windows/win32/api/winbase/ns-winbase-file_rename_info
-/// The source must have DELETE access. Its no-DELETE-sharing handle remains held
-/// throughout; this operation changes a directory entry, never file contents.
+/// The source must have DELETE access. Its no-DELETE-sharing handle and the
+/// destination's no-delete-sharing ancestor handles remain held throughout; this
+/// changes a directory entry, never file contents.
 #[allow(unsafe_code)]
 pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Result<()> {
     use windows_sys::Win32::Storage::FileSystem::{
@@ -28,10 +29,30 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
             crate::i18n::text("backend-invalid-owned-metadata-name-4c8f18"),
         ));
     }
-    let wide = name.encode_utf16().collect::<Vec<_>>();
+    let mut target = final_path(directory).ok_or_else(|| {
+        io::Error::other(crate::i18n::text(
+            "backend-the-system-could-not-report-the-held-directory-location-8699e1",
+        ))
+    })?;
+    target.push(name);
+    let wide = target.as_os_str().encode_wide().collect::<Vec<_>>();
     let offset = std::mem::offset_of!(FILE_RENAME_INFO, FileName);
-    // A NUL is included for API compatibility, but is not counted in FileNameLength.
-    let bytes = (offset + (wide.len() + 1) * 2).max(std::mem::size_of::<FILE_RENAME_INFO>());
+    let name_bytes = wide
+        .len()
+        .checked_mul(std::mem::size_of::<u16>())
+        .ok_or_else(|| {
+            io::Error::other(crate::i18n::text(
+                "backend-rename-metadata-too-large-40ee73",
+            ))
+        })?;
+    let bytes = offset
+        .checked_add(name_bytes)
+        .ok_or_else(|| {
+            io::Error::other(crate::i18n::text(
+                "backend-rename-metadata-too-large-40ee73",
+            ))
+        })?
+        .max(std::mem::size_of::<FILE_RENAME_INFO>());
     let mut storage =
         vec![FILE_RENAME_INFO::default(); bytes.div_ceil(std::mem::size_of::<FILE_RENAME_INFO>())];
     let size = u32::try_from(bytes).map_err(|_| {
@@ -50,8 +71,12 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
     unsafe {
         let info = storage.as_mut_ptr();
         (*info).Anonymous.ReplaceIfExists = false;
-        (*info).RootDirectory = directory.as_raw_handle();
-        (*info).FileNameLength = (wide.len() * 2) as u32;
+        (*info).RootDirectory = std::ptr::null_mut();
+        (*info).FileNameLength = u32::try_from(name_bytes).map_err(|_| {
+            io::Error::other(crate::i18n::text(
+                "backend-rename-metadata-too-large-40ee73",
+            ))
+        })?;
         std::ptr::copy_nonoverlapping(
             wide.as_ptr(),
             std::ptr::addr_of_mut!((*info).FileName).cast::<u16>(),
