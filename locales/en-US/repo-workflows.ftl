@@ -3129,7 +3129,277 @@ repo-workflows-lfs_storage-usage-aca1a392 = Measuring the LFS objects…
 
 repo-workflows-lfs_storage-usage-bc295532 = Could not measure the LFS objects: { $e }
 
+repo-workflows-line_dossier-dossier-ignore-finished-366a809a = Revision already present; ignore file and index unchanged
+
+repo-workflows-line_dossier-dossier-ignore-finished-4c50387c = Ignore revision: { $error }
+
+repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff = Revision appended to .git-blame-ignore-revs; staged contents preserved. Ordinary Git blame can use blame.ignoreRevsFile=.git-blame-ignore-revs.
+
+repo-workflows-line_dossier-dossier-ignore-view-66c640dc = Full commit patch
+
+repo-workflows-line_dossier-dossier-ignore-view-7f80e3ed = Preview .git-blame-ignore-revs append
+
+repo-workflows-line_dossier-dossier-ignore-view-8dac5aad = I reviewed the full patch and want this revision ignored
+
+repo-workflows-line_dossier-dossier-ignore-view-a29947af = Append adds a leading newline and one complete object ID. A missing file is created exclusively; links, hardlinks, special files, changed snapshots and changed roots refuse. Remote append requires Python3. Dossier history itself continues to show ignored formatting versions.
+
+repo-workflows-line_dossier-dossier-ignore-view-b784191c = Append reviewed revision
+
+repo-workflows-line_dossier-dossier-ignore-view-cfd1a00e = Existing ignore file
+
+repo-workflows-line_dossier-dossier-ignore-view-dbcd08f5 = Back to versions
+
+repo-workflows-line_dossier-dossier-ignore-view-f5736f62 = Git -w detects whitespace changes, including inside strings. Inspect the full patch and judge whether ignoring this commit is appropriate. Existing bytes and the staged index will be preserved; nothing is changed before confirmation.
+
+repo-workflows-line_dossier-line-dossier-view-054bd44a = Pinned { $super-super-short-result-start-c-1 } · { $clip-result-start-path-120-2 }:{ $result-start-line-3 } · { $result-cards-len-4 } versions
+
+repo-workflows-line_dossier-line-dossier-view-0ac12d95 = Cancel summary
+
+repo-workflows-line_dossier-line-dossier-view-2a0caf4a = Pull requests, line review comments and linked issues
+
+repo-workflows-line_dossier-line-dossier-view-2de6a99b = Sends the displayed history cards to your Settings → AI tool; a custom command can use your own key or a local model
+
+repo-workflows-line_dossier-line-dossier-view-37a046ba = Cancel trace
+
+repo-workflows-line_dossier-line-dossier-view-55b46438 = Model summary · verify the cited source cards
+
+repo-workflows-line_dossier-line-dossier-view-562e7c08 = Open file at this version
+
+repo-workflows-line_dossier-line-dossier-view-5853cee3 = Trace earlier versions
+
+repo-workflows-line_dossier-line-dossier-view-60cc9462 = Summarize cited history with configured AI…
+
+repo-workflows-line_dossier-line-dossier-view-6104eb29 = Open review comment
+
+repo-workflows-line_dossier-line-dossier-view-62fa5a5b = Path
+
+repo-workflows-line_dossier-line-dossier-view-6fe17b05 = Show commit
+
+repo-workflows-line_dossier-line-dossier-view-74b10c62 = Line dossier
+
 repo-workflows-line_dossier-line-dossier-view-82a9c46f = Commit
+
+repo-workflows-line_dossier-line-dossier-view-9a2e3782 = Whitespace-only file changes detected; review the full commit before choosing any ignore revision.
+
+repo-workflows-line_dossier-line-dossier-view-9f405685 = Close dossier
+
+repo-workflows-line_dossier-line-dossier-view-9f68f322 = Whitespace/copy/move-aware blame: { $super-super-short-card-attributi-1 } at { $clip-card-attribution-path-200-2 }:{ $card-attribution-line-3 }
+
+repo-workflows-line_dossier-line-dossier-view-a17a38a1 = Evidence is incomplete because a request or paging budget was reached.
+
+repo-workflows-line_dossier-line-dossier-view-a8198076 = Trace cancelled
+
+repo-workflows-line_dossier-line-dossier-view-aa686e13 = Explain history
+
+repo-workflows-line_dossier-line-dossier-view-ab2f98d8 = Follow mapped parent { $i-1-1 } · { $super-super-short-seed-commit-2 }
+
+repo-workflows-line_dossier-line-dossier-view-ad6fe29b = { $pull-checked-1 } review comments checked; { $pull-unmapped-2 } unrelated or unprovable comments excluded
+
+repo-workflows-line_dossier-line-dossier-view-afd58bc7 = Linked issue { $label }
+
+repo-workflows-line_dossier-line-dossier-view-bc45a9dc = No associated pull request was returned by this forge.
+
+repo-workflows-line_dossier-line-dossier-view-d419751a = Reading evidence for the selected card…
+
+repo-workflows-line_dossier-line-dossier-view-d7852cd0 = Line
+
+repo-workflows-line_dossier-line-dossier-view-eeeadb1d = Choose a committed file and its 1-based line number, then Explain history. Working/index line numbers are not silently treated as HEAD line numbers.
+
+repo-workflows-line_dossier-line-dossier-view-efa2521b = Review formatting ignore…
+
+repo-workflows-line_dossier-line-dossier-view-f31d5024 = Traces pinned regular text blobs without fetching or touching working/staged contents. Parent uncertainty and merge alternatives stay explicit.
+
+repo-workflows-line_dossier-line-dossier-view-f420ab1f = Committed versions · read only
+
+repo-workflows-line_dossier-poll-line-dossier-1cd553a8 = Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history
+
+repo-workflows-line_dossier-poll-line-dossier-45e16671 = No supported forge remote; commit history remains available
+
+repo-workflows-line_dossier-run-2498583a = Configured history summary tool failed
+
+repo-workflows-line_dossier-run-25d4488a = Summary tool returned non-UTF-8 text
+
+repo-workflows-line_dossier-run-6e49ac3f = Summary omitted card citations; use the source cards or retry
+
+repo-workflows-line_dossier-run-7a9f59da = History summary exceeds 256 KiB; trace fewer cards
+
+repo-workflows-line_dossier-run-9f78199f = Empty AI command
+
+repo-workflows-line_dossier-run-a9f1b338 = History summary cancelled or exceeded its output limit
+
+repo-workflows-line_dossier-run-ae6f0623 = Summary cancelled
+
+repo-workflows-local_ci-arguments-2686361a = Runner mapping must be label=container-image
+
+repo-workflows-local_ci-arguments-39e7fe22 = Unsupported container architecture
+
+repo-workflows-local_ci-arguments-48f831c2 = Invalid runner mapping; host execution is not supported
+
+repo-workflows-local_ci-arguments-7e0ae020 = Event JSON must be an object of at most 1 MiB
+
+repo-workflows-local_ci-arguments-9ada5400 = Supply explicit runner-label=container-image mappings; host runners are not started
+
+repo-workflows-local_ci-arguments-d09062d3 = Event JSON: { $e }
+
+repo-workflows-local_ci-capture-06580fa5 = Context remote is missing; refresh repository remotes and choose again
+
+repo-workflows-local_ci-capture-3a6208be = Choose a configured context remote
+
+repo-workflows-local_ci-capture-534b1c84 = Context URL must identify a plain GitHub owner/repository without URL parameters or credentials
+
+repo-workflows-local_ci-capture-cbef0bd4 = Context URL must identify owner/repository
+
+repo-workflows-local_ci-capture-eb158ced = Local Actions currently supports direct GitHub.com HTTPS or git SSH fetch URLs only. Enterprise and other hosts, URL aliases, credentials and custom ports require running act directly with an explicit GitHub instance.
+
+repo-workflows-local_ci-check-config-284c844f = Ambient act configuration at { $path-display-1 } could change this run. Move its options into the explicit runner mapping, or run act directly.
+
+repo-workflows-local_ci-check-config-d57e1227 = Cannot inspect act configuration at { $path-display-1 }: { $e }
+
+repo-workflows-local_ci-controls-3e8197fb = Run the selected workflow against this worktree's current files. Local output is separate from hosted checks.
+
+repo-workflows-local_ci-controls-683b3dce = Read workflows
+
+repo-workflows-local_ci-controls-8bc74e1f = Cancel act process
+
+repo-workflows-local_ci-controls-a5c8e0e7 = Display capped at 2 MiB / 32768 rows; additional output omitted.
+
+repo-workflows-local_ci-controls-b19c65b7 = Local output
+
+repo-workflows-local_ci-display-8dc95fe7 = { $self-name-1 } · host github.com · repository { $self-repository-2 } · fetch URL { $self-url-3 }
+
+repo-workflows-local_ci-execute-with-142bda92 = act exited with { $out-status-1 }. See local output. No hosted CI result was changed.
+
+repo-workflows-local_ci-execute-with-2ea8f492 = { $reason }. The act process stopped; Docker containers/services may still be running. Inspect Docker resources before retrying; gitcraft performs no global cleanup.
+
+repo-workflows-local_ci-execute-with-3e3b1e0a = Local act run completed. This is not a hosted CI result.
+
+repo-workflows-local_ci-execute-with-77a6f13d = Missing private directory name
+
+repo-workflows-local_ci-execute-with-bdf39918 = Workflow changed since selection. Reload workflows and review the new job/matrix.
+
+repo-workflows-local_ci-local-ci-act-3feaaea5 = No selected matrix entry
+
+repo-workflows-local_ci-local-ci-act-476da961 = LOCAL · { $workflow-file-1 } · { $event } · { $job } · { $text-matrix-2 } · worktree { $crate-remote-display-self-path-3 } · { $context-display-4 }
+
+repo-workflows-local_ci-local-ci-act-933801f0 = Repository context changed since display; review it before running
+
+repo-workflows-local_ci-matrices-36d96458 = Matrix exclude must contain mappings
+
+repo-workflows-local_ci-matrices-569945ec = Invalid matrix entry
+
+repo-workflows-local_ci-matrices-57ef5431 = Expression matrix values cannot be enumerated here
+
+repo-workflows-local_ci-matrices-5b4af304 = Expression matrices need an evaluated event/context; act cannot enumerate them here
+
+repo-workflows-local_ci-matrices-5f87e09b = Matrix exclude names an unknown axis
+
+repo-workflows-local_ci-matrices-628bb2dc = Expression matrix axes cannot be enumerated here
+
+repo-workflows-local_ci-matrices-68e58030 = Matrix exclude must be a list
+
+repo-workflows-local_ci-matrices-6ba6931e = Matrix include must contain mappings
+
+repo-workflows-local_ci-matrices-9c4ccca2 = Matrix axis must be a string
+
+repo-workflows-local_ci-matrices-a6667f67 = Expression matrix includes cannot be enumerated here
+
+repo-workflows-local_ci-matrices-e3f5c014 = Matrix exceeds 256 entries
+
+repo-workflows-local_ci-matrices-ea2779b1 = Matrix include must be a list
+
+repo-workflows-local_ci-new-35401ccc = Cannot allocate private act workspace
+
+repo-workflows-local_ci-parse-29e871ff = Workflow exceeds 1 MiB
+
+repo-workflows-local_ci-parse-4e3ad741 = Expected one workflow document
+
+repo-workflows-local_ci-parse-598eb5d3 = Invalid job id
+
+repo-workflows-local_ci-parse-922bc165 = Workflow structure exceeds the selector's limits
+
+repo-workflows-local_ci-parse-96d73183 = Workflow has no selectable events/jobs
+
+repo-workflows-local_ci-parse-a0a33130 = Workflow has no jobs mapping
+
+repo-workflows-local_ci-parse-be534029 = YAML aliases are not supported by the local selector; open this workflow in act directly
+
+repo-workflows-local_ci-poll-3b4f1312 = Local operation ended without an answer (cancelled or worker failed). Inspect Docker resources before retrying.
+
+repo-workflows-local_ci-poll-93b6c091 = Profile changed; the local operation was cancelled. An act run's Docker resources may remain; inspect them before retrying.
+
+repo-workflows-local_ci-put-1e79a468 = Expected a mapping
+
+repo-workflows-local_ci-read-catalog-34bc7dab = { $file }: { $e }
+
+repo-workflows-local_ci-read-catalog-4a734aad = More than 256 workflow files; narrow the workflow directory first
+
+repo-workflows-local_ci-read-catalog-56e09929 = Local Actions needs a worktree on this machine. Use act on the repository's machine for a remote worktree.
+
+repo-workflows-local_ci-read-catalog-e3297274 = Cannot read .github/workflows: { $e }
+
+repo-workflows-local_ci-read-source-0066c097 = Workflow is missing, linked outside the worktree, unreadable, or exceeds 1 MiB
+
+repo-workflows-local_ci-read-source-02772e72 = Workflow is not UTF-8
+
+repo-workflows-local_ci-revalidate-with-d12b2aa8 = Context remote URL changed or is ambiguous. Refresh remotes, review repository context and run again.
+
+repo-workflows-local_ci-revalidate-with-e02bce32 = Cannot confirm the local context remote; refresh remotes before running
+
+repo-workflows-local_ci-selection-ui-289ae09d = The selected job uses a private workflow snapshot with exactly one matrix entry. needs jobs also run. Local files are copied, not bind-mounted. Automatic .env/.secrets/.vars/.input and ambient actrc flags are refused. The Docker socket is not mounted inside the runner. Container options in a trusted workflow still matter. act and Docker must already be installed. No hosted check is written.
+
+repo-workflows-local_ci-selection-ui-2c597b18 = Selected workflow snapshot
+
+repo-workflows-local_ci-selection-ui-2d7d7bb9 = Architecture (optional)
+
+repo-workflows-local_ci-selection-ui-32f7c3c5 = Timeout minutes
+
+repo-workflows-local_ci-selection-ui-4c541172 = Context remote
+
+repo-workflows-local_ci-selection-ui-5784e351 = act limitations and execution scope
+
+repo-workflows-local_ci-selection-ui-57d9c265 = Event payload (JSON)
+
+repo-workflows-local_ci-selection-ui-6252e493 = Choose event
+
+repo-workflows-local_ci-selection-ui-67076d36 = No matrix entry
+
+repo-workflows-local_ci-selection-ui-6c9c931f = Runs { $job } and prerequisites: { $needs }. Prerequisite matrices retain all their entries.
+
+repo-workflows-local_ci-selection-ui-6d053cdd = Choose workflow
+
+repo-workflows-local_ci-selection-ui-85e1c7fb = Cancel/timeout stops gitcraft's act child. Docker containers or services may continue; inspect Docker before retrying. No automatic global Docker cleanup is performed.
+
+repo-workflows-local_ci-selection-ui-88017c1f = act supported features
+
+repo-workflows-local_ci-selection-ui-9052f5fc = I trust this workflow, its actions and runner images to execute on this machine
+
+repo-workflows-local_ci-selection-ui-cfd96599 = Linux containers do not reproduce native macOS/Windows runners. act ignores or incompletely supports concurrency, run-name, permissions, timeout-minutes, continue-on-error, environments/protected environment secrets, OIDC and cancellation inside a run step. GitHub context and event filtering differ. Supply event inputs in JSON; missing secrets, private actions or unsupported reusable workflows may fail.
+
+repo-workflows-local_ci-selection-ui-d3f86564 = act reads this remote's fetch URL for repository context. If its pushURL differs, review repository fields in the event JSON. Hosted CI retains its push-destination routing.
+
+repo-workflows-local_ci-selection-ui-e07ff1de = Run selected entry locally
+
+repo-workflows-local_ci-selection-ui-e9ff68bc = Runner mappings · one label=container-image per line
+
+repo-workflows-local_ci-selection-ui-f87dca5f = Choose job
+
+repo-workflows-local_ci-snapshot-1caa7e76 = Selected matrix no longer exists
+
+repo-workflows-local_ci-snapshot-67615d59 = Selection no longer belongs to this workflow
+
+repo-workflows-local_ci-snapshot-da7150dd = Missing selected job
+
+repo-workflows-local_ci-strings-5c665142 = Dynamic or invalid event/job names cannot be selected locally
+
+repo-workflows-local_ci-strings-d5611771 = Expected a string, list or mapping
+
+repo-workflows-local_ci-submit-84f8f92f = Cancelled before starting
+
+repo-workflows-local_ci-ui-a38baafc = Local Actions · installed act
+
+repo-workflows-local_ci-visit-038c0ec6 = Missing dependency job { $j }
+
+repo-workflows-local_ci-visit-03e9fa88 = Cyclic job dependencies
 
 repo-workflows-owners-contents-3203b0df = Couldn't list the repository's files: { $e }
 

@@ -29,11 +29,11 @@ pub(super) fn run(
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     if !active() {
-        return Err("Summary cancelled".into());
+        return Err(crate::i18n::text("repo-workflows-line_dossier-run-ae6f0623").into());
     }
     let input = prompt(cards).into_bytes();
     if input.len() > 256 * 1024 {
-        return Err("History summary exceeds 256 KiB; trace fewer cards".into());
+        return Err(crate::i18n::text("repo-workflows-line_dossier-run-7a9f59da").into());
     }
     let configured = ai::run::CommandLine::for_tool(settings)?;
     let out = if let Some(target) = remote::parse(repo) {
@@ -49,13 +49,15 @@ pub(super) fn run(
             },
         )?;
         if output.code != 0 {
-            return Err("Configured history summary tool failed".into());
+            return Err(crate::i18n::text("repo-workflows-line_dossier-run-2498583a").into());
         }
         output.stdout
     } else {
         let mut command = match configured {
             ai::run::CommandLine::Words(words) => {
-                let mut cmd = std::process::Command::new(words.first().ok_or("Empty AI command")?);
+                let mut cmd = std::process::Command::new(words.first().ok_or(
+                    crate::i18n::text("repo-workflows-line_dossier-run-9f78199f"),
+                )?);
                 cmd.args(&words[1..]);
                 cmd
             }
@@ -84,20 +86,21 @@ pub(super) fn run(
         )?
         .complete()?;
         if !output.status.success() {
-            return Err("Configured history summary tool failed".into());
+            return Err(crate::i18n::text("repo-workflows-line_dossier-run-2498583a").into());
         }
         output.stdout
     };
     if !active() || out.len() > 1024 * 1024 {
-        return Err("History summary cancelled or exceeded its output limit".into());
+        return Err(crate::i18n::text("repo-workflows-line_dossier-run-a9f1b338").into());
     }
-    let answer = String::from_utf8(out).map_err(|_| "Summary tool returned non-UTF-8 text")?;
+    let answer = String::from_utf8(out)
+        .map_err(|_| crate::i18n::text("repo-workflows-line_dossier-run-25d4488a"))?;
     if cards
         .iter()
         .enumerate()
         .any(|(i, _)| !answer.contains(&format!("[C{}]", i + 1)))
     {
-        return Err("Summary omitted card citations; use the source cards or retry".into());
+        return Err(crate::i18n::text("repo-workflows-line_dossier-run-6e49ac3f").into());
     }
     Ok(answer)
 }

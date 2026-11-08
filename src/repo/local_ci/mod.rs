@@ -79,7 +79,10 @@ impl State {
         };
         if pending.context != connections::current() {
             self.pending = None;
-            self.result=Some(Err("Profile changed; the local operation was cancelled. An act run's Docker resources may remain; inspect them before retrying.".into()));
+            self.result = Some(Err(crate::i18n::text(
+                "repo-workflows-local_ci-poll-93b6c091",
+            )
+            .into()));
             return;
         }
         match pending.reply.try_recv() {
@@ -104,7 +107,10 @@ impl State {
             }
             Err(mpsc::TryRecvError::Disconnected) => {
                 self.pending = None;
-                self.result=Some(Err("Local operation ended without an answer (cancelled or worker failed). Inspect Docker resources before retrying.".into()));
+                self.result = Some(Err(crate::i18n::text(
+                    "repo-workflows-local_ci-poll-3b4f1312",
+                )
+                .into()));
             }
             Err(mpsc::TryRecvError::Empty) => {
                 ctx.request_repaint_after(std::time::Duration::from_millis(100));
@@ -129,8 +135,10 @@ impl State {
                 tasks::Priority::Background,
                 key,
                 Some(Box::new(move || {
-                    let _ =
-                        cancelled.send(Reply::Finished(Err("Cancelled before starting".into())));
+                    let _ = cancelled.send(Reply::Finished(Err(crate::i18n::text(
+                        "repo-workflows-local_ci-submit-84f8f92f",
+                    )
+                    .into())));
                     fail_repaint.request_repaint();
                 })),
                 Box::new(move || {
@@ -154,7 +162,7 @@ impl State {
     }
     fn ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>, remotes: &[crate::git::Remote]) {
         self.poll(ui.ctx());
-        egui::CollapsingHeader::new("Local Actions · installed act")
+        egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-local_ci-ui-a38baafc"))
             .default_open(true)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
@@ -171,17 +179,29 @@ impl State {
         acts: &mut Vec<Action>,
         remotes: &[crate::git::Remote],
     ) {
-        ui.label("Run the selected workflow against this worktree's current files. Local output is separate from hosted checks.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-local_ci-controls-3e8197fb",
+        ));
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(!self.busy(), egui::Button::new("Read workflows"))
+                .add_enabled(
+                    !self.busy(),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-local_ci-controls-683b3dce",
+                    )),
+                )
                 .clicked()
             {
                 acts.push(Action::LocalCi(Act::Load));
             }
             if self.busy() {
                 ui.add(crate::spinner::Spinner::new());
-                if ui.button("Cancel act process").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-local_ci-controls-8bc74e1f",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::LocalCi(Act::Cancel));
                 }
             }
@@ -208,24 +228,26 @@ impl State {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if !log.text.is_empty() {
-            egui::CollapsingHeader::new("Local output")
-                .default_open(true)
-                .show(ui, |ui| {
-                    egui::ScrollArea::vertical()
-                        .id_salt("local-act-output")
-                        .max_height(240.0)
-                        .stick_to_bottom(true)
-                        .show_rows(ui, 18.0, log.rows.len(), |ui, rows| {
-                            for i in rows {
-                                ui.monospace(&log.rows[i]);
-                            }
-                        });
-                    if log.truncated {
-                        ui.label(
-                            "Display capped at 2 MiB / 32768 rows; additional output omitted.",
-                        );
-                    }
-                });
+            egui::CollapsingHeader::new(crate::i18n::text(
+                "repo-workflows-local_ci-controls-b19c65b7",
+            ))
+            .default_open(true)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("local-act-output")
+                    .max_height(240.0)
+                    .stick_to_bottom(true)
+                    .show_rows(ui, 18.0, log.rows.len(), |ui, rows| {
+                        for i in rows {
+                            ui.monospace(&log.rows[i]);
+                        }
+                    });
+                if log.truncated {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-local_ci-controls-a5c8e0e7",
+                    ));
+                }
+            });
         }
     }
 
@@ -237,11 +259,10 @@ impl State {
     ) {
         let before = (self.workflow, self.job);
         egui::ComboBox::from_id_salt("local-workflow")
-            .selected_text(
-                self.workflows
-                    .get(self.workflow)
-                    .map_or("Choose workflow", |w| w.file.as_str()),
-            )
+            .selected_text(self.workflows.get(self.workflow).map_or(
+                crate::i18n::text("repo-workflows-local_ci-selection-ui-6d053cdd"),
+                |w| w.file.as_str(),
+            ))
             .show_ui(ui, |ui| {
                 for (i, w) in self.workflows.iter().enumerate() {
                     ui.selectable_value(&mut self.workflow, i, &w.file);
@@ -257,24 +278,20 @@ impl State {
             return;
         };
         egui::ComboBox::from_id_salt("local-event")
-            .selected_text(
-                workflow
-                    .events
-                    .get(self.event)
-                    .map_or("Choose event", String::as_str),
-            )
+            .selected_text(workflow.events.get(self.event).map_or(
+                crate::i18n::text("repo-workflows-local_ci-selection-ui-6252e493"),
+                String::as_str,
+            ))
             .show_ui(ui, |ui| {
                 for (i, event) in workflow.events.iter().enumerate() {
                     ui.selectable_value(&mut self.event, i, event);
                 }
             });
         egui::ComboBox::from_id_salt("local-job")
-            .selected_text(
-                workflow
-                    .jobs
-                    .get(self.job)
-                    .map_or("Choose job", String::as_str),
-            )
+            .selected_text(workflow.jobs.get(self.job).map_or(
+                crate::i18n::text("repo-workflows-local_ci-selection-ui-f87dca5f"),
+                String::as_str,
+            ))
             .show_ui(ui, |ui| {
                 for (i, job) in workflow.jobs.iter().enumerate() {
                     ui.selectable_value(&mut self.job, i, job);
@@ -295,12 +312,9 @@ impl State {
             }
         };
         egui::ComboBox::from_id_salt("local-matrix")
-            .selected_text(
-                entries
-                    .get(self.matrix)
-                    .map(text)
-                    .unwrap_or_else(|| "No matrix entry".into()),
-            )
+            .selected_text(entries.get(self.matrix).map(text).unwrap_or_else(|| {
+                crate::i18n::text("repo-workflows-local_ci-selection-ui-67076d36").into()
+            }))
             .show_ui(ui, |ui| {
                 for (i, entry) in entries.iter().enumerate() {
                     ui.selectable_value(&mut self.matrix, i, text(entry));
@@ -314,23 +328,34 @@ impl State {
                     .cloned()
                     .collect::<Vec<_>>()
                     .join(", ");
-                ui.label(format!("Runs {job} and prerequisites: {needs}. Prerequisite matrices retain all their entries."));
+                ui.label(crate::i18n::message(
+                    "repo-workflows-local_ci-selection-ui-6c9c931f",
+                    &[
+                        ("job", (job).clone().into()),
+                        ("needs", (needs).clone().into()),
+                    ],
+                ));
             }
             Err(e) => {
                 ui.colored_label(egui::Color32::YELLOW, e);
                 return;
             }
         }
-        ui.collapsing("Event payload (JSON)", |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut self.payload)
-                    .code_editor()
-                    .desired_rows(5)
-                    .char_limit(model::MAX),
-            );
-        });
+        ui.collapsing(
+            crate::i18n::text("repo-workflows-local_ci-selection-ui-57d9c265"),
+            |ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.payload)
+                        .code_editor()
+                        .desired_rows(5)
+                        .char_limit(model::MAX),
+                );
+            },
+        );
         ui.horizontal(|ui| {
-            ui.label("Context remote");
+            ui.label(crate::i18n::text(
+                "repo-workflows-local_ci-selection-ui-4c541172",
+            ));
             if ui.text_edit_singleline(&mut self.remote).changed() {
                 self.remote_override = true;
                 self.trust = false;
@@ -349,8 +374,12 @@ impl State {
                 ui.colored_label(egui::Color32::YELLOW, error);
             }
         }
-        ui.label("act reads this remote's fetch URL for repository context. If its pushURL differs, review repository fields in the event JSON. Hosted CI retains its push-destination routing.");
-        ui.label("Runner mappings · one label=container-image per line");
+        ui.label(crate::i18n::text(
+            "repo-workflows-local_ci-selection-ui-d3f86564",
+        ));
+        ui.label(crate::i18n::text(
+            "repo-workflows-local_ci-selection-ui-e9ff68bc",
+        ));
         ui.add(
             egui::TextEdit::multiline(&mut self.platforms)
                 .desired_rows(2)
@@ -358,42 +387,63 @@ impl State {
                 .char_limit(8192),
         );
         ui.horizontal(|ui| {
-            ui.label("Architecture (optional)");
+            ui.label(crate::i18n::text(
+                "repo-workflows-local_ci-selection-ui-2d7d7bb9",
+            ));
             ui.text_edit_singleline(&mut self.architecture);
-            ui.label("Timeout minutes");
+            ui.label(crate::i18n::text(
+                "repo-workflows-local_ci-selection-ui-32f7c3c5",
+            ));
             ui.add(egui::DragValue::new(&mut self.minutes).range(1..=120));
         });
-        ui.collapsing("act limitations and execution scope", |ui| {
-            ui.label("Linux containers do not reproduce native macOS/Windows runners. act ignores or incompletely supports concurrency, run-name, permissions, timeout-minutes, continue-on-error, environments/protected environment secrets, OIDC and cancellation inside a run step. GitHub context and event filtering differ. Supply event inputs in JSON; missing secrets, private actions or unsupported reusable workflows may fail.");
-            ui.label("The selected job uses a private workflow snapshot with exactly one matrix entry. needs jobs also run. Local files are copied, not bind-mounted. Automatic .env/.secrets/.vars/.input and ambient actrc flags are refused. The Docker socket is not mounted inside the runner. Container options in a trusted workflow still matter. act and Docker must already be installed. No hosted check is written.");
-            ui.label("Cancel/timeout stops gitcraft's act child. Docker containers or services may continue; inspect Docker before retrying. No automatic global Docker cleanup is performed.");
-            ui.hyperlink_to("act supported features", "https://nektosact.com/not_supported.html");
-        });
-        ui.collapsing("Selected workflow snapshot", |ui| {
-            if let (Some(entry), Some(event)) =
-                (entries.get(self.matrix), workflow.events.get(self.event))
-            {
-                match workflow.snapshot(event, job, entry, "preview") {
-                    Ok(source) => {
-                        ui.add(
-                            egui::Label::new(egui::RichText::new(source).monospace())
-                                .selectable(true),
-                        );
-                    }
-                    Err(error) => {
-                        ui.label(error);
+        ui.collapsing(
+            crate::i18n::text("repo-workflows-local_ci-selection-ui-5784e351"),
+            |ui| {
+                ui.label(crate::i18n::text(
+                    "repo-workflows-local_ci-selection-ui-cfd96599",
+                ));
+                ui.label(crate::i18n::text(
+                    "repo-workflows-local_ci-selection-ui-289ae09d",
+                ));
+                ui.label(crate::i18n::text(
+                    "repo-workflows-local_ci-selection-ui-85e1c7fb",
+                ));
+                ui.hyperlink_to(
+                    crate::i18n::text("repo-workflows-local_ci-selection-ui-88017c1f"),
+                    "https://nektosact.com/not_supported.html",
+                );
+            },
+        );
+        ui.collapsing(
+            crate::i18n::text("repo-workflows-local_ci-selection-ui-2c597b18"),
+            |ui| {
+                if let (Some(entry), Some(event)) =
+                    (entries.get(self.matrix), workflow.events.get(self.event))
+                {
+                    match workflow.snapshot(event, job, entry, "preview") {
+                        Ok(source) => {
+                            ui.add(
+                                egui::Label::new(egui::RichText::new(source).monospace())
+                                    .selectable(true),
+                            );
+                        }
+                        Err(error) => {
+                            ui.label(error);
+                        }
                     }
                 }
-            }
-        });
+            },
+        );
         ui.checkbox(
             &mut self.trust,
-            "I trust this workflow, its actions and runner images to execute on this machine",
+            crate::i18n::text("repo-workflows-local_ci-selection-ui-9052f5fc"),
         );
         if ui
             .add_enabled(
                 self.trust && entries.get(self.matrix).is_some() && context.is_ok(),
-                egui::Button::new("Run selected entry locally"),
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-local_ci-selection-ui-e07ff1de",
+                )),
             )
             .clicked()
         {
@@ -464,9 +514,10 @@ impl RepoTab {
                 let state = &mut self.local_ci;
                 if state.displayed_context.as_ref() != Some(&context) {
                     state.trust = false;
-                    state.result = Some(Err(
-                        "Repository context changed since display; review it before running".into(),
-                    ));
+                    state.result = Some(Err(crate::i18n::text(
+                        "repo-workflows-local_ci-local-ci-act-933801f0",
+                    )
+                    .into()));
                     return;
                 }
                 if !state.trust {
@@ -482,9 +533,9 @@ impl RepoTab {
                     return;
                 };
                 let matrix = match workflow.matrices(&job).and_then(|e| {
-                    e.get(state.matrix)
-                        .cloned()
-                        .ok_or("No selected matrix entry".into())
+                    e.get(state.matrix).cloned().ok_or(
+                        crate::i18n::text("repo-workflows-local_ci-local-ci-act-3feaaea5").into(),
+                    )
                 }) {
                     Ok(m) => m,
                     Err(e) => {
@@ -492,12 +543,19 @@ impl RepoTab {
                         return;
                     }
                 };
-                state.provenance = Some(format!(
-                    "LOCAL · {} · {event} · {job} · {} · worktree {} · {}",
-                    workflow.file,
-                    text(&matrix),
-                    crate::remote::display(&self.path),
-                    context.display()
+                state.provenance = Some(crate::i18n::message(
+                    "repo-workflows-local_ci-local-ci-act-476da961",
+                    &[
+                        ("workflow-file-1", (workflow.file).clone().into()),
+                        ("event", (event).clone().into()),
+                        ("job", (job).clone().into()),
+                        ("text-matrix-2", (text(&matrix)).clone().into()),
+                        (
+                            "crate-remote-display-self-path-3",
+                            (crate::remote::display(&self.path)).clone().into(),
+                        ),
+                        ("context-display-4", (context.display()).clone().into()),
+                    ],
                 ));
                 let selection = run::Selection {
                     workflow,

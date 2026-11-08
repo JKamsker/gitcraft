@@ -3129,7 +3129,277 @@ repo-workflows-lfs_storage-usage-aca1a392 = LFS-Objekte werden vermessen …
 
 repo-workflows-lfs_storage-usage-bc295532 = Die LFS-Objekte konnten nicht vermessen werden: { $e }
 
+repo-workflows-line_dossier-dossier-ignore-finished-366a809a = Revision bereits vorhanden. Ignore-Datei und Index blieben unverändert.
+
+repo-workflows-line_dossier-dossier-ignore-finished-4c50387c = Revision ignorieren: { $error }
+
+repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff = Revision an .git-blame-ignore-revs angehängt. Der vorgemerkte Inhalt blieb erhalten. Git blame kann blame.ignoreRevsFile=.git-blame-ignore-revs verwenden.
+
+repo-workflows-line_dossier-dossier-ignore-view-66c640dc = Gesamter Commit-Patch
+
+repo-workflows-line_dossier-dossier-ignore-view-7f80e3ed = Vorschau des Anhangs an .git-blame-ignore-revs
+
+repo-workflows-line_dossier-dossier-ignore-view-8dac5aad = Ich habe den gesamten Patch geprüft und möchte diese Revision ignorieren
+
+repo-workflows-line_dossier-dossier-ignore-view-a29947af = Der Anhang fügt einen führenden Zeilenumbruch und eine vollständige Objekt-ID hinzu. Eine fehlende Datei wird exklusiv erstellt. Links, Hardlinks, Spezialdateien, geänderte Momentaufnahmen und geänderte Wurzeln werden abgelehnt. Entferntes Anhängen benötigt Python 3. Der Dossier-Verlauf zeigt ignorierte Formatierungsversionen weiterhin.
+
+repo-workflows-line_dossier-dossier-ignore-view-b784191c = Geprüfte Revision anhängen
+
+repo-workflows-line_dossier-dossier-ignore-view-cfd1a00e = Bestehende Ignore-Datei
+
+repo-workflows-line_dossier-dossier-ignore-view-dbcd08f5 = Zurück zu den Versionen
+
+repo-workflows-line_dossier-dossier-ignore-view-f5736f62 = Git -w erkennt Leerraumänderungen auch innerhalb von Zeichenketten. Prüfen Sie den gesamten Patch und entscheiden Sie, ob dieser Commit ignoriert werden sollte. Bestehende Bytes und der vorgemerkte Index bleiben erhalten. Vor der Bestätigung wird nichts geändert.
+
+repo-workflows-line_dossier-line-dossier-view-054bd44a = Festgelegt auf { $super-super-short-result-start-c-1 } · { $clip-result-start-path-120-2 }:{ $result-start-line-3 } · { $result-cards-len-4 } Versionen
+
+repo-workflows-line_dossier-line-dossier-view-0ac12d95 = Zusammenfassung abbrechen
+
+repo-workflows-line_dossier-line-dossier-view-2a0caf4a = Pull Requests, Zeilenkommentare und verknüpfte Issues
+
+repo-workflows-line_dossier-line-dossier-view-2de6a99b = Sendet die angezeigten Verlaufskarten an Ihr Tool unter Einstellungen → KI. Ein eigener Befehl kann Ihren eigenen Schlüssel oder ein lokales Modell verwenden.
+
+repo-workflows-line_dossier-line-dossier-view-37a046ba = Untersuchung abbrechen
+
+repo-workflows-line_dossier-line-dossier-view-55b46438 = Modellzusammenfassung · zitierte Quellkarten überprüfen
+
+repo-workflows-line_dossier-line-dossier-view-562e7c08 = Datei in dieser Version öffnen
+
+repo-workflows-line_dossier-line-dossier-view-5853cee3 = Frühere Versionen untersuchen
+
+repo-workflows-line_dossier-line-dossier-view-60cc9462 = Belegten Verlauf mit der konfigurierten KI zusammenfassen …
+
+repo-workflows-line_dossier-line-dossier-view-6104eb29 = Review-Kommentar öffnen
+
+repo-workflows-line_dossier-line-dossier-view-62fa5a5b = Pfad
+
+repo-workflows-line_dossier-line-dossier-view-6fe17b05 = Commit anzeigen
+
+repo-workflows-line_dossier-line-dossier-view-74b10c62 = Zeilendossier
+
 repo-workflows-line_dossier-line-dossier-view-82a9c46f = Committen
+
+repo-workflows-line_dossier-line-dossier-view-9a2e3782 = Änderungen ausschließlich am Leerraum erkannt. Vor der Auswahl einer zu ignorierenden Revision den gesamten Commit prüfen.
+
+repo-workflows-line_dossier-line-dossier-view-9f405685 = Dossier schließen
+
+repo-workflows-line_dossier-line-dossier-view-9f68f322 = Blame mit Berücksichtigung von Leerraum, Kopien und Verschiebungen: { $super-super-short-card-attributi-1 } bei { $clip-card-attribution-path-200-2 }:{ $card-attribution-line-3 }
+
+repo-workflows-line_dossier-line-dossier-view-a17a38a1 = Die Belege sind unvollständig, weil eine Anfrage- oder Seitengrenze erreicht wurde.
+
+repo-workflows-line_dossier-line-dossier-view-a8198076 = Untersuchung abgebrochen
+
+repo-workflows-line_dossier-line-dossier-view-aa686e13 = Verlauf erklären
+
+repo-workflows-line_dossier-line-dossier-view-ab2f98d8 = Zugeordnetem Eltern-Commit { $i-1-1 } · { $super-super-short-seed-commit-2 } folgen
+
+repo-workflows-line_dossier-line-dossier-view-ad6fe29b = { $pull-checked-1 } Review-Kommentare geprüft. { $pull-unmapped-2 } nicht zugehörige oder nicht belegbare Kommentare ausgeschlossen.
+
+repo-workflows-line_dossier-line-dossier-view-afd58bc7 = Verknüpftes Issue { $label }
+
+repo-workflows-line_dossier-line-dossier-view-bc45a9dc = Die Plattform hat keinen zugehörigen Pull Request geliefert.
+
+repo-workflows-line_dossier-line-dossier-view-d419751a = Belege für die ausgewählte Karte werden gelesen …
+
+repo-workflows-line_dossier-line-dossier-view-d7852cd0 = Zeile
+
+repo-workflows-line_dossier-line-dossier-view-eeeadb1d = Eine committete Datei und ihre Zeilennummer ab 1 wählen und dann den Verlauf erklären lassen. Zeilennummern aus Arbeitsverzeichnis oder Index werden nicht stillschweigend als HEAD-Zeilennummern behandelt.
+
+repo-workflows-line_dossier-line-dossier-view-efa2521b = Formatierungsänderung zum Ignorieren prüfen …
+
+repo-workflows-line_dossier-line-dossier-view-f31d5024 = Untersucht festgelegte reguläre Textobjekte ohne Fetch oder Zugriff auf Arbeits- und Indexinhalte. Unsichere Elternzuordnungen und Merge-Alternativen bleiben sichtbar.
+
+repo-workflows-line_dossier-line-dossier-view-f420ab1f = Committete Versionen · schreibgeschützt
+
+repo-workflows-line_dossier-poll-line-dossier-1cd553a8 = Die Dossier-Anzeige hat 256 Versionen oder 32 MiB erreicht. Für älteren Verlauf eine neue Untersuchung starten.
+
+repo-workflows-line_dossier-poll-line-dossier-45e16671 = Kein unterstütztes Plattform-Remote. Der Commit-Verlauf bleibt verfügbar.
+
+repo-workflows-line_dossier-run-2498583a = Das konfigurierte Tool für Verlaufszusammenfassungen ist fehlgeschlagen
+
+repo-workflows-line_dossier-run-25d4488a = Das Zusammenfassungstool lieferte keinen UTF-8-Text
+
+repo-workflows-line_dossier-run-6e49ac3f = In der Zusammenfassung fehlen Kartenbelege. Die Quellkarten verwenden oder erneut versuchen.
+
+repo-workflows-line_dossier-run-7a9f59da = Die Verlaufszusammenfassung überschreitet 256 KiB. Weniger Karten untersuchen.
+
+repo-workflows-line_dossier-run-9f78199f = Leerer KI-Befehl
+
+repo-workflows-line_dossier-run-a9f1b338 = Verlaufszusammenfassung abgebrochen oder Ausgabelimit überschritten
+
+repo-workflows-line_dossier-run-ae6f0623 = Zusammenfassung abgebrochen
+
+repo-workflows-local_ci-arguments-2686361a = Runner-Zuordnung muss label=container-image sein
+
+repo-workflows-local_ci-arguments-39e7fe22 = Nicht unterstützte Containerarchitektur
+
+repo-workflows-local_ci-arguments-48f831c2 = Ungültige Runner-Zuordnung. Ausführung auf dem Host wird nicht unterstützt.
+
+repo-workflows-local_ci-arguments-7e0ae020 = Ereignis-JSON muss ein Objekt mit höchstens 1 MiB sein
+
+repo-workflows-local_ci-arguments-9ada5400 = Explizite Zuordnungen runner-label=container-image angeben. Host-Runner werden nicht gestartet.
+
+repo-workflows-local_ci-arguments-d09062d3 = Ereignis-JSON: { $e }
+
+repo-workflows-local_ci-capture-06580fa5 = Das Kontext-Remote fehlt. Repository-Remotes aktualisieren und erneut wählen.
+
+repo-workflows-local_ci-capture-3a6208be = Ein konfiguriertes Kontext-Remote wählen
+
+repo-workflows-local_ci-capture-534b1c84 = Die Kontext-URL muss einen einfachen GitHub-Inhaber und Repositorynamen ohne URL-Parameter oder Zugangsdaten bezeichnen
+
+repo-workflows-local_ci-capture-cbef0bd4 = Die Kontext-URL muss Inhaber/Repository bezeichnen
+
+repo-workflows-local_ci-capture-eb158ced = Lokale Actions unterstützen derzeit nur direkte GitHub.com-Fetch-URLs über HTTPS oder Git-SSH. Enterprise, andere Hosts, URL-Aliase, Zugangsdaten und eigene Ports erfordern act mit einer expliziten GitHub-Instanz.
+
+repo-workflows-local_ci-check-config-284c844f = Umgebungsabhängige act-Konfiguration in { $path-display-1 } könnte diesen Lauf verändern. Ihre Optionen in die expliziten Runner-Zuordnungen übernehmen oder act direkt ausführen.
+
+repo-workflows-local_ci-check-config-d57e1227 = act-Konfiguration in { $path-display-1 } kann nicht geprüft werden: { $e }
+
+repo-workflows-local_ci-controls-3e8197fb = Den gewählten Workflow mit den aktuellen Dateien dieses Worktrees ausführen. Lokale Ausgabe wird getrennt von gehosteten Prüfungen angezeigt.
+
+repo-workflows-local_ci-controls-683b3dce = Workflows lesen
+
+repo-workflows-local_ci-controls-8bc74e1f = act-Prozess abbrechen
+
+repo-workflows-local_ci-controls-a5c8e0e7 = Anzeige auf 2 MiB oder 32.768 Zeilen begrenzt. Weitere Ausgabe ausgelassen.
+
+repo-workflows-local_ci-controls-b19c65b7 = Lokale Ausgabe
+
+repo-workflows-local_ci-display-8dc95fe7 = { $self-name-1 } · Host github.com · Repository { $self-repository-2 } · Fetch-URL { $self-url-3 }
+
+repo-workflows-local_ci-execute-with-142bda92 = act wurde mit { $out-status-1 } beendet. Siehe lokale Ausgabe. Kein gehostetes CI-Ergebnis wurde geändert.
+
+repo-workflows-local_ci-execute-with-2ea8f492 = { $reason }. Der act-Prozess wurde beendet. Docker-Container oder Dienste können weiterlaufen. Docker vor einem erneuten Versuch prüfen. gitcraft führt keine globale Bereinigung durch.
+
+repo-workflows-local_ci-execute-with-3e3b1e0a = Lokaler act-Lauf abgeschlossen. Dies ist kein gehostetes CI-Ergebnis.
+
+repo-workflows-local_ci-execute-with-77a6f13d = Name des privaten Verzeichnisses fehlt
+
+repo-workflows-local_ci-execute-with-bdf39918 = Workflow seit der Auswahl geändert. Workflows erneut laden und den neuen Job und Matrixeintrag prüfen.
+
+repo-workflows-local_ci-local-ci-act-3feaaea5 = Kein Matrixeintrag ausgewählt
+
+repo-workflows-local_ci-local-ci-act-476da961 = LOKAL · { $workflow-file-1 } · { $event } · { $job } · { $text-matrix-2 } · Worktree { $crate-remote-display-self-path-3 } · { $context-display-4 }
+
+repo-workflows-local_ci-local-ci-act-933801f0 = Der Repository-Kontext hat sich seit der Anzeige geändert. Vor dem Start erneut prüfen.
+
+repo-workflows-local_ci-matrices-36d96458 = Matrix-exclude muss Zuordnungen enthalten
+
+repo-workflows-local_ci-matrices-569945ec = Ungültiger Matrixeintrag
+
+repo-workflows-local_ci-matrices-57ef5431 = Matrixwerte mit Ausdrücken können hier nicht aufgezählt werden
+
+repo-workflows-local_ci-matrices-5b4af304 = Ausdrucksmatrizen brauchen ausgewertete Ereignis- und Kontextdaten. act kann sie hier nicht aufzählen.
+
+repo-workflows-local_ci-matrices-5f87e09b = Matrix-exclude nennt eine unbekannte Achse
+
+repo-workflows-local_ci-matrices-628bb2dc = Matrixachsen mit Ausdrücken können hier nicht aufgezählt werden
+
+repo-workflows-local_ci-matrices-68e58030 = Matrix-exclude muss eine Liste sein
+
+repo-workflows-local_ci-matrices-6ba6931e = Matrix-include muss Zuordnungen enthalten
+
+repo-workflows-local_ci-matrices-9c4ccca2 = Die Matrixachse muss eine Zeichenkette sein
+
+repo-workflows-local_ci-matrices-a6667f67 = Matrix-include mit Ausdrücken können hier nicht aufgezählt werden
+
+repo-workflows-local_ci-matrices-e3f5c014 = Die Matrix überschreitet 256 Einträge
+
+repo-workflows-local_ci-matrices-ea2779b1 = Matrix-include muss eine Liste sein
+
+repo-workflows-local_ci-new-35401ccc = Privater act-Arbeitsbereich kann nicht angelegt werden
+
+repo-workflows-local_ci-parse-29e871ff = Der Workflow überschreitet 1 MiB
+
+repo-workflows-local_ci-parse-4e3ad741 = Genau ein Workflow-Dokument erwartet
+
+repo-workflows-local_ci-parse-598eb5d3 = Ungültige Job-ID
+
+repo-workflows-local_ci-parse-922bc165 = Die Workflow-Struktur überschreitet die Grenzen des Auswahlfelds
+
+repo-workflows-local_ci-parse-96d73183 = Der Workflow enthält keine auswählbaren Ereignisse oder Jobs
+
+repo-workflows-local_ci-parse-a0a33130 = Der Workflow enthält keine jobs-Zuordnung
+
+repo-workflows-local_ci-parse-be534029 = YAML-Aliase werden vom lokalen Auswahlfeld nicht unterstützt. Diesen Workflow direkt in act öffnen.
+
+repo-workflows-local_ci-poll-3b4f1312 = Der lokale Vorgang endete ohne Antwort (abgebrochen oder Worker fehlgeschlagen). Docker-Ressourcen vor einem erneuten Versuch prüfen.
+
+repo-workflows-local_ci-poll-93b6c091 = Profil geändert. Der lokale Vorgang wurde abgebrochen. Docker-Ressourcen eines act-Laufs können bestehen bleiben. Vor einem erneuten Versuch prüfen.
+
+repo-workflows-local_ci-put-1e79a468 = Zuordnung erwartet
+
+repo-workflows-local_ci-read-catalog-34bc7dab = { $file }: { $e }
+
+repo-workflows-local_ci-read-catalog-4a734aad = Mehr als 256 Workflow-Dateien. Das Workflow-Verzeichnis zuerst eingrenzen.
+
+repo-workflows-local_ci-read-catalog-56e09929 = Lokale Actions benötigen einen Worktree auf diesem Rechner. Für einen entfernten Worktree act auf dem Rechner des Repositorys verwenden.
+
+repo-workflows-local_ci-read-catalog-e3297274 = .github/workflows kann nicht gelesen werden: { $e }
+
+repo-workflows-local_ci-read-source-0066c097 = Workflow fehlt, verweist aus dem Worktree, ist nicht lesbar oder überschreitet 1 MiB
+
+repo-workflows-local_ci-read-source-02772e72 = Der Workflow ist kein UTF-8
+
+repo-workflows-local_ci-revalidate-with-d12b2aa8 = Die Kontext-Remote-URL hat sich geändert oder ist mehrdeutig. Remotes aktualisieren, Repository-Kontext prüfen und erneut starten.
+
+repo-workflows-local_ci-revalidate-with-e02bce32 = Das lokale Kontext-Remote kann nicht bestätigt werden. Vor dem Start die Remotes aktualisieren.
+
+repo-workflows-local_ci-selection-ui-289ae09d = Der gewählte Job verwendet eine private Workflow-Momentaufnahme mit genau einem Matrixeintrag. Jobs unter needs laufen ebenfalls. Lokale Dateien werden kopiert und nicht eingebunden. Automatische .env/.secrets/.vars/.input und Umgebungsoptionen aus actrc werden abgelehnt. Der Docker-Socket wird nicht im Runner eingebunden. Containeroptionen eines vertrauenswürdigen Workflows bleiben relevant. act und Docker müssen bereits installiert sein. Es wird keine gehostete Prüfung geschrieben.
+
+repo-workflows-local_ci-selection-ui-2c597b18 = Ausgewählte Workflow-Momentaufnahme
+
+repo-workflows-local_ci-selection-ui-2d7d7bb9 = Architektur (optional)
+
+repo-workflows-local_ci-selection-ui-32f7c3c5 = Zeitlimit in Minuten
+
+repo-workflows-local_ci-selection-ui-4c541172 = Kontext-Remote
+
+repo-workflows-local_ci-selection-ui-5784e351 = Einschränkungen und Ausführungsumfang von act
+
+repo-workflows-local_ci-selection-ui-57d9c265 = Ereignisdaten (JSON)
+
+repo-workflows-local_ci-selection-ui-6252e493 = Ereignis wählen
+
+repo-workflows-local_ci-selection-ui-67076d36 = Kein Matrixeintrag
+
+repo-workflows-local_ci-selection-ui-6c9c931f = Führt { $job } und seine Voraussetzungen aus: { $needs }. Matrizen der Voraussetzungen behalten alle Einträge.
+
+repo-workflows-local_ci-selection-ui-6d053cdd = Workflow wählen
+
+repo-workflows-local_ci-selection-ui-85e1c7fb = Abbruch oder Zeitlimit beendet den act-Kindprozess von gitcraft. Docker-Container oder Dienste können weiterlaufen. Docker vor einem erneuten Versuch prüfen. Es erfolgt keine automatische globale Docker-Bereinigung.
+
+repo-workflows-local_ci-selection-ui-88017c1f = Von act unterstützte Funktionen
+
+repo-workflows-local_ci-selection-ui-9052f5fc = Ich vertraue diesem Workflow, seinen Actions und Runner-Images zur Ausführung auf diesem Rechner
+
+repo-workflows-local_ci-selection-ui-cfd96599 = Linux-Container bilden native macOS- und Windows-Runner nicht nach. act unterstützt concurrency, run-name, permissions, timeout-minutes, continue-on-error, environments, geschützte Umgebungsgeheimnisse, OIDC und Abbruch innerhalb eines Schritts nicht oder nur teilweise. GitHub-Kontext und Ereignisfilter unterscheiden sich. Eingaben als JSON bereitstellen. Fehlende Geheimnisse, private Actions und nicht unterstützte wiederverwendbare Workflows können fehlschlagen.
+
+repo-workflows-local_ci-selection-ui-d3f86564 = act liest die Fetch-URL dieses Remotes für den Repository-Kontext. Bei abweichender pushURL die Repository-Felder im Ereignis-JSON prüfen. Gehostete CI behält ihre Push-Zielzuordnung.
+
+repo-workflows-local_ci-selection-ui-e07ff1de = Ausgewählten Eintrag lokal ausführen
+
+repo-workflows-local_ci-selection-ui-e9ff68bc = Runner-Zuordnungen · ein label=container-image pro Zeile
+
+repo-workflows-local_ci-selection-ui-f87dca5f = Job wählen
+
+repo-workflows-local_ci-snapshot-1caa7e76 = Die gewählte Matrix existiert nicht mehr
+
+repo-workflows-local_ci-snapshot-67615d59 = Die Auswahl gehört nicht mehr zu diesem Workflow
+
+repo-workflows-local_ci-snapshot-da7150dd = Der gewählte Job fehlt
+
+repo-workflows-local_ci-strings-5c665142 = Dynamische oder ungültige Ereignis- und Jobnamen können lokal nicht ausgewählt werden
+
+repo-workflows-local_ci-strings-d5611771 = Zeichenkette, Liste oder Zuordnung erwartet
+
+repo-workflows-local_ci-submit-84f8f92f = Vor dem Start abgebrochen
+
+repo-workflows-local_ci-ui-a38baafc = Lokale Actions · installiertes act
+
+repo-workflows-local_ci-visit-038c0ec6 = Abhängiger Job { $j } fehlt
+
+repo-workflows-local_ci-visit-03e9fa88 = Zyklische Job-Abhängigkeiten
 
 repo-workflows-owners-contents-3203b0df = Die Dateien des Repositorys konnten nicht aufgelistet werden: { $e }
 

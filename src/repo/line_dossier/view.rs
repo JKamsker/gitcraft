@@ -14,11 +14,20 @@ impl RepoTab {
         let mut cancel = false;
         let mut prepare_ignore = None;
         ui.horizontal_wrapped(|ui| {
-            ui.heading("Line dossier");
-            if ui.button("Close dossier").clicked() {
+            ui.heading(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-74b10c62",
+            ));
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-line_dossier-line-dossier-view-9f405685",
+                ))
+                .clicked()
+            {
                 acts.push(Action::CloseLineDossier);
             }
-            ui.label("Committed versions · read only");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-f420ab1f",
+            ));
         });
         ui.horizontal_wrapped(|ui| {
             ui.label(crate::i18n::text(
@@ -29,15 +38,24 @@ impl RepoTab {
                     .desired_width(160.0)
                     .char_limit(64),
             );
-            ui.label("Path");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-62fa5a5b",
+            ));
             ui.add(
                 egui::TextEdit::singleline(&mut self.dossier.path)
                     .desired_width(240.0)
                     .char_limit(4096),
             );
-            ui.label("Line");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-d7852cd0",
+            ));
             ui.add(egui::DragValue::new(&mut self.dossier.line).range(1..=20000));
-            if ui.button("Explain history").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-line_dossier-line-dossier-view-aa686e13",
+                ))
+                .clicked()
+            {
                 trace = Some(Seed {
                     commit: self.dossier.revision.clone(),
                     path: self.dossier.path.clone(),
@@ -46,23 +64,58 @@ impl RepoTab {
             }
             if self.dossier.reader.busy() {
                 ui.add(crate::spinner::Spinner::new());
-                cancel = ui.button("Cancel trace").clicked();
+                cancel = ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-line_dossier-line-dossier-view-37a046ba",
+                    ))
+                    .clicked();
             }
         });
-        ui.small("Traces pinned regular text blobs without fetching or touching working/staged contents. Parent uncertainty and merge alternatives stay explicit.");
+        ui.small(crate::i18n::text(
+            "repo-workflows-line_dossier-line-dossier-view-f31d5024",
+        ));
         if let Some(error) = &self.dossier.error {
             ui.colored_label(t.danger, clip(error, 2000));
         }
         ui.horizontal(|ui| {
-            if ui.add_enabled(self.dossier.result.is_some()&&!self.dossier.summary_reader.busy()&&crate::settings::Settings::get(ui.ctx()).ai.tool!=crate::ai::AiTool::Off,egui::Button::new("Summarize cited history with configured AI…")).on_hover_text("Sends the displayed history cards to your Settings → AI tool; a custom command can use your own key or a local model").clicked(){self.summarize_dossier(ui.ctx());}
-            if self.dossier.summary_reader.busy(){ui.add(crate::spinner::Spinner::new());if ui.button("Cancel summary").clicked(){self.dossier.summary_reader.cancel();}}
+            if ui
+                .add_enabled(
+                    self.dossier.result.is_some()
+                        && !self.dossier.summary_reader.busy()
+                        && crate::settings::Settings::get(ui.ctx()).ai.tool
+                            != crate::ai::AiTool::Off,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-line_dossier-line-dossier-view-60cc9462",
+                    )),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-line_dossier-line-dossier-view-2de6a99b",
+                ))
+                .clicked()
+            {
+                self.summarize_dossier(ui.ctx());
+            }
+            if self.dossier.summary_reader.busy() {
+                ui.add(crate::spinner::Spinner::new());
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-line_dossier-line-dossier-view-0ac12d95",
+                    ))
+                    .clicked()
+                {
+                    self.dossier.summary_reader.cancel();
+                }
+            }
         });
         if let Some(summary) = &self.dossier.summary {
             match summary {
                 Ok(text) => {
-                    ui.collapsing("Model summary · verify the cited source cards", |ui| {
-                        ui.label(clip(text, 32000));
-                    });
+                    ui.collapsing(
+                        crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-55b46438"),
+                        |ui| {
+                            ui.label(clip(text, 32000));
+                        },
+                    );
                 }
                 Err(error) => {
                     ui.colored_label(t.warning, error);
@@ -74,19 +127,29 @@ impl RepoTab {
             return;
         }
         if let Some(result) = &self.dossier.result {
-            ui.small(format!(
-                "Pinned {} · {}:{} · {} versions",
-                super::super::short(&result.start.commit),
-                clip(&result.start.path, 120),
-                result.start.line,
-                result.cards.len()
+            ui.small(crate::i18n::message(
+                "repo-workflows-line_dossier-line-dossier-view-054bd44a",
+                &[
+                    (
+                        "super-super-short-result-start-c-1",
+                        (super::super::short(&result.start.commit)).clone().into(),
+                    ),
+                    (
+                        "clip-result-start-path-120-2",
+                        (clip(&result.start.path, 120)).clone().into(),
+                    ),
+                    ("result-start-line-3", (result.start.line).clone().into()),
+                    ("result-cards-len-4", (result.cards.len()).clone().into()),
+                ],
             ));
             ui.horizontal_wrapped(|ui| {
                 if let Some(seed) = &result.continuation
                     && ui
                         .add_enabled(
                             !self.dossier.reader.busy(),
-                            egui::Button::new("Trace earlier versions"),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-line_dossier-line-dossier-view-5853cee3",
+                            )),
                         )
                         .clicked()
                 {
@@ -96,10 +159,15 @@ impl RepoTab {
                     if ui
                         .add_enabled(
                             !self.dossier.reader.busy(),
-                            egui::Button::new(format!(
-                                "Follow mapped parent {} · {}",
-                                i + 1,
-                                super::super::short(&seed.commit)
+                            egui::Button::new(crate::i18n::message(
+                                "repo-workflows-line_dossier-line-dossier-view-ab2f98d8",
+                                &[
+                                    ("i-1-1", (i + 1).clone().into()),
+                                    (
+                                        "super-super-short-seed-commit-2",
+                                        (super::super::short(&seed.commit)).clone().into(),
+                                    ),
+                                ],
                             )),
                         )
                         .clicked()
@@ -110,26 +178,123 @@ impl RepoTab {
             });
             ui.label(clip(&result.stopped, 1000));
             ui.separator();
-            ui.columns(2,|columns|{
-    egui::ScrollArea::vertical().id_salt("dossier_timeline").max_height(columns[0].available_height()).show_rows(&mut columns[0],30.0,result.cards.len(),|ui,range|{for i in range{let card=&result.cards[i];if ui.selectable_label(self.dossier.selected==i,format!("[C{}] {} · {}:{}",i+1,super::super::short(&card.at.commit),clip(&card.at.path,55),card.at.line)).clicked(){self.dossier.selected=i;}}});
-    let ui=&mut columns[1];if let Some(card)=result.cards.get(self.dossier.selected){
-     ui.heading(format!("[C{}] {}",self.dossier.selected+1,super::super::short(&card.at.commit)));
-     ui.label(format!("{} <{}> · {}",clip(&card.author,120),clip(&card.email,160),crate::git::relative_time(card.time,crate::git::now())));ui.label(clip(&card.subject,500));ui.label(format!("{}:{}",clip(&card.at.path,300),card.at.line));
-     egui::ScrollArea::both().id_salt("dossier_line").max_height(180.0).show(ui,|ui|{ui.monospace(clip(&card.text,4000));});
-     ui.small(clip(&card.note,1000));ui.small(format!("Whitespace/copy/move-aware blame: {} at {}:{}",super::super::short(&card.attribution.commit),clip(&card.attribution.path,200),card.attribution.line));
-     if card.whitespace_only{ui.label("Whitespace-only file changes detected; review the full commit before choosing any ignore revision.");if ui.add_enabled(!self.dossier.reader.busy()&&self.busy_op.is_none(),egui::Button::new("Review formatting ignore…")).clicked(){prepare_ignore=Some(card.at.commit.clone());}}
-     ui.horizontal_wrapped(|ui|{if ui.button("Show commit").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::SelectHash(card.at.commit.clone()));}
-if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineDossier);acts.push(Action::OpenPinnedFileLine(card.at.clone()));}});
-    }
-   });
+            ui.columns(2, |columns| {
+                egui::ScrollArea::vertical()
+                    .id_salt("dossier_timeline")
+                    .max_height(columns[0].available_height())
+                    .show_rows(&mut columns[0], 30.0, result.cards.len(), |ui, range| {
+                        for i in range {
+                            let card = &result.cards[i];
+                            if ui
+                                .selectable_label(
+                                    self.dossier.selected == i,
+                                    format!(
+                                        "[C{}] {} · {}:{}",
+                                        i + 1,
+                                        super::super::short(&card.at.commit),
+                                        clip(&card.at.path, 55),
+                                        card.at.line
+                                    ),
+                                )
+                                .clicked()
+                            {
+                                self.dossier.selected = i;
+                            }
+                        }
+                    });
+                let ui = &mut columns[1];
+                if let Some(card) = result.cards.get(self.dossier.selected) {
+                    ui.heading(format!(
+                        "[C{}] {}",
+                        self.dossier.selected + 1,
+                        super::super::short(&card.at.commit)
+                    ));
+                    ui.label(format!(
+                        "{} <{}> · {}",
+                        clip(&card.author, 120),
+                        clip(&card.email, 160),
+                        crate::git::relative_time(card.time, crate::git::now())
+                    ));
+                    ui.label(clip(&card.subject, 500));
+                    ui.label(format!("{}:{}", clip(&card.at.path, 300), card.at.line));
+                    egui::ScrollArea::both()
+                        .id_salt("dossier_line")
+                        .max_height(180.0)
+                        .show(ui, |ui| {
+                            ui.monospace(clip(&card.text, 4000));
+                        });
+                    ui.small(clip(&card.note, 1000));
+                    ui.small(crate::i18n::message(
+                        "repo-workflows-line_dossier-line-dossier-view-9f68f322",
+                        &[
+                            (
+                                "super-super-short-card-attributi-1",
+                                (super::super::short(&card.attribution.commit))
+                                    .clone()
+                                    .into(),
+                            ),
+                            (
+                                "clip-card-attribution-path-200-2",
+                                (clip(&card.attribution.path, 200)).clone().into(),
+                            ),
+                            (
+                                "card-attribution-line-3",
+                                (card.attribution.line).clone().into(),
+                            ),
+                        ],
+                    ));
+                    if card.whitespace_only {
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-line_dossier-line-dossier-view-9a2e3782",
+                        ));
+                        if ui
+                            .add_enabled(
+                                !self.dossier.reader.busy() && self.busy_op.is_none(),
+                                egui::Button::new(crate::i18n::text(
+                                    "repo-workflows-line_dossier-line-dossier-view-efa2521b",
+                                )),
+                            )
+                            .clicked()
+                        {
+                            prepare_ignore = Some(card.at.commit.clone());
+                        }
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-line_dossier-line-dossier-view-6fe17b05",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::CloseLineDossier);
+                            acts.push(Action::SelectHash(card.at.commit.clone()));
+                        }
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-line_dossier-line-dossier-view-562e7c08",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::CloseLineDossier);
+                            acts.push(Action::OpenPinnedFileLine(card.at.clone()));
+                        }
+                    });
+                }
+            });
         } else if !self.dossier.reader.busy() {
-            ui.label("Choose a committed file and its 1-based line number, then Explain history. Working/index line numbers are not silently treated as HEAD line numbers.");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-eeeadb1d",
+            ));
         }
         ui.separator();
-        ui.heading("Pull requests, line review comments and linked issues");
+        ui.heading(crate::i18n::text(
+            "repo-workflows-line_dossier-line-dossier-view-2a0caf4a",
+        ));
         if self.dossier.forge_reader.busy() {
             ui.add(crate::spinner::Spinner::new());
-            ui.label("Reading evidence for the selected card…");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-d419751a",
+            ));
         }
         if let Some(card) = self
             .dossier
@@ -146,14 +311,14 @@ if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineD
                 Ok(evidence) => {
                     egui::ScrollArea::vertical().id_salt("dossier-evidence").max_height(280.0).show(ui,|ui|{
                         for note in &evidence.notes{ui.label(note);}
-                        if evidence.pulls.is_empty(){ui.label("No associated pull request was returned by this forge.");}
+                        if evidence.pulls.is_empty(){ui.label(crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-bc45a9dc"));}
                         for pull in &evidence.pulls {ui.group(|ui| {
                             ui.hyperlink_to(format!("#{} {} ({})",pull.number,clip(&pull.title,250),pull.state),&pull.url);
                             ui.label(&pull.association);
-                            for (label,url) in &pull.issues{ui.hyperlink_to(format!("Linked issue {label}"),url);}
-                            for comment in &pull.comments{ui.label(format!("{}: {}",comment.author,comment.body));ui.small(&comment.proof);if !comment.url.is_empty(){ui.hyperlink_to("Open review comment",&comment.url);}}
-                            ui.small(format!("{} review comments checked; {} unrelated or unprovable comments excluded",pull.checked,pull.unmapped));
-                            for note in &pull.notes{ui.label(note);}if pull.limited||evidence.limited{ui.label("Evidence is incomplete because a request or paging budget was reached.");}
+                            for (label,url) in &pull.issues{ui.hyperlink_to(crate::i18n::message("repo-workflows-line_dossier-line-dossier-view-afd58bc7", &[("label", (label).clone().into())]),url);}
+                            for comment in &pull.comments{ui.label(format!("{}: {}",comment.author,comment.body));ui.small(&comment.proof);if !comment.url.is_empty(){ui.hyperlink_to(crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-6104eb29"),&comment.url);}}
+                            ui.small(crate::i18n::message("repo-workflows-line_dossier-line-dossier-view-ad6fe29b", &[("pull-checked-1", (pull.checked).clone().into()), ("pull-unmapped-2", (pull.unmapped).clone().into())]));
+                            for note in &pull.notes{ui.label(note);}if pull.limited||evidence.limited{ui.label(crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-a17a38a1"));}
                         });}
                     });
                 }
@@ -161,7 +326,9 @@ if ui.button("Open file at this version").clicked(){acts.push(Action::CloseLineD
         }
         if cancel {
             self.dossier.reader.cancel();
-            self.dossier.error = Some("Trace cancelled".into());
+            self.dossier.error = Some(
+                crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-a8198076").into(),
+            );
         }
         if let Some(commit) = prepare_ignore {
             self.prepare_dossier_ignore(commit, ui.ctx());
@@ -179,12 +346,16 @@ impl RepoTab {
         let Some(preview) = self.dossier.ignore.as_ref() else {
             return;
         };
-        ui.heading("Preview .git-blame-ignore-revs append");
+        ui.heading(crate::i18n::text(
+            "repo-workflows-line_dossier-dossier-ignore-view-7f80e3ed",
+        ));
         ui.monospace(&preview.prepared.commit);
-        ui.label("Git -w detects whitespace changes, including inside strings. Inspect the full patch and judge whether ignoring this commit is appropriate. Existing bytes and the staged index will be preserved; nothing is changed before confirmation.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-line_dossier-dossier-ignore-view-f5736f62",
+        ));
         ui.checkbox(
             &mut self.dossier.ignore_reviewed,
-            "I reviewed the full patch and want this revision ignored",
+            crate::i18n::text("repo-workflows-line_dossier-dossier-ignore-view-8dac5aad"),
         );
         let mut append = false;
         let mut back = false;
@@ -192,18 +363,30 @@ impl RepoTab {
             append = ui
                 .add_enabled(
                     self.dossier.ignore_reviewed && self.busy_op.is_none(),
-                    egui::Button::new("Append reviewed revision"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-line_dossier-dossier-ignore-view-b784191c",
+                    )),
                 )
                 .clicked();
-            back = ui.button("Back to versions").clicked();
-            ui.selectable_value(&mut self.dossier.show_existing, false, "Full commit patch");
+            back = ui
+                .button(crate::i18n::text(
+                    "repo-workflows-line_dossier-dossier-ignore-view-dbcd08f5",
+                ))
+                .clicked();
+            ui.selectable_value(
+                &mut self.dossier.show_existing,
+                false,
+                crate::i18n::text("repo-workflows-line_dossier-dossier-ignore-view-66c640dc"),
+            );
             ui.selectable_value(
                 &mut self.dossier.show_existing,
                 true,
-                "Existing ignore file",
+                crate::i18n::text("repo-workflows-line_dossier-dossier-ignore-view-cfd1a00e"),
             );
         });
-        ui.small("Append adds a leading newline and one complete object ID. A missing file is created exclusively; links, hardlinks, special files, changed snapshots and changed roots refuse. Remote append requires Python3. Dossier history itself continues to show ignored formatting versions.");
+        ui.small(crate::i18n::text(
+            "repo-workflows-line_dossier-dossier-ignore-view-a29947af",
+        ));
         let text = if self.dossier.show_existing {
             &preview.prepared.existing
         } else {
