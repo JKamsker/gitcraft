@@ -7,7 +7,7 @@ pub(super) fn frame(
     draw: &mut impl FnMut(&mut egui::Ui),
 ) -> FullOutput {
     // Test the fully opened layout without depending on wall-clock animation frames.
-    ctx.style_mut(|style| style.animation_time = 0.0);
+    ctx.all_styles_mut(|style| style.animation_time = 0.0);
     let mut output = ctx.run_ui(
         RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1800., 4000.))),
