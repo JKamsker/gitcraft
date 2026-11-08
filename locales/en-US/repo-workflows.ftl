@@ -2413,7 +2413,10 @@ repo-workflows-forks-plan-tidy-c3812fc4 = Remove
 
 repo-workflows-forks-plan-tidy-da56e1d6 = No fork remote can go{ $kept }
 
-repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } working files change
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 ->
+        [one] One working file changes
+       *[other] { $files-len-1 } working files change
+    }
 
 repo-workflows-ghost-approval-preview-675d236b = Discards uncommitted working changes
 

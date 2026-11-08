@@ -573,51 +573,20 @@ pub(in crate::repo) fn approval_preview(
     facts: &op::Facts,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<crate::repo::agent::preview::Preview, String> {
-    let outcome = plan::plan(repo, op, facts, GitVersion::of(repo)?, cancelled)?;
-    let mut notes = outcome.notes;
-    notes.extend(outcome.warnings);
-    notes.extend(outcome.refused);
-    if outcome.discards_work {
-        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-675d236b").into());
-    }
-    if let Some(files) = outcome.files {
-        notes.push(crate::i18n::message(
-            "repo-workflows-ghost-approval-preview-1426bc08",
-            &[("files-len-1", (files.len()).clone().into())],
-        ));
-    }
-    if let Some(conflict) = outcome.conflict {
-        notes.push(crate::i18n::message(
-            "repo-workflows-ghost-approval-preview-e74a52f6",
-            &[
-                ("conflict-step-1", (conflict.step).clone().into()),
-                (
-                    "conflict-files-join-2",
-                    (conflict.files.join(", ")).clone().into(),
-                ),
-            ],
-        ));
-    }
-    if outcome.lost_more {
-        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-70be46e5").into());
-    }
-    Ok(crate::repo::agent::preview::Preview {
-        moves: outcome
-            .moves
-            .into_iter()
-            .map(|m| {
-                (
-                    m.full,
-                    m.from.unwrap_or_else(|| "absent".into()),
-                    m.to.unwrap_or_else(|| "absent".into()),
-                )
-            })
-            .collect(),
-        leaving: outcome
-            .lost
-            .into_iter()
-            .map(|c| format!("{} {}", c.hash, c.summary))
-            .collect(),
-        notes,
-    })
+    approval_preview_with_witness(repo, op, facts, cancelled).map_err(|failure| failure.legacy())
+}
+
+pub(in crate::repo) fn approval_preview_with_witness(
+    repo: &std::path::Path,
+    op: &GhostOp,
+    facts: &op::Facts,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<crate::repo::agent::preview::Preview, PreviewFailure> {
+    let version = GitVersion::of_with_witness(repo)?;
+    let outcome = plan::plan_with_witness(repo, op, facts, version, cancelled)?;
+    Ok(crate::repo::agent::preview::Preview::from_outcome(outcome))
+}
+
+pub(in crate::repo) fn display_preview_note(raw: &str) -> String {
+    plan::display_preview_text(raw)
 }

@@ -2413,7 +2413,10 @@ repo-workflows-forks-plan-tidy-c3812fc4 = Entfernen
 
 repo-workflows-forks-plan-tidy-da56e1d6 = Kein Fork-Remote kann entfernt werden{ $kept }
 
-repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } Arbeitsdateien ändern sich
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 ->
+        [one] Eine Datei im Arbeitsverzeichnis ändert sich
+       *[other] { $files-len-1 } Dateien im Arbeitsverzeichnis ändern sich
+    }
 
 repo-workflows-ghost-approval-preview-675d236b = Verwirft uncommittete Arbeitsänderungen
 

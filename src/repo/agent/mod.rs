@@ -117,6 +117,14 @@ pub(crate) struct CardView {
     pub shown_for: Duration,
 }
 
+impl CardView {
+    /// Resolve the retained note witnesses only for the current frame's card snapshot.
+    fn for_display(mut self) -> Self {
+        self.preview = self.preview.as_ref().map(preview::Preview::for_display);
+        self
+    }
+}
+
 /// `text` without the characters that change how text around them reads: bidirectional
 /// overrides and isolates, zero-width ones, other format and control characters.
 fn visible(text: &str) -> String {
@@ -352,24 +360,27 @@ impl RepoTab {
         let waiting = self.agent_calls.card.as_ref()?;
         let plan = &waiting.ready.plan;
         let ask = plan.ask.as_ref()?;
-        Some(CardView {
-            agent: visible(&waiting.ready.job.agent),
-            preview: waiting.ready.preview.clone(),
-            ask: Ask {
-                title: visible(&ask.title),
-                body: visible(&ask.body),
-                undo_note: visible(&ask.undo_note),
-            },
-            commands: plan
-                .ops
-                .iter()
-                .filter_map(|op| shown_command(op))
-                .map(|c| visible(&c))
-                .collect(),
-            undoable: plan.undo != Undo::None,
-            left: waiting.until.saturating_duration_since(Instant::now()),
-            shown_for: waiting.shown.elapsed(),
-        })
+        Some(
+            CardView {
+                agent: visible(&waiting.ready.job.agent),
+                preview: waiting.ready.preview.clone(),
+                ask: Ask {
+                    title: visible(&ask.title),
+                    body: visible(&ask.body),
+                    undo_note: visible(&ask.undo_note),
+                },
+                commands: plan
+                    .ops
+                    .iter()
+                    .filter_map(|op| shown_command(op))
+                    .map(|c| visible(&c))
+                    .collect(),
+                undoable: plan.undo != Undo::None,
+                left: waiting.until.saturating_duration_since(Instant::now()),
+                shown_for: waiting.shown.elapsed(),
+            }
+            .for_display(),
+        )
     }
 
     /// The user's answer to the card. Approved, the request is planned again, and runs if it
