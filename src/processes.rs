@@ -127,6 +127,29 @@ fn record_stop_confirmation(
 mod recording_outcomes {
     use super::*;
     #[test]
+    fn shared_predispatch_guard_keeps_ancestor_cancellation_sticky() {
+        let lease = Cancellation::default();
+        let target = lease.child();
+        assert_eq!(before_start(target.is_cancelled(), false), None);
+        lease.cancel();
+        for _ in 0..3 {
+            assert_eq!(
+                before_start(target.is_cancelled(), false),
+                Some("cancelled")
+            );
+        }
+        assert!(matches!(
+            checked(Err(before_start(target.is_cancelled(), false)
+                .unwrap()
+                .into())),
+            Err(Failure::CancelledBeforeStart)
+        ));
+        assert_eq!(
+            before_start(false, true),
+            Some("process timed out and was stopped")
+        );
+    }
+    #[test]
     fn failed_ack_or_unavailable_cleanup_worker_always_surfaces_uncertainty() {
         for why in ["capacity closed", "worker lost", "wrong receipt"] {
             let mut stopped = Some("cancelled".into());
@@ -365,14 +388,9 @@ impl Service {
                                 || request.options.cancel.is_cancelled()
                                 || request.options.cancelled.as_ref().is_some_and(|f| f());
                             let expired = request.deadline.is_some_and(|at| Instant::now() >= at);
-                            if cancelled || expired {
+                            if let Some(reason) = before_start(cancelled, expired) {
                                 metrics.queued.fetch_sub(1, Ordering::Relaxed);
-                                let _ = request.reply.send(Err(if cancelled {
-                                    "cancelled"
-                                } else {
-                                    "process timed out and was stopped"
-                                }
-                                .into()));
+                                let _ = request.reply.send(Err(reason.into()));
                             }
                             !cancelled && !expired
                         });
@@ -579,6 +597,16 @@ pub(crate) fn shutdown_cleanup() {
     }
 }
 
+fn before_start(cancelled: bool, expired: bool) -> Option<&'static str> {
+    if cancelled {
+        Some("cancelled")
+    } else if expired {
+        Some("process timed out and was stopped")
+    } else {
+        None
+    }
+}
+
 // The eighth argument only exists in opt-in libtest diagnostics.
 #[cfg_attr(test, allow(clippy::too_many_arguments))]
 async fn execute(
@@ -597,11 +625,9 @@ async fn execute(
             || shutdown.is_cancelled()
             || options.cancelled.as_ref().is_some_and(|f| f())
     };
-    if cancelled() {
-        return Err("cancelled".into());
-    }
-    if deadline.is_some_and(|at| Instant::now() >= at) {
-        return Err("process timed out and was stopped".into());
+    if let Some(reason) = before_start(cancelled(), deadline.is_some_and(|at| Instant::now() >= at))
+    {
+        return Err(reason.into());
     }
     command
         .stdin(if options.input.is_some() {

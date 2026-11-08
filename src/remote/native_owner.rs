@@ -693,7 +693,7 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
     };
     let (mut code, mut complete, mut stdout, mut stderr) = result;
     if let Some(plan) = cleanup_plan {
-        if code == 0 && complete {
+        if super::workspace_ledger::cleanup_complete_allowed(code, complete) {
             match plan.complete() {
                 Ok(proof) => stdout = proof,
                 Err(error) => {

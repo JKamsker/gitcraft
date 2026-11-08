@@ -319,7 +319,6 @@ impl NativePlan {
     }
     /// Called only after checked CLEAR and all its postconditions succeeded.
     pub(super) fn complete(self) -> Result<Vec<u8>, String> {
-        self.verify()?;
         let manifest = Manifest {
             v: 1,
             anchor: self.authority.anchor.clone(),
@@ -332,53 +331,120 @@ impl NativePlan {
             return Err("cleaned manifest exceeds limit; external proofs retained".into());
         }
         let manifest_name = format!("{}.cleaned", self.owner);
-        publish(&self.directory, &manifest_name, &bytes)?;
-        // Keep every original record/cache until every artifact retirement succeeds.
-        for entry in self.entries.values() {
-            entry.endpoint.retire_proven(&entry.receipt)?;
-        }
-        for entry in self.entries.values() {
-            if entry.present {
-                self.directory
-                    .remove_checked(&entry.name, &entry.record)
-                    .map_err(|e| e.to_string())?;
-            }
-            let name = format!("{}.proof", entry.name);
-            if let Some(proof) = optional(&self.directory, &name, MAX_PROOF)? {
-                let decoded: Proof = serde_json::from_slice(&proof).map_err(|e| e.to_string())?;
-                let cached = decode(&decoded, &self.authority.anchor)?;
-                if cached.name != entry.name
-                    || cached.record != entry.record
-                    || cached.receipt != entry.receipt
-                {
-                    return Err("proof changed before pruning; manifest retained".into());
+        finish_cleanup(
+            || self.verify(),
+            || publish(&self.directory, &manifest_name, &bytes),
+            || {
+                // Keep every original record/cache until every artifact retirement succeeds.
+                for entry in self.entries.values() {
+                    entry.endpoint.retire_proven(&entry.receipt)?;
+                }
+                Ok(())
+            },
+            || {
+                for entry in self.entries.values() {
+                    if entry.present {
+                        self.directory
+                            .remove_checked(&entry.name, &entry.record)
+                            .map_err(|e| e.to_string())?;
+                    }
+                    let name = format!("{}.proof", entry.name);
+                    if let Some(proof) = optional(&self.directory, &name, MAX_PROOF)? {
+                        let decoded: Proof =
+                            serde_json::from_slice(&proof).map_err(|e| e.to_string())?;
+                        let cached = decode(&decoded, &self.authority.anchor)?;
+                        if cached.name != entry.name
+                            || cached.record != entry.record
+                            || cached.receipt != entry.receipt
+                        {
+                            return Err("proof changed before pruning; manifest retained".into());
+                        }
+                        self.directory
+                            .remove_checked(&name, &proof)
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+                for (name, bytes) in &self.manifests {
+                    self.directory
+                        .remove_checked(name, bytes)
+                        .map_err(|e| e.to_string())?;
                 }
                 self.directory
-                    .remove_checked(&name, &proof)
+                    .remove_checked(&manifest_name, &bytes)
                     .map_err(|e| e.to_string())?;
-            }
-        }
-        for (name, bytes) in self.manifests {
-            self.directory
-                .remove_checked(&name, &bytes)
-                .map_err(|e| e.to_string())?;
-        }
-        self.directory
-            .remove_checked(&manifest_name, &bytes)
-            .map_err(|e| e.to_string())?;
-        let mut digest = Sha256::new();
-        for entry in self.entries.values() {
-            digest.update(entry.name.as_bytes());
-            digest.update([0]);
-            digest.update(&entry.record);
-            digest.update([0]);
-        }
-        serde_json::to_vec(&serde_json::json!({"v":1,"state":"cleaned","anchor":self.authority.anchor,"generation":self.authority.generation,"records":self.entries.len(),"records_sha256":digest.finalize().iter().map(|b|format!("{b:02x}")).collect::<String>()})).map_err(|e|e.to_string())
+                Ok(())
+            },
+            || {
+                let mut digest = Sha256::new();
+                for entry in self.entries.values() {
+                    digest.update(entry.name.as_bytes());
+                    digest.update([0]);
+                    digest.update(&entry.record);
+                    digest.update([0]);
+                }
+                serde_json::to_vec(&serde_json::json!({"v":1,"state":"cleaned","anchor":self.authority.anchor,"generation":self.authority.generation,"records":self.entries.len(),"records_sha256":digest.finalize().iter().map(|b|format!("{b:02x}")).collect::<String>()})).map_err(|e|e.to_string())
+            },
+        )
     }
+}
+pub(super) fn cleanup_complete_allowed(code: i32, complete: bool) -> bool {
+    code == 0 && complete
+}
+// Checked completion boundaries used by the actual native ledger and pure recordings.
+fn finish_cleanup(
+    verify: impl FnOnce() -> Result<(), String>,
+    publish: impl FnOnce() -> Result<(), String>,
+    retire: impl FnOnce() -> Result<(), String>,
+    prune: impl FnOnce() -> Result<(), String>,
+    receipt: impl FnOnce() -> Result<Vec<u8>, String>,
+) -> Result<Vec<u8>, String> {
+    verify()?;
+    publish()?;
+    retire()?;
+    prune()?;
+    receipt()
 }
 #[cfg(test)]
 mod recording_tests {
     use super::*;
+    #[test]
+    fn every_partial_completion_preserves_failure_and_blocks_later_retirement_or_success() {
+        use std::cell::RefCell;
+        assert!(!cleanup_complete_allowed(1, true));
+        assert!(!cleanup_complete_allowed(0, false));
+        assert!(cleanup_complete_allowed(0, true));
+        for failure in ["verify", "manifest", "retire", "prune", "receipt", "none"] {
+            let events = RefCell::new(Vec::new());
+            let stage = |name| {
+                events.borrow_mut().push(name);
+                if failure == name {
+                    Err(format!("{name} failed; ledger retained"))
+                } else {
+                    Ok(())
+                }
+            };
+            let result = finish_cleanup(
+                || stage("verify"),
+                || stage("manifest"),
+                || stage("retire"),
+                || stage("prune"),
+                || {
+                    stage("receipt")?;
+                    Ok(b"cleaned".to_vec())
+                },
+            );
+            assert_eq!(result.is_ok(), failure == "none");
+            let expected = ["verify", "manifest", "retire", "prune", "receipt"];
+            let end = expected
+                .iter()
+                .position(|s| *s == failure)
+                .map_or(5, |i| i + 1);
+            assert_eq!(*events.borrow(), expected[..end]);
+            if end < 4 {
+                assert!(!events.borrow().contains(&"prune"));
+            }
+        }
+    }
     #[test]
     fn recovery_manifest_merge_never_overwrites_changed_or_unbounded_evidence() {
         let authority = WorkspaceAuthority {

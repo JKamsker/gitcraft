@@ -433,6 +433,8 @@ class Handshake:
         self.released = True
         return True
 
+def cleanup_complete_allowed(code, delivery): return code == 0 and delivery
+
 def run(req, controller, stream=False):
     locks=None
     if req.get('cleanup') and (not req.get('workspace') or req['workspace'].get('mode')!='mutation'): raise ValueError('cleanup requires full mutation fence')
@@ -611,7 +613,7 @@ def run_inner(req, controller, stream=False, locks=None):
                 if not eof: delivery = False
                 os.close(fd)
             os.close(status_r)
-            if ledger is not None and code==0 and delivery:
+            if ledger is not None and cleanup_complete_allowed(code,delivery):
                 try:
                     proof=ledger.complete(); output[0]=bytearray(proof)
                     if forward and not forward.add(0,proof): delivery=False

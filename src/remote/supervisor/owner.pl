@@ -365,6 +365,7 @@ sub handshake_step {
     return -1 if $now->()>=$state->{until};
     $release->(); $state->{released}=1; return 1;
 }
+sub cleanup_complete_allowed { my ($code,$delivery)=@_; return $code==0 && $delivery; }
 sub run {
     my ($req,$controller,$stream)=@_;my $locks;
     die 'cleanup requires full mutation fence' if $req->{cleanup} && (!$req->{workspace} || $req->{workspace}{mode} ne 'mutation');
@@ -509,7 +510,7 @@ sub run_inner {
         $delivery=0 unless $eof;
         close($fd);
     }
-    if ($ledger && $code==0 && $delivery) {
+    if ($ledger && cleanup_complete_allowed($code,$delivery)) {
         my $ok=eval {my $proof=ledger_complete($ledger);$output[0]=$proof;$delivery=0 if $stream && !forward_add(\@pending,0,$proof);1;};
         if (!$ok) {my $message=substr("cleanup partial; external ledger retained: $@",0,8192);$code=125;$delivery=0;$output[1].=$message;forward_add(\@pending,1,$message) if $stream;}
         $end=time()+.3;

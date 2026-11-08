@@ -313,13 +313,11 @@ impl WorkspaceFence {
             return Err(io::Error::other("invalid bounded generation owner record"));
         }
         self.coordination.verify_names()?;
-        let mut file = self
+        let file = self
             .coordination
             .directory
             .open_file(name, PrivateFileMode::CreateNew)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        crate::close_file(file)
+        publish_file(file, bytes, File::sync_all, crate::close_file)
     }
     pub fn verify(&self, grant: &WorkspaceGrant) -> io::Result<()> {
         self.coordination.verify_names()?;
@@ -330,6 +328,17 @@ impl WorkspaceFence {
             &read_file(&self.coordination.files[2], 128)?,
         )
     }
+}
+// One checked publication boundary: a failed write/sync/close cannot release dispatch.
+fn publish_file<T: Write>(
+    mut file: T,
+    bytes: &[u8],
+    sync: impl FnOnce(&T) -> io::Result<()>,
+    close: impl FnOnce(T) -> io::Result<()>,
+) -> io::Result<()> {
+    file.write_all(bytes)?;
+    sync(&file)?;
+    close(file)
 }
 fn validate_namespace(expected: &[String], actual: &[String]) -> io::Result<()> {
     if expected.len() != 4 || actual != expected {
@@ -361,6 +370,61 @@ fn protect_anchor(file: &File, directory: &PrivateDirectory) -> io::Result<()> {
 #[cfg(test)]
 mod recording_tests {
     use super::*;
+    #[test]
+    fn record_publication_failure_never_authorizes_dispatch_or_late_start() {
+        use std::{cell::RefCell, rc::Rc};
+        struct Sink {
+            events: Rc<RefCell<Vec<&'static str>>>,
+            fail: bool,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.events.borrow_mut().push("write");
+                if self.fail {
+                    Err(io::Error::other("truncated"))
+                } else {
+                    Ok(bytes.len())
+                }
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                unreachable!()
+            }
+        }
+        for failure in ["write", "sync", "close", "none"] {
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let result = publish_file(
+                Sink {
+                    events: events.clone(),
+                    fail: failure == "write",
+                },
+                b"bound owner",
+                |_| {
+                    events.borrow_mut().push("sync");
+                    if failure == "sync" {
+                        Err(io::Error::other("sync failed"))
+                    } else {
+                        Ok(())
+                    }
+                },
+                |_| {
+                    events.borrow_mut().push("close");
+                    if failure == "close" {
+                        Err(io::Error::other("close failed"))
+                    } else {
+                        Ok(())
+                    }
+                },
+            );
+            if result.is_ok() {
+                events.borrow_mut().push("release-fence");
+            }
+            assert_eq!(result.is_ok(), failure == "none");
+            assert_eq!(
+                events.borrow().contains(&"release-fence"),
+                failure == "none"
+            );
+        }
+    }
     #[test]
     fn replacement_and_missing_lock_never_become_a_second_namespace() {
         let original: Vec<String> = ["directory", "primary", "fence", "generation"]
