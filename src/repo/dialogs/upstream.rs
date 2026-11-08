@@ -27,10 +27,7 @@ pub(super) fn set_upstream(
     title(
         ui,
         crate::i18n::text("repo-core-1522"),
-        &crate::i18n::message(
-            "repo-core-1523",
-            &[("branch", format!("{}", branch).into())],
-        ),
+        &crate::i18n::message("repo-core-1523", &[("branch", branch.to_string().into())]),
         &t,
     );
     if remote_names.len() > 1 {
@@ -76,17 +73,17 @@ pub(super) fn set_upstream(
             crate::i18n::message(
                 "repo-core-1528",
                 &[
-                    ("remote", format!("{}", remote).into()),
-                    ("target", format!("{}", target).into()),
+                    ("remote", remote.to_string().into()),
+                    ("target", target.to_string().into()),
                 ],
             )
         } else {
             crate::i18n::message(
                 "repo-core-1529",
                 &[
-                    ("remote", format!("{}", remote).into()),
-                    ("target", format!("{}", target).into()),
-                    ("branch", format!("{}", branch).into()),
+                    ("remote", remote.to_string().into()),
+                    ("target", target.to_string().into()),
+                    ("branch", branch.to_string().into()),
                 ],
             )
         };

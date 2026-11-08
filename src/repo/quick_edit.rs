@@ -158,10 +158,7 @@ impl RepoTab {
             self.work.in_progress.map(|s| {
                 crate::i18n::message(
                     "repo-core-3192",
-                    &[(
-                        "to-lowercase",
-                        format!("{}", s.label().to_lowercase()).into(),
-                    )],
+                    &[("to-lowercase", s.label().to_lowercase().to_string().into())],
                 )
             })
         };
@@ -226,9 +223,9 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-3196",
                     &[
-                        ("short", format!("{}", short).into()),
-                        ("summary", format!("{}", commit.summary).into()),
-                        ("branch", format!("{}", branch).into()),
+                        ("short", short.to_string().into()),
+                        ("summary", commit.summary.to_string().into()),
+                        ("branch", branch.to_string().into()),
                     ],
                 ),
                 crate::i18n::text("repo-core-3197"),
@@ -245,10 +242,7 @@ impl RepoTab {
                     &self.refs.head,
                     self.upstream_ref(branch),
                 ),
-                crate::i18n::message(
-                    "repo-core-3198",
-                    &[("branch", format!("{}", branch).into())],
-                ),
+                crate::i18n::message("repo-core-3198", &[("branch", branch.to_string().into())]),
             ),
         )
     }
@@ -299,11 +293,11 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-3199",
                     &[
-                        ("label", format!("{}", edit.label()).into()),
-                        ("hash", format!("{}", short(&hash)).into()),
+                        ("label", edit.label().to_string().into()),
+                        ("hash", short(&hash).to_string().into()),
                         (
                             "busy",
-                            crate::repo::messages::display_operation(&busy).into(),
+                            crate::repo::messages::display_operation(busy).into(),
                         ),
                     ],
                 ),
@@ -351,11 +345,15 @@ impl RepoTab {
                         &[
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
                             (
                                 "self",
-                                format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                                self.busy_op
+                                    .as_deref()
+                                    .unwrap_or_default()
+                                    .to_string()
+                                    .into(),
                             ),
                         ],
                     ),

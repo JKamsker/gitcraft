@@ -55,7 +55,7 @@ impl View {
                 selected: Some(hash),
             } => crate::i18n::message(
                 "repo-core-2903",
-                &[("hash", format!("{}", short(hash)).into())],
+                &[("hash", short(hash).to_string().into())],
             ),
             View::Graph { selected: None } => crate::i18n::text("repo-core-2904").to_owned(),
             View::Diff { key, .. } => diff_label(key),
@@ -70,16 +70,16 @@ impl View {
                     .map(|r| {
                         crate::i18n::message(
                             "repo-core-2907",
-                            &[("r", format!("{}", short(r)).into())],
+                            &[("r", short(r).to_string().into())],
                         )
                     })
                     .unwrap_or_default();
                 crate::i18n::message(
                     "repo-core-2908",
                     &[
-                        ("what", format!("{}", what).into()),
-                        ("path", format!("{}", file_name(path)).into()),
-                        ("at", format!("{}", at).into()),
+                        ("what", what.to_string().into()),
+                        ("path", file_name(path).to_string().into()),
+                        ("at", at.to_string().into()),
                     ],
                 )
             }
@@ -87,10 +87,9 @@ impl View {
                 "repo-core-2909",
                 &[("number", format!("{}", number).into())],
             ),
-            View::Ci(sha) => crate::i18n::message(
-                "repo-core-2910",
-                &[("sha", format!("{}", short(sha)).into())],
-            ),
+            View::Ci(sha) => {
+                crate::i18n::message("repo-core-2910", &[("sha", short(sha).to_string().into())])
+            }
         }
     }
 }
@@ -102,29 +101,29 @@ fn diff_label(key: &DiffKey) -> String {
         DiffKey::Remerge { hash, .. } => crate::i18n::message(
             "repo-core-2911",
             &[
-                ("name", format!("{}", name).into()),
-                ("hash", format!("{}", short(hash)).into()),
+                ("name", name.to_string().into()),
+                ("hash", short(hash).to_string().into()),
             ],
         ),
         DiffKey::Commit { hash, .. } => crate::i18n::message(
             "repo-core-2912",
             &[
-                ("name", format!("{}", name).into()),
-                ("hash", format!("{}", short(hash)).into()),
+                ("name", name.to_string().into()),
+                ("hash", short(hash).to_string().into()),
             ],
         ),
         DiffKey::Work(file) => match file.area {
             Area::Unstaged => {
-                crate::i18n::message("repo-core-2913", &[("name", format!("{}", name).into())])
+                crate::i18n::message("repo-core-2913", &[("name", name.to_string().into())])
             }
             Area::Staged => {
-                crate::i18n::message("repo-core-2914", &[("name", format!("{}", name).into())])
+                crate::i18n::message("repo-core-2914", &[("name", name.to_string().into())])
             }
             Area::Conflicted => {
-                crate::i18n::message("repo-core-2915", &[("name", format!("{}", name).into())])
+                crate::i18n::message("repo-core-2915", &[("name", name.to_string().into())])
             }
             Area::Untracked => {
-                crate::i18n::message("repo-core-2916", &[("name", format!("{}", name).into())])
+                crate::i18n::message("repo-core-2916", &[("name", name.to_string().into())])
             }
         },
         DiffKey::Range {
@@ -132,16 +131,16 @@ fn diff_label(key: &DiffKey) -> String {
         } => crate::i18n::message(
             "repo-core-2917",
             &[
-                ("name", format!("{}", name).into()),
-                ("from", format!("{}", short(from)).into()),
-                ("to", format!("{}", short(to)).into()),
+                ("name", name.to_string().into()),
+                ("from", short(from).to_string().into()),
+                ("to", short(to).to_string().into()),
             ],
         ),
         DiffKey::Range { from, to: None, .. } => crate::i18n::message(
             "repo-core-2918",
             &[
-                ("name", format!("{}", name).into()),
-                ("from", format!("{}", short(from)).into()),
+                ("name", name.to_string().into()),
+                ("from", short(from).to_string().into()),
             ],
         ),
     }
@@ -152,16 +151,16 @@ fn gone_change(file: &git::StatusFile) -> String {
     let path = &file.path;
     match file.area {
         Area::Unstaged => {
-            crate::i18n::message("repo-core-2919", &[("path", format!("{}", path).into())])
+            crate::i18n::message("repo-core-2919", &[("path", path.to_string().into())])
         }
         Area::Staged => {
-            crate::i18n::message("repo-core-2920", &[("path", format!("{}", path).into())])
+            crate::i18n::message("repo-core-2920", &[("path", path.to_string().into())])
         }
         Area::Conflicted => {
-            crate::i18n::message("repo-core-2921", &[("path", format!("{}", path).into())])
+            crate::i18n::message("repo-core-2921", &[("path", path.to_string().into())])
         }
         Area::Untracked => {
-            crate::i18n::message("repo-core-2922", &[("path", format!("{}", path).into())])
+            crate::i18n::message("repo-core-2922", &[("path", path.to_string().into())])
         }
     }
 }
@@ -258,10 +257,7 @@ impl RepoTab {
     pub(super) fn navigate(&mut self, step: i32, ctx: &egui::Context) {
         if let Some(editor) = self.navigation_editor_open() {
             self.status = Some((
-                crate::i18n::message(
-                    "repo-core-2923",
-                    &[("editor", format!("{}", editor).into())],
-                ),
+                crate::i18n::message("repo-core-2923", &[("editor", editor.to_string().into())]),
                 true,
             ));
             return;
@@ -423,7 +419,7 @@ impl RepoTab {
             self.status = Some((
                 crate::i18n::message(
                     "repo-core-2927",
-                    &[("hash", format!("{}", short(hash)).into())],
+                    &[("hash", short(hash).to_string().into())],
                 ),
                 false,
             ));
@@ -465,16 +461,16 @@ impl RepoTab {
                 Some(view) => crate::i18n::message(
                     "repo-core-2931",
                     &[
-                        ("name", format!("{}", name).into()),
-                        ("graph-shown", format!("{}", view.label(graph_shown)).into()),
-                        ("keys", format!("{}", keys).into()),
+                        ("name", name.to_string().into()),
+                        ("graph-shown", view.label(graph_shown).to_string().into()),
+                        ("keys", keys.to_string().into()),
                     ],
                 ),
                 None => crate::i18n::message(
                     "repo-core-2932",
                     &[
-                        ("to-lowercase", format!("{}", name.to_lowercase()).into()),
-                        ("keys", format!("{}", keys).into()),
+                        ("to-lowercase", name.to_lowercase().to_string().into()),
+                        ("keys", keys.to_string().into()),
                     ],
                 ),
             };

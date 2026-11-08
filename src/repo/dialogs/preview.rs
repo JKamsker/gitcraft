@@ -122,7 +122,7 @@ impl RepoTab {
             crate::i18n::text("repo-core-1433").to_owned()
         } else {
             let head = self.refs.current.as_deref().unwrap_or("HEAD");
-            crate::i18n::message("repo-core-1434", &[("head", format!("{}", head).into())])
+            crate::i18n::message("repo-core-1434", &[("head", head.to_string().into())])
         };
         (PreviewAsk::delete(tips, &self.refs.head, moving), heading)
     }
@@ -174,7 +174,7 @@ pub(super) fn show(ui: &mut Ui, preview: &WhatItDoes) {
                 egui::Label::new(
                     RichText::new(crate::i18n::message(
                         "repo-core-1436",
-                        &[("e", format!("{}", e).into())],
+                        &[("e", e.to_string().into())],
                     ))
                     .color(t.text_dim),
                 )
@@ -196,10 +196,7 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
         // Said, so that an empty list doesn't read as a preview that didn't work.
         section(
             ui,
-            &crate::i18n::message(
-                "repo-core-1437",
-                &[("heading", format!("{}", heading).into())],
-            ),
+            &crate::i18n::message("repo-core-1437", &[("heading", heading.to_string().into())]),
         );
     }
     if found.leaving_total > 0 {
@@ -251,7 +248,7 @@ fn commit_row(ui: &mut Ui, c: &git::LeavingCommit, t: &Tokens) {
     let (where_, color) = match &c.kept {
         Kept::OnlyHere => (crate::i18n::text("repo-core-1440").to_owned(), t.danger),
         Kept::On(name) => (
-            crate::i18n::message("repo-core-1441", &[("name", format!("{}", name).into())]),
+            crate::i18n::message("repo-core-1441", &[("name", name.to_string().into())]),
             t.text_dim,
         ),
         Kept::Elsewhere => (crate::i18n::text("repo-core-1442").to_owned(), t.text_dim),
@@ -387,11 +384,11 @@ fn undo_text(undo: &Undo, lost_files: bool) -> Option<String> {
         Undo::None => None,
         Undo::HeadMove { .. } if lost_files => Some(crate::i18n::message(
             "repo-core-1451",
-            &[("key", format!("{}", key).into())],
+            &[("key", key.to_string().into())],
         )),
         Undo::HeadMove { .. } | Undo::Custom { .. } => Some(crate::i18n::message(
             "repo-core-1452",
-            &[("key", format!("{}", key).into())],
+            &[("key", key.to_string().into())],
         )),
     }
 }

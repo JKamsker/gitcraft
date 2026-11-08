@@ -51,8 +51,8 @@ pub(in crate::repo) fn algorithm_menu(
         .next()
         .unwrap_or(path);
     let kept_for = match kind.strip_prefix('*') {
-        Some(ext) => crate::i18n::message("repo-core-1555", &[("ext", format!("{}", ext).into())]),
-        None => crate::i18n::message("repo-core-1556", &[("name", format!("{}", name).into())]),
+        Some(ext) => crate::i18n::message("repo-core-1555", &[("ext", ext.to_string().into())]),
+        None => crate::i18n::message("repo-core-1556", &[("name", name.to_string().into())]),
     };
     let mut picked = current;
     egui::ComboBox::from_id_salt(("diff-algorithm", path))
@@ -69,7 +69,7 @@ pub(in crate::repo) fn algorithm_menu(
         .response
         .on_hover_text(crate::i18n::message(
             "repo-core-1560",
-            &[("kept-for", format!("{}", kept_for).into())],
+            &[("kept-for", kept_for.to_string().into())],
         ));
     if repairing {
         // Laid out right to left: beside the drop-down, on its left.
@@ -78,11 +78,10 @@ pub(in crate::repo) fn algorithm_menu(
                 "repo-core-1561",
                 &[(
                     "label",
-                    format!(
-                        "{}",
-                        current.map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)
-                    )
-                    .into(),
+                    current
+                        .map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)
+                        .to_string()
+                        .into(),
                 )],
             ));
     }

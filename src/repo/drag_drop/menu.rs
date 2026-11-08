@@ -104,7 +104,7 @@ impl RepoTab {
                     0 => first,
                     n => crate::i18n::message(
                         "repo-core-2417",
-                        &[("first", format!("{}", first).into()), ("n", (n).into())],
+                        &[("first", first.to_string().into()), ("n", (n).into())],
                     ),
                 };
                 (hint, t.accent)

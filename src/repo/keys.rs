@@ -45,7 +45,7 @@ impl RepoTab {
         {
             return Err(crate::i18n::message(
                 "repo-core-2860",
-                &[("op", crate::repo::messages::display_operation(&op).into())],
+                &[("op", crate::repo::messages::display_operation(op).into())],
             ));
         }
         let no_remote = || crate::i18n::text("repo-core-2861").to_owned();

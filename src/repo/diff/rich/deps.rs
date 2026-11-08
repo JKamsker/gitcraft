@@ -492,9 +492,9 @@ pub fn diff(path: &str, sides: &Sides) -> Result<DepsDiff, String> {
                     crate::i18n::message(
                         "repo-core-2138",
                         &[
-                            ("file", format!("{}", file).into()),
-                            ("side", format!("{}", side).into()),
-                            ("e", format!("{}", e).into()),
+                            ("file", file.to_string().into()),
+                            ("side", side.to_string().into()),
+                            ("e", e.to_string().into()),
                         ],
                     )
                 })

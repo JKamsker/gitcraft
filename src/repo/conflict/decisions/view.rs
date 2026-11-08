@@ -62,8 +62,8 @@ pub(in crate::repo) fn test_line(offer: &Offer) -> Option<(String, Option<bool>)
             crate::i18n::message(
                 "repo-core-0524",
                 &[
-                    ("test", format!("{}", d.test).into()),
-                    ("at", format!("{}", ago(run.at)).into()),
+                    ("test", d.test.to_string().into()),
+                    ("at", ago(run.at).to_string().into()),
                 ],
             ),
             Some(true),
@@ -72,14 +72,14 @@ pub(in crate::repo) fn test_line(offer: &Offer) -> Option<(String, Option<bool>)
             crate::i18n::message(
                 "repo-core-0525",
                 &[
-                    ("test", format!("{}", d.test).into()),
-                    ("at", format!("{}", ago(run.at)).into()),
+                    ("test", d.test.to_string().into()),
+                    ("at", ago(run.at).to_string().into()),
                 ],
             ),
             Some(false),
         ),
         None => (
-            crate::i18n::message("repo-core-0526", &[("test", format!("{}", d.test).into())]),
+            crate::i18n::message("repo-core-0526", &[("test", d.test.to_string().into())]),
             None,
         ),
     })
@@ -257,10 +257,10 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
             let kept = if note.is_empty() {
                 crate::i18n::message(
                     "repo-core-0549",
-                    &[("test", format!("{}", one_line(&draft.test)).into())],
+                    &[("test", one_line(&draft.test).to_string().into())],
                 )
             } else {
-                crate::i18n::message("repo-core-0550", &[("note", format!("{}", note).into())])
+                crate::i18n::message("repo-core-0550", &[("note", note.to_string().into())])
             };
             ui.label(RichText::new(kept).color(t.text_faint).small());
         }
@@ -319,7 +319,7 @@ pub(in crate::repo) fn run_tests_switch(ui: &mut Ui, memo: &mut Memo, has_tests:
             tests.dedup();
             ui.label(crate::i18n::message(
                 "repo-core-0559",
-                &[("n", format!("{}", tests.join("\n")).into())],
+                &[("n", tests.join("\n").to_string().into())],
             ));
         });
 }

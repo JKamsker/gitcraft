@@ -40,7 +40,7 @@ impl Find {
                             if self.capped() {
                                 label.on_hover_text(crate::i18n::message(
                                     "repo-core-2500",
-                                    &[("MAX-HITS", format!("{}", thousands(MAX_HITS)).into())],
+                                    &[("MAX-HITS", thousands(MAX_HITS).to_string().into())],
                                 ));
                             } else if error {
                                 label.on_hover_text(text);
@@ -80,7 +80,7 @@ impl Find {
             .id(egui::Id::new(FIELD_ID))
             .hint_text(crate::i18n::message(
                 "repo-core-2504",
-                &[("what", format!("{}", what).into())],
+                &[("what", what.to_string().into())],
             ))
             .font(theme::mono(12.0))
             .desired_width((ui.available_width() - 330.0).clamp(140.0, 420.0))

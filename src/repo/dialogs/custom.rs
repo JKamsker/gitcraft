@@ -180,8 +180,8 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         &crate::i18n::message(
             "repo-core-1293",
             &[
-                ("REPO-FILE", format!("{}", cc::REPO_FILE).into()),
-                ("repo", format!("{}", repo).into()),
+                ("REPO-FILE", cc::REPO_FILE.to_string().into()),
+                ("repo", repo.to_string().into()),
             ],
         ),
         &t,
@@ -217,8 +217,8 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                     RichText::new(crate::i18n::message(
                         "repo-core-1296",
                         &[
-                            ("label", format!("{}", c.placement.label()).into()),
-                            ("label2", format!("{}", c.output.label()).into()),
+                            ("label", c.placement.label().to_string().into()),
+                            ("label2", c.output.label().to_string().into()),
                         ],
                     ))
                     .color(t.text_faint)
@@ -235,8 +235,8 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                     let mut asks = crate::i18n::message(
                         "repo-core-1298",
                         &[
-                            ("variable", format!("{}", p.variable).into()),
-                            ("label", format!("{}", p.kind.label()).into()),
+                            ("variable", p.variable.to_string().into()),
+                            ("label", p.kind.label().to_string().into()),
                         ],
                     );
                     if !p.label.trim().is_empty() {
@@ -245,7 +245,7 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                     if !p.default.is_empty() {
                         asks.push_str(&crate::i18n::message(
                             "repo-core-1299",
-                            &[("default", format!("{}", p.default).into())],
+                            &[("default", p.default.to_string().into())],
                         ));
                     }
                     ui.label(RichText::new(asks).color(t.text_dim).small());

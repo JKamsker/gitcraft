@@ -49,7 +49,7 @@ pub(super) fn order_button(
             "repo-core-2681",
             &[(
                 "label",
-                crate::repo::messages::display_operation(&label).into(),
+                crate::repo::messages::display_operation(label).into(),
             )],
         )
     });

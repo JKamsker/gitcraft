@@ -89,12 +89,12 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
             crate::i18n::message(
                 "repo-core-0388",
                 &[
-                    ("target", format!("{}", target).into()),
-                    ("short", format!("{}", short).into()),
-                    ("summary", format!("{}", summary).into()),
+                    ("target", target.to_string().into()),
+                    ("short", short.to_string().into()),
+                    ("summary", summary.to_string().into()),
                     (
                         "explain",
-                        format!("{}", crate::i18n::text(mode.explain)).into(),
+                        crate::i18n::text(mode.explain).to_string().into(),
                     ),
                 ],
             ),
@@ -102,11 +102,10 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
                 "repo-core-0389",
                 &[(
                     "to-lowercase",
-                    format!(
-                        "{}",
-                        super::messages::display_operation(mode.label).to_lowercase()
-                    )
-                    .into(),
+                    super::messages::display_operation(mode.label)
+                        .to_lowercase()
+                        .to_string()
+                        .into(),
                 )],
             ),
             reset_steps(mode.mode, hash, target, head),
@@ -163,7 +162,8 @@ mod fluent_action_tests {
     use super::*;
 
     #[test]
-    fn reset_presentation_keeps_raw_title_guards_argv_and_undo_in_both_languages() {
+    fn reset_presentation_keeps_raw_title_guards_argv_and_undo_in_both_languages()
+    -> Result<(), String> {
         let r = Rewrite {
             hash: "target-hash",
             short: "target",
@@ -181,7 +181,7 @@ mod fluent_action_tests {
                 ..
             }) = reset_action(&r, &RESET_MODES[2])
             else {
-                panic!("reset must ask first")
+                return Err("reset must ask first".into());
             };
             assert_eq!(title, "Keep reset");
             assert!(body.contains(r.target));
@@ -201,5 +201,6 @@ mod fluent_action_tests {
             );
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 }

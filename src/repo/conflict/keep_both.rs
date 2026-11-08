@@ -113,8 +113,8 @@ pub(super) fn free_name(
     Err(crate::i18n::message(
         "repo-core-0569",
         &[
-            ("path", format!("{}", path).into()),
-            ("tag", format!("{}", tagged(path, tag)).into()),
+            ("path", path.to_string().into()),
+            ("tag", tagged(path, tag).to_string().into()),
         ],
     ))
 }
@@ -169,8 +169,8 @@ fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a S
         crate::i18n::message(
             "repo-core-0573",
             &[
-                ("who", format!("{}", who).into()),
-                ("path", format!("{}", path).into()),
+                ("who", who.to_string().into()),
+                ("path", path.to_string().into()),
             ],
         )
     })?;
@@ -178,15 +178,15 @@ fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a S
         "120000" => Err(crate::i18n::message(
             "repo-core-0574",
             &[
-                ("who", format!("{}", who).into()),
-                ("path", format!("{}", path).into()),
+                ("who", who.to_string().into()),
+                ("path", path.to_string().into()),
             ],
         )),
         "160000" => Err(crate::i18n::message(
             "repo-core-0575",
             &[
-                ("who", format!("{}", who).into()),
-                ("path", format!("{}", path).into()),
+                ("who", who.to_string().into()),
+                ("path", path.to_string().into()),
             ],
         )),
         _ => Ok(stage),
@@ -200,7 +200,7 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
     if stages.ours.is_none() && stages.theirs.is_none() {
         return Err(crate::i18n::message(
             "repo-core-0576",
-            &[("path", format!("{}", path).into())],
+            &[("path", path.to_string().into())],
         ));
     }
     let rebase = state == Some(InProgress::Rebase);
@@ -234,10 +234,7 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
                 size: git::checked_out_size(repo, &stage.oid).map_err(|e| {
                     crate::i18n::message(
                         "repo-core-0582",
-                        &[
-                            ("who", format!("{}", who).into()),
-                            ("e", format!("{}", e).into()),
-                        ],
+                        &[("who", who.to_string().into()), ("e", e.to_string().into())],
                     )
                 })?,
                 ignored: git::is_ignored(repo, &target)?,
@@ -269,8 +266,8 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
                 crate::i18n::message(
                     "repo-core-0583",
                     &[
-                        ("origin", format!("{}", version.origin).into()),
-                        ("e", format!("{}", e).into()),
+                        ("origin", version.origin.to_string().into()),
+                        ("e", e.to_string().into()),
                     ],
                 )
             })
@@ -284,8 +281,8 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
                     crate::i18n::message(
                         "repo-core-0584",
                         &[
-                            ("target", format!("{}", version.target).into()),
-                            ("e", format!("{}", e).into()),
+                            ("target", version.target.to_string().into()),
+                            ("e", e.to_string().into()),
                         ],
                     )
                 })
@@ -408,9 +405,9 @@ pub fn still_in_conflict(repo: &Path, plan: &Plan) -> Result<(), String> {
         Err(crate::i18n::message(
             "repo-core-0589",
             &[
-                ("path", format!("{}", plan.path).into()),
-                ("target", format!("{}", plan.ours.target).into()),
-                ("target2", format!("{}", plan.theirs.target).into()),
+                ("path", plan.path.to_string().into()),
+                ("target", plan.ours.target.to_string().into()),
+                ("target2", plan.theirs.target.to_string().into()),
             ],
         ))
     }

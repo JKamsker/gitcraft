@@ -187,7 +187,7 @@ fn submodule_tip(sub: &Submodule) -> String {
     if !sub.url.is_empty() {
         tip.push_str(&crate::i18n::message(
             "repo-core-3528",
-            &[("url", format!("{}", sub.url).into())],
+            &[("url", sub.url.to_string().into())],
         ));
     }
     let at = match &sub.describe {
@@ -196,16 +196,16 @@ fn submodule_tip(sub: &Submodule) -> String {
     };
     tip.push_str(&match sub.state {
         SubmoduleState::UpToDate => {
-            crate::i18n::message("repo-core-3530", &[("at", format!("{}", at).into())])
+            crate::i18n::message("repo-core-3530", &[("at", at.to_string().into())])
         }
         SubmoduleState::NotInitialized => {
-            crate::i18n::message("repo-core-3531", &[("at", format!("{}", at).into())])
+            crate::i18n::message("repo-core-3531", &[("at", at.to_string().into())])
         }
         SubmoduleState::OutOfDate => {
-            crate::i18n::message("repo-core-3532", &[("at", format!("{}", at).into())])
+            crate::i18n::message("repo-core-3532", &[("at", at.to_string().into())])
         }
         SubmoduleState::Conflicted => {
-            crate::i18n::message("repo-core-3533", &[("at", format!("{}", at).into())])
+            crate::i18n::message("repo-core-3533", &[("at", at.to_string().into())])
         }
     });
     if sub.modified {

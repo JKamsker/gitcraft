@@ -113,11 +113,11 @@ impl RepoTab {
                 &[
                     (
                         "label",
-                        crate::repo::messages::display_operation(&label).into(),
+                        crate::repo::messages::display_operation(label).into(),
                     ),
                     (
                         "busy",
-                        crate::repo::messages::display_operation(&busy).into(),
+                        crate::repo::messages::display_operation(busy).into(),
                     ),
                 ],
             ),
@@ -149,7 +149,7 @@ impl RepoTab {
                         "repo-core-3316",
                         &[(
                             "label",
-                            crate::repo::messages::display_operation(&label).into(),
+                            crate::repo::messages::display_operation(label).into(),
                         )],
                     ),
                     false,
@@ -160,7 +160,7 @@ impl RepoTab {
                     "repo-core-3317",
                     &[(
                         "label",
-                        crate::repo::messages::display_operation(&label).into(),
+                        crate::repo::messages::display_operation(label).into(),
                     )],
                 ),
                 false,
@@ -178,9 +178,9 @@ impl RepoTab {
                         &[
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
-                            ("files", format!("{}", files).into()),
+                            ("files", files.to_string().into()),
                         ],
                     ),
                     true,
@@ -192,9 +192,9 @@ impl RepoTab {
                     &[
                         (
                             "label",
-                            crate::repo::messages::display_operation(&label).into(),
+                            crate::repo::messages::display_operation(label).into(),
                         ),
-                        ("e", format!("{}", e).into()),
+                        ("e", e.to_string().into()),
                     ],
                 ),
                 true,

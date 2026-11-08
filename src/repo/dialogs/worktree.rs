@@ -236,7 +236,7 @@ fn new_branch_field(ui: &mut Ui, new_name: &mut String, base: &str, focus: &mut 
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-core-1549",
-            &[("base", format!("{}", base).into())],
+            &[("base", base.to_string().into())],
         ))
         .color(t.text_faint)
         .small(),

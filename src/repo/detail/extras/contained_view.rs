@@ -52,7 +52,7 @@ pub(super) fn headline(c: &Containment) -> String {
     if let Some(tag) = c.first_tag() {
         parts.push(crate::i18n::message(
             "repo-core-1087",
-            &[("tag", format!("{}", tag).into())],
+            &[("tag", tag.to_string().into())],
         ));
     }
     parts.join(" · ")
@@ -66,7 +66,7 @@ fn body(ui: &mut Ui, c: &Containment) {
                 ui.label(RichText::new(crate::i18n::text("repo-core-1091")).color(t.text_faint));
                 widgets::chip(ui, tag, t.success).on_hover_text(crate::i18n::message(
                     "repo-core-1092",
-                    &[("describe", format!("{}", describe).into())],
+                    &[("describe", describe.to_string().into())],
                 ));
             });
         }

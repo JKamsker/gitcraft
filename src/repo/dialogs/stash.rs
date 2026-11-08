@@ -139,7 +139,7 @@ pub(super) fn files_summary(files: &[String]) -> String {
         more => crate::i18n::message(
             "repo-core-1491",
             &[
-                ("names", format!("{}", names).into()),
+                ("names", names.to_string().into()),
                 ("more", format!("{}", more).into()),
             ],
         ),
@@ -172,7 +172,7 @@ pub(super) fn stash(
     if d.files.is_empty() {
         let how = crate::i18n::message(
             "repo-core-1496",
-            &[("command", format!("{}", crate::manual::command()).into())],
+            &[("command", crate::manual::command().to_string().into())],
         );
         choice(
             ui,

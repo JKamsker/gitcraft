@@ -29,9 +29,9 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                     &[
                         (
                             "label",
-                            crate::repo::messages::display_operation(&label).into(),
+                            crate::repo::messages::display_operation(label).into(),
                         ),
-                        ("label2", format!("{}", cell.kind.display_label()).into()),
+                        ("label2", cell.kind.display_label().to_string().into()),
                         (
                             "execution-count",
                             cell.execution_count
@@ -68,14 +68,14 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                     Output::Image { mime, .. } => doc.text(
                         &crate::i18n::message(
                             "repo-core-1897",
-                            &[("mime", format!("{}", mime).into())],
+                            &[("mime", mime.to_string().into())],
                         ),
                         t.text_dim,
                     ),
                     Output::Other(kinds, _) => doc.text(
                         &crate::i18n::message(
                             "repo-core-1898",
-                            &[("kinds", format!("{}", kinds.join(", ")).into())],
+                            &[("kinds", kinds.join(", ").to_string().into())],
                         ),
                         t.warning,
                     ),

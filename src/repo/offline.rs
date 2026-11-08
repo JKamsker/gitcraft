@@ -12,7 +12,7 @@ use crate::theme::Tokens;
 /// Why the network buttons are off, when offline mode is on.
 pub(super) fn refused_text() -> Option<String> {
     network::refused()
-        .map(|p| crate::i18n::message("repo-core-2933", &[("why", format!("{}", p.why()).into())]))
+        .map(|p| crate::i18n::message("repo-core-2933", &[("why", p.why().to_string().into())]))
 }
 
 /// The chip's text: "Offline · last fetched 3 h ago" (or "never fetched").
@@ -21,13 +21,13 @@ pub(super) fn chip_text(pause: Pause, since_fetch: Option<std::time::Duration>) 
         Some(d) => crate::i18n::message(
             "repo-core-2934",
             &[
-                ("label", format!("{}", pause.label()).into()),
-                ("d", format!("{}", ago(d)).into()),
+                ("label", pause.label().to_string().into()),
+                ("d", ago(d).to_string().into()),
             ],
         ),
         None => crate::i18n::message(
             "repo-core-2935",
-            &[("label", format!("{}", pause.label()).into())],
+            &[("label", pause.label().to_string().into())],
         ),
     }
 }
@@ -59,22 +59,22 @@ pub(super) fn chip_tip(pause: Pause) -> String {
         Pause::Switch => crate::i18n::message(
             "repo-core-2939",
             &[
-                ("why", format!("{}", pause.why()).into()),
-                ("what", format!("{}", what).into()),
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
             ],
         ),
         Pause::NoConnection => crate::i18n::message(
             "repo-core-2940",
             &[
-                ("why", format!("{}", pause.why()).into()),
-                ("what", format!("{}", what).into()),
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
             ],
         ),
         Pause::Metered => crate::i18n::message(
             "repo-core-2941",
             &[
-                ("why", format!("{}", pause.why()).into()),
-                ("what", format!("{}", what).into()),
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
             ],
         ),
     }

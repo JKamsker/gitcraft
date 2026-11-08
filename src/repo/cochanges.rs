@@ -92,7 +92,7 @@ impl RepoTab {
                 if let Some(error) = &self.cochanges.error {
                     ui.label(crate::i18n::message(
                         "repo-core-0328",
-                        &[("error", format!("{}", error).into())],
+                        &[("error", error.to_string().into())],
                     ));
                 }
                 if let Some(history) = &self.cochanges.history {
@@ -106,14 +106,12 @@ impl RepoTab {
                             ("skipped", format!("{}", history.skipped).into()),
                             (
                                 "else",
-                                format!(
-                                    "{}",
-                                    if history.limited {
-                                        crate::i18n::text("repo-core-0330")
-                                    } else {
-                                        ""
-                                    }
-                                )
+                                (if history.limited {
+                                    crate::i18n::text("repo-core-0330")
+                                } else {
+                                    ""
+                                })
+                                .to_string()
                                 .into(),
                             ),
                         ],
@@ -135,8 +133,8 @@ impl RepoTab {
                             ui.label(crate::i18n::message(
                                 "repo-core-0331",
                                 &[
-                                    ("companion", format!("{}", hint.companion).into()),
-                                    ("source", format!("{}", hint.source).into()),
+                                    ("companion", hint.companion.to_string().into()),
+                                    ("source", hint.source.to_string().into()),
                                     ("count", (hint.evidence.len()).into()),
                                     ("source-changes", format!("{}", hint.source_changes).into()),
                                     (

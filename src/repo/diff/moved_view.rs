@@ -191,8 +191,8 @@ fn header(
             egui::RichText::new(crate::i18n::message(
                 "repo-core-3951",
                 &[
-                    ("true", format!("{}", span(&block.del, true)).into()),
-                    ("false", format!("{}", span(&block.add, false)).into()),
+                    ("true", span(&block.del, true).to_string().into()),
+                    ("false", span(&block.add, false).to_string().into()),
                 ],
             ))
             .font(theme::medium(12.5))

@@ -103,7 +103,7 @@ mod fluent_identity_tests {
     /// Exercise the painted confirmation and its real click-to-action path without a repo,
     /// preview reader, worker, Git command or rewrite. The title remains DCO's classifier key.
     #[test]
-    fn german_dco_confirmation_preserves_raw_operation_identity() {
+    fn german_dco_confirmation_preserves_raw_operation_identity() -> Result<(), String> {
         for language in ["en-US", "de"] {
             crate::i18n::set_language(language);
             for local_only in [false, true] {
@@ -169,7 +169,7 @@ mod fluent_identity_tests {
                     refresh,
                 }) = h.state()
                 else {
-                    panic!("confirmation must return its actual ops action")
+                    return Err("confirmation must return its actual ops action".into());
                 };
                 assert_eq!(label, &raw);
                 assert_eq!(ops, &expected_ops);
@@ -177,5 +177,6 @@ mod fluent_identity_tests {
             }
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 }

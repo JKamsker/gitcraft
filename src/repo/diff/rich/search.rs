@@ -13,14 +13,14 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                     prose::Part::Added { text, .. } => doc.text(
                         &crate::i18n::message(
                             "repo-core-2223",
-                            &[("text", format!("{}", text).into())],
+                            &[("text", text.to_string().into())],
                         ),
                         t.success,
                     ),
                     prose::Part::Removed { text, .. } => doc.text(
                         &crate::i18n::message(
                             "repo-core-2224",
-                            &[("text", format!("{}", text).into())],
+                            &[("text", text.to_string().into())],
                         ),
                         t.danger,
                     ),
@@ -38,19 +38,13 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                 );
                 if let Some(old) = &entry.old {
                     doc.text(
-                        &crate::i18n::message(
-                            "repo-core-2225",
-                            &[("old", format!("{}", old).into())],
-                        ),
+                        &crate::i18n::message("repo-core-2225", &[("old", old.to_string().into())]),
                         t.danger,
                     );
                 }
                 if let Some(new) = &entry.new {
                     doc.text(
-                        &crate::i18n::message(
-                            "repo-core-2226",
-                            &[("new", format!("{}", new).into())],
-                        ),
+                        &crate::i18n::message("repo-core-2226", &[("new", new.to_string().into())]),
                         t.success,
                     );
                 }
@@ -59,8 +53,8 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                         &crate::i18n::message(
                             "repo-core-2227",
                             &[
-                                ("old", format!("{}", old).into()),
-                                ("new", format!("{}", new).into()),
+                                ("old", old.to_string().into()),
+                                ("new", new.to_string().into()),
                             ],
                         ),
                         t.text_dim,
@@ -106,21 +100,17 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                             &[
                                 (
                                     "declared",
-                                    format!(
-                                        "{}",
-                                        old.as_deref()
-                                            .unwrap_or(crate::i18n::text("repo-core-2230"))
-                                    )
-                                    .into(),
+                                    old.as_deref()
+                                        .unwrap_or(crate::i18n::text("repo-core-2230"))
+                                        .to_string()
+                                        .into(),
                                 ),
                                 (
                                     "declared2",
-                                    format!(
-                                        "{}",
-                                        new.as_deref()
-                                            .unwrap_or(crate::i18n::text("repo-core-2230"))
-                                    )
-                                    .into(),
+                                    new.as_deref()
+                                        .unwrap_or(crate::i18n::text("repo-core-2230"))
+                                        .to_string()
+                                        .into(),
                                 ),
                             ],
                         ),
@@ -137,27 +127,25 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                         &[
                             (
                                 "column",
-                                format!(
-                                    "{}",
-                                    column
-                                        .old
-                                        .as_ref()
-                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
-                                            .as_str())
-                                )
-                                .into(),
+                                column
+                                    .old
+                                    .as_ref()
+                                    .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| {
+                                        s.as_str()
+                                    })
+                                    .to_string()
+                                    .into(),
                             ),
                             (
                                 "column2",
-                                format!(
-                                    "{}",
-                                    column
-                                        .new
-                                        .as_ref()
-                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
-                                            .as_str())
-                                )
-                                .into(),
+                                column
+                                    .new
+                                    .as_ref()
+                                    .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| {
+                                        s.as_str()
+                                    })
+                                    .to_string()
+                                    .into(),
                             ),
                         ],
                     ),
@@ -169,7 +157,7 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                     doc.text(
                         &crate::i18n::message(
                             "repo-core-2232",
-                            &[("old", format!("{}", old.join(" │ ")).into())],
+                            &[("old", old.join(" │ ").to_string().into())],
                         ),
                         t.danger,
                     );
@@ -178,7 +166,7 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                     doc.text(
                         &crate::i18n::message(
                             "repo-core-2233",
-                            &[("new", format!("{}", new.join(" │ ")).into())],
+                            &[("new", new.join(" │ ").to_string().into())],
                         ),
                         t.success,
                     );
@@ -196,10 +184,7 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                             doc.text(
                                 &crate::i18n::message(
                                     "repo-core-2234",
-                                    &[
-                                        ("side", format!("{}", side).into()),
-                                        ("files", (files).into()),
-                                    ],
+                                    &[("side", side.to_string().into()), ("files", (files).into())],
                                 ),
                                 t.text,
                             );

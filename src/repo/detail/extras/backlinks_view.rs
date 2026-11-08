@@ -71,7 +71,7 @@ pub(super) fn headline(links: &[Backlink], more: bool) -> String {
         crate::i18n::message(
             "repo-core-1073",
             &[
-                ("text", format!("{}", text).into()),
+                ("text", text.to_string().into()),
                 ("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into()),
             ],
         )
@@ -156,18 +156,18 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             crate::i18n::message(
                 "repo-core-1079",
                 &[
-                    ("hash", format!("{}", short(&link.hash)).into()),
-                    ("subject", format!("{}", link.subject).into()),
+                    ("hash", short(&link.hash).to_string().into()),
+                    ("subject", link.subject.to_string().into()),
                 ],
             )
         })
         .on_hover_text(crate::i18n::message(
             "repo-core-1080",
             &[
-                ("hash", format!("{}", short(&link.hash)).into()),
-                ("author", format!("{}", link.author).into()),
+                ("hash", short(&link.hash).to_string().into()),
+                ("author", link.author.to_string().into()),
                 ("date", crate::i18n::date_iso(&link.date).into()),
-                ("text", format!("{}", link.text).into()),
+                ("text", link.text.to_string().into()),
             ],
         ));
     // The root's action label and the interaction metadata describe this same button.

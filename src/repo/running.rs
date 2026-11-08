@@ -133,7 +133,7 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-3347",
                     &[
-                        ("label", format!("{}", waiter.label()).into()),
+                        ("label", waiter.label().to_string().into()),
                         ("MAX-WAITING", format!("{}", MAX_WAITING).into()),
                         (
                             "busy",
@@ -228,7 +228,7 @@ pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
     let names: Vec<&str> = dropped.iter().map(|w| w.label()).collect();
     let note = crate::i18n::message(
         "repo-core-3348",
-        &[("names", format!("{}", names.join(", ")).into())],
+        &[("names", names.join(", ").to_string().into())],
     );
     match msg.split_once(": ") {
         Some((head, rest)) => format!("{head}{note}: {rest}"),

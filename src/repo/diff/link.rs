@@ -95,7 +95,7 @@ impl LineLinks<'_> {
         let what = if old {
             crate::i18n::message(
                 "repo-core-1860",
-                &[("label", format!("{}", picked.label()).into())],
+                &[("label", picked.label().to_string().into())],
             )
         } else {
             picked.label()

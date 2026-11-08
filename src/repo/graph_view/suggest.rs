@@ -242,14 +242,14 @@ fn ready<'a, T>(
             out.load = Some(kind);
             out.status = Some(crate::i18n::message(
                 "repo-core-2730",
-                &[("what", format!("{}", what).into())],
+                &[("what", what.to_string().into())],
             ));
             None
         }
         Source::Loading => {
             out.status = Some(crate::i18n::message(
                 "repo-core-2730",
-                &[("what", format!("{}", what).into())],
+                &[("what", what.to_string().into())],
             ));
             None
         }
@@ -257,8 +257,8 @@ fn ready<'a, T>(
             out.status = Some(crate::i18n::message(
                 "repo-core-2731",
                 &[
-                    ("what", format!("{}", what).into()),
-                    ("e", format!("{}", e).into()),
+                    ("what", what.to_string().into()),
+                    ("e", e.to_string().into()),
                 ],
             ));
             None
@@ -312,7 +312,7 @@ fn people(
             detail: crate::i18n::message(
                 "repo-core-2735",
                 &[
-                    ("email", format!("{}", p.email).into()),
+                    ("email", p.email.to_string().into()),
                     ("commits", (p.commits).into()),
                 ],
             ),
@@ -322,7 +322,7 @@ fn people(
     if out.items.is_empty() {
         out.status = Some(crate::i18n::message(
             "repo-core-2736",
-            &[("what", format!("{}", what).into())],
+            &[("what", what.to_string().into())],
         ));
     }
 }

@@ -71,8 +71,8 @@ fn pair(
                 "repo-core-2174",
                 &[
                     ("line", format!("{}", any.line).into()),
-                    ("path", format!("{}", any.path).into()),
-                    ("state", format!("{}", state).into()),
+                    ("path", any.path.to_string().into()),
+                    ("state", state.to_string().into()),
                 ],
             )
         });
@@ -86,7 +86,7 @@ fn pair(
         if any.list == "deps" {
             let what = match &any.repo {
                 Some(url) => {
-                    crate::i18n::message("repo-core-2175", &[("url", format!("{}", url).into())])
+                    crate::i18n::message("repo-core-2175", &[("url", url.to_string().into())])
                 }
                 None => crate::i18n::text("repo-core-2176").to_owned(),
             };

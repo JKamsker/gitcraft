@@ -189,12 +189,12 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
         ui.strong(crate::i18n::message(
             "repo-core-3081",
             &[
-                ("path", format!("{}", logic::redact(&hunk.path)).into()),
+                ("path", logic::redact(&hunk.path).to_string().into()),
                 ("range", format!("{}", hunk.range.0).into()),
                 ("range2", format!("{}", hunk.range.1).into()),
                 (
                     "new",
-                    format!("{}", if hunk.old { "old" } else { "new" }).into(),
+                    (if hunk.old { "old" } else { "new" }).to_string().into(),
                 ),
             ],
         ));
@@ -249,20 +249,18 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
                                 "repo-core-3086",
                                 &[
                                     ("j", format!("{}", j + 1).into()),
-                                    ("kind", format!("{}", step.kind).into()),
+                                    ("kind", step.kind.to_string().into()),
                                     (
                                         "t",
-                                        format!(
-                                            "{}",
-                                            step.at.map_or(
-                                                String::new(),
-                                                |t| crate::i18n::message(
+                                        step.at
+                                            .map_or(String::new(), |t| {
+                                                crate::i18n::message(
                                                     "repo-core-3087",
-                                                    &[("t", format!("{}", t).into())]
+                                                    &[("t", format!("{}", t).into())],
                                                 )
-                                            )
-                                        )
-                                        .into(),
+                                            })
+                                            .to_string()
+                                            .into(),
                                     ),
                                 ],
                             ));
@@ -332,39 +330,42 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
 mod tests {
     use super::*;
     #[test]
-    fn pure_prompt_panel_hunk_jump_uses_recorded_range_and_read_action_pins_selected_oid() {
+    fn pure_prompt_panel_hunk_jump_uses_recorded_range_and_read_action_pins_selected_oid()
+    -> Result<(), String> {
         let hash = "a".repeat(40);
-        let mut state = State::default();
-        state.requested = Some(hash.clone());
-        state.result = Some(Ok(Evidence {
-            commit: hash.clone(),
-            sessions: vec![logic::Session {
-                source: "synthetic local".into(),
-                relation: "candidate".into(),
-                steps: vec![logic::Step {
-                    kind: "Tool",
-                    text: "Edit".into(),
-                    at: None,
-                    path: Some("file".into()),
-                    before: "old".into(),
-                    after: "new".into(),
-                    exact: true,
-                    ranges: vec![logic::Span {
-                        start: 5,
-                        end: 6,
-                        old: false,
+        let mut state = State {
+            requested: Some(hash.clone()),
+            result: Some(Ok(Evidence {
+                commit: hash.clone(),
+                sessions: vec![logic::Session {
+                    source: "synthetic local".into(),
+                    relation: "candidate".into(),
+                    steps: vec![logic::Step {
+                        kind: "Tool",
+                        text: "Edit".into(),
+                        at: None,
+                        path: Some("file".into()),
+                        before: "old".into(),
+                        after: "new".into(),
+                        exact: true,
+                        ranges: vec![logic::Span {
+                            start: 5,
+                            end: 6,
+                            old: false,
+                        }],
                     }],
                 }],
-            }],
-            notices: vec![],
-        }));
-        state.hunk = Some(Hunk {
-            commit: hash.clone(),
-            path: "file".into(),
-            range: (6, 8),
-            old: false,
-            alternate: None,
-        });
+                notices: vec![],
+            })),
+            hunk: Some(Hunk {
+                commit: hash.clone(),
+                path: "file".into(),
+                range: (6, 8),
+                old: false,
+                alternate: None,
+            }),
+            ..Default::default()
+        };
         assert_eq!(matches(&state), vec![(0, 0)]);
         let ctx = egui::Context::default();
         let mut acts = Vec::new();
@@ -396,7 +397,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .unwrap();
+            .ok_or("missing Open commit lines 5–6 text")?;
         out.textures_delta.clear();
         let mut out = ctx.run_ui(
             egui::RawInput {
@@ -421,7 +422,8 @@ mod tests {
         );
         out.textures_delta.clear();
         assert!(acts.iter().any(|a|matches!(a,Action::OpenPinnedFileLine(s)if s.commit==hash&&s.path=="file"&&s.line==5)));
-        state.hunk.as_mut().unwrap().commit = "b".repeat(40);
+        state.hunk.as_mut().ok_or("missing recorded hunk")?.commit = "b".repeat(40);
         assert!(matches(&state).is_empty());
+        Ok(())
     }
 }

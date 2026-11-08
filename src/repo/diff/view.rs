@@ -460,7 +460,7 @@ impl RepoTab {
                 path.clone(),
                 crate::i18n::message(
                     "repo-core-2355",
-                    &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+                    &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
                 ),
             ),
             DiffKey::Work(file) => (
@@ -721,7 +721,7 @@ impl RepoTab {
             let b = egui::Button::new(crate::i18n::message(
                 "repo-core-2376",
                 &[
-                    ("verb", format!("{}", pick.verb()).into()),
+                    ("verb", pick.verb().to_string().into()),
                     ("chosen", (chosen).into()),
                 ],
             ));
@@ -796,10 +796,9 @@ impl RepoTab {
         };
         match to {
             Some(to) => format!("{} → {}", name(from), name(to)),
-            None => crate::i18n::message(
-                "repo-core-2382",
-                &[("from", format!("{}", name(from)).into())],
-            ),
+            None => {
+                crate::i18n::message("repo-core-2382", &[("from", name(from).to_string().into())])
+            }
         }
     }
 }
@@ -950,19 +949,15 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
             &[
                 (
                     "NextChange",
-                    format!(
-                        "{}",
-                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)
-                    )
-                    .into(),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)
+                        .to_string()
+                        .into(),
                 ),
                 (
                     "NextChangeAlt",
-                    format!(
-                        "{}",
-                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
-                    )
-                    .into(),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+                        .to_string()
+                        .into(),
                 ),
             ],
         ),
@@ -979,19 +974,15 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
             &[
                 (
                     "PreviousChange",
-                    format!(
-                        "{}",
-                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)
-                    )
-                    .into(),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)
+                        .to_string()
+                        .into(),
                 ),
                 (
                     "PreviousChangeAlt",
-                    format!(
-                        "{}",
-                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
-                    )
-                    .into(),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+                        .to_string()
+                        .into(),
                 ),
             ],
         ),

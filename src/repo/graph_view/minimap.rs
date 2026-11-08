@@ -125,7 +125,7 @@ impl RepoTab {
         let coverage = lane_coverage(self.graph.width);
         let label = crate::i18n::message(
             "repo-core-2673",
-            &[("coverage", format!("{}", coverage).into())],
+            &[("coverage", coverage.to_string().into())],
         );
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
@@ -265,17 +265,15 @@ impl RepoTab {
             "repo-core-2677",
             &[
                 ("rows", format!("{}", self.history_minimap.rows).into()),
-                ("coverage", format!("{}", coverage).into()),
+                ("coverage", coverage.to_string().into()),
                 (
                     "loaded",
-                    format!(
-                        "{}",
-                        if self.has_more {
-                            crate::i18n::text("repo-core-2678")
-                        } else {
-                            crate::i18n::text("repo-core-2679")
-                        }
-                    )
+                    (if self.has_more {
+                        crate::i18n::text("repo-core-2678")
+                    } else {
+                        crate::i18n::text("repo-core-2679")
+                    })
+                    .to_string()
                     .into(),
                 ),
             ],

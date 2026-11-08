@@ -45,11 +45,11 @@ impl RepoTab {
                         &[
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
                             (
                                 "busy",
-                                crate::repo::messages::display_operation(&busy).into(),
+                                crate::repo::messages::display_operation(busy).into(),
                             ),
                         ],
                     ),
@@ -68,9 +68,9 @@ impl RepoTab {
                         &[
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
-                            ("why", format!("{}", why).into()),
+                            ("why", why.to_string().into()),
                         ],
                     ),
                     true,
@@ -270,7 +270,7 @@ impl RepoTab {
                     "repo-core-2950",
                     &[(
                         "busy",
-                        crate::repo::messages::display_operation(&busy).into(),
+                        crate::repo::messages::display_operation(busy).into(),
                     )],
                 ),
                 true,
@@ -402,7 +402,7 @@ impl RepoTab {
                         ),
                         (
                             "busy",
-                            crate::repo::messages::display_operation(&busy).into(),
+                            crate::repo::messages::display_operation(busy).into(),
                         ),
                     ],
                 ),
@@ -479,7 +479,7 @@ impl RepoTab {
                                     "label",
                                     crate::repo::messages::display_operation(&label).into(),
                                 ),
-                                ("note", format!("{}", note).into()),
+                                ("note", note.to_string().into()),
                             ],
                         ),
                         true,
@@ -541,7 +541,7 @@ impl RepoTab {
                                 "label",
                                 crate::repo::messages::display_operation(&label).into(),
                             ),
-                            ("e", format!("{}", e).into()),
+                            ("e", e.to_string().into()),
                         ],
                     ),
                     true,
@@ -567,7 +567,7 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2965",
                         &[
-                            ("name", format!("{}", self.name).into()),
+                            ("name", self.name.to_string().into()),
                             (
                                 "label",
                                 crate::repo::messages::display_operation(&label).into(),
@@ -580,12 +580,12 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2966",
                         &[
-                            ("name", format!("{}", self.name).into()),
+                            ("name", self.name.to_string().into()),
                             (
                                 "label",
                                 crate::repo::messages::display_operation(&label).into(),
                             ),
-                            ("e", format!("{}", headline(e)).into()),
+                            ("e", headline(e).to_string().into()),
                         ],
                     ),
                     true,
@@ -695,7 +695,7 @@ fn run_step(
                     "repo-core-2967",
                     &[(
                         "error",
-                        format!("{}", crate::diagnostics::crash::scrub(&error)).into(),
+                        crate::diagnostics::crash::scrub(&error).to_string().into(),
                     )],
                 ));
             }
@@ -795,7 +795,7 @@ pub(crate) fn run_reviewed_push(
             "repo-core-4157",
             &[(
                 "error",
-                format!("{}", crate::diagnostics::crash::scrub(&error)).into(),
+                crate::diagnostics::crash::scrub(&error).to_string().into(),
             )],
         )
     })?;
@@ -888,12 +888,8 @@ fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::Path
 pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
     let pause = crate::network::refused()?;
     let network = ops.iter().any(|op| reaches_a_remote(op));
-    network.then(|| {
-        crate::i18n::message(
-            "repo-core-4161",
-            &[("why", format!("{}", pause.why()).into())],
-        )
-    })
+    network
+        .then(|| crate::i18n::message("repo-core-4161", &[("why", pause.why().to_string().into())]))
 }
 
 /// Whether the git command `op` reaches a remote: fetch, pull, push, clone, `ls-remote`, the
@@ -969,8 +965,8 @@ pub(super) fn run_steps_counted(
                 Err(crate::i18n::message(
                     "repo-core-4164",
                     &[
-                        ("now", format!("{}", super::short(&now)).into()),
-                        ("expected", format!("{}", super::short(expected)).into()),
+                        ("now", super::short(&now).to_string().into()),
+                        ("expected", super::short(expected).to_string().into()),
                     ],
                 )),
                 kind,
@@ -1018,7 +1014,7 @@ pub(super) fn run_steps_counted(
                 Ok::<_, String>(())
             })();
             snapshot.map_err(|error| {
-                crate::i18n::message("repo-core-4168", &[("error", format!("{}", error).into())])
+                crate::i18n::message("repo-core-4168", &[("error", error.to_string().into())])
             })
         },
     );
@@ -1283,7 +1279,7 @@ fn check_expected(
         if now != tree {
             return Err(crate::i18n::message(
                 "repo-core-4178",
-                &[("rev", format!("{}", rev).into())],
+                &[("rev", rev.to_string().into())],
             ));
         }
     }
@@ -1308,14 +1304,14 @@ fn check_expected(
                 |r| says(&r),
             );
             let place = dir.map_or(String::new(), |d| {
-                crate::i18n::message("repo-core-4181", &[("d", format!("{}", d).into())])
+                crate::i18n::message("repo-core-4181", &[("d", d.to_string().into())])
             });
             return Err(crate::i18n::message(
                 "repo-core-4182",
                 &[
-                    ("now", format!("{}", now).into()),
-                    ("place", format!("{}", place).into()),
-                    ("target", format!("{}", says(target)).into()),
+                    ("now", now.to_string().into()),
+                    ("place", place.to_string().into()),
+                    ("target", says(target).to_string().into()),
                 ],
             ));
         }
@@ -1327,14 +1323,14 @@ fn check_expected(
             return Err(if name == "refs/stash" {
                 crate::i18n::text("repo-core-4183").to_owned()
             } else if value.is_empty() {
-                crate::i18n::message("repo-core-4184", &[("what", format!("{}", what).into())])
+                crate::i18n::message("repo-core-4184", &[("what", what.to_string().into())])
             } else {
                 crate::i18n::message(
                     "repo-core-4185",
                     &[
-                        ("what", format!("{}", what).into()),
-                        ("now", format!("{}", super::short(&now)).into()),
-                        ("value", format!("{}", super::short(value)).into()),
+                        ("what", what.to_string().into()),
+                        ("now", super::short(&now).to_string().into()),
+                        ("value", super::short(value).to_string().into()),
                     ],
                 )
             });

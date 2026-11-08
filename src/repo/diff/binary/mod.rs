@@ -294,7 +294,7 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
             };
             text_note = Some(crate::i18n::message(
                 "repo-core-3902",
-                &[("which", format!("{}", which).into())],
+                &[("which", which.to_string().into())],
             ));
         } else {
             let a: Vec<&str> = text_of(&old)
@@ -325,8 +325,8 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
                 notes.push(crate::i18n::message(
                     "repo-core-3903",
                     &[
-                        ("which", format!("{}", which).into()),
-                        ("gaps", format!("{}", gaps.join("; ")).into()),
+                        ("which", which.to_string().into()),
+                        ("gaps", gaps.join("; ").to_string().into()),
                     ],
                 ));
             }
@@ -414,8 +414,8 @@ fn compare_members(
             let note = crate::i18n::message(
                 "repo-core-3908",
                 &[
-                    ("which", format!("{}", which).into()),
-                    ("why", format!("{}", why).into()),
+                    ("which", which.to_string().into()),
+                    ("why", why.to_string().into()),
                 ],
             );
             return (None, Some(note));
@@ -435,8 +435,8 @@ fn compare_members(
             notes.push(crate::i18n::message(
                 "repo-core-3909",
                 &[
-                    ("which", format!("{}", which).into()),
-                    ("d", format!("{}", d.duplicates.join(", ")).into()),
+                    ("which", which.to_string().into()),
+                    ("d", d.duplicates.join(", ").to_string().into()),
                 ],
             ));
         }

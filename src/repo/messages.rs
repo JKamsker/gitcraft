@@ -352,7 +352,7 @@ fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
         .map(|s| (*s).to_owned())
         .or_else(|| payload.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| crate::i18n::text("repo-core-2897").to_owned());
-    crate::i18n::message("repo-core-2898", &[("said", format!("{}", said).into())])
+    crate::i18n::message("repo-core-2898", &[("said", said.to_string().into())])
 }
 
 impl RepoTab {
@@ -726,10 +726,9 @@ fn operation_display(label: &str, depth: usize) -> String {
         if let Some(branch) = label
             .strip_prefix("Sign off the commits of ")
             .and_then(|v| v.strip_suffix(suffix))
+            && !branch.is_empty()
         {
-            if !branch.is_empty() {
-                return crate::i18n::message(id, &[("branch", branch.into())]);
-            }
+            return crate::i18n::message(id, &[("branch", branch.into())]);
         }
     }
     use std::sync::OnceLock;

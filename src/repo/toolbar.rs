@@ -21,24 +21,24 @@ fn step_tip(what: &str, entry: &super::timeline::Entry, keys: &str) -> String {
         Some(agent) => crate::i18n::message(
             "repo-core-3645",
             &[
-                ("what", format!("{}", what).into()),
-                ("agent", format!("{}", agent).into()),
+                ("what", what.to_string().into()),
+                ("agent", agent.to_string().into()),
                 (
                     "label",
                     crate::repo::messages::display_operation(&entry.label).into(),
                 ),
-                ("keys", format!("{}", keys).into()),
+                ("keys", keys.to_string().into()),
             ],
         ),
         None => crate::i18n::message(
             "repo-core-3646",
             &[
-                ("what", format!("{}", what).into()),
+                ("what", what.to_string().into()),
                 (
                     "label",
                     crate::repo::messages::display_operation(&entry.label).into(),
                 ),
-                ("keys", format!("{}", keys).into()),
+                ("keys", keys.to_string().into()),
             ],
         ),
     }
@@ -186,7 +186,9 @@ impl RepoTab {
                 "repo-core-3651",
                 &[(
                     "Timeline",
-                    format!("{}", keymap::label(ui.ctx(), keymap::Command::Timeline)).into(),
+                    keymap::label(ui.ctx(), keymap::Command::Timeline)
+                        .to_string()
+                        .into(),
                 )],
             ))
             .clicked()
@@ -210,7 +212,11 @@ impl RepoTab {
                     "repo-core-3652",
                     &[(
                         "self",
-                        format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                        self.busy_op
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_string()
+                            .into(),
                     )],
                 )
             })
@@ -220,21 +226,19 @@ impl RepoTab {
             &[
                 (
                     "Fetch",
-                    format!(
-                        "{}",
-                        keymap::tip(
-                            ui.ctx(),
-                            crate::i18n::text("repo-core-3654"),
-                            Command::Fetch
-                        )
+                    keymap::tip(
+                        ui.ctx(),
+                        crate::i18n::text("repo-core-3654"),
+                        Command::Fetch,
                     )
+                    .to_string()
                     .into(),
                 ),
                 (
                     "elapsed",
-                    format!("{}", short_duration(self.last_fetch.elapsed())).into(),
+                    short_duration(self.last_fetch.elapsed()).to_string().into(),
                 ),
-                ("waits", format!("{}", waits).into()),
+                ("waits", waits.to_string().into()),
             ],
         );
         if icons::tool_button(
@@ -318,7 +322,7 @@ impl RepoTab {
         super::hooks::push_menu(&push, acts);
         let sync_tip = crate::i18n::message(
             "repo-core-3662",
-            &[("mode", format!("{}", mode.args().join(" ")).into())],
+            &[("mode", mode.args().join(" ").to_string().into())],
         );
         if icons::tool_button(
             ui,
@@ -419,7 +423,9 @@ impl RepoTab {
                 "repo-core-3672",
                 &[(
                     "Search",
-                    format!("{}", keymap::label(ui.ctx(), keymap::Command::Search)).into(),
+                    keymap::label(ui.ctx(), keymap::Command::Search)
+                        .to_string()
+                        .into(),
                 )],
             ));
         if self.search.open {
@@ -516,8 +522,8 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-3681",
                     &[
-                        ("label", format!("{}", target.host.label()).into()),
-                        ("path", format!("{}", target.path).into()),
+                        ("label", target.host.label().to_string().into()),
+                        ("path", target.path.to_string().into()),
                     ],
                 ),
             );
@@ -530,7 +536,7 @@ impl RepoTab {
                 if let Some(e) = &self.ci.error {
                     label.on_hover_text(crate::i18n::message(
                         "repo-core-3682",
-                        &[("e", format!("{}", e).into())],
+                        &[("e", e.to_string().into())],
                     ));
                 }
             }
@@ -545,7 +551,11 @@ impl RepoTab {
                         "repo-core-3684",
                         &[(
                             "head",
-                            format!("{}", self.refs.head.get(..8).unwrap_or(&self.refs.head))
+                            self.refs
+                                .head
+                                .get(..8)
+                                .unwrap_or(&self.refs.head)
+                                .to_string()
                                 .into(),
                         )],
                     ))
@@ -572,7 +582,7 @@ impl RepoTab {
                 ui,
                 &crate::i18n::message(
                     "repo-core-0818",
-                    &[("label", format!("{}", state.label()).into())],
+                    &[("label", state.label().to_string().into())],
                 ),
                 t.warning,
             );
@@ -581,7 +591,7 @@ impl RepoTab {
                     idle,
                     egui::Button::new(crate::i18n::message(
                         "repo-core-3686",
-                        &[("fold", format!("{}", state.label().to_lowercase()).into())],
+                        &[("fold", state.label().to_lowercase().to_string().into())],
                     )),
                 )
                 .clicked()
@@ -633,12 +643,12 @@ impl RepoTab {
                 .on_hover_text(if self.waiting.is_empty() {
                     crate::i18n::message(
                         "repo-core-3688",
-                        &[("op", crate::repo::messages::display_operation(&op).into())],
+                        &[("op", crate::repo::messages::display_operation(op).into())],
                     )
                 } else {
                     crate::i18n::message(
                         "repo-core-3689",
-                        &[("op", crate::repo::messages::display_operation(&op).into())],
+                        &[("op", crate::repo::messages::display_operation(op).into())],
                     )
                 })
                 .clicked()
@@ -672,7 +682,7 @@ impl RepoTab {
                 ui,
                 &crate::i18n::message(
                     "repo-core-3693",
-                    &[("names", format!("{}", names.join(", ")).into())],
+                    &[("names", names.join(", ").to_string().into())],
                 ),
                 t.text_dim,
             )
@@ -688,7 +698,7 @@ impl RepoTab {
         self.busy_op.as_ref().map(|op| {
             crate::i18n::message(
                 "repo-core-3695",
-                &[("op", crate::repo::messages::display_operation(&op).into())],
+                &[("op", crate::repo::messages::display_operation(op).into())],
             )
         })
     }
@@ -739,7 +749,7 @@ pub(super) fn headline(msg: &str) -> String {
                 &[
                     (
                         "label",
-                        crate::repo::messages::display_operation(&label).into(),
+                        crate::repo::messages::display_operation(label).into(),
                     ),
                     ("conflicts", (conflicts).into()),
                 ],
@@ -749,7 +759,7 @@ pub(super) fn headline(msg: &str) -> String {
                 &[
                     (
                         "label",
-                        crate::repo::messages::display_operation(&label).into(),
+                        crate::repo::messages::display_operation(label).into(),
                     ),
                     ("n", (n).into()),
                 ],
@@ -759,7 +769,7 @@ pub(super) fn headline(msg: &str) -> String {
                 &[
                     (
                         "label",
-                        crate::repo::messages::display_operation(&label).into(),
+                        crate::repo::messages::display_operation(label).into(),
                     ),
                     ("conflicts", (conflicts).into()),
                     ("n", (n).into()),

@@ -135,7 +135,7 @@ impl RepoTab {
                 };
                 let identity = git::identity(&path);
                 let worktree_root = git::read_worktree_root(&path).map_err(|e| {
-                    crate::i18n::message("repo-core-2893", &[("e", format!("{}", e).into())])
+                    crate::i18n::message("repo-core-2893", &[("e", e.to_string().into())])
                 })?;
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;

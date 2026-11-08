@@ -79,11 +79,11 @@ fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
             }),
             Area::Untracked => Err(crate::i18n::message(
                 "repo-core-2455",
-                &[("path", format!("{}", f.path).into())],
+                &[("path", f.path.to_string().into())],
             )),
             Area::Conflicted => Err(crate::i18n::message(
                 "repo-core-2456",
-                &[("path", format!("{}", f.path).into())],
+                &[("path", f.path.to_string().into())],
             )),
         },
         DiffKey::Commit { hash, path } => tool::commit_target(repo, hash, path),
@@ -97,7 +97,7 @@ fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
 fn where_it_runs(repo: &Path) -> String {
     match tool::place_of(repo) {
         Place::Ssh(host) => {
-            crate::i18n::message("repo-core-2457", &[("host", format!("{}", host).into())])
+            crate::i18n::message("repo-core-2457", &[("host", host.to_string().into())])
         }
         Place::Here | Place::Wsl => String::new(),
     }
@@ -119,13 +119,13 @@ impl RepoTab {
             crate::i18n::message(
                 "repo-core-2459",
                 &[
-                    ("file", format!("{}", file).into()),
+                    ("file", file.to_string().into()),
                     (
                         "label",
                         crate::repo::messages::display_operation(&label).into(),
                     ),
-                    ("refreshes", format!("{}", refreshes).into()),
-                    ("path", format!("{}", where_it_runs(&self.path)).into()),
+                    ("refreshes", refreshes.to_string().into()),
+                    ("path", where_it_runs(&self.path).to_string().into()),
                 ],
             ),
             false,
@@ -151,7 +151,7 @@ impl RepoTab {
         let label = choice.label(Kind::Merge);
         let Some(open) = Merging::register(&self.path, &path) else {
             self.status = Some((
-                crate::i18n::message("repo-core-2460", &[("path", format!("{}", path).into())]),
+                crate::i18n::message("repo-core-2460", &[("path", path.to_string().into())]),
                 true,
             ));
             return;
@@ -164,8 +164,8 @@ impl RepoTab {
                         "label",
                         crate::repo::messages::display_operation(&label).into(),
                     ),
-                    ("path", format!("{}", path).into()),
-                    ("path2", format!("{}", where_it_runs(&self.path)).into()),
+                    ("path", path.to_string().into()),
+                    ("path2", where_it_runs(&self.path).to_string().into()),
                 ],
             ),
             false,
@@ -201,10 +201,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2462",
                         &[
-                            ("path", format!("{}", path).into()),
+                            ("path", path.to_string().into()),
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
                         ],
                     ),
@@ -223,7 +223,7 @@ impl RepoTab {
             !error
                 && s.starts_with(&crate::i18n::message(
                     "repo-core-2463",
-                    &[("file", format!("{}", file).into())],
+                    &[("file", file.to_string().into())],
                 ))
         }) {
             self.status = None;

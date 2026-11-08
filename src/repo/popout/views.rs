@@ -98,14 +98,14 @@ impl RepoTab {
             Panel::Diff => match &self.diff {
                 Some(view) => crate::i18n::message(
                     "repo-core-4215",
-                    &[("path", format!("{}", view.key.path()).into())],
+                    &[("path", view.key.path().to_string().into())],
                 ),
                 None => crate::i18n::text("repo-core-2367").to_owned(),
             },
             Panel::Terminal => match self.terminals.get(self.active_terminal) {
                 Some(term) if self.terminal_open => crate::i18n::message(
                     "repo-core-4216",
-                    &[("shell", format!("{}", term.shell).into())],
+                    &[("shell", term.shell.to_string().into())],
                 ),
                 _ => crate::i18n::text("repo-core-3669").to_owned(),
             },
@@ -115,7 +115,7 @@ impl RepoTab {
                         "repo-core-4217",
                         &[
                             ("number", format!("{}", view.number).into()),
-                            ("title", format!("{}", details.title).into()),
+                            ("title", details.title.to_string().into()),
                         ],
                     ),
                     _ => crate::i18n::message(
@@ -135,8 +135,8 @@ impl RepoTab {
                     Some(view) => crate::i18n::message(
                         "repo-core-4222",
                         &[
-                            ("noun", format!("{}", noun).into()),
-                            ("sha", format!("{}", crate::repo::short(&view.sha)).into()),
+                            ("noun", noun.to_string().into()),
+                            ("sha", crate::repo::short(&view.sha).to_string().into()),
                         ],
                     ),
                     None => noun.to_owned(),
@@ -299,7 +299,7 @@ impl RepoTab {
                     self.status = Some((
                         crate::i18n::message(
                             "repo-core-4225",
-                            &[("noun", format!("{}", panel.noun()).into())],
+                            &[("noun", panel.noun().to_string().into())],
                         ),
                         true,
                     ));
@@ -453,7 +453,7 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
             "picture-in-picture",
             crate::i18n::message(
                 "repo-core-4238",
-                &[("noun", format!("{}", panel.noun()).into())],
+                &[("noun", panel.noun().to_string().into())],
             ),
             Request::Dock(panel),
         )
@@ -462,7 +462,7 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
             "picture-in-picture-2",
             crate::i18n::message(
                 "repo-core-4239",
-                &[("noun", format!("{}", panel.noun()).into())],
+                &[("noun", panel.noun().to_string().into())],
             ),
             Request::PopOut(panel),
         )

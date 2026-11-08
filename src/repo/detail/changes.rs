@@ -93,7 +93,7 @@ impl RepoTab {
                         ),
                         None => crate::i18n::message(
                             "repo-core-0818",
-                            &[("label", format!("{}", state.label()).into())],
+                            &[("label", state.label().to_string().into())],
                         ),
                     };
                     let title = match restack {
@@ -102,7 +102,9 @@ impl RepoTab {
                             &[
                                 (
                                     "p",
-                                    format!("{}", p.current().map_or("", |s| s.branch.as_str()))
+                                    p.current()
+                                        .map_or("", |s| s.branch.as_str())
+                                        .to_string()
                                         .into(),
                                 ),
                                 ("done", format!("{}", p.done + 1).into()),
@@ -111,7 +113,7 @@ impl RepoTab {
                         ),
                         None => crate::i18n::message(
                             "repo-core-0818",
-                            &[("label", format!("{}", state.label()).into())],
+                            &[("label", state.label().to_string().into())],
                         ),
                     };
                     ui.label(
@@ -477,7 +479,7 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     if f.area == Area::Untracked {
         Dialog::confirm(
             "Delete new file",
-            crate::i18n::message("repo-core-0852", &[("path", format!("{}", f.path).into())]),
+            crate::i18n::message("repo-core-0852", &[("path", f.path.to_string().into())]),
             crate::i18n::text("repo-core-0853"),
             ops(&[&["--literal-pathspecs", "clean", "-f", "-q", "--", &f.path]]),
             None,
@@ -491,7 +493,7 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     } else {
         Dialog::confirm(
             "Discard changes",
-            crate::i18n::message("repo-core-0857", &[("path", format!("{}", f.path).into())]),
+            crate::i18n::message("repo-core-0857", &[("path", f.path.to_string().into())]),
             crate::i18n::text("repo-core-0858"),
             // Not `--literal-pathspecs`: restore runs the post-checkout hook, which would get it.
             ops(&[&["restore", "--", &literal_path(&f.path)]]),

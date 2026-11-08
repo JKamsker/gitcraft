@@ -20,7 +20,7 @@ impl RepoTab {
                 ui.horizontal_wrapped(|ui| {
                     ui.strong(crate::i18n::message(
                         "repo-core-3062",
-                        &[("title", format!("{}", session.scenario.title()).into())],
+                        &[("title", session.scenario.title().to_string().into())],
                     ));
                     ui.label(crate::i18n::text("repo-core-3063"))
                         .on_hover_text(self.path.display().to_string());
@@ -55,7 +55,7 @@ impl RepoTab {
                                 t.danger,
                                 crate::i18n::message(
                                     "repo-core-3070",
-                                    &[("error", format!("{}", error).into())],
+                                    &[("error", error.to_string().into())],
                                 ),
                             );
                         }

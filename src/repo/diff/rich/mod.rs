@@ -300,8 +300,8 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
                     egui::RichText::new(crate::i18n::message(
                         "repo-core-4045",
                         &[
-                            ("how", format!("{}", kind.how()).into()),
-                            ("note", format!("{}", note).into()),
+                            ("how", kind.how().to_string().into()),
+                            ("note", note.to_string().into()),
                         ],
                     ))
                     .color(t.text),

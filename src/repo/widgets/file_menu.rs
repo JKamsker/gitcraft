@@ -273,7 +273,7 @@ fn ignore_patterns(path: &str) -> Vec<(String, String, String)> {
         && let Some(literal) = ignore_literal(ext)
     {
         out.push((
-            crate::i18n::message("repo-core-3762", &[("ext", format!("{}", ext).into())]),
+            crate::i18n::message("repo-core-3762", &[("ext", ext.to_string().into())]),
             format!("*.{literal}"),
             path.to_owned(),
         ));
@@ -283,7 +283,7 @@ fn ignore_patterns(path: &str) -> Vec<(String, String, String)> {
         && let Some(literal) = ignore_literal(dir)
     {
         out.push((
-            crate::i18n::message("repo-core-3764", &[("dir", format!("{}", dir).into())]),
+            crate::i18n::message("repo-core-3764", &[("dir", dir.to_string().into())]),
             format!("/{literal}/"),
             dir.to_owned(),
         ));

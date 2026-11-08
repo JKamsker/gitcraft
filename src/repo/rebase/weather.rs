@@ -292,8 +292,7 @@ fn replay_rows(
                 rows.push(applied.forecast);
             }
             Err(e) => {
-                let reason =
-                    crate::i18n::message("repo-core-3257", &[("e", format!("{}", e).into())]);
+                let reason = crate::i18n::message("repo-core-3257", &[("e", e.to_string().into())]);
                 blocked = Some(reason.clone());
                 rows.push(Forecast::Unknown(reason));
             }
@@ -441,7 +440,7 @@ fn apply(
                     crate::i18n::text("repo-core-3278").to_owned()
                 }
                 Ok(_) => crate::i18n::text("repo-core-3279").to_owned(),
-                Err(e) => crate::i18n::message("repo-core-3280", &[("e", format!("{}", e).into())]),
+                Err(e) => crate::i18n::message("repo-core-3280", &[("e", e.to_string().into())]),
             };
             conflicts.push((path, result));
         }
@@ -489,15 +488,13 @@ pub(super) fn badge(ui: &mut egui::Ui, forecast: Option<&Forecast>, dropped: boo
                     "repo-core-3286",
                     &[(
                         "n",
-                        format!(
-                            "{}",
-                            files
-                                .iter()
-                                .map(|(path, result)| format!("{path}\n  {result}"))
-                                .collect::<Vec<_>>()
-                                .join("\n")
-                        )
-                        .into(),
+                        files
+                            .iter()
+                            .map(|(path, result)| format!("{path}\n  {result}"))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                            .to_string()
+                            .into(),
                     )],
                 ),
             ),

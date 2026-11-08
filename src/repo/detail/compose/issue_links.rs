@@ -68,10 +68,9 @@ pub fn compile(rule: &IssueRule) -> Result<Regex, String> {
         .size_limit(SIZE_LIMIT)
         .build()
         .map_err(|e| match e {
-            regex::Error::Syntax(s) => crate::i18n::message(
-                "repo-core-0959",
-                &[("s", format!("{}", last_line(&s)).into())],
-            ),
+            regex::Error::Syntax(s) => {
+                crate::i18n::message("repo-core-0959", &[("s", last_line(&s).to_string().into())])
+            }
             regex::Error::CompiledTooBig(_) => crate::i18n::text("repo-core-0960").to_owned(),
             other => {
                 crate::i18n::message("repo-core-0961", &[("other", format!("{}", other).into())])

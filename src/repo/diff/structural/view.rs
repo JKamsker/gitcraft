@@ -18,7 +18,7 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
     ui.label(
         egui::RichText::new(crate::i18n::message(
             "repo-core-2339",
-            &[("language", format!("{}", data.language).into())],
+            &[("language", data.language.to_string().into())],
         ))
         .color(t.text_dim),
     );

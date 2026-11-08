@@ -364,8 +364,8 @@ impl At {
             crate::i18n::message(
                 "repo-core-1996",
                 &[
-                    ("owner", format!("{}", self.owner).into()),
-                    ("path", format!("{}", self.path).into()),
+                    ("owner", self.owner.to_string().into()),
+                    ("path", self.path.to_string().into()),
                 ],
             )
         }
@@ -393,8 +393,8 @@ impl<'a> Cx<'a, '_> {
             let label = crate::i18n::message(
                 "repo-core-1997",
                 &[
-                    ("place", format!("{}", cap(&p.place)).into()),
-                    ("name", format!("{}", p.name).into()),
+                    ("place", cap(&p.place).to_string().into()),
+                    ("name", p.name.to_string().into()),
                 ],
             );
             match old_params.iter().find(|o| o.is(p)) {
@@ -402,8 +402,8 @@ impl<'a> Cx<'a, '_> {
                     crate::i18n::message(
                         "repo-core-1998",
                         &[
-                            ("place", format!("{}", p.place).into()),
-                            ("name", format!("{}", p.name).into()),
+                            ("place", p.place.to_string().into()),
+                            ("name", p.name.to_string().into()),
                         ],
                     ),
                     None,
@@ -438,8 +438,8 @@ impl<'a> Cx<'a, '_> {
                     crate::i18n::message(
                         "repo-core-2000",
                         &[
-                            ("place", format!("{}", cap(&o.place)).into()),
-                            ("name", format!("{}", o.name).into()),
+                            ("place", cap(&o.place).to_string().into()),
+                            ("name", o.name.to_string().into()),
                         ],
                     ),
                     Some(o.line),
@@ -479,7 +479,7 @@ impl<'a> Cx<'a, '_> {
         for m in &o.media {
             if !n.media.is_empty() && !n.media.contains(m) {
                 self.breaking(
-                    crate::i18n::message("repo-core-2003", &[("m", format!("{}", m).into())]),
+                    crate::i18n::message("repo-core-2003", &[("m", m.to_string().into())]),
                     Some(o.line),
                     Some(n.line),
                 );
@@ -510,7 +510,7 @@ impl<'a> Cx<'a, '_> {
                     self.breaking(
                         crate::i18n::message(
                             "repo-core-2007",
-                            &[("key", format!("{}", o.key).into())],
+                            &[("key", o.key.to_string().into())],
                         ),
                         Some(o.line),
                         None,
@@ -524,7 +524,7 @@ impl<'a> Cx<'a, '_> {
                 let at = At {
                     owner: crate::i18n::message(
                         "repo-core-2008",
-                        &[("key", format!("{}", o.key).into())],
+                        &[("key", o.key.to_string().into())],
                     ),
                     path: String::new(),
                 };
@@ -565,10 +565,7 @@ impl<'a> Cx<'a, '_> {
             |n: &Node| get(n, "additionalProperties").and_then(|f| text(&f.node)) == Some("false");
         if dir == Dir::Request && !closed(old) && closed(new) {
             self.breaking(
-                crate::i18n::message(
-                    "repo-core-2010",
-                    &[("name", format!("{}", at.name()).into())],
-                ),
+                crate::i18n::message("repo-core-2010", &[("name", at.name().to_string().into())]),
                 Some(ol),
                 Some(nl),
             );
@@ -584,7 +581,7 @@ impl<'a> Cx<'a, '_> {
                     self.breaking(
                         crate::i18n::message(
                             "repo-core-2011",
-                            &[("name", format!("{}", child.name()).into())],
+                            &[("name", child.name().to_string().into())],
                         ),
                         Some(o.line),
                         None,
@@ -598,7 +595,7 @@ impl<'a> Cx<'a, '_> {
                 self.breaking(
                     crate::i18n::message(
                         "repo-core-2013",
-                        &[("name", format!("{}", child.name()).into())],
+                        &[("name", child.name().to_string().into())],
                     ),
                     Some(o.line),
                     Some(n.line),
@@ -608,7 +605,7 @@ impl<'a> Cx<'a, '_> {
                 self.breaking(
                     crate::i18n::message(
                         "repo-core-2014",
-                        &[("name", format!("{}", child.name()).into())],
+                        &[("name", child.name().to_string().into())],
                     ),
                     Some(o.line),
                     Some(n.line),
@@ -625,8 +622,8 @@ impl<'a> Cx<'a, '_> {
                         crate::i18n::message(
                             "repo-core-2015",
                             &[
-                                ("owner", format!("{}", at.owner).into()),
-                                ("path", format!("{}", path).into()),
+                                ("owner", at.owner.to_string().into()),
+                                ("path", path.to_string().into()),
                             ],
                         ),
                         None,
@@ -675,9 +672,9 @@ impl<'a> Cx<'a, '_> {
                 crate::i18n::message(
                     "repo-core-2018",
                     &[
-                        ("name", format!("{}", at.name()).into()),
-                        ("ot", format!("{}", show(&ot)).into()),
-                        ("nt", format!("{}", show(&nt)).into()),
+                        ("name", at.name().to_string().into()),
+                        ("ot", show(&ot).to_string().into()),
+                        ("nt", show(&nt).to_string().into()),
                     ],
                 ),
                 Some(ol),
@@ -707,8 +704,8 @@ impl<'a> Cx<'a, '_> {
                     crate::i18n::message(
                         "repo-core-2021",
                         &[
-                            ("name", format!("{}", at.name()).into()),
-                            ("only", format!("{}", quote(&only)).into()),
+                            ("name", at.name().to_string().into()),
+                            ("only", quote(&only).to_string().into()),
                         ],
                     ),
                     Some(ol),
@@ -722,8 +719,8 @@ impl<'a> Cx<'a, '_> {
                         crate::i18n::message(
                             "repo-core-2022",
                             &[
-                                ("name", format!("{}", at.name()).into()),
-                                ("missing", format!("{}", quote(&missing)).into()),
+                                ("name", at.name().to_string().into()),
+                                ("missing", quote(&missing).to_string().into()),
                             ],
                         ),
                         Some(line(old, ol)),
@@ -738,8 +735,8 @@ impl<'a> Cx<'a, '_> {
                         crate::i18n::message(
                             "repo-core-2023",
                             &[
-                                ("name", format!("{}", at.name()).into()),
-                                ("extra", format!("{}", quote(&extra)).into()),
+                                ("name", at.name().to_string().into()),
+                                ("extra", quote(&extra).to_string().into()),
                             ],
                         ),
                         Some(line(old, ol)),

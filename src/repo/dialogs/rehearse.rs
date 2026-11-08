@@ -29,10 +29,7 @@ pub(super) fn rehearse(
     title(
         ui,
         crate::i18n::text("repo-core-1453"),
-        &crate::i18n::message(
-            "repo-core-1454",
-            &[("machine", format!("{}", machine).into())],
-        ),
+        &crate::i18n::message("repo-core-1454", &[("machine", machine.to_string().into())]),
         &t,
     );
     let Some(current) = current else {
@@ -52,8 +49,8 @@ pub(super) fn rehearse(
         crate::i18n::message(
             "repo-core-1456",
             &[
-                ("current", format!("{}", current).into()),
-                ("other", format!("{}", other).into()),
+                ("current", current.to_string().into()),
+                ("other", other.to_string().into()),
             ],
         ),
     );
@@ -63,8 +60,8 @@ pub(super) fn rehearse(
         crate::i18n::message(
             "repo-core-1457",
             &[
-                ("other", format!("{}", other).into()),
-                ("current", format!("{}", current).into()),
+                ("other", other.to_string().into()),
+                ("current", current.to_string().into()),
             ],
         ),
     );
@@ -77,7 +74,7 @@ pub(super) fn rehearse(
         compare,
         crate::i18n::message(
             "repo-core-1460",
-            &[("the-other", format!("{}", the_other).into())],
+            &[("the-other", the_other.to_string().into())],
         ),
     );
     ui.add_space(6.0);

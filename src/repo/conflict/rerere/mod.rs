@@ -151,10 +151,7 @@ impl RepoTab {
                     Err(e) => {
                         tab.rerere.setup = Some(Setup::default());
                         tab.status = Some((
-                            crate::i18n::message(
-                                "repo-core-0671",
-                                &[("e", format!("{}", e).into())],
-                            ),
+                            crate::i18n::message("repo-core-0671", &[("e", e.to_string().into())]),
                             true,
                         ));
                     }

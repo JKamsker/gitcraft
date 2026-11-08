@@ -404,7 +404,7 @@ fn lines_menu(
                         .show(ui)
                         .on_hover_text(crate::i18n::message(
                             "repo-core-2474",
-                            &[("which", format!("{}", which).into())],
+                            &[("which", which.to_string().into())],
                         ));
                     if b.clicked() {
                         *asked = Some((start, end));

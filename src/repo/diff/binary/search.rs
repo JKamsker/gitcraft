@@ -58,7 +58,7 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
                 &crate::i18n::message(
                     "repo-core-1571",
                     &[
-                        ("name", format!("{}", member.name).into()),
+                        ("name", member.name.to_string().into()),
                         (
                             "old",
                             member

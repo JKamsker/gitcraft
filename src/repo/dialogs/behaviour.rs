@@ -213,7 +213,10 @@ impl Form {
             "repo-core-1163",
             &[(
                 "label",
-                format!("{}", crate::teleport::Machine::of(&self.repo).label()).into(),
+                crate::teleport::Machine::of(&self.repo)
+                    .label()
+                    .to_string()
+                    .into(),
             )],
         ));
         let idle = self.active.is_none();
@@ -358,7 +361,7 @@ impl Form {
                 if ui
                     .button(crate::i18n::message(
                         "repo-core-1178",
-                        &[("hash", format!("{}", &self.commits[i].hash[..8]).into())],
+                        &[("hash", (&self.commits[i].hash[..8]).to_string().into())],
                     ))
                     .clicked()
                 {
@@ -483,10 +486,10 @@ impl Form {
             .iter()
             .enumerate()
             .filter_map(|(i, f)| {
-                if let Frame::Observed(Observation::Stable(sample)) = f {
-                    if let Value::Number(n) = sample.value {
-                        return Some((i, n));
-                    }
+                if let Frame::Observed(Observation::Stable(sample)) = f
+                    && let Value::Number(n) = sample.value
+                {
+                    return Some((i, n));
                 }
                 None
             })
@@ -534,7 +537,7 @@ impl Form {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn form() -> Form {
+    fn form() -> Result<Form, Box<dyn std::error::Error>> {
         let mut form = Form::new(
             "/synthetic/repo".into(),
             Default::default(),
@@ -548,13 +551,14 @@ mod tests {
                 summary: format!("frame {i}"),
             })
             .collect();
-        form.tx.send(Event::Loaded(commits)).unwrap();
+        form.tx.send(Event::Loaded(commits))?;
         form.poll();
-        form
+        Ok(form)
     }
     #[test]
-    fn recording_timeline_dialog_scrubs_injected_stable_unknown_and_inconsistent_frames() {
-        let mut form = form();
+    fn recording_timeline_dialog_scrubs_injected_stable_unknown_and_inconsistent_frames()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut form = form()?;
         assert!(form.frames.iter().all(|f| matches!(f, Frame::Unknown)));
         form.cache.put(
             form.key(&form.commits[0].tree),
@@ -596,23 +600,24 @@ mod tests {
         assert!(text.contains("not run / evicted"));
         assert!(text.contains("Open first observed adjacent change"));
         assert!(form.active.is_none());
+        Ok(())
     }
     #[test]
-    fn recording_late_worker_error_survives_cancelled_token_and_completion() {
-        let mut form = form();
+    fn recording_late_worker_error_survives_cancelled_token_and_completion()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut form = form()?;
         let token = form.scope.0.child();
         token.cancel();
         form.active = Some(token);
         form.frames[0] = Frame::Queued;
         form.tx
-            .send(Event::Frame(0, Err("late concrete owner error".into())))
-            .unwrap();
+            .send(Event::Frame(0, Err("late concrete owner error".into())))?;
         form.tx
-            .send(Event::Done(Err("workspace cleanup unknown".into())))
-            .unwrap();
+            .send(Event::Done(Err("workspace cleanup unknown".into())))?;
         form.poll();
         assert!(matches!(&form.frames[0], Frame::Failed(e) if e == "late concrete owner error"));
         assert_eq!(form.error.as_deref(), Some("workspace cleanup unknown"));
         assert!(form.active.is_none());
+        Ok(())
     }
 }

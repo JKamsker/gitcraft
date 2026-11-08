@@ -268,7 +268,7 @@ pub(super) fn tooltip(status: &Status) -> String {
     let mut text = match ci::tally_label(&status.checks) {
         tally if tally.is_empty() => crate::i18n::message(
             "repo-core-0285",
-            &[("state", format!("{}", state_word(status.state)).into())],
+            &[("state", state_word(status.state).to_string().into())],
         ),
         tally => crate::i18n::message("repo-core-0286", &[("tally", (tally).into())]),
     };

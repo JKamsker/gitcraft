@@ -294,8 +294,8 @@ pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
             crate::i18n::message(
                 "repo-core-3786",
                 &[
-                    ("path", format!("{}", path).into()),
-                    ("e", format!("{}", e).into()),
+                    ("path", path.to_string().into()),
+                    ("e", e.to_string().into()),
                 ],
             )
         });
@@ -304,14 +304,14 @@ pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
     if is_link(&file) {
         return Err(crate::i18n::message(
             "repo-core-3787",
-            &[("path", format!("{}", path).into())],
+            &[("path", path.to_string().into())],
         ));
     }
     std::fs::write(&file, text).map_err(|e| {
         crate::i18n::message(
             "repo-core-3786",
             &[
-                ("path", format!("{}", path).into()),
+                ("path", path.to_string().into()),
                 ("e", format!("{}", e).into()),
             ],
         )
@@ -524,7 +524,7 @@ impl ConflictEditor {
                 "repo-core-3799",
                 &[
                     ("left", (left).into()),
-                    ("path", format!("{}", self.path).into()),
+                    ("path", self.path.to_string().into()),
                 ],
             ));
         }
@@ -537,28 +537,22 @@ impl ConflictEditor {
             (
                 crate::i18n::message(
                     "repo-core-3800",
-                    &[("ours-label", format!("{}", short(&self.ours_label)).into())],
+                    &[("ours-label", short(&self.ours_label).to_string().into())],
                 ),
                 crate::i18n::message(
                     "repo-core-3801",
-                    &[(
-                        "theirs-label",
-                        format!("{}", short(&self.theirs_label)).into(),
-                    )],
+                    &[("theirs-label", short(&self.theirs_label).to_string().into())],
                 ),
             )
         } else {
             (
                 crate::i18n::message(
                     "repo-core-3802",
-                    &[("ours-label", format!("{}", short(&self.ours_label)).into())],
+                    &[("ours-label", short(&self.ours_label).to_string().into())],
                 ),
                 crate::i18n::message(
                     "repo-core-3803",
-                    &[(
-                        "theirs-label",
-                        format!("{}", short(&self.theirs_label)).into(),
-                    )],
+                    &[("theirs-label", short(&self.theirs_label).to_string().into())],
                 ),
             )
         }

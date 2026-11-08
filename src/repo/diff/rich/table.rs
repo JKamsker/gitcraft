@@ -188,9 +188,9 @@ pub fn diff(path: &str, sides: &Sides) -> Result<TableDiff, String> {
                     crate::i18n::message(
                         "repo-core-2048",
                         &[
-                            ("format", format!("{}", format).into()),
-                            ("side", format!("{}", side).into()),
-                            ("e", format!("{}", e).into()),
+                            ("format", format.to_string().into()),
+                            ("side", side.to_string().into()),
+                            ("e", e.to_string().into()),
                         ],
                     )
                 })

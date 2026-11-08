@@ -192,7 +192,7 @@ impl Form {
                         Err(e) => {
                             ui.label(crate::i18n::message(
                                 "repo-core-1373",
-                                &[("e", format!("{}", e).into())],
+                                &[("e", e.to_string().into())],
                             ));
                         }
                         Ok(f) => {
@@ -207,17 +207,15 @@ impl Form {
                             ui.label(crate::i18n::message(
                                 "repo-core-1376",
                                 &[
-                                    ("machine", format!("{}", f.machine).into()),
-                                    ("head", format!("{}", f.head).into()),
+                                    ("machine", f.machine.to_string().into()),
+                                    ("head", f.head.to_string().into()),
                                     (
                                         "untested",
-                                        format!(
-                                            "{}",
-                                            f.stored_test
-                                                .as_deref()
-                                                .unwrap_or(crate::i18n::text("repo-core-1377"))
-                                        )
-                                        .into(),
+                                        f.stored_test
+                                            .as_deref()
+                                            .unwrap_or(crate::i18n::text("repo-core-1377"))
+                                            .to_string()
+                                            .into(),
                                     ),
                                 ],
                             ));
@@ -227,7 +225,7 @@ impl Form {
                                     "repo-core-1380",
                                     &[
                                         ("count", (f.files.len()).into()),
-                                        ("tree", format!("{}", f.tree).into()),
+                                        ("tree", f.tree.to_string().into()),
                                     ],
                                 ));
                                 for (key, value) in &f.settings {
@@ -251,9 +249,9 @@ impl Form {
                                         ui.monospace(crate::i18n::message(
                                             "repo-core-1384",
                                             &[
-                                                ("path", format!("{}", file.path).into()),
-                                                ("mode", format!("{}", file.mode).into()),
-                                                ("endings", format!("{}", file.endings).into()),
+                                                ("path", file.path.to_string().into()),
+                                                ("mode", file.mode.to_string().into()),
+                                                ("endings", file.endings.to_string().into()),
                                             ],
                                         ));
                                     }

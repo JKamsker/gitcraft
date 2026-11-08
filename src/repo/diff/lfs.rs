@@ -74,7 +74,7 @@ pub(super) fn lfs_view(ui: &mut Ui, pair: &LfsPair) {
                         ui.label(
                             RichText::new(crate::i18n::message(
                                 "repo-core-1855",
-                                &[("oid", format!("{}", oid.get(..12).unwrap_or(oid)).into())],
+                                &[("oid", oid.get(..12).unwrap_or(oid).to_string().into())],
                             ))
                             .color(t.text_faint)
                             .small(),

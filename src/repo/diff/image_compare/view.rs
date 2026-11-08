@@ -201,7 +201,7 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             crate::i18n::message(
                 "repo-core-1818",
                 &[
-                    ("path", format!("{}", cmp.path).into()),
+                    ("path", cmp.path.to_string().into()),
                     ("x", (center.x * 100.0).into()),
                     ("y", (center.y * 100.0).into()),
                 ],
@@ -257,14 +257,14 @@ pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
             &[
                 ("width", format!("{}", d.width).into()),
                 ("height", format!("{}", d.height).into()),
-                ("scaled", format!("{}", scaled).into()),
+                ("scaled", scaled.to_string().into()),
             ],
         )
     };
     let mut parts = Vec::new();
     match (&cmp.old, &cmp.new) {
         (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => parts.push(
-            crate::i18n::message("repo-core-1821", &[("b", format!("{}", dims(b)).into())]),
+            crate::i18n::message("repo-core-1821", &[("b", dims(b).to_string().into())]),
         ),
         (Some(a), Some(b)) => parts.push(format!("{} → {}", dims(a), dims(b))),
         (None, Some(b)) => parts.push(dims(b)),
@@ -494,9 +494,9 @@ fn filmstrip(
                             crate::i18n::message(
                                 "repo-core-1830",
                                 &[
-                                    ("hash", format!("{}", crate::repo::short(&v.hash)).into()),
-                                    ("summary", format!("{}", v.summary).into()),
-                                    ("path", format!("{}", v.path).into()),
+                                    ("hash", crate::repo::short(&v.hash).to_string().into()),
+                                    ("summary", v.summary.to_string().into()),
+                                    ("path", v.path.to_string().into()),
                                 ],
                             )
                         },

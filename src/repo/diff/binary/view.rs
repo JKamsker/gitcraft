@@ -61,7 +61,7 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
                 {
                     let text = crate::i18n::message(
                         "repo-core-1685",
-                        &[("MAX-READ", format!("{}", human_size(MAX_READ)).into())],
+                        &[("MAX-READ", human_size(MAX_READ).to_string().into())],
                     );
                     ui.label(RichText::new(text).color(t.text_dim));
                 }
@@ -125,13 +125,11 @@ pub(super) fn size_text(s: &Side) -> String {
         (Some(n), false) => crate::i18n::message(
             "repo-core-1689",
             &[
-                ("n", format!("{}", human_size(n)).into()),
-                ("limit", format!("{}", limit).into()),
+                ("n", human_size(n).to_string().into()),
+                ("limit", limit.to_string().into()),
             ],
         ),
-        (None, _) => {
-            crate::i18n::message("repo-core-1690", &[("limit", format!("{}", limit).into())])
-        }
+        (None, _) => crate::i18n::message("repo-core-1690", &[("limit", limit.to_string().into())]),
     }
 }
 
@@ -236,7 +234,7 @@ fn text_diff(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-core-1698",
-                &[("more", format!("{}", more).into())],
+                &[("more", more.to_string().into())],
             ))
             .color(t.text_dim),
         );
@@ -307,7 +305,7 @@ fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
                             t.warning,
                             crate::i18n::message(
                                 "repo-core-1705",
-                                &[("n", format!("{}", human_size(n)).into())],
+                                &[("n", human_size(n).to_string().into())],
                             ),
                         ),
                         (Some(o), Some(n)) => (

@@ -15,10 +15,10 @@ fn banner_text(reused: Reused, whole: bool) -> String {
     let check = crate::i18n::text("repo-core-0680");
     match (reused, whole) {
         (Reused::Rerere, false) => {
-            crate::i18n::message("repo-core-0681", &[("check", format!("{}", check).into())])
+            crate::i18n::message("repo-core-0681", &[("check", check.to_string().into())])
         }
         (Reused::Rerere, true) => {
-            crate::i18n::message("repo-core-0682", &[("check", format!("{}", check).into())])
+            crate::i18n::message("repo-core-0682", &[("check", check.to_string().into())])
         }
         (Reused::NoMarkers, false) => crate::i18n::text("repo-core-0683").to_owned(),
         (Reused::NoMarkers, true) => crate::i18n::text("repo-core-0684").to_owned(),
@@ -37,8 +37,8 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
                 crate::i18n::message(
                     "repo-core-0689",
                     &[
-                        ("path", format!("{}", path).into()),
-                        ("lost", format!("{}", lost).into()),
+                        ("path", path.to_string().into()),
+                        ("lost", lost.to_string().into()),
                     ],
                 ),
                 crate::i18n::text("repo-core-0690"),
@@ -54,8 +54,8 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
                 crate::i18n::message(
                     "repo-core-0694",
                     &[
-                        ("path", format!("{}", path).into()),
-                        ("lost", format!("{}", lost).into()),
+                        ("path", path.to_string().into()),
+                        ("lost", lost.to_string().into()),
                     ],
                 ),
                 crate::i18n::text("repo-core-0695"),

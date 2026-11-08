@@ -103,8 +103,8 @@ pub fn diff(sides: &Sides) -> Result<DvcDiff, String> {
                     crate::i18n::message(
                         "repo-core-2167",
                         &[
-                            ("side", format!("{}", side).into()),
-                            ("e", format!("{}", e).into()),
+                            ("side", side.to_string().into()),
+                            ("e", e.to_string().into()),
                         ],
                     )
                 })

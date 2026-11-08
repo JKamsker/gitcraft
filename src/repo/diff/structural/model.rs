@@ -64,7 +64,7 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
     if report.language.starts_with("Text (") {
         return Err(crate::i18n::message(
             "repo-core-2332",
-            &[("language", format!("{}", report.language).into())],
+            &[("language", report.language.to_string().into())],
         ));
     }
     if report.language == "Binary" {

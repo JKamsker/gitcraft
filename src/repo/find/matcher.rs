@@ -104,7 +104,7 @@ fn regex_error(e: &regex::Error) -> String {
                 .find_map(|l| l.trim().strip_prefix("error:"))
                 .map(str::trim)
                 .unwrap_or(crate::i18n::text("repo-core-4103"));
-            crate::i18n::message("repo-core-4104", &[("why", format!("{}", why).into())])
+            crate::i18n::message("repo-core-4104", &[("why", why.to_string().into())])
         }
     }
 }

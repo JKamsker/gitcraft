@@ -97,14 +97,14 @@ fn delete_label(count: usize, there: Option<(usize, &[&str])>) -> String {
         Some((n, remotes)) => crate::i18n::message(
             "repo-core-1271",
             &[
-                ("count", format!("{}", branches(count)).into()),
+                ("count", branches(count).to_string().into()),
                 ("n", (n).into()),
-                ("remotes", format!("{}", remotes.join(", ")).into()),
+                ("remotes", remotes.join(", ").to_string().into()),
             ],
         ),
         None => crate::i18n::message(
             "repo-core-1272",
-            &[("count", format!("{}", branches(count)).into())],
+            &[("count", branches(count).to_string().into())],
         ),
     }
 }
@@ -153,8 +153,8 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         crate::i18n::message(
             "repo-core-1278",
             &[
-                ("there", format!("{}", branches(there)).into()),
-                ("remotes", format!("{}", remotes.join(", ")).into()),
+                ("there", branches(there).to_string().into()),
+                ("remotes", remotes.join(", ").to_string().into()),
             ],
         )
     };
@@ -224,8 +224,8 @@ fn checklist(ui: &mut Ui, rows: &mut [(Candidate, bool)], t: &Tokens) {
                     why.push(crate::i18n::message(
                         "repo-core-1285",
                         &[
-                            ("remote", format!("{}", remote).into()),
-                            ("name", format!("{}", name).into()),
+                            ("remote", remote.to_string().into()),
+                            ("name", name.to_string().into()),
                         ],
                     ));
                 }

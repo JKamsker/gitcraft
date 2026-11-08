@@ -328,7 +328,7 @@ pub(super) fn load(repo: &std::path::Path, path: &str) -> IndexBases {
         Err(e) => {
             return IndexBases::Failed(crate::i18n::message(
                 "repo-core-0617",
-                &[("e", format!("{}", e).into())],
+                &[("e", e.to_string().into())],
             ));
         }
     };

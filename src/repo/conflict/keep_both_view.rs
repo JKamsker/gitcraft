@@ -123,7 +123,7 @@ impl RepoTab {
             .shadow(ctx.global_style().visuals.window_shadow);
         let title = crate::i18n::message(
             "repo-core-0590",
-            &[("path", format!("{}", state.path()).into())],
+            &[("path", state.path().to_string().into())],
         );
         let body = |ui: &mut Ui| {
             ui.set_width(440.0_f32.min(ctx.content_rect().width() - 64.0).max(200.0));
@@ -211,18 +211,16 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
                 egui::Label::new(crate::i18n::message(
                     "repo-core-0598",
                     &[
-                        ("target", format!("{}", plan.ours.target).into()),
-                        ("target2", format!("{}", plan.theirs.target).into()),
+                        ("target", plan.ours.target.to_string().into()),
+                        ("target2", plan.theirs.target.to_string().into()),
                         (
                             "them",
-                            format!(
-                                "{}",
-                                if plan.ours.ignored || plan.theirs.ignored {
-                                    crate::i18n::text("repo-core-0599")
-                                } else {
-                                    crate::i18n::text("repo-core-0600")
-                                }
-                            )
+                            (if plan.ours.ignored || plan.theirs.ignored {
+                                crate::i18n::text("repo-core-0599")
+                            } else {
+                                crate::i18n::text("repo-core-0600")
+                            })
+                            .to_string()
                             .into(),
                         ),
                     ],
@@ -234,7 +232,7 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
                 egui::Label::new(
                     RichText::new(crate::i18n::message(
                         "repo-core-0601",
-                        &[("path", format!("{}", plan.path).into())],
+                        &[("path", plan.path.to_string().into())],
                     ))
                     .color(t.text_dim),
                 )
@@ -245,7 +243,7 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
                 egui::Label::new(
                     RichText::new(crate::i18n::message(
                         "repo-core-0602",
-                        &[("path", format!("{}", plan.path).into())],
+                        &[("path", plan.path.to_string().into())],
                     ))
                     .color(t.text_dim),
                 )
@@ -265,7 +263,7 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
     ui.add(
         egui::Label::new(crate::i18n::message(
             "repo-core-0605",
-            &[("path", format!("{}", plan.path).into())],
+            &[("path", plan.path.to_string().into())],
         ))
         .wrap(),
     );
@@ -285,7 +283,7 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
                 egui::Label::new(
                     RichText::new(crate::i18n::message(
                         "repo-core-0606",
-                        &[("name", format!("{}", name).into())],
+                        &[("name", name.to_string().into())],
                     ))
                     .color(t.text),
                 )
@@ -329,7 +327,7 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
                     egui::Label::new(
                         RichText::new(crate::i18n::message(
                             "repo-core-0608",
-                            &[("version", format!("{}", version.taken.join(", ")).into())],
+                            &[("version", version.taken.join(", ").to_string().into())],
                         ))
                         .color(t.text_faint)
                         .small(),

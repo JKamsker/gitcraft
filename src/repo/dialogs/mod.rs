@@ -483,7 +483,7 @@ impl RepoTab {
         let machine = match crate::remote::parse(&self.path) {
             Some(target) => crate::i18n::message(
                 "repo-core-1391",
-                &[("label", format!("{}", target.host.label()).into())],
+                &[("label", target.host.label().to_string().into())],
             ),
             None => crate::i18n::text("repo-core-1392").to_owned(),
         };

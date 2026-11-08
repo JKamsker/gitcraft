@@ -25,7 +25,7 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                 ui.label(
                     egui::RichText::new(crate::i18n::message(
                         "repo-core-2053",
-                        &[("format", format!("{}", diff.format).into())],
+                        &[("format", diff.format.to_string().into())],
                     ))
                     .font(theme::medium(12.5))
                     .color(t.text),

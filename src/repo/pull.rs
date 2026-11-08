@@ -49,13 +49,11 @@ impl PullMode {
             &[
                 (
                     "Pull",
-                    format!(
-                        "{}",
-                        crate::keymap::tip(ctx, what, crate::keymap::Command::Pull)
-                    )
-                    .into(),
+                    crate::keymap::tip(ctx, what, crate::keymap::Command::Pull)
+                        .to_string()
+                        .into(),
                 ),
-                ("self", format!("{}", self.args().join(" ")).into()),
+                ("self", self.args().join(" ").to_string().into()),
             ],
         )
     }

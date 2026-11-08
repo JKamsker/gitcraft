@@ -71,13 +71,13 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
         git::run(Some(repo), &["rev-parse", "--verify", "-q", name])
             .map(|s| s.trim().to_owned())
             .map_err(|_| {
-                crate::i18n::message("repo-core-0402", &[("name", format!("{}", name).into())])
+                crate::i18n::message("repo-core-0402", &[("name", name.to_string().into())])
             })
     };
     let shown = rev(head)?;
     let base = match base {
         Some(name) => Some(rev(name).map_err(|_| {
-            crate::i18n::message("repo-core-0403", &[("head", format!("{}", head).into())])
+            crate::i18n::message("repo-core-0403", &[("head", head.to_string().into())])
         })?),
         None => None,
     };
@@ -202,9 +202,7 @@ fn one_commit(repo: &Path, hash: &str) -> Result<Step, String> {
         .into_iter()
         .next()
         .map(|(_, s)| s)
-        .ok_or_else(|| {
-            crate::i18n::message("repo-core-0416", &[("hash", format!("{}", hash).into())])
-        })
+        .ok_or_else(|| crate::i18n::message("repo-core-0416", &[("hash", hash.to_string().into())]))
 }
 
 /// Whether merging commits `a` and `b` (from `base`, or their merge base) conflicts in `path`,
@@ -229,7 +227,7 @@ pub fn merge_conflicts(
         if e.contains("unknown option") || e.contains("usage: git merge-tree") {
             crate::i18n::text("repo-core-0425").to_owned()
         } else {
-            crate::i18n::message("repo-core-0426", &[("e", format!("{}", e).into())])
+            crate::i18n::message("repo-core-0426", &[("e", e.to_string().into())])
         }
     })?;
     // The tree, then each conflicted file.

@@ -49,7 +49,7 @@ fn checks_note(blocked: bool, merge_state: &str, failed: usize, running: usize) 
         &[
             ("failed", format!("{}", failed).into()),
             ("running", format!("{}", running).into()),
-            ("required", format!("{}", required).into()),
+            ("required", required.to_string().into()),
         ],
     ))
 }
@@ -114,16 +114,15 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 &[
                     (
                         "name",
-                        format!(
-                            "{}",
-                            d.forge.map_or(
+                        d.forge
+                            .map_or(
                                 crate::i18n::text("repo-core-forge-fallback"),
-                                crate::forge::Forge::name
+                                crate::forge::Forge::name,
                             )
-                        )
-                        .into(),
+                            .to_string()
+                            .into(),
                     ),
-                    ("head-branch", format!("{}", d.head_branch).into()),
+                    ("head-branch", d.head_branch.to_string().into()),
                 ],
             ))
             .color(t.text_faint)
@@ -136,7 +135,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 &mut delete,
                 crate::i18n::message(
                     "repo-core-3054",
-                    &[("head-branch", format!("{}", d.head_branch).into())],
+                    &[("head-branch", d.head_branch.to_string().into())],
                 ),
             )
             .changed()
@@ -169,7 +168,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 "repo-core-3056",
                 &[(
                     "name",
-                    format!("{}", d.forge.map_or("forge", |f| f.name())).into(),
+                    d.forge.map_or("forge", |f| f.name()).to_string().into(),
                 )],
             ))
             .clicked()
@@ -185,7 +184,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 "repo-core-3058",
                 &[
                     ("number", format!("{}", d.number).into()),
-                    ("base-branch", format!("{}", d.base_branch).into()),
+                    ("base-branch", d.base_branch.to_string().into()),
                 ],
             ))
             .color(t.warning),

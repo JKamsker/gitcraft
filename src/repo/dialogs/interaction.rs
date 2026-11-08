@@ -24,7 +24,7 @@ pub(super) fn find_interaction(
         &crate::i18n::message(
             "repo-core-1339",
             &[
-                ("machine", format!("{}", machine).into()),
+                ("machine", machine.to_string().into()),
                 ("MAX-CHANGES", format!("{}", MAX_CHANGES).into()),
             ],
         ),

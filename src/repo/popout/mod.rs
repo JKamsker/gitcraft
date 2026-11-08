@@ -170,11 +170,11 @@ pub(crate) fn title(repo: &str, what: &str) -> String {
         &[
             (
                 "MAX-WHAT",
-                format!("{}", shorten(what.trim(), MAX_WHAT)).into(),
+                shorten(what.trim(), MAX_WHAT).to_string().into(),
             ),
             (
                 "MAX-REPO",
-                format!("{}", shorten(repo.trim(), MAX_REPO)).into(),
+                shorten(repo.trim(), MAX_REPO).to_string().into(),
             ),
         ],
     )

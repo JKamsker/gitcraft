@@ -198,13 +198,13 @@ pub fn file_row_owned(
         (Some(p), Some(o)) => Some(crate::i18n::message(
             "repo-core-3767",
             &[
-                ("p", format!("{}", p).into()),
-                ("full", format!("{}", o.full).into()),
+                ("p", p.to_string().into()),
+                ("full", o.full.to_string().into()),
             ],
         )),
         (None, Some(o)) => Some(crate::i18n::message(
             "repo-core-3768",
-            &[("full", format!("{}", o.full).into())],
+            &[("full", o.full.to_string().into())],
         )),
         (shown, None) => shown,
     };

@@ -255,7 +255,7 @@ pub(super) fn hunk_button(
     let t = Tokens::get(ui.ctx());
     let label = crate::i18n::message(
         "repo-core-1938",
-        &[("verb", format!("{}", pick.verb()).into())],
+        &[("verb", pick.verb().to_string().into())],
     );
     let color = if matches!(pick, Pick::Discard | Pick::Revert) {
         t.text_dim
