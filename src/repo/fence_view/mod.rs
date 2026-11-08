@@ -450,7 +450,7 @@ mod fluent_guard_target_tests {
             let errors = vec![fence::display::check_diagnostic(&raw, target)];
             let body = confirm_body("refs/heads/ß", Some(target), &[], &errors);
             assert!(body.contains(target));
-            assert_eq!(body.contains("kein Hauptbranch"), lang == "de");
+            assert_eq!(body.contains("keinen Hauptbranch"), lang == "de");
             assert_eq!(fence::display::diagnostic(&raw), raw);
             assert_eq!(fence::display::check_diagnostic(&raw, "different"), raw);
             assert!(format!("Merge refs/heads/ß{PAST}").ends_with(PAST));
