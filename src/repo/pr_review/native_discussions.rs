@@ -17,9 +17,10 @@ pub(super) fn show(
             format!(
                 " · {}:{} ({})",
                 thread.path,
-                thread
-                    .line
-                    .map_or_else(|| "unmapped".into(), |n| n.to_string()),
+                thread.line.map_or_else(
+                    || crate::i18n::text("repo-workflows-paint-unmapped").into(),
+                    |n| n.to_string()
+                ),
                 if thread.side == crate::pull_request::DiffSide::Left {
                     crate::i18n::text("repo-workflows-pr_review-show-05dc48b8")
                 } else {

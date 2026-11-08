@@ -291,7 +291,7 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
         .worktree
         .branch
         .clone()
-        .unwrap_or_else(|| "detached".to_owned());
+        .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-detached").to_owned());
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-workflows-drift_view-body-a8164b33",

@@ -83,7 +83,7 @@ impl Picker {
                                 (crate::remote::display(w)).clone().into(),
                             )],
                         ),
-                        None => "branch".to_owned(),
+                        None => crate::i18n::text("repo-workflows-paint-branch-kind").to_owned(),
                     };
                     let full = picked >= MAX && !*on;
                     ui.add_enabled_ui(!full, |ui| {

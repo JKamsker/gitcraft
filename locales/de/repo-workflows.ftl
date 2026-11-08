@@ -2278,7 +2278,10 @@ repo-workflows-file_comparison-show-pair-9bb72500 = Vorher
 
 repo-workflows-file_comparison-show-pair-e3ccb1fe = Vorher: { $pair-versions-0-label-1 } · Nachher: { $pair-versions-1-label-2 }
 
-repo-workflows-file_comparison-view-4699e093 = { $if-side-0-source-else-destinatio-1 } { $l-label-2 } öffnen
+repo-workflows-file_comparison-view-4699e093 = { $if-side-0-source-else-destinatio-1 ->
+        [source] Quelle { $l-label-2 } öffnen
+       *[destination] Ziel { $l-label-2 } öffnen
+    }
 
 repo-workflows-file_comparison-view-746eb9db = { $data-locations-len-1 } dateiübergreifend verschobene Blöcke · gemeinsame M-Markierungen verbinden beide Stellen
 
@@ -4931,7 +4934,13 @@ repo-workflows-repository_tools-show-6c1991e9 = „Unabhängig machen“ kopiert
 
 repo-workflows-repository_tools-show-6c892519 = Nur die ersten 100 passenden Referenzen wurden geprüft. Fügen Sie eine vollständige Commit-ID für einen anderen Kandidaten ein.
 
-repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 } · { $b-owned-len-3 } zugeordnete Hunks
+repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 ->
+        [active] aktiv
+       *[inactive] inaktiv
+    } · { $b-owned-len-3 ->
+        [one] ein zugeordneter Hunk
+       *[other] { $b-owned-len-3 } zugeordnete Hunks
+    }
 
 repo-workflows-repository_tools-show-71ba13e6 = Geprüfte unveränderte Hunks anzeigen
 
@@ -7574,4 +7583,16 @@ repo-workflows-status-forks-none-to-remove = Kein Fork-Remote kann entfernt werd
         [yes] { "\u000A\u000ABehalten: " }{ $names }, deren Branches Commits enthalten, die hier auf keinem Branch liegen.
        *[no] { "" }
     }
+
+repo-workflows-paint-unmapped = nicht zugeordnet
+
+repo-workflows-paint-detached = ohne Branch
+
+repo-workflows-paint-unborn = noch ohne Commit
+
+repo-workflows-paint-no-base = keine
+
+repo-workflows-paint-branch-kind = Branch
+
+repo-workflows-paint-running = läuft
 

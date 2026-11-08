@@ -22,7 +22,11 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             ("c-path-1", (c.path).clone().into()),
             (
                 "c-base-as-deref-unwrap-or-none-2",
-                (c.base.as_deref().unwrap_or("none")).clone().into(),
+                (c.base
+                    .as_deref()
+                    .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-no-base")))
+                .clone()
+                .into(),
             ),
             ("c-ours-3", (c.ours).clone().into()),
             ("c-theirs-4", (c.theirs).clone().into()),

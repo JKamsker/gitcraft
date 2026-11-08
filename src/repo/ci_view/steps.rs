@@ -103,7 +103,7 @@ pub(super) fn timeline(ui: &mut Ui, job: &Job, now: i64) {
             );
         }
         let span = match (step.started, step.finished) {
-            (Some(_), None) => "running".to_owned(),
+            (Some(_), None) => crate::i18n::text("repo-workflows-paint-running").to_owned(),
             (None, _) => crate::i18n::text("repo-workflows-ci_view-timeline-7a7400f4").to_owned(),
             _ => crate::repo::ci_status::state_word(step.state).to_owned(),
         };

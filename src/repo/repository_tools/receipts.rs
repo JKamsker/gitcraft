@@ -67,15 +67,23 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     ),
                     (
                         "report-intent-branch-as-deref-un-5",
-                        (report.intent.branch.as_deref().unwrap_or("detached"))
-                            .clone()
-                            .into(),
+                        (report
+                            .intent
+                            .branch
+                            .as_deref()
+                            .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-detached")))
+                        .clone()
+                        .into(),
                     ),
                     (
                         "report-intent-expected-head-as-d-6",
-                        (report.intent.expected_head.as_deref().unwrap_or("unborn"))
-                            .clone()
-                            .into(),
+                        (report
+                            .intent
+                            .expected_head
+                            .as_deref()
+                            .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-unborn")))
+                        .clone()
+                        .into(),
                     ),
                     (
                         "report-intent-evidence-7",

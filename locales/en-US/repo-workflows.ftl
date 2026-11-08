@@ -2278,7 +2278,10 @@ repo-workflows-file_comparison-show-pair-9bb72500 = Before
 
 repo-workflows-file_comparison-show-pair-e3ccb1fe = Before: { $pair-versions-0-label-1 } · After: { $pair-versions-1-label-2 }
 
-repo-workflows-file_comparison-view-4699e093 = Open { $if-side-0-source-else-destinatio-1 } { $l-label-2 }
+repo-workflows-file_comparison-view-4699e093 = { $if-side-0-source-else-destinatio-1 ->
+        [source] Open source { $l-label-2 }
+       *[destination] Open destination { $l-label-2 }
+    }
 
 repo-workflows-file_comparison-view-746eb9db = { $data-locations-len-1 } blocks moved across files · shared M-markers pair both locations
 
@@ -4931,7 +4934,13 @@ repo-workflows-repository_tools-show-6c1991e9 = Make independent copies a comple
 
 repo-workflows-repository_tools-show-6c892519 = Only the first 100 matching refs were examined. Paste a full commit ID to check another candidate.
 
-repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 } · { $b-owned-len-3 } owned hunks
+repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 ->
+        [active] active
+       *[inactive] inactive
+    } · { $b-owned-len-3 ->
+        [one] one owned hunk
+       *[other] { $b-owned-len-3 } owned hunks
+    }
 
 repo-workflows-repository_tools-show-71ba13e6 = Show reviewed unchanged hunks
 
@@ -7576,4 +7585,16 @@ repo-workflows-status-forks-none-to-remove = No fork remote can go{ $kept ->
         [yes] { "\u000A\u000AKept: " }{ $names }, whose branches have commits no branch here has.
        *[no] { "" }
     }
+
+repo-workflows-paint-unmapped = unmapped
+
+repo-workflows-paint-detached = detached
+
+repo-workflows-paint-unborn = unborn
+
+repo-workflows-paint-no-base = none
+
+repo-workflows-paint-branch-kind = branch
+
+repo-workflows-paint-running = running
 
