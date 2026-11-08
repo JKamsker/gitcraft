@@ -1,0 +1,20 @@
+Independent adversarial review: PASS
+
+Candidate: 58d2ddc5a44397ec954f17df76a7471d5b1c78c1
+Prior reviewed candidate: bfceb9f456d0ee0f14932a1900e301880399f7bb
+Tested correction source: 2045b1bae77939e7fbdb8c5c005c90ea4bd53142
+Reviewer: separate agent /root/pr179_followup_review, fresh context, read-only.
+
+PASS at 58d2ddc5a44397ec954f17df76a7471d5b1c78c1. No actionable findings in the follow-up delta.
+
+- Named Action selection fixes the reported scanner defect; all six Python tests passed independently.
+- The strengthened handoff test meaningfully checks hidden destination reveal and Select/Close dispatcher routing.
+- All embedded log hashes verified; baseline JSON reproduced byte-for-byte and historical result summary matched.
+- Changes after tested commit 2045b1ba are documentation/evidence only.
+
+No Rust, PTY, process-control, or CI tests were executed during this review.
+
+Prior finding: first enum was used as root Action. Response: explicitly select named Action and cover before/after decoy enums with real-Git report fixture.
+Prior test suggestions: hidden destination must reveal/select on paste; exercise Close/Select dispatcher routing. Response: strengthened existing owned-PTY handoff test, targeted test passed locally after inert tests and after preservation/push.
+
+Raw local validation: docs/validation/architecture-179-review-evidence.json at this candidate. Earlier full suite, reproduced baseline failures and timings remain historical evidence for bfceb9f4; no new full-suite or performance execution is claimed.
