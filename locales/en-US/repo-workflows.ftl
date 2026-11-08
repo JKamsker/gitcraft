@@ -120,7 +120,10 @@ repo-workflows-agent-mixed-ask-2ddd09f5 = Ctrl+Z moves { $target } back afterwar
 
 repo-workflows-agent-not-in-progress-1049b227 = a { $state-label-to-lowercase-1 } is in progress: { $what } would end it, which can't be undone. Finish or abort it first (see `conflicts`)
 
-repo-workflows-agent-paths-label-26d36d06 = { $many-len-1 } paths
+repo-workflows-agent-paths-label-26d36d06 = { $many-len-1 ->
+        [one] one path
+       *[other] { $many-len-1 } paths
+    }
 
 repo-workflows-agent-plan-0026c505 = Revert
 
@@ -314,7 +317,10 @@ repo-workflows-agents-sub-32dfcdbc = 1 file changed
 
 repo-workflows-agents-sub-96b72d81 = folder missing: prune it in WORKTREES
 
-repo-workflows-agents-sub-a7109ae6 = { $n } files changed
+repo-workflows-agents-sub-a7109ae6 = { $n ->
+        [one] One file changed
+       *[other] { $n } files changed
+    }
 
 repo-workflows-agents-sub-b2c35ddf = no uncommitted changes
 
@@ -580,7 +586,10 @@ repo-workflows-bakeoff-assemble-bar-5a22f453 = Assembling…
 
 repo-workflows-bakeoff-assemble-bar-8462ef57 = Assemble into
 
-repo-workflows-bakeoff-assemble-bar-86fd9bbb = Assemble ({ $picks } files)
+repo-workflows-bakeoff-assemble-bar-86fd9bbb = Assemble ({ $picks ->
+        [one] one file
+       *[other] { $picks } files
+    })
 
 repo-workflows-bakeoff-assemble-bar-916e34d4 = Show in graph
 
@@ -855,13 +864,19 @@ repo-workflows-bisect-start-bisect-db936451 = Start bisect
 
 repo-workflows-bisect-start-bisect-run-d300d73e = Bisect run
 
-repo-workflows-bisect-steps-text-14999716 = About { $n } steps left
+repo-workflows-bisect-steps-text-14999716 = { $n ->
+        [one] About one step left
+       *[other] About { $n } steps left
+    }
 
 repo-workflows-bisect-steps-text-263b5d8b = About 1 step left
 
 repo-workflows-bisect-steps-text-2d1513e9 = The last step
 
-repo-workflows-bisect-steps-text-5ccbfd65 = { $n } commits after this one
+repo-workflows-bisect-steps-text-5ccbfd65 = { $n ->
+        [one] One commit after this
+       *[other] { $n } commits after this
+    }
 
 repo-workflows-bisect-steps-text-9bbc8458 = 1 commit after this one
 
@@ -1140,7 +1155,10 @@ repo-workflows-dco-commit-note-c87e4ef3 = No Signed-off-by from its author (DCO)
 
 repo-workflows-dco-commit-note-fccbd96e = ✔ Signed off by its author (DCO)
 
-repo-workflows-dco-commits-count-4eb116dc = { $n } commits
+repo-workflows-dco-commits-count-4eb116dc = { $n ->
+        [one] one commit
+       *[other] { $n } commits
+    }
 
 repo-workflows-dco-commits-count-acfd7b9e = 1 commit
 
@@ -1417,11 +1435,17 @@ repo-workflows-doctor-clear-83b12c22 = Clear
 
 repo-workflows-doctor-clear-909d7fba = Clear the flags?
 
-repo-workflows-doctor-clear-ac70d25c = { $files-len-1 } files
+repo-workflows-doctor-clear-ac70d25c = { $files-len-1 ->
+        [one] one file
+       *[other] { $files-len-1 } files
+    }
 
 repo-workflows-doctor-clear-ae587a37 = Git will look at { $what } again: local edits show under Changes, where Discard would throw them away. Which files were flagged isn't kept, so this can't be undone here.
 
-repo-workflows-doctor-clear-e318945b = Clear the flags of { $files-len-1 } files
+repo-workflows-doctor-clear-e318945b = { $files-len-1 ->
+        [one] Clear the flags on one file
+       *[other] Clear the flags on { $files-len-1 } files
+    }
 
 repo-workflows-doctor-confirm-modal-19766ed6 = Cancel
 
@@ -1575,7 +1599,10 @@ repo-workflows-doctor-other-worktrees-965a2b09 = Compare with the other worktree
 
 repo-workflows-doctor-output-card-01623799 = Output of the last operations
 
-repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } lines above
+repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 ->
+        [one] one line above
+       *[other] { $lines-len-shown-len-1 } lines above
+    }
 
 repo-workflows-doctor-output-card-50f9b973 = Nothing yet: no operation gitcraft ran that runs hooks printed anything (what runs in the terminal isn't kept).
 
@@ -1673,7 +1700,10 @@ repo-workflows-doctor-size-card-1f2fe3f1 = { $o-packed-1 } in { $o-packs-2 } pac
 
 repo-workflows-doctor-size-card-35195164 = Packed objects
 
-repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 } files in the objects folder aren't objects ({ $size-o-garbage-kib-2 }): left by an interrupted operation; git gc reports them.
+repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 ->
+        [one] One file in the objects folder is not an object ({ $size-o-garbage-kib-2 }). It was left by an interrupted operation; git gc reports it.
+       *[other] { $o-garbage-1 } files in the objects folder are not objects ({ $size-o-garbage-kib-2 }). They were left by an interrupted operation; git gc reports them.
+    }
 
 repo-workflows-doctor-size-card-8757152b = Loose objects
 
@@ -2175,7 +2205,10 @@ repo-workflows-file_comparison-matrix-6be36ca4 = Missing
 repo-workflows-file_comparison-matrix-c81d97c3 = { $label }
     Pinned { $c-oid-1 }
 
-repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 } files · select another cell after the first
+repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 ->
+        [one] One file
+       *[other] { $data-paths-len-1 } files
+    } · pick a second cell after the first
 
 repo-workflows-file_comparison-migration-06869a99 = similarity unknown
 
@@ -2639,7 +2672,10 @@ repo-workflows-history_activity-activity-view-d402be35 = Stopped at the 64 MiB a
 
 repo-workflows-history_activity-activity-view-e136531e = { $coverage } · { $history-commits-len-1 } unique commits · { $history-tips-2 } reference tips{ $if-history-shallow-shallow-clone-3 }
 
-repo-workflows-history_activity-activity-view-e23552d7 = Analyzing history… { $view-progress-load-ordering-rela-1 } commits read
+repo-workflows-history_activity-activity-view-e23552d7 = Analysing history… { $view-progress-load-ordering-rela-1 ->
+        [one] one commit read
+       *[other] { $view-progress-load-ordering-rela-1 } commits read
+    }
 
 repo-workflows-history_activity-activity-view-e6f89512 = At the shallow boundary, files in the first available tree count as additions.
 
@@ -2666,7 +2702,10 @@ repo-workflows-history_activity-authors-d95082a2 = Author
 repo-workflows-history_activity-authors-e707bedf = Active period
 
 repo-workflows-history_activity-calendar-370eebba = { $month-year-1 }-{ $m }
-    { $n } commits
+    { $n ->
+        [one] one commit
+       *[other] { $n } commits
+    }
 
 repo-workflows-history_activity-calendar-58339f45 = Wed
 
@@ -2697,7 +2736,10 @@ repo-workflows-history_activity-calendar-fdeb71b5 = Sat
 
 repo-workflows-history_activity-cancel-ddfe1c43 = Analysis cancelled. Refresh to try again.
 
-repo-workflows-history_activity-commits-640e56ec = { $selected-len-1 } commits in selected period
+repo-workflows-history_activity-commits-640e56ec = { $selected-len-1 ->
+        [one] One commit in the selected period
+       *[other] { $selected-len-1 } commits in the selected period
+    }
 
 repo-workflows-history_activity-commits-f0d98513 = Open commit detail
 
@@ -2947,7 +2989,10 @@ repo-workflows-lfs_locks-lock-banners-379e383e = Unlock all
 
 repo-workflows-lfs_locks-lock-banners-4ac709aa = Unlock
 
-repo-workflows-lfs_locks-lock-banners-4caac7c4 = You pushed { $many-len-1 } files and still hold their locks: give them back so others can change them?
+repo-workflows-lfs_locks-lock-banners-4caac7c4 = { $many-len-1 ->
+        [one] You pushed one file and still hold its lock. Release it so others can change it?
+       *[other] You pushed { $many-len-1 } files and still hold their locks. Release them so others can change the files?
+    }
 
 repo-workflows-lfs_locks-lock-banners-4fa40890 = You pushed { $one-path-1 } and still hold its lock: give it back so others can change it?
 
@@ -3029,7 +3074,10 @@ repo-workflows-lfs_locks-unlock-buttons-2978e628 = its owner loses the lock
 
 repo-workflows-lfs_locks-unlock-buttons-4ac709aa = Unlock
 
-repo-workflows-lfs_locks-unlock-buttons-6021bccb = Force unlock { $n }…
+repo-workflows-lfs_locks-unlock-buttons-6021bccb = { $n ->
+        [one] Force unlock one file…
+       *[other] Force unlock { $n } files…
+    }
 
 repo-workflows-lfs_locks-unlock-buttons-62509394 = the owners lose their locks
 
@@ -3061,7 +3109,10 @@ repo-workflows-lfs_storage-checkout-683768ab = and { $missing-len-listed-1 } mor
 
 repo-workflows-lfs_storage-checkout-87bcf309 = git lfs pull, as far as the folders below allow ({ $e })
 
-repo-workflows-lfs_storage-checkout-a5d7a59b = { $n } files in LFS, all downloaded.
+repo-workflows-lfs_storage-checkout-a5d7a59b = { $n ->
+        [one] One file in LFS, downloaded.
+       *[other] { $n } files in LFS, all downloaded.
+    }
 
 repo-workflows-lfs_storage-checkout-b627e471 = No file of the checkout is kept in LFS.
 
@@ -3119,7 +3170,10 @@ repo-workflows-lfs_storage-prune-659493e2 = Nothing to prune.
 
 repo-workflows-lfs_storage-prune-8bfaae7c = Pruning deletes local LFS objects that no recent commit, the checkout or unpushed work needs; they can be downloaded again as long as the remote still has them.
 
-repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 } objects
+repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 ->
+        [one] one object
+       *[other] { $plan-objects-1 } objects
+    }
 
 repo-workflows-lfs_storage-prune-ebe86463 = Check what pruning frees
 
@@ -3493,7 +3547,10 @@ repo-workflows-owners-rules-343bb384 = 1 rule
 
 repo-workflows-owners-rules-4d726f4a = { $n } rules
 
-repo-workflows-owners-summary-text-3ff108bf = { $unowned } files without an owner
+repo-workflows-owners-summary-text-3ff108bf = { $unowned ->
+        [one] One file with no owner
+       *[other] { $unowned } files with no owner
+    }
 
 repo-workflows-owners-summary-text-4339bb43 = No owner
 
@@ -3631,7 +3688,10 @@ repo-workflows-parallel_bisect-poll-parallel-e34dd853 = { $self-name-1 } · { $m
 
 repo-workflows-parallel_bisect-progress-text-0246004e = Round { $n }, about { $more } more
 
-repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } of { $view-total-1 } commits left
+repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } of { $view-total-1 ->
+        [one] one commit
+       *[other] { $view-total-1 } commits
+    } left
 
 repo-workflows-parallel_bisect-progress-text-9879a77a = Round { $n }, about 1 more
 
@@ -3643,7 +3703,10 @@ repo-workflows-parallel_bisect-progress-text-b6c2fb65 = { $round } · { $left }{
 
 repo-workflows-parallel_bisect-progress-text-d4e57ece = Round { $n }, the last
 
-repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· testing { $n }
+repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· { $n ->
+        [one] one test running
+       *[other] { $n } tests running
+    }
 
 repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· testing 1
 
@@ -3822,7 +3885,10 @@ repo-workflows-postcards-render-d2afb115 = Invalid postcard size
 
 repo-workflows-postcards-render-eb578243 = Missing postcard font texture
 
-repo-workflows-postcards-render-ebb961b0 = { $snapshot-date-1 } · { $snapshot-commits-len-2 } commits
+repo-workflows-postcards-render-ebb961b0 = { $snapshot-date-1 } · { $snapshot-commits-len-2 ->
+        [one] one commit
+       *[other] { $snapshot-commits-len-2 } commits
+    }
 
 repo-workflows-pr_review-apply-suggestion-2ca103b5 = Apply suggestion
 
@@ -4289,7 +4355,10 @@ repo-workflows-rehearse-played-line-cc3a8109 = Goes through cleanly: a merge com
 
 repo-workflows-rehearse-played-line-da976bc1 = Fails: { $e }
 
-repo-workflows-rehearse-played-line-e270e3ca = Goes through cleanly: { $n } commits
+repo-workflows-rehearse-played-line-e270e3ca = { $n ->
+        [one] Replays cleanly: one commit
+       *[other] Replays cleanly: { $n } commits
+    }
 
 repo-workflows-rehearse-rehearsals-ended-31373501 = { $name } · rehearsal of { $run-branch-1 } done
 
@@ -5342,7 +5411,10 @@ repo-workflows-stack-graph-stacks-50b2c678 = Repair parent…
 
 repo-workflows-stack-graph-stacks-61883d6e = +{ $layer-own-1 } own commits
 
-repo-workflows-stack-graph-stacks-6f246c03 = Needs restack ({ $layer-behind-1 } parent commits)
+repo-workflows-stack-graph-stacks-6f246c03 = Needs restack ({ $layer-behind-1 ->
+        [one] one commit on parent
+       *[other] { $layer-behind-1 } commits on parent
+    })
 
 repo-workflows-stack-graph-stacks-8bbf19c1 = Branch dependencies
 
@@ -5491,7 +5563,10 @@ repo-workflows-stack-restack-done-33b4b547 = Restack stopped at { $branch } on c
 
 repo-workflows-stack-restack-done-6cecc855 = { " " }in its worktree at { $wt-display-1 }
 
-repo-workflows-stack-restack-done-7f6cce25 = Restack: { $n } branches moved · Ctrl+Z puts them back
+repo-workflows-stack-restack-done-7f6cce25 = { $n ->
+        [one] Restacked: one branch moved
+       *[other] Restacked: { $n } branches moved
+    } · Ctrl+Z puts them back
 
 repo-workflows-stack-restack-done-9fbc2915 = Restack
 
@@ -5561,7 +5636,10 @@ repo-workflows-stack-stack-menu-items-d8ad545a = A restack is paused: continue o
 
 repo-workflows-stack-stack-menu-items-e5c65f7a = Publish its stack's { $forge-noun-1 }s…
 
-repo-workflows-stack-stack-menu-items-f7763ef9 = Restack the { $on-it } branches on it…
+repo-workflows-stack-stack-menu-items-f7763ef9 = { $on-it ->
+        [one] Restack the branch on it…
+       *[other] Restack the { $on-it } branches on it…
+    }
 
 repo-workflows-stack-stack-section-316027d9 = STACKS
 
@@ -5579,7 +5657,10 @@ repo-workflows-stack-summary-47eeff3f = Publish { $noun }s: nothing to do
 
 repo-workflows-stack-summary-7f75368f = Published { $noun }s: { $parts-join-1 }
 
-repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 } branches
+repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 ->
+        [one] one branch
+       *[other] { $self-rows-len-2 } branches
+    }
 
 repo-workflows-stack-title-row-3f1c7b21 = { $n } to restack
 
@@ -6262,7 +6343,10 @@ repo-workflows-timeline-sentence-4a61e684 = too many commits to follow one by on
 
 repo-workflows-timeline-sentence-99e79f74 = final files differ
 
-repo-workflows-timeline-sentence-b5ea0271 = { $old } commits → { $new }
+repo-workflows-timeline-sentence-b5ea0271 = { $old ->
+        [one] one commit
+       *[other] { $old } commits
+    } → { $new }
 
 repo-workflows-timeline-sentence-d30ebcc6 = authors kept
 
@@ -6314,7 +6398,10 @@ repo-workflows-timeline-undo-bf959af0 = Undo { $entry-label-1 }
 
 repo-workflows-tour-open-tour-a6cb5dc1 = Finish or close the editor first
 
-repo-workflows-tour-tour-view-009719be = { $n } <{ $e }> ({ $c } commits)
+repo-workflows-tour-tour-view-009719be = { $n } <{ $e }> ({ $c ->
+        [one] one commit
+       *[other] { $c } commits
+    })
 
 repo-workflows-tour-tour-view-0715e061 = No README or contribution document was available in the recorded HEAD tree.
 
@@ -6346,7 +6433,10 @@ repo-workflows-tour-tour-view-55b8885f = Reachable refs and HEAD counted once. D
 
 repo-workflows-tour-tour-view-5b0a8af2 = Copy a Signed-off-by line
 
-repo-workflows-tour-tour-view-6a2e97ea = { $n } commits · { $string-from-utf8-lossy-path-1 }
+repo-workflows-tour-tour-view-6a2e97ea = { $n ->
+        [one] one commit
+       *[other] { $n } commits
+    } · { $string-from-utf8-lossy-path-1 }
 
 repo-workflows-tour-tour-view-6df591db = Git LFS
 
@@ -6402,7 +6492,10 @@ repo-workflows-tour-tour-view-f98bf467 = Refresh tour
 
 repo-workflows-unity-add-attributes-0b9b6295 = Adding lines to .gitattributes
 
-repo-workflows-unity-add-attributes-ec651afe = Added { $missing-len-1 } lines to .gitattributes: commit it to share them
+repo-workflows-unity-add-attributes-ec651afe = { $missing-len-1 ->
+        [one] One line added to .gitattributes
+       *[other] Added { $missing-len-1 } lines to .gitattributes
+    }: commit to share
 
 repo-workflows-unity-add-ignores-52181c32 = Adding lines to .gitignore
 

@@ -120,7 +120,10 @@ repo-workflows-agent-mixed-ask-2ddd09f5 = Ctrl+Z setzt { $target } anschließend
 
 repo-workflows-agent-not-in-progress-1049b227 = Ein Vorgang ({ $state-label-to-lowercase-1 }) läuft. { $what } würde ihn unwiderruflich beenden. Schließen Sie ihn zuerst ab oder brechen Sie ihn ab (siehe `conflicts`).
 
-repo-workflows-agent-paths-label-26d36d06 = { $many-len-1 } Pfade
+repo-workflows-agent-paths-label-26d36d06 = { $many-len-1 ->
+        [one] ein Pfad
+       *[other] { $many-len-1 } Pfade
+    }
 
 repo-workflows-agent-plan-0026c505 = Zurücknehmen
 
@@ -314,7 +317,10 @@ repo-workflows-agents-sub-32dfcdbc = Eine Datei geändert
 
 repo-workflows-agents-sub-96b72d81 = Ordner fehlt: Bereinigen Sie ihn unter WORKTREES
 
-repo-workflows-agents-sub-a7109ae6 = { $n } Dateien geändert
+repo-workflows-agents-sub-a7109ae6 = { $n ->
+        [one] Eine Datei geändert
+       *[other] { $n } Dateien geändert
+    }
 
 repo-workflows-agents-sub-b2c35ddf = keine uncommitteten Änderungen
 
@@ -580,7 +586,10 @@ repo-workflows-bakeoff-assemble-bar-5a22f453 = Wird zusammengestellt …
 
 repo-workflows-bakeoff-assemble-bar-8462ef57 = Zusammenstellen in
 
-repo-workflows-bakeoff-assemble-bar-86fd9bbb = Zusammenstellen ({ $picks } Dateien)
+repo-workflows-bakeoff-assemble-bar-86fd9bbb = Zusammenstellen ({ $picks ->
+        [one] eine Datei
+       *[other] { $picks } Dateien
+    })
 
 repo-workflows-bakeoff-assemble-bar-916e34d4 = Im Graphen anzeigen
 
@@ -855,13 +864,19 @@ repo-workflows-bisect-start-bisect-db936451 = Bisect starten
 
 repo-workflows-bisect-start-bisect-run-d300d73e = Bisect-Lauf
 
-repo-workflows-bisect-steps-text-14999716 = Noch etwa { $n } Schritte
+repo-workflows-bisect-steps-text-14999716 = { $n ->
+        [one] Noch etwa ein Schritt
+       *[other] Noch etwa { $n } Schritte
+    }
 
 repo-workflows-bisect-steps-text-263b5d8b = Noch etwa ein Schritt
 
 repo-workflows-bisect-steps-text-2d1513e9 = Letzter Schritt
 
-repo-workflows-bisect-steps-text-5ccbfd65 = { $n } Commits nach diesem
+repo-workflows-bisect-steps-text-5ccbfd65 = { $n ->
+        [one] Ein Commit nach diesem
+       *[other] { $n } Commits nach diesem
+    }
 
 repo-workflows-bisect-steps-text-9bbc8458 = Ein Commit nach diesem
 
@@ -1140,7 +1155,10 @@ repo-workflows-dco-commit-note-c87e4ef3 = Kein Signed-off-by des Autors (DCO)
 
 repo-workflows-dco-commit-note-fccbd96e = ✔ Vom Autor signiert (DCO)
 
-repo-workflows-dco-commits-count-4eb116dc = { $n } Commits
+repo-workflows-dco-commits-count-4eb116dc = { $n ->
+        [one] ein Commit
+       *[other] { $n } Commits
+    }
 
 repo-workflows-dco-commits-count-acfd7b9e = Ein Commit
 
@@ -1417,11 +1435,17 @@ repo-workflows-doctor-clear-83b12c22 = Entfernen
 
 repo-workflows-doctor-clear-909d7fba = Flags entfernen?
 
-repo-workflows-doctor-clear-ac70d25c = { $files-len-1 } Dateien
+repo-workflows-doctor-clear-ac70d25c = { $files-len-1 ->
+        [one] eine Datei
+       *[other] { $files-len-1 } Dateien
+    }
 
 repo-workflows-doctor-clear-ae587a37 = Git prüft { $what } wieder. Lokale Änderungen erscheinen unter „Änderungen“, wo „Verwerfen“ sie löschen würde. Die zuvor gesetzten Flags werden nicht gespeichert. Dies lässt sich hier nicht rückgängig machen.
 
-repo-workflows-doctor-clear-e318945b = Flags von { $files-len-1 } Dateien entfernen
+repo-workflows-doctor-clear-e318945b = { $files-len-1 ->
+        [one] Flags einer Datei entfernen
+       *[other] Flags von { $files-len-1 } Dateien entfernen
+    }
 
 repo-workflows-doctor-confirm-modal-19766ed6 = Abbrechen
 
@@ -1575,7 +1599,10 @@ repo-workflows-doctor-other-worktrees-965a2b09 = Mit anderen Worktrees vergleich
 
 repo-workflows-doctor-output-card-01623799 = Ausgabe der letzten Vorgänge
 
-repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } Zeilen darüber
+repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 ->
+        [one] eine Zeile darüber
+       *[other] { $lines-len-shown-len-1 } Zeilen darüber
+    }
 
 repo-workflows-doctor-output-card-50f9b973 = Noch keine Ausgabe von durch gitcraft ausgeführten Hook-Vorgängen. Terminalausgaben werden nicht gespeichert.
 
@@ -1673,7 +1700,10 @@ repo-workflows-doctor-size-card-1f2fe3f1 = { $o-packed-1 } in { $o-packs-2 } Pac
 
 repo-workflows-doctor-size-card-35195164 = Gepackte Objekte
 
-repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 } Dateien im Objektordner sind keine Objekte ({ $size-o-garbage-kib-2 }). Sie stammen von einem unterbrochenen Vorgang; git gc meldet sie.
+repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 ->
+        [one] Eine Datei im Objektordner ist kein Objekt ({ $size-o-garbage-kib-2 }). Sie stammt von einem unterbrochenen Vorgang; git gc meldet sie.
+       *[other] { $o-garbage-1 } Dateien im Objektordner sind keine Objekte ({ $size-o-garbage-kib-2 }). Sie stammen von einem unterbrochenen Vorgang; git gc meldet sie.
+    }
 
 repo-workflows-doctor-size-card-8757152b = Lose Objekte
 
@@ -2175,7 +2205,10 @@ repo-workflows-file_comparison-matrix-6be36ca4 = Fehlt
 repo-workflows-file_comparison-matrix-c81d97c3 = { $label }
     Fixiert: { $c-oid-1 }
 
-repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 } Dateien · nach der ersten eine weitere Zelle auswählen
+repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 ->
+        [one] Eine Datei
+       *[other] { $data-paths-len-1 } Dateien
+    } · nach der ersten eine weitere Zelle auswählen
 
 repo-workflows-file_comparison-migration-06869a99 = Ähnlichkeit unbekannt
 
@@ -2639,7 +2672,10 @@ repo-workflows-history_activity-activity-view-d402be35 = Die Analyse wurde an de
 
 repo-workflows-history_activity-activity-view-e136531e = { $coverage } · { $history-commits-len-1 } eindeutige Commits · { $history-tips-2 } Referenzspitzen{ $if-history-shallow-shallow-clone-3 }
 
-repo-workflows-history_activity-activity-view-e23552d7 = Verlauf wird analysiert … { $view-progress-load-ordering-rela-1 } Commits gelesen
+repo-workflows-history_activity-activity-view-e23552d7 = Verlauf wird analysiert … { $view-progress-load-ordering-rela-1 ->
+        [one] ein Commit gelesen
+       *[other] { $view-progress-load-ordering-rela-1 } Commits gelesen
+    }
 
 repo-workflows-history_activity-activity-view-e6f89512 = An der Grenze eines flachen Klons zählen Dateien im ersten verfügbaren Dateibaum als hinzugefügt.
 
@@ -2666,7 +2702,10 @@ repo-workflows-history_activity-authors-d95082a2 = Autor
 repo-workflows-history_activity-authors-e707bedf = Aktivitätszeitraum
 
 repo-workflows-history_activity-calendar-370eebba = { $month-year-1 }-{ $m }
-    { $n } Commits
+    { $n ->
+        [one] ein Commit
+       *[other] { $n } Commits
+    }
 
 repo-workflows-history_activity-calendar-58339f45 = Mi
 
@@ -2697,7 +2736,10 @@ repo-workflows-history_activity-calendar-fdeb71b5 = Sa
 
 repo-workflows-history_activity-cancel-ddfe1c43 = Analyse abgebrochen. Zum erneuten Versuch aktualisieren.
 
-repo-workflows-history_activity-commits-640e56ec = { $selected-len-1 } Commits im ausgewählten Zeitraum
+repo-workflows-history_activity-commits-640e56ec = { $selected-len-1 ->
+        [one] Ein Commit im ausgewählten Zeitraum
+       *[other] { $selected-len-1 } Commits im ausgewählten Zeitraum
+    }
 
 repo-workflows-history_activity-commits-f0d98513 = Commit-Details öffnen
 
@@ -2947,7 +2989,10 @@ repo-workflows-lfs_locks-lock-banners-379e383e = Alle entsperren
 
 repo-workflows-lfs_locks-lock-banners-4ac709aa = Entsperren
 
-repo-workflows-lfs_locks-lock-banners-4caac7c4 = Sie haben { $many-len-1 } Dateien gepusht und halten deren Sperren weiterhin. Freigeben, damit andere die Dateien ändern können?
+repo-workflows-lfs_locks-lock-banners-4caac7c4 = { $many-len-1 ->
+        [one] Sie haben eine Datei gepusht und halten ihre Sperre weiterhin. Freigeben, damit andere sie ändern können?
+       *[other] Sie haben { $many-len-1 } Dateien gepusht und halten deren Sperren weiterhin. Freigeben, damit andere die Dateien ändern können?
+    }
 
 repo-workflows-lfs_locks-lock-banners-4fa40890 = Sie haben { $one-path-1 } gepusht und halten die Sperre weiterhin. Freigeben, damit andere die Datei ändern können?
 
@@ -3029,7 +3074,10 @@ repo-workflows-lfs_locks-unlock-buttons-2978e628 = der Inhaber verliert die Sper
 
 repo-workflows-lfs_locks-unlock-buttons-4ac709aa = Entsperren
 
-repo-workflows-lfs_locks-unlock-buttons-6021bccb = Entsperren von { $n } Dateien erzwingen …
+repo-workflows-lfs_locks-unlock-buttons-6021bccb = { $n ->
+        [one] Entsperren einer Datei erzwingen …
+       *[other] Entsperren von { $n } Dateien erzwingen …
+    }
 
 repo-workflows-lfs_locks-unlock-buttons-62509394 = die Inhaber verlieren ihre Sperren
 
@@ -3061,7 +3109,10 @@ repo-workflows-lfs_storage-checkout-683768ab = und { $missing-len-listed-1 } wei
 
 repo-workflows-lfs_storage-checkout-87bcf309 = git lfs pull, soweit die folgenden Ordnereinstellungen dies zulassen ({ $e })
 
-repo-workflows-lfs_storage-checkout-a5d7a59b = { $n } Dateien in LFS, alle heruntergeladen.
+repo-workflows-lfs_storage-checkout-a5d7a59b = { $n ->
+        [one] Eine Datei in LFS, heruntergeladen.
+       *[other] { $n } Dateien in LFS, alle heruntergeladen.
+    }
 
 repo-workflows-lfs_storage-checkout-b627e471 = Keine Datei dieses Checkouts wird in LFS gespeichert.
 
@@ -3119,7 +3170,10 @@ repo-workflows-lfs_storage-prune-659493e2 = Nichts zu bereinigen.
 
 repo-workflows-lfs_storage-prune-8bfaae7c = Die Bereinigung löscht lokale LFS-Objekte, die weder aktuelle Commits noch der Checkout oder ungepushte Arbeit benötigen. Sie können erneut heruntergeladen werden, solange das Remote sie bereithält.
 
-repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 } Objekte
+repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 ->
+        [one] ein Objekt
+       *[other] { $plan-objects-1 } Objekte
+    }
 
 repo-workflows-lfs_storage-prune-ebe86463 = Freigebbaren Speicher ermitteln
 
@@ -3493,7 +3547,10 @@ repo-workflows-owners-rules-343bb384 = Eine Regel
 
 repo-workflows-owners-rules-4d726f4a = { $n } Regeln
 
-repo-workflows-owners-summary-text-3ff108bf = { $unowned } Dateien ohne Verantwortlichen
+repo-workflows-owners-summary-text-3ff108bf = { $unowned ->
+        [one] Eine Datei ohne Verantwortlichen
+       *[other] { $unowned } Dateien ohne Verantwortlichen
+    }
 
 repo-workflows-owners-summary-text-4339bb43 = Kein Verantwortlicher
 
@@ -3631,7 +3688,10 @@ repo-workflows-parallel_bisect-poll-parallel-e34dd853 = { $self-name-1 } · { $m
 
 repo-workflows-parallel_bisect-progress-text-0246004e = Runde { $n }, ungefähr { $more } weitere
 
-repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } von { $view-total-1 } Commits verbleiben
+repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } von { $view-total-1 ->
+        [one] einem Commit
+       *[other] { $view-total-1 } Commits
+    } verbleiben
 
 repo-workflows-parallel_bisect-progress-text-9879a77a = Runde { $n }, ungefähr eine weitere
 
@@ -3643,7 +3703,10 @@ repo-workflows-parallel_bisect-progress-text-b6c2fb65 = { $round } · { $left }{
 
 repo-workflows-parallel_bisect-progress-text-d4e57ece = Runde { $n }, die letzte
 
-repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· { $n } Tests laufen
+repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· { $n ->
+        [one] ein Test läuft
+       *[other] { $n } Tests laufen
+    }
 
 repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· ein Test läuft
 
@@ -3822,7 +3885,10 @@ repo-workflows-postcards-render-d2afb115 = Ungültige Postkartengröße
 
 repo-workflows-postcards-render-eb578243 = Schrifttextur der Postkarte fehlt
 
-repo-workflows-postcards-render-ebb961b0 = { $snapshot-date-1 } · { $snapshot-commits-len-2 } Commits
+repo-workflows-postcards-render-ebb961b0 = { $snapshot-date-1 } · { $snapshot-commits-len-2 ->
+        [one] ein Commit
+       *[other] { $snapshot-commits-len-2 } Commits
+    }
 
 repo-workflows-pr_review-apply-suggestion-2ca103b5 = Vorschlag übernehmen
 
@@ -4289,7 +4355,10 @@ repo-workflows-rehearse-played-line-cc3a8109 = Läuft konfliktfrei durch: ein Me
 
 repo-workflows-rehearse-played-line-da976bc1 = Schlägt fehl: { $e }
 
-repo-workflows-rehearse-played-line-e270e3ca = Läuft konfliktfrei durch: { $n } Commits
+repo-workflows-rehearse-played-line-e270e3ca = { $n ->
+        [one] Läuft konfliktfrei durch: ein Commit
+       *[other] Läuft konfliktfrei durch: { $n } Commits
+    }
 
 repo-workflows-rehearse-rehearsals-ended-31373501 = { $name } · Probelauf von { $run-branch-1 } abgeschlossen
 
@@ -5342,7 +5411,10 @@ repo-workflows-stack-graph-stacks-50b2c678 = Eltern-Branch korrigieren…
 
 repo-workflows-stack-graph-stacks-61883d6e = +{ $layer-own-1 } eigene Commits
 
-repo-workflows-stack-graph-stacks-6f246c03 = Neu aufbauen erforderlich ({ $layer-behind-1 } Commits im Eltern-Branch)
+repo-workflows-stack-graph-stacks-6f246c03 = Neu aufbauen erforderlich ({ $layer-behind-1 ->
+        [one] ein Commit im Eltern-Branch
+       *[other] { $layer-behind-1 } Commits im Eltern-Branch
+    })
 
 repo-workflows-stack-graph-stacks-8bbf19c1 = Branch-Abhängigkeiten
 
@@ -5491,7 +5563,10 @@ repo-workflows-stack-restack-done-33b4b547 = Neuaufbau bei { $branch } wegen Kon
 
 repo-workflows-stack-restack-done-6cecc855 = { " " }in seinem Arbeitsverzeichnis unter { $wt-display-1 }
 
-repo-workflows-stack-restack-done-7f6cce25 = Neuaufbau: { $n } Branches verschoben · Strg+Z setzt sie zurück
+repo-workflows-stack-restack-done-7f6cce25 = { $n ->
+        [one] Neuaufbau: ein Branch verschoben
+       *[other] Neuaufbau: { $n } Branches verschoben
+    } · Strg+Z setzt den vorherigen Stand zurück
 
 repo-workflows-stack-restack-done-9fbc2915 = Stapel neu aufbauen
 
@@ -5561,7 +5636,10 @@ repo-workflows-stack-stack-menu-items-d8ad545a = Ein Neuaufbau ist angehalten: Z
 
 repo-workflows-stack-stack-menu-items-e5c65f7a = Die { $forge-noun-1 }s seines Stapels veröffentlichen…
 
-repo-workflows-stack-stack-menu-items-f7763ef9 = Die { $on-it } Branches darauf neu aufbauen…
+repo-workflows-stack-stack-menu-items-f7763ef9 = { $on-it ->
+        [one] Den darauf basierenden Branch neu aufbauen …
+       *[other] Die { $on-it } darauf basierenden Branches neu aufbauen …
+    }
 
 repo-workflows-stack-stack-section-316027d9 = STAPEL
 
@@ -5579,7 +5657,10 @@ repo-workflows-stack-summary-47eeff3f = { $noun }s veröffentlichen: nichts zu t
 
 repo-workflows-stack-summary-7f75368f = { $noun }s veröffentlicht: { $parts-join-1 }
 
-repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 } Branches
+repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 ->
+        [one] ein Branch
+       *[other] { $self-rows-len-2 } Branches
+    }
 
 repo-workflows-stack-title-row-3f1c7b21 = { $n } neu aufzubauen
 
@@ -6262,7 +6343,10 @@ repo-workflows-timeline-sentence-4a61e684 = Zu viele Commits, um sie einzeln nac
 
 repo-workflows-timeline-sentence-99e79f74 = Dateien am Ende unterschiedlich
 
-repo-workflows-timeline-sentence-b5ea0271 = { $old } Commits → { $new }
+repo-workflows-timeline-sentence-b5ea0271 = { $old ->
+        [one] ein Commit
+       *[other] { $old } Commits
+    } → { $new }
 
 repo-workflows-timeline-sentence-d30ebcc6 = Autoren beibehalten
 
@@ -6314,7 +6398,10 @@ repo-workflows-timeline-undo-bf959af0 = { $entry-label-1 } rückgängig machen
 
 repo-workflows-tour-open-tour-a6cb5dc1 = Beenden oder schließen Sie zunächst den Editor
 
-repo-workflows-tour-tour-view-009719be = { $n } <{ $e }> ({ $c } Commits)
+repo-workflows-tour-tour-view-009719be = { $n } <{ $e }> ({ $c ->
+        [one] ein Commit
+       *[other] { $c } Commits
+    })
 
 repo-workflows-tour-tour-view-0715e061 = Im aufgezeichneten HEAD-Baum war keine README oder Beitragsdokumentation verfügbar.
 
@@ -6346,7 +6433,10 @@ repo-workflows-tour-tour-view-55b8885f = Erreichbare Refs und HEAD werden einmal
 
 repo-workflows-tour-tour-view-5b0a8af2 = Signed-off-by-Zeile kopieren
 
-repo-workflows-tour-tour-view-6a2e97ea = { $n } Commits · { $string-from-utf8-lossy-path-1 }
+repo-workflows-tour-tour-view-6a2e97ea = { $n ->
+        [one] ein Commit
+       *[other] { $n } Commits
+    } · { $string-from-utf8-lossy-path-1 }
 
 repo-workflows-tour-tour-view-6df591db = Git LFS
 
@@ -6402,7 +6492,10 @@ repo-workflows-tour-tour-view-f98bf467 = Rundgang aktualisieren
 
 repo-workflows-unity-add-attributes-0b9b6295 = Zeilen werden zu .gitattributes hinzugefügt
 
-repo-workflows-unity-add-attributes-ec651afe = { $missing-len-1 } Zeilen zu .gitattributes hinzugefügt: committen, um sie zu teilen
+repo-workflows-unity-add-attributes-ec651afe = { $missing-len-1 ->
+        [one] Eine Zeile zu .gitattributes hinzugefügt
+       *[other] { $missing-len-1 } Zeilen zu .gitattributes hinzugefügt
+    }: committen, um sie zu teilen
 
 repo-workflows-unity-add-ignores-52181c32 = Zeilen werden zu .gitignore hinzugefügt
 

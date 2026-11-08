@@ -289,7 +289,7 @@ fn history_card(ui: &mut Ui, h: &Health, loading: &Loading) {
                         "repo-workflows-doctor-history-card-cd12e41d",
                         &[(
                             "group-h-commits-unwrap-or-defaul-1",
-                            (group(h.commits.unwrap_or_default())).clone().into(),
+                            h.commits.unwrap_or_default().into(),
                         )],
                     ))
                     .color(t.warning),
