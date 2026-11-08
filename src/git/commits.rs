@@ -707,7 +707,7 @@ pub(crate) fn investigation_commits_of(
 
 fn parse_investigation_commits(output: &[u8]) -> Result<Vec<Commit>, String> {
     let text =
-        std::str::from_utf8(&output).map_err(|_| "History page returned non-UTF-8 metadata")?;
+        std::str::from_utf8(output).map_err(|_| "History page returned non-UTF-8 metadata")?;
     let fields: Vec<_> = text.split('\0').collect();
     let (records, tail) = fields.as_chunks::<LOG_FIELDS>();
     if !tail.iter().all(|s| s.trim().is_empty()) {

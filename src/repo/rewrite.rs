@@ -241,10 +241,9 @@ impl RepoTab {
             return;
         }
         let id = editor.id;
-        let editor = self
-            .rebase
-            .as_ref()
-            .expect("editor retained during approval");
+        let Some(editor) = self.rebase.as_ref() else {
+            return;
+        };
         let branch = self.refs.current.as_deref().unwrap_or("HEAD");
         let ask = git::PreviewAsk::rebase(
             branch,
@@ -367,10 +366,13 @@ impl RepoTab {
             self.status = Some(("The approved rebase branch, HEAD or todo changed while preparing its command. Reopen its preview.".into(), true));
             return;
         }
-        let retained_guard = editor
-            .branch_guard
-            .clone()
-            .expect("approved branch is bound");
+        let Some(retained_guard) = editor.branch_guard.clone() else {
+            self.status = Some((
+                "The approved rebase has no retained branch identity; reopen its preview.".into(),
+                true,
+            ));
+            return;
+        };
         match command {
             // Something else started while the files were written.
             Ok(_) if self.busy_op.is_some() => {
