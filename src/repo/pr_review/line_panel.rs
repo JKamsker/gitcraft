@@ -157,6 +157,7 @@ fn threads(
     shown.pending_exists = extras.pending_review.is_some();
     shown.open = details.state == "OPEN";
     let open = shown.open;
+    let relocated = view.relocations().cloned().unwrap_or_default();
     let markdown = &mut view.markdown;
     let bodies = &view.thread_bodies;
     let suggestions = &view.suggestions;
@@ -167,9 +168,9 @@ fn threads(
         .show(ui, |ui| {
             for thread in extras.threads.iter().filter(|th| {
                 thread_is_on(th, &target.path, target.side, target.line)
-                    || view.relocated.get(&th.id) == Some(target)
+                    || relocated.get(&th.id) == Some(target)
             }) {
-                if view.relocated.contains_key(&thread.id) {
+                if relocated.contains_key(&thread.id) {
                     ui.label(
                         "Earlier comment · relocated across unchanged lines (local navigation)",
                     );

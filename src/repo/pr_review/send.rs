@@ -40,7 +40,7 @@ impl RepoTab {
             return None;
         }
         let mut marks = line_marks(&details.extras.threads, path);
-        for (id, target) in &view.relocated {
+        for (id, target) in view.relocations().into_iter().flatten() {
             if target.path == *path {
                 let count = details
                     .extras

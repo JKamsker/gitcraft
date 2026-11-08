@@ -25,14 +25,14 @@ impl RepoTab {
             return;
         };
         page_header(ui, view, popped, acts);
-        if !view.relocated.is_empty() {
+        if let Some(relocated) = view.relocations().filter(|m| !m.is_empty()) {
             egui::CollapsingHeader::new(format!(
                 "{} earlier comment anchors relocated",
-                view.relocated.len()
+                relocated.len()
             ))
             .show(ui, |ui| {
                 if let Some(Ok(files)) = &view.files {
-                    for target in view.relocated.values() {
+                    for target in relocated.values() {
                         if ui
                             .button(format!("{}:{} · unchanged text", target.path, target.line))
                             .clicked()
@@ -49,6 +49,9 @@ impl RepoTab {
             });
         }
 
+        if let Some(error) = &view.relocated.error {
+            ui.weak(format!("Earlier comment locations unavailable: {error}"));
+        }
         if let Some(Ok(_)) = &view.details {
             crate::repo::versions::since_banner(
                 ui,

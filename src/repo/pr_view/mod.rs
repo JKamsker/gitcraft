@@ -37,6 +37,16 @@ pub(crate) struct PrView {
 }
 
 impl PrView {
+    pub(super) fn relocations(
+        &self,
+    ) -> Option<&std::collections::HashMap<String, super::pr_review::LineTarget>> {
+        let files = self.files.as_ref()?.as_ref().ok()?;
+        let details = self.details.as_ref()?.as_ref().ok()?;
+        if self.loading || files.to != details.head_oid {
+            return None;
+        }
+        self.relocated.current(&files.from, &files.to)
+    }
     /// The pull request's latest commit as last read.
     pub(super) fn head(&self) -> Option<&str> {
         self.seen_head.as_deref()
@@ -113,6 +123,7 @@ impl RepoTab {
             return;
         };
         view.request = request;
+        view.relocated = Default::default();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
         spawn(&self.tx, ctx, move || {
@@ -193,6 +204,7 @@ impl RepoTab {
         {
             draft.posting = false;
         }
+        view.relocated = Default::default();
         let before = view.files.take().and_then(Result::ok);
         // Its commits are here now: whether it changed since it was last looked at.
         let details = match (&result, &view.details) {
@@ -218,6 +230,8 @@ impl RepoTab {
                             match result {
                                 Ok(anchors) => view.relocated = anchors,
                                 Err(e) => {
+                                    view.relocated = Default::default();
+                                    view.relocated.error = Some(e.clone());
                                     tab.status = Some((format!("Comment relocation: {e}"), true))
                                 }
                             }

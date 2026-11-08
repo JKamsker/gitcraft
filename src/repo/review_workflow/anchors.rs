@@ -7,7 +7,18 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
-pub(in crate::repo) type Relocations = HashMap<String, LineTarget>;
+#[derive(Default)]
+pub(in crate::repo) struct Relocations {
+    base: String,
+    head: String,
+    targets: HashMap<String, LineTarget>,
+    pub error: Option<String>,
+}
+impl Relocations {
+    pub fn current(&self, base: &str, head: &str) -> Option<&HashMap<String, LineTarget>> {
+        (self.error.is_none() && self.base == base && self.head == head).then_some(&self.targets)
+    }
+}
 #[derive(Serialize, Deserialize)]
 struct Snapshot {
     head: String,
@@ -20,6 +31,24 @@ struct Anchor {
     line: u64,
     start: Option<u64>,
     right: bool,
+}
+fn mapped_span(patch: &str, start: Option<u64>, end: u64) -> Option<(Option<u64>, u64)> {
+    let line = map_line(patch, end)?;
+    let mapped = match start {
+        Some(start) => {
+            let mapped = map_line(patch, start)?;
+            let length = end.checked_sub(start)?;
+            if length > 10_000
+                || (start..=end).any(|n| map_line(patch, n) != mapped.checked_add(n - start))
+                || line.checked_sub(mapped) != Some(length)
+            {
+                return None;
+            }
+            Some(mapped)
+        }
+        None => None,
+    };
+    Some((mapped, line))
 }
 
 /// Only unchanged spans move. Edited/deleted lines have no justified destination. An
@@ -67,7 +96,7 @@ fn relocate(
     old: &str,
     new: &str,
     anchor: &Anchor,
-) -> Result<Option<LineTarget>, String> {
+) -> Result<Option<(LineTarget, Option<u64>)>, String> {
     let files = git::diff_files(repo, old, Some(new))?;
     let path = files
         .iter()
@@ -94,31 +123,23 @@ fn relocate(
             path,
         ],
     )?;
-    let Some(line) = map_line(&patch, anchor.line) else {
+    let Some((start, line)) = mapped_span(&patch, anchor.start, anchor.line) else {
         return Ok(None);
     };
-    if let Some(start) = anchor.start {
-        let Some(mapped) = map_line(&patch, start) else {
-            return Ok(None);
-        };
-        if anchor.line.checked_sub(start).is_none_or(|n| n > 10_000)
-            || (start..=anchor.line).any(|n| map_line(&patch, n) != mapped.checked_add(n - start))
-            || line.checked_sub(mapped) != anchor.line.checked_sub(start)
-        {
-            return Ok(None);
-        }
-    }
     // Reject unavailable blobs; a missing path is never a successful identity mapping.
     git::run(Some(repo), &["cat-file", "-e", &format!("{new}:{path}")])?;
-    Ok(Some(LineTarget {
-        path: path.to_owned(),
-        line,
-        side: if anchor.right {
-            DiffSide::Right
-        } else {
-            DiffSide::Left
+    Ok(Some((
+        LineTarget {
+            path: path.to_owned(),
+            line,
+            side: if anchor.right {
+                DiffSide::Right
+            } else {
+                DiffSide::Left
+            },
         },
-    }))
+        start,
+    )))
 }
 
 pub(in crate::repo) fn relocate_threads(
@@ -128,7 +149,7 @@ pub(in crate::repo) fn relocate_threads(
 ) -> Result<Relocations, String> {
     let key = format!("{}#{}", details.url, details.number);
     let before = store::load::<Snapshot>(repo, "anchors", &key)?;
-    let mut moved = Relocations::new();
+    let mut moved = HashMap::new();
     let mut anchors = HashMap::new();
     for thread in &details.extras.threads {
         // Pending comments belong to the forge's pending review. Never reinterpret them.
@@ -160,13 +181,13 @@ pub(in crate::repo) fn relocate_threads(
             } else {
                 base
             };
-            if let Some(target) = relocate(repo, old, new, anchor)? {
+            if let Some((target, start)) = relocate(repo, old, new, anchor)? {
                 anchors.insert(
                     thread.id.clone(),
                     Anchor {
                         path: target.path.clone(),
                         line: target.line,
-                        start: None,
+                        start,
                         right: anchor.right,
                     },
                 );
@@ -184,7 +205,12 @@ pub(in crate::repo) fn relocate_threads(
             anchors,
         },
     )?;
-    Ok(moved)
+    Ok(Relocations {
+        base: base.into(),
+        head: details.head_oid.clone(),
+        targets: moved,
+        error: None,
+    })
 }
 
 #[cfg(test)]
@@ -206,7 +232,7 @@ mod tests {
             start: None,
             right: true,
         };
-        let mapped = relocate(r.path(), &old, &new, &a)?.ok_or("missing relocation")?;
+        let (mapped, _) = relocate(r.path(), &old, &new, &a)?.ok_or("missing relocation")?;
         assert_eq!((mapped.path.as_str(), mapped.line), ("new.rs", 3));
         a.line = 3;
         assert!(relocate(r.path(), &old, &new, &a)?.is_none());
@@ -232,5 +258,38 @@ mod tests {
         assert_eq!(map_line("@@ -3,0 +4,2 @@", 3), Some(3));
         assert_eq!(map_line("@@ -3,0 +4,2 @@", 4), Some(6));
         assert_eq!(map_line("", 0), None);
+    }
+    #[test]
+    fn r2_pure_multiline_ranges_survive_serialization_and_repeated_rewrites() -> Result<(), String>
+    {
+        let (start, line) = mapped_span("@@ -0,0 +1 @@", Some(2), 3).ok_or("first mapping")?;
+        let anchor = Anchor {
+            path: "a.rs".into(),
+            line,
+            start,
+            right: true,
+        };
+        let bytes = serde_json::to_vec(&anchor).map_err(|e| e.to_string())?;
+        let reopened: Anchor = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        assert_eq!((reopened.start, reopened.line), (Some(3), 4));
+        assert!(mapped_span("@@ -3 +3 @@", reopened.start, reopened.line).is_none());
+        assert_eq!(
+            mapped_span("@@ -0,0 +1,2 @@", reopened.start, reopened.line),
+            Some((Some(5), 6))
+        );
+        Ok(())
+    }
+    #[test]
+    fn r2_pure_relocation_maps_cannot_cross_generations_or_errors() {
+        let mut map = Relocations {
+            base: "A".into(),
+            head: "B".into(),
+            ..Default::default()
+        };
+        assert!(map.current("A", "B").is_some());
+        assert!(map.current("A", "C").is_none());
+        map.error = Some("unavailable".into());
+        assert!(map.current("A", "B").is_none());
+        assert!(Relocations::default().current("A", "B").is_none());
     }
 }
