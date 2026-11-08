@@ -1,0 +1,8 @@
+{
+  "candidate": "940cacbc31f36b040dfcb4f347afc9bc3698ed45",
+  "reviewed_history": "99808ef2726a24801a0042292b95561b05247b5d",
+  "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+  "exit_code": 0,
+  "log_sha256": "c123370fdace3c4fffd406e0df80d3422c406b2a38002bd4a985328e2e681b31",
+  "limits": "Compilation only; native/runtime/full suite/CI held. Seven critical history common files and fifteen existing tracker/GitLab source files byte-verified unchanged."
+}

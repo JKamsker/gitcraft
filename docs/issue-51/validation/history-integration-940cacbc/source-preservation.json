@@ -1,0 +1,114 @@
+{
+  "checks": [
+    {
+      "path": "src/git/command.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "7db063204968f039a88dac94e3e130ed4c0062eae875e57d58e440d0c3cbcc17"
+    },
+    {
+      "path": "src/git/command/credential_policy.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "efedb66f73b5c247d17ffcc71ecd6d999ae208cc0cfd305c4d575bbca3c889ca"
+    },
+    {
+      "path": "src/git/credential_scope.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "373538cb2f8687b275fc404dd32abaca0b38ff271903c021c8fe1fc0099d652d"
+    },
+    {
+      "path": "src/git/command/watched.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "1ca090cc0663786f38787df80a048ae224a4e310992e7e04b685bea0ce00be21"
+    },
+    {
+      "path": "src/repo/operations.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "e38cefe4361a3b25601de89b3cfe68cbded7910b9fb83d7c5ba9fe3326d59ab5"
+    },
+    {
+      "path": "src/settings/profiles.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "5530f3c3f5a4a14d6efc7dce1479f361cfd761d1dbd7a237a1f4cb85bddbe857"
+    },
+    {
+      "path": "src/repo/graph_view/mod.rs",
+      "equal_to": "99808ef2726a24801a0042292b95561b05247b5d",
+      "sha256": "9250c683d9843dbd021021b18bc9e079417efb5bc009193c2e47b352b1aa4bac"
+    },
+    {
+      "path": "src/forge/gitlab/api.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "254eed3f5135d5946b132ed41275290ab5b36787854d39f67c4e6bfae2d3a1ef"
+    },
+    {
+      "path": "src/forge/gitlab/details.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "936a5294fed37e699bbf0bb7f0982242856d30601ac8c35def789821e183eafb"
+    },
+    {
+      "path": "src/forge/gitlab/mod.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "b0de172e16246d928801209940ba5dca2d83d740c4724c35d3584763093c01b7"
+    },
+    {
+      "path": "src/forge/gitlab/native_tests.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "aaef4a32aae0559d4f3cbfa357cdff51bdb636e7d40c9284fa412e6c00241652"
+    },
+    {
+      "path": "src/forge/gitlab/post.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "ab32cf9f9c849d087e2ac04b98e299d4c4f38b59c58f560fa5816550bf43227b"
+    },
+    {
+      "path": "src/repo/issue_work/card.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "a168ca2603c579e35245a71d80ff27548852b4cbdde57ce200ecc87b7912d6db"
+    },
+    {
+      "path": "src/repo/issue_work/criteria.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "00ddead78e6bdf6d4871df14cb52e556519316466360fc27542bf5d65287591c"
+    },
+    {
+      "path": "src/repo/issue_work/link.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "57895ff0c1f46fbe74f1624ffebec0ea568cc4cfc8bc06ac79272d3040fca81f"
+    },
+    {
+      "path": "src/repo/issue_work/mod.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "55f1391e6808875de899504cdd2c9b70cf98109ed58acfe50db2803c7d105016"
+    },
+    {
+      "path": "src/repo/issue_work/naming.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "3fb5a54104cd50192534d7f8f3378460a6e6d2deb41f59048ca9149ef8138201"
+    },
+    {
+      "path": "src/repo/issue_work/picker.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "71ce9d353fe3c62d77d21fe41c5abaad55afc2dfe5af1d54056ecea0d0d35dca"
+    },
+    {
+      "path": "src/repo/issue_work/tests.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "7b67ff81fb4e163f06866686f6efaac2b95eaa89209bd6438e416ddbf6620b14"
+    },
+    {
+      "path": "src/trackers/mod.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "a052d2d46a53251ce89d2a7693047c3a94920398ff8cfaa974d124420bf763a7"
+    },
+    {
+      "path": "src/trackers/tests.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "7d25b1064b3456a1357d67b46a5abc3e02060d31f2d881e568ff5076f43bd711"
+    },
+    {
+      "path": "src/trackers/ui.rs",
+      "equal_to": "2dbb721676ed613093e48ad98f7a75d662b0a958",
+      "sha256": "e30e9a0781fddf400d0479665b4e35db94f592c6a1234f8d11dcde24712dd44e"
+    }
+  ]
+}
