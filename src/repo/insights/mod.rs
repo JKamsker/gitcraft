@@ -256,7 +256,10 @@ impl RepoTab {
             None
         };
         if let Some(editor) = editor {
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Finish or close the {editor} first"),
+                true,
+            )));
             return;
         }
         let pr = self.pr_view.as_ref().map(|v| v.number);
