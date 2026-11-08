@@ -241,6 +241,10 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
                 Box::new(move |t| t.reply(&thread, &body)),
             )
         }
+        PrAct::ReplyConversation(thread) => {
+            let body = draft.comment.clone();
+            (Posted::Comment, Box::new(move |t| t.reply(&thread, &body)))
+        }
         PrAct::SetResolved(thread, resolved) => (
             Posted::Resolve(resolved),
             Box::new(move |t| t.set_resolved(&thread, resolved)),

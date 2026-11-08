@@ -5,6 +5,7 @@
 mod boxes;
 mod line_panel;
 mod lines;
+mod native_discussions;
 mod send;
 
 use egui::Ui;
@@ -39,6 +40,7 @@ pub(crate) enum PrAct {
     RemovePending(String),
     DiscardPending,
     Reply(String),
+    ReplyConversation(String),
     SetResolved(String, bool),
     ApplySuggestion {
         thread: String,

@@ -88,7 +88,8 @@ fn line_buttons(
         }
         None => {
             // A review started now couldn't be sent from a page without a review box.
-            if (threads.open || threads.pending_exists)
+            if threads.pending_supported
+                && (threads.open || threads.pending_exists)
                 && ui
                     .add_enabled(can_send, egui::Button::new("Add to review"))
                     .on_hover_text("Keep it in a pending review, to send with the others")
@@ -132,6 +133,7 @@ struct ThreadsShown {
     pending_exists: bool,
     /// The pull request is still going.
     open: bool,
+    pending_supported: bool,
 }
 
 /// The threads on `target`.
@@ -148,12 +150,14 @@ fn threads(
         reply_to: None,
         pending_exists: false,
         open: false,
+        pending_supported: false,
     };
     let Some(Ok(details)) = &view.details else {
         return shown;
     };
     let extras = &details.extras;
     let forge = details.forge.map_or("the forge", crate::forge::Forge::name);
+    shown.pending_supported = extras.review_features.pending;
     shown.pending_exists = extras.pending_review.is_some();
     shown.open = details.state == "OPEN";
     let open = shown.open;
@@ -195,9 +199,10 @@ fn threads(
                     if let Some(body) = bodies.get(&comment.id) {
                         pr_view::blocks(ui, markdown, &comment.id, body, width);
                     }
-                    let suggestion = suggestions
-                        .get(&comment.id)
-                        .filter(|_| suggestion_applies(thread, comment.pending, open));
+                    let suggestion = suggestions.get(&comment.id).filter(|_| {
+                        extras.review_features.apply_suggestions
+                            && suggestion_applies(thread, comment.pending, open)
+                    });
                     if let Some(text) = suggestion
                         && extras.can_write()
                         && let Some(line) = thread.line
