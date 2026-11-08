@@ -1,0 +1,20 @@
+# Finite batch C local runtime corrections
+
+Application source: `dc8746e2576a93aa705da3abab4fd502fd89f77e`, based on exact parent `19b39cae1e39fd7c84048e719e2eb9f0379958b4`. Assigned branch only; all four correction commits were pushed and remote-SHA verified under Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>. Parent common command/process/credential/publisher sources are unchanged.
+
+| Preserved commit | Source delta and disposition |
+|---|---|
+| `7c58211c5286bd58ca72843718b151ffe6130f05` | Fixture setup creates its trap-hook directory under an empty template. Partial fixture seeds only its known sparse-checkout blob locally; the omitted promisor blob stays absent. Passive object reads must not execute the helper; an explicit fetch to the owned local trap is the positive control. Both exact actual tests PASS. Shared no-lazy-fetch policy is unchanged. |
+| `7e5b2b16c794914f88e669af3417100d39e172b6` | Retain bounded, scrubbed replay stop detail; failure-only assertion messages include existing Recorded dispatch. Original expected conflict/cursor predicates unchanged. Both deferred exact tests still FAIL, revealing successful worktree creation followed by a silent alias guard refusal. |
+| `6b9fa5f2aa237e52ce5ed42e1ea1d6219eabc6cf` | Existing guards gain refusal-stage text; their predicates/order remain. Both deferred exact tests FAIL at the Git-link descriptor identity check. |
+| `dc8746e2576a93aa705da3abab4fd502fd89f77e` | Native descriptor stat uses fixed held stdin descriptors: BSD stat without a pathname on Darwin, GNU stat via stdin on Linux. The installed stat(1) manual documents the BSD interface. Root/link/metadata/common guards now pass in the two exact Darwin tests; Git then rejects `/dev/fd/7` as a repository directory. Deferred behavior remains unresolved, not runtime accepted. Linux was not executed. |
+
+The two passing exact tests are `configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recovery` and `partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers`. Their marker, unchanged-index/config, absent promised object and pack-count assertions remain. The two failing exact tests are `deferred_owned_conflict_keeps_source_index_files_and_branch_until_guarded_acceptance` and `deferred_owned_stack_uses_parent_candidate_and_refuses_stale_source_tip`. A failure before their conflict/cursor assertions does not validate later acceptance/undo/stale-tip assertions.
+
+Each unit passed the five previously audited `pure_deferred_` recording/headless checks before preservation/runtime. Final `cargo +1.95.0 check --locked --offline --all-targets` PASS (12.01s) on dc8746e. This is not lint acceptance. Actual runs selected one exact existing test at a time with fresh private HOME/TMPDIR/XDG/config/templates, stable Cargo/Rustup homes and an allowlisted environment. No full suite, external transport, native GUI/PTY, CI/PR or process-controller change was run here. Original and intermediate FAIL logs remain external alongside every PASS receipt.
+
+## Open native interface
+
+The subtree consumer shares `deferred::registered_run`, so it has the same Darwin metadata-path dependency. No mutable-path fallback or `/.vol` wrapper was added. Apple's [XNU lookup source](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_lookup.c) translates legacy volume/inode paths through `vfs_getrealpath` before namespace lookup and retries a missing path. That source alone does not establish the held-object concurrency contract; this is a source inference, not an executed volume-path race. Parent native-core design will compare the original accepted C5 contract and seek a minimal viable dispatch/candidate mechanism. No platform-success or absolute impossibility claim is made.
+
+External handoff/source/hash records: `/tmp/gitcraft-c-runtime-corrections/handoff.md`, `manifest.json`, `initial-evidence.json`, `*-runtime.json`, and per-run `owned-*/release.json`/`test.log`. This report is plain text; generated binary evidence is not committed. Further runtime is stopped pending the parent's concrete design response.
