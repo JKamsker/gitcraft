@@ -257,7 +257,15 @@ impl RepoTab {
             }
             Act::Options(options) => {
                 state.options = options.clone();
-                let Some(history) = state.read.ready().map(|m| Arc::clone(&m.history)) else {
+                // The history shown is counted again, unless another is being read (a new
+                // limit): then that one is read with these options.
+                let (loading, limit) = (state.read.loading, state.limit);
+                let Some(history) = state
+                    .read
+                    .ready()
+                    .filter(|m| !loading && m.history.limit == limit)
+                    .map(|m| Arc::clone(&m.history))
+                else {
                     self.coupling_load(ctx);
                     return;
                 };

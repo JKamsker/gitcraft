@@ -109,8 +109,17 @@ impl RepoTab {
                 heat::analyze(&path, &details, key.as_deref())
             },
             move |tab, result, _| {
-                if let Some(state) = tab.review_heat_state() {
-                    state.data.accept(request, result);
+                let Some(state) = tab.review_heat_state() else {
+                    return;
+                };
+                let paths = |h: &Heat| -> Vec<String> {
+                    h.files.iter().map(|f| f.file.path.clone()).collect()
+                };
+                let before = state.data.ready().map(paths);
+                if state.data.accept(request, result) && state.data.ready().map(paths) != before {
+                    // The files opened and picked were by place: places of other files now.
+                    state.expanded.clear();
+                    state.selected = None;
                 }
             },
         );
@@ -445,13 +454,13 @@ fn threads(ui: &mut Ui, data: &Heat, acts: &mut Vec<Action>) {
                         Some(n) => format!("{}:{n}", th.path),
                         None => th.path.clone(),
                     };
-                    let changed = data.files.iter().any(|f| f.file.path == th.path);
-                    let link = ui
-                        .add_enabled(changed, egui::Link::new(place))
-                        .on_hover_text(
-                            "Open the file's diff at the pull request's revisions, at this line",
-                        )
-                        .on_disabled_hover_text("The pull request doesn't change this file now");
+                    let listed = data.files.iter().any(|f| f.file.path == th.path);
+                    let link = ui.link(place).on_hover_text(if listed {
+                        "Open the file's diff at the pull request's revisions, at this line"
+                    } else {
+                        "Not among the files read: open its diff at the pull request's \
+                         revisions all the same"
+                    });
                     if link.clicked() {
                         let at = th.line.map(|n| (th.left, n.min(u32::MAX as u64) as u32));
                         acts.push(Action::Insights(InsightsAct::ReviewHeat(Act::Open {
