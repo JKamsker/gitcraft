@@ -1031,7 +1031,7 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
         }).collect()
     });
     if depth < 4 {
-        for template in templates {
+        'template: for template in templates {
             let source_family = if template.id.starts_with("repo-workflows-review-") {
                 PaintFamily::Review
             } else if template.id.starts_with("repo-workflows-") {
@@ -1068,6 +1068,15 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
                     } else {
                         let adapted = workflow_argument(template.id, name, raw, depth);
                         let Some(adapted) = adapted else {
+                            // The same raw Push-refused envelope also comes from an
+                            // ordinary known Push with opaque output. Only a recognized
+                            // headline gets the richer adapter; other output stays data.
+                            if matches!(
+                                workflow::adapter(template.id, name),
+                                Some(workflow::Adapter::Headline)
+                            ) {
+                                continue 'template;
+                            }
                             return Some(Painted::Opaque);
                         };
                         adapted.into()

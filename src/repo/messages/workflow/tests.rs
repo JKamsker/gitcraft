@@ -2830,7 +2830,7 @@ fn workflow_finite_scope_health_noun_and_state_choices_render_each_supplied_cont
             assert_eq!(
                 display_operation(&input),
                 crate::i18n::message(
-                    "repo-workflows-stack-publish-done-c4ffa0c1",
+                    "repo-workflows-stack-start-publish-c4ffa0c1",
                     &[("noun", crate::i18n::text(id).into())]
                 )
             );
