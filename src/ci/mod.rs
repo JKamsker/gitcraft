@@ -4,6 +4,7 @@
 pub(crate) mod github;
 pub(crate) mod gitlab;
 pub(crate) mod route;
+pub(crate) mod timing;
 
 use std::collections::HashMap;
 use std::path::Path;
