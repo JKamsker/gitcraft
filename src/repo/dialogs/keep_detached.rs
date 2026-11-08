@@ -22,7 +22,7 @@ pub(super) fn keep_detached(
     let t = Tokens::get(ui.ctx());
     let target = d.target();
     let n = d.commits.len().min(crate::git::LOOSE_LISTED);
-    title(ui, "Keep the commits made here?", &explanation(d), &t);
+    title(ui, crate::i18n::text("repo-core-1349"), &explanation(d), &t);
     for (hash, summary) in d.commits.iter().take(SHOWN) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(short(hash)).monospace().color(t.text_faint));
@@ -31,7 +31,7 @@ pub(super) fn keep_detached(
     }
     if n > SHOWN {
         let rest = if d.more() {
-            "and more".to_owned()
+            crate::i18n::text("repo-core-1350").to_owned()
         } else {
             crate::i18n::message("repo-core-1099", &[("SHOWN", format!("{}", n - SHOWN).into())])
         };
@@ -43,13 +43,13 @@ pub(super) fn keep_detached(
             .color(t.text_dim)
             .small(),
     );
-    field(ui, &mut d.name, "branch name", &mut d.focus);
+    field(ui, &mut d.name, crate::i18n::text("repo-core-1352"), &mut d.focus);
     dash_spaces(&mut d.name);
     ui.add_space(12.0);
     let taken = local.iter().any(|b| b.name == d.name.trim());
     if taken {
         ui.label(
-            RichText::new("A branch of that name exists already")
+            RichText::new(crate::i18n::text("repo-core-1353"))
                 .color(t.warning)
                 .small(),
         );
@@ -57,11 +57,8 @@ pub(super) fn keep_detached(
     let valid = usable(&d.name) && !taken;
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        let keep = crate::repo::widgets::primary_button(ui, "Keep and check out", valid, 90.0)
-            .on_hover_text(format!(
-                "Create the branch {} at these commits, then check {target} out",
-                d.name.trim()
-            ));
+        let keep = crate::repo::widgets::primary_button(ui, crate::i18n::text("repo-core-1354"), valid, 90.0)
+            .on_hover_text(crate::i18n::message("repo-core-1355", &[("trim", format!("{}", d.name.trim()).into()), ("target", format!("{}", target).into())]));
         if keep.clicked() || (enter && valid) {
             outcome = Outcome::Done(Box::new(Action::Detached(DetachedAct::Keep {
                 name: d.name.trim().to_owned(),
@@ -70,8 +67,8 @@ pub(super) fn keep_detached(
             })));
         }
         if ui
-            .add(egui::Button::new("Leave them").min_size(egui::vec2(80.0, 30.0)))
-            .on_hover_text(format!("Check {target} out; the commits stay on no branch"))
+            .add(egui::Button::new(crate::i18n::text("repo-core-1356")).min_size(egui::vec2(80.0, 30.0)))
+            .on_hover_text(crate::i18n::message("repo-core-1357", &[("target", format!("{}", target).into())]))
             .clicked()
         {
             outcome = Outcome::Done(Box::new(Action::Detached(DetachedAct::Leave(
@@ -89,9 +86,9 @@ pub(super) fn keep_detached(
 fn explanation(d: &KeepDialog) -> String {
     let n = d.commits.len().min(crate::git::LOOSE_LISTED);
     let (count, verb, them) = match n {
-        _ if d.more() => (format!("More than {n} commits made here"), "are", "them"),
-        1 => ("The commit made here".to_owned(), "is", "it"),
-        _ => (format!("The {n} commits made here"), "are", "them"),
+        _ if d.more() => (crate::i18n::message("repo-core-1358", &[("n", (n).into())]), crate::i18n::text("repo-core-1324"), "them"),
+        1 => (crate::i18n::text("repo-core-1360").to_owned(), crate::i18n::text("repo-core-1323"), "it"),
+        _ => (crate::i18n::message("repo-core-1362", &[("n", (n).into())]), crate::i18n::text("repo-core-1324"), "them"),
     };
     format!(
         "{count} {verb} on no branch. Checking out {} leaves {them} where nothing shows \

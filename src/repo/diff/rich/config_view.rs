@@ -23,30 +23,30 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    egui::RichText::new(format!("{} by key", diff.format))
+                    egui::RichText::new(crate::i18n::message("repo-core-2053", &[("format", format!("{}", diff.format).into())]))
                         .font(theme::medium(12.5))
                         .color(t.text),
                 );
                 let summary = if diff.entries.is_empty() {
-                    "the same keys and values: only formatting or comments changed".to_owned()
+                    crate::i18n::text("repo-core-2054").to_owned()
                 } else {
                     [
-                        (changed, "changed"),
-                        (added, "added"),
-                        (removed, "removed"),
-                        (moved, "moved"),
+                        (changed, crate::i18n::text("repo-core-1704")),
+                        (added, crate::i18n::text("repo-core-1702")),
+                        (removed, crate::i18n::text("repo-core-1703")),
+                        (moved, crate::i18n::text("repo-core-1920")),
                     ]
                     .iter()
                     .filter(|(n, _)| *n > 0)
-                    .map(|(n, what)| format!("{n} {what}"))
+                    .map(|(n, what)| crate::i18n::message("repo-core-1911", &[("n", (n).into()), ("what", format!("{}", what).into())]))
                     .collect::<Vec<_>>()
                     .join(" · ")
                 };
                 ui.label(egui::RichText::new(summary).color(t.text_dim));
                 if diff.api
                     && ui
-                        .link("Show the API contract changes")
-                        .on_hover_text("What breaks this API's clients, and what was added")
+                        .link(crate::i18n::text("repo-core-2055"))
+                        .on_hover_text(crate::i18n::text("repo-core-2056"))
                         .clicked()
                 {
                     acts.push(Action::DiffRich(Some(super::RichKind::Api)));
@@ -97,7 +97,7 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
         (Change::Removed, Some(o), _) => add(o, t.text_dim),
         (Change::Reordered, _, Some(n)) => {
             add(n, t.text_faint);
-            add("   moved, same value", t.text_faint);
+            add(crate::i18n::text("repo-core-2060"), t.text_faint);
         }
         (_, _, Some(n)) => add(n, t.text_dim),
         _ => {}
@@ -125,9 +125,9 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
     );
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &text);
     let tip = match (e.change, e.old_line, e.new_line) {
-        (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
-        (_, _, Some(n)) => format!("Go to line {n}"),
-        _ => "Go to the lines".to_owned(),
+        (Change::Removed, Some(o), _) => crate::i18n::message("repo-core-2040", &[("o", format!("{}", o).into())]),
+        (_, _, Some(n)) => crate::i18n::message("repo-core-2039", &[("n", (n).into())]),
+        _ => crate::i18n::text("repo-core-2062").to_owned(),
     };
     let resp = resp
         .on_hover_cursor(egui::CursorIcon::PointingHand)

@@ -26,7 +26,7 @@ fn capped(mut text: String) -> String {
             at -= 1;
         }
         text.truncate(at);
-        text.push_str("\n… (the rest of the text isn't shown)");
+        text.push_str(crate::i18n::text("repo-core-1563"));
     }
     text
 }

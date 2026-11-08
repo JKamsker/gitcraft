@@ -38,11 +38,7 @@ impl Find {
                                     .truncate(),
                             );
                             if self.capped() {
-                                label.on_hover_text(format!(
-                                    "Stopped at the first {} matches; type more to narrow the \
-                                     search",
-                                    thousands(MAX_HITS)
-                                ));
+                                label.on_hover_text(crate::i18n::message("repo-core-2500", &[("MAX-HITS", format!("{}", thousands(MAX_HITS)).into())]));
                             } else if error {
                                 label.on_hover_text(text);
                             }
@@ -59,7 +55,7 @@ impl Find {
         }
         let next = crate::keymap::tip(
             ui.ctx(),
-            "Next match; Enter in the find field",
+            crate::i18n::text("repo-core-2501"),
             crate::keymap::Command::FindNext,
         );
         if icons::small_button(ui, "chevron-down", &next).clicked() {
@@ -67,7 +63,7 @@ impl Find {
         }
         let previous = crate::keymap::tip(
             ui.ctx(),
-            "Previous match; Shift+Enter in the find field",
+            crate::i18n::text("repo-core-2502"),
             crate::keymap::Command::FindPrevious,
         );
         if icons::small_button(ui, "chevron-up", &previous).clicked() {
@@ -79,7 +75,7 @@ impl Find {
     fn field(&mut self, ui: &mut Ui, what: &str) {
         let edit = egui::TextEdit::singleline(&mut self.query.text)
             .id(egui::Id::new(FIELD_ID))
-            .hint_text(format!("Find in {what}"))
+            .hint_text(crate::i18n::message("repo-core-2504", &[("what", format!("{}", what).into())]))
             .font(theme::mono(12.0))
             .desired_width((ui.available_width() - 330.0).clamp(140.0, 420.0))
             .margin(egui::Margin::symmetric(8, 3));
@@ -116,9 +112,9 @@ impl Find {
         let t = Tokens::get(ui.ctx());
         let q = &mut self.query;
         for (label, on, tip) in [
-            ("Aa", &mut q.case_sensitive, "Match case"),
-            ("ab", &mut q.whole_word, "Match whole words only"),
-            (".*", &mut q.regex, "Use a regular expression"),
+            ("Aa", &mut q.case_sensitive, crate::i18n::text("repo-core-2506")),
+            ("ab", &mut q.whole_word, crate::i18n::text("repo-core-2508")),
+            (".*", &mut q.regex, crate::i18n::text("repo-core-2509")),
         ] {
             let text = RichText::new(label).font(theme::mono(11.5)).color(if *on {
                 t.text

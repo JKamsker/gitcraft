@@ -3,19 +3,19 @@ use crate::theme::{self, Tokens};
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State) {
     let t = Tokens::get(ui.ctx());
-    ui.label(egui::RichText::new("Private decrypted comparison · read only").color(t.warning));
-    ui.label("Plaintext is held only by this view. Closing, refreshing, changing modes or leaving this tab discards it. Return to the encrypted patch to stage changes.");
+    ui.label(egui::RichText::new(crate::i18n::text("repo-core-1781")).color(t.warning));
+    ui.label(crate::i18n::text("repo-core-1782"));
     match &state.result {
         None => {
             ui.add(crate::spinner::Spinner::new());
-            ui.label("Decrypting with local SOPS and keys on this computer… Cancel returns to the encrypted patch.");
+            ui.label(crate::i18n::text("repo-core-1783"));
         }
         Some(Err(reason)) => {
             ui.colored_label(t.warning, reason);
-            ui.label("Choose Encrypted patch to return, or Show decrypted again to retry.");
+            ui.label(crate::i18n::text("repo-core-1784"));
         }
         Some(Ok(data)) => {
-            if ui.selectable_label(state.wrap, "Wrap").clicked() {
+            if ui.selectable_label(state.wrap, crate::i18n::text("repo-core-1785")).clicked() {
                 state.wrap = !state.wrap;
             }
             comparison(ui, data, &t, state.wrap, &mut state.wrap_geometry);
@@ -32,23 +32,23 @@ fn comparison(
 ) {
     ui.horizontal_wrapped(|ui| {
         ui.label(if data.content_changed {
-            "Decrypted content: changed"
+            crate::i18n::text("repo-core-1786")
         } else {
-            "Decrypted content: unchanged"
+            crate::i18n::text("repo-core-1787")
         });
         ui.separator();
         ui.label(if data.recipients_changed {
-            "Recipients / wrapped keys: changed"
+            crate::i18n::text("repo-core-1788")
         } else {
-            "Recipients / wrapped keys: unchanged"
+            crate::i18n::text("repo-core-1789")
         });
         if data.metadata_changed && !data.recipients_changed {
             ui.separator();
-            ui.label("Other encryption metadata changed");
+            ui.label(crate::i18n::text("repo-core-1790"));
         }
     });
     if !data.content_changed {
-        ui.label("No plaintext changes. Ciphertext or integrity metadata may have changed through re-encryption.");
+        ui.label(crate::i18n::text("repo-core-1791"));
     }
     ui.separator();
     let width = (ui.available_width() - 124.).max(1.);

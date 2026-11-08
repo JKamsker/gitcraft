@@ -23,9 +23,8 @@ pub(super) fn start_bisect(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Start bisect",
-        "Finds the commit that brought a change in (a bug, say): git checks out commits between \
-         a good one and a bad one for you to test, halving the range each time.",
+        crate::i18n::text("repo-core-1199"),
+        crate::i18n::text("repo-core-1200"),
         &t,
     );
     let at = short(hash);
@@ -33,9 +32,9 @@ pub(super) fn start_bisect(
     ui.radio_value(
         this_good,
         true,
-        format!("{at} is good: from before the change"),
+        crate::i18n::message("repo-core-1201", &[("at", format!("{}", at).into())]),
     );
-    ui.radio_value(this_good, false, format!("{at} is bad: it has the change"));
+    ui.radio_value(this_good, false, crate::i18n::message("repo-core-1202", &[("at", format!("{}", at).into())]));
     // The other end's usual answer, unless one was typed.
     if *this_good != was_good {
         match (*this_good, other.trim()) {
@@ -47,13 +46,13 @@ pub(super) fn start_bisect(
     ui.add_space(8.0);
     let (label, hint) = if *this_good {
         (
-            "The bad commit, which has the change:",
-            "HEAD, a branch, a tag or a hash",
+            crate::i18n::text("repo-core-1203"),
+            crate::i18n::text("repo-core-1204"),
         )
     } else {
         (
-            "A good commit, from before the change (or leave it empty and mark one later):",
-            "a branch, a tag or a hash",
+            crate::i18n::text("repo-core-1205"),
+            crate::i18n::text("repo-core-1206"),
         )
     };
     ui.label(RichText::new(label).color(t.text_dim));
@@ -65,7 +64,7 @@ pub(super) fn start_bisect(
     ui.add_space(12.0);
     let other_ok = usable(other) || (!*this_good && other.trim().is_empty());
     let valid = blocker.is_none() && other_ok;
-    buttons(ui, "Start", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1207"), valid, enter, || {
         let other = other.trim().to_owned();
         let (bad, good) = if *this_good {
             (other, Some(hash.to_owned()))
@@ -87,25 +86,21 @@ pub(super) fn bisect_run(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Run a command to bisect",
-        &format!(
-            "Runs it {machine}, in the repository, at each commit git picks, until the first \
-             bad one is found. Its output shows under the banner."
-        ),
+        crate::i18n::text("repo-core-1208"),
+        &crate::i18n::message("repo-core-1209", &[("machine", format!("{}", machine).into())]),
         &t,
     );
     field(ui, command, "cargo test, make check, ./test.sh…", focus);
     ui.add_space(6.0);
     ui.label(
         RichText::new(
-            "Exit code 0 marks a commit good, 125 skips it, any other up to 127 marks it bad, \
-             and 128 or more stops the run.",
+            crate::i18n::text("repo-core-1211"),
         )
         .color(t.text_dim),
     );
     ui.add_space(12.0);
     let valid = !command.trim().is_empty();
-    buttons(ui, "Run", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1212"), valid, enter, || {
         Action::Bisect(BisectAct::Run(command.trim().to_owned()))
     })
 }

@@ -7,8 +7,7 @@ use yaml_rust2::{
 
 pub(super) const MAX_BYTES: usize = 2 * 1024 * 1024;
 pub(super) const MAX_LINES: usize = 20_000;
-const BAD: &str =
-    "Malformed or unsupported SOPS document. Showing the encrypted patch remains available.";
+const BAD: &str = "repo-core-1724";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Format {
@@ -57,9 +56,9 @@ pub(crate) enum JsonEncoding {
 impl JsonEncoding {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Ask => "Ask when ambiguous",
-            Self::Document => "JSON document",
-            Self::Binary => "Binary envelope",
+            Self::Ask => crate::i18n::text("repo-core-1734"),
+            Self::Document => crate::i18n::text("repo-core-1735"),
+            Self::Binary => crate::i18n::text("repo-core-1736"),
         }
     }
 }
@@ -69,7 +68,7 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
         return Ok(None);
     }
     if text.len() > MAX_BYTES || text.contains('\0') {
-        return Err("SOPS comparison needs UTF-8 text within 2 MiB per side.".into());
+        return Err(crate::i18n::text("repo-core-1737").into());
     }
     let lower = path.to_ascii_lowercase();
     let json = if text.trim_start().starts_with('{') {
@@ -93,7 +92,7 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
                     .insert(key.to_owned(), Value::String(value.trim().to_owned()))
                     .is_some()
             {
-                return Err(BAD.into());
+                return Err(crate::i18n::text(BAD).into());
             }
         }
         (
@@ -108,7 +107,7 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
                 continue;
             }
             if inside && !line.starts_with(['#', ';']) && !line.is_empty() {
-                let (key, value) = line.split_once('=').ok_or(BAD)?;
+                let (key, value) = line.split_once('=').ok_or(crate::i18n::text(BAD))?;
                 if meta
                     .insert(
                         key.trim().to_owned(),
@@ -116,7 +115,7 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
                     )
                     .is_some()
                 {
-                    return Err(BAD.into());
+                    return Err(crate::i18n::text(BAD).into());
                 }
             }
         }
@@ -132,19 +131,19 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
         for token in scanner.by_ref() {
             tokens += 1;
             match token.1 {
-                TokenType::Alias(_)|TokenType::Anchor(_)=>return Err("SOPS comparison does not support YAML aliases or anchors. Use the encrypted patch.".into()),
+                TokenType::Alias(_)|TokenType::Anchor(_)=>return Err(crate::i18n::text("repo-core-1745").into()),
                 TokenType::BlockSequenceStart|TokenType::BlockMappingStart|TokenType::FlowSequenceStart|TokenType::FlowMappingStart=>depth+=1,
                 TokenType::BlockEnd|TokenType::FlowSequenceEnd|TokenType::FlowMappingEnd=>depth=depth.saturating_sub(1),
                 _=>{}
             }
             if depth > 64 || tokens > 100_000 {
-                return Err("SOPS document structure exceeded its limit.".into());
+                return Err(crate::i18n::text("repo-core-1746").into());
             }
         }
         if scanner.get_error().is_some() {
-            return Err(BAD.into());
+            return Err(crate::i18n::text(BAD).into());
         }
-        let docs = YamlLoader::load_from_str(text).map_err(|_| BAD)?;
+        let docs = YamlLoader::load_from_str(text).map_err(|_| crate::i18n::text(BAD))?;
         let mut metadata = Vec::new();
         for doc in docs {
             if let Some(map) = doc.as_hash()
@@ -179,7 +178,7 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
         Value::Array(docs) => docs.iter().all(valid),
         _ => valid(&metadata),
     } {
-        return Err(BAD.into());
+        return Err(crate::i18n::text(BAD).into());
     }
     Ok(Some(Envelope {
         format,
@@ -198,11 +197,11 @@ fn yaml_value(yaml: &Yaml) -> Result<Value, String> {
         Yaml::Hash(map) => {
             let mut out = Map::new();
             for (key, value) in map {
-                out.insert(key.as_str().ok_or(BAD)?.to_owned(), yaml_value(value)?);
+                out.insert(key.as_str().ok_or(crate::i18n::text(BAD))?.to_owned(), yaml_value(value)?);
             }
             Value::Object(out)
         }
-        _ => return Err(BAD.into()),
+        _ => return Err(crate::i18n::text(BAD).into()),
     })
 }
 

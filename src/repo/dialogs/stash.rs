@@ -90,7 +90,7 @@ impl StashDialog {
 }
 
 /// Said while the repository's git is asked whether it can stash only what is staged.
-const CHECKING: &str = "checking which git this repository has…";
+const CHECKING: &str = "repo-core-1489";
 
 /// `text` as a sentence of its own: messages start in lower case, as they read after
 /// "<operation> failed: " in the status line.
@@ -105,12 +105,12 @@ pub(crate) fn sentence(text: &str) -> String {
 /// Why stashing only what is staged can't be done now, if it can't.
 pub(super) fn staged_problem(work: &WorkStatus, support: &StagedSupport) -> Option<String> {
     if work.staged.is_empty() {
-        return Some("nothing is staged".into());
+        return Some(crate::i18n::text("repo-core-1490").into());
     }
     match support {
         StagedSupport::Known(Ok(())) => None,
         StagedSupport::Known(Err(e)) | StagedSupport::Failed(e) => Some(e.clone()),
-        StagedSupport::Unknown | StagedSupport::Checking => Some(CHECKING.into()),
+        StagedSupport::Unknown | StagedSupport::Checking => Some(crate::i18n::text(CHECKING).into()),
     }
 }
 
@@ -134,7 +134,7 @@ pub(super) fn files_summary(files: &[String]) -> String {
     let names = names.join(", ");
     match files.len().saturating_sub(SHOWN) {
         0 => names,
-        more => format!("{names} and {more} more"),
+        more => crate::i18n::message("repo-core-1491", &[("names", format!("{}", names).into()), ("more", format!("{}", more).into())]),
     }
 }
 
@@ -148,36 +148,33 @@ pub(super) fn stash(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Stash changes",
-        "Saves changes in a stash; Undo takes it back.",
+        crate::i18n::text("repo-core-1492"),
+        crate::i18n::text("repo-core-1493"),
         &t,
     );
     choice(
         ui,
         &mut d.choice,
         Choice::Everything,
-        "Everything",
-        "Every change; the files go back to how the last commit has them.",
+        crate::i18n::text("repo-core-1494"),
+        crate::i18n::text("repo-core-1495"),
         None,
         &t,
     );
     if d.files.is_empty() {
-        let how = format!(
-            "{}+click files in the changes to pick them",
-            crate::manual::command()
-        );
+        let how = crate::i18n::message("repo-core-1496", &[("command", format!("{}", crate::manual::command()).into())]);
         choice(
             ui,
             &mut d.choice,
             Choice::Files,
-            "Picked files",
+            crate::i18n::text("repo-core-1497"),
             "",
             Some(&how),
             &t,
         );
     } else {
         let n = d.files.len();
-        let label = format!("{n} picked file{}", if n == 1 { "" } else { "s" });
+        let label = crate::i18n::message("repo-core-1498", &[("n", (n).into()), ("s", format!("{}", if n == 1 { "" } else { "s" }).into())]);
         let hint = files_summary(&d.files);
         choice(ui, &mut d.choice, Choice::Files, &label, &hint, None, &t);
     }
@@ -186,8 +183,8 @@ pub(super) fn stash(
         ui,
         &mut d.choice,
         Choice::Staged,
-        "Only what is staged",
-        "The staged changes; the unstaged ones stay.",
+        crate::i18n::text("repo-core-1499"),
+        crate::i18n::text("repo-core-1500"),
         staged.as_deref(),
         &t,
     );
@@ -195,13 +192,13 @@ pub(super) fn stash(
         ui,
         &mut d.choice,
         Choice::Snapshot,
-        "Snapshot",
-        "Saves a stash and leaves every file and the staging as they are.",
+        crate::i18n::text("repo-core-1501"),
+        crate::i18n::text("repo-core-1502"),
         None,
         &t,
     );
     ui.add_space(8.0);
-    field(ui, &mut d.message, "Message (optional)", &mut d.focus);
+    field(ui, &mut d.message, crate::i18n::text("repo-core-1503"), &mut d.focus);
     ui.add_space(6.0);
     untracked_box(ui, d, work);
     let problem = problem(d, work, support);
@@ -212,7 +209,7 @@ pub(super) fn stash(
     }
     ui.add_space(10.0);
     let button = if d.choice == Choice::Snapshot {
-        "Save snapshot"
+        crate::i18n::text("repo-core-1504")
     } else {
         crate::i18n::text("repo-core-0862")
     };
@@ -237,7 +234,7 @@ fn choice(
     });
     let (text, color) = match unavailable {
         // Not a warning while it is only being found out.
-        Some(why) if why == CHECKING => (why, t.text_faint),
+        Some(why) if why == crate::i18n::text(CHECKING) => (why, t.text_faint),
         Some(why) => (why, t.warning),
         None => (hint, t.text_faint),
     };
@@ -257,23 +254,23 @@ fn choice(
 fn untracked_box(ui: &mut Ui, d: &mut StashDialog, work: &WorkStatus) {
     match d.choice {
         Choice::Everything | Choice::Snapshot => {
-            ui.checkbox(&mut d.untracked, "Include untracked files");
+            ui.checkbox(&mut d.untracked, crate::i18n::text("repo-core-1505"));
         }
         Choice::Files => {
             let mut picked = has_untracked(&d.files, work);
             ui.add_enabled(
                 false,
-                egui::Checkbox::new(&mut picked, "Include untracked files"),
+                egui::Checkbox::new(&mut picked, crate::i18n::text("repo-core-1505")),
             )
-            .on_disabled_hover_text("Untracked files you picked are stashed; the others stay");
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1506"));
         }
         Choice::Staged => {
             let mut none = false;
             ui.add_enabled(
                 false,
-                egui::Checkbox::new(&mut none, "Include untracked files"),
+                egui::Checkbox::new(&mut none, crate::i18n::text("repo-core-1505")),
             )
-            .on_disabled_hover_text("Untracked files aren't staged, so they stay");
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1507"));
         }
     }
 }

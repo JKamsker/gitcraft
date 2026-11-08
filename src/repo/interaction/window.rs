@@ -95,7 +95,7 @@ fn going(ui: &mut egui::Ui, t: &Tokens, search: &Search, acts: &mut Vec<Action>)
         ))
         .color(t.text_faint),
     );
-    if ui.button("Stop").clicked() {
+    if ui.button(crate::i18n::text("repo-core-1263")).clicked() {
         acts.push(Action::Interaction(InteractionAct::Stop));
     }
 }

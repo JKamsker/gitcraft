@@ -18,14 +18,14 @@ pub(super) fn show(ui: &mut Ui, diff: &DvcDiff, acts: &mut Vec<Action>) {
                 .inner_margin(egui::Margin::symmetric(24, 16))
                 .show(ui, |ui| {
                     ui.label(
-                        RichText::new("Data tracked by DVC")
+                        RichText::new(crate::i18n::text("repo-core-2169"))
                             .font(theme::medium(13.0))
                             .color(t.text),
                     );
                     if ui
                         .button(crate::i18n::text("repo-core-0020"))
                         .on_hover_text(
-                            "Download data for the current checkout from its configured DVC remote",
+                            crate::i18n::text("repo-core-2170"),
                         )
                         .clicked()
                     {
@@ -49,12 +49,12 @@ fn pair(
 ) {
     let Some(any) = new.or(old) else { return };
     let state = match (old, new) {
-        (None, _) => "now tracked",
-        (_, None) => "no longer tracked",
+        (None, _) => crate::i18n::text("repo-core-2171"),
+        (_, None) => crate::i18n::text("repo-core-2172"),
         (Some(o), Some(n)) if o.hash == n.hash && o.size == n.size && o.repo == n.repo => {
             crate::i18n::text("repo-core-0610")
         }
-        _ => "changed",
+        _ => crate::i18n::text("repo-core-1704"),
     };
     ui.horizontal(|ui| {
         let path = ui
@@ -67,12 +67,9 @@ fn pair(
                 .sense(egui::Sense::click()),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Go to its line");
+            .on_hover_text(crate::i18n::text("repo-core-2173"));
         crate::a11y::a11y(&path, egui::WidgetType::Button, || {
-            format!(
-                "Go to line {} for tracked data {}, {state}",
-                any.line, any.path
-            )
+            crate::i18n::message("repo-core-2174", &[("line", format!("{}", any.line).into()), ("path", format!("{}", any.path).into()), ("state", format!("{}", state).into())])
         });
         if path.clicked() {
             let (o, n) = match new {
@@ -83,16 +80,16 @@ fn pair(
         }
         if any.list == "deps" {
             let what = match &any.repo {
-                Some(url) => format!("imported from {url}"),
-                None => "where the data was imported from".to_owned(),
+                Some(url) => crate::i18n::message("repo-core-2175", &[("url", format!("{}", url).into())]),
+                None => crate::i18n::text("repo-core-2176").to_owned(),
             };
             ui.label(RichText::new(what).color(t.text_faint));
         }
         ui.label(RichText::new(state).color(t.text_dim));
     });
     ui.columns(2, |cols| {
-        side(&mut cols[0], t, "Before", old);
-        side(&mut cols[1], t, "After", new);
+        side(&mut cols[0], t, crate::i18n::text("repo-core-1564"), old);
+        side(&mut cols[1], t, crate::i18n::text("repo-core-1565"), new);
     });
 }
 
@@ -105,18 +102,18 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
             ui.set_width(ui.available_width());
             ui.label(RichText::new(title).color(t.text_faint).small());
             let Some(x) = tracked else {
-                ui.label(RichText::new("not tracked").color(t.text_faint));
+                ui.label(RichText::new(crate::i18n::text("repo-core-2177")).color(t.text_faint));
                 return;
             };
             let size = match (x.size, &x.repo) {
                 (Some(size), _) => human_size(size),
-                (None, Some(_)) => "imported".to_owned(),
-                (None, None) => "size not recorded".to_owned(),
+                (None, Some(_)) => crate::i18n::text("repo-core-2178").to_owned(),
+                (None, None) => crate::i18n::text("repo-core-2179").to_owned(),
             };
             ui.label(RichText::new(size).font(theme::semibold(16.0)));
             if let Some(files) = x.files {
                 let s = if files == 1 { "" } else { "s" };
-                ui.label(RichText::new(format!("a folder of {files} file{s}")).color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::message("repo-core-2180", &[("files", format!("{}", files).into()), ("s", format!("{}", s).into())])).color(t.text_dim));
             }
             if let Some(hash) = &x.hash {
                 ui.label(

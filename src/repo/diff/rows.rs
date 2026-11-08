@@ -272,7 +272,7 @@ impl<'a> Rows<'a> {
         let mut shown = out.inner;
         if let Some(offset) = crate::a11y::value::slider(
             &map,
-            "Diff change map. Arrow keys scroll a line; Page Up and Page Down scroll a page; Home and End reach the ends.",
+            crate::i18n::text("repo-core-2303"),
             shown.state.offset.y,
             0.0..=(total_h - shown.inner_rect.height()).max(0.0),
             LINE_H,
@@ -545,12 +545,12 @@ impl<'a> Rows<'a> {
                     ui,
                     right,
                     rect.center().y,
-                    "Prompt step",
+                    crate::i18n::text("repo-core-2306"),
                     self.t.accent,
                     ui.id().with(("prompt-hunk", i)),
                 );
                 if button
-                    .on_hover_text("Read local recorded edits matching this immutable commit hunk")
+                    .on_hover_text(crate::i18n::text("repo-core-2308"))
                     .clicked()
                 {
                     acts.push(Action::ShowPromptHunk(crate::repo::prompt_session::Hunk {
@@ -607,16 +607,16 @@ impl<'a> Rows<'a> {
                 .unwrap_or(0)
         };
         let label = if i == block.del.start {
-            format!("Moved to line {}", number(block.add.start, false))
+            crate::i18n::message("repo-core-2309", &[("false", format!("{}", number(block.add.start, false)).into())])
         } else if i == block.add.start {
-            format!("Moved from line {}", number(block.del.start, true))
+            crate::i18n::message("repo-core-2310", &[("true", format!("{}", number(block.del.start, true)).into())])
         } else {
             return;
         };
         let label = if block.exact {
             label
         } else {
-            format!("{label}, edited")
+            crate::i18n::message("repo-core-2311", &[("label", format!("{}", label).into())])
         };
         let right = rect.right().min(ui.clip_rect().right()) - 6.0;
         let id = ui.id().with(("moved_btn", i));
@@ -631,7 +631,7 @@ impl<'a> Rows<'a> {
             );
         }
         if resp
-            .on_hover_text("Show both places of the moved block, and what changed on the way")
+            .on_hover_text(crate::i18n::text("repo-core-2313"))
             .clicked()
         {
             acts.push(Action::DiffMoved(Some(b)));
@@ -708,9 +708,9 @@ impl<'a> Rows<'a> {
             Sense::click()
         };
         let tip = match (review.local, alt_only) {
-            (false, _) => "Comment on this line",
-            (true, false) => "Note for the agent on this line",
-            (true, true) => "Alt+click: note for the agent on this line",
+            (false, _) => crate::i18n::text("repo-core-2314"),
+            (true, false) => crate::i18n::text("repo-core-2315"),
+            (true, true) => crate::i18n::text("repo-core-2316"),
         };
         let resp = ui.interact(
             area,
@@ -726,7 +726,7 @@ impl<'a> Rows<'a> {
         let count = review.marks.get(&(spot_side, number)).copied();
         let active = self.is_target((spot_side, number));
         crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
-            format!("{tip}, line {number}, {} comments", count.unwrap_or(0))
+            crate::i18n::message("repo-core-2318", &[("tip", format!("{}", tip).into()), ("number", format!("{}", number).into()), ("count", format!("{}", count.unwrap_or(0)).into())])
         });
         paint_gutter_mark(ui, area, count, resp.hovered(), active);
         if resp.clicked() {
@@ -784,21 +784,16 @@ fn column_of(side: Side) -> Option<DiffSide> {
 /// The painted line's identity, change kind, and content are available without hovering.
 fn line_label(line: &super::DiffLine) -> String {
     let kind = match line.kind {
-        Kind::Add => "added",
-        Kind::Del => "deleted",
-        Kind::Hunk => "hunk",
-        Kind::Context => "context",
+        Kind::Add => crate::i18n::text("repo-core-1702"),
+        Kind::Del => crate::i18n::text("repo-core-2319"),
+        Kind::Hunk => crate::i18n::text("repo-core-2320"),
+        Kind::Context => crate::i18n::text("repo-core-2321"),
         Kind::Fold => "folded",
         Kind::Meta => "metadata",
     };
-    format!(
-        "{kind}, old line {}, new line {}: {}",
-        line.old
-            .map_or_else(|| "none".to_owned(), |n| n.to_string()),
-        line.new
-            .map_or_else(|| "none".to_owned(), |n| n.to_string()),
-        line.text
-    )
+    crate::i18n::message("repo-core-2322", &[("kind", format!("{}", kind).into()), ("line", format!("{}", line.old
+            .map_or_else(|| crate::i18n::text("repo-core-2323").to_owned(), |n| n.to_string())).into()), ("line2", format!("{}", line.new
+            .map_or_else(|| crate::i18n::text("repo-core-2323").to_owned(), |n| n.to_string())).into()), ("text", format!("{}", line.text).into())])
 }
 
 fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {

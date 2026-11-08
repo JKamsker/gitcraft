@@ -77,7 +77,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     ui.horizontal_wrapped(|ui| {
         for (option, allowed, label) in [
             (MergeMethod::Merge, extras.merge_allowed, "Merge commit"),
-            (MergeMethod::Squash, extras.squash_allowed, "Squash"),
+            (MergeMethod::Squash, extras.squash_allowed, crate::i18n::text("repo-core-2444")),
             (MergeMethod::Rebase, extras.rebase_allowed, "Rebase"),
         ] {
             if allowed && ui.radio(method == option, label).clicked() {

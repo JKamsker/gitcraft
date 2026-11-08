@@ -24,7 +24,7 @@ pub(in crate::repo) fn folded_diff(
     let mut open = false;
     ui.add_space(28.0);
     ui.vertical_centered(|ui| {
-        ui.label(RichText::new(format!("{name} is folded")).color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::message("repo-core-2539", &[("name", format!("{}", name).into())])).color(t.text_dim));
         ui.add_space(4.0);
         let line = match data {
             Some(data) => {
@@ -36,8 +36,8 @@ pub(in crate::repo) fn folded_diff(
         ui.label(RichText::new(line).color(t.text_faint).monospace());
         ui.add_space(10.0);
         open = ui
-            .button("Show the changes")
-            .on_hover_text("Settings → Git → Diffs turns folding off")
+            .button(crate::i18n::text("repo-core-2540"))
+            .on_hover_text(crate::i18n::text("repo-core-2541"))
             .clicked();
     });
     open

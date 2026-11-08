@@ -89,15 +89,15 @@ impl RepoTab {
                     if let Some(rev) = &view.rev {
                         widgets::chip(
                             ui,
-                            &format!("at {}", rev.get(..8).unwrap_or(rev)),
+                            &crate::i18n::message("repo-core-2494", &[("rev", format!("{}", rev.get(..8).unwrap_or(rev)).into())]),
                             t.text_dim,
                         );
                     }
                     ui.add_space(12.0);
                     let tabs = [
-                        (FileTab::History, "History"),
-                        (FileTab::Blame, "Blame"),
-                        (FileTab::File, "File"),
+                        (FileTab::History, crate::i18n::text("repo-core-2497")),
+                        (FileTab::Blame, crate::i18n::text("repo-core-2498")),
+                        (FileTab::File, crate::i18n::text("repo-core-2368")),
                     ];
                     for (tab, label) in tabs {
                         let on = view.tab == tab;
@@ -145,7 +145,7 @@ impl RepoTab {
                 let mut link = |ui: &mut Ui, lines: Lines| {
                     if let Some(rev) = &rev
                         && crate::git::investigations::oid(rev)
-                        && ui.button("Explain history").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2325")).clicked()
                     {
                         acts.push(Action::OpenLineDossier(Some(
                             crate::git::investigations::dossier::Seed {
@@ -157,7 +157,7 @@ impl RepoTab {
                     }
                     if let Some(rev) = &rev
                         && crate::git::investigations::oid(rev)
-                        && ui.button("Symbol biography").clicked()
+                        && ui.button(crate::i18n::text("repo-core-2326")).clicked()
                     {
                         acts.push(Action::OpenSymbolBiography(Some(
                             crate::git::investigations::dossier::Seed {

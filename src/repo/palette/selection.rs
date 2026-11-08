@@ -124,7 +124,7 @@ impl RepoTab {
             for (label, tab, kind) in [
                 ("View", FileTab::File, "view"),
                 ("File history of", FileTab::History, "history"),
-                ("Blame", FileTab::Blame, "blame"),
+                (crate::i18n::text("repo-core-2498"), FileTab::Blame, "blame"),
             ] {
                 items.push(
                     PaletteItem::action(

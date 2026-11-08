@@ -134,15 +134,15 @@ impl ParallelForm {
     fn missing(&self) -> &'static str {
         let good: Vec<&str> = self.good.split_whitespace().collect();
         if !usable(&self.bad) {
-            "Type the bad commit, which has the problem"
+            crate::i18n::text("repo-core-1403")
         } else if good.is_empty() {
-            "Type a good commit, one from before the problem"
+            crate::i18n::text("repo-core-1404")
         } else if !good.iter().all(|g| usable(g)) {
-            "A good commit can't start with -"
+            crate::i18n::text("repo-core-1405")
         } else if self.command.trim().is_empty() {
-            "Type the command that tests a commit"
+            crate::i18n::text("repo-core-1406")
         } else {
-            "Choose how many commits to test at once"
+            crate::i18n::text("repo-core-1407")
         }
     }
 
@@ -174,15 +174,13 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     form.take_wsl();
     title(
         ui,
-        "Bisect in parallel",
-        "Tests several commits at once, each in a worktree of its own on the machine chosen, \
-         until the first bad commit is found: about log base (k + 1) of n rounds instead of \
-         log base 2 of n. Your checkout isn't touched.",
+        crate::i18n::text("repo-core-1408"),
+        crate::i18n::text("repo-core-1409"),
         &t,
     );
     ends(ui, form, &t);
     ui.add_space(8.0);
-    ui.label(RichText::new("Test command, run at the top of each worktree:").color(t.text_dim));
+    ui.label(RichText::new(crate::i18n::text("repo-core-1410")).color(t.text_dim));
     let mut focus = std::mem::take(&mut form.focus);
     field(
         ui,
@@ -192,8 +190,7 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     );
     ui.label(
         RichText::new(
-            "As git bisect run: exit code 0 is good, 125 skips, any other up to 127 is bad. \
-             128 or more (a crash) stops the bisect on an end, and skips any other commit.",
+            crate::i18n::text("repo-core-1411"),
         )
         .small()
         .color(t.text_faint),
@@ -207,7 +204,7 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     let missing = form.missing();
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        let start = widgets::primary_button(ui, "Start", setup.is_some(), 90.0)
+        let start = widgets::primary_button(ui, crate::i18n::text("repo-core-1207"), setup.is_some(), 90.0)
             .on_disabled_hover_text(missing);
         if let Some(setup) = setup
             && (start.clicked() || enter)
@@ -226,28 +223,28 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
 /// The bad and the good commits.
 fn ends(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
     let mut no_focus = false;
-    ui.label(RichText::new("Bad commit, which has the problem:").color(t.text_dim));
+    ui.label(RichText::new(crate::i18n::text("repo-core-1412")).color(t.text_dim));
     field(
         ui,
         &mut form.bad,
-        "HEAD, a branch, a tag or a hash",
+        crate::i18n::text("repo-core-1204"),
         &mut no_focus,
     );
     ui.add_space(4.0);
     ui.label(
-        RichText::new("Good commits, from before it (separated by spaces):").color(t.text_dim),
+        RichText::new(crate::i18n::text("repo-core-1413")).color(t.text_dim),
     );
     field(
         ui,
         &mut form.good,
-        "a tag, a branch or a hash",
+        crate::i18n::text("repo-core-1414"),
         &mut no_focus,
     );
     if !form.skip.is_empty() {
         ui.label(
             RichText::new(match form.skip.len() {
-                1 => "The commit the bisect skipped isn't tested.".to_owned(),
-                n => format!("The {n} commits the bisect skipped aren't tested."),
+                1 => crate::i18n::text("repo-core-1415").to_owned(),
+                n => crate::i18n::message("repo-core-1416", &[("n", (n).into())]),
             })
             .small()
             .color(t.text_faint),
@@ -257,11 +254,11 @@ fn ends(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
 
 /// Where the tests run, and the repository there when it is another machine.
 fn machine(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
-    ui.label(RichText::new("Run on:").color(t.text_dim));
+    ui.label(RichText::new(crate::i18n::text("repo-core-1417")).color(t.text_dim));
     let home = Machine::of(&form.repo);
     let label = |m: &Machine| {
         if *m == home {
-            format!("{} (where the repository is)", capital(&m.label()))
+            crate::i18n::message("repo-core-1418", &[("label", format!("{}", capital(&m.label())).into())])
         } else {
             capital(&m.label())
         }
@@ -277,23 +274,23 @@ fn machine(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
         });
     if form.wsl.is_some() {
         ui.label(
-            RichText::new("Looking for WSL distributions…")
+            RichText::new(crate::i18n::text("repo-core-1420"))
                 .small()
                 .color(t.text_faint),
         );
     }
     if !form.at_home() {
         ui.add_space(4.0);
-        ui.label(RichText::new("A clone of this repository there (optional):").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::text("repo-core-1421")).color(t.text_dim));
         let mut no_focus = false;
         field(
             ui,
             &mut form.repo_there,
-            "empty: gitcraft keeps a copy in ~/.cache/gitcraft/bisect",
+            crate::i18n::text("repo-core-1422"),
             &mut no_focus,
         );
         ui.label(
-            RichText::new("The commits it lacks are sent there first.")
+            RichText::new(crate::i18n::text("repo-core-1423"))
                 .small()
                 .color(t.text_faint),
         );
@@ -310,32 +307,32 @@ fn limits(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
         };
     }
     ui.horizontal(|ui| {
-        ui.label(RichText::new("At once:").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::text("repo-core-1424")).color(t.text_dim));
         let drag = egui::DragValue::new(&mut form.parallel).range(1..=MAX_PARALLEL);
         if ui
             .add(drag)
-            .on_hover_text("How many commits are tested side by side, each in its own worktree")
+            .on_hover_text(crate::i18n::text("repo-core-1425"))
             .changed()
         {
             form.parallel_set = true;
         }
         let (said, why) = match &cores {
-            Some(Ok(n)) => (format!("{n} cores on {}", form.chosen().label()), None),
-            Some(Err(e)) if !e.is_empty() => ("cores unknown".to_owned(), Some(e.clone())),
-            _ => ("counting cores…".to_owned(), None),
+            Some(Ok(n)) => (crate::i18n::message("repo-core-1426", &[("n", (n).into()), ("label", format!("{}", form.chosen().label()).into())]), None),
+            Some(Err(e)) if !e.is_empty() => (crate::i18n::text("repo-core-1427").to_owned(), Some(e.clone())),
+            _ => (crate::i18n::text("repo-core-1428").to_owned(), None),
         };
         let label = ui.label(RichText::new(said).small().color(t.text_faint));
         if let Some(why) = why {
             label.on_hover_text(why);
         }
         ui.add_space(12.0);
-        ui.label(RichText::new("Time limit:").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::text("repo-core-1429")).color(t.text_dim));
         ui.add(
             egui::DragValue::new(&mut form.minutes)
                 .range(1..=1440)
-                .suffix(" min"),
+                .suffix(crate::i18n::text("repo-core-1430")),
         )
-        .on_hover_text("A test that runs longer is stopped and counts as skipped");
+        .on_hover_text(crate::i18n::text("repo-core-1431"));
     });
 }
 

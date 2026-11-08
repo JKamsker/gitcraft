@@ -45,8 +45,8 @@ impl Step {
         match self {
             Step::Pick => "Pick",
             Step::Reword => "Reword",
-            Step::Squash => "Squash",
-            Step::Fixup => "Fixup",
+            Step::Squash => crate::i18n::text("repo-core-2444"),
+            Step::Fixup => crate::i18n::text("repo-core-2446"),
             Step::Drop => "Drop",
             Step::Edit => crate::i18n::text("repo-core-1116"),
         }

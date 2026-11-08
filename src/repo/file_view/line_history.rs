@@ -67,8 +67,8 @@ impl RepoTab {
                         if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
                             acts.push(Action::CloseFileView);
                         }
-                        let whole = ui.button("Whole file").on_hover_text(
-                            "Every commit that changed the file, not only these lines",
+                        let whole = ui.button(crate::i18n::text("repo-core-2489")).on_hover_text(
+                            crate::i18n::text("repo-core-2490"),
                         );
                         if whole.clicked() {
                             acts.push(Action::FileView {
@@ -87,9 +87,9 @@ impl RepoTab {
 /// "Line 4" or "Lines 4–9".
 pub(super) fn lines_label((start, end): LineRange) -> String {
     if start == end {
-        format!("Line {start}")
+        crate::i18n::message("repo-core-2491", &[("start", format!("{}", start).into())])
     } else {
-        format!("Lines {start}–{end}")
+        crate::i18n::message("repo-core-2492", &[("start", format!("{}", start).into()), ("end", format!("{}", end).into())])
     }
 }
 
@@ -97,11 +97,11 @@ pub(super) fn lines_label((start, end): LineRange) -> String {
 fn where_label(at: &LinesAt) -> String {
     match at {
         LinesAt::Rev(rev) => match rev.strip_suffix('^') {
-            Some(commit) => format!("before {}", short(commit)),
-            None => format!("at {}", short(rev)),
+            Some(commit) => crate::i18n::message("repo-core-2493", &[("commit", format!("{}", short(commit)).into())]),
+            None => crate::i18n::message("repo-core-2494", &[("rev", format!("{}", short(rev)).into())]),
         },
-        LinesAt::Index => "as staged".to_owned(),
-        LinesAt::WorkTree => "in the working tree".to_owned(),
+        LinesAt::Index => crate::i18n::text("repo-core-2495").to_owned(),
+        LinesAt::WorkTree => crate::i18n::text("repo-core-2496").to_owned(),
     }
 }
 

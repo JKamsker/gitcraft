@@ -239,20 +239,20 @@ impl Find {
         };
         ui.label(
             egui::RichText::new(
-                "Find reading view · rendered text · Close Find to restore the rich layout",
+                crate::i18n::text("repo-core-2516"),
             )
             .small()
             .color(t.text_dim),
         );
         if doc.limited {
             self.drop_results();
-            ui.label("Rendered Find is unavailable: this reading exceeds 32768 logical rows or 20 MiB of rendered text. Close Find to use the original view; no partial result count is shown.");
+            ui.label(crate::i18n::text("repo-core-2517"));
             self.rendered_document = Some((key, doc));
             return;
         }
         if let Some(hit) = self.current
             && let Some(row) = doc.rows.get(hit.line)
-            && ui.small_button("Copy current reading row").clicked()
+            && ui.small_button(crate::i18n::text("repo-core-2518")).clicked()
         {
             ui.ctx().copy_text(row.text.clone());
         }

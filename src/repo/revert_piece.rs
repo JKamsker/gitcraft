@@ -151,7 +151,7 @@ impl RepoTab {
             Ok((_, Reverted::Conflicts(files))) => {
                 self.focus_wip = true;
                 let files = if files.is_empty() {
-                    "the file".to_owned()
+                    crate::i18n::text("repo-core-2511").to_owned()
                 } else {
                     files.join(", ")
                 };

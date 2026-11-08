@@ -264,7 +264,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
     for (before, step) in plan.local_steps() {
         ui.label(format!(
             "{} reviewed push: {}",
-            if before { "Before" } else { "After" },
+            if before { crate::i18n::text("repo-core-1564") } else { crate::i18n::text("repo-core-1565") },
             step
         ));
     }

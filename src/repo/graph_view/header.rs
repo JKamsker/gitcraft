@@ -59,7 +59,7 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
         .show(|ui| {
             let mut next = settings.clone();
             ui.checkbox(&mut next.show_hash, crate::i18n::text("repo-core-0056"));
-            ui.checkbox(&mut next.show_author, "Author");
+            ui.checkbox(&mut next.show_author, crate::i18n::text("repo-core-1671"));
             ui.checkbox(&mut next.show_when, "When");
             ui.checkbox(&mut next.show_date, "Date");
             ui.checkbox(&mut next.show_test_lane, crate::i18n::text("repo-core-1020"))

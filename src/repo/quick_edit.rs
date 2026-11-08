@@ -85,7 +85,7 @@ pub(super) fn refusal(edit: Edit, line: &[&Commit], hash: &str) -> Option<&'stat
         return None;
     }
     if line[..pos].iter().any(|c| c.parents.len() > 1) {
-        return Some("Merges came after this commit: rewriting it would flatten them");
+        return Some(crate::i18n::text("repo-core-2522"));
     }
     if commit.parents.len() > 1 {
         return Some("Merge commits can't be rewritten here");
@@ -115,7 +115,7 @@ pub(super) fn plan(
     commits: Vec<RebaseCommit>,
 ) -> Result<RebaseEditor, String> {
     if commits.iter().any(|c| c.merge) {
-        return Err("merges came after the commit, which this would flatten".to_owned());
+        return Err(crate::i18n::text("repo-core-2448").to_owned());
     }
     let mut editor = RebaseEditor::new(edit.base(hash), short(hash).to_owned(), commits);
     let i = editor
@@ -322,10 +322,7 @@ impl RepoTab {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
                 self.status = Some((
-                    format!(
-                        "{label}: {} is still running, try again when it's done",
-                        self.busy_op.as_deref().unwrap_or_default()
-                    ),
+                    crate::i18n::message("repo-core-2452", &[("label", format!("{}", label).into()), ("self", format!("{}", self.busy_op.as_deref().unwrap_or_default()).into())]),
                     true,
                 ));
             }

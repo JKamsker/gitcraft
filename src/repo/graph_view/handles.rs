@@ -124,7 +124,7 @@ fn bar_name(bar: Bar) -> &'static str {
         Bar::Hash => "hash",
         Bar::Author => "author",
         Bar::When => "age",
-        Bar::Date => "date",
+        Bar::Date => crate::i18n::text("repo-core-2271"),
     }
 }
 

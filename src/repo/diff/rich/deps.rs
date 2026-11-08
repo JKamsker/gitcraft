@@ -140,7 +140,7 @@ impl Ecosystem {
             ),
             Ecosystem::PyPi => (
                 format!("https://pypi.org/project/{name}/#history"),
-                "PyPI's release history",
+                crate::i18n::text("repo-core-2106"),
             ),
             Ecosystem::Composer => (
                 format!("https://packagist.org/packages/{name}"),
@@ -162,7 +162,7 @@ pub fn packages(file: &str, text: &str) -> Result<Vec<Pkg>, String> {
         "pnpm-lock.yaml" => Ok(pnpm_packages(&yaml::parse(text)?)),
         "composer.lock" => Ok(composer_packages(&json::parse(text)?)),
         "go.sum" => Ok(go_packages(text)),
-        _ => Err("not a lockfile this reads".to_owned()),
+        _ => Err(crate::i18n::text("repo-core-2109").to_owned()),
     }
 }
 
@@ -472,17 +472,17 @@ pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 
 /// Compares the packages pinned on each side of the lockfile `path`.
 pub fn diff(path: &str, sides: &Sides) -> Result<DepsDiff, String> {
-    let (file, ecosystem) = lockfile(path).ok_or("not a lockfile this reads")?;
+    let (file, ecosystem) = lockfile(path).ok_or(crate::i18n::text("repo-core-2109"))?;
     let read = |text: &Option<String>, side: &str| -> Result<Vec<Pkg>, String> {
         text.as_deref()
             .map(|t| {
                 packages(file, t)
-                    .map_err(|e| format!("the {file} {side} the change isn't valid ({e})"))
+                    .map_err(|e| crate::i18n::message("repo-core-2138", &[("file", format!("{}", file).into()), ("side", format!("{}", side).into()), ("e", format!("{}", e).into())]))
             })
             .transpose()
             .map(Option::unwrap_or_default)
     };
-    let (old, new) = (read(&sides.old, "before")?, read(&sides.new, "after")?);
+    let (old, new) = (read(&sides.old, crate::i18n::text("repo-core-2049"))?, read(&sides.new, crate::i18n::text("repo-core-2050"))?);
     Ok(DepsDiff {
         ecosystem,
         file,

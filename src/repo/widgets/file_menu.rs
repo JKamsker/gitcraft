@@ -117,7 +117,7 @@ pub fn file_menu_with(
                     tab: FileTab::History,
                 });
             }
-            if crate::menu_item::MenuItem::new("Blame")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2498"))
                 .icon("history")
                 .keys_when(crate::keymap::Command::FileBlame, shortcuts)
                 .show(ui)
@@ -135,8 +135,7 @@ pub fn file_menu_with(
                     .icon("undo-2")
                     .show(ui)
                     .on_hover_text(
-                        "Undo this commit's changes to the file in the working tree, to look over \
-                     before committing",
+                        crate::i18n::text("repo-core-2381"),
                     );
                 if b.clicked() {
                     acts.push(Action::RevertFile {

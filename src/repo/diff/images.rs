@@ -89,12 +89,12 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(12.0);
     if images.svg {
-        ui.label("Isolated SVG preview: external resources disabled; bounded embedded PNG/JPEG images only. Unsupported effects can be inspected in SVG source.");
+        ui.label(crate::i18n::text("repo-core-1849"));
     }
     ui.columns(2, |cols| {
         for (col, (label, bytes, side)) in cols.iter_mut().zip([
-            ("Before", &images.old, "old"),
-            ("After", &images.new, "new"),
+            (crate::i18n::text("repo-core-1564"), &images.old, "old"),
+            (crate::i18n::text("repo-core-1565"), &images.new, "new"),
         ]) {
             col.vertical_centered(|ui| {
                 ui.label(
@@ -115,16 +115,16 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
                                 .bg_fill(t.field),
                         );
                         ui.label(
-                            egui::RichText::new(format!("{} KB", bytes.len().div_ceil(1024)))
+                            egui::RichText::new(crate::i18n::message("repo-core-1851", &[("div-ceil", format!("{}", bytes.len().div_ceil(1024)).into())]))
                                 .color(t.text_faint)
                                 .small(),
                         );
                     }
                     None => {
                         let note = if side == "old" {
-                            "(new file)"
+                            crate::i18n::text("repo-core-1695")
                         } else {
-                            "(deleted)"
+                            crate::i18n::text("repo-core-1696")
                         };
                         ui.label(egui::RichText::new(note).color(t.text_faint));
                     }

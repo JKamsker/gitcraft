@@ -29,11 +29,11 @@ const PAD_Y: f32 = 8.0;
 fn summary(prose: &ProseDiff) -> Option<&'static str> {
     let all = |f: fn(&Part) -> bool| !prose.parts.is_empty() && prose.parts.iter().all(f);
     if prose.parts.is_empty() {
-        Some("The file is empty on both sides.")
+        Some(crate::i18n::text("repo-core-2205"))
     } else if all(|p| matches!(p, Part::Added { .. })) {
-        Some("The whole file is new.")
+        Some(crate::i18n::text("repo-core-2206"))
     } else if all(|p| matches!(p, Part::Removed { .. })) {
-        Some("The change deletes the whole file.")
+        Some(crate::i18n::text("repo-core-2207"))
     } else if all(|p| {
         matches!(
             p,
@@ -44,10 +44,10 @@ fn summary(prose: &ProseDiff) -> Option<&'static str> {
         )
     }) {
         Some(
-            "The words are as they were: only whitespace, blank lines or the file's name or mode changed.",
+            crate::i18n::text("repo-core-2208"),
         )
     } else if all(|p| matches!(p, Part::Kept { .. })) {
-        Some("The words are as they were: only how the lines are wrapped changed.")
+        Some(crate::i18n::text("repo-core-2209"))
     } else {
         None
     }
@@ -169,9 +169,9 @@ pub(super) fn layout(parts: &[Part], opened: &std::collections::HashSet<usize>) 
 /// A fold of unchanged paragraphs; clicked, it opens.
 fn fold(ui: &mut Ui, t: &Tokens, rect: Rect, count: usize, run: usize) -> egui::Response {
     let label = if count == 1 {
-        "1 unchanged paragraph".to_owned()
+        crate::i18n::text("repo-core-2213").to_owned()
     } else {
-        format!("{count} unchanged paragraphs")
+        crate::i18n::message("repo-core-2214", &[("count", (count).into())])
     };
     let galley = ui
         .painter()
@@ -180,7 +180,7 @@ fn fold(ui: &mut Ui, t: &Tokens, rect: Rect, count: usize, run: usize) -> egui::
     let resp = ui
         .interact(r, ui.id().with(("prose_fold", run)), egui::Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text("Show them");
+        .on_hover_text(crate::i18n::text("repo-core-2216"));
     let fill = if resp.hovered() { t.hover } else { t.card };
     ui.painter().rect_filled(r, t.radius_sm, fill);
     ui.painter().galley(
@@ -196,11 +196,11 @@ fn caption(part: &Part, captions: bool) -> Option<&'static str> {
     match part {
         Part::Kept {
             rewrapped: true, ..
-        } => Some("re-wrapped"),
+        } => Some(crate::i18n::text("repo-core-2217")),
         Part::Kept { .. } => None,
-        Part::Changed { .. } => Some("edited"),
-        Part::Removed { .. } => captions.then_some("removed"),
-        Part::Added { .. } => captions.then_some("added"),
+        Part::Changed { .. } => Some(crate::i18n::text("repo-core-2218")),
+        Part::Removed { .. } => captions.then_some(crate::i18n::text("repo-core-1703")),
+        Part::Added { .. } => captions.then_some(crate::i18n::text("repo-core-1702")),
     }
 }
 
@@ -263,8 +263,8 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
         );
     }
     let tip = match (old, new) {
-        (Some(o), None) => format!("Line {o} before the change: click to see the lines"),
-        (_, Some(n)) => format!("Line {n}: click to see the lines there"),
+        (Some(o), None) => crate::i18n::message("repo-core-2220", &[("o", format!("{}", o).into())]),
+        (_, Some(n)) => crate::i18n::message("repo-core-2221", &[("n", (n).into())]),
         _ => String::new(),
     };
     let label = match part {
@@ -298,7 +298,7 @@ fn cut(text: String) -> String {
         return text;
     }
     let mut s: String = text.chars().take(MAX_CHARS).collect();
-    s.push_str(&format!(" … ({} more characters)", total - MAX_CHARS));
+    s.push_str(&crate::i18n::message("repo-core-2222", &[("MAX-CHARS", format!("{}", total - MAX_CHARS).into())]));
     s
 }
 

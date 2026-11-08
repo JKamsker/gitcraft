@@ -127,7 +127,7 @@ impl RepoTab {
             if self.graph.width > LANES {
                 "History · 24 lanes"
             } else {
-                "History"
+                crate::i18n::text("repo-core-2497")
             },
             FontId::proportional(10.0),
             t.text_dim,

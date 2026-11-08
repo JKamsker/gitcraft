@@ -20,9 +20,9 @@ impl FindIn {
     /// What the bar's hint calls it.
     pub(crate) fn name(self) -> &'static str {
         match self {
-            FindIn::Diff => "the diff",
-            FindIn::File => "the file",
-            FindIn::Blame => "the blame",
+            FindIn::Diff => crate::i18n::text("repo-core-2510"),
+            FindIn::File => crate::i18n::text("repo-core-2511"),
+            FindIn::Blame => crate::i18n::text("repo-core-2512"),
         }
     }
 }

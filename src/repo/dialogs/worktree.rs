@@ -65,16 +65,16 @@ pub(super) fn add_worktree(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Add worktree",
-        "A second working folder of this repository, on its own branch.",
+        crate::i18n::text("repo-core-1535"),
+        crate::i18n::text("repo-core-1536"),
         &t,
     );
     let mut changed = false;
     ui.horizontal(|ui| {
         changed |= ui
-            .radio_value(new_branch, false, "Existing branch")
+            .radio_value(new_branch, false, crate::i18n::text("repo-core-1537"))
             .changed();
-        changed |= ui.radio_value(new_branch, true, "New branch").changed();
+        changed |= ui.radio_value(new_branch, true, crate::i18n::text("repo-core-1538")).changed();
     });
     ui.add_space(4.0);
     if *new_branch {
@@ -85,30 +85,30 @@ pub(super) fn add_worktree(
     ui.add_space(8.0);
     let mut root_edited = false;
     ui.label(
-        RichText::new("Default worktrees root")
+        RichText::new(crate::i18n::text("repo-core-1539"))
             .color(t.text_dim)
             .small(),
     );
-    folder_field(ui, repo, root, &mut root_edited, "Worktrees root");
+    folder_field(ui, repo, root, &mut root_edited, crate::i18n::text("repo-core-1540"));
     ui.horizontal(|ui| {
-        if ui.small_button("Beside repository").clicked() {
+        if ui.small_button(crate::i18n::text("repo-core-1541")).clicked() {
             *root = crate::remote::git_path(&git::default_worktree_root(repo));
             root_edited = true;
         }
-        if ui.small_button("Inside repository").clicked() {
+        if ui.small_button(crate::i18n::text("repo-core-1542")).clicked() {
             *root = ".worktrees".to_owned();
             root_edited = true;
         }
     });
     ui.label(
         RichText::new(
-            "Saved when you add. Relative to the main checkout; shared by its worktrees.",
+            crate::i18n::text("repo-core-1544"),
         )
         .color(t.text_faint)
         .small(),
     );
     ui.label(
-        RichText::new("Folders inside a checkout are automatically ignored locally.")
+        RichText::new(crate::i18n::text("repo-core-1545"))
             .color(t.text_faint)
             .small(),
     );
@@ -128,9 +128,9 @@ pub(super) fn add_worktree(
         *path = suggested_folder(repo, root, name);
     }
     ui.add_space(8.0);
-    ui.label(RichText::new("Worktree folder").color(t.text_dim).small());
-    folder_field(ui, repo, path, path_edited, "Worktree folder");
-    if *path_edited && ui.small_button("Use branch folder").clicked() {
+    ui.label(RichText::new(crate::i18n::text("repo-core-1546")).color(t.text_dim).small());
+    folder_field(ui, repo, path, path_edited, crate::i18n::text("repo-core-1546"));
+    if *path_edited && ui.small_button(crate::i18n::text("repo-core-1547")).clicked() {
         *path_edited = false;
         let name = if *new_branch {
             new_name.as_str()
@@ -173,7 +173,7 @@ pub(super) fn add_worktree(
             ]
         };
         Action::Ops {
-            label: "Add worktree".to_owned(),
+            label: crate::i18n::text("repo-core-1535").to_owned(),
             ops: vec![
                 vec![
                     "config".into(),
@@ -202,7 +202,7 @@ fn new_branch_field(ui: &mut Ui, new_name: &mut String, base: &str, focus: &mut 
     let edit = field(ui, new_name, "feature/my-branch", focus);
     dash_spaces(new_name);
     ui.label(
-        RichText::new(format!("Starting at {base}"))
+        RichText::new(crate::i18n::message("repo-core-1549", &[("base", format!("{}", base).into())]))
             .color(t.text_faint)
             .small(),
     );
@@ -216,7 +216,7 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
     egui::ComboBox::from_id_salt("worktree-branch")
         .width(ui.available_width())
         .selected_text(if branch.is_empty() {
-            "Choose a branch"
+            crate::i18n::text("repo-core-1551")
         } else {
             branch.as_str()
         })
@@ -229,7 +229,7 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
             }
             if free.is_empty() {
                 ui.label(
-                    RichText::new("Every branch is checked out somewhere").color(t.text_faint),
+                    RichText::new(crate::i18n::text("repo-core-1552")).color(t.text_faint),
                 );
             }
         });
@@ -260,7 +260,7 @@ fn folder_field(
                 can_pick,
                 egui::Button::new(crate::i18n::text("repo-core-0300")).min_size(egui::vec2(80.0, 28.0)),
             )
-            .on_disabled_hover_text("Type a path on that machine")
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1553"))
             .clicked()
             && let Some(dir) = rfd::FileDialog::new().set_title(title).pick_folder()
         {

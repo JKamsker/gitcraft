@@ -76,9 +76,9 @@ impl RepoTab {
         let mut settings = Settings::get(ui.ctx());
         let on = settings.diff_beside_graph;
         let tip = if on {
-            "Show the diff in place of the graph"
+            crate::i18n::text("repo-core-2414")
         } else {
-            "Show the diff below the graph"
+            crate::i18n::text("repo-core-2415")
         };
         let button = icons::small_button(ui, "panel-bottom", tip);
         if on {

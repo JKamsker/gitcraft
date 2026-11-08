@@ -150,7 +150,7 @@ impl RepoTab {
         let mut choose = None;
         let t = crate::theme::Tokens::get(ui.ctx());
         ui.horizontal_wrapped(|ui| {
-            ui.heading("Symbol biography");
+            ui.heading(crate::i18n::text("repo-core-2326"));
             if ui.button("Close biography").clicked() {
                 acts.push(Action::CloseSymbolBiography);
             }
@@ -173,7 +173,7 @@ impl RepoTab {
             {
                 self.symbols.line = None;
             }
-            ui.label("Function");
+            ui.label(crate::i18n::text("repo-core-1800"));
             if ui
                 .add(
                     egui::TextEdit::singleline(&mut self.symbols.name)
@@ -388,7 +388,7 @@ fn scrub(ui: &mut egui::Ui, selected: &mut usize, len: usize) {
         {
             *selected -= 1;
         }
-        ui.add(egui::Slider::new(selected, 0..=len - 1).text("Version"));
+        ui.add(egui::Slider::new(selected, 0..=len - 1).text(crate::i18n::text("repo-core-1667")));
         if ui
             .add_enabled(*selected + 1 < len, egui::Button::new("Next version"))
             .clicked()

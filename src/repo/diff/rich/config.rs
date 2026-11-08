@@ -62,18 +62,18 @@ pub fn read(
     path: &str,
     sides: &Sides,
 ) -> Result<(&'static str, Option<Node>, Option<Node>), String> {
-    let (format, parse) = format_of(path).ok_or("not a config file")?;
+    let (format, parse) = format_of(path).ok_or(crate::i18n::text("repo-core-2047"))?;
     let read = |text: &Option<String>, side: &str| -> Result<Option<Node>, String> {
         text.as_deref()
             .map(|t| {
-                parse(t).map_err(|e| format!("the {format} {side} the change isn't valid ({e})"))
+                parse(t).map_err(|e| crate::i18n::message("repo-core-2048", &[("format", format!("{}", format).into()), ("side", format!("{}", side).into()), ("e", format!("{}", e).into())]))
             })
             .transpose()
     };
     Ok((
         format,
-        read(&sides.old, "before")?,
-        read(&sides.new, "after")?,
+        read(&sides.old, crate::i18n::text("repo-core-2049"))?,
+        read(&sides.new, crate::i18n::text("repo-core-2050"))?,
     ))
 }
 
@@ -149,7 +149,7 @@ fn entry(
     };
     Entry {
         path: if path.is_empty() {
-            "(the whole file)".to_owned()
+            crate::i18n::text("repo-core-2051").to_owned()
         } else {
             path.to_owned()
         },

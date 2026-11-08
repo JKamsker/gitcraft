@@ -22,17 +22,17 @@ pub(super) fn show(ui: &mut Ui, diff: &ApiDiff, acts: &mut Vec<Action>) {
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    egui::RichText::new(format!("API contract · {}", diff.version))
+                    egui::RichText::new(crate::i18n::message("repo-core-2032", &[("version", format!("{}", diff.version).into())]))
                         .font(theme::medium(12.5))
                         .color(t.text),
                 );
                 let summary = match (breaking, added) {
                     (0, 0) => {
-                        "no change to the endpoints, parameters or schemas clients use".to_owned()
+                        crate::i18n::text("repo-core-2033").to_owned()
                     }
-                    (0, n) => format!("nothing breaks · {n} added"),
-                    (1, n) => format!("1 breaking change · {n} added"),
-                    (b, n) => format!("{b} breaking changes · {n} added"),
+                    (0, n) => crate::i18n::message("repo-core-2034", &[("n", (n).into())]),
+                    (1, n) => crate::i18n::message("repo-core-2035", &[("n", (n).into())]),
+                    (b, n) => crate::i18n::message("repo-core-2036", &[("b", format!("{}", b).into()), ("n", (n).into())]),
                 };
                 let color = if breaking > 0 { t.danger } else { t.text_dim };
                 ui.label(egui::RichText::new(summary).color(color));
@@ -78,8 +78,8 @@ fn row(ui: &mut Ui, t: &Tokens, c: &ApiChange, acts: &mut Vec<Action>) {
     let label = format!("{} {}", c.endpoint, c.what);
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let place = match (c.old_line, c.new_line) {
-        (_, Some(n)) => format!("Go to line {n}"),
-        (Some(o), None) => format!("Go to line {o} of the file before the change"),
+        (_, Some(n)) => crate::i18n::message("repo-core-2039", &[("n", (n).into())]),
+        (Some(o), None) => crate::i18n::message("repo-core-2040", &[("o", format!("{}", o).into())]),
         _ => String::new(),
     };
     // The whole text, which a narrow pane cuts.

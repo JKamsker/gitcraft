@@ -38,15 +38,15 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             ui.add_space(12.0);
         }
         if ui
-            .button("Fit")
-            .on_hover_text("Fit the picture (double-click it)")
+            .button(crate::i18n::text("repo-core-1807"))
+            .on_hover_text(crate::i18n::text("repo-core-1808"))
             .clicked()
         {
             state.zoom = None;
         }
         if ui
             .button("100%")
-            .on_hover_text("One picture pixel a screen pixel")
+            .on_hover_text(crate::i18n::text("repo-core-1809"))
             .clicked()
         {
             state.zoom = Some(1.0 / ppp);
@@ -61,11 +61,11 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     match mode {
         Mode::Swipe => slider(
             ui,
-            ("All new", "All old"),
+            (crate::i18n::text("repo-core-1810"), crate::i18n::text("repo-core-1811")),
             &mut state.swipe,
-            Some("or drag the line"),
+            Some(crate::i18n::text("repo-core-1812")),
         ),
-        Mode::Onion => slider(ui, ("Old", "New"), &mut state.onion, None),
+        Mode::Onion => slider(ui, (crate::i18n::text("repo-core-1813"), crate::i18n::text("repo-core-1814")), &mut state.onion, None),
         _ => {}
     }
     let history = cmp.versions(ui.ctx());
@@ -100,7 +100,7 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             let half = vec2((area.width() - gap) / 2.0, area.height());
             let left = Rect::from_min_size(area.min, half);
             let right = Rect::from_min_size(pos2(left.right() + gap, area.top()), half);
-            for (rect, side, missing) in [(left, &old, "(new file)"), (right, &new, "(deleted)")] {
+            for (rect, side, missing) in [(left, &old, crate::i18n::text("repo-core-1695")), (right, &new, crate::i18n::text("repo-core-1696"))] {
                 let p = ui.painter_at(rect);
                 match side {
                     Some((tex, d)) => {
@@ -158,7 +158,7 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
                                 painter.text(
                                     area.center(),
                                     egui::Align2::CENTER_CENTER,
-                                    "Working out the difference…",
+                                    crate::i18n::text("repo-core-1817"),
                                     theme::medium(13.0),
                                     t.text_dim,
                                 );
@@ -184,12 +184,7 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     if let Some(percent) = crate::a11y::value::slider(
         &resp,
         || {
-            format!(
-                "Image comparison zoom for {}. Pan position {:.0}%, {:.0}%. Arrow keys pan; plus and minus zoom; Home fits. Use controls above to change comparison mode.",
-                cmp.path,
-                center.x * 100.0,
-                center.y * 100.0
-            )
+            crate::i18n::message("repo-core-1818", &[("path", format!("{}", cmp.path).into()), ("x", (center.x * 100.0).into()), ("y", (center.y * 100.0).into())])
         },
         zoom * ppp * 100.0,
         super::view_state::MIN_ZOOM.min(zoom) * ppp * 100.0
@@ -231,13 +226,13 @@ fn canvas(cmp: &Compare) -> egui::Vec2 {
 /// "640 × 480 → 800 × 600 · 12.0 KB → 14.1 KB · 3.2% of pixels changed".
 pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
     let dims = |d: &Decoded| {
-        let scaled = if d.scaled { " (shown smaller)" } else { "" };
-        format!("{} × {}{scaled}", d.width, d.height)
+        let scaled = if d.scaled { crate::i18n::text("repo-core-1819") } else { "" };
+        crate::i18n::message("repo-core-1820", &[("width", format!("{}", d.width).into()), ("height", format!("{}", d.height).into()), ("scaled", format!("{}", scaled).into())])
     };
     let mut parts = Vec::new();
     match (&cmp.old, &cmp.new) {
         (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => {
-            parts.push(format!("{}, same dimensions", dims(b)))
+            parts.push(crate::i18n::message("repo-core-1821", &[("b", format!("{}", dims(b)).into())]))
         }
         (Some(a), Some(b)) => parts.push(format!("{} → {}", dims(a), dims(b))),
         (None, Some(b)) => parts.push(dims(b)),
@@ -254,14 +249,14 @@ pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
     }
     if let Some(d) = diff {
         parts.push(match d.changed {
-            0 => "no pixel changed".to_owned(),
-            1 => "1 pixel changed".to_owned(),
+            0 => crate::i18n::text("repo-core-1822").to_owned(),
+            1 => crate::i18n::text("repo-core-1823").to_owned(),
             n => {
                 let share = n as f64 * 100.0 / d.total.max(1) as f64;
                 if share < 0.1 {
-                    format!("{n} pixels changed")
+                    crate::i18n::message("repo-core-1824", &[("n", (n).into())])
                 } else {
-                    format!("{share:.1}% of pixels changed")
+                    crate::i18n::message("repo-core-1825", &[("share", (share).into())])
                 }
             }
         });
@@ -464,12 +459,7 @@ fn filmstrip(
                     crate::a11y::a11y_selected(
                         &resp,
                         || {
-                            format!(
-                                "Image version {}, {}, {}",
-                                crate::repo::short(&v.hash),
-                                v.summary,
-                                v.path
-                            )
+                            crate::i18n::message("repo-core-1830", &[("hash", format!("{}", crate::repo::short(&v.hash)).into()), ("summary", format!("{}", v.summary).into()), ("path", format!("{}", v.path).into())])
                         },
                         current,
                     );
@@ -511,7 +501,7 @@ fn filmstrip(
                                 p.text(
                                     frame.center(),
                                     egui::Align2::CENTER_CENTER,
-                                    "(none)",
+                                    crate::i18n::text("repo-core-1832"),
                                     theme::medium(11.0),
                                     t.text_faint,
                                 );

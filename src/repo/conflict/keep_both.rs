@@ -240,7 +240,7 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 /// Why a version was not written when something appeared at its name since the preview.
-const APPEARED: &str = crate::i18n::text("repo-core-0585");
+const APPEARED: &str = "repo-core-0585";
 
 /// What the create script ends with when something is at the path already.
 const EXISTS: i32 = 17;
@@ -271,7 +271,7 @@ fn create_new(file: &Path, bytes: &[u8], executable: bool) -> Result<(), String>
     )?;
     match out.code {
         0 => Ok(()),
-        EXISTS => Err(APPEARED.to_owned()),
+        EXISTS => Err(crate::i18n::text(APPEARED).to_owned()),
         _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
     }
 }
@@ -282,7 +282,7 @@ fn create_new_here(file: &Path, bytes: &[u8], executable: bool) -> Result<(), St
         .create_new(true)
         .open(file)
         .map_err(|e| match e.kind() {
-            std::io::ErrorKind::AlreadyExists => APPEARED.to_owned(),
+            std::io::ErrorKind::AlreadyExists => crate::i18n::text(APPEARED).to_owned(),
             _ => e.to_string(),
         })?;
     let filled = fill(&mut opened, bytes, executable);

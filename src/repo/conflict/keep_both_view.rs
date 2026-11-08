@@ -198,12 +198,16 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
         KeepBoth::Written(plan) => {
             ui.add(
                 egui::Label::new(crate::i18n::message("repo-core-0598", &[("target", format!("{}", plan.ours.target).into()), ("target2", format!("{}", plan.theirs.target).into()), ("them", format!("{}", if plan.ours.ignored || plan.theirs.ignored {
-                        " A .gitignore hides them from the changes list: check them in the \
-                         folder."
+                        crate::i18n::text("repo-core-0599")
                     } else {
-                        " They are in the changes list as new files: click them there to check \
-                         them."
-                    }).into())])           RichText::new(crate::i18n::message("repo-core-0601", &[("path", format!("{}", plan.path).into())]))
+                        crate::i18n::text("repo-core-0600")
+                    }).into())]))
+                .wrap(),
+            );
+            ui.add_space(6.0);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(crate::i18n::message("repo-core-0601", &[("path", format!("{}", plan.path).into())]))
                     .color(t.text_dim),
                 )
                 .wrap(),

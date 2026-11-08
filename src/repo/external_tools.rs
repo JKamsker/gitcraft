@@ -69,7 +69,7 @@ pub(crate) fn tool_item(key: &DiffKey) -> ToolItem {
 fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
     match key {
         DiffKey::Remerge { .. } => {
-            Err("A remerge has a synthetic base: view it in gitcraft".to_owned())
+            Err(crate::i18n::text("repo-core-2454").to_owned())
         }
         DiffKey::Work(f) => match f.area {
             Area::Unstaged => Ok(DiffTarget::Unstaged {
@@ -79,14 +79,8 @@ fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
                 path: f.path.clone(),
                 old_path: f.old_path.clone(),
             }),
-            Area::Untracked => Err(format!(
-                "{} isn't tracked yet: there is nothing to compare it with",
-                f.path
-            )),
-            Area::Conflicted => Err(format!(
-                "{} is conflicted: use Resolve in merge tool",
-                f.path
-            )),
+            Area::Untracked => Err(crate::i18n::message("repo-core-2455", &[("path", format!("{}", f.path).into())])),
+            Area::Conflicted => Err(crate::i18n::message("repo-core-2456", &[("path", format!("{}", f.path).into())])),
         },
         DiffKey::Commit { hash, path } => tool::commit_target(repo, hash, path),
         DiffKey::Range { from, to, path } => {
@@ -98,7 +92,7 @@ fn diff_target(repo: &Path, key: &DiffKey) -> Result<DiffTarget, String> {
 /// Where the tool opens, for the message saying it is waited for: over SSH it runs there.
 fn where_it_runs(repo: &Path) -> String {
     match tool::place_of(repo) {
-        Place::Ssh(host) => format!(". It runs on {host}, so it has to be installed there"),
+        Place::Ssh(host) => crate::i18n::message("repo-core-2457", &[("host", format!("{}", host).into())]),
         Place::Here | Place::Wsl => String::new(),
     }
 }
@@ -111,15 +105,12 @@ impl RepoTab {
         let file = key.path().to_owned();
         // Only the working tree's side can be edited in the tool.
         let refreshes = if matches!(key, DiffKey::Work(_)) {
-            ": the view refreshes when it closes"
+            crate::i18n::text("repo-core-2458")
         } else {
             ""
         };
         self.status = Some((
-            format!(
-                "Showing {file} in {label}{refreshes}{}",
-                where_it_runs(&self.path)
-            ),
+            crate::i18n::message("repo-core-2459", &[("file", format!("{}", file).into()), ("label", format!("{}", label).into()), ("refreshes", format!("{}", refreshes).into()), ("path", format!("{}", where_it_runs(&self.path)).into())]),
             false,
         ));
         let repo = self.path.clone();
@@ -143,16 +134,13 @@ impl RepoTab {
         let label = choice.label(Kind::Merge);
         let Some(open) = Merging::register(&self.path, &path) else {
             self.status = Some((
-                format!("{path} is already open in a merge tool: finish there first"),
+                crate::i18n::message("repo-core-2460", &[("path", format!("{}", path).into())]),
                 true,
             ));
             return;
         };
         self.status = Some((
-            format!(
-                "Waiting for {label} on {path}: save and close it to finish{}",
-                where_it_runs(&self.path)
-            ),
+            crate::i18n::message("repo-core-2461", &[("label", format!("{}", label).into()), ("path", format!("{}", path).into()), ("path2", format!("{}", where_it_runs(&self.path)).into())]),
             false,
         ));
         let repo = self.path.clone();
@@ -182,7 +170,7 @@ impl RepoTab {
                 if self.conflict.as_ref().is_some_and(|ed| ed.path == path) {
                     self.conflict = None;
                 }
-                self.status = Some((format!("Resolved {path} in {label}"), false));
+                self.status = Some((crate::i18n::message("repo-core-2462", &[("path", format!("{}", path).into()), ("label", format!("{}", label).into())]), false));
             }
             Ok(MergeOutcome::Unresolved(why)) => self.status = Some((why, false)),
             Err(e) => self.status = Some((e, true)),
@@ -195,7 +183,7 @@ impl RepoTab {
         if self
             .status
             .as_ref()
-            .is_some_and(|(s, error)| !error && s.starts_with(&format!("Showing {file} in ")))
+            .is_some_and(|(s, error)| !error && s.starts_with(&crate::i18n::message("repo-core-2463", &[("file", format!("{}", file).into())])))
         {
             self.status = None;
         }

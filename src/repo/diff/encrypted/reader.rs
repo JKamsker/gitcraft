@@ -35,17 +35,17 @@ impl Read<'_> {
     fn bytes(&self, args: &[&str], limit: usize) -> Result<Vec<u8>, String> {
         let remaining = self.deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Err("Syntax preparation timed out. Showing the patch.".to_owned());
+            return Err(crate::i18n::text("repo-core-1758").to_owned());
         }
         let bytes = crate::git::file_comparison::raw_output(self.repo, args, self.active)?;
         if bytes.len() > limit {
-            return Err("Encrypted source exceeds size limit".into());
+            return Err(crate::i18n::text("repo-core-1759").into());
         }
         Ok(bytes)
     }
     fn text(&self, args: &[&str]) -> Result<String, String> {
         String::from_utf8(self.bytes(args, MAX_BYTES)?)
-            .map_err(|_| "Syntax metadata is not UTF-8".to_owned())
+            .map_err(|_| crate::i18n::text("repo-core-1760").to_owned())
     }
     fn files(&self, from: Option<&str>, to: Option<&str>) -> Result<Vec<ChangedFile>, String> {
         let mut args = match from {
@@ -81,7 +81,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
     let at = |rev: Option<&str>, path: &str| Some((rev.map(str::to_owned), path.to_owned()));
     let changed = |files: Vec<ChangedFile>, path: &str, old: Option<&str>, new: Option<&str>| {
         let file = files.into_iter().find(|f| f.path == path).ok_or_else(|| {
-            "This file is no longer in the comparison. Refresh its diff.".to_owned()
+            crate::i18n::text("repo-core-1768").to_owned()
         })?;
         let before = (file.status != 'A' && old.is_some())
             .then(|| at(old, file.old_path.as_deref().unwrap_or(path)))
@@ -91,7 +91,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
     };
     match key {
         DiffKey::Remerge { .. } => Err(
-            "Syntax comparison is not available for merge-resolution diffs. Showing the patch."
+            crate::i18n::text("repo-core-1769")
                 .to_owned(),
         ),
         DiffKey::Commit { hash, path } => {
@@ -135,7 +135,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
                 (file.code != 'D').then(|| at(None, &file.path)).flatten(),
             )),
             Area::Untracked => Ok((None, at(None, &file.path))),
-            Area::Conflicted => Err("Resolve the conflict before comparing its syntax.".to_owned()),
+            Area::Conflicted => Err(crate::i18n::text("repo-core-1773").to_owned()),
         },
     }
 }
@@ -159,10 +159,10 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             if size
                 .trim()
                 .parse::<usize>()
-                .map_err(|_| "Couldn't read this blob's size")?
+                .map_err(|_| crate::i18n::text("repo-core-1776"))?
                 > MAX_BYTES
             {
-                return Err("Syntax comparison is limited to 2 MiB per file.".to_owned());
+                return Err(crate::i18n::text("repo-core-1777").to_owned());
             }
             read.bytes(&["cat-file", "blob", blob], MAX_BYTES)?
         }
@@ -172,7 +172,7 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
                 || !matches!(version.mode.as_deref(), None | Some("100644" | "100755"))
             {
                 return Err(
-                    "Encrypted source is not a safely readable regular file within 2 MiB".into(),
+                    crate::i18n::text("repo-core-1778").into(),
                 );
             }
             // Missing is distinct from a failed read. Only an actual missing side is empty.
@@ -180,10 +180,10 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
         }
     };
     if bytes.len() > MAX_BYTES {
-        return Err("Syntax comparison is limited to 2 MiB per file.".to_owned());
+        return Err(crate::i18n::text("repo-core-1777").to_owned());
     }
     if bytes.contains(&0) {
-        return Err("Syntax comparison is available for text files only.".to_owned());
+        return Err(crate::i18n::text("repo-core-1779").to_owned());
     }
-    String::from_utf8(bytes).map_err(|_| "Syntax comparison needs UTF-8 text.".to_owned())
+    String::from_utf8(bytes).map_err(|_| crate::i18n::text("repo-core-1780").to_owned())
 }

@@ -16,12 +16,12 @@ pub enum Ty {
 impl Ty {
     pub fn name(self) -> &'static str {
         match self {
-            Ty::String => "string",
+            Ty::String => crate::i18n::text("repo-core-2269"),
             Ty::Number => "number",
-            Ty::Bool => "boolean",
+            Ty::Bool => crate::i18n::text("repo-core-2270"),
             Ty::Null => "null",
-            Ty::Date => "date",
-            Ty::Alias => "alias",
+            Ty::Date => crate::i18n::text("repo-core-2271"),
+            Ty::Alias => crate::i18n::text("repo-core-2272"),
         }
     }
 }
@@ -80,13 +80,13 @@ impl Node {
             }
             Node::Map(fields) => match fields.len() {
                 0 => "{}".to_owned(),
-                1 => "{1 key}".to_owned(),
-                n => format!("{{{n} keys}}"),
+                1 => crate::i18n::text("repo-core-2276").to_owned(),
+                n => crate::i18n::message("repo-core-2277", &[("n", (n).into())]),
             },
             Node::List(items) => match items.len() {
                 0 => "[]".to_owned(),
-                1 => "[1 item]".to_owned(),
-                n => format!("[{n} items]"),
+                1 => crate::i18n::text("repo-core-2278").to_owned(),
+                n => crate::i18n::message("repo-core-2279", &[("n", (n).into())]),
             },
         }
     }

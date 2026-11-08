@@ -59,7 +59,7 @@ impl View {
             View::File { path, rev, tab } => {
                 let what = match tab {
                     file_view::FileTab::History => "the history",
-                    file_view::FileTab::Blame => "the blame",
+                    file_view::FileTab::Blame => crate::i18n::text("repo-core-2512"),
                     file_view::FileTab::File => "the contents",
                 };
                 let at = rev

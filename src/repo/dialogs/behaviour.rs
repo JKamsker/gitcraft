@@ -133,9 +133,9 @@ impl Form {
         let cancelled_ctx = ctx.clone();
         let key = mutation.then(|| crate::repo::messages::mutation_key(&self.repo));
         let result = pool.submit_cancellable(token.clone(), tasks::Priority::Interactive, key,
-            Some(Box::new(move || { let _ = cancelled_tx.send(Event::Done(Err("Cancelled before execution".into()))); cancelled_ctx.request_repaint(); })),
+            Some(Box::new(move || { let _ = cancelled_tx.send(Event::Done(Err(crate::i18n::text("repo-core-1159").into()))); cancelled_ctx.request_repaint(); })),
             Box::new(move || {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&tx))).unwrap_or_else(|_| Err("Timeline worker failed unexpectedly; inspect recovery evidence before retrying".into()));
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&tx))).unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1160").into()));
                 let _ = tx.send(Event::Done(result)); ctx.request_repaint();
             }));
         match result {
@@ -198,19 +198,19 @@ impl Form {
     fn show_contents(&mut self, ui: &mut egui::Ui) -> Outcome {
         self.poll();
         ui.set_width(850.0);
-        ui.heading("Behaviour timeline");
-        ui.label(format!("Runs on {} in new isolated worktrees. Commands run with your account and may execute checkout hooks/filters or access the network. Your open checkout is preserved.", crate::teleport::Machine::of(&self.repo).label()));
+        ui.heading(crate::i18n::text("repo-core-1162"));
+        ui.label(crate::i18n::message("repo-core-1163", &[("label", format!("{}", crate::teleport::Machine::of(&self.repo).label()).into())]));
         let idle = self.active.is_none();
         ui.add_enabled_ui(idle, |ui| {
-            ui.horizontal(|ui| { ui.label("Ending revision:"); ui.text_edit_singleline(&mut self.revision); ui.label("Frames:"); ui.add(egui::DragValue::new(&mut self.count).range(1..=32)); });
-            ui.label("Loads at most 32 first-parent commits, oldest first. Results are observations of this sampled range.");
-            if ui.button("Load frames").clicked() {
+            ui.horizontal(|ui| { ui.label(crate::i18n::text("repo-core-1164")); ui.text_edit_singleline(&mut self.revision); ui.label(crate::i18n::text("repo-core-1165")); ui.add(egui::DragValue::new(&mut self.count).range(1..=32)); });
+            ui.label(crate::i18n::text("repo-core-1166"));
+            if ui.button(crate::i18n::text("repo-core-1167")).clicked() {
                 let repo = self.repo.clone(); let revision = self.revision.clone(); let count = self.count;
                 self.submit(ui.ctx(), false, move |tx| { let commits = git::behaviour_commits(&repo, &revision, count)?; let _ = tx.send(Event::Loaded(commits)); Ok(()) });
             }
-            ui.label("Command (stdout supplies the frame):"); ui.text_edit_multiline(&mut self.command);
-            ui.horizontal(|ui| { ui.selectable_value(&mut self.mode, Mode::Text, "UTF-8 output"); ui.selectable_value(&mut self.mode, Mode::Number, "One benchmark number"); ui.selectable_value(&mut self.mode, Mode::Png, "PNG screenshot"); });
-            ui.horizontal(|ui| { ui.label("Seconds per run:"); ui.add(egui::DragValue::new(&mut self.timeout).range(1..=600)); });
+            ui.label(crate::i18n::text("repo-core-1168")); ui.text_edit_multiline(&mut self.command);
+            ui.horizontal(|ui| { ui.selectable_value(&mut self.mode, Mode::Text, crate::i18n::text("repo-core-1169")); ui.selectable_value(&mut self.mode, Mode::Number, crate::i18n::text("repo-core-1170")); ui.selectable_value(&mut self.mode, Mode::Png, crate::i18n::text("repo-core-1171")); });
+            ui.horizontal(|ui| { ui.label(crate::i18n::text("repo-core-1172")); ui.add(egui::DragValue::new(&mut self.timeout).range(1..=600)); });
         });
         if self
             .loaded_selection
@@ -227,13 +227,13 @@ impl Form {
             self.configuration = (self.command.clone(), self.mode);
             self.refresh_cache();
         }
-        ui.label("Text compares complete stdout; benchmark output must be one finite number; screenshot commands must write PNG bytes to stdout (up to 1024×1024). Each frame must repeat exactly twice in separate fresh worktrees. Exit code and complete stderr participate in repeat comparison. Limit: 2 MiB accepted per stream; transport capture is separately bounded at 64 MiB per stream.");
+        ui.label(crate::i18n::text("repo-core-1173"));
         if ui
             .add_enabled(
                 idle && !self.commits.is_empty()
                     && !self.command.trim().is_empty()
                     && self.command.len() <= 8192,
-                egui::Button::new("Run command twice per missing frame"),
+                egui::Button::new(crate::i18n::text("repo-core-1174")),
             )
             .clicked()
         {
@@ -276,12 +276,12 @@ impl Form {
         ui.horizontal(|ui| {
             if let Some(token) = &self.active {
                 ui.spinner();
-                if ui.button("Stop and join owned work").clicked() {
+                if ui.button(crate::i18n::text("repo-core-1175")).clicked() {
                     token.cancel();
                 }
             }
             if ui
-                .add_enabled(idle, egui::Button::new("Forget tab cache / rerun"))
+                .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-1176")))
                 .clicked()
             {
                 self.cache.clear();
@@ -296,7 +296,7 @@ impl Form {
                 self.benchmark_points(ui);
             }
             if ui
-                .add(egui::Slider::new(&mut self.index, 0..=self.commits.len() - 1).text("Frame"))
+                .add(egui::Slider::new(&mut self.index, 0..=self.commits.len() - 1).text(crate::i18n::text("repo-core-1177")))
                 .changed()
             {
                 self.texture = None;
@@ -305,10 +305,7 @@ impl Form {
             ui.label(format!("{} · {}", commit.hash, commit.summary));
             if let Some(i) = self.first_change {
                 if ui
-                    .button(format!(
-                        "Open first observed adjacent change: {}",
-                        &self.commits[i].hash[..8]
-                    ))
+                    .button(crate::i18n::message("repo-core-1178", &[("hash", format!("{}", &self.commits[i].hash[..8]).into())]))
                     .clicked()
                 {
                     return Outcome::Done(Box::new(crate::repo::Action::SelectHash(
@@ -316,7 +313,7 @@ impl Form {
                     )));
                 }
             } else {
-                ui.label("No observed adjacent stable change. Unknown or inconsistent gaps are never inferred.");
+                ui.label(crate::i18n::text("repo-core-1179"));
             }
             egui::ScrollArea::vertical()
                 .max_height(150.0)
@@ -324,11 +321,11 @@ impl Form {
                 .show(ui, |ui| {
                     for (i, (commit, frame)) in self.commits.iter().zip(&self.frames).enumerate() {
                         let status = match frame {
-                            Frame::Unknown => "not run / evicted",
-                            Frame::Queued => "queued / running",
-                            Frame::Failed(_) => "failed / unavailable",
-                            Frame::Observed(Observation::Inconsistent) => "inconsistent repeats",
-                            Frame::Observed(Observation::Stable(_)) => "stable",
+                            Frame::Unknown => crate::i18n::text("repo-core-1181"),
+                            Frame::Queued => crate::i18n::text("repo-core-1182"),
+                            Frame::Failed(_) => crate::i18n::text("repo-core-1183"),
+                            Frame::Observed(Observation::Inconsistent) => crate::i18n::text("repo-core-1184"),
+                            Frame::Observed(Observation::Stable(_)) => crate::i18n::text("repo-core-1185"),
                         };
                         if ui
                             .selectable_label(
@@ -344,21 +341,21 @@ impl Form {
                 });
             match &self.frames[self.index] {
                 Frame::Unknown => {
-                    ui.label("Not run, or evicted from the bounded tab cache.");
+                    ui.label(crate::i18n::text("repo-core-1187"));
                 }
                 Frame::Queued => {
-                    ui.label("Queued / running; no result yet.");
+                    ui.label(crate::i18n::text("repo-core-1188"));
                 }
                 Frame::Failed(e) => {
                     ui.label(e);
                 }
                 Frame::Observed(Observation::Inconsistent) => {
-                    ui.label("The two runs differ. This frame is inconsistent; no output or value is guessed.");
+                    ui.label(crate::i18n::text("repo-core-1189"));
                 }
                 Frame::Observed(Observation::Stable(sample)) => {
-                    ui.label(format!("Exit code: {}", sample.code));
+                    ui.label(crate::i18n::message("repo-core-1190", &[("code", format!("{}", sample.code).into())]));
                     if !sample.stderr.is_empty() {
-                        ui.collapsing("Stderr (escaped byte preview)", |ui| { let preview: String = sample.stderr.iter().take(8192).flat_map(|b| std::ascii::escape_default(*b)).map(char::from).collect(); ui.monospace(preview); if sample.stderr.len() > 8192 { ui.label("Preview shows the first 8192 bytes; complete stderr was compared."); } });
+                        ui.collapsing(crate::i18n::text("repo-core-1191"), |ui| { let preview: String = sample.stderr.iter().take(8192).flat_map(|b| std::ascii::escape_default(*b)).map(char::from).collect(); ui.monospace(preview); if sample.stderr.len() > 8192 { ui.label(crate::i18n::text("repo-core-1192")); } });
                     }
                     match &sample.value {
                         Value::Text(text) => {
@@ -371,7 +368,7 @@ impl Form {
                         }
                         Value::Number(number) => {
                             ui.heading(format!("{number}"));
-                            ui.label("Exact repeated scalar; units are supplied by your command.");
+                            ui.label(crate::i18n::text("repo-core-1195"));
                         }
                         Value::Png {
                             width,
@@ -400,7 +397,7 @@ impl Form {
                 }
             }
         }
-        ui.label("Cache lives with this tab and is bounded to 64 keys / 32 MiB, keyed by repository/machine path, tree, exact command and mode. Checkout identity, timestamps or machine configuration can affect a command even with the same tree: use Forget cache when those inputs change. Closing cancels work; recovery evidence is retained if cleanup is unconfirmed.");
+        ui.label(crate::i18n::text("repo-core-1197"));
         if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
             Outcome::Cancel
         } else {
@@ -424,7 +421,7 @@ impl Form {
         if values.is_empty() {
             return;
         }
-        ui.label("Stable benchmark observations (click a point; gaps are not interpolated):");
+        ui.label(crate::i18n::text("repo-core-1198"));
         let (rect, response) = ui.allocate_exact_size(
             egui::vec2(ui.available_width(), 100.0),
             egui::Sense::click(),

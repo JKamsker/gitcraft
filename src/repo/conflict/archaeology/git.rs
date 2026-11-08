@@ -65,7 +65,7 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
         Some(InProgress::CherryPick) => ("CHERRY_PICK_HEAD", None, Some("CHERRY_PICK_HEAD^")),
         // Reverting applies the change from the commit to its parent.
         Some(InProgress::Revert) => ("REVERT_HEAD", Some("REVERT_HEAD^"), Some("REVERT_HEAD")),
-        Some(InProgress::Am) | None => return Err(NO_OTHER_SIDE.to_owned()),
+        Some(InProgress::Am) | None => return Err(crate::i18n::text(NO_OTHER_SIDE).to_owned()),
     };
     let rev = |name: &str| {
         git::run(Some(repo), &["rev-parse", "--verify", "-q", name])
@@ -87,7 +87,7 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
 }
 
 /// Said when the conflict comes from no other branch (a stash, a patch).
-pub const NO_OTHER_SIDE: &str = crate::i18n::text("repo-core-0404");
+pub const NO_OTHER_SIDE: &str = "repo-core-0404";
 
 const FIELD: char = '\x1f';
 const RECORD: char = '\x1e';

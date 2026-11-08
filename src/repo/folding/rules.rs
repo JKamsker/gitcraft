@@ -54,7 +54,7 @@ impl FoldReason {
         match self {
             FoldReason::Generated => "generated",
             FoldReason::NoDiff => "marked -diff",
-            FoldReason::Lockfile => "lockfile",
+            FoldReason::Lockfile => crate::i18n::text("repo-core-2546"),
             FoldReason::Minified => "minified",
             FoldReason::Pattern => "matches a pattern of Settings → Git → Diffs",
         }

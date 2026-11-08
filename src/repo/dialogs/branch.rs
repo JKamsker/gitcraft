@@ -21,14 +21,14 @@ pub(super) fn create_branch(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, crate::i18n::text("repo-core-0140"), &format!("Starting at {at_label}"), &t);
+    title(ui, crate::i18n::text("repo-core-0140"), &crate::i18n::message("repo-core-1213", &[("at-label", format!("{}", at_label).into())]), &t);
     field(ui, name, "feature/my-branch", focus);
     dash_spaces(name);
     ui.add_space(6.0);
-    ui.checkbox(checkout, "Check it out");
+    ui.checkbox(checkout, crate::i18n::text("repo-core-1215"));
     ui.add_space(12.0);
     let valid = usable(name);
-    buttons(ui, "Create", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1216"), valid, enter, || {
         let name = name.trim().to_owned();
         let args: Vec<String> = if *checkout {
             vec!["switch".into(), "-c".into(), name.clone(), at.to_owned()]
@@ -36,7 +36,7 @@ pub(super) fn create_branch(
             vec!["branch".into(), name.clone(), at.to_owned()]
         };
         Action::UndoableOps {
-            label: format!("Create branch {name}"),
+            label: crate::i18n::message("repo-core-1218", &[("name", format!("{}", name).into())]),
             ops: vec![args.clone()],
             refresh: Refresh::All,
             undo: Undo::Custom {
@@ -94,27 +94,27 @@ pub(super) fn tag(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, crate::i18n::text("repo-core-0141"), &format!("At {at_label}"), &t);
+    title(ui, crate::i18n::text("repo-core-0141"), &crate::i18n::message("repo-core-1220", &[("at-label", format!("{}", at_label).into())]), &t);
     field(ui, name, "v1.2.0", focus);
     dash_spaces(name);
     ui.add_space(4.0);
     ui.add(
         egui::TextEdit::multiline(message)
-            .hint_text("Message (optional: makes an annotated tag)")
+            .hint_text(crate::i18n::text("repo-core-1222"))
             .desired_width(f32::INFINITY)
             .desired_rows(2)
             .margin(egui::Margin::symmetric(8, 6)),
     );
     if let Some(remote) = remote {
         ui.add_space(4.0);
-        ui.checkbox(push, format!("Push it to {remote}"));
+        ui.checkbox(push, crate::i18n::message("repo-core-1223", &[("remote", format!("{}", remote).into())]));
     }
     ui.add_space(8.0);
-    ui.checkbox(release, "This is a release tag");
+    ui.checkbox(release, crate::i18n::text("repo-core-1224"));
     let valid = usable(name);
     buttons(
         ui,
-        "Create",
+        crate::i18n::text("repo-core-1216"),
         valid,
         enter && !message.contains('\n'),
         || {
@@ -134,9 +134,9 @@ pub(super) fn tag(
             }
             Action::UndoableOps {
                 label: if *release {
-                    format!("Create release tag {name}")
+                    crate::i18n::message("repo-core-1227", &[("name", format!("{}", name).into())])
                 } else {
-                    format!("Create tag {name}")
+                    crate::i18n::message("repo-core-1228", &[("name", format!("{}", name).into())])
                 },
                 ops: steps,
                 refresh: Refresh::All,
@@ -161,15 +161,15 @@ pub(super) fn rename_branch(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Rename branch",
-        &format!("Renames {old} on this computer; its remote copy keeps its name."),
+        crate::i18n::text("repo-core-1229"),
+        &crate::i18n::message("repo-core-1230", &[("old", format!("{}", old).into())]),
         &t,
     );
     field(ui, new, "new-name", focus);
     dash_spaces(new);
     ui.add_space(8.0);
     let valid = usable(new) && new.trim() != old;
-    buttons(ui, "Rename", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1232"), valid, enter, || {
         let new = new.trim().to_owned();
         let old = old.to_owned();
         let rename = |from: &str, to: &str| {
@@ -178,7 +178,7 @@ pub(super) fn rename_branch(
             steps
         };
         Action::UndoableOps {
-            label: format!("Rename {old} to {new}"),
+            label: crate::i18n::message("repo-core-1233", &[("old", format!("{}", old).into()), ("new", format!("{}", new).into())]),
             ops: rename(&old, &new),
             refresh: Refresh::All,
             undo: Undo::Custom {

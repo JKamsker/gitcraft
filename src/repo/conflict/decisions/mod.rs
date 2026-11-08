@@ -146,8 +146,7 @@ impl RepoTab {
             Act::Sync(remote, send) => {
                 let repo = self.path.clone();
                 self.status = Some((
-                    crate::i18n::message("repo-core-0486", &[("Fetching", format!("{}", if send { "Sending" } else { "Fetching" }).into()), ("remote", format!("{}", remote).into())])18n::text("repo-core-0488") }
-                    ),
+                    crate::i18n::message("repo-core-0486", &[(crate::i18n::text("repo-core-0488"), format!("{}", if send { crate::i18n::text("repo-core-0487") } else { crate::i18n::text("repo-core-0488") }).into()), ("remote", format!("{}", remote).into())]),
                     false,
                 ));
                 self.then(
