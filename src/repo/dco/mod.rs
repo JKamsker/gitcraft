@@ -32,8 +32,14 @@ pub(crate) struct Dco {
     pr: Option<PrSignoffs>,
     /// The sign-off asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<Plan>,
-    #[cfg(test)]
-    prepared_snapshot: Option<crate::git::repository_tools::guard::Snapshot>,
+    /// Review starts after the local timeline receipt and GC retention have finished.
+    review_after: Option<ReviewAfter>,
+}
+
+struct ReviewAfter {
+    label: String,
+    heads: (String, String),
+    then: Box<dyn FnOnce(&mut RepoTab, &Context) + Send>,
 }
 
 /// The commits of a pull request, with whether each is signed off.
@@ -232,6 +238,25 @@ impl RepoTab {
         }
     }
 
+    /// The timeline's existing worker has finished both receipt refs and GC retention.
+    /// Match the exact local rewrite, then hand back to normal push preflight once.
+    pub(super) fn dco_timeline_kept(&mut self, id: u64, kept: bool, ctx: &Context) {
+        let Some(entry) = self.timeline.get(id) else {
+            return;
+        };
+        let Some(pending) = self.dco.review_after.take_if(|pending| {
+            entry.label == pending.label
+                && entry.undo.as_ref().and_then(|undo| undo.heads.as_ref()) == Some(&pending.heads)
+        }) else {
+            return;
+        };
+        if kept {
+            (pending.then)(self, ctx);
+        } else {
+            self.status = Some(("Local sign-off finished, but its timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true));
+        }
+    }
+
     /// Whether the commit is made with `--signoff`.
     pub(super) fn signs_off(&self) -> bool {
         self.dco.signs_off()
@@ -275,34 +300,36 @@ impl RepoTab {
                 let profile = crate::settings::Settings::get(ctx).profile();
                 let context = crate::connections::current();
                 let generation = self.https_generation;
-                // This callback runs only after op_done has finished retaining local undo,
-                // reloading and draining queued work. It hands back to the existing root gate.
-                self.then_or(ctx, false, Err, move || {
-                    let snapshot = crate::git::repository_tools::guard::Snapshot::capture(&repo)?;
-                    let prepared = completed_push(&plan, signed, snapshot).ok_or("DCO push target disappeared")?;
-                    prepared.snapshot.check_publication(&repo)?;
-                    Ok(prepared)
-                }, move |tab, prepared, ctx| {
-                    if tab.path != path || crate::settings::Settings::get(ctx).profile() != profile
-                        || crate::connections::current() != context || tab.connection_context != context
-                        || tab.https_generation != generation || tab.busy_op.is_some()
-                        || tab.dialog.is_some() || tab.echo_push_pending()
-                    {
-                        tab.status = Some(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true));
-                        return;
-                    }
-                    match prepared {
-                        Ok(prepared) => {
-                            #[cfg(test)]
-                            { tab.dco.prepared_snapshot = Some(prepared.snapshot.clone()); }
-                            let ops = prepared.route.operations();
-                            tab.preflight_selection = Some(prepared);
-                            tab.run_ops_ex("Push the signed-off commits", ops, Refresh::All, OpKind::plain(), false, ctx);
-                            // Busy/offline refusal must not constrain another push.
-                            tab.preflight_selection = None;
-                        },
-                        Err(error) => tab.status = Some((error, true)),
-                    }
+                self.dco.review_after = Some(ReviewAfter {
+                    label: label.to_owned(),
+                    heads: (plan.head.clone(), signed.clone()),
+                    then: Box::new(move |tab, ctx| {
+                        tab.then_or(ctx, false, Err, move || {
+                            let snapshot = crate::git::repository_tools::guard::Snapshot::capture(&repo)?;
+                            let prepared = completed_push(&plan, signed, snapshot).ok_or("DCO push target disappeared")?;
+                            prepared.snapshot.check_publication(&repo)?;
+                            Ok(prepared)
+                        }, move |tab, prepared, ctx| {
+                            if tab.path != path || crate::settings::Settings::get(ctx).profile() != profile
+                                || crate::connections::current() != context || tab.connection_context != context
+                                || tab.https_generation != generation || tab.busy_op.is_some()
+                                || tab.dialog.is_some() || tab.echo_push_pending()
+                            {
+                                tab.status = Some(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true));
+                                return;
+                            }
+                            match prepared {
+                                Ok(prepared) => {
+                                    let ops = prepared.route.operations();
+                                    tab.preflight_selection = Some(prepared);
+                                    tab.run_ops_ex("Push the signed-off commits", ops, Refresh::All, OpKind::plain(), false, ctx);
+                                    // Busy/offline refusal must not constrain another push.
+                                    tab.preflight_selection = None;
+                                },
+                                Err(error) => tab.status = Some((error, true)),
+                            }
+                        });
+                    }),
                 });
             }
             return;

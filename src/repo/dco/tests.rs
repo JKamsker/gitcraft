@@ -369,6 +369,13 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
         assert!(tab.dialog.is_none() && tab.busy_op.is_none() && tab.running.is_none());
         assert!(tab.preflight_pending.is_none() && tab.last_op.is_none());
         if result.is_ok() {
+            let pending = tab
+                .dco
+                .review_after
+                .as_ref()
+                .ok_or("Successful local rewrite lost its continuation")?;
+            assert_eq!(pending.label, label);
+            assert_eq!(pending.heads, (plan.head.clone(), "d".repeat(40)));
             let prepared = super::completed_push(
                 &plan,
                 "d".repeat(40),
@@ -415,9 +422,63 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
             assert_eq!(raw, label);
             assert_eq!(undo.label, format!("{label} (here only)"));
             assert_eq!(undo.heads, Some((plan.head.clone(), "d".repeat(40))));
+            let local_undo = undo.clone();
+            let id = tab.timeline.push(crate::repo::timeline::Entry {
+                id: 0,
+                parent: None,
+                time: 0,
+                label: label.into(),
+                origin: crate::repo::timeline::Origin::Gitcraft,
+                before: Default::default(),
+                after: Default::default(),
+                files: Vec::new(),
+                files_total: 0,
+                undo: Some(local_undo),
+                redo_child: None,
+                receipt: None,
+            });
+            let entered = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let record = entered.clone();
+            tab.dco
+                .review_after
+                .as_mut()
+                .ok_or("Continuation lost")?
+                .then = Box::new(move |_, _| {
+                record.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            });
+            tab.dco_timeline_kept(id + 1, true, &ctx);
+            assert!(
+                tab.dco.review_after.is_some(),
+                "unrelated retention cannot resume DCO"
+            );
+            assert_eq!(entered.load(std::sync::atomic::Ordering::SeqCst), 0);
+            tab.dco_timeline_kept(id, true, &ctx);
+            tab.dco_timeline_kept(id, true, &ctx);
+            assert!(tab.dco.review_after.is_none());
+            assert_eq!(entered.load(std::sync::atomic::Ordering::SeqCst), 1);
+            let record = entered.clone();
+            tab.dco.review_after = Some(super::ReviewAfter {
+                label: label.into(),
+                heads: (plan.head.clone(), "d".repeat(40)),
+                then: Box::new(move |_, _| {
+                    record.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }),
+            });
+            tab.dco_timeline_kept(id, false, &ctx);
+            assert!(tab.dco.review_after.is_none());
+            assert_eq!(
+                entered.load(std::sync::atomic::Ordering::SeqCst),
+                1,
+                "failed retention cannot resume push review"
+            );
+            assert!(
+                tab.timeline
+                    .get(id)
+                    .is_some_and(|entry| entry.undo.is_some())
+            );
         } else {
             assert!(
-                tab.preflight_after.is_none(),
+                tab.dco.review_after.is_none() && tab.preflight_after.is_none(),
                 "local failure/cancel must queue zero pushes"
             );
         }
@@ -472,11 +533,6 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     let signed = git::head(&dir);
     assert_ne!(signed, head);
     if let Some(Dialog::PushError(error)) = &tab.dialog {
-        let now = crate::git::repository_tools::guard::Snapshot::capture(&dir)?;
-        eprintln!(
-            "DCO snapshot before: {:?}\nafter: {now:?}",
-            tab.dco.prepared_snapshot
-        );
         return Err(format!(
             "DCO fresh checklist refused after local rewrite: {error}"
         ));

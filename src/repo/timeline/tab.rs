@@ -333,6 +333,7 @@ impl RepoTab {
                         Some(format!("The rewrite's receipt couldn't be made: {e}"));
                 }
                 tab.show_receipt(id);
+                let keep_ok = kept.is_ok();
                 if let Err(e) = kept {
                     tab.timeline_error = Some(format!(
                         "The commits of “{}” couldn't be kept from git gc: {e}",
@@ -340,6 +341,7 @@ impl RepoTab {
                     ));
                 }
                 tab.save_timeline(ctx);
+                tab.dco_timeline_kept(id, keep_ok, ctx);
             },
         );
     }
