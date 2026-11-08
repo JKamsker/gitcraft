@@ -5290,11 +5290,257 @@ repo-workflows-ssh_setup-validate-path-371cfd2c = Choose the private-key filenam
 
 repo-workflows-ssh_setup-validate-path-e922aa6d = Choose an absolute key path on the indicated machine (~/ is also supported on SSH/WSL).
 
+repo-workflows-stack-abort-restack-4fe4c0de = Abort restack
+
+repo-workflows-stack-graph-stacks-19350e29 = No open PR
+
+repo-workflows-stack-graph-stacks-50b2c678 = Repair parent…
+
+repo-workflows-stack-graph-stacks-61883d6e = +{ $layer-own-1 } own commits
+
+repo-workflows-stack-graph-stacks-6f246c03 = Needs restack ({ $layer-behind-1 } parent commits)
+
+repo-workflows-stack-graph-stacks-8bbf19c1 = Branch dependencies
+
+repo-workflows-stack-graph-stacks-b4dfe95c = Compare this layer with its parent
+
+repo-workflows-stack-graph-stacks-b5bed1e8 = Choose parent…
+
+repo-workflows-stack-graph-stacks-bd4899fc = Restack…
+
+repo-workflows-stack-graph-stacks-ce29b7f8 = Up to date
+
+repo-workflows-stack-graph-stacks-db1982a0 = PR #{ $pr-number-1 }
+
+repo-workflows-stack-graph-stacks-dd057049 = Parent missing
+
+repo-workflows-stack-graph-stacks-f0192c88 = Cyclic parents: { $cycles-join-1 }
+
+repo-workflows-stack-layer-tip-10e3cf36 = { "\u000A" }{ $layer-parent-1 } is gone: pick the branch it is based on now (This branch is based on…)
+
+repo-workflows-stack-layer-tip-285462c7 = { "\u000A" }{ $layer-parent-1 } moved on ({ $commits-layer-behind-2 } not in { $layer-branch-3 }): needs restacking onto it
+
+repo-workflows-stack-layer-tip-4d3086f3 = { "\u000A" }Double-click to check out; right-click for the changes it adds
+
+repo-workflows-stack-layer-tip-fc53c05a = { $layer-branch-1 }
+    Based on { $layer-parent-2 } · { $commits-layer-own-3 } of its own
+
+repo-workflows-stack-loop-problem-27b30746 = { $branch } can't be based on itself.
+
+repo-workflows-stack-loop-problem-bc8dbf35 = { $parent } is based on { $branch }: { $branch } can't be based on it too.
+
+repo-workflows-stack-loop-row-72369e42 = { $looped-join-1 } are based on each other.
+
+repo-workflows-stack-loop-row-cf097c1a = Pick { $first }'s parent…
+
+repo-workflows-stack-open-publish-3e534e60 = { $layer-parent-1 } is gone: pick what { $layer-branch-2 } is based on first.
+
+repo-workflows-stack-open-publish-a23e7f8b = This repository isn't on a forge gitcraft knows: there is nowhere to publish to.
+
+repo-workflows-stack-open-restack-419e0d8e = Nothing to restack: every layer is on its parent's tip.
+
+repo-workflows-stack-parent-problem-61a1cff0 = Pick the branch { $branch } is based on.
+
+repo-workflows-stack-parent-problem-f7032e38 = { $parent } is not a local branch.
+
+repo-workflows-stack-plan-row-1004d25d = #{ $number }: into { $plan-base-1 } instead of { $from }
+
+repo-workflows-stack-plan-row-140261ea = { "     " }and { $n-4-1 } more
+
+repo-workflows-stack-plan-row-25b842ca = nothing of its own: pushed, no { $noun }
+
+repo-workflows-stack-plan-row-3c8950f2 = new { $noun } into { $plan-base-1 } (#{ $n } was closed without merging)
+
+repo-workflows-stack-plan-row-512a4ebf = new { $noun } into { $plan-base-1 }
+
+repo-workflows-stack-plan-row-6a96cf4f = #{ $n } is merged: left alone
+
+repo-workflows-stack-plan-row-7e8cd205 = Title
+
+repo-workflows-stack-plan-row-96f34b27 = { "   " }{ $from }'s { $noun } was merged: { $plan-branch-1 } goes into { $plan-base-2 } now
+
+repo-workflows-stack-plan-row-bbd4b6a8 = Changes
+
+repo-workflows-stack-plan-row-c5790350 = #{ $n }: push the new commits
+
+repo-workflows-stack-plan-row-ff1f70b3 = What { $plan-branch-1 } adds to { $plan-base-2 }, in full
+
+repo-workflows-stack-preview-row-134f0bef = already on { $p-step-parent-1 }'s tip: nothing to replay
+
+repo-workflows-stack-preview-row-5302fc22 = { $commits-p-commits-1 } onto { $p-step-parent-2 } · base { $short-p-step-old-base-3 } → { $short-p-new-base-4 }
+
+repo-workflows-stack-preview-row-c62999a7 = · in its worktree at { $wt-display-1 }
+
+repo-workflows-stack-preview-row-f80cf9a0 = { $commits-p-commits-1 } onto { $p-step-parent-2 }'s new tip · base { $short-p-step-old-base-3 } → its new tip
+
+repo-workflows-stack-publish-dialog-1638800f = Can't publish: { $e }
+
 repo-workflows-stack-publish-dialog-19766ed6 = Cancel
+
+repo-workflows-stack-publish-dialog-44cb25f8 = Restack the branches moved down afterwards, so their changes are only their own.
+
+repo-workflows-stack-publish-dialog-55798dde = Each branch is pushed, bottom first, and its { $noun } goes into the branch below it. Publish again later to update them all: none is opened twice, and a branch is never pushed over commits it doesn't have.
+
+repo-workflows-stack-publish-dialog-64d68875 = Asking which { $noun }s are open…
+
+repo-workflows-stack-publish-dialog-859390eb = Publish
+
+repo-workflows-stack-publish-dialog-d530df80 = Open new { $noun }s as drafts
+
+repo-workflows-stack-publish-dialog-e512538a = The { $noun }s of the stack on { $preview-root-1 }
+
+repo-workflows-stack-publish-done-6ffb5e8c = { $report-done-len-1 } of { $total } done, then { $branch } failed: { $e }. Publish again to go on: what was done stays, no { $noun } is opened twice.
+
+repo-workflows-stack-publish-done-c4ffa0c1 = Publish { $noun }s
+
+repo-workflows-stack-read-stacks-4272623a = Couldn't read the stacks: { $e }
+
+repo-workflows-stack-remove-parent-e6733ec1 = Remove { $branch } from its stack
+
+repo-workflows-stack-restack-banner-13c0353b = 1 dependent branch needs updating
+
+repo-workflows-stack-restack-banner-219a0515 = Resolve its conflicts, mark them resolved, then Continue restack.
+
+repo-workflows-stack-restack-banner-253f5c4b = { $n } dependent branches need updating
+
+repo-workflows-stack-restack-banner-3935d0e6 = Open its worktree
+
+repo-workflows-stack-restack-banner-41ffaa88 = Restack paused at { $branch } ({ $pending-done-1-1 } of { $pending-steps-len-2 })
+
+repo-workflows-stack-restack-banner-47e6c77e = Preview each one's new base, then replay their commits onto their parents
+
+repo-workflows-stack-restack-banner-4fe4c0de = Abort restack
+
+repo-workflows-stack-restack-banner-7a7b5fb5 = Continue restack
+
+repo-workflows-stack-restack-banner-82febca8 = Continue restack goes on from here.
+
+repo-workflows-stack-restack-banner-97adce19 = Resolve its conflicts in its worktree at { $wt-display-1 }, then Continue restack.
+
+repo-workflows-stack-restack-banner-aecb595d = Every branch back where it was before the restack
+
+repo-workflows-stack-restack-banner-bd4899fc = Restack…
+
+repo-workflows-stack-restack-dialog-17605ec0 = Working out the new bases…
 
 repo-workflows-stack-restack-dialog-19766ed6 = Cancel
 
+repo-workflows-stack-restack-dialog-34001cc3 = Each branch's own commits are replayed onto its parent's new tip, parents first. A conflict stops the restack: resolve it, then Continue restack. Ctrl+Z afterwards puts every branch back.
+
+repo-workflows-stack-restack-dialog-467c87df = Can't restack: { $e }
+
+repo-workflows-stack-restack-dialog-9868923b = Commit or stash your changes first: restacking checks the branches out here.
+
+repo-workflows-stack-restack-dialog-9fbc2915 = Restack
+
+repo-workflows-stack-restack-dialog-dacd5d19 = Finish or abort the operation in progress first.
+
+repo-workflows-stack-restack-dialog-ea8badd0 = Waiting for { $busy }…
+
+repo-workflows-stack-restack-dialog-fd52d182 = Replay in isolated worktrees…
+
+repo-workflows-stack-restack-done-1fc5c0ba = Restack: every branch was already on its parent's tip
+
+repo-workflows-stack-restack-done-33b4b547 = Restack stopped at { $branch } on conflicts: resolve them{ $place }, then Continue restack (or Abort restack)
+
+repo-workflows-stack-restack-done-6cecc855 = { " " }in its worktree at { $wt-display-1 }
+
+repo-workflows-stack-restack-done-7f6cce25 = Restack: { $n } branches moved · Ctrl+Z puts them back
+
+repo-workflows-stack-restack-done-9fbc2915 = Restack
+
+repo-workflows-stack-restack-done-a7222989 = Restack aborted: every branch is back where it was
+
+repo-workflows-stack-restack-done-c27578ee = Restack aborted: every branch is back where it was but { $kept-join-1 }, which got commits after it was restacked and is left as it is
+
+repo-workflows-stack-restack-done-dbfb6ce0 = Restack: 1 branch moved · Ctrl+Z puts it back
+
+repo-workflows-stack-resume-restack-9fbc2915 = Restack
+
+repo-workflows-stack-run-restack-95c7214f = { $label }: run it again once { $busy } is done
+
+repo-workflows-stack-run-stack-op-95c7214f = { $label }: run it again once { $busy } is done
+
+repo-workflows-stack-set-parent-81fef295 = Base { $branch } on { $parent }
+
+repo-workflows-stack-stack-dialogs-0681a692 = No other branch shares history with it.
+
+repo-workflows-stack-stack-dialogs-0772e513 = Set parent
+
 repo-workflows-stack-stack-dialogs-19766ed6 = Cancel
+
+repo-workflows-stack-stack-dialogs-3ed31566 = The branch it is a layer on in a stack: STACKS then shows the commits it adds, and warns when that branch moves on.
+
+repo-workflows-stack-stack-dialogs-48de49a3 = { $dialog-branch-1 } is based on…
+
+repo-workflows-stack-stack-dialogs-834da95d = Pick a branch
+
+repo-workflows-stack-stack-dialogs-8511ea38 = Now based on { $r-parent-1 }
+
+repo-workflows-stack-stack-dialogs-87dad22d = Couldn't look at history: { $e }
+
+repo-workflows-stack-stack-dialogs-9ba88e00 = Now based on { $r-parent-1 }, which is gone
+
+repo-workflows-stack-stack-dialogs-c36d819e = Use
+
+repo-workflows-stack-stack-dialogs-e3dadccb = Suggested from history: { $name }
+
+repo-workflows-stack-stack-dialogs-e4fe8b0e = Looking at history…
+
+repo-workflows-stack-stack-line-559ed9fe = Stack: { $chain-self-stacks-layers-branch--1 }
+
+repo-workflows-stack-stack-line-c5c1ffb4 = { " " }· { $layer-parent-1 } moved on: needs restacking
+
+repo-workflows-stack-stack-line-e4355cbd = { " " }· { $layer-parent-1 } is gone
+
+repo-workflows-stack-stack-menu-items-1485e8a2 = Replay their own commits onto its new tip
+
+repo-workflows-stack-stack-menu-items-30af0952 = Restack the branch on it…
+
+repo-workflows-stack-stack-menu-items-3a261297 = Changes { $b-name-1 } adds to { $r-parent-2 }
+
+repo-workflows-stack-stack-menu-items-42e9f303 = Its own commits in the stack: since it forked from its parent
+
+repo-workflows-stack-stack-menu-items-4537653e = The branch it is a layer on in a stack
+
+repo-workflows-stack-stack-menu-items-68f6577e = Preview each one's base and patch, then open or update them bottom-up
+
+repo-workflows-stack-stack-menu-items-8400b536 = Remove from its stack
+
+repo-workflows-stack-stack-menu-items-8511ea38 = Now based on { $r-parent-1 }
+
+repo-workflows-stack-stack-menu-items-ce8e45b9 = This branch is based on…
+
+repo-workflows-stack-stack-menu-items-d8ad545a = A restack is paused: continue or abort it in STACKS first
+
+repo-workflows-stack-stack-menu-items-e5c65f7a = Publish its stack's { $forge-noun-1 }s…
+
+repo-workflows-stack-stack-menu-items-f7763ef9 = Restack the { $on-it } branches on it…
+
+repo-workflows-stack-stack-section-316027d9 = STACKS
+
+repo-workflows-stack-stack-section-68f6577e = Preview each one's base and patch, then open or update them bottom-up
+
+repo-workflows-stack-stack-section-c5c6049a = Publish its { $forge-noun-1 }s…
+
+repo-workflows-stack-start-publish-c4ffa0c1 = Publish { $noun }s
+
+repo-workflows-stack-start-publish-e0c26cc9 = Publish: run it again once { $busy } is done
+
+repo-workflows-stack-start-restack-9fbc2915 = Restack
+
+repo-workflows-stack-summary-47eeff3f = Publish { $noun }s: nothing to do
+
+repo-workflows-stack-summary-7f75368f = Published { $noun }s: { $parts-join-1 }
+
+repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 } branches
+
+repo-workflows-stack-title-row-3f1c7b21 = { $n } to restack
+
+repo-workflows-stack-title-row-569c1ff8 = { $title }
+    Right-click to publish its { $noun }s
+
+repo-workflows-stack-title-row-f3da38c2 = { $n } to restack · { $g } gone
 
 repo-workflows-surgery-footer-19766ed6 = Cancel
 
@@ -5592,4 +5838,40 @@ repo-workflows-saved-view-summary = { $loaded } loaded matches / { $selected } s
         [yes] { " · partial: " }{ $budget }-commit budget
        *[no] { "" }
     } · working changes, stashes and selection kept as context
+
+repo-workflows-stack-commit-count = { $count ->
+        [one] 1 commit
+       *[other] { $count } commits
+    }
+
+repo-workflows-stack-patch-count = { $count ->
+        [one] { "   " }1 commit
+       *[other] { "   " }{ $count } commits
+    }
+
+repo-workflows-stack-restack-title = Restack { $count ->
+        [one] 1 branch
+       *[other] { $count } branches
+    }
+
+repo-workflows-stack-layer-summary = { $branch }
+    Based on { $parent } · { $count ->
+        [one] one commit of its own
+       *[other] { $count } commits of its own
+    }
+
+repo-workflows-stack-gone-parents = { $count ->
+        [one] 1 parent gone
+       *[other] { $count } parents gone
+    }
+
+repo-workflows-stack-own-count = { $count ->
+        [one] +1 own commit
+       *[other] +{ $count } own commits
+    }
+
+repo-workflows-stack-behind-count = Needs restack ({ $count ->
+        [one] 1 parent commit
+       *[other] { $count } parent commits
+    })
 

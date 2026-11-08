@@ -12,100 +12,134 @@ impl RepoTab {
             return;
         }
         let t = Tokens::get(ui.ctx());
-        egui::CollapsingHeader::new("Branch dependencies")
-            .id_salt("graph-stack-relations")
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt("graph-stack-layers")
-                    .max_height(180.0)
-                    .show(ui, |ui| {
-                        for tree in trees(&self.stacks.layers) {
-                            ui.label(egui::RichText::new(tree.title()).strong());
-                            for (depth, layer) in tree.rows {
-                                ui.horizontal_wrapped(|ui| {
-                                    ui.add_space((depth.saturating_sub(1).min(12) * 12) as f32);
-                                    if ui.link(&layer.parent).clicked()
-                                        && let Some(b) =
-                                            self.refs.local.iter().find(|b| b.name == layer.parent)
-                                    {
-                                        acts.push(Action::SelectHash(b.target.clone()));
-                                    }
-                                    ui.label("→");
-                                    if ui.link(&layer.branch).clicked()
-                                        && let Some(b) =
-                                            self.refs.local.iter().find(|b| b.name == layer.branch)
-                                    {
-                                        acts.push(Action::SelectHash(b.target.clone()));
-                                    }
+        egui::CollapsingHeader::new(crate::i18n::text(
+            "repo-workflows-stack-graph-stacks-8bbf19c1",
+        ))
+        .id_salt("graph-stack-relations")
+        .default_open(true)
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("graph-stack-layers")
+                .max_height(180.0)
+                .show(ui, |ui| {
+                    for tree in trees(&self.stacks.layers) {
+                        ui.label(egui::RichText::new(tree.title()).strong());
+                        for (depth, layer) in tree.rows {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.add_space((depth.saturating_sub(1).min(12) * 12) as f32);
+                                if ui.link(&layer.parent).clicked()
+                                    && let Some(b) =
+                                        self.refs.local.iter().find(|b| b.name == layer.parent)
+                                {
+                                    acts.push(Action::SelectHash(b.target.clone()));
+                                }
+                                ui.label("→");
+                                if ui.link(&layer.branch).clicked()
+                                    && let Some(b) =
+                                        self.refs.local.iter().find(|b| b.name == layer.branch)
+                                {
+                                    acts.push(Action::SelectHash(b.target.clone()));
+                                }
+                                if ui
+                                    .small_button(crate::i18n::message(
+                                        "repo-workflows-stack-own-count",
+                                        &[("count", (layer.own).into())],
+                                    ))
+                                    .on_hover_text(crate::i18n::text(
+                                        "repo-workflows-stack-graph-stacks-b4dfe95c",
+                                    ))
+                                    .clicked()
+                                {
+                                    acts.push(crate::repo::actions::compare_branches_action(
+                                        crate::repo::actions::BranchRef::local(&layer.parent),
+                                        crate::repo::actions::BranchRef::local(&layer.branch),
+                                        true,
+                                    ));
+                                }
+                                if let Some(pr) = self.prs.iter().find(|p| p.branch == layer.branch)
+                                {
                                     if ui
-                                        .small_button(format!("+{} own commits", layer.own))
-                                        .on_hover_text("Compare this layer with its parent")
+                                        .link(crate::i18n::message(
+                                            "repo-workflows-stack-graph-stacks-db1982a0",
+                                            &[("pr-number-1", (pr.number).clone().into())],
+                                        ))
+                                        .on_hover_text(&pr.title)
                                         .clicked()
                                     {
-                                        acts.push(crate::repo::actions::compare_branches_action(
-                                            crate::repo::actions::BranchRef::local(&layer.parent),
-                                            crate::repo::actions::BranchRef::local(&layer.branch),
-                                            true,
-                                        ));
+                                        acts.push(Action::OpenPr(pr.number));
                                     }
-                                    if let Some(pr) =
-                                        self.prs.iter().find(|p| p.branch == layer.branch)
+                                } else {
+                                    ui.weak(crate::i18n::text(
+                                        "repo-workflows-stack-graph-stacks-19350e29",
+                                    ));
+                                }
+                                if layer.parent_missing {
+                                    ui.colored_label(
+                                        t.warning,
+                                        crate::i18n::text(
+                                            "repo-workflows-stack-graph-stacks-dd057049",
+                                        ),
+                                    );
+                                    if ui
+                                        .small_button(crate::i18n::text(
+                                            "repo-workflows-stack-graph-stacks-b5bed1e8",
+                                        ))
+                                        .clicked()
                                     {
-                                        if ui
-                                            .link(format!("PR #{}", pr.number))
-                                            .on_hover_text(&pr.title)
-                                            .clicked()
-                                        {
-                                            acts.push(Action::OpenPr(pr.number));
-                                        }
-                                    } else {
-                                        ui.weak("No open PR");
+                                        acts.push(Action::Stack(StackAct::OpenBasedOn(
+                                            layer.branch.clone(),
+                                        )));
                                     }
-                                    if layer.parent_missing {
-                                        ui.colored_label(t.warning, "Parent missing");
-                                        if ui.small_button("Choose parent…").clicked() {
-                                            acts.push(Action::Stack(StackAct::OpenBasedOn(
-                                                layer.branch.clone(),
-                                            )));
-                                        }
-                                    } else if layer.needs_restack() {
-                                        ui.colored_label(
-                                            t.warning,
-                                            format!(
-                                                "Needs restack ({} parent commits)",
-                                                layer.behind
-                                            ),
-                                        );
-                                        if ui
-                                            .add_enabled(
-                                                !self.is_busy(),
-                                                egui::Button::new("Restack…").small(),
-                                            )
-                                            .clicked()
-                                        {
-                                            acts.push(Action::Stack(StackAct::OpenRestack(Some(
-                                                layer.parent.clone(),
-                                            ))));
-                                        }
-                                    } else {
-                                        ui.weak("Up to date");
+                                } else if layer.needs_restack() {
+                                    ui.colored_label(
+                                        t.warning,
+                                        crate::i18n::message(
+                                            "repo-workflows-stack-behind-count",
+                                            &[("count", (layer.behind).into())],
+                                        ),
+                                    );
+                                    if ui
+                                        .add_enabled(
+                                            !self.is_busy(),
+                                            egui::Button::new(crate::i18n::text(
+                                                "repo-workflows-stack-graph-stacks-bd4899fc",
+                                            ))
+                                            .small(),
+                                        )
+                                        .clicked()
+                                    {
+                                        acts.push(Action::Stack(StackAct::OpenRestack(Some(
+                                            layer.parent.clone(),
+                                        ))));
                                     }
-                                });
-                            }
+                                } else {
+                                    ui.weak(crate::i18n::text(
+                                        "repo-workflows-stack-graph-stacks-ce29b7f8",
+                                    ));
+                                }
+                            });
                         }
-                        let cycles = looped(&self.stacks.layers);
-                        if !cycles.is_empty() {
-                            ui.colored_label(
-                                t.warning,
-                                format!("Cyclic parents: {}", cycles.join(", ")),
-                            );
-                            if ui.button("Repair parent…").clicked() {
-                                acts.push(Action::Stack(StackAct::OpenBasedOn(cycles[0].clone())));
-                            }
+                    }
+                    let cycles = looped(&self.stacks.layers);
+                    if !cycles.is_empty() {
+                        ui.colored_label(
+                            t.warning,
+                            crate::i18n::message(
+                                "repo-workflows-stack-graph-stacks-f0192c88",
+                                &[("cycles-join-1", (cycles.join(", ")).clone().into())],
+                            ),
+                        );
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-stack-graph-stacks-50b2c678",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Stack(StackAct::OpenBasedOn(cycles[0].clone())));
                         }
-                    });
-            });
+                    }
+                });
+        });
     }
 }
 

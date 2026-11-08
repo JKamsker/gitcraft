@@ -42,7 +42,7 @@ impl RepoTab {
             Header {
                 key: "stacks",
                 icon: "rows-2",
-                title: "STACKS",
+                title: crate::i18n::text("repo-workflows-stack-stack-section-316027d9"),
                 count: stacks.len(),
                 default_open: true,
                 button: None,
@@ -65,21 +65,21 @@ impl RepoTab {
             if !tree.rows.iter().any(|(_, l)| shown(l)) {
                 continue;
             }
-            let r = title_row(ui, tree, self.forge().map(|f| f.noun()));
+            let r = title_row(ui, tree, self.forge().map(|f| f.noun_label()));
             if let Some(forge) = self.forge() {
                 crate::menu_item::context(&r)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
-                        if crate::menu_item::MenuItem::new(format!(
-                            "Publish its {}s…",
-                            forge.noun()
+                        if crate::menu_item::MenuItem::new(crate::i18n::message(
+                            "repo-workflows-stack-stack-section-c5c6049a",
+                            &[("forge-noun-1", (forge.noun_label()).clone().into())],
                         ))
                         .icon("external-link")
                         .enabled(idle)
                         .show(ui)
-                        .on_hover_text(
-                            "Preview each one's base and patch, then open or update them bottom-up",
-                        )
+                        .on_hover_text(crate::i18n::text(
+                            "repo-workflows-stack-stack-section-68f6577e",
+                        ))
                         .clicked()
                         {
                             acts.push(Action::Stack(StackAct::OpenPublish(tree.root.clone())));
@@ -116,43 +116,63 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     crate::icons::inline(ui, "circle-alert", 16.0, t.warning);
                     ui.label(
-                        egui::RichText::new(format!(
-                            "Restack paused at {branch} ({} of {})",
-                            pending.done + 1,
-                            pending.steps.len()
+                        egui::RichText::new(crate::i18n::message(
+                            "repo-workflows-stack-restack-banner-41ffaa88",
+                            &[
+                                ("branch", (branch).clone().into()),
+                                ("pending-done-1-1", (pending.done + 1).clone().into()),
+                                ("pending-steps-len-2", (pending.steps.len()).clone().into()),
+                            ],
                         ))
                         .color(t.warning)
                         .font(theme::medium(12.5)),
                     );
                 });
                 let what = match (elsewhere, stopped_here) {
-                    (Some(wt), _) => format!(
-                        "Resolve its conflicts in its worktree at {}, then Continue restack.",
-                        wt.display()
+                    (Some(wt), _) => crate::i18n::message(
+                        "repo-workflows-stack-restack-banner-97adce19",
+                        &[("wt-display-1", (wt.display()).to_string().into())],
                     ),
                     (None, true) => {
-                        "Resolve its conflicts, mark them resolved, then Continue restack."
-                            .to_owned()
+                        crate::i18n::text("repo-workflows-stack-restack-banner-219a0515").to_owned()
                     }
-                    (None, false) => "Continue restack goes on from here.".to_owned(),
+                    (None, false) => {
+                        crate::i18n::text("repo-workflows-stack-restack-banner-82febca8").to_owned()
+                    }
                 };
                 ui.label(egui::RichText::new(what).color(t.text_dim).small());
                 ui.horizontal_wrapped(|ui| {
                     if ui
-                        .add_enabled(idle, egui::Button::new("Continue restack"))
+                        .add_enabled(
+                            idle,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-restack-banner-7a7b5fb5",
+                            )),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::ResumeRestack));
                     }
                     if ui
-                        .add_enabled(idle, egui::Button::new("Abort restack"))
-                        .on_hover_text("Every branch back where it was before the restack")
+                        .add_enabled(
+                            idle,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-restack-banner-4fe4c0de",
+                            )),
+                        )
+                        .on_hover_text(crate::i18n::text(
+                            "repo-workflows-stack-restack-banner-aecb595d",
+                        ))
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::AbortRestack));
                     }
                     if let Some(wt) = elsewhere
-                        && ui.button("Open its worktree").clicked()
+                        && ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-stack-restack-banner-3935d0e6",
+                            ))
+                            .clicked()
                     {
                         acts.push(Action::OpenWorktree(wt.clone()));
                     }
@@ -168,18 +188,25 @@ impl RepoTab {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new(if n == 1 {
-                        "1 dependent branch needs updating".to_owned()
+                        crate::i18n::text("repo-workflows-stack-restack-banner-13c0353b").to_owned()
                     } else {
-                        format!("{n} dependent branches need updating")
+                        crate::i18n::message(
+                            "repo-workflows-stack-restack-banner-253f5c4b",
+                            &[("n", (n).clone().into())],
+                        )
                     })
                     .color(t.text),
                 );
                 if ui
-                    .add_enabled(idle, egui::Button::new("Restack…"))
-                    .on_hover_text(
-                        "Preview each one's new base, then replay their commits onto their \
-                         parents",
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-stack-restack-banner-bd4899fc",
+                        )),
                     )
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-stack-restack-banner-47e6c77e",
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Stack(StackAct::OpenRestack(None)));
@@ -195,14 +222,21 @@ impl RepoTab {
         ui.horizontal_wrapped(|ui| {
             ui.add_space(22.0);
             ui.label(
-                egui::RichText::new(format!("{} are based on each other.", looped.join(", ")))
-                    .color(t.warning),
+                egui::RichText::new(crate::i18n::message(
+                    "repo-workflows-stack-loop-row-72369e42",
+                    &[("looped-join-1", (looped.join(", ")).clone().into())],
+                ))
+                .color(t.warning),
             );
             if let Some(first) = looped.first()
                 && ui
                     .add_enabled(
                         idle,
-                        egui::Button::new(format!("Pick {first}'s parent…")).small(),
+                        egui::Button::new(crate::i18n::message(
+                            "repo-workflows-stack-loop-row-cf097c1a",
+                            &[("first", (first).clone().into())],
+                        ))
+                        .small(),
                     )
                     .clicked()
             {
@@ -277,15 +311,25 @@ impl RepoTab {
 
     /// What a layer's tooltip says.
     fn layer_tip(&self, layer: &Layer) -> String {
-        let commits = |n: u32| format!("{n} commit{}", if n == 1 { "" } else { "s" });
-        let mut tip = format!(
-            "{}\nBased on {} · {} of its own",
-            layer.branch,
-            layer.parent,
-            commits(layer.own)
+        let commits = |n: u32| {
+            crate::i18n::message(
+                "repo-workflows-stack-commit-count",
+                &[("count", (n).into())],
+            )
+        };
+        let mut tip = crate::i18n::message(
+            "repo-workflows-stack-layer-summary",
+            &[
+                ("branch", (layer.branch.as_str()).into()),
+                ("parent", (layer.parent.as_str()).into()),
+                ("count", (layer.own).into()),
+            ],
         );
         if let Some(pr) = self.prs.iter().find(|p| p.branch == layer.branch) {
-            let noun = self.forge().map_or("pull request", |f| f.noun());
+            let noun = self
+                .forge()
+                .unwrap_or(crate::forge::Forge::GitHub)
+                .noun_label();
             tip.push_str(&format!(
                 "\n{} #{}: {}",
                 capitalised(noun),
@@ -294,19 +338,24 @@ impl RepoTab {
             ));
         }
         if layer.parent_missing {
-            tip.push_str(&format!(
-                "\n{} is gone: pick the branch it is based on now (This branch is based on…)",
-                layer.parent
+            tip.push_str(&crate::i18n::message(
+                "repo-workflows-stack-layer-tip-10e3cf36",
+                &[("layer-parent-1", (layer.parent).clone().into())],
             ));
         } else if layer.needs_restack() {
-            tip.push_str(&format!(
-                "\n{} moved on ({} not in {}): needs restacking onto it",
-                layer.parent,
-                commits(layer.behind),
-                layer.branch
+            tip.push_str(&crate::i18n::message(
+                "repo-workflows-stack-layer-tip-285462c7",
+                &[
+                    ("layer-parent-1", (layer.parent).clone().into()),
+                    (
+                        "commits-layer-behind-2",
+                        (commits(layer.behind)).clone().into(),
+                    ),
+                    ("layer-branch-3", (layer.branch).clone().into()),
+                ],
             ));
         }
-        tip.push_str("\nDouble-click to check out; right-click for the changes it adds");
+        tip.push_str(crate::i18n::text("repo-workflows-stack-layer-tip-4d3086f3"));
         tip
     }
 
@@ -339,11 +388,19 @@ impl RepoTab {
         // Its own changes: since it forked from its parent, as its pull request will show them.
         if let Some(r) = recorded
             && self.refs.local.iter().any(|l| l.name == r.parent)
-            && crate::menu_item::MenuItem::new(format!("Changes {} adds to {}", b.name, r.parent))
-                .icon("command")
-                .show(ui)
-                .on_hover_text("Its own commits in the stack: since it forked from its parent")
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-stack-stack-menu-items-3a261297",
+                &[
+                    ("b-name-1", (b.name).clone().into()),
+                    ("r-parent-2", (r.parent).clone().into()),
+                ],
+            ))
+            .icon("command")
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-42e9f303",
+            ))
+            .clicked()
         {
             acts.push(compare_branches_action(
                 BranchRef::local(&r.parent),
@@ -352,59 +409,73 @@ impl RepoTab {
             ));
         }
         let hover = match recorded {
-            Some(r) => format!("Now based on {}", r.parent),
-            None => "The branch it is a layer on in a stack".to_owned(),
+            Some(r) => crate::i18n::message(
+                "repo-workflows-stack-stack-menu-items-8511ea38",
+                &[("r-parent-1", (r.parent).clone().into())],
+            ),
+            None => crate::i18n::text("repo-workflows-stack-stack-menu-items-4537653e").to_owned(),
         };
-        if crate::menu_item::MenuItem::new("This branch is based on…")
-            .icon("git-branch-plus")
-            .enabled(idle)
-            .show(ui)
-            .on_hover_text(hover)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-stack-stack-menu-items-ce8e45b9",
+        ))
+        .icon("git-branch-plus")
+        .enabled(idle)
+        .show(ui)
+        .on_hover_text(hover)
+        .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenBasedOn(b.name.clone())));
         }
         let on_it = dependents(&self.stacks.layers, &b.name).len();
         if on_it > 0
             && crate::menu_item::MenuItem::new(if on_it == 1 {
-                "Restack the branch on it…".to_owned()
+                crate::i18n::text("repo-workflows-stack-stack-menu-items-30af0952").to_owned()
             } else {
-                format!("Restack the {on_it} branches on it…")
+                crate::i18n::message(
+                    "repo-workflows-stack-stack-menu-items-f7763ef9",
+                    &[("on-it", (on_it).clone().into())],
+                )
             })
             .icon("git-branch-plus")
             .enabled(idle)
-            .refused(
-                self.stacks
-                    .pending
-                    .is_some()
-                    .then_some("A restack is paused: continue or abort it in STACKS first"),
-            )
+            .refused(self.stacks.pending.is_some().then_some(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-d8ad545a",
+            )))
             .show(ui)
-            .on_hover_text("Replay their own commits onto its new tip")
-            .on_disabled_hover_text("A restack is paused: continue or abort it in STACKS first")
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-1485e8a2",
+            ))
+            .on_disabled_hover_text(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-d8ad545a",
+            ))
             .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenRestack(Some(b.name.clone()))));
         }
         if let Some(forge) = self.forge()
             && self.stacks.layer(&b.name).is_some()
-            && crate::menu_item::MenuItem::new(format!("Publish its stack's {}s…", forge.noun()))
-                .icon("external-link")
-                .enabled(idle)
-                .show(ui)
-                .on_hover_text(
-                    "Preview each one's base and patch, then open or update them bottom-up",
-                )
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-stack-stack-menu-items-e5c65f7a",
+                &[("forge-noun-1", (forge.noun_label()).clone().into())],
+            ))
+            .icon("external-link")
+            .enabled(idle)
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-68f6577e",
+            ))
+            .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenPublish(b.name.clone())));
         }
         if self.stacks.recorded.contains_key(&b.name)
-            && crate::menu_item::MenuItem::new("Remove from its stack")
-                .icon("minus")
-                .enabled(idle)
-                .show(ui)
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-stack-stack-menu-items-8400b536",
+            ))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
         {
             acts.push(Action::Stack(StackAct::RemoveParent(b.name.clone())));
         }
@@ -422,9 +493,18 @@ fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
     let (stale, gone) = tree.stale();
     let note = match (stale, gone) {
         (0, 0) => None,
-        (n, 0) => Some(format!("{n} to restack")),
-        (0, g) => Some(format!("{g} parent{} gone", if g == 1 { "" } else { "s" })),
-        (n, g) => Some(format!("{n} to restack · {g} gone")),
+        (n, 0) => Some(crate::i18n::message(
+            "repo-workflows-stack-title-row-3f1c7b21",
+            &[("n", (n).clone().into())],
+        )),
+        (0, g) => Some(crate::i18n::message(
+            "repo-workflows-stack-gone-parents",
+            &[("count", (g).into())],
+        )),
+        (n, g) => Some(crate::i18n::message(
+            "repo-workflows-stack-title-row-f3da38c2",
+            &[("n", (n).clone().into()), ("g", (g).clone().into())],
+        )),
     };
     if let Some(note) = note {
         let r = painter.text(
@@ -447,7 +527,13 @@ fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
             t.text_dim,
         );
     match noun {
-        Some(noun) => resp.on_hover_text(format!("{title}\nRight-click to publish its {noun}s")),
+        Some(noun) => resp.on_hover_text(crate::i18n::message(
+            "repo-workflows-stack-title-row-569c1ff8",
+            &[
+                ("title", (title).clone().into()),
+                ("noun", (noun).clone().into()),
+            ],
+        )),
         None => resp.on_hover_text(title),
     }
 }

@@ -5290,11 +5290,257 @@ repo-workflows-ssh_setup-validate-path-371cfd2c = Wählen Sie den Namen der priv
 
 repo-workflows-ssh_setup-validate-path-e922aa6d = Wählen Sie auf dem angegebenen Rechner einen absoluten Schlüsselpfad (auf SSH/WSL wird auch ~/ unterstützt).
 
+repo-workflows-stack-abort-restack-4fe4c0de = Neuaufbau abbrechen
+
+repo-workflows-stack-graph-stacks-19350e29 = Kein offener PR
+
+repo-workflows-stack-graph-stacks-50b2c678 = Eltern-Branch korrigieren…
+
+repo-workflows-stack-graph-stacks-61883d6e = +{ $layer-own-1 } eigene Commits
+
+repo-workflows-stack-graph-stacks-6f246c03 = Neu aufbauen erforderlich ({ $layer-behind-1 } Commits im Eltern-Branch)
+
+repo-workflows-stack-graph-stacks-8bbf19c1 = Branch-Abhängigkeiten
+
+repo-workflows-stack-graph-stacks-b4dfe95c = Diese Ebene mit ihrem Eltern-Branch vergleichen
+
+repo-workflows-stack-graph-stacks-b5bed1e8 = Eltern-Branch auswählen…
+
+repo-workflows-stack-graph-stacks-bd4899fc = Neu aufbauen…
+
+repo-workflows-stack-graph-stacks-ce29b7f8 = Aktuell
+
+repo-workflows-stack-graph-stacks-db1982a0 = PR #{ $pr-number-1 }
+
+repo-workflows-stack-graph-stacks-dd057049 = Eltern-Branch fehlt
+
+repo-workflows-stack-graph-stacks-f0192c88 = Zyklische Eltern-Branches: { $cycles-join-1 }
+
+repo-workflows-stack-layer-tip-10e3cf36 = { "\u000A" }{ $layer-parent-1 } ist nicht mehr vorhanden: Wählen Sie den Branch, auf dem dieser Branch jetzt basiert („Dieser Branch basiert auf…“)
+
+repo-workflows-stack-layer-tip-285462c7 = { "\u000A" }{ $layer-parent-1 } hat sich weiterentwickelt ({ $commits-layer-behind-2 } nicht in { $layer-branch-3 }): Neuaufbau darauf erforderlich
+
+repo-workflows-stack-layer-tip-4d3086f3 = { "\u000A" }Doppelklick zum Auschecken; Rechtsklick für seine eigenen Änderungen
+
+repo-workflows-stack-layer-tip-fc53c05a = { $layer-branch-1 }
+    Basiert auf { $layer-parent-2 } · { $commits-layer-own-3 } eigene Commits
+
+repo-workflows-stack-loop-problem-27b30746 = { $branch } kann nicht auf sich selbst basieren.
+
+repo-workflows-stack-loop-problem-bc8dbf35 = { $parent } basiert auf { $branch }: { $branch } kann nicht ebenfalls darauf basieren.
+
+repo-workflows-stack-loop-row-72369e42 = { $looped-join-1 } basieren aufeinander.
+
+repo-workflows-stack-loop-row-cf097c1a = Eltern-Branch von { $first } auswählen…
+
+repo-workflows-stack-open-publish-3e534e60 = { $layer-parent-1 } ist nicht mehr vorhanden: Wählen Sie zunächst, worauf { $layer-branch-2 } basiert.
+
+repo-workflows-stack-open-publish-a23e7f8b = Dieses Repository liegt auf keiner gitcraft bekannten Plattform. Es gibt kein Veröffentlichungsziel.
+
+repo-workflows-stack-open-restack-419e0d8e = Nichts neu aufzubauen: Jede Ebene liegt auf der Spitze ihres Eltern-Branches.
+
+repo-workflows-stack-parent-problem-61a1cff0 = Wählen Sie den Branch, auf dem { $branch } basiert.
+
+repo-workflows-stack-parent-problem-f7032e38 = { $parent } ist kein lokaler Branch.
+
+repo-workflows-stack-plan-row-1004d25d = #{ $number }: nach { $plan-base-1 } statt nach { $from }
+
+repo-workflows-stack-plan-row-140261ea = { "     " }und { $n-4-1 } weitere
+
+repo-workflows-stack-plan-row-25b842ca = Keine eigenen Änderungen: gepusht, kein { $noun }
+
+repo-workflows-stack-plan-row-3c8950f2 = Neuer { $noun } nach { $plan-base-1 } (#{ $n } wurde ohne Merge geschlossen)
+
+repo-workflows-stack-plan-row-512a4ebf = Neuer { $noun } nach { $plan-base-1 }
+
+repo-workflows-stack-plan-row-6a96cf4f = #{ $n } wurde gemergt: bleibt unverändert
+
+repo-workflows-stack-plan-row-7e8cd205 = Titel
+
+repo-workflows-stack-plan-row-96f34b27 = { "   " }Der { $noun } von { $from } wurde gemergt: { $plan-branch-1 } zielt jetzt auf { $plan-base-2 }
+
+repo-workflows-stack-plan-row-bbd4b6a8 = Änderungen
+
+repo-workflows-stack-plan-row-c5790350 = #{ $n }: neue Commits pushen
+
+repo-workflows-stack-plan-row-ff1f70b3 = Alle Änderungen, die { $plan-branch-1 } zu { $plan-base-2 } hinzufügt
+
+repo-workflows-stack-preview-row-134f0bef = Bereits auf der Spitze von { $p-step-parent-1 }: nichts zu wiederholen
+
+repo-workflows-stack-preview-row-5302fc22 = { $commits-p-commits-1 } auf { $p-step-parent-2 } · Basis { $short-p-step-old-base-3 } → { $short-p-new-base-4 }
+
+repo-workflows-stack-preview-row-c62999a7 = · in seinem Arbeitsverzeichnis unter { $wt-display-1 }
+
+repo-workflows-stack-preview-row-f80cf9a0 = { $commits-p-commits-1 } auf die neue Spitze von { $p-step-parent-2 } · Basis { $short-p-step-old-base-3 } → neue Spitze
+
+repo-workflows-stack-publish-dialog-1638800f = Veröffentlichen nicht möglich: { $e }
+
 repo-workflows-stack-publish-dialog-19766ed6 = Abbrechen
+
+repo-workflows-stack-publish-dialog-44cb25f8 = Anschließend die verschobenen Branches neu aufbauen, damit sie nur ihre eigenen Änderungen enthalten.
+
+repo-workflows-stack-publish-dialog-55798dde = Jeder Branch wird gepusht, der unterste zuerst, und sein { $noun } zielt auf den Branch darunter. Später erneut veröffentlichen, um alle zu aktualisieren: Keiner wird zweimal geöffnet und ein Branch wird niemals über Commits gepusht, die ihm fehlen.
+
+repo-workflows-stack-publish-dialog-64d68875 = Offene { $noun }s werden abgefragt…
+
+repo-workflows-stack-publish-dialog-859390eb = Veröffentlichen
+
+repo-workflows-stack-publish-dialog-d530df80 = Neue { $noun }s als Entwurf öffnen
+
+repo-workflows-stack-publish-dialog-e512538a = Die { $noun }s des Stapels auf { $preview-root-1 }
+
+repo-workflows-stack-publish-done-6ffb5e8c = { $report-done-len-1 } von { $total } abgeschlossen, dann ist { $branch } fehlgeschlagen: { $e }. Erneut veröffentlichen, um fortzufahren. Abgeschlossenes bleibt bestehen; kein { $noun } wird zweimal geöffnet.
+
+repo-workflows-stack-publish-done-c4ffa0c1 = { $noun }s veröffentlichen
+
+repo-workflows-stack-read-stacks-4272623a = Stapel konnten nicht gelesen werden: { $e }
+
+repo-workflows-stack-remove-parent-e6733ec1 = { $branch } aus seinem Stapel entfernen
+
+repo-workflows-stack-restack-banner-13c0353b = Ein abhängiger Branch muss aktualisiert werden
+
+repo-workflows-stack-restack-banner-219a0515 = Lösen Sie seine Konflikte, markieren Sie sie als gelöst und setzen Sie den Neuaufbau fort.
+
+repo-workflows-stack-restack-banner-253f5c4b = { $n } abhängige Branches müssen aktualisiert werden
+
+repo-workflows-stack-restack-banner-3935d0e6 = Sein Arbeitsverzeichnis öffnen
+
+repo-workflows-stack-restack-banner-41ffaa88 = Neuaufbau bei { $branch } angehalten ({ $pending-done-1-1 } von { $pending-steps-len-2 })
+
+repo-workflows-stack-restack-banner-47e6c77e = Die neue Basis jedes Branches prüfen und seine Commits auf seinen Eltern-Branch anwenden
+
+repo-workflows-stack-restack-banner-4fe4c0de = Neuaufbau abbrechen
+
+repo-workflows-stack-restack-banner-7a7b5fb5 = Neuaufbau fortsetzen
+
+repo-workflows-stack-restack-banner-82febca8 = „Neuaufbau fortsetzen“ fährt hier fort.
+
+repo-workflows-stack-restack-banner-97adce19 = Lösen Sie seine Konflikte im Arbeitsverzeichnis unter { $wt-display-1 } und setzen Sie den Neuaufbau fort.
+
+repo-workflows-stack-restack-banner-aecb595d = Jeden Branch an seine Position vor dem Neuaufbau zurücksetzen
+
+repo-workflows-stack-restack-banner-bd4899fc = Neu aufbauen…
+
+repo-workflows-stack-restack-dialog-17605ec0 = Neue Basen werden ermittelt…
 
 repo-workflows-stack-restack-dialog-19766ed6 = Abbrechen
 
+repo-workflows-stack-restack-dialog-34001cc3 = Die eigenen Commits jedes Branches werden auf die neue Spitze seines Eltern-Branches angewendet, Eltern zuerst. Bei einem Konflikt wird angehalten: Lösen Sie ihn und setzen Sie den Neuaufbau fort. Anschließend setzt Strg+Z jeden Branch zurück.
+
+repo-workflows-stack-restack-dialog-467c87df = Neuaufbau nicht möglich: { $e }
+
+repo-workflows-stack-restack-dialog-9868923b = Committen oder stashen Sie zunächst Ihre Änderungen: Beim Neuaufbau werden die Branches hier ausgecheckt.
+
+repo-workflows-stack-restack-dialog-9fbc2915 = Neu aufbauen
+
+repo-workflows-stack-restack-dialog-dacd5d19 = Beenden Sie zunächst den laufenden Vorgang oder brechen Sie ihn ab.
+
+repo-workflows-stack-restack-dialog-ea8badd0 = Warten auf { $busy }…
+
+repo-workflows-stack-restack-dialog-fd52d182 = In isolierten Arbeitsverzeichnissen wiederholen…
+
+repo-workflows-stack-restack-done-1fc5c0ba = Neuaufbau: Jeder Branch lag bereits auf der Spitze seines Eltern-Branches
+
+repo-workflows-stack-restack-done-33b4b547 = Neuaufbau bei { $branch } wegen Konflikten angehalten: Lösen Sie diese{ $place }, dann „Neuaufbau fortsetzen“ (oder „Neuaufbau abbrechen“)
+
+repo-workflows-stack-restack-done-6cecc855 = { " " }in seinem Arbeitsverzeichnis unter { $wt-display-1 }
+
+repo-workflows-stack-restack-done-7f6cce25 = Neuaufbau: { $n } Branches verschoben · Strg+Z setzt sie zurück
+
+repo-workflows-stack-restack-done-9fbc2915 = Stapel neu aufbauen
+
+repo-workflows-stack-restack-done-a7222989 = Neuaufbau abgebrochen: Jeder Branch ist wieder an seiner ursprünglichen Position
+
+repo-workflows-stack-restack-done-c27578ee = Neuaufbau abgebrochen: Jeder Branch ist wieder an seiner ursprünglichen Position, außer { $kept-join-1 }. Dort sind seit dem Neuaufbau Commits hinzugekommen; der Branch bleibt unverändert.
+
+repo-workflows-stack-restack-done-dbfb6ce0 = Neuaufbau: 1 Branch verschoben · Strg+Z setzt ihn zurück
+
+repo-workflows-stack-resume-restack-9fbc2915 = Stapel neu aufbauen
+
+repo-workflows-stack-run-restack-95c7214f = { $label }: erneut ausführen, sobald { $busy } beendet ist
+
+repo-workflows-stack-run-stack-op-95c7214f = { $label }: erneut ausführen, sobald { $busy } beendet ist
+
+repo-workflows-stack-set-parent-81fef295 = { $branch } auf { $parent } aufbauen
+
+repo-workflows-stack-stack-dialogs-0681a692 = Kein anderer Branch teilt einen Verlauf mit diesem Branch.
+
+repo-workflows-stack-stack-dialogs-0772e513 = Eltern-Branch festlegen
+
 repo-workflows-stack-stack-dialogs-19766ed6 = Abbrechen
+
+repo-workflows-stack-stack-dialogs-3ed31566 = Der Branch, auf dem dieser Branch als Ebene eines Stapels aufbaut: STAPEL zeigt dann seine eigenen Commits an und warnt, wenn sich der Eltern-Branch weiterentwickelt.
+
+repo-workflows-stack-stack-dialogs-48de49a3 = { $dialog-branch-1 } basiert auf…
+
+repo-workflows-stack-stack-dialogs-834da95d = Branch auswählen
+
+repo-workflows-stack-stack-dialogs-8511ea38 = Basiert derzeit auf { $r-parent-1 }
+
+repo-workflows-stack-stack-dialogs-87dad22d = Verlauf konnte nicht untersucht werden: { $e }
+
+repo-workflows-stack-stack-dialogs-9ba88e00 = Basiert derzeit auf { $r-parent-1 }, der nicht mehr vorhanden ist
+
+repo-workflows-stack-stack-dialogs-c36d819e = Verwenden
+
+repo-workflows-stack-stack-dialogs-e3dadccb = Aus dem Verlauf vorgeschlagen: { $name }
+
+repo-workflows-stack-stack-dialogs-e4fe8b0e = Verlauf wird untersucht…
+
+repo-workflows-stack-stack-line-559ed9fe = Stapel: { $chain-self-stacks-layers-branch--1 }
+
+repo-workflows-stack-stack-line-c5c1ffb4 = { " " }· { $layer-parent-1 } hat sich weiterentwickelt: Neuaufbau erforderlich
+
+repo-workflows-stack-stack-line-e4355cbd = { " " }· { $layer-parent-1 } ist nicht mehr vorhanden
+
+repo-workflows-stack-stack-menu-items-1485e8a2 = Ihre eigenen Commits auf die neue Spitze anwenden
+
+repo-workflows-stack-stack-menu-items-30af0952 = Den Branch darauf neu aufbauen…
+
+repo-workflows-stack-stack-menu-items-3a261297 = Änderungen, die { $b-name-1 } zu { $r-parent-2 } hinzufügt
+
+repo-workflows-stack-stack-menu-items-42e9f303 = Seine eigenen Commits im Stapel: seit der Abzweigung vom Eltern-Branch
+
+repo-workflows-stack-stack-menu-items-4537653e = Der Branch, auf dem dieser Branch als Ebene eines Stapels aufbaut
+
+repo-workflows-stack-stack-menu-items-68f6577e = Basis und Patch jeder Anfrage prüfen, dann von unten nach oben öffnen oder aktualisieren
+
+repo-workflows-stack-stack-menu-items-8400b536 = Aus seinem Stapel entfernen
+
+repo-workflows-stack-stack-menu-items-8511ea38 = Basiert derzeit auf { $r-parent-1 }
+
+repo-workflows-stack-stack-menu-items-ce8e45b9 = Dieser Branch basiert auf…
+
+repo-workflows-stack-stack-menu-items-d8ad545a = Ein Neuaufbau ist angehalten: Zunächst unter STAPEL fortsetzen oder abbrechen
+
+repo-workflows-stack-stack-menu-items-e5c65f7a = Die { $forge-noun-1 }s seines Stapels veröffentlichen…
+
+repo-workflows-stack-stack-menu-items-f7763ef9 = Die { $on-it } Branches darauf neu aufbauen…
+
+repo-workflows-stack-stack-section-316027d9 = STAPEL
+
+repo-workflows-stack-stack-section-68f6577e = Basis und Patch jeder Anfrage prüfen, dann von unten nach oben öffnen oder aktualisieren
+
+repo-workflows-stack-stack-section-c5c6049a = Seine { $forge-noun-1 }s veröffentlichen…
+
+repo-workflows-stack-start-publish-c4ffa0c1 = { $noun }s veröffentlichen
+
+repo-workflows-stack-start-publish-e0c26cc9 = Veröffentlichen: erneut ausführen, sobald { $busy } beendet ist
+
+repo-workflows-stack-start-restack-9fbc2915 = Stapel neu aufbauen
+
+repo-workflows-stack-summary-47eeff3f = { $noun }s veröffentlichen: nichts zu tun
+
+repo-workflows-stack-summary-7f75368f = { $noun }s veröffentlicht: { $parts-join-1 }
+
+repo-workflows-stack-title-6bb263ae = { $self-root-1 } → { $self-rows-len-2 } Branches
+
+repo-workflows-stack-title-row-3f1c7b21 = { $n } neu aufzubauen
+
+repo-workflows-stack-title-row-569c1ff8 = { $title }
+    Rechtsklick, um seine { $noun }s zu veröffentlichen
+
+repo-workflows-stack-title-row-f3da38c2 = { $n } neu aufzubauen · { $g } nicht mehr vorhanden
 
 repo-workflows-surgery-footer-19766ed6 = Abbrechen
 
@@ -5590,4 +5836,40 @@ repo-workflows-saved-view-summary = { $loaded } geladene Treffer / { $selected }
         [yes] { " · teilweise: Grenze von " }{ $budget } Commits
        *[no] { "" }
     } · Arbeitsänderungen, Stashes und Auswahl bleiben als Kontext erhalten
+
+repo-workflows-stack-commit-count = { $count ->
+        [one] ein Commit
+       *[other] { $count } Commits
+    }
+
+repo-workflows-stack-patch-count = { $count ->
+        [one] { "   ein Commit" }
+       *[other] { "   " }{ $count } Commits
+    }
+
+repo-workflows-stack-restack-title = { $count ->
+        [one] Einen Branch neu aufbauen
+       *[other] { $count } Branches neu aufbauen
+    }
+
+repo-workflows-stack-layer-summary = { $branch }
+    Basiert auf { $parent } · { $count ->
+        [one] ein eigener Commit
+       *[other] { $count } eigene Commits
+    }
+
+repo-workflows-stack-gone-parents = { $count ->
+        [one] Ein Eltern-Branch nicht mehr vorhanden
+       *[other] { $count } Eltern-Branches nicht mehr vorhanden
+    }
+
+repo-workflows-stack-own-count = { $count ->
+        [one] +1 eigener Commit
+       *[other] +{ $count } eigene Commits
+    }
+
+repo-workflows-stack-behind-count = Neuaufbau erforderlich ({ $count ->
+        [one] ein Commit im Eltern-Branch
+       *[other] { $count } Commits im Eltern-Branch
+    })
 
