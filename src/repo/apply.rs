@@ -90,6 +90,7 @@ impl RepoTab {
             Action::Ci(act) => self.ci_act(act, ctx),
             Action::LocalCi(act) => self.local_ci_act(act, ctx),
             Action::Email(act) => self.email_act(act, ctx),
+            Action::Devcontainer(act) => self.devcontainer_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),

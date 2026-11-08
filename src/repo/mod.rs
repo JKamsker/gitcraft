@@ -33,6 +33,7 @@ pub(crate) mod custom_commands;
 mod dco;
 mod detached;
 mod detail;
+mod devcontainer;
 mod dialogs;
 mod diff;
 mod diff_split;
@@ -300,6 +301,7 @@ pub struct RepoTab {
     ci_view: Option<ci_view::CiView>,
     local_ci: local_ci::State,
     email: email::State,
+    devcontainer: devcontainer::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -630,6 +632,7 @@ impl RepoTab {
             ci_view: None,
             local_ci: Default::default(),
             email: Default::default(),
+            devcontainer: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,
