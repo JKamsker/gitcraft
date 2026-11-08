@@ -46,7 +46,7 @@ impl App {
                         ],
                     ));
                     if let Some(error) = &self.update_error {
-                        ui.label(RichText::new(crate::git::display_error(error)).color(t.danger));
+                        paint_update_error(ui, error, self.update_failure.as_ref(), t.danger);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::small_button(
@@ -105,7 +105,7 @@ impl App {
     /// Goes back to the version the last update replaced ("Go back to 0.3.3" in the settings)
     /// and pins it, or forward again to the one gone back from, unpinned: the window closes, which saves the tabs, and `main` starts that version.
     pub(super) fn go_back(&mut self, ctx: &egui::Context) {
-        match update::go_back() {
+        match update::go_back_witnessed() {
             Ok((program, previous)) => {
                 if previous.is_newer() {
                     // Forward again, to the version gone back from: no longer staying put.
@@ -122,13 +122,9 @@ impl App {
                 update::relaunch_after_exit(program);
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
-            Err(e) => self.toasts.push(super::panels::Toast::new(
-                crate::i18n::message(
-                    "interaction-dialogs-go-back",
-                    &[("error", crate::git::display_error(&e).into())],
-                ),
-                true,
-            )),
+            Err(failure) => self
+                .toasts
+                .push(super::panels::Toast::from_go_back_failure(failure)),
         }
     }
 
@@ -142,12 +138,114 @@ impl App {
     /// Puts the downloaded version `new` in place and closes the window, which saves the tabs;
     /// `main` then starts the new version.
     fn update_now(&mut self, new: &Path, ctx: &egui::Context) {
-        match update::install(new) {
+        match update::install_witnessed(new) {
             Ok(program) => {
+                keep_install_failure(&mut self.update_error, &mut self.update_failure, None);
                 update::relaunch_after_exit(program);
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
-            Err(e) => self.update_error = Some(e),
+            Err(failure) => keep_install_failure(
+                &mut self.update_error,
+                &mut self.update_failure,
+                Some(failure),
+            ),
         }
+    }
+}
+
+/// Keep original raw state and its same-result provenance together, never a translation.
+fn keep_install_failure(
+    raw: &mut Option<String>,
+    receipt: &mut Option<update::Failure>,
+    failure: Option<update::Failure>,
+) {
+    *raw = failure.as_ref().map(|f| f.raw().to_owned());
+    *receipt = failure;
+}
+
+fn update_error_text(raw: &str, receipt: Option<&update::Failure>) -> String {
+    match receipt {
+        Some(failure) if failure.raw() == raw => failure.display(),
+        _ => raw.to_owned(),
+    }
+}
+
+fn paint_update_error(
+    ui: &mut Ui,
+    raw: &str,
+    receipt: Option<&update::Failure>,
+    color: egui::Color32,
+) {
+    ui.label(RichText::new(update_error_text(raw, receipt)).color(color));
+}
+
+#[cfg(test)]
+mod witnessed_display_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn retained_install_failure_repaints_en_de_en_and_raw_receipt_clear_together() {
+        let failure = update::Failure::PutNew {
+            raw: "Could not put the new version in place: Could not copy the new version".into(),
+            failure: update::PlacementFailure::CopyFailed {
+                raw: "Could not copy the new version".into(),
+            },
+        };
+        let mut state = (None, None);
+        keep_install_failure(&mut state.0, &mut state.1, Some(failure.clone()));
+        let before = state.clone();
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (Option<String>, Option<update::Failure>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if let Some(raw) = &state.0 {
+                    paint_update_error(ui, raw, state.1.as_ref(), egui::Color32::RED);
+                }
+            },
+            state,
+        );
+        h.run();
+        h.get_by_label(failure.raw());
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("Die neue Version konnte nicht an ihren Platz verschoben werden: Die neue Version konnte nicht kopiert werden");
+        assert_eq!(h.state(), &before);
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(failure.raw());
+        assert_eq!(h.state(), &before);
+        let state = h.state_mut();
+        keep_install_failure(&mut state.0, &mut state.1, None);
+        assert_eq!(state, &(None, None));
+    }
+
+    #[test]
+    fn missing_mismatched_and_opaque_install_receipts_do_not_reclassify_text() {
+        crate::i18n::set_language("de");
+        let raw = "No previous version of gitcraft is kept";
+        let known = update::Failure::NoPrevious { raw: raw.into() };
+        assert_eq!(update_error_text(raw, None), raw);
+        assert_eq!(
+            update_error_text("external lookalike", Some(&known)),
+            "external lookalike"
+        );
+        assert_eq!(
+            update_error_text(raw, Some(&update::Failure::Opaque(raw.into()))),
+            raw
+        );
+        let mut state = (Some("old raw".into()), Some(known));
+        keep_install_failure(
+            &mut state.0,
+            &mut state.1,
+            Some(update::Failure::Opaque(raw.into())),
+        );
+        assert_eq!(state.0.as_deref(), Some(raw));
+        assert_eq!(state.1.as_ref().map(update::Failure::raw), Some(raw));
+        assert_eq!(update_error_text(raw, state.1.as_ref()), raw);
     }
 }

@@ -13,6 +13,12 @@ pub(super) struct Toast {
     text: String,
     error: bool,
     until: Instant,
+    update_go_back: Option<UpdateGoBack>,
+}
+
+/// Created only from the failed go_back_witnessed result; never inferred from toast text.
+struct UpdateGoBack {
+    failure: update::Failure,
 }
 
 impl Toast {
@@ -27,7 +33,34 @@ impl Toast {
             text,
             error,
             until: Instant::now() + Duration::from_secs(secs),
+            update_go_back: None,
         }
+    }
+
+    pub(super) fn from_go_back_failure(failure: update::Failure) -> Self {
+        let mut toast = Self::new(format!("Couldn't go back: {}", failure.raw()), true);
+        toast.update_go_back = Some(UpdateGoBack { failure });
+        toast
+    }
+
+    fn display_text(&self) -> String {
+        match &self.update_go_back {
+            Some(source)
+                if self.error
+                    && self.text == format!("Couldn't go back: {}", source.failure.raw()) =>
+            {
+                crate::i18n::message(
+                    "interaction-dialogs-go-back",
+                    &[("error", source.failure.display().into())],
+                )
+            }
+            Some(_) => self.text.clone(),
+            None => display_app_message(&self.text),
+        }
+    }
+
+    fn label(&self, ui: &mut Ui) {
+        ui.add(egui::Label::new(self.display_text()).wrap());
     }
 }
 
@@ -60,7 +93,10 @@ impl App {
                 || self.my_work.open,
             update: self.update_check(),
             check_updates_now: false,
-            previous: self.previous_version.as_ref().map(|p| p.label().to_owned()),
+            previous: self
+                .previous_version
+                .as_ref()
+                .map(|p| p.display_label().to_owned()),
             previous_is_newer: self
                 .previous_version
                 .as_ref()
@@ -217,7 +253,7 @@ impl App {
                                     16.0,
                                     if toast.error { t.danger } else { t.success },
                                 );
-                                ui.add(egui::Label::new(display_app_message(&toast.text)).wrap());
+                                toast.label(ui);
                             });
                         });
                     ui.add_space(6.0);
@@ -310,5 +346,77 @@ mod remote_display_tests {
         assert_eq!(super::display_app_message(command), command);
         crate::i18n::set_language("en-US");
         assert_eq!(super::display_app_message(raw), raw);
+    }
+}
+
+#[cfg(test)]
+mod updater_toast_display_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline() {
+        let failure = update::Failure::NoPrevious {
+            raw: "No previous version of gitcraft is kept".into(),
+        };
+        let toast = Toast::from_go_back_failure(failure.clone());
+        let raw = toast.text.clone();
+        let until = toast.until;
+        assert_eq!(
+            raw,
+            "Couldn't go back: No previous version of gitcraft is kept"
+        );
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, toast: &mut Toast| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                toast.label(ui);
+            },
+            toast,
+        );
+        h.run();
+        h.get_by_label(&raw);
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("Zurückwechseln fehlgeschlagen: Es wurde keine vorherige Version von gitcraft aufbewahrt");
+        assert_eq!(h.state().text, raw);
+        assert!(h.state().error);
+        assert_eq!(h.state().until, until);
+        assert_eq!(
+            h.state().update_go_back.as_ref().map(|s| &s.failure),
+            Some(&failure)
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(&raw);
+        assert_eq!(h.state().text, raw);
+        assert_eq!(h.state().until, until);
+    }
+
+    #[test]
+    fn go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling() {
+        crate::i18n::set_language("de");
+        let raw = "No previous version of gitcraft is kept";
+        let opaque = Toast::from_go_back_failure(update::Failure::Opaque(raw.into()));
+        assert_eq!(
+            opaque.display_text(),
+            format!("Zurückwechseln fehlgeschlagen: {raw}")
+        );
+        let ordinary = Toast::new(opaque.text.clone(), true);
+        assert!(ordinary.update_go_back.is_none());
+        assert_eq!(ordinary.display_text(), ordinary.text);
+        let ordinary_secs = Toast::for_secs("unrelated".into(), false, 10);
+        assert!(ordinary_secs.update_go_back.is_none());
+        let mut mismatched =
+            Toast::from_go_back_failure(update::Failure::NoPrevious { raw: raw.into() });
+        mismatched.text = "Couldn't go back: unrelated raw".into();
+        assert_eq!(mismatched.display_text(), mismatched.text);
+        mismatched.text = format!("Couldn't go back: {raw}");
+        mismatched.error = false;
+        assert_eq!(mismatched.display_text(), mismatched.text);
     }
 }

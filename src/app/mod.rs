@@ -169,6 +169,8 @@ pub struct App {
     update_later: bool,
     /// Why the update didn't go in place.
     update_error: Option<String>,
+    /// Owned source receipt for exactly the raw installation failure above.
+    update_failure: Option<update::Failure>,
     skipped_version: String,
     /// See `Saved::pinned_version`.
     pinned_version: String,
@@ -335,6 +337,7 @@ impl App {
             update_looked: None,
             update_later: false,
             update_error: None,
+            update_failure: None,
             skipped_version: saved.skipped_version,
             pinned_version: update::settle_pin(&saved.pinned_version, update::CURRENT),
             previous_version: update::previous(),

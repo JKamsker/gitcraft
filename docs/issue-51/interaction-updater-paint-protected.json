@@ -1,0 +1,26 @@
+{
+  "base": "c377c6ace05b76a59f1620da54f937c5e7fb35bc",
+  "protected_blocks": {
+    "complete_original_app_without_sidecar_fields": "68981b0d46de179a8803fcbf3a1254235f87be16641fd3d85ebec43b8fcda373",
+    "original_complete_banner_ui_except_error_paint": "01d4ed109bdd00f32bd7350dca734647ca5b2ff390f526b711836584a212eab4",
+    "original_go_back_success_pins_previous_relaunch_close": "95026bf100954340d2ef9ac994f442dc18e4b40539f6f256317086530db874a2",
+    "original_unpin": "0af13ee8b644f7065566514a6fa466d6e9d95d814a378de90f7e3a4176bc105d",
+    "locales/de/interaction-package-update.ftl": "a590b9a73f98f0c7b974838db47b4035edbdb08bfb70b26d7c35cde4e545c280",
+    "locales/en-US/interaction-package-update.ftl": "8507285453035fcc7705d943fedd766a76eadfb61158dff3bb906e31c6514837",
+    "src/update/display.rs": "327261d91a0ebb6db7fab0769c9fdbf4e65afe9cd27c6750726ccf749b9f0c0d",
+    "src/update/display/tests.rs": "1fd28c5e84c258783cdf3e5f5beef81c587012123b0b26238d40076dfe905555",
+    "src/update/install.rs": "a4538c0e274d3ac5977ed4d9c970cf9717946feadc373e675b2a78d374611ef4",
+    "src/update/install/witness_tests.rs": "c1aa7d89556a8147831947b21ad8af699f5b083a144e6840130fef76316a04de",
+    "src/update/mod.rs": "0f6d833edc94f54d3119506513e1fadd9da0bd1453717649ffd1bcfdfc8b78aa",
+    "src/update/previous.rs": "14b40362bafb76eace00cf2611d36570dedb072b0e5c1b969009b9514c3edb45",
+    "src/update/previous/tests.rs": "cebc4160b1462b63033a2bf1d2b7248b1f8d524f1867458e0fceb1b1b366c02c",
+    "src/update/previous/witness_tests.rs": "0e705c8bd955d49a3e84749fe8698cf02b392368a9617df6843c4a38d0de596a",
+    "src/update/witness.rs": "903653d62f5a17c505c7b5497a2359253293d3eb3cf633f075431c047ec329f9"
+  },
+  "consumer_changes": [
+    "app raw update_error + optional same-result Failure",
+    "actual witnessed install/go-back entrypoints",
+    "banner and finite go-back Toast per-paint receipt projection",
+    "root5ec Previous.display_label retained"
+  ]
+}
