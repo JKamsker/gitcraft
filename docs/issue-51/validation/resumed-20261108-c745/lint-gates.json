@@ -1,0 +1,383 @@
+[
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings",
+      "-A",
+      "dead_code"
+    ],
+    "exit": 0,
+    "selected_pass": null,
+    "seconds": 26.399,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-00.log",
+    "sha256": "1b5f97e2cbac8855eec63c8531d2ae2981aa7807dd8d948e5bf072c37c8e5e73"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::tests::retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 510.064,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-01.log",
+    "sha256": "938f614959985f29a17f0f5887ec0f484a53d0794a1221c16dd1c973e8cd5b7c"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::tests::retained_finished_uses_original_headline_and_discards_unselected_output",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.375,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-02.log",
+    "sha256": "40582a3399de33e073c838d50c2423276bdbee9621419f6167f01a4330baa47c"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::view::operation_presentation_tests::same_recording_stack_check_repaints_retained_status_finished_and_actual_activity",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.444,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-03.log",
+    "sha256": "a9a44643041206083686d66812486527af5990c0ef3455db1287ddd305cf7672"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::view::operation_presentation_tests::provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.299,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-04.log",
+    "sha256": "b7ed86bdb69573b9749406afa88685d4e0db889dbdb73081f19630fb97e9418d"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.301,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-05.log",
+    "sha256": "ceec6f82ab5905d763fabc233854408576269d7f886c9037399d15c51db5ee20"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "gerrit::display::tests::actual_recording_stack_validation_uses_same_log_context_and_keeps_unknowns_opaque",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.297,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-06.log",
+    "sha256": "8be1095d0a2130ff4f60d422032e95a13447ecae60b386f5351179167e35eded"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "gerrit::display::tests::actual_validation_and_server_warning_render_without_mutating_identity_or_ops",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.298,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-07.log",
+    "sha256": "73722684a8ee5a5a25906171484d4041a894a9d08a74baf9ee3467b3435b8155"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::tests::source_notice_moves_through_queues_and_repaints_without_changing_raw",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.297,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-08.log",
+    "sha256": "6fb06a5f106bf03aa4ca25db6bd613ee0181c432bf9ea6dd650104bfe214b198"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::tests::any_raw_edit_retires_origin_before_noop_or_unwind",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.253,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-09.log",
+    "sha256": "167bf48bcee756d1727dbf3a417b5e7c983a22cd862a7c6e14ad8f9144eede18"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::an_entry_copies_as_text",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.312,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-10.log",
+    "sha256": "043d9c5d50b5d5c7055e4fbd31ed8cc0840be74c232a14f882252ab9e6a752dd"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::the_same_background_failure_is_counted_not_repeated",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.248,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-11.log",
+    "sha256": "13145877bc8e03e4560309a85eacb4d6280ad3ed3c95a7ef941a14db184c847a"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::dialogs::gerrit::warning_presentation_tests::actual_review_warning_paint_repaints_without_changing_raw_server_or_plan",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.33,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-12.log",
+    "sha256": "ba226c26c7b274c749b1f33e4d493bb131f833c418c808328fa2fd2ead5d0bce"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.371,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-13.log",
+    "sha256": "61d01b7a58d9aba7ead905ac5dae3bb5c531898e08167d2b54f49bfc0c0ccd42"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::opaque_provider_tests::generic_provider_lfs_suffixes_never_acquire_push_provenance",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.315,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-14.log",
+    "sha256": "60d9c12cf44aebe60c7f228fefa57fd1e563d3dcdbaf419865c841427dc9a624"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::messages::workflow::tests::workflow_r1_fixed_sentinels_and_raw_operation_templates_project_only_at_paint",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.333,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-15.log",
+    "sha256": "db64b848e058ab9a86d254c9b0275bf2f8282399bc32b9d39c5a6fc9e1fb456a"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "app::home::retained_error_tests::retained_home_errors_paint_en_de_en_from_original_source_without_io",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.31,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-16.log",
+    "sha256": "4a89538e79aa3df4137130702d49e53db068b28bb7546f6d4bdb0eda76d1df87"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::operations::core_guard_paint_tests::core_guard_paint_reviewed_auth_extracts_original_proof_before_display",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 1,
+    "seconds": 0.309,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-17.log",
+    "sha256": "4b3c284a514ba0416db722b409fd9d1d195ef5a4154ed3806d766ae48dbe539c"
+  },
+  {
+    "candidate": "c745112aba948965b580e6b06903e3ca8702ff19",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::doctor::health_section::tests::fluent_partition_r1_actual_maintenance_selection_retains_raw_control_and_cached_command_provenance",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "selected_pass": 0,
+    "seconds": 0.235,
+    "log": "/Volumes/RAMDisk/gitcraft-evidence/lint-immutable-18.log",
+    "sha256": "afe98730c3695d8013522fa7b7cc73fbc1cb2a8a3feff9fbdc36978df6e9c055"
+  }
+]

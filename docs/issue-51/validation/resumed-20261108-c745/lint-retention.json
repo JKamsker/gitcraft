@@ -1,0 +1,252 @@
+{
+  "base": "886b42b54ba23e01e0cdfc477282bbc4afca3de3",
+  "source_rows": [
+    {
+      "path": "src/app/dropped.rs",
+      "before_sha256": "bd9d5a6446bceb9d64ec9c4ad9e978e0353249bf430c7a3fde8cda00348bbcb7",
+      "after_sha256": "fbc140d398f7be0013255affb77ca0eb3459fef2140a3cd736175d50ff3cafa0",
+      "test_names_retained": 8,
+      "assertions_before": 59,
+      "assertions_after": 59,
+      "assertions_equal_after_fallible_accessor_normalization": false,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/app/workspaces.rs",
+      "before_sha256": "a3decb79c2b3d44b16657b87fdb059b4f781c6ec6ef559ef28154f921286169a",
+      "after_sha256": "7d9744460c9f848e6316a7fde4eaea1e66d29b69ed6922958ea4651e4c5f2262",
+      "test_names_retained": 2,
+      "assertions_before": 15,
+      "assertions_after": 15,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": false
+    },
+    {
+      "path": "src/authorship/display.rs",
+      "before_sha256": "04135f24669422a4fc218bf47f8d850f1fc83f415779f2ed952278938199ff4c",
+      "after_sha256": "fcbc2a63be73f13497bd4c411c4fb2db89cb862437ad9d29185b232468ed896a",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/drift/display.rs",
+      "before_sha256": "b220bd775d1c47b2e0e4a8be5e7ba44c14495bc2723ab4bf464bb5d19d7bc956",
+      "after_sha256": "056e32ce0a6f9e7bbe7d8990a6b89fd0ff5eadd5ad0c42289cb04fc301c1f9c4",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/gerrit.rs",
+      "before_sha256": "5fa9424c936d40bb2ac3a009e26c72852e7d93dda031d4f96643f0049e562e47",
+      "after_sha256": "f8c78872c50a95ea087560fc1708ac7672f8cdebc5a470554423a389d6738d1e",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/git/command/credential_policy.rs",
+      "before_sha256": "295bb41f7cffff139d725c4c364ff88209895e9fd09d37f50e1d4b0ef99e5615",
+      "after_sha256": "1432cddcaf3b02202da6521cf0918ca3cf6f1fe4bfa97fd7b88e07d22d83d8ef",
+      "test_names_retained": 6,
+      "assertions_before": 59,
+      "assertions_after": 59,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": false
+    },
+    {
+      "path": "src/package/run/witness_tests.rs",
+      "before_sha256": "3a83cd7bc36464aa82acf93286ebce9e7702b202307d443feb9d163bd9cc35e9",
+      "after_sha256": "560e6e3828967b703765c836a74480d49e218f24b20e75240aa7948b912c44a5",
+      "test_names_retained": 1,
+      "assertions_before": 17,
+      "assertions_after": 17,
+      "assertions_equal_after_fallible_accessor_normalization": false,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/package/tools.rs",
+      "before_sha256": "0ba1d156a480db8daf32fd2a1052d681851311fd4a9267b315c4664ba45b9d48",
+      "after_sha256": "c755abfe0e242cfeaa7a2d803f23d7e3126112cb7b9cb2f565cef98031e50cc9",
+      "test_names_retained": 3,
+      "assertions_before": 8,
+      "assertions_after": 8,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/package/witness.rs",
+      "before_sha256": "a8633e19f6dd7ecc1ac0985ffda6126c559432a8a76571e240a920ead6188355",
+      "after_sha256": "f243d84b350d33d99ac2fa4b25ad268a1d800461d3c1fcac606ac355d5d17239",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/parallel_bisect/bundle.rs",
+      "before_sha256": "8831251d076b24dd809aa6421277f02da996538f64c845bb63c014f09894d7dd",
+      "after_sha256": "0d011a58bcfe9c713ee3e031785a956f3c73809bc81bc50102cdeb6e4b5d0d79",
+      "test_names_retained": 9,
+      "assertions_before": 44,
+      "assertions_after": 44,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": false
+    },
+    {
+      "path": "src/repo/activity/mod.rs",
+      "before_sha256": "ed75ab04b97ea97346eb7eb6bf34cdfcecc64e7c4ea2a9fb83358221cdf3449c",
+      "after_sha256": "8cda4f4d9b1b800624ec814afce306d704b35ded7e88df93e816b5fafcddf4c2",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/activity/tests.rs",
+      "before_sha256": "63d82e33b3ac1a54c29759ebdd8fd19e34fe4c46f8adc3cd0b816acfef62e9ec",
+      "after_sha256": "a587f1d2818a88ddde386c565d904f9525da98a3ab98eec7be1336bb68931f73",
+      "test_names_retained": 12,
+      "assertions_before": 54,
+      "assertions_after": 54,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/activity/view.rs",
+      "before_sha256": "897616abedf7ce3fb3343f5356648d411923abf1b5e10b1e9daf1a8badc83ebf",
+      "after_sha256": "64a08823f4380cbad1151db1f4cf798e534f2553905525a085298a569c63e327",
+      "test_names_retained": 2,
+      "assertions_before": 33,
+      "assertions_after": 33,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/devcontainer/mod.rs",
+      "before_sha256": "b4983b5a92461e681100228dd49a2cf7778b70eea1a0c9dace34675f249d4e46",
+      "after_sha256": "c2fd18f3626a03e2a529c9ad70d83b74ca8971e9a3e05f5ba0e29cfaad485bc0",
+      "test_names_retained": 3,
+      "assertions_before": 18,
+      "assertions_after": 18,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/dialogs/gerrit.rs",
+      "before_sha256": "0ba7b532564ff03377082872957a347da4b11cdba2c3b51eeb665a8a84788dc3",
+      "after_sha256": "9054772a49fd1b402e6f515826cc944c75785c4c49622d1420c520aca0dfdeb9",
+      "test_names_retained": 1,
+      "assertions_before": 6,
+      "assertions_after": 6,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/doctor/mod.rs",
+      "before_sha256": "798c4154f2c46d4ccf5f8e508116e1eb8902e15ec38282595c23748b079262b1",
+      "after_sha256": "c88b776b8946bfbd8ebdf07e7f6864f02c40dc4e35c102daf36310719fb7444c",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/local_ci/mod.rs",
+      "before_sha256": "e9113c6cef55dbd6d14376e868dbe2552c4a0ead41967f18e1cc842d778ccb0a",
+      "after_sha256": "123d3788e227ae57b37b1a8971a3d0bca18025d1776b37b3af1b334fcb0801b8",
+      "test_names_retained": 3,
+      "assertions_before": 20,
+      "assertions_after": 20,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/messages.rs",
+      "before_sha256": "e976c3450e5f63185c02875fb4d1c02b8b6f5fb57215d37c1f8c8dca83957067",
+      "after_sha256": "5603e9af10e865594335b8ce7b2962b96149ed5525acc6bda74d0a1c703af4ef",
+      "test_names_retained": 3,
+      "assertions_before": 29,
+      "assertions_after": 29,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/notice.rs",
+      "before_sha256": "90318022d4c59526263a9a29643a7c71fac22055494484bf5e4d70d65f765570",
+      "after_sha256": "db63f5898f3b512701ea8a4e1cc4bb8be10eaa8d0da2719289b4c384cdfc3099",
+      "test_names_retained": 5,
+      "assertions_before": 40,
+      "assertions_after": 40,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/notice/operation.rs",
+      "before_sha256": "bfe2b708ecd13a72d863e634938842aa26301cebf8e5d4a8098ff9685103e497",
+      "after_sha256": "8e69eced28331e3f6339341bee3fed71c9055232a5ac7c60ed40a155215e0a1a",
+      "test_names_retained": 3,
+      "assertions_before": 21,
+      "assertions_after": 21,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/repo/operations.rs",
+      "before_sha256": "d740ab4bd1ae05f2fb49de667675e357960029086d24b4c97d564b13df5f5859",
+      "after_sha256": "f1a9d0b612312bc19a6a6ef1996f97dbbf50946cd72a6d21a72aa221b7715379",
+      "test_names_retained": 13,
+      "assertions_before": 86,
+      "assertions_after": 86,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/standalone/windows_metadata.rs",
+      "before_sha256": "b13034b774647edc1bd8bc7d9b6c24c654e286da2d0ed18e6706047e2fd7cf30",
+      "after_sha256": "498ea9529b68d64cac71318e4e586b27e63b50f1c7f814fefc6bc5051c0ac042",
+      "test_names_retained": 5,
+      "assertions_before": 42,
+      "assertions_after": 42,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    },
+    {
+      "path": "src/weakened/display.rs",
+      "before_sha256": "36330769d0205167b1c8ed63d8561b3cc9a8a9696ec7d621a9cf09e9ea9df128",
+      "after_sha256": "ba4b8d210dc0b747a59dc2a07b95551755fe0127480c53c67e6773a6d6af901c",
+      "test_names_retained": 0,
+      "assertions_before": 0,
+      "assertions_after": 0,
+      "assertions_equal_after_fallible_accessor_normalization": true,
+      "production_literals_equal": true
+    }
+  ],
+  "source_files": 23,
+  "test_names_retained": 79,
+  "assertions_retained": 551,
+  "explicit_assertion_exceptions": [
+    "Dropped Vec equality expressed as slice equality to from_ref (same exact file)",
+    "assert_eq!(boolean,true) expressed as assert!(boolean)"
+  ],
+  "explicit_literal_exceptions": [
+    "Equivalent newline string push changed to char push",
+    "Obsolete unfulfilled dead-code expectation reason removed",
+    "One narrow too_many_arguments expectation reason for stable original bundle operands plus producer out-slot"
+  ],
+  "private_storage_changes": [
+    "ConfirmPresentation stored in Box; same fields and equality guard",
+    "Packages optional CargoFailure stored in Box; same raw/source fields and borrowing"
+  ],
+  "failures": []
+}

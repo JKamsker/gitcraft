@@ -1,0 +1,628 @@
+   Compiling unicode-ident v1.0.27
+   Compiling serde_core v1.0.229
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling syn v3.0.9
+   Compiling libc v0.2.191
+   Compiling cfg-if v1.0.5
+   Compiling bitflags v2.13.2
+   Compiling memchr v2.8.3
+   Compiling equivalent v1.0.3
+   Compiling foldhash v0.2.0
+   Compiling once_cell v1.21.4
+   Compiling getrandom v0.4.3
+   Compiling allocator-api2 v0.2.21
+   Compiling stable_deref_trait v1.2.1
+   Compiling syn v2.0.119
+   Compiling serde_derive v1.0.229
+   Compiling scopeguard v1.2.0
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+   Compiling serde v1.0.229
+   Compiling smallvec v1.16.4
+   Compiling parking_lot_core v0.9.12
+   Compiling regex-automata v0.4.18
+   Compiling lock_api v0.4.14
+   Compiling parking_lot v0.12.5
+   Compiling objc2-encode v4.1.0
+   Compiling hashbrown v0.17.1
+   Compiling bstr v1.13.1
+   Compiling log v0.4.34
+   Compiling gix-error v0.5.2
+   Compiling objc2 v0.6.5
+   Compiling bytemuck_derive v1.12.1
+   Compiling itoa v1.0.18
+   Compiling bytemuck v1.25.2
+   Compiling libm v0.2.16
+   Compiling objc2-core-foundation v0.3.2
+   Compiling num-traits v0.2.19
+   Compiling fastrand v2.5.0
+   Compiling tinyvec v1.13.3
+   Compiling prodash v31.0.1
+   Compiling unicode-normalization v0.1.26
+   Compiling arrayvec v0.7.8
+   Compiling gix-utils v0.5.2
+   Compiling block2 v0.6.2
+   Compiling thiserror-impl v2.0.21
+   Compiling synstructure v0.14.0
+   Compiling crc32fast v1.5.3
+   Compiling simd-adler32 v0.3.10
+   Compiling zerofrom-derive v0.1.8
+   Compiling thiserror v2.0.21
+   Compiling objc2-foundation v0.3.2
+   Compiling adler2 v2.0.1
+   Compiling zerofrom v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling gix-validate v0.13.1
+   Compiling yoke v0.8.4
+   Compiling miniz_oxide v0.9.1
+   Compiling byteorder v1.5.0
+   Compiling typenum v1.20.1
+   Compiling hybrid-array v0.4.15
+   Compiling hash32 v0.3.1
+   Compiling flate2 v1.1.10
+   Compiling zerocopy-derive v0.8.63
+   Compiling zerovec-derive v0.11.7
+   Compiling zerovec v0.11.9
+   Compiling heapless v0.8.0
+   Compiling displaydoc v0.2.7
+   Compiling zerocopy v0.8.63
+   Compiling gix-trace v0.3.1
+   Compiling faster-hex v0.10.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling cpufeatures v0.3.1
+   Compiling bitflags v1.3.2
+   Compiling core-foundation-sys v0.8.7
+   Compiling sha2 v0.11.1
+   Compiling tinystr v0.8.5
+   Compiling objc2-core-graphics v0.3.2
+   Compiling uuid v1.29.0
+   Compiling sha1dc v0.1.5
+   Compiling gix-hash v0.28.1
+   Compiling half v2.7.1
+   Compiling gix-path v0.14.1
+   Compiling errno v0.3.14
+   Compiling indexmap v2.14.2
+   Compiling same-file v1.0.6
+   Compiling jiff-core v0.1.2
+   Compiling percent-encoding v2.3.2
+   Compiling jiff v0.2.39
+   Compiling walkdir v2.5.0
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling pin-project-lite v0.2.17
+   Compiling raw-window-handle v0.6.2
+   Compiling gix-date v0.18.1
+   Compiling enumn v0.1.14
+   Compiling accesskit v0.24.1
+   Compiling gix-actor v0.44.1
+   Compiling objc-sys v0.3.5
+   Compiling gix-hashtable v0.18.1
+   Compiling core-foundation v0.9.4
+   Compiling gix-parallel v0.50.1
+   Compiling polycool v0.4.0
+   Compiling zeroize v1.9.1
+   Compiling unicode-width v0.2.2
+   Compiling profiling v1.0.18
+   Compiling weezl v0.1.12
+   Compiling kurbo v0.13.1
+   Compiling rustls-pki-types v1.15.1
+   Compiling gix-object v0.66.1
+   Compiling objc2 v0.5.3
+   Compiling rustix v1.1.6
+   Compiling euclid v0.22.14
+   Compiling color v0.3.3
+   Compiling font-types v0.12.7
+   Compiling hashbrown v0.16.1
+   Compiling memmap2 v0.9.12
+   Compiling linebender_resource_handle v0.1.1
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling color_quant v1.1.0
+   Compiling quick-error v2.0.1
+   Compiling icu_locale_core v2.4.0
+   Compiling peniko v0.6.1
+   Compiling read-fonts v0.41.0
+   Compiling guillotiere v0.7.0
+   Compiling tempfile v3.27.0
+   Compiling block2 v0.5.1
+   Compiling gix-fs v0.24.1
+   Compiling png v0.18.1
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling dispatch v0.2.0
+   Compiling utf8_iter v1.0.4
+   Compiling byteorder-lite v0.1.0
+   Compiling fearless_simd v0.4.1
+   Compiling rustc-hash v1.1.0
+   Compiling zune-core v0.5.3
+   Compiling either v1.19.0
+   Compiling zune-jpeg v0.5.15
+   Compiling naga-types v30.0.1
+   Compiling vello_common v0.1.0
+   Compiling image-webp v0.2.4
+   Compiling icu_collections v2.4.0
+   Compiling objc2-foundation v0.2.2
+   Compiling icu_provider v2.4.0
+   Compiling zmij v1.0.23
+   Compiling objc2-app-kit v0.3.2
+   Compiling emath v0.36.2
+   Compiling tracing-attributes v0.1.31
+   Compiling foreign-types-macros v0.2.4
+   Compiling tracing-core v0.1.36
+   Compiling fax v0.2.7
+   Compiling foreign-types-shared v0.3.1
+   Compiling self_cell v1.3.0
+   Compiling pxfm v0.1.30
+   Compiling bit-vec v0.9.1
+   Compiling bytes v1.12.1
+   Compiling bit-set v0.10.0
+   Compiling tracing v0.1.44
+   Compiling moxcms v0.8.1
+   Compiling foreign-types v0.5.0
+   Compiling tiff v0.11.3
+   Compiling ecolor v0.36.2
+   Compiling objc2-app-kit v0.2.2
+   Compiling ahash v0.8.12
+   Compiling icu_normalizer_data v2.4.0
+   Compiling icu_properties_data v2.4.0
+   Compiling typeid v1.0.3
+   Compiling vello_cpu v0.1.0
+   Compiling crossbeam-utils v0.8.23
+   Compiling unicode-general-category v1.1.0
+   Compiling skrifa v0.44.0
+   Compiling harfrust v0.12.0
+   Compiling gif v0.14.2
+   Compiling codespan-reporting v0.13.1
+   Compiling core-graphics-types v0.1.3
+   Compiling objc2-metal v0.3.2
+   Compiling getrandom v0.2.17
+   Compiling static_assertions v1.1.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling epaint_default_fonts v0.36.2
+   Compiling base64 v0.23.1
+   Compiling untrusted v0.9.0
+   Compiling nohash-hasher v0.2.0
+   Compiling epaint v0.36.2
+   Compiling ring v0.17.14
+   Compiling objc2-quartz-core v0.3.2
+   Compiling wgpu-types v30.0.1
+   Compiling core-graphics v0.23.2
+   Compiling naga v30.0.1
+   Compiling image v0.25.10
+   Compiling ron v0.12.2
+   Compiling icu_properties v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling itertools v0.15.0
+   Compiling gix-tempfile v26.0.1
+   Compiling tree-sitter-language v0.1.9
+   Compiling gix-chunk v0.10.1
+   Compiling float-cmp v0.9.0
+   Compiling dpi v0.1.1 (/Volumes/RAMDisk/g51/vendor/winit/dpi)
+   Compiling smol_str v0.2.2
+   Compiling cursor-icon v1.2.0
+   Compiling base64 v0.22.1
+   Compiling nonempty v0.12.0
+   Compiling winit v0.30.13 (/Volumes/RAMDisk/g51/vendor/winit)
+   Compiling strict-num v0.1.1
+   Compiling egui v0.36.2
+   Compiling gix-lock v26.0.1
+   Compiling idna_adapter v1.2.2
+   Compiling wgpu-naga-bridge v30.0.1
+   Compiling raw-window-metal v1.1.0
+   Compiling rustls-webpki v0.103.16
+   Compiling webpki-roots v1.0.11
+   Compiling libloading v0.8.9
+   Compiling arrayref v0.3.9
+   Compiling subtle v2.6.1
+   Compiling rustls v0.23.46
+   Compiling tiny-skia-path v0.11.4
+   Compiling wgpu-hal v30.0.1
+   Compiling idna v1.1.0
+   Compiling httparse v1.10.1
+   Compiling http v1.5.0
+   Compiling form_urlencoded v1.2.2
+   Compiling security-framework-sys v2.17.0
+   Compiling kurbo v0.11.3
+   Compiling deranged v0.5.9
+   Compiling powerfmt v0.2.1
+   Compiling rustc-hash v2.1.3
+   Compiling futures-core v0.3.34
+   Compiling num-conv v0.2.2
+   Compiling siphasher v1.0.4
+   Compiling time-core v0.1.9
+   Compiling futures-sink v0.3.34
+   Compiling time v0.3.55
+   Compiling svgtypes v0.15.3
+   Compiling type-map v0.5.1
+   Compiling url v2.5.8
+   Compiling ureq-proto v0.7.1
+   Compiling wgpu-core-deps-apple v30.0.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling gix-commitgraph v0.42.0
+   Compiling accesskit_consumer v0.38.0
+   Compiling png v0.17.16
+   Compiling unic-langid-impl v0.9.6
+   Compiling gix-quote v0.10.1
+   Compiling objc2-core-audio-types v0.3.2
+   Compiling simplecss v0.2.2
+   Compiling gix-sec v0.16.1
+   Compiling roxmltree v0.20.0
+   Compiling utf8-zero v0.8.1
+   Compiling zune-core v0.4.12
+   Compiling pico-args v0.5.0
+   Compiling xmlwriter v0.1.0
+   Compiling data-url v0.3.2
+   Compiling imagesize v0.13.0
+   Compiling usvg v0.45.1
+   Compiling serde_json v1.0.154
+   Compiling zune-jpeg v0.4.21
+   Compiling ureq v3.5.1
+   Compiling objc2-core-audio v0.3.2
+   Compiling unic-langid v0.9.6
+   Compiling tiny-skia v0.11.4
+   Compiling accesskit_macos v0.26.3
+   Compiling gix-revwalk v0.38.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling wgpu-core v30.0.1
+   Compiling futures-channel v0.3.34
+   Compiling gix-ref v0.69.1
+   Compiling gif v0.13.3
+   Compiling rgb v0.8.53
+   Compiling enum-map-derive v0.17.0
+   Compiling futures-macro v0.3.34
+   Compiling futures-io v0.3.34
+   Compiling fnv v1.0.7
+   Compiling web-time v1.1.0
+   Compiling bit-vec v0.8.0
+   Compiling zlib-rs v0.6.8
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling winnow v1.0.4
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling futures-util v0.3.34
+   Compiling gix-zlib v0.4.0
+   Compiling bit-set v0.8.0
+   Compiling enum-map v2.7.3
+   Compiling resvg v0.45.1
+   Compiling wgpu v30.0.1
+   Compiling onig_sys v69.9.3
+   Compiling rayon-core v1.13.0
+   Compiling accesskit_winit v0.32.2
+   Compiling objc2-audio-toolbox v0.3.2
+   Compiling ehttp v0.7.2
+   Compiling tree-sitter v0.25.10
+   Compiling anyhow v1.0.104
+   Compiling gix-command v0.12.1
+   Compiling webbrowser v1.2.6
+   Compiling arboard v3.7.0
+   Compiling clru v0.6.3
+   Compiling gix-url v0.40.1
+   Compiling signal-hook-registry v1.4.8
+   Compiling core-foundation v0.10.1
+   Compiling gix-packetline v0.24.1
+   Compiling num-integer v0.1.47
+   Compiling thiserror-impl v1.0.69
+   Compiling ref-cast-impl v1.0.27
+   Compiling tokio-macros v2.7.2
+   Compiling gitcraft-os v0.1.0 (/Volumes/RAMDisk/g51/crates/gitcraft-os)
+   Compiling serde_derive_internals v0.30.0
+   Compiling quick-xml v0.42.0
+   Compiling encoding_rs v0.8.35
+   Compiling mio v1.2.4
+   Compiling socket2 v0.6.5
+   Compiling toml_datetime v1.1.2+spec-1.1.0
+   Compiling unicase v2.10.0
+   Compiling linked-hash-map v0.5.6
+   Compiling lazy_static v1.5.1
+   Compiling colored v2.2.0
+   Compiling yaml-rust v0.4.5
+   Compiling pulldown-cmark v0.13.6
+   Compiling tokio v1.54.1
+   Compiling schemars_derive v1.2.3
+   Compiling plist v1.10.3
+   Compiling thiserror v1.0.69
+   Compiling ref-cast v1.0.27
+   Compiling num-bigint v0.4.8
+   Compiling gix-transport v0.62.0
+   Compiling security-framework v3.7.0
+   Compiling gix-pack v0.77.0
+   Compiling egui-winit v0.36.2
+   Compiling arc-swap v1.9.4
+   Compiling egui_extras v0.36.2
+   Compiling coreaudio-rs v0.13.0
+   Compiling rayon v1.12.0
+   Compiling onig v6.5.3
+   Compiling egui-wgpu v0.36.2
+   Compiling fancy-regex v0.16.2
+   Compiling futures-executor v0.3.34
+   Compiling gix-traverse v0.64.0
+   Compiling security-framework v2.11.1
+   Compiling gix-shallow v0.15.1
+   Compiling crossbeam-channel v0.5.17
+   Compiling gix-glob v0.29.1
+   Compiling accesskit_consumer v0.35.0
+   Compiling rustls-pemfile v2.2.0
+   Compiling getopts v0.2.24
+   Compiling gix-config-value v0.21.1
+   Compiling chrono v0.4.45
+   Compiling gix-bitmap v0.6.1
+   Compiling keyring-core v1.0.1
+   Compiling bincode v1.3.3
+   Compiling gix-macros v0.2.1
+   Compiling keyboard-types v0.8.3
+   Compiling filetime v0.2.29
+   Compiling mach2 v0.4.3
+   Compiling serde_spanned v1.1.2
+   Compiling unicode-bom v2.0.3
+   Compiling dyn-clone v1.0.20
+   Compiling dpi v0.1.2
+   Compiling dasp_sample v0.11.0
+   Compiling pollster v1.0.1
+   Compiling eframe v0.36.2
+   Compiling gix-protocol v0.68.0
+   Compiling cpal v0.16.0
+   Compiling muda v0.21.2
+   Compiling schemars v1.2.3
+   Compiling gix-config v0.62.2
+   Compiling toml v1.1.8+spec-1.1.0
+   Compiling gix-index v0.58.0
+   Compiling syntect v5.3.0
+   Compiling apple-native-keyring-store v1.0.2
+   Compiling dify v0.8.0
+   Compiling rustls-native-certs v0.7.3
+   Compiling kittest v0.4.0
+   Compiling futures v0.3.34
+   Compiling nix v0.28.0
+   Compiling gitcraft v0.3.4 (/Volumes/RAMDisk/g51)
+   Compiling egui_commonmark_backend v0.25.0
+   Compiling gix-odb v0.87.0
+   Compiling num-rational v0.4.2
+   Compiling filedescriptor v0.8.3
+   Compiling mac-notification-sys v0.6.15
+   Compiling tokio-util v0.7.20
+   Compiling charset v0.1.5
+   Compiling gix-discover v0.57.1
+   Compiling gix-revision v0.52.0
+   Compiling intl-memoizer v0.5.3
+   Compiling fluent-langneg v0.13.1
+   Compiling intl_pluralrules v7.0.2
+   Compiling webpki-roots v0.26.11
+   Compiling gix-diff v0.70.0
+   Compiling gix-refspec v0.47.1
+   Compiling fluent-syntax v0.12.0
+   Compiling dispatch2 v0.3.1
+   Compiling vte v0.15.0
+   Compiling objc2-core-services v0.3.2
+   Compiling hashlink v0.12.2
+   Compiling regex v1.13.1
+   Compiling notify-types v2.1.0
+   Compiling serial2 v0.2.39
+   Compiling open v5.4.5
+   Compiling streaming-iterator v0.1.9
+   Compiling shell-words v1.1.1
+   Compiling data-encoding v2.11.1
+   Compiling quoted_printable v0.5.2
+   Compiling downcast-rs v1.2.1
+   Compiling arraydeque v0.5.1
+   Compiling yaml-rust2 v0.13.0
+   Compiling portable-pty v0.9.0
+   Compiling rmcp v3.7.0
+   Compiling mailparse v0.18.0
+   Compiling egui_kittest v0.36.2
+   Compiling notify v8.2.1
+   Compiling vt100 v0.18.1
+   Compiling rfd v0.17.2
+   Compiling fluent-bundle v0.16.0
+   Compiling gix v0.90.0
+   Compiling ureq v2.12.1
+   Compiling notify-rust v4.18.2
+   Compiling rodio v0.21.1
+   Compiling egui_commonmark v0.25.0
+   Compiling keyring v4.2.0
+   Compiling two-face v0.5.2+bat-0.26.1
+   Compiling tree-sitter-javascript v0.25.0
+   Compiling tree-sitter-python v0.25.0
+   Compiling tree-sitter-go v0.25.0
+   Compiling tree-sitter-cpp v0.23.4
+   Compiling tree-sitter-c v0.24.2
+   Compiling tree-sitter-typescript v0.23.2
+   Compiling tree-sitter-rust v0.24.2
+   Compiling tray-icon v0.26.1
+   Compiling exacl v0.13.0
+   Compiling toml_edit v0.25.17+spec-1.1.0
+   Compiling num-format v0.4.4
+   Compiling md5 v0.7.0
+   Compiling sys-locale v0.3.2
+warning: method `display_label` is never used
+   --> src/fence/display.rs:311:12
+    |
+310 | impl super::check::How {
+    | ---------------------- method in this implementation
+311 |     pub fn display_label(self) -> &'static str {
+    |            ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `check_bundle` is never used
+   --> src/git/bundles.rs:232:15
+    |
+232 | pub(crate) fn check_bundle(
+    |               ^^^^^^^^^^^^
+
+warning: function `unreachable_bounded` is never used
+   --> src/git/dry_run/reach.rs:199:15
+    |
+199 | pub(crate) fn unreachable_bounded(
+    |               ^^^^^^^^^^^^^^^^^^^
+
+warning: function `published` is never used
+   --> src/package/mod.rs:118:15
+    |
+118 | pub(crate) fn published(
+    |               ^^^^^^^^^
+
+warning: function `packages` is never used
+  --> src/package/tools.rs:13:15
+   |
+13 | pub(crate) fn packages(repo: &Path, cargo: bool, npm: bool) -> Result<Vec<Package>, String> {
+   |               ^^^^^^^^
+
+warning: function `files` is never used
+   --> src/package/tools.rs:180:15
+    |
+180 | pub(crate) fn files(repo: &Path, pkg: &Package) -> Result<Vec<(String, Option<u64>)>, String> {
+    |               ^^^^^
+
+warning: function `published` is never used
+   --> src/package/tools.rs:249:15
+    |
+249 | pub(crate) fn published(pkg: &Package) -> Result<Option<(String, String)>, String> {
+    |               ^^^^^^^^^
+
+warning: function `published_files` is never used
+   --> src/package/tools.rs:318:15
+    |
+318 | pub(crate) fn published_files(url: &str) -> Result<Vec<String>, String> {
+    |               ^^^^^^^^^^^^^^^
+
+warning: method `display` is never used
+  --> src/package/witness.rs:96:19
+   |
+73 | impl CargoFailure {
+   | ----------------- method in this implementation
+...
+96 |     pub(crate) fn display(&self) -> String {
+   |                   ^^^^^^^
+
+warning: function `run` is never used
+  --> src/parallel_bisect/bundle.rs:16:15
+   |
+16 | pub(crate) fn run(
+   |               ^^^
+
+warning: function `run` is never used
+   --> src/parallel_bisect/observe.rs:160:15
+    |
+160 | pub(crate) fn run(
+    |               ^^^
+
+warning: method `send` is never used
+   --> src/parallel_bisect/workspace.rs:209:12
+    |
+ 40 | impl Workspace {
+    | -------------- method in this implementation
+...
+209 |     pub fn send(&self, source: &Path, wanted: &[String]) -> Result<(), String> {
+    |            ^^^^
+
+warning: function `ui_thread_debug` is never used
+    --> src/remote/display.rs:1708:8
+     |
+1708 | pub fn ui_thread_debug(command: &str, detail: &str) -> String {
+     |        ^^^^^^^^^^^^^^^
+
+warning: function `commits_count` is never used
+  --> src/repo/dco/view.rs:79:4
+   |
+79 | fn commits_count(n: usize) -> String {
+   |    ^^^^^^^^^^^^^
+
+warning: function `approval_preview` is never used
+   --> src/repo/ghost/mod.rs:570:24
+    |
+570 | pub(in crate::repo) fn approval_preview(
+    |                        ^^^^^^^^^^^^^^^^
+
+warning: function `read_catalog` is never used
+ --> src/repo/local_ci/run.rs:9:15
+  |
+9 | pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), String> {
+  |               ^^^^^^^^^^^^
+
+warning: function `capital` is never used
+   --> src/repo/parallel_bisect/marks.rs:124:4
+    |
+124 | fn capital(word: &str) -> String {
+    |    ^^^^^^^
+
+warning: constant `COMPACT_TIP` is never used
+   --> src/settings/mod.rs:260:11
+    |
+260 | pub const COMPACT_TIP: &str = "Lanes closer together, for a narrower graph column";
+    |           ^^^^^^^^^^^
+
+warning: variant `Fallback` is never constructed
+  --> src/tray/mod.rs:28:5
+   |
+24 | pub(crate) enum Availability {
+   |                 ------------ variant in this enum
+...
+28 |     Fallback(String),
+   |     ^^^^^^^^
+   |
+   = note: `Availability` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `download` is never used
+   --> src/update/install.rs:175:4
+    |
+175 | fn download(url: &str, to: &Path) -> Result<(), String> {
+    |    ^^^^^^^^
+
+warning: function `unpack` is never used
+   --> src/update/install.rs:197:4
+    |
+197 | fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
+    |    ^^^^^^
+
+warning: function `install` is never used
+   --> src/update/install.rs:238:8
+    |
+238 | pub fn install(new: &Path) -> Result<PathBuf, String> {
+    |        ^^^^^^^
+
+warning: function `go_back` is never used
+   --> src/update/install.rs:264:8
+    |
+264 | pub fn go_back() -> Result<(PathBuf, Previous), String> {
+    |        ^^^^^^^
+
+warning: function `move_into` is never used
+   --> src/update/install.rs:280:4
+    |
+280 | fn move_into(from: &Path, to: &Path) -> Result<(), String> {
+    |    ^^^^^^^^^
+
+warning: method `into_raw` is never used
+  --> src/update/witness.rs:36:12
+   |
+30 | impl PlacementFailure {
+   | --------------------- method in this implementation
+...
+36 |     pub fn into_raw(self) -> String {
+   |            ^^^^^^^^
+
+warning: constant `BADGE` is never used
+  --> src/weakened/mod.rs:26:11
+   |
+26 | pub const BADGE: &str = "weakens checks";
+   |           ^^^^^
+
+warning: `gitcraft` (lib test) generated 26 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8m 28s
+     Running unittests src/lib.rs (/Volumes/RAMDisk/gitcraft-target/debug/deps/gitcraft-3b14d64496fedda3)
+
+running 1 test
+test repo::notice::operation::tests::retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4462 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (/Volumes/RAMDisk/gitcraft-target/debug/deps/gitcraft_os-6af19aa421ebb49d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.00s
+
