@@ -228,7 +228,7 @@ fn publish(
         tx.push_str(&format!("update HEAD {commit} {head}\n"));
     } else {
         tx.push_str(&format!(
-            "symref-verify HEAD {branch}\nverify {branch} {head}\n"
+            "option no-deref\nsymref-verify HEAD {branch}\nverify {branch} {head}\n"
         ));
     }
     tx.push_str(&format!(
