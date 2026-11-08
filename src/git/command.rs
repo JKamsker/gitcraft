@@ -204,6 +204,13 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = repository_command(dir, args);
+    cmd.args(&extra.pre).args(&extra.owned_pre);
+    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
+        normalize_connection_command(&mut cmd, args);
+    }
+    for (name, value) in &extra.env {
+        cmd.env(name, value);
+    }
     if extra
         .owned_pre
         .iter()
@@ -211,13 +218,6 @@ pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) ->
     {
         let selected = cmd.get_program().to_owned();
         cmd.env("GITCRAFT_GIT_ORIGINAL", selected);
-    }
-    cmd.args(&extra.pre).args(&extra.owned_pre);
-    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
-        normalize_connection_command(&mut cmd, args);
-    }
-    for (name, value) in &extra.env {
-        cmd.env(name, value);
     }
     cmd.args(args);
     cmd
@@ -272,13 +272,19 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         ""
     };
     let script = if extra.trace_hooks {
-        format!("{pin}{}", super::hooks::traced_script(&words.join(" ")))
-    } else {
-        if credential_transport {
-            format!("{pin}exec \"$GITCRAFT_GIT_ORIGINAL\" {}", words.join(" "))
+        let program = if credential_transport {
+            "\"$GITCRAFT_GIT_ORIGINAL\""
         } else {
-            format!("exec git {}", words.join(" "))
-        }
+            "git"
+        };
+        format!(
+            "{pin}{}",
+            super::hooks::traced_script_with_program(&words.join(" "), program)
+        )
+    } else if credential_transport {
+        format!("{pin}exec \"$GITCRAFT_GIT_ORIGINAL\" {}", words.join(" "))
+    } else {
+        format!("exec git {}", words.join(" "))
     };
     remote::Request {
         cwd: Some(target.path.clone()),
@@ -1268,6 +1274,68 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(unix)]
+    fn scratch(name: &str) -> Result<std::path::PathBuf, String> {
+        let dir = std::env::temp_dir().join(format!("gitcraft-cmd-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        Ok(dir)
+    }
+
+    /// A script that leaves `marker` behind when run, then prints `x` (an askpass answer).
+    #[cfg(unix)]
+    fn marking_script(dir: &Path, marker: &Path) -> Result<std::path::PathBuf, String> {
+        use std::os::unix::fs::PermissionsExt;
+        let script = dir.join("askpass.sh");
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\ntouch '{}'\necho x\n", marker.display()),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        Ok(script)
+    }
+
+    /// Whether git, asked for a credential (quietly or not) in an environment that sets
+    /// `SSH_ASKPASS` (KDE's opens a window) and maybe `GIT_ASKPASS` (VS Code's terminal), ran
+    /// the askpass program.
+    #[cfg(unix)]
+    fn askpass_asked(dir: &Path, quiet: bool, git_askpass: bool) -> Result<bool, String> {
+        let marker = dir.join("asked");
+        let _ = std::fs::remove_file(&marker);
+        let script = marking_script(dir, &marker)?;
+        let mut cmd = git_cmd();
+        // Not the user's own config, whose `core.askPass` would stand in for the script.
+        cmd.env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null");
+        // What the app inherited, which `unattended` then has to override.
+        cmd.env("SSH_ASKPASS", &script);
+        if git_askpass {
+            cmd.env("GIT_ASKPASS", &script);
+        } else {
+            cmd.env_remove("GIT_ASKPASS");
+        }
+        if quiet {
+            unattended(&mut cmd);
+        }
+        let mut child = cmd
+            .args(["-c", "credential.helper=", "credential", "fill"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(b"protocol=https\nhost=example.invalid\n\n");
+        }
+        child.wait().map_err(|e| e.to_string())?;
+        Ok(marker.exists())
+    }
+
+    /// The background fetch asks nobody to sign in, every few minutes, through a window: not
+    /// even with a `GIT_ASKPASS` in the environment, which git reads before `core.askPass`.
+    #[cfg(unix)]
     #[test]
     fn a_quiet_operation_opens_no_sign_in_window() -> Result<(), String> {
         let dir = scratch("unattended")?;
