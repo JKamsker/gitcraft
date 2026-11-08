@@ -49,7 +49,11 @@ impl RepoTab {
         ui.set_clip_rect(ui.clip_rect().intersect(ui.max_rect()));
         let t = Tokens::get(ui.ctx());
         crate::icons::inline(ui, "search", 14.0, t.accent);
-        widgets::chip(ui, "Bisecting", t.accent);
+        widgets::chip(
+            ui,
+            crate::i18n::text("repo-workflows-bisect-bisect-status-675fd45e"),
+            t.accent,
+        );
         ui.add_space(4.0);
         self.where_it_is(ui, bisect, acts);
     }
@@ -63,14 +67,19 @@ impl RepoTab {
         }
         match (&bisect.outcome, &bisect.progress, &bisect.marks.bad) {
             (Some(Outcome::FirstBad(hash)), _, _) => {
-                ui.label(RichText::new("First bad commit:").color(t.text));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-bisect-where-it-is-8b3812c0",
+                    ))
+                    .color(t.text),
+                );
                 self.commit_link(ui, hash, acts);
             }
             (Some(Outcome::OnlySkipped(possible)), _, _) => {
                 ui.label(
-                    RichText::new(format!(
-                        "Only skipped commits are left: the first bad commit is one of these {}:",
-                        possible.len()
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-bisect-where-it-is-25230d8d",
+                        &[("possible-len-1", (possible.len()).clone().into())],
                     ))
                     .color(t.text),
                 );
@@ -80,23 +89,38 @@ impl RepoTab {
                 }
                 if possible.len() > MAX_NAMED {
                     ui.label(
-                        RichText::new(format!("and {} more", possible.len() - MAX_NAMED))
-                            .color(t.text_dim),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-bisect-where-it-is-683768ab",
+                            &[(
+                                "possible-len-max-named-1",
+                                (possible.len() - MAX_NAMED).clone().into(),
+                            )],
+                        ))
+                        .color(t.text_dim),
                     );
                 }
             }
             (None, Some(progress), _) => {
                 // The count first: the commit's summary is cut to fit.
                 ui.label(RichText::new(steps_text(progress.steps, progress.left)).color(t.text));
-                ui.label(RichText::new("· Testing").color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-bisect-where-it-is-7d7c30e4",
+                    ))
+                    .color(t.text_dim),
+                );
                 self.commit_link(ui, &bisect.current, acts);
             }
             (None, None, None) => {
-                waiting(ui, &t, bisect.word(Mark::Bad), "one with the change");
+                waiting(
+                    ui,
+                    &t,
+                    bisect.word(Mark::Bad),
+                    crate::i18n::text("repo-workflows-bisect-where-it-is-d5ebaa0a"),
+                );
             }
             (None, None, Some(_)) if !bisect.marks.good.is_empty() => {
-                let text = "git finds nothing to test between the marks (a good commit after the \
-                            bad one?): mark others, or Stop.";
+                let text = crate::i18n::text("repo-workflows-bisect-where-it-is-4c0b8e59");
                 ui.add(egui::Label::new(RichText::new(text).color(t.warning)).truncate())
                     .on_hover_text(text);
             }
@@ -105,7 +129,7 @@ impl RepoTab {
                     ui,
                     &t,
                     bisect.word(Mark::Good),
-                    "one from before the change",
+                    crate::i18n::text("repo-workflows-bisect-where-it-is-94883ca6"),
                 );
             }
         }
@@ -129,7 +153,12 @@ impl RepoTab {
             .sense(egui::Sense::click())
             .truncate();
         let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-        if resp.on_hover_text("Show this commit").clicked() {
+        if resp
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-bisect-commit-link-63633913",
+            ))
+            .clicked()
+        {
             acts.push(Action::SelectHash(hash.to_owned()));
         }
     }
@@ -139,24 +168,35 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let running = self.bisect.running();
         let back = match bisect.start_branch() {
-            Some(branch) => format!("git bisect reset: checks out {branch} again"),
-            None => {
-                "git bisect reset: checks out again what was checked out when it began".to_owned()
-            }
+            Some(branch) => crate::i18n::message(
+                "repo-workflows-bisect-bisect-buttons-0599842f",
+                &[("branch", (branch).into())],
+            ),
+            None => crate::i18n::text("repo-workflows-bisect-bisect-buttons-a28c79f7").to_owned(),
         };
         if bisect.outcome.is_some() {
-            if widgets::primary_button(ui, "Finish", idle, 80.0)
-                .on_hover_text(&back)
-                .on_disabled_hover_text(BUSY)
-                .clicked()
+            if widgets::primary_button(
+                ui,
+                crate::i18n::text("repo-workflows-bisect-bisect-buttons-a6c7a84b"),
+                idle,
+                80.0,
+            )
+            .on_hover_text(&back)
+            .on_disabled_hover_text(crate::i18n::text(BUSY))
+            .clicked()
             {
                 acts.push(Action::Bisect(BisectAct::Reset));
             }
             return;
         }
-        let wait = if running { RUNNING } else { BUSY };
+        let wait = crate::i18n::text(if running { RUNNING } else { BUSY });
         if ui
-            .add_enabled(idle && !running, egui::Button::new("Stop"))
+            .add_enabled(
+                idle && !running,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-bisect-bisect-buttons-cae7d57b",
+                )),
+            )
             .on_hover_text(&back)
             .on_disabled_hover_text(wait)
             .clicked()
@@ -166,12 +206,19 @@ impl RepoTab {
         let ready = bisect.progress.is_some();
         self.parallel_banner_button(ui, acts);
         if ui
-            .add_enabled(idle && ready, egui::Button::new("Run a command…"))
-            .on_hover_text("git bisect run: a command tests each commit for you")
+            .add_enabled(
+                idle && ready,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-bisect-bisect-buttons-eded3d42",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-bisect-bisect-buttons-7cf0c74e",
+            ))
             .on_disabled_hover_text(if ready {
                 wait
             } else {
-                "Mark a good and a bad commit first"
+                crate::i18n::text("repo-workflows-bisect-bisect-buttons-c3efc1be")
             })
             .clicked()
         {
@@ -181,10 +228,25 @@ impl RepoTab {
         for (mark, tip) in [
             (
                 Mark::Skip,
-                format!("{current} can't be tested: try another one"),
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-buttons-12c0910a",
+                    &[("current", (current).clone().into())],
+                ),
             ),
-            (Mark::Bad, format!("{current} has the change")),
-            (Mark::Good, format!("{current} is from before the change")),
+            (
+                Mark::Bad,
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-buttons-7f573858",
+                    &[("current", (current).clone().into())],
+                ),
+            ),
+            (
+                Mark::Good,
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-buttons-a9a77839",
+                    &[("current", (current).clone().into())],
+                ),
+            ),
         ] {
             let word = capitalised(if mark == Mark::Skip {
                 "skip"
@@ -204,10 +266,10 @@ impl RepoTab {
 }
 
 /// Why the banner's buttons are greyed out while another operation runs.
-pub(super) const BUSY: &str = "Wait for the operation going on to finish";
+pub(super) const BUSY: &str = "repo-workflows-bisect--e5e3ecc5";
 
 /// Why they are while `git bisect run` tests the commits.
-pub(super) const RUNNING: &str = "Wait for the run to end, or stop it";
+pub(super) const RUNNING: &str = "repo-workflows-bisect--512af075";
 
 /// A commit's short hash; a click selects it and shows its details.
 fn hash_link(ui: &mut Ui, hash: &str, acts: &mut Vec<Action>) {
@@ -215,17 +277,25 @@ fn hash_link(ui: &mut Ui, hash: &str, acts: &mut Vec<Action>) {
     let link =
         egui::Label::new(RichText::new(short(hash)).color(t.accent)).sense(egui::Sense::click());
     let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-    if resp.on_hover_text("Show this commit").clicked() {
+    if resp
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-bisect-hash-link-63633913",
+        ))
+        .clicked()
+    {
         acts.push(Action::SelectHash(hash.to_owned()));
     }
 }
 
 /// What a bisect still needs before it can pick commits to test.
 fn waiting(ui: &mut Ui, t: &Tokens, word: &str, meaning: &str) {
-    let text = format!(
-        "Mark a {word} commit ({meaning}): right-click it in the graph, or use {} for the one \
-         checked out.",
-        capitalised(word)
+    let text = crate::i18n::message(
+        "repo-workflows-bisect-waiting-2d4ce59a",
+        &[
+            ("word", (word).into()),
+            ("meaning", (meaning).into()),
+            ("capitalised-word-1", (capitalised(word)).clone().into()),
+        ],
     );
     ui.add(egui::Label::new(RichText::new(&text).color(t.text)).truncate())
         .on_hover_text(text);
@@ -234,14 +304,20 @@ fn waiting(ui: &mut Ui, t: &Tokens, word: &str, meaning: &str) {
 /// "About 3 steps left (12 commits after this one)".
 fn steps_text(steps: u32, left: usize) -> String {
     let steps = match steps {
-        0 => "The last step".to_owned(),
-        1 => "About 1 step left".to_owned(),
-        n => format!("About {n} steps left"),
+        0 => crate::i18n::text("repo-workflows-bisect-steps-text-2d1513e9").to_owned(),
+        1 => crate::i18n::text("repo-workflows-bisect-steps-text-263b5d8b").to_owned(),
+        n => crate::i18n::message(
+            "repo-workflows-bisect-steps-text-14999716",
+            &[("n", (n).clone().into())],
+        ),
     };
     let left = match left {
-        0 => "no commits after this one".to_owned(),
-        1 => "1 commit after this one".to_owned(),
-        n => format!("{n} commits after this one"),
+        0 => crate::i18n::text("repo-workflows-bisect-steps-text-a4e9b171").to_owned(),
+        1 => crate::i18n::text("repo-workflows-bisect-steps-text-9bbc8458").to_owned(),
+        n => crate::i18n::message(
+            "repo-workflows-bisect-steps-text-5ccbfd65",
+            &[("n", (n).clone().into())],
+        ),
     };
     format!("{steps} ({left})")
 }
@@ -275,33 +351,49 @@ fn run_log(ui: &mut Ui, run: &RunLog, acts: &mut Vec<Action>) {
             Some(Ok(e)) => {
                 let (text, color) = match e.code {
                     Some(0) => ("done".to_owned(), t.success),
-                    Some(c) => (format!("ended with exit code {c}"), t.warning),
-                    None => ("ended by a signal".to_owned(), t.warning),
+                    Some(c) => (
+                        crate::i18n::message(
+                            "repo-workflows-bisect-run-log-534a3a34",
+                            &[("c", (c).clone().into())],
+                        ),
+                        t.warning,
+                    ),
+                    None => (
+                        crate::i18n::text("repo-workflows-bisect-run-log-bb5e4bf5").to_owned(),
+                        t.warning,
+                    ),
                 };
                 ui.label(RichText::new(text).color(color));
             }
             Some(Err(e)) => {
-                ui.label(RichText::new(format!("failed: {e}")).color(t.danger));
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-bisect-run-log-5fd804ed",
+                        &[("e", (e).clone().into())],
+                    ))
+                    .color(t.danger),
+                );
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if run.ended.is_some() {
-                if ui.button("Close").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-bisect-run-log-7d9eb7ac"))
+                    .clicked()
+                {
                     acts.push(Action::Bisect(BisectAct::CloseLog));
                 }
             } else if ui
-                .button("Stop run")
-                .on_hover_text(
-                    "Stops the command and what it started; the bisect stays where it got to",
-                )
+                .button(crate::i18n::text("repo-workflows-bisect-run-log-b7ec68a2"))
+                .on_hover_text(crate::i18n::text("repo-workflows-bisect-run-log-8d23f4ee"))
                 .clicked()
             {
                 acts.push(Action::Bisect(BisectAct::StopRun));
             }
             let toggle = if run.open {
-                "Hide output"
+                crate::i18n::text("repo-workflows-bisect-run-log-64876c47")
             } else {
-                "Show output"
+                crate::i18n::text("repo-workflows-bisect-run-log-9dbbb249")
             };
             if ui.button(toggle).clicked() {
                 acts.push(Action::Bisect(BisectAct::ToggleLog));

@@ -52,7 +52,12 @@ impl RepoTab {
                             ui.label(RichText::new("Stopping…").color(t.text_dim));
                         } else {
                             ui.label(RichText::new("Rehearsing…").color(t.text_dim));
-                            if ui.button("Stop").clicked() {
+                            if ui
+                                .button(crate::i18n::text(
+                                    "repo-workflows-rehearse-rehearse-window-cae7d57b",
+                                ))
+                                .clicked()
+                            {
                                 acts.push(Action::Rehearse(RehearseAct::Stop));
                             }
                         }

@@ -27,7 +27,12 @@ impl RepoTab {
                         }
                     }
                     _ => {
-                        if ui.button("Close").clicked() {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-test_lane-test-banner-7d9eb7ac",
+                            ))
+                            .clicked()
+                        {
                             acts.push(Action::TestLane(LaneAct::Close));
                         }
                     }

@@ -202,7 +202,10 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
         Some(Err(e)) => {
             ui.add(egui::Label::new(RichText::new(e.as_str()).color(t.danger)).wrap());
             ui.add_space(6.0);
-            if ui.button("Try again").clicked() {
+            if ui
+                .button(crate::i18n::text("repo-workflows-issue_work-show-d8b8392e"))
+                .clicked()
+            {
                 outcome = Outcome::Retry;
             }
         }
@@ -246,7 +249,10 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
             outcome = Outcome::Start(index, picker.name.clone(), picker.worktree);
         }
         if ui
-            .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+            .add(
+                egui::Button::new(crate::i18n::text("repo-workflows-issue_work-show-19766ed6"))
+                    .min_size(egui::vec2(80.0, 30.0)),
+            )
             .clicked()
         {
             outcome = Outcome::Close;
@@ -353,7 +359,12 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
     ui.add_space(8.0);
     let mut start = false;
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Branch").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-issue_work-choose-52656e81",
+            ))
+            .color(t.text_dim),
+        );
         let name = ui.add(
             egui::TextEdit::singleline(&mut picker.name)
                 .desired_width(f32::INFINITY)

@@ -65,8 +65,14 @@ pub(crate) enum Reason {
 impl Reason {
     pub(crate) fn text(&self) -> String {
         match self {
-            Reason::File(file) => format!("this repository has a {file} file"),
-            Reason::FailingCheck(n) => format!("the DCO check of #{n} fails"),
+            Reason::File(file) => crate::i18n::message(
+                "repo-workflows-dco-text-e5458838",
+                &[("file", (file).clone().into())],
+            ),
+            Reason::FailingCheck(n) => crate::i18n::message(
+                "repo-workflows-dco-text-dc4915c9",
+                &[("n", (n).clone().into())],
+            ),
         }
     }
 }
@@ -198,10 +204,12 @@ impl RepoTab {
                     |tab, result, _| {
                         if let Err(e) = result {
                             tab.status = Some((
-                                format!(
-                                    "Couldn't save Sign off for this repository \
-                                     (git config {}): {e}",
-                                    signoff::SIGN_OFF_KEY
+                                crate::i18n::message(
+                                    "repo-workflows-dco-dco-act-10fe4a7c",
+                                    &[
+                                        ("signoff-sign-off-key-1", (signoff::SIGN_OFF_KEY).into()),
+                                        ("e", (e).clone().into()),
+                                    ],
                                 ),
                                 true,
                             ));
@@ -264,7 +272,10 @@ impl RepoTab {
                     UndoEntry {
                         id: 0,
                         agent: None,
-                        label: format!("Sign off the commits of {} (here only)", plan.branch),
+                        label: crate::i18n::message(
+                            "repo-workflows-dco-dco-op-done-5d0c9ff1",
+                            &[("plan-branch-1", (plan.branch).clone().into())],
+                        ),
                         undo,
                         redo,
                         heads: None,
@@ -288,7 +299,10 @@ impl RepoTab {
                     && op.label == fix_label(&plan)
                 {
                     *op = PendingOp {
-                        label: format!("Push the signed-off commits of {}", plan.branch),
+                        label: crate::i18n::message(
+                            "repo-workflows-dco-dco-op-done-55d2b32b",
+                            &[("plan-branch-1", (plan.branch).clone().into())],
+                        ),
                         ops: plan.push_steps(),
                         refresh: Refresh::All,
                         kind: OpKind::plain(),
@@ -308,9 +322,9 @@ fn fix_label(plan: &Plan) -> String {
 /// The dialog that shows what signing off the branch does, and does it.
 fn fix_dialog(plan: &Plan, who: &str, email: &str) -> Dialog {
     let button = if plan.push.is_some() {
-        "Sign off and push"
+        crate::i18n::text("repo-workflows-dco-fix-dialog-1a8aeebd")
     } else {
-        "Sign off"
+        crate::i18n::text("repo-workflows-dco-fix-dialog-6ce6ab1f")
     };
     Dialog::confirm(
         &fix_label(plan),
@@ -373,9 +387,9 @@ pub(crate) fn fix_preview(plan: &Plan, who: &str, email: &str) -> String {
     match &plan.push {
         Some(push) => {
             let guard = if push.seen.is_some() {
-                "refused if someone pushed there since it was last fetched"
+                crate::i18n::text("repo-workflows-dco-fix-preview-1cc2b37b")
             } else {
-                "refused if that branch exists there already"
+                crate::i18n::text("repo-workflows-dco-fix-preview-b12258fd")
             };
             text.push_str(&format!(
                 "\nThen force-pushes it to {} with a lease: {guard}.\n\nCtrl+Z puts the \

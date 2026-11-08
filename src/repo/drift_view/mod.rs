@@ -291,7 +291,10 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             .font(theme::semibold(15.0)),
     );
     ui.add_space(6.0);
-    ui.label(RichText::new("Task").font(theme::medium(12.5)));
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-drift_view-body-4bc74b21"))
+            .font(theme::medium(12.5)),
+    );
     ui.add(
         egui::TextEdit::multiline(&mut view.task)
             .desired_rows(3)
@@ -332,7 +335,9 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             ui.label(RichText::new(said).size(11.5).color(t.text_faint));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            todo.close = ui.button("Close").clicked();
+            todo.close = ui
+                .button(crate::i18n::text("repo-workflows-drift_view-body-7d9eb7ac"))
+                .clicked();
         });
     });
     ui.add_space(8.0);

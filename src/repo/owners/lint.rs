@@ -169,7 +169,10 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
             acts.push(Action::OpenInEditor(file.path.clone().into()));
         }
         if ui
-            .add(egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)))
+            .add(
+                egui::Button::new(crate::i18n::text("repo-workflows-owners-contents-7d9eb7ac"))
+                    .min_size(egui::vec2(80.0, 30.0)),
+            )
             .clicked()
         {
             acts.push(Action::Owners(OwnersAct::Close));

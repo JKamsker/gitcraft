@@ -100,7 +100,12 @@ pub(in crate::repo) fn history(
                     });
             }
         });
-    if ui.button("Close").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-working_drafts-history-7d9eb7ac",
+        ))
+        .clicked()
+    {
         outcome = Outcome::Cancel;
     }
     outcome
@@ -172,7 +177,12 @@ pub(in crate::repo) fn recovery(
         if ui.button("Back").clicked() {
             outcome = done(Action::EarlierVersions);
         }
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-working_drafts-recovery-19766ed6",
+            ))
+            .clicked()
+        {
             outcome = Outcome::Cancel;
         }
     });

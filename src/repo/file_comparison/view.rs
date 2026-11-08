@@ -45,7 +45,13 @@ impl RepoTab {
                 ui.horizontal_wrapped(|ui| {
                     ui.selectable_value(&mut state.source, 0, "Staged");
                     ui.selectable_value(&mut state.source, 3, "Working copy");
-                    ui.selectable_value(&mut state.source, 1, "Commit");
+                    ui.selectable_value(
+                        &mut state.source,
+                        1,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-82a9c46f",
+                        ),
+                    );
                     ui.selectable_value(&mut state.source, 2, "Between commits");
                     ui.selectable_value(&mut state.source, 4, "Commit → working copy");
                 });
@@ -76,7 +82,13 @@ impl RepoTab {
                         ui.add(egui::TextEdit::singleline(&mut state.from).desired_width(140.));
                     }
                     if state.source != 0 {
-                        ui.label(if state.source == 1 { "Commit" } else { "To" });
+                        ui.label(if state.source == 1 {
+                            crate::i18n::text(
+                                "repo-workflows-file_comparison-file-comparison-view-82a9c46f",
+                            )
+                        } else {
+                            "To"
+                        });
                         ui.add(egui::TextEdit::singleline(&mut state.to).desired_width(140.));
                     }
                     if ui.button("Find file migrations").clicked() {
@@ -105,7 +117,9 @@ impl RepoTab {
             }
             Page::Matrix => {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Folder");
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-file_comparison-file-comparison-view-74ccd433",
+                    ));
                     ui.add(
                         egui::TextEdit::singleline(&mut state.folder)
                             .hint_text("Repository root")

@@ -27,7 +27,12 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(said).color(color_of(&t, color)));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Copy").clicked() {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-test_lane-test-output-window-e21f935f",
+                            ))
+                            .clicked()
+                        {
                             ui.ctx().copy_text(kept.lines.join("\n"));
                         }
                     });

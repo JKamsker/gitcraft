@@ -206,7 +206,10 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) ->
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             close = ui
-                .add_enabled(!editor.saving, egui::Button::new("Close"))
+                .add_enabled(
+                    !editor.saving,
+                    egui::Button::new(crate::i18n::text("repo-workflows-fence_view-body-7d9eb7ac")),
+                )
                 .clicked();
         });
     });

@@ -105,7 +105,12 @@ fn verdict_buttons(
     }
     if extras.pending_review.is_some()
         && ui
-            .add_enabled(!draft.posting, egui::Button::new("Discard"))
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-verdict-buttons-eb1a70e3",
+                )),
+            )
             .on_hover_text("Throw away the pending review with its comments")
             .clicked()
     {

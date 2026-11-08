@@ -258,7 +258,7 @@ impl RepoTab {
                     if widgets::primary_button(ui, "Forget", gone > 0, 80.0).clicked() {
                         acts.push(Action::Timeline(TimelineAct::Forget(keep)));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(crate::i18n::text("repo-workflows-timeline-forget-confirm-19766ed6")).clicked() {
                         acts.push(Action::Timeline(TimelineAct::CancelForget));
                     }
                 });
@@ -521,7 +521,7 @@ impl RepoTab {
                     if widgets::primary_button(ui, "Go here", idle, 90.0).clicked() {
                         acts.push(Action::Timeline(TimelineAct::Jump(id)));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(crate::i18n::text("repo-workflows-timeline-jump-controls-19766ed6")).clicked() {
                         acts.push(Action::Timeline(TimelineAct::CancelJump));
                     }
                 });

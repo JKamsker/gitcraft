@@ -306,7 +306,10 @@ fn close_button(ui: &mut Ui, acts: &mut Vec<Action>, enabled: bool) {
     if ui
         .add_enabled(
             enabled,
-            egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-release-close-button-7d9eb7ac",
+            ))
+            .min_size(egui::vec2(80.0, 30.0)),
         )
         .clicked()
     {

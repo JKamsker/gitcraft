@@ -59,8 +59,16 @@ impl RepoTab {
         };
         let folder = crate::remote::resolve(&self.path, &found.folder);
         let (name, fix, done): (String, Fix, &str) = match act {
-            HooksAct::MakeExecutable(name) => (name, hooks::make_executable, "made executable"),
-            HooksAct::ToLf(name) => (name, hooks::to_lf, "saved with LF line endings"),
+            HooksAct::MakeExecutable(name) => (
+                name,
+                hooks::make_executable,
+                crate::i18n::text("repo-workflows-doctor-hooks-act-63222fea"),
+            ),
+            HooksAct::ToLf(name) => (
+                name,
+                hooks::to_lf,
+                crate::i18n::text("repo-workflows-doctor-hooks-act-fdf85121"),
+            ),
         };
         // A script husky's stub runs is named by its path from the repository's top.
         let script = found

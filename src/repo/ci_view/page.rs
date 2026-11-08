@@ -23,14 +23,20 @@ impl RepoTab {
             return;
         };
         let noun = match self.forge() {
-            Some(Forge::GitLab) => "Pipelines",
-            _ => "Workflow runs",
+            Some(Forge::GitLab) => crate::i18n::text("repo-workflows-ci_view-ci-view-ui-d1a8fffe"),
+            _ => crate::i18n::text("repo-workflows-ci_view-ci-view-ui-c454bec0"),
         };
         let popped = !self.docked(Panel::Ci);
         page_header(
             ui,
             view,
-            &format!("{noun} of {}", short(&view.sha)),
+            &crate::i18n::message(
+                "repo-workflows-ci_view-ci-view-ui-b431c0d7",
+                &[
+                    ("noun", (noun).into()),
+                    ("short-view-sha-1", (short(&view.sha)).into()),
+                ],
+            ),
             popped,
             acts,
         );
@@ -67,9 +73,9 @@ impl RepoTab {
                             });
                             ui.label(
                                 RichText::new(if partial {
-                                    "Some projects could not be checked for builds."
+                                    crate::i18n::text("repo-workflows-ci_view-ci-view-ui-e50c77eb")
                                 } else {
-                                    "No CI ran on this commit."
+                                    crate::i18n::text("repo-workflows-ci_view-ci-view-ui-90db5328")
                                 })
                                 .color(t.text_faint)
                                 .italics(),
@@ -87,18 +93,38 @@ impl RepoTab {
 fn page_header(ui: &mut Ui, view: &CiView, title: &str, popped: bool, acts: &mut Vec<Action>) {
     let url = view.shown_run().map(|run| run.url.clone());
     widgets::panel_header(ui, title, |ui| {
-        if icons::small_button(ui, "x", popout::close_tip(popped, "Back (Esc)")).clicked() {
+        if icons::small_button(
+            ui,
+            "x",
+            popout::close_tip(
+                popped,
+                crate::i18n::text("repo-workflows-ci_view-page-header-8c6c9cf3"),
+            ),
+        )
+        .clicked()
+        {
             acts.push(Action::CloseCi);
         }
         popout::button(ui, Panel::Ci, popped, acts);
         if let Some(url) = url
-            && icons::small_button(ui, "external-link", "Open in the browser").clicked()
+            && icons::small_button(
+                ui,
+                "external-link",
+                crate::i18n::text("repo-workflows-ci_view-page-header-a7eac6b5"),
+            )
+            .clicked()
         {
             acts.push(Action::OpenUrl(url));
         }
         if view.loading {
             ui.add(crate::spinner::Spinner::new());
-        } else if icons::small_button(ui, "refresh-cw", "Load again").clicked() {
+        } else if icons::small_button(
+            ui,
+            "refresh-cw",
+            crate::i18n::text("repo-workflows-ci_view-page-header-d62bc4a3"),
+        )
+        .clicked()
+        {
             acts.push(Action::Ci(CiAct::Reload));
         }
     });
@@ -129,7 +155,11 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[(Project, Run)], acts: &mut Vec<Acti
             ui.colored_label(t.danger, e);
         }
         Some(Ok(jobs)) if jobs.is_empty() => {
-            ui.label(RichText::new("No jobs.").color(t.text_faint).italics());
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-ci_view-page-66f52811"))
+                    .color(t.text_faint)
+                    .italics(),
+            );
         }
         Some(Ok(jobs)) => {
             egui::ScrollArea::horizontal()
@@ -138,13 +168,25 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[(Project, Run)], acts: &mut Vec<Acti
                     graph::job_graph(ui, jobs, run.started, view.job, now, acts)
                 });
             if let Some(job) = jobs.iter().find(|job| Some(job.id) == view.job) {
-                section(ui, &format!("STEPS OF {}", job.name.to_uppercase()));
+                section(
+                    ui,
+                    &crate::i18n::message(
+                        "repo-workflows-ci_view-page-30fc4b32",
+                        &[(
+                            "job-name-to-uppercase-1",
+                            (job.name.to_uppercase()).clone().into(),
+                        )],
+                    ),
+                );
                 steps::timeline(ui, job, now);
             }
         }
     }
     if let Some(log) = &view.log {
-        section(ui, "LOG OF THE FAILED JOBS");
+        section(
+            ui,
+            crate::i18n::text("repo-workflows-ci_view-page-04ec3970"),
+        );
         match log {
             None => {
                 ui.add(crate::spinner::Spinner::new());
@@ -154,22 +196,20 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[(Project, Run)], acts: &mut Vec<Acti
             }
             Some(Ok(text)) if text.trim().is_empty() => {
                 ui.label(
-                    RichText::new("The log is empty.")
+                    RichText::new(crate::i18n::text("repo-workflows-ci_view-page-7261125c"))
                         .color(t.text_faint)
                         .italics(),
                 );
             }
             Some(Ok(text)) => {
                 if ui
-                    .button("Send to agent")
-                    .on_hover_text(
-                        "Types the end of this log into the agent's terminal, to fix the failure",
-                    )
+                    .button(crate::i18n::text("repo-workflows-ci_view-page-77a860cb"))
+                    .on_hover_text(crate::i18n::text("repo-workflows-ci_view-page-da532fb6"))
                     .clicked()
                 {
                     acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
                         crate::agent::handoff::ci_message(&run.name, text),
-                        "the log",
+                        crate::i18n::text("repo-workflows-ci_view-page-20681c9f"),
                     )));
                 }
                 steps::log(ui, text);
@@ -226,7 +266,7 @@ fn run_header(ui: &mut Ui, run: &Run, now: i64, acts: &mut Vec<Action>) {
     ui.add_space(6.0);
     ui.horizontal_wrapped(|ui| {
         let state = match state_word(run.state) {
-            "skipped" => "skipped or cancelled",
+            "skipped" => crate::i18n::text("repo-workflows-ci_view-run-header-b368daf0"),
             word => word,
         };
         widgets::chip(ui, state, state_color(&t, run.state));
@@ -234,7 +274,14 @@ fn run_header(ui: &mut Ui, run: &Run, now: i64, acts: &mut Vec<Action>) {
             widgets::chip(ui, &run.event, t.text_dim);
         }
         if run.attempt > 1 {
-            widgets::chip(ui, &format!("attempt {}", run.attempt), t.text_dim);
+            widgets::chip(
+                ui,
+                &crate::i18n::message(
+                    "repo-workflows-ci_view-run-header-396f73af",
+                    &[("run-attempt-1", (run.attempt).clone().into())],
+                ),
+                t.text_dim,
+            );
         }
         if !run.branch.is_empty() {
             ui.label(RichText::new(&run.branch).font(theme::mono(11.5)));
@@ -242,23 +289,43 @@ fn run_header(ui: &mut Ui, run: &Run, now: i64, acts: &mut Vec<Action>) {
         if !run.sha.is_empty()
             && ui
                 .link(RichText::new(short(&run.sha)).font(theme::mono(11.5)))
-                .on_hover_text("Show the commit in the graph")
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-ci_view-run-header-0b4ad7c1",
+                ))
                 .clicked()
         {
             acts.push(Action::SelectHash(run.sha.clone()));
         }
         if let Some(seconds) = ci::duration(run.started, run.finished, now) {
             let took = if run.finished.is_some() {
-                format!("took {}", ci::duration_label(seconds))
+                crate::i18n::message(
+                    "repo-workflows-ci_view-run-header-ac6a17db",
+                    &[(
+                        "ci-duration-label-seconds-1",
+                        (ci::duration_label(seconds)).clone().into(),
+                    )],
+                )
             } else {
-                format!("running for {}", ci::duration_label(seconds))
+                crate::i18n::message(
+                    "repo-workflows-ci_view-run-header-420fc08d",
+                    &[(
+                        "ci-duration-label-seconds-1",
+                        (ci::duration_label(seconds)).clone().into(),
+                    )],
+                )
             };
             ui.label(RichText::new(took).color(t.text_faint));
         }
         if let Some(started) = run.started {
             ui.label(
-                RichText::new(format!("· started {}", git::relative_time(started, now)))
-                    .color(t.text_faint),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-ci_view-run-header-4e8bc57f",
+                    &[(
+                        "git-relative-time-started-now-1",
+                        (git::relative_time(started, now)).clone().into(),
+                    )],
+                ))
+                .color(t.text_faint),
             );
         }
     });
@@ -272,24 +339,36 @@ fn run_actions(ui: &mut Ui, view: &CiView, run: &Run, jobs: &[Job], acts: &mut V
         // A run can fail with no job failed (one was cancelled): those count as failed then.
         if (failed || run.state == CheckState::Failed) && !running {
             let rerun = ui
-                .add_enabled(!view.acting, egui::Button::new("Re-run failed jobs"))
-                .on_hover_text("Runs the jobs that failed or were cancelled again");
+                .add_enabled(
+                    !view.acting,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-ci_view-run-actions-8c40a11a",
+                    )),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-ci_view-run-actions-46677f1c",
+                ));
             if rerun.clicked() {
                 acts.push(Action::Ci(CiAct::RerunFailed));
             }
         }
         if running
             && ui
-                .add_enabled(!view.acting, egui::Button::new("Cancel"))
+                .add_enabled(
+                    !view.acting,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-ci_view-run-actions-19766ed6",
+                    )),
+                )
                 .clicked()
         {
             acts.push(Action::Ci(CiAct::Cancel));
         }
         if failed {
             let label = if view.log.is_some() {
-                "Hide the log"
+                crate::i18n::text("repo-workflows-ci_view-run-actions-7b68b715")
             } else {
-                "Show the failed log"
+                crate::i18n::text("repo-workflows-ci_view-run-actions-1c703119")
             };
             if ui.button(label).clicked() {
                 acts.push(Action::Ci(CiAct::ToggleLog));

@@ -34,15 +34,7 @@ impl Env {
 }
 
 pub(super) fn ui(ui: &mut Ui, state: &mut ConfigState, mut env: Env, acts: &mut Vec<Action>) {
-    faint(
-        ui,
-        "Git reads the system file, then your global one, then this repository's and this \
-         worktree's, then values given on the command line; for a setting with one value, the \
-         last value read wins. With a gitcraft profile, the global file is the profile's: it \
-         reads ~/.gitconfig first, then its own values on top (git run outside gitcraft \
-         doesn't see it). Values from include or includeIf files show under their own file. \
-         Only these settings are shown: nothing credential-related.",
-    );
+    faint(ui, crate::i18n::text("repo-workflows-doctor-ui-1f9897b7"));
     let Some(data) = reading(ui, &state.origins).cloned() else {
         return;
     };
@@ -52,10 +44,13 @@ pub(super) fn ui(ui: &mut Ui, state: &mut ConfigState, mut env: Env, acts: &mut 
     ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut state.filter)
-                .hint_text("Filter settings")
+                .hint_text(crate::i18n::text("repo-workflows-doctor-ui-4e47a723"))
                 .desired_width(220.0),
         );
-        ui.checkbox(&mut state.show_unset, "Show settings nobody set");
+        ui.checkbox(
+            &mut state.show_unset,
+            crate::i18n::text("repo-workflows-doctor-ui-089db75c"),
+        );
     });
     let filter = state.filter.trim().to_lowercase();
     let mut group = "";
@@ -76,7 +71,7 @@ pub(super) fn ui(ui: &mut Ui, state: &mut ConfigState, mut env: Env, acts: &mut 
     }
     if group.is_empty() {
         ui.add_space(12.0);
-        faint(ui, "No setting here matches.");
+        faint(ui, crate::i18n::text("repo-workflows-doctor-ui-2bfe98f3"));
     }
 }
 
@@ -113,7 +108,9 @@ fn setting_row(
             format!(
                 "{}: {}. {}",
                 setting.key,
-                winner.map(|o| o.shown_value()).unwrap_or("Git default"),
+                winner.map(|o| o.shown_value()).unwrap_or(crate::i18n::text(
+                    "repo-workflows-doctor-setting-row-8ffd7cc3"
+                )),
                 setting.about
             )
         },
@@ -142,14 +139,22 @@ fn setting_row(
                     widgets::chip(ui, &origin_label(o), t.text_dim);
                     if values.len() > 1 {
                         ui.label(
-                            RichText::new(format!("overrides {}", values.len() - 1))
-                                .size(11.5)
-                                .color(t.warning),
+                            RichText::new(crate::i18n::message(
+                                "repo-workflows-doctor-setting-row-8f8c7445",
+                                &[("values-len-1-1", (values.len() - 1).clone().into())],
+                            ))
+                            .size(11.5)
+                            .color(t.warning),
                         );
                     }
                 }
                 None => {
-                    ui.label(RichText::new("not set: git's default").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-doctor-setting-row-2224c772",
+                        ))
+                        .color(t.text_faint),
+                    );
                 }
             }
         },
@@ -186,7 +191,7 @@ fn shortened(value: &str) -> String {
 /// Where a value comes from, as the row's chip says it.
 fn origin_label(o: &Origin) -> String {
     if o.file.as_deref().is_some_and(is_profile_file) {
-        return "gitcraft profile".to_owned();
+        return crate::i18n::text("repo-workflows-doctor-origin-label-4cf3860a").to_owned();
     }
     o.scope.label().to_owned()
 }
@@ -214,7 +219,10 @@ fn details(
 ) {
     card(ui, setting.key, Some(setting.about), |ui| {
         if values.is_empty() {
-            faint(ui, "No file sets it: git uses its built-in default.");
+            faint(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-details-ba8d6068"),
+            );
         }
         // The one in effect first, then those it overrides.
         for (n, origin) in values.iter().rev().enumerate() {
@@ -235,9 +243,17 @@ fn value_row(ui: &mut Ui, origin: &Origin, wins: bool, locked: bool, acts: &mut 
     let t = Tokens::get(ui.ctx());
     ui.horizontal_wrapped(|ui| {
         if wins {
-            widgets::chip(ui, "In effect", t.success);
+            widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-value-row-4b67153d"),
+                t.success,
+            );
         } else {
-            widgets::chip(ui, "Overridden", t.text_faint);
+            widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-value-row-62a03f09"),
+                t.text_faint,
+            );
         }
         let value = code(origin.shown_value());
         ui.label(if wins {
@@ -251,24 +267,30 @@ fn value_row(ui: &mut Ui, origin: &Origin, wins: bool, locked: bool, acts: &mut 
         }
         let profile = origin.file.as_deref().is_some_and(is_profile_file);
         let why = match () {
-            _ if origin.scope == Scope::Command => {
-                Some("Given on the command line or in GIT_CONFIG_PARAMETERS: not in a file")
-            }
-            _ if profile => {
-                Some("gitcraft writes this file from Settings → Profile: change it there")
-            }
+            _ if origin.scope == Scope::Command => Some(crate::i18n::text(
+                "repo-workflows-doctor-value-row-4d8ff0fe",
+            )),
+            _ if profile => Some(crate::i18n::text(
+                "repo-workflows-doctor-value-row-fd2cc5af",
+            )),
             _ => None,
         };
         let args = config::unset_args(origin);
         let why = why.or(args.as_ref().err().map(String::as_str));
         let remove = ui
-            .add_enabled(why.is_none() && !locked, egui::Button::new("Remove"))
-            .on_hover_text(format!(
-                "Remove every {} from this file; the next value down (or git's default) then \
-                 applies",
-                origin.key
+            .add_enabled(
+                why.is_none() && !locked,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-doctor-value-row-c3812fc4",
+                )),
+            )
+            .on_hover_text(crate::i18n::message(
+                "repo-workflows-doctor-value-row-29f009c0",
+                &[("origin-key-1", (origin.key).clone().into())],
             ))
-            .on_disabled_hover_text(why.unwrap_or("Wait for the running operation"));
+            .on_disabled_hover_text(why.unwrap_or(crate::i18n::text(
+                "repo-workflows-doctor-value-row-b5c82673",
+            )));
         if remove.clicked()
             && let Ok(op) = &args
         {
@@ -280,24 +302,40 @@ fn value_row(ui: &mut Ui, origin: &Origin, wins: bool, locked: bool, acts: &mut 
 /// The question asked before removing `origin` from its file.
 fn remove_confirm(origin: &Origin, op: Vec<String>) -> Action {
     let file = origin.file.clone().unwrap_or_default();
-    let reach = match origin.scope {
-        Scope::Global => " This applies to all your repositories.",
-        Scope::System => " This applies to every user of this machine.",
-        _ => "",
-    };
+
     Action::Doctor(DoctorAct::Confirm(Confirm {
-        title: format!("Remove {}?", origin.key),
-        body: format!(
-            "Remove {} = {} from {file}?{reach} The value isn't kept: to get it back, set it \
-             again.",
-            origin.key,
-            origin.shown_value()
+        title: crate::i18n::message(
+            "repo-workflows-doctor-remove-confirm-9861b6eb",
+            &[("origin-key-1", (origin.key).clone().into())],
         ),
-        button: "Remove".to_owned(),
-        label: format!(
-            "Remove {} ({}) from {file}",
-            origin.key,
-            shortened(origin.shown_value())
+        body: crate::i18n::message(
+            "repo-workflows-doctor-remove-setting",
+            &[
+                ("key", (origin.key.as_str()).into()),
+                ("value", (origin.shown_value()).into()),
+                ("file", (file.as_str()).into()),
+                (
+                    "scope",
+                    (match origin.scope {
+                        Scope::Global => "global",
+                        Scope::System => "system",
+                        _ => "local",
+                    })
+                    .into(),
+                ),
+            ],
+        ),
+        button: crate::i18n::text("repo-workflows-doctor-remove-confirm-c3812fc4").to_owned(),
+        label: crate::i18n::message(
+            "repo-workflows-doctor-remove-confirm-b0b26eef",
+            &[
+                ("origin-key-1", (origin.key).clone().into()),
+                (
+                    "shortened-origin-shown-value-2",
+                    (shortened(origin.shown_value())).clone().into(),
+                ),
+                ("file", (file).clone().into()),
+            ],
         ),
         ops: vec![op],
     }))
@@ -314,7 +352,7 @@ fn set_row(
     let locked = env.locked;
     let scope = *state.scope.get_or_insert(Scope::Local);
     ui.horizontal_wrapped(|ui| {
-        ui.label("Set it for");
+        ui.label(crate::i18n::text("repo-workflows-doctor-set-row-85b9cd3d"));
         egui::ComboBox::from_id_salt(("doctor-scope", setting.key))
             .selected_text(scope_choice(scope))
             .show_ui(ui, |ui| {
@@ -322,11 +360,9 @@ fn set_row(
                     let off = s == Scope::Worktree && !env.worktree_config;
                     ui.add_enabled_ui(!off, |ui| {
                         ui.selectable_value(&mut state.scope, Some(s), scope_choice(s))
-                            .on_disabled_hover_text(
-                                "Needs extensions.worktreeConfig = true in this repository: \
-                                 without it git refuses when there are other worktrees, and \
-                                 with only one writes .git/config",
-                            );
+                            .on_disabled_hover_text(crate::i18n::text(
+                                "repo-workflows-doctor-set-row-6ec46474",
+                            ));
                     });
                 }
             });
@@ -350,40 +386,62 @@ fn set_row(
         let args = config::set_args(scope, setting.key, &value);
         let enabled = !locked && !value.is_empty() && args.is_ok();
         let set = ui
-            .add_enabled(enabled, egui::Button::new("Set"))
+            .add_enabled(
+                enabled,
+                egui::Button::new(crate::i18n::text("repo-workflows-doctor-set-row-b6f6f3ad")),
+            )
             .on_disabled_hover_text(match &args {
                 Err(e) => e.as_str(),
-                Ok(_) if locked => "Wait for the running operation",
-                Ok(_) if setting.choices.is_empty() => "Type a value first",
-                Ok(_) => "Choose a value first",
+                Ok(_) if locked => crate::i18n::text("repo-workflows-doctor-set-row-b5c82673"),
+                Ok(_) if setting.choices.is_empty() => {
+                    crate::i18n::text("repo-workflows-doctor-set-row-46f01635")
+                }
+                Ok(_) => crate::i18n::text("repo-workflows-doctor-set-row-30a28bf1"),
             });
         if set.clicked()
             && let Ok(op) = args
         {
-            let label = format!(
-                "Set {} to {} for {}",
-                setting.key,
-                shortened(&value),
-                scope_choice(scope).to_lowercase()
+            let label = crate::i18n::message(
+                "repo-workflows-doctor-set-row-921f564b",
+                &[
+                    ("setting-key-1", (setting.key).into()),
+                    ("shortened-value-2", (shortened(&value)).clone().into()),
+                    (
+                        "scope-choice-scope-to-lowercase-3",
+                        (scope_choice(scope).to_lowercase()).clone().into(),
+                    ),
+                ],
             );
             acts.push(Action::Doctor(match scope {
                 // Beyond this repository: asked first.
                 Scope::Global | Scope::System => DoctorAct::Confirm(Confirm {
-                    title: format!(
-                        "Set {} for {}?",
-                        setting.key,
-                        scope_choice(scope).to_lowercase()
+                    title: crate::i18n::message(
+                        "repo-workflows-doctor-set-row-a215cc6f",
+                        &[
+                            ("setting-key-1", (setting.key).into()),
+                            (
+                                "scope-choice-scope-to-lowercase-2",
+                                (scope_choice(scope).to_lowercase()).clone().into(),
+                            ),
+                        ],
                     ),
-                    body: format!(
-                        "{} = {value} goes into {}. The value it replaces there isn't kept.",
-                        setting.key,
-                        if scope == Scope::Global {
-                            "your global git config, for all your repositories"
-                        } else {
-                            "git's system file, for every user of this machine"
-                        }
+                    body: crate::i18n::message(
+                        "repo-workflows-doctor-set-row-ccc71902",
+                        &[
+                            ("setting-key-1", (setting.key).into()),
+                            ("value", (value).clone().into()),
+                            (
+                                "if-scope-scope-global-your-globa-2",
+                                (if scope == Scope::Global {
+                                    crate::i18n::text("repo-workflows-doctor-set-row-e0a790f9")
+                                } else {
+                                    crate::i18n::text("repo-workflows-doctor-set-row-cc3edd84")
+                                })
+                                .into(),
+                            ),
+                        ],
                     ),
-                    button: "Set".to_owned(),
+                    button: crate::i18n::text("repo-workflows-doctor-set-row-b6f6f3ad").to_owned(),
                     label,
                     ops: vec![op],
                 }),
@@ -395,34 +453,22 @@ fn set_row(
         }
     });
     let note = match scope {
-        Scope::Global if env.remote => {
-            "Your global git config on that machine (usually ~/.gitconfig), for all your \
-             repositories there."
-        }
-        Scope::Global => {
-            "Your global git config (usually ~/.gitconfig), for all your repositories. A \
-             gitcraft profile that sets the same thing still wins over it."
-        }
-        Scope::System => {
-            "Git's system file, for every user of this machine; usually needs administrator \
-             rights."
-        }
-        Scope::Worktree => "Only this worktree (its config.worktree file).",
-        _ => {
-            "Only this repository (.git/config). An include later in that file that sets it \
-             still wins."
-        }
+        Scope::Global if env.remote => crate::i18n::text("repo-workflows-doctor-set-row-2b7c9578"),
+        Scope::Global => crate::i18n::text("repo-workflows-doctor-set-row-ad30af45"),
+        Scope::System => crate::i18n::text("repo-workflows-doctor-set-row-3da50e6f"),
+        Scope::Worktree => crate::i18n::text("repo-workflows-doctor-set-row-cadb5751"),
+        _ => crate::i18n::text("repo-workflows-doctor-set-row-e0d5ce0a"),
     };
     faint(ui, note);
 }
 
 fn scope_choice(scope: Scope) -> &'static str {
     match scope {
-        Scope::Local => "This repository",
-        Scope::Worktree => "This worktree",
-        Scope::Global => "All my repositories",
-        Scope::System => "Everyone on this machine",
-        Scope::Command => "Command line",
+        Scope::Local => crate::i18n::text("repo-workflows-doctor-scope-choice-38429e22"),
+        Scope::Worktree => crate::i18n::text("repo-workflows-doctor-scope-choice-0eb26325"),
+        Scope::Global => crate::i18n::text("repo-workflows-doctor-scope-choice-59b8031f"),
+        Scope::System => crate::i18n::text("repo-workflows-doctor-scope-choice-ad944dcb"),
+        Scope::Command => crate::i18n::text("repo-workflows-doctor-scope-choice-c925a118"),
     }
 }
 
@@ -431,7 +477,12 @@ fn other_worktrees(ui: &mut Ui, state: &ConfigState, key: &'static str, acts: &m
     let t = Tokens::get(ui.ctx());
     let shown = state.worktrees.as_ref().filter(|(k, _)| *k == key);
     let Some((_, read)) = shown else {
-        if ui.button("Compare with the other worktrees").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-doctor-other-worktrees-965a2b09",
+            ))
+            .clicked()
+        {
             acts.push(Action::Doctor(DoctorAct::CompareWorktrees(key)));
         }
         return;
@@ -447,7 +498,10 @@ fn other_worktrees(ui: &mut Ui, state: &ConfigState, key: &'static str, acts: &m
                     ui.label(code(o.shown_value()).color(t.text));
                     ui.label(RichText::new(origin_label(o)).color(t.text_faint));
                 }
-                Ok(None) => dim(ui, "not set"),
+                Ok(None) => dim(
+                    ui,
+                    crate::i18n::text("repo-workflows-doctor-other-worktrees-1aef9399"),
+                ),
                 Err(e) => {
                     ui.label(RichText::new(e).color(t.danger));
                 }

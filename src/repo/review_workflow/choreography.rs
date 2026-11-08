@@ -424,7 +424,12 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec
         ui.group(|ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("Component {}", i + 1));
-                if ui.small_button("Remove").clicked() {
+                if ui
+                    .small_button(crate::i18n::text(
+                        "repo-workflows-review_workflow-show-c3812fc4",
+                    ))
+                    .clicked()
+                {
                     remove = Some(i);
                 }
             });

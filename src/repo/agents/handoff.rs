@@ -200,7 +200,7 @@ impl RepoTab {
             self.status = Some((
                 crate::i18n::message(
                     "repo-workflows-agents-send-to-agent-a6f80242",
-                    &[("what", (what).clone().into())],
+                    &[("what", (what).into())],
                 ),
                 true,
             ));
@@ -231,7 +231,7 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-workflows-agents-send-to-agent-4e9f0022",
                         &[
-                            ("what", (what).clone().into()),
+                            ("what", (what).into()),
                             ("label", (label).clone().into()),
                             ("e", (e).clone().into()),
                         ],
@@ -345,7 +345,7 @@ impl RepoTab {
         egui::ComboBox::from_id_salt("handoff-terminal")
             .selected_text(crate::i18n::message(
                 "repo-workflows-agents-terminal-choice-c0d8980e",
-                &[("shown", (shown).clone().into())],
+                &[("shown", (shown).into())],
             ))
             .show_ui(ui, |ui| {
                 for (i, label) in labels.iter().enumerate() {

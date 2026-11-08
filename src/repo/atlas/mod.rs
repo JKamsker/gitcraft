@@ -64,7 +64,9 @@ impl RepoTab {
             if s.trim().is_empty() {
                 Ok(None)
             } else {
-                Day::parse(s).map(Some).ok_or("Use YYYY-MM-DD dates")
+                Day::parse(s).map(Some).ok_or(crate::i18n::text(
+                    "repo-workflows-atlas-read-atlas-02c42736",
+                ))
             }
         };
         let query = match (parse(&view.from), parse(&view.through)) {
@@ -76,7 +78,8 @@ impl RepoTab {
                 }
             }
             _ => {
-                view.error = Some("Use YYYY-MM-DD dates, with start on or before end".into());
+                view.error =
+                    Some(crate::i18n::text("repo-workflows-atlas-read-atlas-67b18cbf").into());
                 return;
             }
         };
@@ -114,36 +117,36 @@ impl RepoTab {
         let mut open = true;
         let mut refresh = false;
         let mut file = None;
-        egui::Window::new("Churn and contributor atlas").id(egui::Id::new(("atlas", &self.path))).open(&mut open).default_size(vec2(880.0,680.0)).resizable(true).show(ctx, |ui| {
+        egui::Window::new(crate::i18n::text("repo-workflows-atlas-atlas-window-611ebb33")).id(egui::Id::new(("atlas", &self.path))).open(&mut open).default_size(vec2(880.0,680.0)).resizable(true).show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label("Size"); ui.selectable_value(&mut view.size, Size::Bytes, "Bytes"); ui.selectable_value(&mut view.size, Size::Changes, "Change frequency");
-                ui.separator(); ui.label("Colour"); ui.selectable_value(&mut view.colour, Colour::Churn, "Recent churn"); ui.selectable_value(&mut view.colour, Colour::Contributor, "Most frequent contributor");
+                ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-1af85190")); ui.selectable_value(&mut view.size, Size::Bytes, crate::i18n::text("repo-workflows-atlas-atlas-window-4d800030")); ui.selectable_value(&mut view.size, Size::Changes, crate::i18n::text("repo-workflows-atlas-atlas-window-bc087fce"));
+                ui.separator(); ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-3a9dfa58")); ui.selectable_value(&mut view.colour, Colour::Churn, crate::i18n::text("repo-workflows-atlas-atlas-window-1bfb5492")); ui.selectable_value(&mut view.colour, Colour::Contributor, crate::i18n::text("repo-workflows-atlas-atlas-window-ba512e1a"));
             });
             ui.horizontal_wrapped(|ui| {
-                ui.label("Period"); ui.add(egui::TextEdit::singleline(&mut view.from).hint_text("From YYYY-MM-DD").desired_width(145.0)); ui.add(egui::TextEdit::singleline(&mut view.through).hint_text("Through YYYY-MM-DD").desired_width(155.0));
-                egui::ComboBox::from_id_salt("atlas-clock").selected_text(if view.clock == Clock::Author { "Author date" } else { "Committer date" }).show_ui(ui, |ui| { ui.selectable_value(&mut view.clock, Clock::Author, "Author date"); ui.selectable_value(&mut view.clock, Clock::Committer, "Committer date"); });
-                refresh |= ui.button("Apply / refresh atlas").clicked();
+                ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-6e795d4d")); ui.add(egui::TextEdit::singleline(&mut view.from).hint_text(crate::i18n::text("repo-workflows-atlas-atlas-window-63bfe85d")).desired_width(145.0)); ui.add(egui::TextEdit::singleline(&mut view.through).hint_text(crate::i18n::text("repo-workflows-atlas-atlas-window-6fd659e0")).desired_width(155.0));
+                egui::ComboBox::from_id_salt("atlas-clock").selected_text(if view.clock == Clock::Author { crate::i18n::text("repo-workflows-atlas-atlas-window-1556feb2") } else { crate::i18n::text("repo-workflows-atlas-atlas-window-4562ddd7") }).show_ui(ui, |ui| { ui.selectable_value(&mut view.clock, Clock::Author, crate::i18n::text("repo-workflows-atlas-atlas-window-1556feb2")); ui.selectable_value(&mut view.clock, Clock::Committer, crate::i18n::text("repo-workflows-atlas-atlas-window-4562ddd7")); });
+                refresh |= ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-34dd32fc")).clicked();
             });
-            if view.reader.busy() { ui.label("Analyzing pinned history and file sizes…"); if ui.button("Cancel atlas analysis").clicked() { view.reader.cancel(); } }
+            if view.reader.busy() { ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-ef7caa7d")); if ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-d16ccfdf")).clicked() { view.reader.cancel(); } }
             if let Some(error) = &view.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, error); }
             let Some(data) = &view.data else { return; };
             ui.label(format!("{} of {} scanned unique commits in period · {} reference tips · tree {}{}{}", data.selected, data.history.commits.len(), data.history.tips, data.head.get(..8).unwrap_or(&data.head), if data.history.more { " · partial history" } else { " · all reachable history" }, if data.history.shallow { " · shallow boundary" } else { "" }));
-            ui.small(format!("Applied period: {} – {} ({:?}). Churn counts changed paths per commit, including deletions; folder totals count file touches. Zero-byte/deleted entries get a minimum visible area. File bytes are from the pinned HEAD tree.", data.query.from.map(|d|d.to_string()).unwrap_or_else(||"earliest scanned".into()), data.query.through.map(|d|d.to_string()).unwrap_or_else(||"latest scanned".into()), data.query.clock));
-            if data.history.more && view.limit < 100_000 && ui.button("Scan more atlas history").clicked() { view.limit = (view.limit * 2).min(100_000); refresh = true; }
+            ui.small(format!("Applied period: {} – {} ({:?}). Churn counts changed paths per commit, including deletions; folder totals count file touches. Zero-byte/deleted entries get a minimum visible area. File bytes are from the pinned HEAD tree.", data.query.from.map(|d|d.to_string()).unwrap_or_else(||crate::i18n::text("repo-workflows-atlas-atlas-window-c2e87ba8").into()), data.query.through.map(|d|d.to_string()).unwrap_or_else(||crate::i18n::text("repo-workflows-atlas-atlas-window-48c740b7").into()), data.query.clock));
+            if data.history.more && view.limit < 100_000 && ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-a9656539")).clicked() { view.limit = (view.limit * 2).min(100_000); refresh = true; }
             let node = &data.nodes[view.zoom];
             ui.horizontal_wrapped(|ui| {
-                if view.zoom != 0 && ui.button("↑ Repository root").clicked() { view.zoom = 0; view.page = 0; }
+                if view.zoom != 0 && ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-b4ab9b3d")).clicked() { view.zoom = 0; view.page = 0; }
                 ui.label(if node.path.is_empty() { "/".into() } else { String::from_utf8_lossy(&node.path).into_owned() });
-                ui.label(format!("{} bytes · {} file changes", node.bytes, node.changes));
-                if !node.contributor.is_empty() { ui.label(format!("Most frequent contributor: {}", node.contributor)); }
+                ui.label(crate::i18n::message("repo-workflows-atlas-atlas-window-aef428d1", &[("node-bytes-1", (node.bytes).clone().into()), ("node-changes-2", (node.changes).clone().into())]));
+                if !node.contributor.is_empty() { ui.label(crate::i18n::message("repo-workflows-atlas-atlas-window-a5661a75", &[("node-contributor-1", node.contributor.as_ref().into())])); }
             });
             let node = &data.nodes[view.zoom];
-            if node.children.is_empty() { ui.label("No files in this snapshot."); return; }
-            ui.small("Files and historical folders at the same path are separate hotspots. File history uses HEAD for current files or an observed change revision for historical files. Right-click a file for history across analyzed refs; non-UTF-8 paths open that history directly. Long contributor labels are shortened; numbered identities remain separate.");
+            if node.children.is_empty() { ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-5769ad13")); return; }
+            ui.small(crate::i18n::text("repo-workflows-atlas-atlas-window-f69e93c6"));
             // Bound painter and AccessKit work even for a flat tree with 100,000 files.
             let pages = node.children.len().div_ceil(300);
             view.page = view.page.min(pages.saturating_sub(1));
-            if pages > 1 { ui.horizontal(|ui| { if ui.button("Previous hotspots").clicked() { view.page = view.page.saturating_sub(1); } ui.label(format!("Hotspot page {} / {pages}", view.page + 1)); if ui.button("Next hotspots").clicked() { view.page = (view.page + 1).min(pages - 1); } }); }
+            if pages > 1 { ui.horizontal(|ui| { if ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-6aba5092")).clicked() { view.page = view.page.saturating_sub(1); } ui.label(crate::i18n::message("repo-workflows-atlas-atlas-window-1316052d", &[("view-page-1-1", (view.page + 1).clone().into()), ("pages", (pages).clone().into())])); if ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-86061296")).clicked() { view.page = (view.page + 1).min(pages - 1); } }); }
             let ids: Vec<_> = node.children.iter().skip(view.page * 300).take(300).copied().collect();
             let weights: Vec<_> = ids.iter().map(|id| { let n = &data.nodes[*id]; (if view.size == Size::Bytes { n.bytes as f64 } else { n.changes as f64 }).max(1.0) }).collect();
             let (rect,_) = ui.allocate_exact_size(vec2(ui.available_width().max(50.0), ui.available_height().clamp(160.0,500.0)), egui::Sense::hover());
@@ -156,11 +159,11 @@ impl RepoTab {
                 let response = ui.interact(rect, ui.id().with(("atlas-node", id)), egui::Sense::click());
                 let fill = if view.colour == Colour::Churn { t.accent.gamma_multiply(0.15 + 0.85 * n.changes as f32 / max) } else { t.lane(n.contributor_key).gamma_multiply(0.7) };
                 ui.painter().rect_filled(rect,3.0,fill);
-                crate::a11y::a11y(&response, egui::WidgetType::Button, format!("{label} ({}), {} bytes, {} changes, most frequent contributor: {}. {}", if n.directory {"folder"} else {"file"}, n.bytes,n.changes,n.contributor,if n.directory {"Zoom into folder"} else if std::str::from_utf8(&n.path).is_ok() {"Open file history at the pinned revision"} else {"Open scanned history for this exact byte path"}));
+                crate::a11y::a11y(&response, egui::WidgetType::Button, crate::i18n::message("repo-workflows-atlas-atlas-window-2657941d", &[("label", (label).clone().into()), ("if-n-directory-folder-else-file-1", (if n.directory {"folder"} else {"file"}).into()), ("n-bytes-2", (n.bytes).clone().into()), ("n-changes-3", (n.changes).clone().into()), ("n-contributor-4", n.contributor.as_ref().into()), ("if-n-directory-zoom-into-folder--5", (if n.directory {crate::i18n::text("repo-workflows-atlas-atlas-window-41bb5a28")} else if std::str::from_utf8(&n.path).is_ok() {crate::i18n::text("repo-workflows-atlas-atlas-window-39c66d83")} else {crate::i18n::text("repo-workflows-atlas-atlas-window-8d9ca065")}).into())]));
                 if rect.width() > 42.0 && rect.height() > 22.0 { ui.painter().with_clip_rect(rect.shrink(3.0)).text(rect.left_top()+vec2(4.0,4.0),egui::Align2::LEFT_TOP,n.path.rsplit(|b| *b==b'/').next().map(String::from_utf8_lossy).unwrap_or_default(),egui::FontId::proportional(12.0),t.text); }
                 let mut scanned = false;
-                response.context_menu(|ui| {if !n.directory && ui.button("Scanned file history across analyzed refs").clicked() {scanned = true; ui.close();}});
-                let clicked = response.clicked(); response.on_hover_text(format!("{label}\n{} bytes · {} changes\nMost frequent contributor: {}",n.bytes,n.changes,if n.contributor.is_empty() {"No changes in selected period"} else {n.contributor.as_ref()}));
+                response.context_menu(|ui| {if !n.directory && ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-67be181b")).clicked() {scanned = true; ui.close();}});
+                let clicked = response.clicked(); response.on_hover_text(crate::i18n::message("repo-workflows-atlas-atlas-window-4b6c521c", &[("label", (label).clone().into()), ("n-bytes-1", (n.bytes).clone().into()), ("n-changes-2", (n.changes).clone().into()), ("if-n-contributor-is-empty-no-cha-3", (if n.contributor.is_empty() {crate::i18n::text("repo-workflows-atlas-atlas-window-862161d0")} else {n.contributor.as_ref()}).into())]));
                 if scanned || (clicked && !n.directory && std::str::from_utf8(&n.path).is_err()) {
                     view.byte_history = Some(ByteHistory::new(data.history.clone(),n.path.clone(),view.profile.clone(),view.clock));
                 } else if clicked { if !n.directory { if let Ok(path) = String::from_utf8(n.path.clone()) {file = n.revision.as_ref().map(|rev| (path,rev.to_string()));} } else { view.zoom = id; view.page=0; } }

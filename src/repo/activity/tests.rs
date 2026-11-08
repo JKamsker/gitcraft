@@ -318,3 +318,26 @@ fn the_toolbar_message_opens_its_own_operation() {
     tab.status = Some(("Something else".to_owned(), true));
     assert_eq!(tab.status_entry(), None);
 }
+
+#[test]
+fn fluent_partition_actual_activity_adapter_formats_numbers_and_preserves_commands() {
+    let args = [
+        "push",
+        "--force-with-lease=refs/heads/topic:abc",
+        "origin",
+        "refs/heads/topic:refs/heads/topic",
+    ]
+    .map(str::to_owned);
+    for (language, done, duration) in [("en-US", "done", "1.2 s"), ("de", "abgeschlossen", "1,2 s")]
+    {
+        crate::i18n::set_language(language);
+        assert_eq!(outcome_text(&Outcome::Done), done);
+        assert_eq!(seconds(Duration::from_millis(1200)), duration);
+        assert_eq!(
+            command_line(&args),
+            "git push --force-with-lease=refs/heads/topic:abc origin refs/heads/topic:refs/heads/topic"
+        );
+        assert_eq!(args[2], "origin");
+    }
+    crate::i18n::set_language("en-US");
+}

@@ -284,7 +284,12 @@ impl RepoTab {
                         acts.push(Action::Stack(StackAct::StartRestack));
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-restack-dialog-19766ed6",
+                            ))
+                            .min_size(egui::vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::CloseRestack));

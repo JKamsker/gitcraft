@@ -177,12 +177,9 @@ pub(super) fn bounded(output: &str) -> String {
     crate::i18n::message(
         "repo-workflows-activity-bounded-62a56981",
         &[
-            ("output-head-end-1", (&output[..head_end]).clone().into()),
+            ("output-head-end-1", (&output[..head_end]).into()),
             ("left-out", (left_out).clone().into()),
-            (
-                "output-tail-start-2",
-                (&output[tail_start..]).clone().into(),
-            ),
+            ("output-tail-start-2", (&output[tail_start..]).into()),
         ],
     )
 }
@@ -269,10 +266,7 @@ pub(super) fn seconds(d: Duration) -> String {
     match ms {
         0..10_000 => crate::i18n::message(
             "repo-workflows-activity-seconds-6f29d45b",
-            &[(
-                "d-as-secs-f32-1",
-                (format!("{:.1}", d.as_secs_f32())).clone().into(),
-            )],
+            &[("d-as-secs-f32-1", (d.as_secs_f32()).clone().into())],
         ),
         10_000..60_000 => crate::i18n::message(
             "repo-workflows-activity-seconds-af37e50f",

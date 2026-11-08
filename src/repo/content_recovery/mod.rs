@@ -66,11 +66,9 @@ impl RepoTab {
         let repo = self.path.clone();
         self.content_recovery.selected = Some(hit);
         self.content_recovery.queue(move |active| {
-            let hit = results
-                .report
-                .hits
-                .get(hit)
-                .ok_or("Invalid content selection")?;
+            let hit = results.report.hits.get(hit).ok_or(crate::i18n::text(
+                "repo-workflows-content_recovery-content-inspect-e3ceaa94",
+            ))?;
             engine::inspect(&repo, &results, hit, source, active)
                 .map(|p| Read::Preview(Arc::new(p)))
         });
@@ -115,7 +113,9 @@ impl RepoTab {
         self.content_recovery.cancel();
         self.content_recovery.prepared = None;
         self.dialog = None;
-        self.busy_op = Some("Recover content".into());
+        self.busy_op = Some(
+            crate::i18n::text("repo-workflows-content_recovery-content-perform-fbdf23f8").into(),
+        );
         self.op_started = Some(Instant::now());
         let repo = self.path.clone();
         self.then_or(
@@ -131,7 +131,13 @@ impl RepoTab {
                 tab.op_started = None;
                 tab.status = Some(match result {
                     Ok(s) => (s, false),
-                    Err(e) => (format!("Content recovery: {e}"), true),
+                    Err(e) => (
+                        crate::i18n::message(
+                            "repo-workflows-content_recovery-content-perform-9d57ebb2",
+                            &[("e", (e).clone().into())],
+                        ),
+                        true,
+                    ),
                 });
                 tab.content_recovery.preview = None;
                 tab.reload(ctx);

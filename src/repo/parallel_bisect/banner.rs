@@ -43,7 +43,12 @@ impl RepoTab {
     fn parallel_buttons(&self, ui: &mut Ui, view: &View, acts: &mut Vec<Action>) {
         if view.running() {
             if ui
-                .add_enabled(!view.cancelling, egui::Button::new("Cancel"))
+                .add_enabled(
+                    !view.cancelling,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-buttons-19766ed6",
+                    )),
+                )
                 .on_disabled_hover_text("Stopping the tests and removing the worktrees…")
                 .on_hover_text("Stops every test running and removes the worktrees")
                 .clicked()
@@ -52,7 +57,12 @@ impl RepoTab {
             }
             return;
         }
-        if ui.button("Close").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac",
+            ))
+            .clicked()
+        {
             acts.push(Action::ParallelBisect(ParallelAct::Close));
         }
         // Only between the same marks: another range may say nothing of the bisect's.
@@ -68,7 +78,9 @@ impl RepoTab {
                     "Marks the first bad commit bad and its parents good in the bisect going on, \
                      which then ends there too",
                 )
-                .on_disabled_hover_text("Wait for the operation going on to finish")
+                .on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5",
+                ))
                 .clicked()
             {
                 acts.push(Action::ParallelBisect(ParallelAct::MarkInBisect));
@@ -87,7 +99,12 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         match outcome {
             Outcome::FirstBad(hash) => {
-                ui.label(RichText::new("First bad commit:").color(t.text));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-outcome-8b3812c0",
+                    ))
+                    .color(t.text),
+                );
                 self.parallel_link(ui, hash, acts);
             }
             Outcome::OneOf(hashes) => {
@@ -103,8 +120,14 @@ impl RepoTab {
                 }
                 if hashes.len() > MAX_NAMED {
                     ui.label(
-                        RichText::new(format!("and {} more", hashes.len() - MAX_NAMED))
-                            .color(t.text_dim),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-parallel_bisect-parallel-outcome-683768ab",
+                            &[(
+                                "hashes-len-max-named-1",
+                                (hashes.len() - MAX_NAMED).clone().into(),
+                            )],
+                        ))
+                        .color(t.text_dim),
                     );
                 }
             }
@@ -153,7 +176,12 @@ impl RepoTab {
             .sense(egui::Sense::click())
             .truncate();
         let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-        if resp.on_hover_text("Show this commit").clicked() {
+        if resp
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-parallel_bisect-parallel-link-63633913",
+            ))
+            .clicked()
+        {
             acts.push(Action::SelectHash(hash.to_owned()));
         }
     }
@@ -210,7 +238,12 @@ fn hash_link(ui: &mut Ui, hash: &str, acts: &mut Vec<Action>) {
     let link =
         egui::Label::new(RichText::new(short(hash)).color(t.accent)).sense(egui::Sense::click());
     let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-    if resp.on_hover_text("Show this commit").clicked() {
+    if resp
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-parallel_bisect-hash-link-63633913",
+        ))
+        .clicked()
+    {
         acts.push(Action::SelectHash(hash.to_owned()));
     }
 }

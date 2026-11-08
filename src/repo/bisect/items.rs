@@ -28,8 +28,15 @@ impl RepoTab {
     ) {
         let Some(bisect) = self.bisect.state() else {
             let blocker = self.bisect_blocker();
-            let resp = crate::menu_item::MenuItem::new("Start bisect here…").icon("command").refused(blocker.as_deref()).show(ui)
-                .on_hover_text("Find the commit that brought a change in, by testing commits between a good and a bad one");
+            let resp = crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-bisect-bisect-menu-items-43fa49b5",
+            ))
+            .icon("command")
+            .refused(blocker.as_deref())
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-bisect-bisect-menu-items-5cc56687",
+            ));
             let resp = match &blocker {
                 Some(why) => resp.on_disabled_hover_text(why.as_str()),
                 None => resp,
@@ -44,19 +51,37 @@ impl RepoTab {
         for (mark, label) in [
             (
                 Mark::Good,
-                format!("Mark {at} as {}", bisect.word(Mark::Good)),
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-menu-items-5f1847b9",
+                    &[
+                        ("at", (at).into()),
+                        ("bisect-word-mark-good-1", (bisect.word(Mark::Good)).into()),
+                    ],
+                ),
             ),
             (
                 Mark::Bad,
-                format!("Mark {at} as {}", bisect.word(Mark::Bad)),
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-menu-items-5f1847b9",
+                    &[
+                        ("at", (at).into()),
+                        ("bisect-word-mark-bad-1", (bisect.word(Mark::Bad)).into()),
+                    ],
+                ),
             ),
-            (Mark::Skip, format!("Skip {at} in the bisect")),
+            (
+                Mark::Skip,
+                crate::i18n::message(
+                    "repo-workflows-bisect-bisect-menu-items-72281c73",
+                    &[("at", (at).into())],
+                ),
+            ),
         ] {
-            let wait = if running {
+            let wait = crate::i18n::text(if running {
                 super::banner::RUNNING
             } else {
                 super::banner::BUSY
-            };
+            });
             if crate::menu_item::MenuItem::new(label)
                 .icon("command")
                 .refused((!idle || running).then_some(wait))
@@ -86,7 +111,7 @@ impl RepoTab {
                 return Vec::new();
             }
             return vec![item(
-                "Start bisect…".to_owned(),
+                crate::i18n::text("repo-workflows-bisect-bisect-palette-items-ba89bd47").to_owned(),
                 Action::Dialog(Dialog::start_bisect("HEAD", false)),
             )];
         };
@@ -100,24 +125,49 @@ impl RepoTab {
             let at = short(&bisect.current);
             items.extend([
                 item(
-                    format!("Bisect: mark {at} as {}", bisect.word(Mark::Good)),
+                    crate::i18n::message(
+                        "repo-workflows-bisect-bisect-palette-items-417fbb2c",
+                        &[
+                            ("at", (at).into()),
+                            ("bisect-word-mark-good-1", (bisect.word(Mark::Good)).into()),
+                        ],
+                    ),
                     mark(Mark::Good),
                 ),
                 item(
-                    format!("Bisect: mark {at} as {}", bisect.word(Mark::Bad)),
+                    crate::i18n::message(
+                        "repo-workflows-bisect-bisect-palette-items-417fbb2c",
+                        &[
+                            ("at", (at).into()),
+                            ("bisect-word-mark-bad-1", (bisect.word(Mark::Bad)).into()),
+                        ],
+                    ),
                     mark(Mark::Bad),
                 ),
-                item(format!("Bisect: skip {at}"), mark(Mark::Skip)),
+                item(
+                    crate::i18n::message(
+                        "repo-workflows-bisect-bisect-palette-items-011b904c",
+                        &[("at", (at).into())],
+                    ),
+                    mark(Mark::Skip),
+                ),
             ]);
             if bisect.progress.is_some() {
                 items.push(item(
-                    "Bisect: run a command…".to_owned(),
+                    crate::i18n::text("repo-workflows-bisect-bisect-palette-items-96774cb9")
+                        .to_owned(),
                     self.bisect_run_dialog(),
                 ));
             }
-            items.push(item("Bisect: stop".to_owned(), self.stop_bisect_action()));
+            items.push(item(
+                crate::i18n::text("repo-workflows-bisect-bisect-palette-items-23b8f037").to_owned(),
+                self.stop_bisect_action(),
+            ));
         } else {
-            items.push(item("Bisect: finish".to_owned(), self.stop_bisect_action()));
+            items.push(item(
+                crate::i18n::text("repo-workflows-bisect-bisect-palette-items-34a86ddf").to_owned(),
+                self.stop_bisect_action(),
+            ));
         }
         items
     }

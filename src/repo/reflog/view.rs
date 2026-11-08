@@ -490,7 +490,10 @@ fn scanning(ui: &mut Ui, t: &Tokens, secs: u64, acts: &mut Vec<Action>) {
             .color(t.text_dim),
         );
         ui.add_space(8.0);
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text("repo-workflows-reflog-scanning-19766ed6"))
+            .clicked()
+        {
             acts.push(Action::Reflog(ReflogAct::CancelScan));
         }
     });

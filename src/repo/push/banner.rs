@@ -204,9 +204,12 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
     let named = r.missing.len().min(IN_BANNER) as u32;
     if r.behind > named && named > 0 {
         ui.label(
-            RichText::new(format!("and {} more", r.behind - named))
-                .size(11.5)
-                .color(t.text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-push-rejected-683768ab",
+                &[("r-behind-named-1", (r.behind - named).clone().into())],
+            ))
+            .size(11.5)
+            .color(t.text_faint),
         );
     }
     let mode = Settings::get(ui.ctx()).pull_mode;
@@ -396,7 +399,10 @@ fn primary(ui: &mut Ui, label: &str, tip: &str, enabled: bool, clicked: impl FnO
 }
 
 fn dismiss(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui.button("Dismiss").clicked() {
+    if ui
+        .button(crate::i18n::text("repo-workflows-push-dismiss-48845bff"))
+        .clicked()
+    {
         acts.push(Action::PushFlow(PushAct::Dismiss));
     }
 }

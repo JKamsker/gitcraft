@@ -116,7 +116,7 @@ impl RepoTab {
         let mut open = true;
         egui::Window::new("Email patches · b4").id(egui::Id::new(("email-patches", &self.path))).open(&mut open).default_width(760.0).vscroll(true).show(ctx, |ui| {
             ui.label("Requires the supported b4 source build ce4c1158 (0.17-dev), installed with its Python entrypoint in a virtual environment on this machine. The Python helper uses isolated mode, so user-site/PYTHONPATH-only installs are unsupported. Other builds are refused until their contract is reviewed. Uses b4's configured identity, public-inbox and sending transport. No credentials are exported by gitcraft.");
-            if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button("Cancel operation").clicked() { acts.push(Action::Email(Act::Cancel)); } }
+            if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button(crate::i18n::text("repo-workflows-email-email-window-b64a0d4f")).clicked() { acts.push(Action::Email(Act::Cancel)); } }
             ui.label(&state.result);
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
                 ui.heading("Receive and review");

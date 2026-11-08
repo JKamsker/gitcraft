@@ -33,11 +33,11 @@ pub(super) fn timeline(ui: &mut Ui, job: &Job, now: i64) {
     let t = Tokens::get(ui.ctx());
     if job.steps.is_empty() {
         let text = if !job.stage.is_empty() {
-            "GitLab doesn't list the steps of a job: its log is on its page."
+            crate::i18n::text("repo-workflows-ci_view-timeline-709e9121")
         } else if job.state == CheckState::Running {
-            "This job has no steps to show yet."
+            crate::i18n::text("repo-workflows-ci_view-timeline-ee459f80")
         } else {
-            "This job ran no steps."
+            crate::i18n::text("repo-workflows-ci_view-timeline-b59cc5d9")
         };
         ui.label(RichText::new(text).color(t.text_faint).italics());
         return;
@@ -47,9 +47,11 @@ pub(super) fn timeline(ui: &mut Ui, job: &Job, now: i64) {
         .or_else(|| job.steps.iter().find_map(|s| s.started))
     else {
         ui.label(
-            RichText::new("Not started yet.")
-                .color(t.text_faint)
-                .italics(),
+            RichText::new(crate::i18n::text(
+                "repo-workflows-ci_view-timeline-99fa228f",
+            ))
+            .color(t.text_faint)
+            .italics(),
         );
         return;
     };
@@ -102,7 +104,7 @@ pub(super) fn timeline(ui: &mut Ui, job: &Job, now: i64) {
         }
         let span = match (step.started, step.finished) {
             (Some(_), None) => "running".to_owned(),
-            (None, _) => "not started".to_owned(),
+            (None, _) => crate::i18n::text("repo-workflows-ci_view-timeline-7a7400f4").to_owned(),
             _ => crate::repo::ci_status::state_word(step.state).to_owned(),
         };
         resp.on_hover_text(format!("{}\n{span}", step.name));

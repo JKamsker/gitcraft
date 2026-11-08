@@ -100,7 +100,7 @@ fn by_start(jobs: &[Job], start: Option<i64>) -> Vec<Column> {
         .collect();
     if !waiting.is_empty() {
         columns.push(Column {
-            title: "Not started".to_owned(),
+            title: crate::i18n::text("repo-workflows-ci_view-by-start-ba35f0c4").to_owned(),
             jobs: waiting,
         });
     }
@@ -180,7 +180,11 @@ fn job_card(ui: &mut Ui, rect: Rect, job: &Job, selected: bool, now: i64, acts: 
         || {
             let state = crate::repo::ci_status::state_word(job.state);
             crate::a11y::labels::join([
-                format!("job {}", job.name).as_str(),
+                crate::i18n::message(
+                    "repo-workflows-ci_view-job-card-0098c77e",
+                    &[("job-name-1", (job.name).clone().into())],
+                )
+                .as_str(),
                 job.stage.as_str(),
                 state,
             ])
@@ -219,9 +223,9 @@ fn job_card(ui: &mut Ui, rect: Rect, job: &Job, selected: bool, now: i64, acts: 
         FontId::proportional(11.0),
         t.text_faint,
     );
-    let resp = resp.on_hover_text(format!(
-        "{}\nDouble-click to open it in the browser",
-        job.name
+    let resp = resp.on_hover_text(crate::i18n::message(
+        "repo-workflows-ci_view-job-card-f4ed9e36",
+        &[("job-name-1", (job.name).clone().into())],
     ));
     if resp.double_clicked() {
         acts.push(Action::OpenUrl(job.url.clone()));

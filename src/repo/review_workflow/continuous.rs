@@ -285,7 +285,12 @@ impl RepoTab {
             if ui.button("Reload").clicked() {
                 acts.push(Action::Review(ReviewAct::Reload));
             }
-            if ui.button("Close").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-review_workflow-review-document-ui-7d9eb7ac",
+                ))
+                .clicked()
+            {
                 acts.push(Action::Review(ReviewAct::Close));
             }
         });

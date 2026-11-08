@@ -48,11 +48,11 @@ impl Section {
 
     pub(crate) fn title(self) -> &'static str {
         match self {
-            Section::Ignore => "Ignore rules and attributes",
-            Section::Hooks => "Hooks",
-            Section::Health => "Health and maintenance",
-            Section::Config => "Which configuration wins",
-            Section::Flags => "Hidden changes",
+            Section::Ignore => crate::i18n::text("repo-workflows-doctor-title-94ec061c"),
+            Section::Hooks => crate::i18n::text("repo-workflows-doctor-title-d412a062"),
+            Section::Health => crate::i18n::text("repo-workflows-doctor-title-8d6acfc3"),
+            Section::Config => crate::i18n::text("repo-workflows-doctor-title-8b2d57fa"),
+            Section::Flags => crate::i18n::text("repo-workflows-doctor-title-1e6bed5e"),
         }
     }
 
@@ -178,7 +178,7 @@ impl RepoTab {
     pub(super) fn open_doctor(&mut self, section: Section, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
             self.status = Some((
-                "Finish or close the conflict editor or the interactive rebase first".to_owned(),
+                crate::i18n::text("repo-workflows-doctor-open-doctor-745454bd").to_owned(),
                 true,
             ));
             return;
@@ -212,7 +212,10 @@ impl RepoTab {
             DoctorAct::Reload => self.load_doctor(ctx),
             DoctorAct::Run { label, ops } => {
                 if self.busy_op.is_some() {
-                    self.status = Some(("Wait for the running operation to end".to_owned(), true));
+                    self.status = Some((
+                        crate::i18n::text("repo-workflows-doctor-doctor-act-9bab8d95").to_owned(),
+                        true,
+                    ));
                     return;
                 }
                 if let Some(doctor) = &mut self.doctor {

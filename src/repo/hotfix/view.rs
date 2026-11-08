@@ -93,7 +93,10 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
                     );
                 });
             ui.add_space(4.0);
-            ui.label(format!("Merged into {}", plan.main.name));
+            ui.label(crate::i18n::message(
+                "repo-workflows-hotfix-contents-f5346a60",
+                &[("plan-main-name-1", (plan.main.name).clone().into())],
+            ));
             match &plan.develop {
                 Some(d) => {
                     ui.checkbox(&mut c.develop, format!("And into {}", d.name));
@@ -165,7 +168,10 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
 
 fn cancel(ui: &mut Ui, acts: &mut Vec<Action>) {
     if ui
-        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+        .add(
+            egui::Button::new(crate::i18n::text("repo-workflows-hotfix-cancel-19766ed6"))
+                .min_size(egui::vec2(80.0, 30.0)),
+        )
         .clicked()
     {
         acts.push(Action::Hotfix(HotfixAct::Close));

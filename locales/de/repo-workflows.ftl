@@ -36,7 +36,7 @@ repo-workflows-activity-outcome-text-8b47045e = abgebrochen
 
 repo-workflows-activity-outcome-text-a4c3ed04 = abgeschlossen
 
-repo-workflows-activity-seconds-6f29d45b = { $d-as-secs-f32-1 } s
+repo-workflows-activity-seconds-6f29d45b = { NUMBER($d-as-secs-f32-1, minimumFractionDigits: 1, maximumFractionDigits: 1) } s
 
 repo-workflows-activity-seconds-af37e50f = { $d-as-secs-1 } s
 
@@ -324,16 +324,16 @@ repo-workflows-agents-terminal-choice-c22c5ccf = Das Terminal, in das die Notize
 
 repo-workflows-agents-terminal-choice-f1f46570 = kein Agent-Terminal
 
-repo-workflows-agents-tip-1c0ba476 = 
+repo-workflows-agents-tip-1c0ba476 =
     In diesem Tab geöffnet: Die Änderungen stehen unter „Uncommittete Änderungen“
 
-repo-workflows-agents-tip-5c1b8dd5 = 
+repo-workflows-agents-tip-5c1b8dd5 =
     Klicken Sie hier, um die Änderungen zu öffnen und zu prüfen
 
-repo-workflows-agents-tip-7d8e5553 = 
+repo-workflows-agents-tip-7d8e5553 =
     Aufgabe: { $row-task-prompt-1 }
 
-repo-workflows-agents-tip-95d5fbf7 = 
+repo-workflows-agents-tip-95d5fbf7 =
     Agent: { $row-task-agent-1 }
 
 repo-workflows-agents-tray-act-78e896bb = die Notizen
@@ -490,6 +490,1393 @@ repo-workflows-ai-writing-row-19766ed6 = Abbrechen
 
 repo-workflows-ai-writing-row-ea07a4e5 = { $running-tool-short-1 } schreibt die Nachricht … { $elapsed-running-started-2 }
 
+repo-workflows-atlas-atlas-window-1316052d = Schwerpunktseite { $view-page-1-1 } / { $pages }
+
+repo-workflows-atlas-atlas-window-1556feb2 = Autorendatum
+
+repo-workflows-atlas-atlas-window-1af85190 = Größe
+
+repo-workflows-atlas-atlas-window-1bfb5492 = Jüngste Änderungen
+
+repo-workflows-atlas-atlas-window-2657941d = { $label } ({ $if-n-directory-folder-else-file-1 }), { $n-bytes-2 } Bytes, { $n-changes-3 } Änderungen, häufigster Mitwirkender: { $n-contributor-4 }. { $if-n-directory-zoom-into-folder--5 }
+
+repo-workflows-atlas-atlas-window-34dd32fc = Atlas anwenden / aktualisieren
+
+repo-workflows-atlas-atlas-window-39c66d83 = Dateiverlauf am fixierten Stand öffnen
+
+repo-workflows-atlas-atlas-window-3a9dfa58 = Farbe
+
+repo-workflows-atlas-atlas-window-41bb5a28 = In Ordner hineinzoomen
+
+repo-workflows-atlas-atlas-window-4562ddd7 = Committerdatum
+
+repo-workflows-atlas-atlas-window-48c740b7 = letzter gescannter Stand
+
+repo-workflows-atlas-atlas-window-4b6c521c = { $label }
+    { $n-bytes-1 } Bytes · { $n-changes-2 } Änderungen
+    Häufigster Mitwirkender: { $if-n-contributor-is-empty-no-cha-3 }
+
+repo-workflows-atlas-atlas-window-4d800030 = Bytes
+
+repo-workflows-atlas-atlas-window-5769ad13 = Keine Dateien in diesem Stand.
+
+repo-workflows-atlas-atlas-window-611ebb33 = Atlas der Änderungen und Mitwirkenden
+
+repo-workflows-atlas-atlas-window-63bfe85d = Von YYYY-MM-DD
+
+repo-workflows-atlas-atlas-window-67be181b = Gescannten Dateiverlauf über analysierte Referenzen anzeigen
+
+repo-workflows-atlas-atlas-window-6aba5092 = Vorherige Schwerpunkte
+
+repo-workflows-atlas-atlas-window-6e795d4d = Zeitraum
+
+repo-workflows-atlas-atlas-window-6fd659e0 = Bis YYYY-MM-DD
+
+repo-workflows-atlas-atlas-window-86061296 = Nächste Schwerpunkte
+
+repo-workflows-atlas-atlas-window-862161d0 = Keine Änderungen im gewählten Zeitraum
+
+repo-workflows-atlas-atlas-window-8d9ca065 = Gescannten Verlauf für diesen exakten Bytepfad öffnen
+
+repo-workflows-atlas-atlas-window-a5661a75 = Häufigster Mitwirkender: { $node-contributor-1 }
+
+repo-workflows-atlas-atlas-window-a9656539 = Mehr Atlasverlauf scannen
+
+repo-workflows-atlas-atlas-window-aef428d1 = { $node-bytes-1 } Bytes · { $node-changes-2 } Dateiänderungen
+
+repo-workflows-atlas-atlas-window-b4ab9b3d = ↑ Repository-Wurzel
+
+repo-workflows-atlas-atlas-window-ba512e1a = Häufigster Mitwirkender
+
+repo-workflows-atlas-atlas-window-bc087fce = Änderungshäufigkeit
+
+repo-workflows-atlas-atlas-window-c2e87ba8 = frühester gescannter Stand
+
+repo-workflows-atlas-atlas-window-d16ccfdf = Atlasanalyse abbrechen
+
+repo-workflows-atlas-atlas-window-ef7caa7d = Fixierter Verlauf und Dateigrößen werden analysiert …
+
+repo-workflows-atlas-atlas-window-f69e93c6 = Dateien und historische Ordner am selben Pfad sind getrennte Schwerpunkte. Der Dateiverlauf verwendet HEAD für aktuelle Dateien oder einen beobachteten Änderungsstand für historische Dateien. Rechtsklick zeigt den Verlauf über die analysierten Referenzen; Nicht-UTF-8-Pfade öffnen ihn direkt. Lange Namen werden gekürzt; nummerierte Identitäten bleiben getrennt.
+
+repo-workflows-atlas-new-70ba4563 = Dateiverlauf abgebrochen
+
+repo-workflows-atlas-read-atlas-02c42736 = Verwenden Sie Datumsangaben im Format YYYY-MM-DD
+
+repo-workflows-atlas-read-atlas-67b18cbf = Verwenden Sie YYYY-MM-DD; der Beginn darf nicht nach dem Ende liegen
+
+repo-workflows-atlas-show-01efcd54 = Dateiverlauf wird vorbereitet …
+
+repo-workflows-atlas-show-076017ad = Diese Liste verfolgt den exakten Pfad über die analysierten Referenzen einschließlich Löschungen. Sie verwendet den gesamten gescannten Stand unabhängig vom Atlaszeitraum und folgt keinen Umbenennungen. Öffnen Sie einen Commit, um die Änderungen zu prüfen. Für ältere Änderungen wählen Sie „Mehr Atlasverlauf scannen“ im Atlas.
+
+repo-workflows-atlas-show-1abc4096 = Nächste Datei-Commits
+
+repo-workflows-atlas-show-56fe4d78 = Vorherige Datei-Commits
+
+repo-workflows-atlas-show-7269bb4e = Gescannten Dateiverlauf über Referenzen anzeigen
+
+repo-workflows-atlas-show-8647a64f = Exakte Pfadbytes: { $clipped-self-label-256-1 }
+
+repo-workflows-atlas-show-c256cd01 = Kein gescannter Commit berührt diesen exakten Pfad. Sein Verlauf liegt möglicherweise vor der Scangrenze.
+
+repo-workflows-bakeoff-assemble-bar-3766ae43 = Öffnen Sie unten eine Datei und übernehmen Sie diese ganz oder einzelne Hunks aus einem Versuch
+
+repo-workflows-bakeoff-assemble-bar-5a22f453 = Wird zusammengestellt …
+
+repo-workflows-bakeoff-assemble-bar-8462ef57 = Zusammenstellen in
+
+repo-workflows-bakeoff-assemble-bar-86fd9bbb = Zusammenstellen ({ $picks } Dateien)
+
+repo-workflows-bakeoff-assemble-bar-916e34d4 = Im Graphen anzeigen
+
+repo-workflows-bakeoff-assemble-bar-aee10357 = Ein neuer Branch ab der Basis mit der Auswahl. Alles andere bleibt wie in der Basis. Kein ausgecheckter Stand wird geändert.
+
+repo-workflows-bakeoff-assemble-bar-ccbdbfe8 = Zusammenstellen (eine Datei)
+
+repo-workflows-bakeoff-assemble-bar-f19adc05 = Benennen Sie zuerst den neuen Branch
+
+repo-workflows-bakeoff-assemble-c7f55e42 = { $branch } bei { $crate-repo-short-commit-1 } erstellt
+
+repo-workflows-bakeoff-bakeoff-view-9754333a = Versuche werden verglichen …
+
+repo-workflows-bakeoff-body-bfd30d1e = Klicken Sie auf eine Datei, um die Versuche zu vergleichen und daraus auszuwählen
+
+repo-workflows-bakeoff-build-06d160c3 = Die Statusdatei für den Build konnte nicht vorbereitet werden: { $e }
+
+repo-workflows-bakeoff-build-c18d3706 = Geben Sie zuerst den Build-Befehl für das Projekt ein
+
+repo-workflows-bakeoff-build-c9238812 = Build · { $name }
+
+repo-workflows-bakeoff-build-cell-17824e4b = Der alte Build läuft möglicherweise noch. Startet einen getrennten gespeicherten Stand und beendet oder bereinigt den alten Start nicht.
+
+repo-workflows-bakeoff-build-cell-26c16489 = nicht gebaut
+
+repo-workflows-bakeoff-build-cell-301c453c = ✘ fehlgeschlagen ({ $code })
+
+repo-workflows-bakeoff-build-cell-3149d8b3 = Führt Ihren Befehl auf dem exakten Vergleichsstand in einem neuen losgelösten Worktree aus
+
+repo-workflows-bakeoff-build-cell-5dac180d = Ergebnis nicht verfügbar
+
+repo-workflows-bakeoff-build-cell-63f96d79 = Start fehlgeschlagen, Terminal oder Ausgabe beendet oder Beleg ungültig. Dies beweist nicht, dass alle Kindprozesse beendet sind.
+
+repo-workflows-bakeoff-build-cell-6fe4abd4 = In neuem Arbeitsbereich wiederholen
+
+repo-workflows-bakeoff-build-cell-84b604d3 = Das vorherige Ergebnis ist unbekannt; Prozesse laufen möglicherweise noch. Startet einen weiteren gespeicherten Arbeitsbereich ohne automatisches Beenden oder Bereinigen.
+
+repo-workflows-bakeoff-build-cell-98cd8a0b = Stand wird vorbereitet …
+
+repo-workflows-bakeoff-build-cell-adccacb7 = Führt den Befehl in einem weiteren neuen gespeicherten Stand aus
+
+repo-workflows-bakeoff-build-cell-af81e9e4 = Erneut bauen
+
+repo-workflows-bakeoff-build-cell-bdd254b6 = Bauen
+
+repo-workflows-bakeoff-build-cell-d07e6c18 = ✔ Build erfolgreich
+
+repo-workflows-bakeoff-build-cell-ef24cfb5 = Die Ausgabe steht im Terminal-Tab
+
+repo-workflows-bakeoff-column-2ed1ade8 = Keine Hunks auswählbar (Binärdatei): Übernehmen Sie die ganze Datei
+
+repo-workflows-bakeoff-column-6e86718f = Ersetzt die ausgewählten Hunks. Erneutes Klicken nimmt die Auswahl zurück.
+
+repo-workflows-bakeoff-column-772841f1 = Löschung übernehmen
+
+repo-workflows-bakeoff-column-a533487d = Ganze Datei übernehmen
+
+repo-workflows-bakeoff-column-badecf50 = Neue Datei übernehmen
+
+repo-workflows-bakeoff-files-51aec897 = { $a-name-1 } hat diese Datei unverändert gelassen
+
+repo-workflows-bakeoff-files-7e17d722 = Keiner der Versuche hat etwas geändert
+
+repo-workflows-bakeoff-files-83d88f06 = { $a-name-1 } hat diese Datei geändert
+
+repo-workflows-bakeoff-files-fe616a60 = { $path }
+    Im direkten Vergleich über alle Versuche öffnen
+
+repo-workflows-bakeoff-grid-1af85190 = Größe
+
+repo-workflows-bakeoff-grid-1f19288a = ja, wird mitverglichen
+
+repo-workflows-bakeoff-grid-6263bbf3 = Die vollständige gespeicherte Ausgabe dieses Laufs im eingestellten Editor öffnen
+
+repo-workflows-bakeoff-grid-6a3fe887 = Builds
+
+repo-workflows-bakeoff-grid-7a44bde0 = Uncommittete Arbeit
+
+repo-workflows-bakeoff-grid-7cbda0dd = Build-Ausgabe …
+
+repo-workflows-bakeoff-grid-9c37d9c9 = Neue Abhängigkeiten
+
+repo-workflows-bakeoff-grid-ce199c9e = Berührte Dateien
+
+repo-workflows-bakeoff-header-0e2a45b6 = Andere Versuche …
+
+repo-workflows-bakeoff-header-175f9ff6 = Alle bauen
+
+repo-workflows-bakeoff-header-43c40423 = Bake-off
+
+repo-workflows-bakeoff-header-46334791 = Bauen mit
+
+repo-workflows-bakeoff-header-502f6dbd = Erneut vergleichen
+
+repo-workflows-bakeoff-header-50cd264e = ausgehend von { $crate-repo-short-cmp-base-1 }
+
+repo-workflows-bakeoff-header-7d9eb7ac = Schließen
+
+repo-workflows-bakeoff-header-862a0723 = Führt diesen Befehl ausdrücklich auf jedem verglichenen Stand in einem neuen losgelösten Worktree aus. Kein Einrichtungsrezept wird ausgeführt. Die Arbeitsbereiche bleiben unter Worktrees zur Prüfung und Entfernung erhalten.
+
+repo-workflows-bakeoff-header-9cec669f = Vergleichen Sie zuerst die Versuche
+
+repo-workflows-bakeoff-header-a195ce68 = Geben Sie den Build-Befehl für das Projekt ein
+
+repo-workflows-bakeoff-header-acb0a622 = ⚠ { $elsewhere-join-1 } begann anderswo
+
+repo-workflows-bakeoff-header-b1ce0225 = Liest die Versuche samt uncommitteter Arbeit erneut ein
+
+repo-workflows-bakeoff-header-bb683fa4 = Der gemeinsame Ausgangscommit (ihre Merge-Basis)
+
+repo-workflows-bakeoff-header-c38e956d = Für dieses Repository gespeichert
+
+repo-workflows-bakeoff-header-dd4159a5 = Dieser Versuch begann an einem anderen Commit. Seine Spalte zeigt auch die Änderungen vor seinem Beginn.
+
+repo-workflows-bakeoff-hunk-label-0cf292e8 = Am Anfang
+
+repo-workflows-bakeoff-hunk-label-4d9d8a81 = Zeile { $hunk-old-start-1 }
+
+repo-workflows-bakeoff-hunk-label-7647677f = Nach Zeile { $hunk-old-start-1 }
+
+repo-workflows-bakeoff-hunk-label-a3052fdf = Zeilen { $hunk-old-start-1 }–{ $hunk-old-start-n-1-2 }
+
+repo-workflows-bakeoff-load-bakeoff-c6f043db = Auswahl verworfen: Die Versuche haben sich seit der Auswahl geändert
+
+repo-workflows-bakeoff-pick-label-77dbc108 = ← ganze Datei aus { $name-n-1 }
+
+repo-workflows-bakeoff-pick-label-c708de81 = ← { $list-len-1 } Hunks
+
+repo-workflows-bakeoff-pick-label-d3d98b5d = ← ein Hunk
+
+repo-workflows-bakeoff-side-by-side-47c58b04 = Unverändert in { $unchanged-join-1 }
+
+repo-workflows-bakeoff-side-by-side-6bdfa343 = Auswahl aufheben
+
+repo-workflows-bakeoff-side-by-side-76215eb4 = Der zusammengestellte Branch behält die Basisversion dieser Datei
+
+repo-workflows-bakeoff-side-by-side-f280944f = Ausgewählte Hunks zweier Versuche ändern dieselben Zeilen. Wählen Sie einen davon ab.
+
+repo-workflows-bakeoff-ui-09eb5aca = Wählen Sie { $MIN } bis { $MAX } Versuche derselben Aufgabe zum Vergleich: Worktrees (einschließlich uncommitteter Änderungen) oder Branches.
+
+repo-workflows-bakeoff-ui-19766ed6 = Abbrechen
+
+repo-workflows-bakeoff-ui-43c40423 = Bake-off
+
+repo-workflows-bakeoff-ui-6217d161 = Worktree · { $crate-remote-display-w-1 }
+
+repo-workflows-bakeoff-ui-638e249f = Filter
+
+repo-workflows-bakeoff-ui-ae96d29a = Wählen Sie { $MIN } bis { $MAX } Versuche
+
+repo-workflows-bakeoff-ui-c51e8eaa = Keine Worktrees oder anderen Branches zum Vergleichen
+
+repo-workflows-bakeoff-ui-cd8d844d = Keine Treffer
+
+repo-workflows-bakeoff-ui-e888155d = Vergleichen
+
+repo-workflows-bakeoff-ui-fbbc3b24 = Höchstens { $MAX } Versuche
+
+repo-workflows-bisect--512af075 = Warten Sie auf das Ende des Laufs oder stoppen Sie ihn
+
+repo-workflows-bisect--e5e3ecc5 = Warten Sie, bis der laufende Vorgang abgeschlossen ist
+
+repo-workflows-bisect-bisect-blocker-cff28fea = Warten Sie zuerst auf den Abschluss von { $busy }.
+
+repo-workflows-bisect-bisect-buttons-0599842f = git bisect reset: checkt { $branch } erneut aus
+
+repo-workflows-bisect-bisect-buttons-12c0910a = { $current } kann nicht getestet werden. Versuchen Sie einen anderen Commit.
+
+repo-workflows-bisect-bisect-buttons-7cf0c74e = git bisect run: Ein Befehl testet jeden Commit für Sie
+
+repo-workflows-bisect-bisect-buttons-7f573858 = { $current } enthält die Änderung
+
+repo-workflows-bisect-bisect-buttons-a28c79f7 = git bisect reset: checkt den ursprünglichen Ausgangsstand erneut aus
+
+repo-workflows-bisect-bisect-buttons-a6c7a84b = Abschließen
+
+repo-workflows-bisect-bisect-buttons-a9a77839 = { $current } liegt vor der Änderung
+
+repo-workflows-bisect-bisect-buttons-c3efc1be = Markieren Sie zuerst einen guten und einen schlechten Commit
+
+repo-workflows-bisect-bisect-buttons-cae7d57b = Stoppen
+
+repo-workflows-bisect-bisect-buttons-eded3d42 = Befehl ausführen …
+
+repo-workflows-bisect-bisect-menu-items-43fa49b5 = Bisect hier starten …
+
+repo-workflows-bisect-bisect-menu-items-5cc56687 = Findet den Commit, der eine Änderung eingeführt hat, durch Tests zwischen einem guten und einem schlechten Commit
+
+repo-workflows-bisect-bisect-menu-items-5f1847b9 = { $at } als { $bisect-word-mark-bad-1 } markieren
+
+repo-workflows-bisect-bisect-menu-items-72281c73 = { $at } im Bisect überspringen
+
+repo-workflows-bisect-bisect-palette-items-011b904c = Bisect: { $at } überspringen
+
+repo-workflows-bisect-bisect-palette-items-23b8f037 = Bisect: stoppen
+
+repo-workflows-bisect-bisect-palette-items-34a86ddf = Bisect: abschließen
+
+repo-workflows-bisect-bisect-palette-items-417fbb2c = Bisect: { $at } als { $bisect-word-mark-bad-1 } markieren
+
+repo-workflows-bisect-bisect-palette-items-96774cb9 = Bisect: Befehl ausführen …
+
+repo-workflows-bisect-bisect-palette-items-ba89bd47 = Bisect starten …
+
+repo-workflows-bisect-bisect-status-675fd45e = Bisect läuft
+
+repo-workflows-bisect-bisect-step-done-8336fbfe = { $label } fehlgeschlagen: { $e }
+
+repo-workflows-bisect-commit-link-63633913 = Diesen Commit anzeigen
+
+repo-workflows-bisect-hash-link-63633913 = Diesen Commit anzeigen
+
+repo-workflows-bisect-mark-bisect-15306802 = Diesen Commit überspringen
+
+repo-workflows-bisect-mark-bisect-22f6b91b = { $short-rev-1 } als { $bisect-word-mark-2 } markieren
+
+repo-workflows-bisect-mark-bisect-9b0f3138 = Als { $bisect-word-mark-1 } markieren
+
+repo-workflows-bisect-mark-bisect-a1c6c771 = Es läuft kein Bisect
+
+repo-workflows-bisect-reset-bisect-0ddac35c = Bisect stoppen
+
+repo-workflows-bisect-reset-bisect-1bdcc155 = Bisect abschließen
+
+repo-workflows-bisect-reset-bisect-b63b6486 = wieder am Ausgangscommit
+
+repo-workflows-bisect-reset-bisect-fd58b76b = wieder auf { $branch }
+
+repo-workflows-bisect-run-log-534a3a34 = mit Exitcode { $c } beendet
+
+repo-workflows-bisect-run-log-5fd804ed = fehlgeschlagen: { $e }
+
+repo-workflows-bisect-run-log-64876c47 = Ausgabe ausblenden
+
+repo-workflows-bisect-run-log-7d9eb7ac = Schließen
+
+repo-workflows-bisect-run-log-8d23f4ee = Stoppt den Befehl und seine Kindprozesse. Der Bisect bleibt am erreichten Stand.
+
+repo-workflows-bisect-run-log-9dbbb249 = Ausgabe anzeigen
+
+repo-workflows-bisect-run-log-b7ec68a2 = Lauf stoppen
+
+repo-workflows-bisect-run-log-bb5e4bf5 = durch ein Signal beendet
+
+repo-workflows-bisect-run-message-3a24171a = Bisect-Lauf fehlgeschlagen: { $e }
+
+repo-workflows-bisect-run-message-96334386 = Bisect-Lauf gestoppt
+
+repo-workflows-bisect-run-message-b1d63bd2 = Exitcode { $c }
+
+repo-workflows-bisect-run-message-b4eba258 = Bisect-Lauf mit { $code } beendet: { $last-line }
+
+repo-workflows-bisect-run-message-dc9c7971 = Bisect-Lauf: Nur übersprungene Commits übrig; einer davon ist der erste fehlerhafte Commit
+
+repo-workflows-bisect-run-message-de2346a5 = Bisect-Lauf: Ersten fehlerhaften Commit gefunden
+
+repo-workflows-bisect-run-message-e8e581bc = einem Signal
+
+repo-workflows-bisect-start-bisect-5c82e3e0 = Bisect kann nicht gestartet werden: { $why }
+
+repo-workflows-bisect-start-bisect-db936451 = Bisect starten
+
+repo-workflows-bisect-start-bisect-run-d300d73e = Bisect-Lauf
+
+repo-workflows-bisect-steps-text-14999716 = Noch etwa { $n } Schritte
+
+repo-workflows-bisect-steps-text-263b5d8b = Noch etwa ein Schritt
+
+repo-workflows-bisect-steps-text-2d1513e9 = Letzter Schritt
+
+repo-workflows-bisect-steps-text-5ccbfd65 = { $n } Commits nach diesem
+
+repo-workflows-bisect-steps-text-9bbc8458 = Ein Commit nach diesem
+
+repo-workflows-bisect-steps-text-a4e9b171 = Keine Commits nach diesem
+
+repo-workflows-bisect-stop-bisect-action-0ddac35c = Bisect stoppen
+
+repo-workflows-bisect-stop-bisect-action-c380662a = Bisect stoppen und { $back } erneut auschecken? Die bisherigen Markierungen werden vergessen.
+
+repo-workflows-bisect-stop-bisect-action-fff2c8f7 = der zu Beginn ausgecheckte Stand
+
+repo-workflows-bisect-waiting-2d4ce59a = Markieren Sie einen Commit als { $word } ({ $meaning }): per Rechtsklick im Graphen oder mit { $capitalised-word-1 } für den ausgecheckten Commit.
+
+repo-workflows-bisect-where-it-is-25230d8d = Nur übersprungene Commits übrig. Der erste fehlerhafte Commit ist einer dieser { $possible-len-1 }:
+
+repo-workflows-bisect-where-it-is-4c0b8e59 = Git findet zwischen den Markierungen nichts zum Testen (guter Commit nach dem schlechten?). Markieren Sie andere Commits oder wählen Sie „Stoppen“.
+
+repo-workflows-bisect-where-it-is-683768ab = und { $possible-len-max-named-1 } weitere
+
+repo-workflows-bisect-where-it-is-7d7c30e4 = · Wird getestet
+
+repo-workflows-bisect-where-it-is-8b3812c0 = Erster fehlerhafter Commit:
+
+repo-workflows-bisect-where-it-is-94883ca6 = vor der Änderung
+
+repo-workflows-bisect-where-it-is-d5ebaa0a = mit der Änderung
+
+repo-workflows-ci_view-by-start-ba35f0c4 = Nicht gestartet
+
+repo-workflows-ci_view-ci-act-07fe25a7 = { $what } abgebrochen
+
+repo-workflows-ci_view-ci-act-da60943b = Fehlgeschlagene Jobs von { $what } erneut ausgeführt
+
+repo-workflows-ci_view-ci-view-ui-90db5328 = Auf diesem Commit lief keine CI.
+
+repo-workflows-ci_view-ci-view-ui-b431c0d7 = { $noun } von { $short-view-sha-1 }
+
+repo-workflows-ci_view-ci-view-ui-c454bec0 = Workflow-Läufe
+
+repo-workflows-ci_view-ci-view-ui-d1a8fffe = Pipelines
+
+repo-workflows-ci_view-ci-view-ui-e50c77eb = Bei einigen Projekten konnten keine Builds abgefragt werden.
+
+repo-workflows-ci_view-job-card-0098c77e = Job { $job-name-1 }
+
+repo-workflows-ci_view-job-card-f4ed9e36 = { $job-name-1 }
+    Doppelklick öffnet ihn im Browser
+
+repo-workflows-ci_view-load-ci-view-4c1d2d4e = Dieses Repository liegt weder auf GitHub noch auf GitLab.
+
+repo-workflows-ci_view-open-ci-680d5c5f = interaktiver Rebase
+
+repo-workflows-ci_view-open-ci-991ae978 = Schließen oder beenden Sie zuerst den { $editor }
+
+repo-workflows-ci_view-open-ci-d509b2ee = Konflikteditor
+
+repo-workflows-ci_view-page-04ec3970 = PROTOKOLL DER FEHLGESCHLAGENEN JOBS
+
+repo-workflows-ci_view-page-20681c9f = das Protokoll
+
+repo-workflows-ci_view-page-30fc4b32 = SCHRITTE VON { $job-name-to-uppercase-1 }
+
+repo-workflows-ci_view-page-66f52811 = Keine Jobs.
+
+repo-workflows-ci_view-page-7261125c = Das Protokoll ist leer.
+
+repo-workflows-ci_view-page-77a860cb = An Agent senden
+
+repo-workflows-ci_view-page-da532fb6 = Fügt das Ende dieses Protokolls in das Agent-Terminal ein, um den Fehler zu beheben
+
+repo-workflows-ci_view-page-header-8c6c9cf3 = Zurück (Esc)
+
+repo-workflows-ci_view-page-header-a7eac6b5 = Im Browser öffnen
+
+repo-workflows-ci_view-page-header-d62bc4a3 = Erneut laden
+
+repo-workflows-ci_view-run-actions-19766ed6 = Abbrechen
+
+repo-workflows-ci_view-run-actions-1c703119 = Fehlerprotokoll anzeigen
+
+repo-workflows-ci_view-run-actions-46677f1c = Führt fehlgeschlagene oder abgebrochene Jobs erneut aus
+
+repo-workflows-ci_view-run-actions-7b68b715 = Protokoll ausblenden
+
+repo-workflows-ci_view-run-actions-8c40a11a = Fehlgeschlagene Jobs wiederholen
+
+repo-workflows-ci_view-run-header-0b4ad7c1 = Commit im Graphen anzeigen
+
+repo-workflows-ci_view-run-header-396f73af = Versuch { $run-attempt-1 }
+
+repo-workflows-ci_view-run-header-420fc08d = läuft seit { $ci-duration-label-seconds-1 }
+
+repo-workflows-ci_view-run-header-4e8bc57f = · gestartet { $git-relative-time-started-now-1 }
+
+repo-workflows-ci_view-run-header-ac6a17db = Dauer: { $ci-duration-label-seconds-1 }
+
+repo-workflows-ci_view-run-header-b368daf0 = übersprungen oder abgebrochen
+
+repo-workflows-ci_view-timeline-709e9121 = GitLab listet die Schritte eines Jobs nicht auf. Das Protokoll steht auf seiner Seite.
+
+repo-workflows-ci_view-timeline-7a7400f4 = nicht gestartet
+
+repo-workflows-ci_view-timeline-99fa228f = Noch nicht gestartet.
+
+repo-workflows-ci_view-timeline-b59cc5d9 = Dieser Job hat keine Schritte ausgeführt.
+
+repo-workflows-ci_view-timeline-ee459f80 = Dieser Job hat noch keine Schritte zum Anzeigen.
+
+repo-workflows-collision_view-body-282052b1 = Jedes Branchpaar wird im Speicher gemergt (git merge-tree), ebenso jeder Branch mit { $onto }. Kein Checkout und keine Branchänderung. Branches verknüpfter Worktrees sind vorausgewählt.
+
+repo-workflows-collision_view-body-5c35d043 = Zielbranch für die Integration
+
+repo-workflows-collision_view-body-7d9eb7ac = Schließen
+
+repo-workflows-collision_view-body-94846973 = Merge im Speicher … { $done } von { $run-total-1 }
+
+repo-workflows-collision_view-body-cae7d57b = Stoppen
+
+repo-workflows-collision_view-body-cf642735 = Kollisionsmatrix
+
+repo-workflows-collision_view-cannot-check-42af2e23 = Wählen Sie den Zielbranch für die Integration
+
+repo-workflows-collision_view-cannot-check-76fb9e14 = Eine Prüfung läuft
+
+repo-workflows-collision_view-cannot-check-8bcfe01d = Wählen Sie die zu prüfenden Branches aus
+
+repo-workflows-collision_view-cannot-check-c1d9426d = Höchstens { $MOST } Branches gleichzeitig
+
+repo-workflows-collision_view-cell-tip-81bf5184 =
+      und { $n-listed-1 } weitere
+
+repo-workflows-collision_view-cell-tip-9b99b61c =
+    Zum Vergleichen klicken
+
+repo-workflows-collision_view-cell-tip-b3f28cca = { $a } und { $b } lassen sich konfliktfrei mergen
+
+repo-workflows-collision_view-check-collisions-96d2bcac = Gestoppt; keine neuen Ergebnisse
+
+repo-workflows-collision_view-matrix-f5346a60 = Nach { $m-target-1 } gemergt
+
+repo-workflows-collision_view-pick-branches-3bc09abe = Zielbranch
+
+repo-workflows-collision_view-pick-branches-6de3bf71 = Es gibt keinen anderen lokalen Branch.
+
+repo-workflows-collision_view-pick-branches-fb40a427 = Auswählen …
+
+repo-workflows-collision_view-results-45512235 = Einige Paare konnten nicht im Speicher gemergt werden: { $e }
+
+repo-workflows-collision_view-results-87f3fc81 = → zeigt jeden Branch beim Mergen nach { $m-target-1 }. Die Zahl gibt die Konfliktdateien an: Darüberfahren zeigt sie, Klicken vergleicht die Branches.
+
+repo-workflows-collision_view-results-9b24a27f = Vorgeschlagene Integrationsreihenfolge
+
+repo-workflows-collision_view-step-note-5896a7b7 = konnte im Speicher nicht mit { $unknown-join-1 } gemergt werden
+
+repo-workflows-collision_view-step-note-5ef5ed3f = Konflikte mit { $parts-join-1 }
+
+repo-workflows-collision_view-step-note-cb1d05dc = lässt sich konfliktfrei mit allen vorherigen Branches mergen
+
+repo-workflows-content_recovery-content-inspect-e3ceaa94 = Ungültige Inhaltsauswahl
+
+repo-workflows-content_recovery-content-perform-9d57ebb2 = Inhaltswiederherstellung: { $e }
+
+repo-workflows-content_recovery-content-perform-fbdf23f8 = Inhalt wiederherstellen
+
+repo-workflows-content_recovery-origin-53bdf21a = Reflog / Verlauf
+
+repo-workflows-content_recovery-origin-856aca6d = Aktuelle Stash-Liste
+
+repo-workflows-content_recovery-origin-d8ee810d = Unerreichbarer Commit
+
+repo-workflows-content_recovery-origin-ebcaaeb6 = Gelöschter Stash
+
+repo-workflows-content_recovery-show-11f20956 = Text, an den Sie sich erinnern, etwa parse_header
+
+repo-workflows-content_recovery-show-1762ea22 = Dieses Repository ist flach geklont. Ältere Inhalte fehlen möglicherweise lokal.
+
+repo-workflows-content_recovery-show-1e53ab9e = Grenzen: 500 Commits, 10000 Objekte, 15000 Dateieinträge, 2 MiB pro Blob, 64 MiB gescannter Inhalt, 300 Treffer, 120 Sekunden. Binärdateien, Nicht-UTF-8-Inhalte und übergroße Inhalte werden übersprungen.
+
+repo-workflows-content_recovery-show-1f3ee4b2 = Branchwiederherstellung ansehen …
+
+repo-workflows-content_recovery-show-30ea379c = Lesen abbrechen
+
+repo-workflows-content_recovery-show-334a8ddd = Die Anzeige ist auf 2000 Zeilen und 400 Zeichen pro Zeile gekürzt. Die Wiederherstellung verwendet die vollständigen gespeicherten Bytes.
+
+repo-workflows-content_recovery-show-34ac4d52 = { $hit-provenance-len-1 } bekannte Orte / Versionen
+
+repo-workflows-content_recovery-show-4c76d94b = Wörtlichen Text suchen
+
+repo-workflows-content_recovery-show-50b4d1c2 = Neuer Branch:
+
+repo-workflows-content_recovery-show-52545e10 = { $report-hits-len-1 } Treffer · { $report-scanned-2 } Blobs / { $report-bytes-3 } Bytes gelesen · { $report-binary-4 } binäre, { $report-large-5 } übergroße, { $report-missing-6 } fehlende übersprungen
+
+repo-workflows-content_recovery-show-55bda87c = Verlorene Inhalte wiederfinden
+
+repo-workflows-content_recovery-show-5ec718b0 = Lokale Objekte werden gelesen · { $self-began-map-or-0-at-at-elapse-1 } s
+
+repo-workflows-content_recovery-show-67802d1b = Sucht wörtlichen Text im Reflog-Verlauf, unerreichbaren Commits, gelöschten Stashes und losgelösten vorgemerkten Blobs. Die Suche liest lokale Objekte, ohne Downloads oder Dateiänderungen.
+
+repo-workflows-content_recovery-show-6f803fc9 = Zeitpunkt unbekannt
+
+repo-workflows-content_recovery-show-7d9eb7ac = Schließen
+
+repo-workflows-content_recovery-show-8cd42b70 = Erstellt eine neue reguläre Datei auf dem Rechner des Repositorys. Vorhandene, versionierte, ignorierte und verknüpfte Ziele werden abgelehnt. Vorgemerkte Inhalte bleiben unverändert.
+
+repo-workflows-content_recovery-show-8d5a103e = Branch { $name } am gespeicherten Commit erstellen. Der vollständige Commit bleibt enthalten; HEAD und Arbeitsdateien bleiben unverändert.
+
+repo-workflows-content_recovery-show-8ef50fb8 = Die Suche hat eine Grenze erreicht oder nicht unterstützte Pfade beziehungsweise Herkunftsangaben übersprungen. Die Ergebnisse sind unvollständig.
+
+repo-workflows-content_recovery-show-93547d7d = Jetzt wiederherstellen
+
+repo-workflows-content_recovery-show-9cba18de = { $prepared-preview-identity-root-p-1 }/{ $path } mit { $prepared-preview-bytes-len-2 } Rohbytes erstellen. Vorhandene Inhalte werden nicht ersetzt.
+
+repo-workflows-content_recovery-show-a6dcec6a = Losgelöster Inhalt: Ursprünglicher Dateiname und Vormerkzeitpunkt sind unbekannt. Er lässt sich als neue Datei wiederherstellen.
+
+repo-workflows-content_recovery-show-a963e860 = { $date } · Losgelöster vorgemerkter Inhalt
+
+repo-workflows-content_recovery-show-abadbc35 = Bei bekanntem Commit-Datum stehen die neuesten Einträge zuerst. Losgelöste Blobs stehen zuletzt.
+
+repo-workflows-content_recovery-show-beb0df0b = Zurück zu den Treffern
+
+repo-workflows-content_recovery-show-c006906c = Gespeicherter Inhalt · { $preview-bytes-len-1 } Bytes · { $preview-blob-12-2 }
+
+repo-workflows-content_recovery-show-c8d6eb2f = Rückkehr in die Stash-Liste ansehen …
+
+repo-workflows-content_recovery-show-cc6d8221 = Neue Datei in diesem Repository:
+
+repo-workflows-content_recovery-show-da1ba0df = Dateiwiederherstellung ansehen …
+
+repo-workflows-content_recovery-show-eff2c65f = Diesen gelöschten Stash in die Stash-Liste zurückholen und den aktuellen Stash behalten. Weder anwenden noch vorgemerkte oder Arbeitsdateien ändern.
+
+repo-workflows-content_recovery-show-fbdaf564 = (Wurzel nicht verfügbar)
+
+repo-workflows-custom_commands-custom-act-5bd548f5 = { $self-name-1 }: { $commands } Repository-Befehle werden jetzt angeboten
+
+repo-workflows-custom_commands-custom-file-read-4533a718 = { $self-name-1 } enthält eigene Befehle. Prüfen Sie diese in der Palette oder einem Menü, um sie zu verwenden.
+
+repo-workflows-custom_commands-custom-file-read-cbe7f164 = { $self-name-1 }: { $cc-repo-file-2 } kann nicht verwendet werden. „Repository-Befehle prüfen …“ zeigt den Grund.
+
+repo-workflows-custom_commands-custom-palette-items-0841b1ff = Repository-Befehl
+
+repo-workflows-custom_commands-custom-palette-items-b8af1810 = Repository-Befehle prüfen …
+
+repo-workflows-custom_commands-custom-palette-items-cd972ec3 = eigener Befehl
+
+repo-workflows-custom_commands-menu-items-7bbc1546 = { $cc-repo-file-1 } enthält noch nicht freigegebene oder unlesbare Befehle. Sehen Sie diese zuerst an.
+
+repo-workflows-custom_commands-menu-items-8f4e08cd = Eigener Befehl (Einstellungen)
+
+repo-workflows-custom_commands-menu-items-b8af1810 = Repository-Befehle prüfen …
+
+repo-workflows-custom_commands-menu-items-cb87a7d9 = Eigener Befehl dieses Repositorys
+
+repo-workflows-custom_commands-read-file-55a45ca4 = { $cc-repo-file-1 } ist kein UTF-8-Text
+
+repo-workflows-custom_commands-read-file-851cebee = { $cc-repo-file-1 } kann nicht gelesen werden: { $e }
+
+repo-workflows-custom_commands-read-here-28b7ef24 = Es ist größer als { $max-1024-1 } KiB
+
+repo-workflows-custom_commands-read-here-50cdcf6c = Es ist keine Datei
+
+repo-workflows-custom_commands-read-here-f4fd09c1 = Es ist ein symbolischer Link
+
+repo-workflows-custom_commands-run-custom-44771367 = ${ $name } darf kein NUL-Zeichen enthalten
+
+repo-workflows-custom_commands-run-custom-captured-471b45de = { $name } konnte nicht ausgeführt werden: { $e }
+
+repo-workflows-custom_commands-run-custom-captured-5215b5ab = { $name } wird ausgeführt …
+
+repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3 = { $name } konnte nicht gestartet werden: { $e }
+
+repo-workflows-dco--5e1a6b4e = Fügt Signed-off-by mit Ihrem Namen und Ihrer E-Mail-Adresse hinzu (DCO)
+
+repo-workflows-dco-commit-note-72e49d72 = Eine DCO-Prüfung lehnt Commits ohne Sign-off des Autors oder Committers ab
+
+repo-workflows-dco-commit-note-c87e4ef3 = Kein Signed-off-by des Autors (DCO)
+
+repo-workflows-dco-commit-note-fccbd96e = ✔ Vom Autor signiert (DCO)
+
+repo-workflows-dco-commits-count-4eb116dc = { $n } Commits
+
+repo-workflows-dco-commits-count-acfd7b9e = Ein Commit
+
+repo-workflows-dco-dco-act-10fe4a7c = Sign-off für dieses Repository konnte nicht gespeichert werden (git config { $signoff-sign-off-key-1 }): { $e }
+
+repo-workflows-dco-dco-op-done-55d2b32b = Signierte Commits von { $plan-branch-1 } pushen
+
+repo-workflows-dco-dco-op-done-5d0c9ff1 = Commits von { $plan-branch-1 } signieren (nur lokal)
+
+repo-workflows-dco-fix-button-04f5829a = Fügt jedem Branch-Commit Ihr Signed-off-by hinzu (rebase --signoff) und pusht mit Lease, nachdem die Auswirkungen angezeigt wurden. Ctrl+Z macht dies rückgängig.
+
+repo-workflows-dco-fix-button-344ac70e = Commits des Branches signieren …
+
+repo-workflows-dco-fix-button-6d181602 = Checken Sie zuerst { $details-head-branch-1 } aus oder öffnen Sie den Branch in einem Worktree. Signiert werden die Commits des ausgecheckten Branches am neuesten Stand des Pull Requests.
+
+repo-workflows-dco-fix-dialog-1a8aeebd = Signieren und pushen
+
+repo-workflows-dco-fix-dialog-6ce6ab1f = Signieren
+
+repo-workflows-dco-fix-label-dfc76b8d = Commits von { $plan-branch-1 } signieren
+
+repo-workflows-dco-fix-preview-1cc2b37b = abgelehnt, falls seit dem letzten Abruf jemand dorthin gepusht hat
+
+repo-workflows-dco-fix-preview-b12258fd = abgelehnt, falls der Branch dort bereits existiert
+
+repo-workflows-dco-plan-0ac1ebd9 = Branch und Basis haben keinen gemeinsamen Commit: { $e }
+
+repo-workflows-dco-plan-4c71d659 = { $branch } hat seit seiner Basis keine eigenen Commits
+
+repo-workflows-dco-plan-589b41e2 = { $branch } steht auf { $crate-repo-short-head-1 }, der Pull Request auf { $crate-repo-short-expected-2 }. Pullen oder pushen Sie zuerst, damit die signierten Commits zum Pull Request gehören.
+
+repo-workflows-dco-plan-927db158 = { $label } enthält Commits, die { $branch } fehlen. Pullen Sie diese zuerst, damit der Push sie nicht verwirft.
+
+repo-workflows-dco-plan-a16c4b9b = Alle Commits von { $branch } sind bereits signiert
+
+repo-workflows-dco-plan-cfb9aeb9 = Committen oder stashen Sie zuerst Ihre Änderungen. Sign-off führt einen Rebase des Branches aus.
+
+repo-workflows-dco-plan-d7cbaa06 = { $branch } hat seit seiner Basis Merge-Commits, die ein Rebase einebnen würde. Signieren Sie ihn in einem Terminal (git rebase --signoff --rebase-merges { $crate-repo-short-merge-base-1 }) oder bitten Sie die Autoren darum.
+
+repo-workflows-dco-plan-d866c6e0 = Checken Sie zuerst den Branch des Pull Requests aus. HEAD ist losgelöst.
+
+repo-workflows-dco-pr-section-15029601 = Keine Commits für die DCO-Prüfung vorhanden.
+
+repo-workflows-dco-pr-section-9ecdacc9 = Commits des Pull Requests werden geladen …
+
+repo-workflows-dco-pr-section-e93d65c8 = Sign-offs der Commits konnten nicht gelesen werden: { $e }
+
+repo-workflows-dco-text-dc4915c9 = Die DCO-Prüfung von #{ $n } schlägt fehl
+
+repo-workflows-dco-text-e5458838 = Dieses Repository enthält die Datei { $file }
+
+repo-workflows-dco-toggle-6ce6ab1f = Sign-off
+
+repo-workflows-dco-toggle-9ba5d60e = Erneut angewendete Commits behalten ihre eigenen Nachrichten
+
+repo-workflows-detached--bff74cc9 = Sie sehen eine alte Version. Neue Commits hier gehören zu keinem Branch.
+
+repo-workflows-detached-detached-act-70dad4a3 = Warten Sie auf den Abschluss von { $busy } und checken Sie dann erneut aus
+
+repo-workflows-detached-detached-banner-15bbfb59 = Branch hier erstellen
+
+repo-workflows-detached-detached-banner-3d7f6bc2 = HEAD ist bei { $short-head-1 } losgelöst und gehört zu keinem Branch. Auch neue Commits gehören zu keinem Branch und bleiben beim Wechsel auf einen anderen Stand zurück.
+
+repo-workflows-detached-detached-banner-f16cf1bf = Ein ausgecheckter Branch an diesem Commit. Neue Commits landen darauf.
+
+repo-workflows-detached-detached-banner-f5cd526a = { $branch } auschecken
+
+repo-workflows-detached-detached-banner-f76b5669 = Zurück zu { $branch }
+
+repo-workflows-detached-keep-steps-d2a49cac = Branch { $name } erstellen
+
+repo-workflows-detached-leave-to-007a4c0e = { $leave-label-1 } wurde nicht ausgecheckt: { $busy } hat inzwischen begonnen
+
+repo-workflows-detached-leave-to-28ae5898 = { $leave-label-1 } auschecken: Warten Sie auf den Abschluss von { $busy }
+
+repo-workflows-detached-leave-to-48b0ce4c = { $leave-label-1 } wurde nicht ausgecheckt: Die Commits, die ohne Branch zurückblieben, konnten nicht aufgelistet werden ({ $e })
+
+repo-workflows-detached-leave-to-c6023785 = Die Auflistung wurde unerwartet beendet
+
+repo-workflows-devcontainer-container-id-a1ced98b = Docker muss eine vollständige Container-ID mit 64 Zeichen zurückgeben
+
+repo-workflows-devcontainer-detect-01821b94 = Die Dev-Container-Konfiguration muss im Worktree lesbar und höchstens 1 MiB groß sein
+
+repo-workflows-devcontainer-detect-764255b7 = Die Dev-Container-Konfiguration ist kein UTF-8-Text
+
+repo-workflows-devcontainer-devcontainer-act-519a489a = Dev-Container-Vorgang
+
+repo-workflows-devcontainer-devcontainer-act-5474eef8 = Wird ausgeführt …
+
+repo-workflows-devcontainer-devcontainer-act-84f8f92f = Vor dem Start abgebrochen
+
+repo-workflows-devcontainer-devcontainer-window-05be654b = Umgebung starten
+
+repo-workflows-devcontainer-devcontainer-window-0c79d376 = Worker beendet oder abgebrochen. Ein Container kann zurückbleiben. Prüfen Sie vor einem neuen Versuch die Labels dieses Worktrees.
+
+repo-workflows-devcontainer-devcontainer-window-20441b4a = Angezeigte Umgebung neu bauen
+
+repo-workflows-devcontainer-devcontainer-window-22f9e7ca = Keine .devcontainer/devcontainer.json gefunden. Entfernte Worktrees benötigen die CLI auf ihrem Rechner. Diese Integration unterstützt lokale Worktrees.
+
+repo-workflows-devcontainer-devcontainer-window-2d5a4455 = Terminal im Container
+
+repo-workflows-devcontainer-devcontainer-window-3675738c = Worktree: { $config-path-display-1 }
+    Eigentumszuordnung: { $config-label-2 }
+    Konfiguration SHA256: { $model-hash-config-source-as-byte-3 }
+
+repo-workflows-devcontainer-devcontainer-window-3a6ea0e2 = Der Start führt Docker-, Build-, Feature- und Lebenszyklusbefehle dieses Repositorys aus. Prüfen Sie zuerst das Repository und die referenzierten Dateien. Ein Neubau löscht nur den angezeigten zugeordneten Container. Ungespeicherte Dateien, die nur darin existieren, gehen verloren.
+
+repo-workflows-devcontainer-devcontainer-window-3c898437 = Verwendet das installierte Docker und die Dev Container CLI auf diesem Rechner. Unterstützt Linux-Container mit exakter Worktree-Einbindung. Verknüpfte Git-Worktrees benötigen standardmäßige relative POSIX-Metadaten und die native Einbindung des gemeinsamen Git-Verzeichnisses. Compose oder kombinierte eigene workspaceFolder/workspaceMount-Layouts werden abgelehnt. Metadaten werden nie umgeschrieben. Container bleiben nach dem Schließen dieses Fensters erhalten.
+
+repo-workflows-devcontainer-devcontainer-window-4227dbe9 = Container in VS Code öffnen
+
+repo-workflows-devcontainer-devcontainer-window-437e57b5 = Worktree-Konfiguration erneut lesen
+
+repo-workflows-devcontainer-devcontainer-window-4564ef3d = Terminalübergabe abgelaufen oder abgebrochen. Öffnen Sie sie erneut.
+
+repo-workflows-devcontainer-devcontainer-window-473f0412 = Containerkonfiguration SHA256: { $model-hash-binding-config-source-1 }
+
+repo-workflows-devcontainer-devcontainer-window-5d2a90a9 = Container: { $binding-id-1 }
+    Docker-Kontext: { $binding-engine-context-2 }
+    Daemon: { $binding-engine-id-3 }
+    Arbeitsbereich: { $binding-folder-4 }
+    Benutzer: { $binding-user-5 }
+
+repo-workflows-devcontainer-devcontainer-window-6e69284d = Konfiguration geändert: Bauen Sie den angezeigten Container vor der Nutzung von Terminal oder Editor neu. Container älterer App-Sitzungen oder Konfigurationen können in Docker verbleiben.
+
+repo-workflows-devcontainer-devcontainer-window-7cb7e0b2 = Profil geändert oder Vorgang abgebrochen. Ein erstellter Container kann zurückbleiben. Prüfen Sie vor einem neuen Versuch die angezeigten Worktree-Labels.
+
+repo-workflows-devcontainer-devcontainer-window-8f14be4f = Diesen Container löschen und neu bauen (nur darin vorhandene Dateien gehen verloren)
+
+repo-workflows-devcontainer-devcontainer-window-a79d7c99 = Konfiguration erkannt. Prüfen Sie diese vor dem Start.
+
+repo-workflows-devcontainer-devcontainer-window-b64a0d4f = Vorgang abbrechen
+
+repo-workflows-devcontainer-devcontainer-window-b64ae277 = Worktree-Umgebung · Dev Containers
+
+repo-workflows-devcontainer-devcontainer-window-bbd55e3e = /bin/sh im angezeigten Container geöffnet
+
+repo-workflows-devcontainer-devcontainer-window-c1f95bd8 = Ich vertraue der Containerkonfiguration und den Lebenszyklusbefehlen dieses Worktrees
+
+repo-workflows-devcontainer-devcontainer-window-d66d64d1 = Umgebung gestartet; Worktree-Einbindung und Eigentumszuordnung geprüft
+
+repo-workflows-devcontainer-devcontainer-window-d8db68fe = { $error }
+    Start oder Neubau wurden möglicherweise teilweise ausgeführt. Prüfen Sie Docker, die installierte Dev Container CLI, Build-Dateien und die oben angezeigten Fehler der Lebenszyklusbefehle. Es erfolgt keine globale Bereinigung. Prüfen Sie vor einem neuen Versuch die Labels dieses Worktrees.
+
+repo-workflows-devcontainer-devcontainer-window-df4a39c8 = devcontainer.json (JSON-Kommentare werden von der nativen CLI unterstützt)
+
+repo-workflows-devcontainer-devcontainer-window-dfcb3d90 = Das Terminal verwendet Docker exec mit diesem nativen Remote-Benutzer und /bin/sh. Der Editor benötigt VS Code mit der Dev Containers-Erweiterung.
+
+repo-workflows-devcontainer-editor-47c00405 = Container gestoppt. Starten Sie die Umgebung vor der Editorübergabe.
+
+repo-workflows-devcontainer-editor-806df56f = Zugeordneten Container-Arbeitsbereich an VS Code übergeben. Die Dev Containers-Erweiterung muss installiert sein.
+
+repo-workflows-devcontainer-engine-0af39fb5 = Ungültige Docker-Kontext- oder Daemon-Identität
+
+repo-workflows-devcontainer-engine-161bfc12 = Docker-Endpunkt fehlt
+
+repo-workflows-devcontainer-engine-1cfeec69 = Wählen Sie einen lokalen Docker-Kontext und entfernen Sie DOCKER_HOST, bevor Sie diese Integration verwenden
+
+repo-workflows-devcontainer-engine-a5b6c95b = Diese Integration unterstützt lokale Docker-Sockets. SSH-/TCP-Docker-Hosts benötigen eine eigene native Einrichtung. Es erfolgt keine automatische Übergabe.
+
+repo-workflows-devcontainer-engine-f6690c9e = Docker-Daemon-Identität fehlt
+
+repo-workflows-devcontainer-gitdir-pointer-a66f1615 = Nicht unterstützter .git-Verweis
+
+repo-workflows-devcontainer-guard-7103bfb5 = Dev-Container-Konfiguration verschwunden
+
+repo-workflows-devcontainer-guard-d353a99e = Abgebrochen
+
+repo-workflows-devcontainer-inspect-2227e9c4 = Ungültiges Eigentumslabel
+
+repo-workflows-devcontainer-inspect-2e29e769 = Container gehört zu einem anderen Worktree, Docker-Daemon oder ausgewählten Profil
+
+repo-workflows-devcontainer-inspect-3c611856 = Docker inspect muss ein Array zurückgeben
+
+repo-workflows-devcontainer-inspect-85ded6e6 = Container-ID oder Worktree-/Konfigurationslabels stimmen nicht mehr überein. Dieses Ziel wird abgelehnt.
+
+repo-workflows-devcontainer-inspect-85fd3a35 = Dieser Container bindet den exakten Worktree nicht in seinen angezeigten Arbeitsbereich ein. Reine Volume- oder übergeordnete Verzeichniseinbindungen werden derzeit nicht unterstützt.
+
+repo-workflows-devcontainer-inspect-d934c6ee = Genau ein zugeordneter Container erwartet
+
+repo-workflows-devcontainer-json-0d639c4b = CLI-Ergebnis des Containers überschreitet 8 MiB
+
+repo-workflows-devcontainer-json-edd11b13 = Ungültiges JSON-Ergebnis von { $tool }: { $e }
+
+repo-workflows-devcontainer-linked-222d5e0e = Die native Einbindung des gemeinsamen Git-Verzeichnisses unterstützt nur das standardmäßige relative Layout common/worktrees/name
+
+repo-workflows-devcontainer-linked-7c9c7625 = Gemeinsames Git-Verzeichnis fehlt
+
+repo-workflows-devcontainer-linked-9990fafd = Der Rückverweis der verknüpften Git-Metadaten zeigt nicht auf diesen physischen Worktree
+
+repo-workflows-devcontainer-linked-cdb7b1a0 = Übergeordnetes Git-Metadatenverzeichnis fehlt
+
+repo-workflows-devcontainer-metadata-0a13f60e = Metadatenname des Worktrees fehlt
+
+repo-workflows-devcontainer-metadata-735e6123 = Dieses verknüpfte oder symbolische Git-Layout wird von der nativen Container-Metadateneinbindung nicht unterstützt
+
+repo-workflows-devcontainer-metadata-b2bab91f = Symbolisches oder nicht standardmäßiges gemeinsames Git-Metadatenlayout wird nicht unterstützt
+
+repo-workflows-devcontainer-metadata-b9388ff2 = Container benötigt eine physische Worktree-Wurzel: { $e }
+
+repo-workflows-devcontainer-metadata-file-a1a99ba5 = Git-Metadatenverweis ist kein UTF-8-Text
+
+repo-workflows-devcontainer-metadata-file-bd4adcf1 = Verknüpfte Metadatenverweise müssen reguläre Dateien sein
+
+repo-workflows-devcontainer-metadata-file-ddb7553c = Git-Metadatenverweis überschreitet 8 KiB
+
+repo-workflows-devcontainer-metadata-ready-4d28a9de = Physische Worktree-Einbindung fehlt
+
+repo-workflows-devcontainer-metadata-ready-7575b58d = Worktree-Ziel fehlt
+
+repo-workflows-devcontainer-metadata-ready-8dad9e0c = Die Git-Metadaten des verknüpften Worktrees sind nicht am erforderlichen relativen Pfad les- und schreibbar eingebunden. Die Umgebung ist nicht bereit.
+
+repo-workflows-devcontainer-metadata-ready-fea2d3e9 = Container-Einbindungen fehlen
+
+repo-workflows-devcontainer-native-configuration-5aec3885 = Die native CLI hat die erforderliche gemeinsame Git-Verzeichniseinbindung nicht geplant. Die Umgebung kann nicht starten oder neu gebaut werden.
+
+repo-workflows-devcontainer-native-configuration-90cc8e0e = Die Metadateneinbindung verknüpfter Worktrees wird für Compose oder kombinierte workspaceFolder/workspaceMount-Konfigurationen nicht unterstützt. Die native CLI lässt die erforderliche Einbindung des gemeinsamen Git-Verzeichnisses aus.
+
+repo-workflows-devcontainer-native-configuration-969b53cd = Die native CLI hat keine geparste Konfiguration für den verknüpften Worktree zurückgegeben
+
+repo-workflows-devcontainer-native-configuration-b328a4b3 = Ungültiger nativer workspaceFolder
+
+repo-workflows-devcontainer-normalize-3fe3c368 = Git-Metadatenpfad verlässt die Dateisystemwurzel
+
+repo-workflows-devcontainer-relative-fe173813 = Verknüpfte Container benötigen relative POSIX-Pfade für Git-Metadaten. Dieses Layout wird nicht unterstützt. Git-Metadaten wurden nicht geändert.
+
+repo-workflows-devcontainer-same-97743985 = Worktree, Konfiguration oder ausgewähltes Profil geändert. Lesen Sie die Konfiguration erneut.
+
+repo-workflows-devcontainer-start-6a0249a9 = Docker-Kontext oder Daemon seit der Anzeige geändert. Neubau wird abgelehnt.
+
+repo-workflows-devcontainer-start-87b3fed2 = { $pause-why-1 }; beim Start einer Umgebung können Images und Features heruntergeladen werden
+
+repo-workflows-devcontainer-started-046dacc8 = kein erfolgreiches Ergebnis
+
+repo-workflows-devcontainer-started-19964d1c = containerId fehlt
+
+repo-workflows-devcontainer-started-43acb4ec = remoteUser fehlt
+
+repo-workflows-devcontainer-started-8c6f6a65 = Die CLI hat einen nicht unterstützten Container-Arbeitsbereich oder Benutzer zurückgegeben
+
+repo-workflows-devcontainer-started-d1a64c4b = remoteWorkspaceFolder fehlt
+
+repo-workflows-devcontainer-started-f9fa046f = Dev Container CLI hat die Umgebung nicht gestartet: { $value-description-as-str-unwrap--1 }
+
+repo-workflows-devcontainer-terminal-77e417ed = Container { $binding-id-12-1 } · { $binding-folder-2 }
+
+repo-workflows-devcontainer-terminal-b74a6469 = Container gestoppt. Starten Sie die Umgebung vor dem Öffnen eines Terminals erneut.
+
+repo-workflows-devcontainer-terminal-f171832a = Vor dem Terminalstart abgebrochen
+
+repo-workflows-doctor-ago-4603eba2 = vor { $secs-3600-1 } h
+
+repo-workflows-doctor-ago-7ddb44d8 = gerade eben
+
+repo-workflows-doctor-ago-a0c430f4 = vor { $secs-60-1 } min
+
+repo-workflows-doctor-attributes-2176c800 = vergleicht die Datei
+
+repo-workflows-doctor-attributes-4af8906f = filter={ $name } bezeichnet einen hier nicht definierten Filter. Git speichert die Datei unverändert und checkt sie ebenso aus.
+
+repo-workflows-doctor-attributes-68cb5f93 = Zeilenenden · im Repository: { $eol-word-eol-index-1 } · im Arbeitsverzeichnis: { $eol-word-eol-worktree-2 } · Attribute: { $if-eol-attr-is-empty-else-eol-at-3 }
+
+repo-workflows-doctor-attributes-82806016 = filter=lfs, aber Git LFS ist hier nicht eingerichtet (git lfs install). Checkouts hinterlassen Zeigerdateien; hinzugefügte Dateien landen direkt in Git statt in LFS.
+
+repo-workflows-doctor-attributes-c6b25148 = { $attr }={ $name } bezeichnet einen hier nicht definierten Treiber ({ $attr }.{ $name }.*). Git { $if-attr-merge-merges-it-else-dif-1 } wie üblich.
+
+repo-workflows-doctor-attributes-cb2060cc = Keine Attribute. Git schätzt Text oder Binärdaten für Diffs und Merges selbst ein. Nur core.autocrlf bestimmt die Zeilenenden.
+
+repo-workflows-doctor-attributes-ec97a4d2 = filter={ $name } ist erforderlich, hat hier aber keinen clean- oder smudge-Befehl. Git verweigert das Hinzufügen oder Auschecken dieser Datei.
+
+repo-workflows-doctor-attributes-f31e8d7f = mergt die Datei
+
+repo-workflows-doctor-clear-7f76d2cf = Flag von { $one-path-1 } entfernen
+
+repo-workflows-doctor-clear-83b12c22 = Entfernen
+
+repo-workflows-doctor-clear-909d7fba = Flags entfernen?
+
+repo-workflows-doctor-clear-ac70d25c = { $files-len-1 } Dateien
+
+repo-workflows-doctor-clear-ae587a37 = Git prüft { $what } wieder. Lokale Änderungen erscheinen unter „Änderungen“, wo „Verwerfen“ sie löschen würde. Die zuvor gesetzten Flags werden nicht gespeichert. Dies lässt sich hier nicht rückgängig machen.
+
+repo-workflows-doctor-clear-e318945b = Flags von { $files-len-1 } Dateien entfernen
+
+repo-workflows-doctor-confirm-modal-19766ed6 = Abbrechen
+
+repo-workflows-doctor-confirm-modal-3b13192b = Änderungen verwerfen?
+
+repo-workflows-doctor-confirm-modal-c324130d = Ihre Änderungen an { $file } sind nicht gespeichert. Beim Schließen des Doktors gehen sie verloren.
+
+repo-workflows-doctor-confirm-modal-e76fd2ad = Weiter bearbeiten
+
+repo-workflows-doctor-confirm-modal-eb1a70e3 = Verwerfen
+
+repo-workflows-doctor-details-ba8d6068 = Keine Datei setzt den Wert. Git verwendet seinen eingebauten Standard.
+
+repo-workflows-doctor-doctor-act-9bab8d95 = Warten Sie auf das Ende des laufenden Vorgangs
+
+repo-workflows-doctor-doctor-ui-3095e533 = Repository-Doktor
+
+repo-workflows-doctor-doctor-ui-8c6c9cf3 = Zurück (Esc)
+
+repo-workflows-doctor-doctor-ui-d8cb92fa = Erneut lesen
+
+repo-workflows-doctor-editor-0ba2a573 = Keine Änderungen
+
+repo-workflows-doctor-editor-1509f561 = Speichern
+
+repo-workflows-doctor-editor-1ee81c8e = { $e-file-label-1 } gehört nicht zu diesem Repository. Die Datei gilt für jedes Repository, das sie liest. Klicken Sie erneut zum Speichern.
+
+repo-workflows-doctor-editor-23e39291 = Wird gespeichert …
+
+repo-workflows-doctor-editor-324b134f = Vorschau
+
+repo-workflows-doctor-editor-52448408 = { $e-file-label-1 } wird bearbeitet
+
+repo-workflows-doctor-editor-5902680c = Außerhalb des Repositorys speichern
+
+repo-workflows-doctor-editor-6c1adba2 = Erneut lesen
+
+repo-workflows-doctor-editor-7d9eb7ac = Schließen
+
+repo-workflows-doctor-editor-a875327e = Ändern Sie zuerst die Regeln
+
+repo-workflows-doctor-editor-b5bfc677 = { $e-file-label-1 } wird bearbeitet · nicht gespeichert
+
+repo-workflows-doctor-editor-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-editor-f9bfa3dc = Änderungen verwerfen
+
+repo-workflows-doctor-editor-fca046cc = Gespeichert.
+
+repo-workflows-doctor-eol-notes-384973dd = Kein text- oder eol-Attribut. core.autocrlf jedes Rechners bestimmt die Zeilenenden und verursacht dadurch wechselnde Dateiendeformate. `* text=auto` in .gitattributes vereinheitlicht dies.
+
+repo-workflows-doctor-eol-notes-868d3e72 = Mit CRLF oder gemischten Zeilenenden gespeichert. Auf Rechnern mit core.autocrlf erscheint die gesamte Datei als geändert.
+
+repo-workflows-doctor-eol-word-ec3e00be = keine Zeilenumbrüche
+
+repo-workflows-doctor-explain-card-3b61e4e9 = Erklären
+
+repo-workflows-doctor-explain-card-7486f5b7 = Datei erklären
+
+repo-workflows-doctor-explained-55b528ba = Speichern oder verwerfen Sie zuerst die bearbeiteten Änderungen
+
+repo-workflows-doctor-explained-98353ed7 = Diese Datei bearbeiten
+
+repo-workflows-doctor-folder-card-05f75db2 = Durch core.hooksPath ({ $path }) festgelegt statt .git/hooks.
+
+repo-workflows-doctor-folder-card-34845b15 = Der eigene Ordner des Repositorys (.git/hooks); core.hooksPath ist nicht gesetzt.
+
+repo-workflows-doctor-folder-card-548df737 = Hooks-Ordner
+
+repo-workflows-doctor-folder-card-5cc7fab9 = verwaltet hier die Hooks: { $m-advice-1 }
+
+repo-workflows-doctor-folder-card-605924cc = { $n } .sample-Dateien: von Git gelieferte Beispiele, die nie ausgeführt werden.
+
+repo-workflows-doctor-folder-card-63c1e34d = Eine .sample-Datei: ein von Git geliefertes Beispiel, das nie ausgeführt wird.
+
+repo-workflows-doctor-folder-card-8fa06071 = core.hooksPath ist leer. Git führt keinen Hook aus. Entfernen Sie die Einstellung unter „Welche Konfiguration gewinnt“, um Hooks wieder zu aktivieren.
+
+repo-workflows-doctor-history-card-06c896b6 = Verlauf im Graphen
+
+repo-workflows-doctor-history-card-5a389005 = Jede Aktualisierung liest den Verlauf und erstellt den Graphen erneut. Mit einem Commit-Graph liest Git ihn um ein Vielfaches schneller.
+
+repo-workflows-doctor-history-card-cd12e41d = Dieses Repository hat { $group-h-commits-unwrap-or-defaul-1 } Commits und damit mehr als der Graph zeigt. Die ältesten sind nur über das Terminal (git log) oder den Dateiverlauf erreichbar. Das Ausblenden oder Isolieren von Branches begrenzt den Graphen auf diese.
+
+repo-workflows-doctor-hook-row-432f4eba = In LF umwandeln
+
+repo-workflows-doctor-hook-row-433c4667 = läuft bei { $on }
+
+repo-workflows-doctor-hook-row-96c0aa61 = Ausführbar machen
+
+repo-workflows-doctor-hooks-act-63222fea = ausführbar gemacht
+
+repo-workflows-doctor-hooks-act-fdf85121 = mit LF-Zeilenenden gespeichert
+
+repo-workflows-doctor-hooks-card-0dfb736a = Andere Dateien (werden nie ausgeführt)
+
+repo-workflows-doctor-hooks-card-52f0510d = Ein Hook
+
+repo-workflows-doctor-hooks-card-69d27675 = Git führt keine Hooks mit diesen Namen aus. Möglicherweise Tippfehler oder beiseitegelegte Kopien.
+
+repo-workflows-doctor-hooks-card-6c856ad1 = Kein Hook wird ausgeführt. Jeder Vorgang läuft ohne Hook weiter.
+
+repo-workflows-doctor-hooks-card-84fbcccd = Keine aktiven Hooks
+
+repo-workflows-doctor-hooks-card-d028a324 = { $n } Hooks
+
+repo-workflows-doctor-ignored-card-0384b20e = Ignorierte Dateien
+
+repo-workflows-doctor-ignored-card-1303e9b5 = Nichts wird ignoriert.
+
+repo-workflows-doctor-ignored-card-37abda7f = Ignorierte Dateien ({ $total })
+
+repo-workflows-doctor-ignored-card-683768ab = und { $total-list-len-1 } weitere
+
+repo-workflows-doctor-ignored-card-cdd2ef27 = Erklären
+
+repo-workflows-doctor-ignored-card-fb0ae18f = Unversionierte, von Git ignorierte Dateien. Ein Ordner steht für seinen gesamten Inhalt. Klicken Sie einen Eintrag an, um ihn zu erklären.
+
+repo-workflows-doctor-manual-card-14faa67e = Flags der { $ticked-len-1 } ausgewählten Dateien entfernen
+
+repo-workflows-doctor-manual-card-261a3c3d = Keine markierten Dateien
+
+repo-workflows-doctor-manual-card-29a390f9 = Alle Flags entfernen
+
+repo-workflows-doctor-manual-card-6c8cdf68 = Flags der Auswahl entfernen
+
+repo-workflows-doctor-manual-card-70727cd6 = { $n } markierte Dateien
+
+repo-workflows-doctor-manual-card-98cd282b = Wählen Sie zuerst die Dateien aus
+
+repo-workflows-doctor-manual-card-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-manual-card-bf185132 = Der Name ist kein gültiges UTF-8. Entfernen Sie das Flag mit git update-index in einem Terminal.
+
+repo-workflows-doctor-manual-card-eb376b6a = Keine versionierte Datei trägt assume-unchanged oder skip-worktree.
+
+repo-workflows-doctor-manual-card-f01d6b0e = Eine markierte Datei
+
+repo-workflows-doctor-manual-card-febfc014 = Git prüft wieder jede dieser Dateien
+
+repo-workflows-doctor-more-683768ab = und { $total-shown-1 } weitere
+
+repo-workflows-doctor-open-doctor-745454bd = Schließen oder beenden Sie zuerst den Konflikteditor oder den interaktiven Rebase
+
+repo-workflows-doctor-origin-label-4cf3860a = gitcraft-Profil
+
+repo-workflows-doctor-other-worktrees-1aef9399 = nicht gesetzt
+
+repo-workflows-doctor-other-worktrees-965a2b09 = Mit anderen Worktrees vergleichen
+
+repo-workflows-doctor-output-card-01623799 = Ausgabe der letzten Vorgänge
+
+repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } Zeilen darüber
+
+repo-workflows-doctor-output-card-50f9b973 = Noch keine Ausgabe von durch gitcraft ausgeführten Hook-Vorgängen. Terminalausgaben werden nicht gespeichert.
+
+repo-workflows-doctor-output-card-ae5bfc74 = Ausgaben von Git und seinen Hooks bei den letzten Vorgängen in diesem Repository (Commit, Merge, Push, Checkout …), bis zu zwölf Einträge. Nur im Speicher, mit verborgenen Passwörtern in URLs.
+
+repo-workflows-doctor-preview-0f241c6b = Nicht mehr ignoriert
+
+repo-workflows-doctor-preview-63666b35 = Neu ignoriert
+
+repo-workflows-doctor-preview-683768ab = und { $paths-len-preview-shown-1 } weitere
+
+repo-workflows-doctor-preview-8c8b9b2a = Versionierte Dateien mit passenden Regeln (bleiben versioniert)
+
+repo-workflows-doctor-preview-bbb0c0cc = Diese Änderung würde für keine unversionierte Datei die Ignorierung ändern.
+
+repo-workflows-doctor-preview-cd2605b4 = Nur die Regeln dieser Datei. Regeln anderer Dateien sind ausgelassen. Daher werden !-Regeln, die Ignorierungen anderer Dateien aufheben, nicht angezeigt. Andere Dateien können hier aufgeführte Pfade weiterhin ignorieren.
+
+repo-workflows-doctor-remove-confirm-9861b6eb = { $origin-key-1 } entfernen?
+
+repo-workflows-doctor-remove-confirm-b0b26eef = { $origin-key-1 } ({ $shortened-origin-shown-value-2 }) aus { $file } entfernen
+
+repo-workflows-doctor-remove-confirm-c3812fc4 = Entfernen
+
+repo-workflows-doctor-rules-card-379ee96f = Bearbeiten Sie eine Datei, prüfen Sie die Vorschau der Auswirkungen und speichern Sie sie dann.
+
+repo-workflows-doctor-rules-card-464c4ffd = Bearbeiten
+
+repo-workflows-doctor-rules-card-55b528ba = Speichern oder verwerfen Sie zuerst die bearbeiteten Änderungen
+
+repo-workflows-doctor-rules-card-91b1b197 = Dateien mit Ignorierregeln
+
+repo-workflows-doctor-scope-choice-0eb26325 = Dieser Worktree
+
+repo-workflows-doctor-scope-choice-38429e22 = Dieses Repository
+
+repo-workflows-doctor-scope-choice-59b8031f = Alle meine Repositorys
+
+repo-workflows-doctor-scope-choice-ad944dcb = Alle Benutzer dieses Rechners
+
+repo-workflows-doctor-scope-choice-c925a118 = Befehlszeile
+
+repo-workflows-doctor-set-row-2b7c9578 = Ihre globale Git-Konfiguration auf diesem Rechner (meist ~/.gitconfig), für alle Ihre Repositorys dort.
+
+repo-workflows-doctor-set-row-30a28bf1 = Wählen Sie zuerst einen Wert aus
+
+repo-workflows-doctor-set-row-3da50e6f = Gits Systemdatei für alle Benutzer dieses Rechners. Benötigt meist Administratorrechte.
+
+repo-workflows-doctor-set-row-46f01635 = Geben Sie zuerst einen Wert ein
+
+repo-workflows-doctor-set-row-6ec46474 = Benötigt extensions.worktreeConfig = true in diesem Repository. Ohne diese Einstellung verweigert Git den Vorgang bei mehreren Worktrees; bei nur einem schreibt es in .git/config.
+
+repo-workflows-doctor-set-row-85b9cd3d = Geltungsbereich
+
+repo-workflows-doctor-set-row-921f564b = { $setting-key-1 } auf { $shortened-value-2 } für { $scope-choice-scope-to-lowercase-3 } setzen
+
+repo-workflows-doctor-set-row-a215cc6f = { $setting-key-1 } für { $scope-choice-scope-to-lowercase-2 } setzen?
+
+repo-workflows-doctor-set-row-ad30af45 = Ihre globale Git-Konfiguration (meist ~/.gitconfig), für alle Ihre Repositorys. Ein gitcraft-Profil mit demselben Wert hat weiterhin Vorrang.
+
+repo-workflows-doctor-set-row-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-set-row-b6f6f3ad = Setzen
+
+repo-workflows-doctor-set-row-cadb5751 = Nur dieser Worktree (seine Datei config.worktree).
+
+repo-workflows-doctor-set-row-cc3edd84 = Gits Systemdatei für alle Benutzer dieses Rechners
+
+repo-workflows-doctor-set-row-ccc71902 = { $setting-key-1 } = { $value } wird in { $if-scope-scope-global-your-globa-2 } geschrieben. Der dort ersetzte Wert wird nicht gespeichert.
+
+repo-workflows-doctor-set-row-e0a790f9 = Ihre globale Git-Konfiguration für alle Ihre Repositorys
+
+repo-workflows-doctor-set-row-e0d5ce0a = Nur dieses Repository (.git/config). Ein späteres include in dieser Datei kann den Wert weiterhin überschreiben.
+
+repo-workflows-doctor-setting-row-2224c772 = nicht gesetzt: Git-Standard
+
+repo-workflows-doctor-setting-row-8f8c7445 = überschreibt { $values-len-1-1 } Werte
+
+repo-workflows-doctor-setting-row-8ffd7cc3 = Git-Standard
+
+repo-workflows-doctor-size-8333f24e = { NUMBER($kib-as-f64-1024-0-1, minimumFractionDigits: 1, maximumFractionDigits: 1) } MiB
+
+repo-workflows-doctor-size-95886483 = { $kib } KiB
+
+repo-workflows-doctor-size-9d2b746f = { NUMBER($kib-as-f64-1-048-576-0-1, minimumFractionDigits: 2, maximumFractionDigits: 2) } GiB
+
+repo-workflows-doctor-size-card-1af85190 = Größe
+
+repo-workflows-doctor-size-card-1f2fe3f1 = { $o-packed-1 } in { $o-packs-2 } Packs, { $size-o-pack-kib-3 }
+
+repo-workflows-doctor-size-card-35195164 = Gepackte Objekte
+
+repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 } Dateien im Objektordner sind keine Objekte ({ $size-o-garbage-kib-2 }). Sie stammen von einem unterbrochenen Vorgang; git gc meldet sie.
+
+repo-workflows-doctor-size-card-8757152b = Lose Objekte
+
+repo-workflows-doctor-size-card-b83a7e1d = Lose und zusätzlich gepackt
+
+repo-workflows-doctor-size-card-d09648c6 = Commits
+
+repo-workflows-doctor-sparse-card-04bc71e9 = Von Sparse-Checkout ausgelassen ({ $left-out-len-1 })
+
+repo-workflows-doctor-sparse-card-7bb29a8c = Git markiert auch diese Dateien mit skip-worktree. Sie gehören jedoch zu Sparse-Checkout. Ändern Sie die Auswahl mit git sparse-checkout (set, add, disable), indem Sie die Flags beibehalten.
+
+repo-workflows-doctor-sparse-card-9cff4083 = Sparse-Checkout ist im Kegelmodus aktiv. Nur die Dateien auf oberster Ebene sind ausgecheckt.
+
+repo-workflows-doctor-sparse-card-ce4ee135 = Sparse-Checkout ist im Kegelmodus aktiv. Ausgecheckt: { $dirs-join-1 }.
+
+repo-workflows-doctor-sparse-card-f364e530 = Sparse-Checkout ist mit Mustern aktiv. Alle skip-worktree-Dateien gelten als dadurch ausgelassen. Deshalb werden ihre Flags hier nicht entfernt.
+
+repo-workflows-doctor-speed-card-0ad7db50 = git status: { $took-as-millis-1 } ms (gitcraft führt es bei jeder erkannten Änderung aus).
+
+repo-workflows-doctor-speed-card-2154776b = Lesedauer
+
+repo-workflows-doctor-speed-card-8636e9ce = { $d-as-millis-1 } ms
+
+repo-workflows-doctor-speed-card-aebc38ca = Letzte Tab-Aktualisierungen (Branches, Verlauf und Änderungen gemeinsam): { $times-join-1 }.
+
+repo-workflows-doctor-speed-card-ffe6b51a = Noch keine Tab-Aktualisierung gemessen.
+
+repo-workflows-doctor-suggestion-2b7f0cfe = hier nicht verfügbar
+
+repo-workflows-doctor-suggestion-5a1f096a = Einschalten
+
+repo-workflows-doctor-suggestion-5a853d12 = Objekte packen
+
+repo-workflows-doctor-suggestion-a96e0fc8 = Gits eigener Monitor existiert nur unter Windows und macOS (auf Netzlaufwerken nur mit fsmonitor.allowRemote). Unter Linux kann ein durch core.fsmonitor benannter Watchman-Hook einspringen.
+
+repo-workflows-doctor-suggestion-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-suggestion-bd63228b = Dateisystemmonitor
+
+repo-workflows-doctor-suggestions-card-e930084c = Mögliche Beschleunigungen
+
+repo-workflows-doctor-title-1e6bed5e = Verborgene Änderungen
+
+repo-workflows-doctor-title-8b2d57fa = Welche Konfiguration gewinnt
+
+repo-workflows-doctor-title-8d6acfc3 = Zustand und Wartung
+
+repo-workflows-doctor-title-94ec061c = Ignorierregeln und Attribute
+
+repo-workflows-doctor-title-d412a062 = Hooks
+
+repo-workflows-doctor-turn-on-action-3c97132f = Wartung planen?
+
+repo-workflows-doctor-turn-on-action-7cde0a5e = { $commands-join-1 } trägt dieses Repository in maintenance.repo Ihrer globalen Git-Konfiguration ein, setzt maintenance.auto=false und maintenance.strategy=incremental in seiner Konfiguration und plant Git-Hintergrundläufe. Diese rufen stündlich Remotes nach refs/prefetch ab. Die Läufe lesen Ihre globale Konfiguration, kein gitcraft-Profil. git maintenance unregister nimmt dies für dieses Repository zurück (git config --unset maintenance.auto aktiviert automatische gc erneut); git maintenance stop entfernt den Zeitplan für alle Repositorys.
+
+repo-workflows-doctor-turn-on-action-d8e3e02d = Einschalten: { $s-title-to-lowercase-1 }
+
+repo-workflows-doctor-turn-on-action-f4830a1d = Planen
+
+repo-workflows-doctor-turn-on-action-f688c962 = Geplante Wartung
+
+repo-workflows-doctor-ui-089db75c = Nicht gesetzte Einstellungen anzeigen
+
+repo-workflows-doctor-ui-11781882 = Hooks sind Programme, die Git während eines Vorgangs ausführt: vor Commit oder Push und nach Checkout. Ein fehlgeschlagener Hook stoppt den Vorgang. Ein nicht ausführbarer Hook wird übersprungen oder führt zu einer schwer verständlichen Fehlermeldung.
+
+repo-workflows-doctor-ui-195ee0f7 = Dateien, deren Änderungen nie unter „Änderungen“ erscheinen, tragen häufig Index-Flags. Beide Flags verbergen Änderungen, haben aber unterschiedliche Bedeutungen. Git unterstützt keines davon zum Ignorieren von Änderungen an versionierten Dateien.
+
+repo-workflows-doctor-ui-1f9897b7 = Git liest zuerst die Systemdatei, dann Ihre globale Datei, die Dateien dieses Repositorys und Worktrees und zuletzt Befehlszeilenwerte. Bei einwertigen Einstellungen gewinnt der zuletzt gelesene Wert. Bei einem gitcraft-Profil ist die globale Datei die Profildatei: Sie liest zuerst ~/.gitconfig und überschreibt sie dann mit eigenen Werten (Git außerhalb von gitcraft sieht diese nicht). Werte aus include- oder includeIf-Dateien erscheinen unter ihrer eigenen Datei. Angezeigt werden nur diese Einstellungen, keine Zugangsdaten.
+
+repo-workflows-doctor-ui-282e3905 = assume-unchanged: Verspricht Git, dass sich die Datei nicht ändert. Git prüft sie für mehr Geschwindigkeit auf langsamen Datenträgern nicht. Git kann die Datei trotzdem überschreiben (Pull, Checkout) und das Flag entfernen. Es dient nicht dem Erhalt lokaler Änderungen.
+
+repo-workflows-doctor-ui-2bfe98f3 = Keine passende Einstellung.
+
+repo-workflows-doctor-ui-4e47a723 = Einstellungen filtern
+
+repo-workflows-doctor-ui-56146558 = Die beiden Flags
+
+repo-workflows-doctor-ui-678f7b82 = Warum eine Datei verschwindet, Zeilenenden wechseln oder ein Merge-Treiber nicht läuft: Die Ignorierregel und Attribute einer Datei im Arbeitsverzeichnis. Das Dateimenü „Ignorierregeln und Attribute“ führt hierher.
+
+repo-workflows-doctor-ui-99079609 = skip-worktree: Git behält die Arbeitsversion und vergleicht sie nicht mit dem Index. Sparse-Checkout verwendet dies. Auch lokale Änderungen werden damit oft verborgen, obwohl Git dies nicht unterstützt: Pull, Checkout oder Merge können bis zum Entfernen des Flags scheitern. Für lokale Einstellungen ist eine unversionierte Überschreibungsdatei sicherer.
+
+repo-workflows-doctor-ui-9b3b999d = Eine Korrektur läuft
+
+repo-workflows-doctor-ui-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-ui-c7deeea1 = Größe des Repositorys, Lesedauer und mögliche Git-Beschleunigungen. Alle Beschleunigungen sind Git-Einstellungen für dieses Repository und helfen Git überall, auch außerhalb von gitcraft.
+
+repo-workflows-doctor-value-row-29f009c0 = Alle { $origin-key-1 }-Werte aus dieser Datei entfernen. Danach gilt der nächste Wert oder der Git-Standard.
+
+repo-workflows-doctor-value-row-4b67153d = Wirksam
+
+repo-workflows-doctor-value-row-4d8ff0fe = Über die Befehlszeile oder GIT_CONFIG_PARAMETERS gesetzt, nicht in einer Datei
+
+repo-workflows-doctor-value-row-62a03f09 = Überschrieben
+
+repo-workflows-doctor-value-row-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-value-row-c3812fc4 = Entfernen
+
+repo-workflows-doctor-value-row-fd2cc5af = gitcraft schreibt diese Datei über Einstellungen → Profil. Ändern Sie den Wert dort.
+
+repo-workflows-doctor-verdict-050f8d52 = Versioniert: Ignorierregeln gelten nicht für bereits versionierte Dateien. Diese Regel hat daher keine Wirkung. Beenden Sie die Versionierung mit git rm --cached, um sie zu ignorieren. Die Datei bleibt auf dem Datenträger.
+
+repo-workflows-doctor-verdict-2459673a = Keine passende Ignorierregel.
+
+repo-workflows-doctor-verdict-765462d4 = Der Ordner wird ignoriert. Da Git nicht hineinsieht, kann eine !-Regel für eine enthaltene Datei nicht wirken. Heben Sie die Ordnerregel auf (!folder/) oder ignorieren Sie stattdessen folder/*.
+
+repo-workflows-doctor-verdict-a1c6264a = Versioniert, ohne passende Ignorierregel.
+
+repo-workflows-doctor-verdict-a292bdad = Nicht ignoriert: Diese !-Regel ist die letzte passende Regel.
+
+repo-workflows-doctor-verdict-b78474c9 = Ein Ordner: Die angezeigte Regel gilt für seinen gesamten Inhalt. Git sieht nicht in ignorierte Ordner hinein.
+
+repo-workflows-doctor-verdict-b796f495 = Durch diese Regel ignoriert.
+
+repo-workflows-doctor-verdict-c3b9d549 = Diese Datei existiert hier nicht. Die Regeln werden für einen solchen Dateinamen gelesen. Ordnerregeln mit abschließendem / passen nicht darauf.
+
+repo-workflows-doctor-verdict-f0d742e1 = Versioniert; die letzte passende Regel ist diese !-Regel.
+
+repo-workflows-drift_view-body-4bc74b21 = Aufgabe
+
+repo-workflows-drift_view-body-7d9eb7ac = Schließen
+
+repo-workflows-email-email-window-b64a0d4f = Vorgang abbrechen
+
+repo-workflows-fence_view-body-7d9eb7ac = Schließen
+
+repo-workflows-file_comparison-file-comparison-view-74ccd433 = Ordner
+
+repo-workflows-file_comparison-file-comparison-view-82a9c46f = Committen
+
+repo-workflows-hotfix-cancel-19766ed6 = Abbrechen
+
+repo-workflows-hotfix-contents-f5346a60 = Nach { $plan-main-name-1 } gemergt
+
+repo-workflows-issue_work-choose-52656e81 = Branch
+
+repo-workflows-issue_work-show-19766ed6 = Abbrechen
+
+repo-workflows-issue_work-show-d8b8392e = Erneut versuchen
+
+repo-workflows-lfs_locks-unlock-buttons-19766ed6 = Abbrechen
+
+repo-workflows-lfs_storage-prune-19766ed6 = Abbrechen
+
+repo-workflows-line_dossier-line-dossier-view-82a9c46f = Committen
+
+repo-workflows-owners-contents-7d9eb7ac = Schließen
+
+repo-workflows-package-buttons-7d9eb7ac = Schließen
+
+repo-workflows-parallel_bisect-hash-link-63633913 = Diesen Commit anzeigen
+
+repo-workflows-parallel_bisect-parallel-buttons-19766ed6 = Abbrechen
+
+repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac = Schließen
+
+repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5 = Warten Sie, bis der laufende Vorgang abgeschlossen ist
+
+repo-workflows-parallel_bisect-parallel-link-63633913 = Diesen Commit anzeigen
+
+repo-workflows-parallel_bisect-parallel-outcome-683768ab = und { $hashes-len-max-named-1 } weitere
+
+repo-workflows-parallel_bisect-parallel-outcome-8b3812c0 = Erster fehlerhafter Commit:
+
+repo-workflows-pr_review-verdict-buttons-eb1a70e3 = Verwerfen
+
+repo-workflows-pr_view-dismiss-box-19766ed6 = Abbrechen
+
+repo-workflows-pr_view-entry-header-48845bff = Schließen
+
+repo-workflows-push-dismiss-48845bff = Schließen
+
+repo-workflows-push-rejected-683768ab = und { $r-behind-named-1 } weitere
+
+repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-Pick
+
+repo-workflows-reflog-reflog-menu-items-916e34d4 = Im Graphen anzeigen
+
+repo-workflows-reflog-scanning-19766ed6 = Abbrechen
+
+repo-workflows-rehearse-rehearse-window-cae7d57b = Stoppen
+
+repo-workflows-release-close-button-7d9eb7ac = Schließen
+
+repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Schließen
+
+repo-workflows-review_workflow-show-c3812fc4 = Entfernen
+
+repo-workflows-stack-publish-dialog-19766ed6 = Abbrechen
+
+repo-workflows-stack-restack-dialog-19766ed6 = Abbrechen
+
+repo-workflows-stack-stack-dialogs-19766ed6 = Abbrechen
+
+repo-workflows-surgery-footer-19766ed6 = Abbrechen
+
+repo-workflows-test_lane-test-banner-7d9eb7ac = Schließen
+
+repo-workflows-test_lane-test-output-window-e21f935f = Kopieren
+
+repo-workflows-timeline-close-button-7d9eb7ac = Schließen
+
+repo-workflows-timeline-commits-683768ab = und { $total-list-len-1 } weitere
+
+repo-workflows-timeline-finished-19766ed6 = Abbrechen
+
+repo-workflows-timeline-forget-confirm-19766ed6 = Abbrechen
+
+repo-workflows-timeline-jump-controls-19766ed6 = Abbrechen
+
+repo-workflows-working_drafts-history-7d9eb7ac = Schließen
+
+repo-workflows-working_drafts-recovery-19766ed6 = Abbrechen
+
 repo-workflows-activity-count = { $count ->
         [one] Ein Vorgang{ $running }, neueste zuerst
        *[other] { $count } Vorgänge{ $running }, neueste zuerst
@@ -561,4 +1948,59 @@ repo-workflows-agent-push-body = Sendet { $count ->
         [one] den neuen Commit
        *[other] die { $count } neuen Commits
     } von { $branch } an { $to }.
+
+repo-workflows-dco-toggle-0 = { repo-workflows-dco--5e1a6b4e }. Hier aktiviert; dieses Repository verlangt es ebenfalls: { $reason }
+
+repo-workflows-dco-toggle-1 = { repo-workflows-dco--5e1a6b4e }. Hier deaktiviert, obwohl dieses Repository es verlangt: { $reason }
+
+repo-workflows-dco-toggle-2 = { repo-workflows-dco--5e1a6b4e }. Für dieses Repository aktiviert
+
+repo-workflows-dco-toggle-3 = { repo-workflows-dco--5e1a6b4e }. Für dieses Repository deaktiviert
+
+repo-workflows-dco-toggle-4 = { repo-workflows-dco--5e1a6b4e }. Automatisch aktiviert: { $reason }
+
+repo-workflows-dco-toggle-5 = { repo-workflows-dco--5e1a6b4e }. Automatisch aktiviert, wenn ein Repository dies verlangt (DCO-Datei oder fehlgeschlagene DCO-Prüfung)
+
+repo-workflows-dco-all-signed = { $count ->
+        [one] ✔ Der Commit ist mit einem Sign-off versehen.
+       *[other] ✔ Alle { $count } Commits sind mit einem Sign-off versehen.
+    }
+
+repo-workflows-dco-missing-signoffs = { $missing } von { $total } Commits fehlt ein von der DCO-Prüfung akzeptierter Sign-off des Autors oder Committers:
+
+repo-workflows-bakeoff-unassembled = { $count ->
+        [one] Eine Datei ausgewählt, aber nicht zusammengestellt. Erneutes Schließen verwirft sie.
+       *[other] { $count } Dateien ausgewählt, aber nicht zusammengestellt. Erneutes Schließen verwirft sie.
+    }
+
+repo-workflows-collision-files = { $count ->
+        [one] Eine Datei
+       *[other] { $count } Dateien
+    }
+
+repo-workflows-collision-conflicts = { $a } und { $b } haben Konflikte in { $count ->
+        [one] einer Datei
+       *[other] { $count } Dateien
+    }:
+
+repo-workflows-collision-check = { $count ->
+        [one] Einen Branch prüfen
+       *[other] { $count } Branches prüfen
+    }
+
+repo-workflows-doctor-remove-setting = { $key } = { $value } aus { $file } entfernen? { $scope ->
+        [global] Dies gilt für alle Ihre Repositorys.
+        [system] Dies gilt für alle Benutzer dieses Rechners.
+       *[local] Dies gilt hier.
+    } Der Wert wird nicht gespeichert. Um ihn wiederherzustellen, müssen Sie ihn erneut setzen.
+
+repo-workflows-doctor-history-loaded = Der Graph lädt beim Scrollen jeweils { $page } Commits, insgesamt höchstens { $max }. Auch die Suche lädt bei Bedarf bis zu dieser Grenze nach. Derzeit sind { $loaded } geladen.{ $more ->
+        [yes] { " Weitere können geladen werden." }
+       *[no] { "" }
+    }
+
+repo-workflows-doctor-missing-hooks = Dieser Ordner existiert nicht oder ist kein Ordner. Kein Hook wird ausgeführt.{ $custom ->
+        [yes] { " Die Software, die core.hooksPath gesetzt hat (ein Hook-Manager?), ist nicht installiert. Führen Sie deren Installation aus oder entfernen Sie core.hooksPath." }
+       *[no] { "" }
+    }
 

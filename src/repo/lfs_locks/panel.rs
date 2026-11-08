@@ -245,7 +245,12 @@ fn unlock_buttons(
                     .color(t.warning)
                     .small(),
             );
-            if ui.small_button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape))
+            if ui
+                .small_button(crate::i18n::text(
+                    "repo-workflows-lfs_locks-unlock-buttons-19766ed6",
+                ))
+                .clicked()
+                || ui.input(|i| i.key_pressed(egui::Key::Escape))
             {
                 panel.confirm_force = None;
             }

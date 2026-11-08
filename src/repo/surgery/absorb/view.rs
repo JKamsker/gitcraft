@@ -91,7 +91,7 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                 {
                     acts.push(Action::CheckAbsorb);
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6")).clicked() {
                     acts.push(Action::CloseAbsorb);
                 }
                 if editor.git_absorb

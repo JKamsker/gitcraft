@@ -192,10 +192,7 @@ impl StartForm {
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-agents-ui-44e1cc2b",
-                    &[(
-                        "crate-manual-command-1",
-                        (crate::manual::command()).clone().into(),
-                    )],
+                    &[("crate-manual-command-1", (crate::manual::command()).into())],
                 ))
                 .small()
                 .color(t.text_faint),
@@ -216,7 +213,7 @@ impl StartForm {
         if self.branches.iter().any(|b| b == branch) {
             return Some(crate::i18n::message(
                 "repo-workflows-agents-problem-80f33652",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ));
         }
         let base = self.base.trim();
@@ -294,7 +291,7 @@ impl StartForm {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-agents-agent-choice-2b8f8124",
-                        &[("cli-label-1", (cli.label).clone().into())],
+                        &[("cli-label-1", (cli.label).into())],
                     ))
                     .small()
                     .color(t.text_faint),
@@ -490,22 +487,19 @@ mod fluent_partition_tests {
     #[test]
     fn fluent_partition_actual_start_form_keeps_action_payload_in_both_languages() {
         for (language, title, task, start) in [
-            (
-                "en-US",
-                "Start agent task",
-                "What the agent should do (optional)",
-                "Start",
-            ),
-            (
-                "de",
-                "Agent-Aufgabe starten",
-                "Was der Agent tun soll (optional)",
-                "Starten",
-            ),
+            ("en-US", "Start agent task", "Task", "Start"),
+            ("de", "Agent-Aufgabe starten", "Aufgabe", "Starten"),
         ] {
             crate::i18n::set_language(language);
-            let mut h = Harness::new_ui_state(
+            let mut initialized = false;
+            let h = Harness::new_ui_state(
                 |ui, form: &mut StartForm| {
+                    if !initialized {
+                        crate::theme::install_fonts(ui.ctx());
+                        initialized = true;
+                        ui.ctx().request_discard("Install supplied test fonts");
+                        return;
+                    }
                     let _ = form.ui(ui, false);
                 },
                 supplied_form(),
@@ -515,15 +509,20 @@ mod fluent_partition_tests {
             h.get_by_label(start);
             assert_eq!(h.state().agent_command(), "codex --model exact-model");
             assert_eq!(h.state().branch, "topic/Überprüfung");
-            let mut action = None;
-            let ctx = egui::Context::default();
-            let mut form = supplied_form();
-            let _ = ctx.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    action = form.ui(ui, true);
-                });
-            });
-            let Some(AgentAct::Start(payload)) = action else {
+            let mut recording_initialized = false;
+            let recorded = Harness::new_ui_state(
+                |ui, state: &mut (StartForm, Option<AgentAct>)| {
+                    if !recording_initialized {
+                        crate::theme::install_fonts(ui.ctx());
+                        recording_initialized = true;
+                        ui.ctx().request_discard("Install supplied test fonts");
+                        return;
+                    }
+                    state.1 = state.0.ui(ui, true);
+                },
+                (supplied_form(), None),
+            );
+            let Some(AgentAct::Start(payload)) = &recorded.state().1 else {
                 panic!("expected recorded Start action");
             };
             assert_eq!(payload.agent, "codex --model exact-model");

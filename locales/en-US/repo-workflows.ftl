@@ -36,7 +36,7 @@ repo-workflows-activity-outcome-text-8b47045e = cancelled
 
 repo-workflows-activity-outcome-text-a4c3ed04 = done
 
-repo-workflows-activity-seconds-6f29d45b = { $d-as-secs-f32-1 } s
+repo-workflows-activity-seconds-6f29d45b = { NUMBER($d-as-secs-f32-1, minimumFractionDigits: 1, maximumFractionDigits: 1) } s
 
 repo-workflows-activity-seconds-af37e50f = { $d-as-secs-1 } s
 
@@ -324,16 +324,16 @@ repo-workflows-agents-terminal-choice-c22c5ccf = The terminal the notes are type
 
 repo-workflows-agents-terminal-choice-f1f46570 = no agent terminal
 
-repo-workflows-agents-tip-1c0ba476 = 
+repo-workflows-agents-tip-1c0ba476 =
     Shown in this tab: its changes are in Uncommitted changes
 
-repo-workflows-agents-tip-5c1b8dd5 = 
+repo-workflows-agents-tip-5c1b8dd5 =
     Click to open it and review its changes
 
-repo-workflows-agents-tip-7d8e5553 = 
+repo-workflows-agents-tip-7d8e5553 =
     Task: { $row-task-prompt-1 }
 
-repo-workflows-agents-tip-95d5fbf7 = 
+repo-workflows-agents-tip-95d5fbf7 =
     Agent: { $row-task-agent-1 }
 
 repo-workflows-agents-tray-act-78e896bb = the notes
@@ -490,6 +490,1393 @@ repo-workflows-ai-writing-row-19766ed6 = Cancel
 
 repo-workflows-ai-writing-row-ea07a4e5 = { $running-tool-short-1 } is writing the message… { $elapsed-running-started-2 }
 
+repo-workflows-atlas-atlas-window-1316052d = Hotspot page { $view-page-1-1 } / { $pages }
+
+repo-workflows-atlas-atlas-window-1556feb2 = Author date
+
+repo-workflows-atlas-atlas-window-1af85190 = Size
+
+repo-workflows-atlas-atlas-window-1bfb5492 = Recent churn
+
+repo-workflows-atlas-atlas-window-2657941d = { $label } ({ $if-n-directory-folder-else-file-1 }), { $n-bytes-2 } bytes, { $n-changes-3 } changes, most frequent contributor: { $n-contributor-4 }. { $if-n-directory-zoom-into-folder--5 }
+
+repo-workflows-atlas-atlas-window-34dd32fc = Apply / refresh atlas
+
+repo-workflows-atlas-atlas-window-39c66d83 = Open file history at the pinned revision
+
+repo-workflows-atlas-atlas-window-3a9dfa58 = Colour
+
+repo-workflows-atlas-atlas-window-41bb5a28 = Zoom into folder
+
+repo-workflows-atlas-atlas-window-4562ddd7 = Committer date
+
+repo-workflows-atlas-atlas-window-48c740b7 = latest scanned
+
+repo-workflows-atlas-atlas-window-4b6c521c = { $label }
+    { $n-bytes-1 } bytes · { $n-changes-2 } changes
+    Most frequent contributor: { $if-n-contributor-is-empty-no-cha-3 }
+
+repo-workflows-atlas-atlas-window-4d800030 = Bytes
+
+repo-workflows-atlas-atlas-window-5769ad13 = No files in this snapshot.
+
+repo-workflows-atlas-atlas-window-611ebb33 = Churn and contributor atlas
+
+repo-workflows-atlas-atlas-window-63bfe85d = From YYYY-MM-DD
+
+repo-workflows-atlas-atlas-window-67be181b = Scanned file history across analyzed refs
+
+repo-workflows-atlas-atlas-window-6aba5092 = Previous hotspots
+
+repo-workflows-atlas-atlas-window-6e795d4d = Period
+
+repo-workflows-atlas-atlas-window-6fd659e0 = Through YYYY-MM-DD
+
+repo-workflows-atlas-atlas-window-86061296 = Next hotspots
+
+repo-workflows-atlas-atlas-window-862161d0 = No changes in selected period
+
+repo-workflows-atlas-atlas-window-8d9ca065 = Open scanned history for this exact byte path
+
+repo-workflows-atlas-atlas-window-a5661a75 = Most frequent contributor: { $node-contributor-1 }
+
+repo-workflows-atlas-atlas-window-a9656539 = Scan more atlas history
+
+repo-workflows-atlas-atlas-window-aef428d1 = { $node-bytes-1 } bytes · { $node-changes-2 } file changes
+
+repo-workflows-atlas-atlas-window-b4ab9b3d = ↑ Repository root
+
+repo-workflows-atlas-atlas-window-ba512e1a = Most frequent contributor
+
+repo-workflows-atlas-atlas-window-bc087fce = Change frequency
+
+repo-workflows-atlas-atlas-window-c2e87ba8 = earliest scanned
+
+repo-workflows-atlas-atlas-window-d16ccfdf = Cancel atlas analysis
+
+repo-workflows-atlas-atlas-window-ef7caa7d = Analyzing pinned history and file sizes…
+
+repo-workflows-atlas-atlas-window-f69e93c6 = Files and historical folders at the same path are separate hotspots. File history uses HEAD for current files or an observed change revision for historical files. Right-click a file for history across analyzed refs; non-UTF-8 paths open that history directly. Long contributor labels are shortened; numbered identities remain separate.
+
+repo-workflows-atlas-new-70ba4563 = File history cancelled
+
+repo-workflows-atlas-read-atlas-02c42736 = Use YYYY-MM-DD dates
+
+repo-workflows-atlas-read-atlas-67b18cbf = Use YYYY-MM-DD dates, with start on or before end
+
+repo-workflows-atlas-show-01efcd54 = Preparing file history…
+
+repo-workflows-atlas-show-076017ad = This list matches this exact path across the analyzed refs, including deletions. It uses the full scanned snapshot, independent of the atlas time window; it does not follow renames to other paths. Open a commit to inspect its changes. For older changes, use Scan more atlas history in the atlas.
+
+repo-workflows-atlas-show-1abc4096 = Next file commits
+
+repo-workflows-atlas-show-56fe4d78 = Previous file commits
+
+repo-workflows-atlas-show-7269bb4e = Scanned file history across refs
+
+repo-workflows-atlas-show-8647a64f = Exact path bytes: { $clipped-self-label-256-1 }
+
+repo-workflows-atlas-show-c256cd01 = No scanned commits touch this exact path. Its history may precede the scan boundary.
+
+repo-workflows-bakeoff-assemble-bar-3766ae43 = Open a file below and take it whole, or some of its hunks, from any attempt
+
+repo-workflows-bakeoff-assemble-bar-5a22f453 = Assembling…
+
+repo-workflows-bakeoff-assemble-bar-8462ef57 = Assemble into
+
+repo-workflows-bakeoff-assemble-bar-86fd9bbb = Assemble ({ $picks } files)
+
+repo-workflows-bakeoff-assemble-bar-916e34d4 = Show in graph
+
+repo-workflows-bakeoff-assemble-bar-aee10357 = A new branch from the base with what is picked; the rest stays as the base has it. Nothing checked out changes
+
+repo-workflows-bakeoff-assemble-bar-ccbdbfe8 = Assemble (1 file)
+
+repo-workflows-bakeoff-assemble-bar-f19adc05 = Name the new branch first
+
+repo-workflows-bakeoff-assemble-c7f55e42 = Made { $branch } at { $crate-repo-short-commit-1 }
+
+repo-workflows-bakeoff-bakeoff-view-9754333a = Comparing the attempts…
+
+repo-workflows-bakeoff-body-bfd30d1e = click one to see it across the attempts and pick from it
+
+repo-workflows-bakeoff-build-06d160c3 = could not prepare the build's status file: { $e }
+
+repo-workflows-bakeoff-build-c18d3706 = Type the command that builds the project first
+
+repo-workflows-bakeoff-build-c9238812 = build · { $name }
+
+repo-workflows-bakeoff-build-cell-17824e4b = The old build may still run. Starts a separate retained snapshot; does not stop or clean up the old launch
+
+repo-workflows-bakeoff-build-cell-26c16489 = not built
+
+repo-workflows-bakeoff-build-cell-301c453c = ✘ fails ({ $code })
+
+repo-workflows-bakeoff-build-cell-3149d8b3 = Runs your command on the exact compared snapshot in a fresh detached worktree
+
+repo-workflows-bakeoff-build-cell-5dac180d = outcome unavailable
+
+repo-workflows-bakeoff-build-cell-63f96d79 = Launch failed, terminal closed/output ended, or receipt is invalid. This does not prove all child processes finished.
+
+repo-workflows-bakeoff-build-cell-6fe4abd4 = Retry in fresh workspace
+
+repo-workflows-bakeoff-build-cell-84b604d3 = The previous outcome is unknown and its processes may still run. Starts another retained workspace; no automatic stop or cleanup
+
+repo-workflows-bakeoff-build-cell-98cd8a0b = preparing snapshot…
+
+repo-workflows-bakeoff-build-cell-adccacb7 = Runs the command in another fresh retained snapshot
+
+repo-workflows-bakeoff-build-cell-af81e9e4 = Build again
+
+repo-workflows-bakeoff-build-cell-bdd254b6 = Build
+
+repo-workflows-bakeoff-build-cell-d07e6c18 = ✔ builds
+
+repo-workflows-bakeoff-build-cell-ef24cfb5 = Its output is in the terminal tab
+
+repo-workflows-bakeoff-column-2ed1ade8 = No hunks to pick (a binary file): take it whole
+
+repo-workflows-bakeoff-column-6e86718f = Replaces the hunks picked; click again to take it back
+
+repo-workflows-bakeoff-column-772841f1 = Take the deletion
+
+repo-workflows-bakeoff-column-a533487d = Take the whole file
+
+repo-workflows-bakeoff-column-badecf50 = Take the new file
+
+repo-workflows-bakeoff-files-51aec897 = { $a-name-1 } left it as it was
+
+repo-workflows-bakeoff-files-7e17d722 = None of the attempts changed anything
+
+repo-workflows-bakeoff-files-83d88f06 = { $a-name-1 } changed it
+
+repo-workflows-bakeoff-files-fe616a60 = { $path }
+    Open it side by side across the attempts
+
+repo-workflows-bakeoff-grid-1af85190 = Size
+
+repo-workflows-bakeoff-grid-1f19288a = yes, compared too
+
+repo-workflows-bakeoff-grid-6263bbf3 = Open this run's complete saved output in the configured editor
+
+repo-workflows-bakeoff-grid-6a3fe887 = Builds
+
+repo-workflows-bakeoff-grid-7a44bde0 = Uncommitted work
+
+repo-workflows-bakeoff-grid-7cbda0dd = Build output…
+
+repo-workflows-bakeoff-grid-9c37d9c9 = New dependencies
+
+repo-workflows-bakeoff-grid-ce199c9e = Files touched
+
+repo-workflows-bakeoff-header-0e2a45b6 = Other attempts…
+
+repo-workflows-bakeoff-header-175f9ff6 = Build all
+
+repo-workflows-bakeoff-header-43c40423 = Bake-off
+
+repo-workflows-bakeoff-header-46334791 = Build with
+
+repo-workflows-bakeoff-header-502f6dbd = Compare again
+
+repo-workflows-bakeoff-header-50cd264e = from { $crate-repo-short-cmp-base-1 }
+
+repo-workflows-bakeoff-header-7d9eb7ac = Close
+
+repo-workflows-bakeoff-header-862a0723 = Explicitly runs this command on each compared snapshot in a fresh detached worktree. No setup recipe runs. Workspaces remain in Worktrees for inspection and removal.
+
+repo-workflows-bakeoff-header-9cec669f = Compare the attempts first
+
+repo-workflows-bakeoff-header-a195ce68 = Type the command that builds the project
+
+repo-workflows-bakeoff-header-acb0a622 = ⚠ { $elsewhere-join-1 } started elsewhere
+
+repo-workflows-bakeoff-header-b1ce0225 = Reads the attempts again, uncommitted work included
+
+repo-workflows-bakeoff-header-bb683fa4 = The commit they all start from (their merge base)
+
+repo-workflows-bakeoff-header-c38e956d = Kept for the repository
+
+repo-workflows-bakeoff-header-dd4159a5 = It didn't start from the same commit as the others: its column also shows what came before it started
+
+repo-workflows-bakeoff-hunk-label-0cf292e8 = At the top
+
+repo-workflows-bakeoff-hunk-label-4d9d8a81 = Line { $hunk-old-start-1 }
+
+repo-workflows-bakeoff-hunk-label-7647677f = After line { $hunk-old-start-1 }
+
+repo-workflows-bakeoff-hunk-label-a3052fdf = Lines { $hunk-old-start-1 }–{ $hunk-old-start-n-1-2 }
+
+repo-workflows-bakeoff-load-bakeoff-c6f043db = Picks cleared: the attempts changed since they were made
+
+repo-workflows-bakeoff-pick-label-77dbc108 = ← whole file from { $name-n-1 }
+
+repo-workflows-bakeoff-pick-label-c708de81 = ← { $list-len-1 } hunks
+
+repo-workflows-bakeoff-pick-label-d3d98b5d = ← 1 hunk
+
+repo-workflows-bakeoff-side-by-side-47c58b04 = Unchanged in { $unchanged-join-1 }
+
+repo-workflows-bakeoff-side-by-side-6bdfa343 = Clear pick
+
+repo-workflows-bakeoff-side-by-side-76215eb4 = The assembled branch keeps the base's version of this file
+
+repo-workflows-bakeoff-side-by-side-f280944f = Hunks of two attempts picked here change the same lines: untick one of them
+
+repo-workflows-bakeoff-ui-09eb5aca = Pick { $MIN } to { $MAX } attempts at the same task to compare: worktrees (with what is uncommitted in them) or branches.
+
+repo-workflows-bakeoff-ui-19766ed6 = Cancel
+
+repo-workflows-bakeoff-ui-43c40423 = Bake-off
+
+repo-workflows-bakeoff-ui-6217d161 = worktree · { $crate-remote-display-w-1 }
+
+repo-workflows-bakeoff-ui-638e249f = Filter
+
+repo-workflows-bakeoff-ui-ae96d29a = Pick { $MIN } to { $MAX } attempts
+
+repo-workflows-bakeoff-ui-c51e8eaa = No worktrees or other branches to compare
+
+repo-workflows-bakeoff-ui-cd8d844d = No match
+
+repo-workflows-bakeoff-ui-e888155d = Compare
+
+repo-workflows-bakeoff-ui-fbbc3b24 = At most { $MAX } attempts
+
+repo-workflows-bisect--512af075 = Wait for the run to end, or stop it
+
+repo-workflows-bisect--e5e3ecc5 = Wait for the operation going on to finish
+
+repo-workflows-bisect-bisect-blocker-cff28fea = Wait for { $busy } to finish first.
+
+repo-workflows-bisect-bisect-buttons-0599842f = git bisect reset: checks out { $branch } again
+
+repo-workflows-bisect-bisect-buttons-12c0910a = { $current } can't be tested: try another one
+
+repo-workflows-bisect-bisect-buttons-7cf0c74e = git bisect run: a command tests each commit for you
+
+repo-workflows-bisect-bisect-buttons-7f573858 = { $current } has the change
+
+repo-workflows-bisect-bisect-buttons-a28c79f7 = git bisect reset: checks out again what was checked out when it began
+
+repo-workflows-bisect-bisect-buttons-a6c7a84b = Finish
+
+repo-workflows-bisect-bisect-buttons-a9a77839 = { $current } is from before the change
+
+repo-workflows-bisect-bisect-buttons-c3efc1be = Mark a good and a bad commit first
+
+repo-workflows-bisect-bisect-buttons-cae7d57b = Stop
+
+repo-workflows-bisect-bisect-buttons-eded3d42 = Run a command…
+
+repo-workflows-bisect-bisect-menu-items-43fa49b5 = Start bisect here…
+
+repo-workflows-bisect-bisect-menu-items-5cc56687 = Find the commit that brought a change in, by testing commits between a good and a bad one
+
+repo-workflows-bisect-bisect-menu-items-5f1847b9 = Mark { $at } as { $bisect-word-mark-bad-1 }
+
+repo-workflows-bisect-bisect-menu-items-72281c73 = Skip { $at } in the bisect
+
+repo-workflows-bisect-bisect-palette-items-011b904c = Bisect: skip { $at }
+
+repo-workflows-bisect-bisect-palette-items-23b8f037 = Bisect: stop
+
+repo-workflows-bisect-bisect-palette-items-34a86ddf = Bisect: finish
+
+repo-workflows-bisect-bisect-palette-items-417fbb2c = Bisect: mark { $at } as { $bisect-word-mark-bad-1 }
+
+repo-workflows-bisect-bisect-palette-items-96774cb9 = Bisect: run a command…
+
+repo-workflows-bisect-bisect-palette-items-ba89bd47 = Start bisect…
+
+repo-workflows-bisect-bisect-status-675fd45e = Bisecting
+
+repo-workflows-bisect-bisect-step-done-8336fbfe = { $label } failed: { $e }
+
+repo-workflows-bisect-commit-link-63633913 = Show this commit
+
+repo-workflows-bisect-hash-link-63633913 = Show this commit
+
+repo-workflows-bisect-mark-bisect-15306802 = Skip this commit
+
+repo-workflows-bisect-mark-bisect-22f6b91b = Mark { $short-rev-1 } as { $bisect-word-mark-2 }
+
+repo-workflows-bisect-mark-bisect-9b0f3138 = Mark as { $bisect-word-mark-1 }
+
+repo-workflows-bisect-mark-bisect-a1c6c771 = No bisect is going on
+
+repo-workflows-bisect-reset-bisect-0ddac35c = Stop bisect
+
+repo-workflows-bisect-reset-bisect-1bdcc155 = Finish bisect
+
+repo-workflows-bisect-reset-bisect-b63b6486 = back on the commit it began at
+
+repo-workflows-bisect-reset-bisect-fd58b76b = back on { $branch }
+
+repo-workflows-bisect-run-log-534a3a34 = ended with exit code { $c }
+
+repo-workflows-bisect-run-log-5fd804ed = failed: { $e }
+
+repo-workflows-bisect-run-log-64876c47 = Hide output
+
+repo-workflows-bisect-run-log-7d9eb7ac = Close
+
+repo-workflows-bisect-run-log-8d23f4ee = Stops the command and what it started; the bisect stays where it got to
+
+repo-workflows-bisect-run-log-9dbbb249 = Show output
+
+repo-workflows-bisect-run-log-b7ec68a2 = Stop run
+
+repo-workflows-bisect-run-log-bb5e4bf5 = ended by a signal
+
+repo-workflows-bisect-run-message-3a24171a = Bisect run failed: { $e }
+
+repo-workflows-bisect-run-message-96334386 = Bisect run stopped
+
+repo-workflows-bisect-run-message-b1d63bd2 = exit code { $c }
+
+repo-workflows-bisect-run-message-b4eba258 = Bisect run ended with { $code }: { $last-line }
+
+repo-workflows-bisect-run-message-dc9c7971 = Bisect run: only skipped commits are left, the first bad commit is one of them
+
+repo-workflows-bisect-run-message-de2346a5 = Bisect run: found the first bad commit
+
+repo-workflows-bisect-run-message-e8e581bc = a signal
+
+repo-workflows-bisect-start-bisect-5c82e3e0 = Can't start a bisect: { $why }
+
+repo-workflows-bisect-start-bisect-db936451 = Start bisect
+
+repo-workflows-bisect-start-bisect-run-d300d73e = Bisect run
+
+repo-workflows-bisect-steps-text-14999716 = About { $n } steps left
+
+repo-workflows-bisect-steps-text-263b5d8b = About 1 step left
+
+repo-workflows-bisect-steps-text-2d1513e9 = The last step
+
+repo-workflows-bisect-steps-text-5ccbfd65 = { $n } commits after this one
+
+repo-workflows-bisect-steps-text-9bbc8458 = 1 commit after this one
+
+repo-workflows-bisect-steps-text-a4e9b171 = no commits after this one
+
+repo-workflows-bisect-stop-bisect-action-0ddac35c = Stop bisect
+
+repo-workflows-bisect-stop-bisect-action-c380662a = Stop bisecting and check out { $back } again? The commits marked so far are forgotten.
+
+repo-workflows-bisect-stop-bisect-action-fff2c8f7 = what was checked out when it began
+
+repo-workflows-bisect-waiting-2d4ce59a = Mark a { $word } commit ({ $meaning }): right-click it in the graph, or use { $capitalised-word-1 } for the one checked out.
+
+repo-workflows-bisect-where-it-is-25230d8d = Only skipped commits are left: the first bad commit is one of these { $possible-len-1 }:
+
+repo-workflows-bisect-where-it-is-4c0b8e59 = git finds nothing to test between the marks (a good commit after the bad one?): mark others, or Stop.
+
+repo-workflows-bisect-where-it-is-683768ab = and { $possible-len-max-named-1 } more
+
+repo-workflows-bisect-where-it-is-7d7c30e4 = · Testing
+
+repo-workflows-bisect-where-it-is-8b3812c0 = First bad commit:
+
+repo-workflows-bisect-where-it-is-94883ca6 = one from before the change
+
+repo-workflows-bisect-where-it-is-d5ebaa0a = one with the change
+
+repo-workflows-ci_view-by-start-ba35f0c4 = Not started
+
+repo-workflows-ci_view-ci-act-07fe25a7 = Cancelled { $what }
+
+repo-workflows-ci_view-ci-act-da60943b = Re-ran the failed jobs of { $what }
+
+repo-workflows-ci_view-ci-view-ui-90db5328 = No CI ran on this commit.
+
+repo-workflows-ci_view-ci-view-ui-b431c0d7 = { $noun } of { $short-view-sha-1 }
+
+repo-workflows-ci_view-ci-view-ui-c454bec0 = Workflow runs
+
+repo-workflows-ci_view-ci-view-ui-d1a8fffe = Pipelines
+
+repo-workflows-ci_view-ci-view-ui-e50c77eb = Some projects could not be checked for builds.
+
+repo-workflows-ci_view-job-card-0098c77e = job { $job-name-1 }
+
+repo-workflows-ci_view-job-card-f4ed9e36 = { $job-name-1 }
+    Double-click to open it in the browser
+
+repo-workflows-ci_view-load-ci-view-4c1d2d4e = This repository isn't on GitHub or GitLab.
+
+repo-workflows-ci_view-open-ci-680d5c5f = interactive rebase
+
+repo-workflows-ci_view-open-ci-991ae978 = Finish or close the { $editor } first
+
+repo-workflows-ci_view-open-ci-d509b2ee = conflict editor
+
+repo-workflows-ci_view-page-04ec3970 = LOG OF THE FAILED JOBS
+
+repo-workflows-ci_view-page-20681c9f = the log
+
+repo-workflows-ci_view-page-30fc4b32 = STEPS OF { $job-name-to-uppercase-1 }
+
+repo-workflows-ci_view-page-66f52811 = No jobs.
+
+repo-workflows-ci_view-page-7261125c = The log is empty.
+
+repo-workflows-ci_view-page-77a860cb = Send to agent
+
+repo-workflows-ci_view-page-da532fb6 = Types the end of this log into the agent's terminal, to fix the failure
+
+repo-workflows-ci_view-page-header-8c6c9cf3 = Back (Esc)
+
+repo-workflows-ci_view-page-header-a7eac6b5 = Open in the browser
+
+repo-workflows-ci_view-page-header-d62bc4a3 = Load again
+
+repo-workflows-ci_view-run-actions-19766ed6 = Cancel
+
+repo-workflows-ci_view-run-actions-1c703119 = Show the failed log
+
+repo-workflows-ci_view-run-actions-46677f1c = Runs the jobs that failed or were cancelled again
+
+repo-workflows-ci_view-run-actions-7b68b715 = Hide the log
+
+repo-workflows-ci_view-run-actions-8c40a11a = Re-run failed jobs
+
+repo-workflows-ci_view-run-header-0b4ad7c1 = Show the commit in the graph
+
+repo-workflows-ci_view-run-header-396f73af = attempt { $run-attempt-1 }
+
+repo-workflows-ci_view-run-header-420fc08d = running for { $ci-duration-label-seconds-1 }
+
+repo-workflows-ci_view-run-header-4e8bc57f = · started { $git-relative-time-started-now-1 }
+
+repo-workflows-ci_view-run-header-ac6a17db = took { $ci-duration-label-seconds-1 }
+
+repo-workflows-ci_view-run-header-b368daf0 = skipped or cancelled
+
+repo-workflows-ci_view-timeline-709e9121 = GitLab doesn't list the steps of a job: its log is on its page.
+
+repo-workflows-ci_view-timeline-7a7400f4 = not started
+
+repo-workflows-ci_view-timeline-99fa228f = Not started yet.
+
+repo-workflows-ci_view-timeline-b59cc5d9 = This job ran no steps.
+
+repo-workflows-ci_view-timeline-ee459f80 = This job has no steps to show yet.
+
+repo-workflows-collision_view-body-282052b1 = Each pair of branches merged in memory (git merge-tree), and each with { $onto }: nothing is checked out, no branch moves. Branches of the linked worktrees are ticked.
+
+repo-workflows-collision_view-body-5c35d043 = the branch they land on
+
+repo-workflows-collision_view-body-7d9eb7ac = Close
+
+repo-workflows-collision_view-body-94846973 = Merging in memory… { $done } of { $run-total-1 }
+
+repo-workflows-collision_view-body-cae7d57b = Stop
+
+repo-workflows-collision_view-body-cf642735 = Collision matrix
+
+repo-workflows-collision_view-cannot-check-42af2e23 = Pick the branch they land on
+
+repo-workflows-collision_view-cannot-check-76fb9e14 = A check is running
+
+repo-workflows-collision_view-cannot-check-8bcfe01d = Tick the branches to check
+
+repo-workflows-collision_view-cannot-check-c1d9426d = At most { $MOST } branches at a time
+
+repo-workflows-collision_view-cell-tip-81bf5184 =
+      and { $n-listed-1 } more
+
+repo-workflows-collision_view-cell-tip-9b99b61c =
+    Click to compare them
+
+repo-workflows-collision_view-cell-tip-b3f28cca = { $a } and { $b } merge cleanly
+
+repo-workflows-collision_view-check-collisions-96d2bcac = Stopped; nothing new to show
+
+repo-workflows-collision_view-matrix-f5346a60 = Merged into { $m-target-1 }
+
+repo-workflows-collision_view-pick-branches-3bc09abe = Lands on
+
+repo-workflows-collision_view-pick-branches-6de3bf71 = There is no other local branch.
+
+repo-workflows-collision_view-pick-branches-fb40a427 = Pick one…
+
+repo-workflows-collision_view-results-45512235 = Some pairs couldn't be merged in memory: { $e }
+
+repo-workflows-collision_view-results-87f3fc81 = → is each branch merged into { $m-target-1 }. A number is how many files conflict: hover for them, click to compare the two.
+
+repo-workflows-collision_view-results-9b24a27f = Suggested landing order
+
+repo-workflows-collision_view-step-note-5896a7b7 = couldn't be merged with { $unknown-join-1 } in memory
+
+repo-workflows-collision_view-step-note-5ef5ed3f = conflicts with { $parts-join-1 }
+
+repo-workflows-collision_view-step-note-cb1d05dc = merges cleanly with each one before it
+
+repo-workflows-content_recovery-content-inspect-e3ceaa94 = Invalid content selection
+
+repo-workflows-content_recovery-content-perform-9d57ebb2 = Content recovery: { $e }
+
+repo-workflows-content_recovery-content-perform-fbdf23f8 = Recover content
+
+repo-workflows-content_recovery-origin-53bdf21a = Reflog / history
+
+repo-workflows-content_recovery-origin-856aca6d = Current stash list
+
+repo-workflows-content_recovery-origin-d8ee810d = Unreachable commit
+
+repo-workflows-content_recovery-origin-ebcaaeb6 = Dropped stash
+
+repo-workflows-content_recovery-show-11f20956 = Text you remember, such as parse_header
+
+repo-workflows-content_recovery-show-1762ea22 = This is a shallow repository; older content may not be present locally.
+
+repo-workflows-content_recovery-show-1e53ab9e = Limits: 500 commits, 10000 objects, 15000 file entries, 2 MiB per blob, 64 MiB scanned content, 300 hits, 120 seconds. Binary/non-UTF-8 and oversized content is skipped.
+
+repo-workflows-content_recovery-show-1f3ee4b2 = Preview branch recovery…
+
+repo-workflows-content_recovery-show-30ea379c = Cancel read
+
+repo-workflows-content_recovery-show-334a8ddd = Displayed text is clipped to 2000 lines and 400 characters per line. Recovery uses the complete saved bytes.
+
+repo-workflows-content_recovery-show-34ac4d52 = { $hit-provenance-len-1 } known places / versions
+
+repo-workflows-content_recovery-show-4c76d94b = Search literal text
+
+repo-workflows-content_recovery-show-50b4d1c2 = New branch:
+
+repo-workflows-content_recovery-show-52545e10 = { $report-hits-len-1 } matches · { $report-scanned-2 } blobs / { $report-bytes-3 } bytes read · { $report-binary-4 } binary, { $report-large-5 } oversized, { $report-missing-6 } missing skipped
+
+repo-workflows-content_recovery-show-55bda87c = Lost and found by content
+
+repo-workflows-content_recovery-show-5ec718b0 = Reading local objects · { $self-began-map-or-0-at-at-elapse-1 }s
+
+repo-workflows-content_recovery-show-67802d1b = Find literal text in reflog history, unreachable commits, dropped stashes and unattached staged blobs. Search reads local objects without downloading or changing files.
+
+repo-workflows-content_recovery-show-6f803fc9 = Time unknown
+
+repo-workflows-content_recovery-show-7d9eb7ac = Close
+
+repo-workflows-content_recovery-show-8cd42b70 = Creates a new regular file on the repository’s machine. Existing, tracked, ignored and linked destinations are refused; staged contents stay unchanged.
+
+repo-workflows-content_recovery-show-8d5a103e = Create branch { $name } at the saved commit. The complete saved commit is included; HEAD and working files stay unchanged.
+
+repo-workflows-content_recovery-show-8ef50fb8 = Search reached a budget or skipped unsupported paths/provenance. These results are incomplete.
+
+repo-workflows-content_recovery-show-93547d7d = Recover now
+
+repo-workflows-content_recovery-show-9cba18de = Create { $prepared-preview-identity-root-p-1 }/{ $path } with { $prepared-preview-bytes-len-2 } raw bytes. Nothing existing will be replaced.
+
+repo-workflows-content_recovery-show-a6dcec6a = Unattached content: original filename and staging time are unknown. It can be recovered as a new file.
+
+repo-workflows-content_recovery-show-a963e860 = { $date } · Unattached staged content
+
+repo-workflows-content_recovery-show-abadbc35 = Timeline is newest first where a commit date is known. Unattached blobs appear last.
+
+repo-workflows-content_recovery-show-beb0df0b = Back to matches
+
+repo-workflows-content_recovery-show-c006906c = Saved content · { $preview-bytes-len-1 } bytes · { $preview-blob-12-2 }
+
+repo-workflows-content_recovery-show-c8d6eb2f = Preview return to stash list…
+
+repo-workflows-content_recovery-show-cc6d8221 = New file in this repository:
+
+repo-workflows-content_recovery-show-da1ba0df = Preview file recovery…
+
+repo-workflows-content_recovery-show-eff2c65f = Return this dropped stash to the stash list, preserving the current stash. Do not apply it or change staged/working files.
+
+repo-workflows-content_recovery-show-fbdaf564 = (unavailable root)
+
+repo-workflows-custom_commands-custom-act-5bd548f5 = { $self-name-1 }: { $commands } repository command(s) now offered
+
+repo-workflows-custom_commands-custom-file-read-4533a718 = { $self-name-1 } has its own custom commands: review them (palette or a menu) to use them
+
+repo-workflows-custom_commands-custom-file-read-cbe7f164 = { $self-name-1 }: { $cc-repo-file-2 } can't be used. Review repository commands… says why
+
+repo-workflows-custom_commands-custom-palette-items-0841b1ff = repository command
+
+repo-workflows-custom_commands-custom-palette-items-b8af1810 = Review repository commands…
+
+repo-workflows-custom_commands-custom-palette-items-cd972ec3 = custom command
+
+repo-workflows-custom_commands-menu-items-7bbc1546 = { $cc-repo-file-1 } has commands not trusted yet (or can't be read): see them first
+
+repo-workflows-custom_commands-menu-items-8f4e08cd = Custom command (Settings)
+
+repo-workflows-custom_commands-menu-items-b8af1810 = Review repository commands…
+
+repo-workflows-custom_commands-menu-items-cb87a7d9 = Custom command of this repository
+
+repo-workflows-custom_commands-read-file-55a45ca4 = { $cc-repo-file-1 } isn't UTF-8 text
+
+repo-workflows-custom_commands-read-file-851cebee = { $cc-repo-file-1 } can't be read: { $e }
+
+repo-workflows-custom_commands-read-here-28b7ef24 = it is larger than { $max-1024-1 } KiB
+
+repo-workflows-custom_commands-read-here-50cdcf6c = it isn't a file
+
+repo-workflows-custom_commands-read-here-f4fd09c1 = it is a symbolic link
+
+repo-workflows-custom_commands-run-custom-44771367 = ${ $name } can't hold a NUL character
+
+repo-workflows-custom_commands-run-custom-captured-471b45de = { $name } couldn't be run: { $e }
+
+repo-workflows-custom_commands-run-custom-captured-5215b5ab = Running { $name }…
+
+repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3 = { $name } couldn't be started: { $e }
+
+repo-workflows-dco--5e1a6b4e = Adds Signed-off-by with your name and email (DCO)
+
+repo-workflows-dco-commit-note-72e49d72 = A DCO check refuses a commit without a sign-off of its author or committer
+
+repo-workflows-dco-commit-note-c87e4ef3 = No Signed-off-by from its author (DCO)
+
+repo-workflows-dco-commit-note-fccbd96e = ✔ Signed off by its author (DCO)
+
+repo-workflows-dco-commits-count-4eb116dc = { $n } commits
+
+repo-workflows-dco-commits-count-acfd7b9e = 1 commit
+
+repo-workflows-dco-dco-act-10fe4a7c = Couldn't save Sign off for this repository (git config { $signoff-sign-off-key-1 }): { $e }
+
+repo-workflows-dco-dco-op-done-55d2b32b = Push the signed-off commits of { $plan-branch-1 }
+
+repo-workflows-dco-dco-op-done-5d0c9ff1 = Sign off the commits of { $plan-branch-1 } (here only)
+
+repo-workflows-dco-fix-button-04f5829a = Adds your Signed-off-by to each of the branch's commits (rebase --signoff) and force-pushes them with a lease, after showing what it will do. Ctrl+Z undoes it.
+
+repo-workflows-dco-fix-button-344ac70e = Sign off the branch's commits…
+
+repo-workflows-dco-fix-button-6d181602 = Check out { $details-head-branch-1 } first (or open it in a worktree): the commits signed off are those of the branch checked out, at the pull request's latest commit
+
+repo-workflows-dco-fix-dialog-1a8aeebd = Sign off and push
+
+repo-workflows-dco-fix-dialog-6ce6ab1f = Sign off
+
+repo-workflows-dco-fix-label-dfc76b8d = Sign off the commits of { $plan-branch-1 }
+
+repo-workflows-dco-fix-preview-1cc2b37b = refused if someone pushed there since it was last fetched
+
+repo-workflows-dco-fix-preview-b12258fd = refused if that branch exists there already
+
+repo-workflows-dco-plan-0ac1ebd9 = The branch and its base have no commit in common: { $e }
+
+repo-workflows-dco-plan-4c71d659 = { $branch } has no commits of its own since its base
+
+repo-workflows-dco-plan-589b41e2 = { $branch } is at { $crate-repo-short-head-1 }, the pull request at { $crate-repo-short-expected-2 }: pull or push it first, so that the commits signed off are the pull request's
+
+repo-workflows-dco-plan-927db158 = { $label } has commits { $branch } hasn't: pull them first, or the push would throw them away
+
+repo-workflows-dco-plan-a16c4b9b = Every commit of { $branch } is already signed off
+
+repo-workflows-dco-plan-cfb9aeb9 = Commit or stash your changes first: signing off rebases the branch
+
+repo-workflows-dco-plan-d7cbaa06 = { $branch } has merge commits since its base, which a rebase would flatten. Sign it off in a terminal (git rebase --signoff --rebase-merges { $crate-repo-short-merge-base-1 }), or ask its authors to
+
+repo-workflows-dco-plan-d866c6e0 = Check out the pull request's branch first: HEAD is detached
+
+repo-workflows-dco-pr-section-15029601 = No commits for the DCO check to look at.
+
+repo-workflows-dco-pr-section-9ecdacc9 = Waiting for the pull request's commits to load…
+
+repo-workflows-dco-pr-section-e93d65c8 = Couldn't read the commits' sign-offs: { $e }
+
+repo-workflows-dco-text-dc4915c9 = the DCO check of #{ $n } fails
+
+repo-workflows-dco-text-e5458838 = this repository has a { $file } file
+
+repo-workflows-dco-toggle-6ce6ab1f = Sign off
+
+repo-workflows-dco-toggle-9ba5d60e = The commits being replayed keep their own messages
+
+repo-workflows-detached--bff74cc9 = You're looking at an old version; new commits here belong to no branch.
+
+repo-workflows-detached-detached-act-70dad4a3 = Wait for { $busy } to finish, then check out again
+
+repo-workflows-detached-detached-banner-15bbfb59 = Create branch here
+
+repo-workflows-detached-detached-banner-3d7f6bc2 = HEAD is detached at { $short-head-1 }: it is on no branch. Commits made now are on no branch either, and checking out something else leaves them behind.
+
+repo-workflows-detached-detached-banner-f16cf1bf = A branch at this commit, checked out: new commits go on it
+
+repo-workflows-detached-detached-banner-f5cd526a = Check { $branch } out
+
+repo-workflows-detached-detached-banner-f76b5669 = Back to { $branch }
+
+repo-workflows-detached-keep-steps-d2a49cac = Create branch { $name }
+
+repo-workflows-detached-leave-to-007a4c0e = Didn't check out { $leave-label-1 }: { $busy } started meanwhile
+
+repo-workflows-detached-leave-to-28ae5898 = Checkout { $leave-label-1 }: wait for { $busy } to finish
+
+repo-workflows-detached-leave-to-48b0ce4c = Didn't check out { $leave-label-1 }: couldn't list the commits it would leave on no branch ({ $e })
+
+repo-workflows-detached-leave-to-c6023785 = the listing stopped unexpectedly
+
+repo-workflows-devcontainer-container-id-a1ced98b = Docker must return a complete 64-character container ID
+
+repo-workflows-devcontainer-detect-01821b94 = Dev container configuration must be readable inside the worktree and at most 1 MiB
+
+repo-workflows-devcontainer-detect-764255b7 = Dev container configuration is not UTF-8
+
+repo-workflows-devcontainer-devcontainer-act-519a489a = Dev container operation
+
+repo-workflows-devcontainer-devcontainer-act-5474eef8 = Working…
+
+repo-workflows-devcontainer-devcontainer-act-84f8f92f = Cancelled before starting
+
+repo-workflows-devcontainer-devcontainer-window-05be654b = Start environment
+
+repo-workflows-devcontainer-devcontainer-window-0c79d376 = Worker ended or was cancelled. A container may remain; inspect this worktree's labels before retrying.
+
+repo-workflows-devcontainer-devcontainer-window-20441b4a = Rebuild displayed environment
+
+repo-workflows-devcontainer-devcontainer-window-22f9e7ca = No .devcontainer/devcontainer.json detected. Remote worktrees require the CLI on their own machine; this integration supports local worktrees.
+
+repo-workflows-devcontainer-devcontainer-window-2d5a4455 = Terminal inside container
+
+repo-workflows-devcontainer-devcontainer-window-3675738c = Worktree: { $config-path-display-1 }
+    Ownership: { $config-label-2 }
+    Configuration SHA256: { $model-hash-config-source-as-byte-3 }
+
+repo-workflows-devcontainer-devcontainer-window-3a6ea0e2 = Starting runs this repository's Docker/build/features and lifecycle commands. Review the repository and its referenced files first. Rebuilding deletes only the displayed owned container; unsaved container-only files are lost.
+
+repo-workflows-devcontainer-devcontainer-window-3c898437 = Uses installed Docker and the Dev Container CLI on this machine. Linux containers with an exact worktree bind mount are supported. Linked Git worktrees require standard relative POSIX metadata and the native common-directory mount. Compose or combined custom workspaceFolder/workspaceMount linked layouts are refused; metadata is never rewritten. Containers persist after closing this window.
+
+repo-workflows-devcontainer-devcontainer-window-4227dbe9 = Open container in VS Code
+
+repo-workflows-devcontainer-devcontainer-window-437e57b5 = Read worktree configuration again
+
+repo-workflows-devcontainer-devcontainer-window-4564ef3d = Terminal handoff expired or was cancelled; open it again
+
+repo-workflows-devcontainer-devcontainer-window-473f0412 = Container configuration SHA256: { $model-hash-binding-config-source-1 }
+
+repo-workflows-devcontainer-devcontainer-window-5d2a90a9 = Container: { $binding-id-1 }
+    Docker context: { $binding-engine-context-2 }
+    Daemon: { $binding-engine-id-3 }
+    Workspace: { $binding-folder-4 }
+    User: { $binding-user-5 }
+
+repo-workflows-devcontainer-devcontainer-window-6e69284d = Configuration changed: rebuild the displayed container before terminal/editor use. Containers from older app sessions/configurations can remain in Docker.
+
+repo-workflows-devcontainer-devcontainer-window-7cb7e0b2 = Profile changed or operation cancelled. A created container may remain; inspect its displayed worktree labels before retrying.
+
+repo-workflows-devcontainer-devcontainer-window-8f14be4f = Delete this container and rebuild (container-only files will be lost)
+
+repo-workflows-devcontainer-devcontainer-window-a79d7c99 = Configuration detected; review it before starting
+
+repo-workflows-devcontainer-devcontainer-window-b64a0d4f = Cancel operation
+
+repo-workflows-devcontainer-devcontainer-window-b64ae277 = Worktree environment · Dev Containers
+
+repo-workflows-devcontainer-devcontainer-window-bbd55e3e = Opened /bin/sh inside the displayed container
+
+repo-workflows-devcontainer-devcontainer-window-c1f95bd8 = I trust this worktree's container configuration and lifecycle commands
+
+repo-workflows-devcontainer-devcontainer-window-d66d64d1 = Environment started and its worktree mount/ownership checked
+
+repo-workflows-devcontainer-devcontainer-window-d8db68fe = { $error }
+    Start/rebuild may have partly completed. Check Docker availability, installed Dev Container CLI, build files and lifecycle-command errors above. No global cleanup is performed; inspect this worktree's labels before retrying.
+
+repo-workflows-devcontainer-devcontainer-window-df4a39c8 = devcontainer.json (JSON with comments supported by native CLI)
+
+repo-workflows-devcontainer-devcontainer-window-dfcb3d90 = Terminal uses Docker exec with this native remote user and /bin/sh; editor requires VS Code with its Dev Containers extension.
+
+repo-workflows-devcontainer-editor-47c00405 = Container stopped; start the environment before editor handoff
+
+repo-workflows-devcontainer-editor-806df56f = Handed the bound container workspace to VS Code. Its Dev Containers extension must be installed.
+
+repo-workflows-devcontainer-engine-0af39fb5 = Invalid Docker context/daemon identity
+
+repo-workflows-devcontainer-engine-161bfc12 = Missing Docker endpoint
+
+repo-workflows-devcontainer-engine-1cfeec69 = Select a local Docker context and unset DOCKER_HOST before using this integration
+
+repo-workflows-devcontainer-engine-a5b6c95b = This integration supports local Docker sockets. SSH/TCP Docker hosts require a separate native setup; no automatic remote handoff is attempted.
+
+repo-workflows-devcontainer-engine-f6690c9e = Missing Docker daemon identity
+
+repo-workflows-devcontainer-gitdir-pointer-a66f1615 = Unsupported .git pointer
+
+repo-workflows-devcontainer-guard-7103bfb5 = Dev container configuration disappeared
+
+repo-workflows-devcontainer-guard-d353a99e = Cancelled
+
+repo-workflows-devcontainer-inspect-2227e9c4 = Invalid ownership label
+
+repo-workflows-devcontainer-inspect-2e29e769 = Container belongs to another worktree, Docker daemon or selected profile
+
+repo-workflows-devcontainer-inspect-3c611856 = Docker inspect must return an array
+
+repo-workflows-devcontainer-inspect-85ded6e6 = Container ID or worktree/configuration ownership labels no longer match; refusing this target
+
+repo-workflows-devcontainer-inspect-85fd3a35 = Container does not bind this exact worktree into its displayed workspace. Volume-only or parent-directory workspace mounts are currently unsupported.
+
+repo-workflows-devcontainer-inspect-d934c6ee = Expected exactly one bound container
+
+repo-workflows-devcontainer-json-0d639c4b = Container CLI result exceeds 8 MiB
+
+repo-workflows-devcontainer-json-edd11b13 = Invalid { $tool } JSON result: { $e }
+
+repo-workflows-devcontainer-linked-222d5e0e = Native common-directory mounting supports only the standard relative common/worktrees/name layout
+
+repo-workflows-devcontainer-linked-7c9c7625 = Missing common Git directory
+
+repo-workflows-devcontainer-linked-9990fafd = Linked Git metadata backlink does not point to this physical worktree
+
+repo-workflows-devcontainer-linked-cdb7b1a0 = Missing Git metadata parent
+
+repo-workflows-devcontainer-metadata-0a13f60e = Missing worktree metadata name
+
+repo-workflows-devcontainer-metadata-735e6123 = This linked/symlink Git layout is unsupported by native container metadata mounting
+
+repo-workflows-devcontainer-metadata-b2bab91f = Symlinked or nonstandard common Git metadata layout is unsupported
+
+repo-workflows-devcontainer-metadata-b9388ff2 = Container requires a physical worktree root: { $e }
+
+repo-workflows-devcontainer-metadata-file-a1a99ba5 = Git metadata pointer is not UTF-8
+
+repo-workflows-devcontainer-metadata-file-bd4adcf1 = Linked metadata pointers must be regular files
+
+repo-workflows-devcontainer-metadata-file-ddb7553c = Git metadata pointer exceeds 8 KiB
+
+repo-workflows-devcontainer-metadata-ready-4d28a9de = Missing physical worktree mount
+
+repo-workflows-devcontainer-metadata-ready-7575b58d = Missing worktree destination
+
+repo-workflows-devcontainer-metadata-ready-8dad9e0c = Linked worktree Git metadata is not mounted read/write at its required relative location; environment is not ready
+
+repo-workflows-devcontainer-metadata-ready-fea2d3e9 = Missing container mounts
+
+repo-workflows-devcontainer-native-configuration-5aec3885 = Native CLI did not plan the required linked Git common-directory mount; environment cannot start or rebuild
+
+repo-workflows-devcontainer-native-configuration-90cc8e0e = Linked worktree metadata mounting is unsupported for Compose or combined workspaceFolder/workspaceMount configurations; native CLI skips the required common-directory mount
+
+repo-workflows-devcontainer-native-configuration-969b53cd = CLI did not return parsed configuration for linked worktree
+
+repo-workflows-devcontainer-native-configuration-b328a4b3 = Invalid native workspaceFolder
+
+repo-workflows-devcontainer-normalize-3fe3c368 = Git metadata path escapes the filesystem root
+
+repo-workflows-devcontainer-relative-fe173813 = Linked containers require relative POSIX Git metadata paths; this layout is unsupported. Git metadata was not changed.
+
+repo-workflows-devcontainer-same-97743985 = Worktree, configuration or selected profile changed; read configuration again
+
+repo-workflows-devcontainer-start-6a0249a9 = Docker context/daemon changed since display; refusing rebuild
+
+repo-workflows-devcontainer-start-87b3fed2 = { $pause-why-1 }; starting an environment can pull images/features
+
+repo-workflows-devcontainer-started-046dacc8 = no success result
+
+repo-workflows-devcontainer-started-19964d1c = Missing containerId
+
+repo-workflows-devcontainer-started-43acb4ec = Missing remoteUser
+
+repo-workflows-devcontainer-started-8c6f6a65 = Unsupported container workspace/user returned by CLI
+
+repo-workflows-devcontainer-started-d1a64c4b = Missing remoteWorkspaceFolder
+
+repo-workflows-devcontainer-started-f9fa046f = Dev Container CLI did not start the environment: { $value-description-as-str-unwrap--1 }
+
+repo-workflows-devcontainer-terminal-77e417ed = Container { $binding-id-12-1 } · { $binding-folder-2 }
+
+repo-workflows-devcontainer-terminal-b74a6469 = Container stopped; start the environment again before opening a terminal
+
+repo-workflows-devcontainer-terminal-f171832a = Cancelled before terminal start
+
+repo-workflows-doctor-ago-4603eba2 = { $secs-3600-1 } h ago
+
+repo-workflows-doctor-ago-7ddb44d8 = just now
+
+repo-workflows-doctor-ago-a0c430f4 = { $secs-60-1 } min ago
+
+repo-workflows-doctor-attributes-2176c800 = diffs it
+
+repo-workflows-doctor-attributes-4af8906f = filter={ $name } names a filter this configuration doesn't define: git stores and checks the file out as it is.
+
+repo-workflows-doctor-attributes-68cb5f93 = Line endings · in the repository: { $eol-word-eol-index-1 } · in the working tree: { $eol-word-eol-worktree-2 } · attributes: { $if-eol-attr-is-empty-else-eol-at-3 }
+
+repo-workflows-doctor-attributes-82806016 = filter=lfs, but Git LFS isn't set up here (git lfs install): checkouts leave pointer files, and files you add go into git itself, not LFS.
+
+repo-workflows-doctor-attributes-c6b25148 = { $attr }={ $name } names a driver this configuration doesn't define ({ $attr }.{ $name }.*): git { $if-attr-merge-merges-it-else-dif-1 } as usual.
+
+repo-workflows-doctor-attributes-cb2060cc = No attributes: git guesses text or binary for diffs and merges, and core.autocrlf alone decides line endings.
+
+repo-workflows-doctor-attributes-ec97a4d2 = filter={ $name } is required but has no clean or smudge command here: git refuses to add or check out this file.
+
+repo-workflows-doctor-attributes-f31e8d7f = merges it
+
+repo-workflows-doctor-clear-7f76d2cf = Clear the flag of { $one-path-1 }
+
+repo-workflows-doctor-clear-83b12c22 = Clear
+
+repo-workflows-doctor-clear-909d7fba = Clear the flags?
+
+repo-workflows-doctor-clear-ac70d25c = { $files-len-1 } files
+
+repo-workflows-doctor-clear-ae587a37 = Git will look at { $what } again: local edits show under Changes, where Discard would throw them away. Which files were flagged isn't kept, so this can't be undone here.
+
+repo-workflows-doctor-clear-e318945b = Clear the flags of { $files-len-1 } files
+
+repo-workflows-doctor-confirm-modal-19766ed6 = Cancel
+
+repo-workflows-doctor-confirm-modal-3b13192b = Discard your changes?
+
+repo-workflows-doctor-confirm-modal-c324130d = Your changes to { $file } aren't saved: closing the doctor drops them.
+
+repo-workflows-doctor-confirm-modal-e76fd2ad = Keep editing
+
+repo-workflows-doctor-confirm-modal-eb1a70e3 = Discard
+
+repo-workflows-doctor-details-ba8d6068 = No file sets it: git uses its built-in default.
+
+repo-workflows-doctor-doctor-act-9bab8d95 = Wait for the running operation to end
+
+repo-workflows-doctor-doctor-ui-3095e533 = Repository doctor
+
+repo-workflows-doctor-doctor-ui-8c6c9cf3 = Back (Esc)
+
+repo-workflows-doctor-doctor-ui-d8cb92fa = Read again
+
+repo-workflows-doctor-editor-0ba2a573 = Nothing changed
+
+repo-workflows-doctor-editor-1509f561 = Save
+
+repo-workflows-doctor-editor-1ee81c8e = { $e-file-label-1 } isn't a file of this repository: it applies to every repository that reads it. Click again to save it.
+
+repo-workflows-doctor-editor-23e39291 = Saving…
+
+repo-workflows-doctor-editor-324b134f = Preview
+
+repo-workflows-doctor-editor-52448408 = Editing { $e-file-label-1 }
+
+repo-workflows-doctor-editor-5902680c = Save outside the repository
+
+repo-workflows-doctor-editor-6c1adba2 = Read it again
+
+repo-workflows-doctor-editor-7d9eb7ac = Close
+
+repo-workflows-doctor-editor-a875327e = Change the rules first
+
+repo-workflows-doctor-editor-b5bfc677 = Editing { $e-file-label-1 } · not saved
+
+repo-workflows-doctor-editor-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-editor-f9bfa3dc = Discard changes
+
+repo-workflows-doctor-editor-fca046cc = Saved.
+
+repo-workflows-doctor-eol-notes-384973dd = No text or eol attribute: each machine's core.autocrlf decides its line endings, which is how line-ending churn starts; `* text=auto` in .gitattributes makes it the same everywhere.
+
+repo-workflows-doctor-eol-notes-868d3e72 = Stored in the repository with CRLF or mixed line endings: whoever has core.autocrlf set will see the whole file change.
+
+repo-workflows-doctor-eol-word-ec3e00be = no line breaks
+
+repo-workflows-doctor-explain-card-3b61e4e9 = Explain
+
+repo-workflows-doctor-explain-card-7486f5b7 = Explain a file
+
+repo-workflows-doctor-explained-55b528ba = Save or discard the changes being edited first
+
+repo-workflows-doctor-explained-98353ed7 = Edit this file
+
+repo-workflows-doctor-folder-card-05f75db2 = Set by core.hooksPath ({ $path }), instead of .git/hooks.
+
+repo-workflows-doctor-folder-card-34845b15 = The repository's own (.git/hooks): no core.hooksPath is set.
+
+repo-workflows-doctor-folder-card-548df737 = Hooks folder
+
+repo-workflows-doctor-folder-card-5cc7fab9 = manages the hooks here: { $m-advice-1 }
+
+repo-workflows-doctor-folder-card-605924cc = { $n } .sample files: examples git ships, never run.
+
+repo-workflows-doctor-folder-card-63c1e34d = 1 .sample file: an example git ships, never run.
+
+repo-workflows-doctor-folder-card-8fa06071 = core.hooksPath is set to nothing: git runs no hook at all. Unset it (Which configuration wins) to run the hooks again.
+
+repo-workflows-doctor-history-card-06c896b6 = History in the graph
+
+repo-workflows-doctor-history-card-5a389005 = Each reload reads the history again and rebuilds the graph: with a commit-graph, git reads it several times faster.
+
+repo-workflows-doctor-history-card-cd12e41d = This repository has { $group-h-commits-unwrap-or-defaul-1 } commits, more than the graph shows: the oldest ones are only reachable from the terminal (git log) or a file's history. Hiding branches or soloing some narrows the graph to theirs.
+
+repo-workflows-doctor-hook-row-432f4eba = Convert to LF
+
+repo-workflows-doctor-hook-row-433c4667 = runs on { $on }
+
+repo-workflows-doctor-hook-row-96c0aa61 = Make executable
+
+repo-workflows-doctor-hooks-act-63222fea = made executable
+
+repo-workflows-doctor-hooks-act-fdf85121 = saved with LF line endings
+
+repo-workflows-doctor-hooks-card-0dfb736a = Other files (never run)
+
+repo-workflows-doctor-hooks-card-52f0510d = 1 hook
+
+repo-workflows-doctor-hooks-card-69d27675 = Git runs no hook of these names: a typo, or a copy kept aside.
+
+repo-workflows-doctor-hooks-card-6c856ad1 = No hook runs: every operation goes ahead without one.
+
+repo-workflows-doctor-hooks-card-84fbcccd = No active hooks
+
+repo-workflows-doctor-hooks-card-d028a324 = { $n } hooks
+
+repo-workflows-doctor-ignored-card-0384b20e = Ignored files
+
+repo-workflows-doctor-ignored-card-1303e9b5 = Nothing is ignored.
+
+repo-workflows-doctor-ignored-card-37abda7f = Ignored files ({ $total })
+
+repo-workflows-doctor-ignored-card-683768ab = and { $total-list-len-1 } more
+
+repo-workflows-doctor-ignored-card-cdd2ef27 = Explain it
+
+repo-workflows-doctor-ignored-card-fb0ae18f = Untracked files git ignores; a folder stands for all it holds. Click one to explain it.
+
+repo-workflows-doctor-manual-card-14faa67e = Clear the { $ticked-len-1 } ticked
+
+repo-workflows-doctor-manual-card-261a3c3d = No flagged files
+
+repo-workflows-doctor-manual-card-29a390f9 = Clear all
+
+repo-workflows-doctor-manual-card-6c8cdf68 = Clear ticked
+
+repo-workflows-doctor-manual-card-70727cd6 = { $n } flagged files
+
+repo-workflows-doctor-manual-card-98cd282b = Tick the files to clear first
+
+repo-workflows-doctor-manual-card-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-manual-card-bf185132 = Its name isn't valid UTF-8: clear it with git update-index in a terminal
+
+repo-workflows-doctor-manual-card-eb376b6a = No tracked file is marked assume-unchanged or skip-worktree.
+
+repo-workflows-doctor-manual-card-f01d6b0e = 1 flagged file
+
+repo-workflows-doctor-manual-card-febfc014 = Git looks at every one of these files again
+
+repo-workflows-doctor-more-683768ab = and { $total-shown-1 } more
+
+repo-workflows-doctor-open-doctor-745454bd = Finish or close the conflict editor or the interactive rebase first
+
+repo-workflows-doctor-origin-label-4cf3860a = gitcraft profile
+
+repo-workflows-doctor-other-worktrees-1aef9399 = not set
+
+repo-workflows-doctor-other-worktrees-965a2b09 = Compare with the other worktrees
+
+repo-workflows-doctor-output-card-01623799 = Output of the last operations
+
+repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } lines above
+
+repo-workflows-doctor-output-card-50f9b973 = Nothing yet: no operation gitcraft ran that runs hooks printed anything (what runs in the terminal isn't kept).
+
+repo-workflows-doctor-output-card-ae5bfc74 = What git and its hooks printed during the last operations gitcraft ran in this repository (commit, merge, push, checkout…), the last dozen. Kept in memory only, with passwords in URLs hidden.
+
+repo-workflows-doctor-preview-0f241c6b = No longer ignored
+
+repo-workflows-doctor-preview-63666b35 = Newly ignored
+
+repo-workflows-doctor-preview-683768ab = and { $paths-len-preview-shown-1 } more
+
+repo-workflows-doctor-preview-8c8b9b2a = Tracked files this file's rules match (they stay tracked)
+
+repo-workflows-doctor-preview-bbb0c0cc = This change wouldn't start or stop ignoring any untracked file.
+
+repo-workflows-doctor-preview-cd2605b4 = By this file's rules alone: rules in other files are left out, so a ! rule here that takes back what another file ignores doesn't show, and another file may still ignore a path listed here.
+
+repo-workflows-doctor-remove-confirm-9861b6eb = Remove { $origin-key-1 }?
+
+repo-workflows-doctor-remove-confirm-b0b26eef = Remove { $origin-key-1 } ({ $shortened-origin-shown-value-2 }) from { $file }
+
+repo-workflows-doctor-remove-confirm-c3812fc4 = Remove
+
+repo-workflows-doctor-rules-card-379ee96f = Edit one, preview what the change would ignore, then save it.
+
+repo-workflows-doctor-rules-card-464c4ffd = Edit
+
+repo-workflows-doctor-rules-card-55b528ba = Save or discard the changes being edited first
+
+repo-workflows-doctor-rules-card-91b1b197 = Files of ignore rules
+
+repo-workflows-doctor-scope-choice-0eb26325 = This worktree
+
+repo-workflows-doctor-scope-choice-38429e22 = This repository
+
+repo-workflows-doctor-scope-choice-59b8031f = All my repositories
+
+repo-workflows-doctor-scope-choice-ad944dcb = Everyone on this machine
+
+repo-workflows-doctor-scope-choice-c925a118 = Command line
+
+repo-workflows-doctor-set-row-2b7c9578 = Your global git config on that machine (usually ~/.gitconfig), for all your repositories there.
+
+repo-workflows-doctor-set-row-30a28bf1 = Choose a value first
+
+repo-workflows-doctor-set-row-3da50e6f = Git's system file, for every user of this machine; usually needs administrator rights.
+
+repo-workflows-doctor-set-row-46f01635 = Type a value first
+
+repo-workflows-doctor-set-row-6ec46474 = Needs extensions.worktreeConfig = true in this repository: without it git refuses when there are other worktrees, and with only one writes .git/config
+
+repo-workflows-doctor-set-row-85b9cd3d = Set it for
+
+repo-workflows-doctor-set-row-921f564b = Set { $setting-key-1 } to { $shortened-value-2 } for { $scope-choice-scope-to-lowercase-3 }
+
+repo-workflows-doctor-set-row-a215cc6f = Set { $setting-key-1 } for { $scope-choice-scope-to-lowercase-2 }?
+
+repo-workflows-doctor-set-row-ad30af45 = Your global git config (usually ~/.gitconfig), for all your repositories. A gitcraft profile that sets the same thing still wins over it.
+
+repo-workflows-doctor-set-row-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-set-row-b6f6f3ad = Set
+
+repo-workflows-doctor-set-row-cadb5751 = Only this worktree (its config.worktree file).
+
+repo-workflows-doctor-set-row-cc3edd84 = git's system file, for every user of this machine
+
+repo-workflows-doctor-set-row-ccc71902 = { $setting-key-1 } = { $value } goes into { $if-scope-scope-global-your-globa-2 }. The value it replaces there isn't kept.
+
+repo-workflows-doctor-set-row-e0a790f9 = your global git config, for all your repositories
+
+repo-workflows-doctor-set-row-e0d5ce0a = Only this repository (.git/config). An include later in that file that sets it still wins.
+
+repo-workflows-doctor-setting-row-2224c772 = not set: git's default
+
+repo-workflows-doctor-setting-row-8f8c7445 = overrides { $values-len-1-1 }
+
+repo-workflows-doctor-setting-row-8ffd7cc3 = Git default
+
+repo-workflows-doctor-size-8333f24e = { NUMBER($kib-as-f64-1024-0-1, minimumFractionDigits: 1, maximumFractionDigits: 1) } MiB
+
+repo-workflows-doctor-size-95886483 = { $kib } KiB
+
+repo-workflows-doctor-size-9d2b746f = { NUMBER($kib-as-f64-1-048-576-0-1, minimumFractionDigits: 2, maximumFractionDigits: 2) } GiB
+
+repo-workflows-doctor-size-card-1af85190 = Size
+
+repo-workflows-doctor-size-card-1f2fe3f1 = { $o-packed-1 } in { $o-packs-2 } packs, { $size-o-pack-kib-3 }
+
+repo-workflows-doctor-size-card-35195164 = Packed objects
+
+repo-workflows-doctor-size-card-52c9d559 = { $o-garbage-1 } files in the objects folder aren't objects ({ $size-o-garbage-kib-2 }): left by an interrupted operation; git gc reports them.
+
+repo-workflows-doctor-size-card-8757152b = Loose objects
+
+repo-workflows-doctor-size-card-b83a7e1d = Loose and also packed
+
+repo-workflows-doctor-size-card-d09648c6 = Commits
+
+repo-workflows-doctor-sparse-card-04bc71e9 = Left out by sparse-checkout ({ $left-out-len-1 })
+
+repo-workflows-doctor-sparse-card-7bb29a8c = Git marks these skip-worktree too, but they are sparse-checkout's: change what is checked out with git sparse-checkout (set, add, disable), not by clearing flags.
+
+repo-workflows-doctor-sparse-card-9cff4083 = Sparse-checkout is on in cone mode with only the files at the top checked out.
+
+repo-workflows-doctor-sparse-card-ce4ee135 = Sparse-checkout is on in cone mode; checked out: { $dirs-join-1 }.
+
+repo-workflows-doctor-sparse-card-f364e530 = Sparse-checkout is on with patterns: every skip-worktree file counts as left out by them, so none of them is cleared here.
+
+repo-workflows-doctor-speed-card-0ad7db50 = git status: { $took-as-millis-1 } ms (gitcraft runs it on every change it sees).
+
+repo-workflows-doctor-speed-card-2154776b = How long reading it takes
+
+repo-workflows-doctor-speed-card-8636e9ce = { $d-as-millis-1 } ms
+
+repo-workflows-doctor-speed-card-aebc38ca = The tab's last reloads (branches, history, changes, all at once): { $times-join-1 }.
+
+repo-workflows-doctor-speed-card-ffe6b51a = No reload of the tab timed yet.
+
+repo-workflows-doctor-suggestion-2b7f0cfe = not available here
+
+repo-workflows-doctor-suggestion-5a1f096a = Turn on
+
+repo-workflows-doctor-suggestion-5a853d12 = Pack the objects
+
+repo-workflows-doctor-suggestion-a96e0fc8 = git's own monitor exists on Windows and macOS only (and not on network drives unless fsmonitor.allowRemote is set); on Linux a Watchman hook can stand in (core.fsmonitor naming it).
+
+repo-workflows-doctor-suggestion-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-suggestion-bd63228b = File system monitor
+
+repo-workflows-doctor-suggestions-card-e930084c = What would make it faster
+
+repo-workflows-doctor-title-1e6bed5e = Hidden changes
+
+repo-workflows-doctor-title-8b2d57fa = Which configuration wins
+
+repo-workflows-doctor-title-8d6acfc3 = Health and maintenance
+
+repo-workflows-doctor-title-94ec061c = Ignore rules and attributes
+
+repo-workflows-doctor-title-d412a062 = Hooks
+
+repo-workflows-doctor-turn-on-action-3c97132f = Schedule maintenance?
+
+repo-workflows-doctor-turn-on-action-7cde0a5e = { $commands-join-1 } adds this repository to maintenance.repo in your own global git config, sets maintenance.auto=false and maintenance.strategy=incremental in its config, and schedules git to run in the background: every hour it fetches from the remotes into refs/prefetch. The scheduled runs read your own global config, not a gitcraft profile's. git maintenance unregister undoes it for this repository (and git config --unset maintenance.auto brings automatic gc back); git maintenance stop removes the schedule for every repository.
+
+repo-workflows-doctor-turn-on-action-d8e3e02d = Turn on: { $s-title-to-lowercase-1 }
+
+repo-workflows-doctor-turn-on-action-f4830a1d = Schedule
+
+repo-workflows-doctor-turn-on-action-f688c962 = Scheduled maintenance
+
+repo-workflows-doctor-ui-089db75c = Show settings nobody set
+
+repo-workflows-doctor-ui-11781882 = Hooks are programs git runs at points of an operation: before a commit, before a push, after a checkout. A hook that fails stops the operation, and one that can't run is skipped or fails with a cryptic message.
+
+repo-workflows-doctor-ui-195ee0f7 = Files changed on disk that never show under Changes are often flagged in git's index. Both flags hide a file's changes; they mean different things, and git supports neither as a way to ignore changes to tracked files.
+
+repo-workflows-doctor-ui-1f9897b7 = Git reads the system file, then your global one, then this repository's and this worktree's, then values given on the command line; for a setting with one value, the last value read wins. With a gitcraft profile, the global file is the profile's: it reads ~/.gitconfig first, then its own values on top (git run outside gitcraft doesn't see it). Values from include or includeIf files show under their own file. Only these settings are shown: nothing credential-related.
+
+repo-workflows-doctor-ui-282e3905 = assume-unchanged: a promise to git that the file won't change, so it doesn't check it, for speed on slow disks. Git may still overwrite the file (a pull, a checkout) and drop the flag; it is not for keeping local edits.
+
+repo-workflows-doctor-ui-2bfe98f3 = No setting here matches.
+
+repo-workflows-doctor-ui-4e47a723 = Filter settings
+
+repo-workflows-doctor-ui-56146558 = The two flags
+
+repo-workflows-doctor-ui-678f7b82 = Why a file seems to vanish, why line endings keep changing, why a merge driver doesn't run: the rule that ignores a file and the attributes git gives it, as the working tree has them. A file's menu (Ignore rules and attributes) brings it here.
+
+repo-workflows-doctor-ui-99079609 = skip-worktree: git keeps the working-tree version and doesn't compare it with the index. Sparse-checkout uses it; people also use it to keep local edits to a tracked file, which git warns isn't supported: a pull, checkout or merge that changes the file may refuse to run until the flag is cleared. For local settings, an untracked override file is safer.
+
+repo-workflows-doctor-ui-9b3b999d = A fix is being made
+
+repo-workflows-doctor-ui-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-ui-c7deeea1 = How big the repository is, how long reading it takes, and what would make git faster here. Every speed-up is git's own, set for this repository: it helps git everywhere, not only in gitcraft.
+
+repo-workflows-doctor-value-row-29f009c0 = Remove every { $origin-key-1 } from this file; the next value down (or git's default) then applies
+
+repo-workflows-doctor-value-row-4b67153d = In effect
+
+repo-workflows-doctor-value-row-4d8ff0fe = Given on the command line or in GIT_CONFIG_PARAMETERS: not in a file
+
+repo-workflows-doctor-value-row-62a03f09 = Overridden
+
+repo-workflows-doctor-value-row-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-value-row-c3812fc4 = Remove
+
+repo-workflows-doctor-value-row-fd2cc5af = gitcraft writes this file from Settings → Profile: change it there
+
+repo-workflows-doctor-verdict-050f8d52 = Tracked: ignore rules don't apply to files git already tracks, so this rule has no effect on it. To have it ignored, stop tracking it (git rm --cached; the file stays on disk).
+
+repo-workflows-doctor-verdict-2459673a = No ignore rule matches it.
+
+repo-workflows-doctor-verdict-765462d4 = Its folder is ignored: git doesn't look inside, so a ! rule for a file in it has no effect. Un-ignore the folder (!folder/), or ignore folder/* instead.
+
+repo-workflows-doctor-verdict-a1c6264a = Tracked, and no ignore rule matches it.
+
+repo-workflows-doctor-verdict-a292bdad = Not ignored: this ! rule is the last one that matches it.
+
+repo-workflows-doctor-verdict-b78474c9 = A folder: the rule shown decides for everything in it (git doesn't look inside an ignored folder).
+
+repo-workflows-doctor-verdict-b796f495 = Ignored by this rule.
+
+repo-workflows-doctor-verdict-c3b9d549 = There is no such file here: the rules are read as for a file of that name (a rule for folders, ending in /, can't match it).
+
+repo-workflows-doctor-verdict-f0d742e1 = Tracked, and the last rule that matches it is this ! rule.
+
+repo-workflows-drift_view-body-4bc74b21 = Task
+
+repo-workflows-drift_view-body-7d9eb7ac = Close
+
+repo-workflows-email-email-window-b64a0d4f = Cancel operation
+
+repo-workflows-fence_view-body-7d9eb7ac = Close
+
+repo-workflows-file_comparison-file-comparison-view-74ccd433 = Folder
+
+repo-workflows-file_comparison-file-comparison-view-82a9c46f = Commit
+
+repo-workflows-hotfix-cancel-19766ed6 = Cancel
+
+repo-workflows-hotfix-contents-f5346a60 = Merged into { $plan-main-name-1 }
+
+repo-workflows-issue_work-choose-52656e81 = Branch
+
+repo-workflows-issue_work-show-19766ed6 = Cancel
+
+repo-workflows-issue_work-show-d8b8392e = Try again
+
+repo-workflows-lfs_locks-unlock-buttons-19766ed6 = Cancel
+
+repo-workflows-lfs_storage-prune-19766ed6 = Cancel
+
+repo-workflows-line_dossier-line-dossier-view-82a9c46f = Commit
+
+repo-workflows-owners-contents-7d9eb7ac = Close
+
+repo-workflows-package-buttons-7d9eb7ac = Close
+
+repo-workflows-parallel_bisect-hash-link-63633913 = Show this commit
+
+repo-workflows-parallel_bisect-parallel-buttons-19766ed6 = Cancel
+
+repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac = Close
+
+repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5 = Wait for the operation going on to finish
+
+repo-workflows-parallel_bisect-parallel-link-63633913 = Show this commit
+
+repo-workflows-parallel_bisect-parallel-outcome-683768ab = and { $hashes-len-max-named-1 } more
+
+repo-workflows-parallel_bisect-parallel-outcome-8b3812c0 = First bad commit:
+
+repo-workflows-pr_review-verdict-buttons-eb1a70e3 = Discard
+
+repo-workflows-pr_view-dismiss-box-19766ed6 = Cancel
+
+repo-workflows-pr_view-entry-header-48845bff = Dismiss
+
+repo-workflows-push-dismiss-48845bff = Dismiss
+
+repo-workflows-push-rejected-683768ab = and { $r-behind-named-1 } more
+
+repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-pick
+
+repo-workflows-reflog-reflog-menu-items-916e34d4 = Show in graph
+
+repo-workflows-reflog-scanning-19766ed6 = Cancel
+
+repo-workflows-rehearse-rehearse-window-cae7d57b = Stop
+
+repo-workflows-release-close-button-7d9eb7ac = Close
+
+repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Close
+
+repo-workflows-review_workflow-show-c3812fc4 = Remove
+
+repo-workflows-stack-publish-dialog-19766ed6 = Cancel
+
+repo-workflows-stack-restack-dialog-19766ed6 = Cancel
+
+repo-workflows-stack-stack-dialogs-19766ed6 = Cancel
+
+repo-workflows-surgery-footer-19766ed6 = Cancel
+
+repo-workflows-test_lane-test-banner-7d9eb7ac = Close
+
+repo-workflows-test_lane-test-output-window-e21f935f = Copy
+
+repo-workflows-timeline-close-button-7d9eb7ac = Close
+
+repo-workflows-timeline-commits-683768ab = and { $total-list-len-1 } more
+
+repo-workflows-timeline-finished-19766ed6 = Cancel
+
+repo-workflows-timeline-forget-confirm-19766ed6 = Cancel
+
+repo-workflows-timeline-jump-controls-19766ed6 = Cancel
+
+repo-workflows-working_drafts-history-7d9eb7ac = Close
+
+repo-workflows-working_drafts-recovery-19766ed6 = Cancel
+
 repo-workflows-activity-count = { $count ->
         [one] One operation{ $running }, newest first
        *[other] { $count } operations{ $running }, newest first
@@ -561,4 +1948,59 @@ repo-workflows-agent-push-body = Send { $branch }’s { $count ->
         [one] new commit
        *[other] { $count } new commits
     } to { $to }.
+
+repo-workflows-dco-toggle-0 = { repo-workflows-dco--5e1a6b4e }. Enabled here; this repository also asks for it: { $reason }
+
+repo-workflows-dco-toggle-1 = { repo-workflows-dco--5e1a6b4e }. Disabled here, although this repository asks for it: { $reason }
+
+repo-workflows-dco-toggle-2 = { repo-workflows-dco--5e1a6b4e }. Enabled for this repository
+
+repo-workflows-dco-toggle-3 = { repo-workflows-dco--5e1a6b4e }. Disabled for this repository
+
+repo-workflows-dco-toggle-4 = { repo-workflows-dco--5e1a6b4e }. Enabled automatically: { $reason }
+
+repo-workflows-dco-toggle-5 = { repo-workflows-dco--5e1a6b4e }. Enabled automatically in a repository that asks for it (a DCO file or failing DCO check)
+
+repo-workflows-dco-all-signed = { $count ->
+        [one] ✔ The commit is signed off.
+       *[other] ✔ All { $count } commits are signed off.
+    }
+
+repo-workflows-dco-missing-signoffs = { $missing } of { $total } commits lack a sign-off accepted by the DCO check (their author’s or committer’s):
+
+repo-workflows-bakeoff-unassembled = { $count ->
+        [one] One file picked and not assembled: close again to drop it
+       *[other] { $count } files picked and not assembled: close again to drop them
+    }
+
+repo-workflows-collision-files = { $count ->
+        [one] One file
+       *[other] { $count } files
+    }
+
+repo-workflows-collision-conflicts = { $a } and { $b } conflict on { $count ->
+        [one] one file
+       *[other] { $count } files
+    }:
+
+repo-workflows-collision-check = { $count ->
+        [one] Check one branch
+       *[other] Check { $count } branches
+    }
+
+repo-workflows-doctor-remove-setting = Remove { $key } = { $value } from { $file }? { $scope ->
+        [global] This applies to all your repositories.
+        [system] This applies to every user of this machine.
+       *[local] This applies here.
+    } The value is not kept: to get it back, set it again.
+
+repo-workflows-doctor-history-loaded = The graph loads { $page } commits at a time as you scroll, and at most { $max } in all. Search loads more as needed, up to that limit too. { $loaded } loaded now.{ $more ->
+        [yes] { " More can be loaded." }
+       *[no] { "" }
+    }
+
+repo-workflows-doctor-missing-hooks = This folder does not exist (or is not a folder): no hook runs.{ $custom ->
+        [yes] { " Whatever set core.hooksPath (a hook manager?) is not installed. Run its install step or unset core.hooksPath." }
+       *[no] { "" }
+    }
 

@@ -6,14 +6,20 @@ use std::time::Duration;
 impl State {
     pub(in crate::repo) fn show(&mut self, ui: &mut egui::Ui, idle: bool) -> Outcome {
         ui.set_width(760.0);
-        ui.heading("Lost and found by content");
-        ui.label("Find literal text in reflog history, unreachable commits, dropped stashes and unattached staged blobs. Search reads local objects without downloading or changing files.");
+        ui.heading(crate::i18n::text(
+            "repo-workflows-content_recovery-show-55bda87c",
+        ));
+        ui.label(crate::i18n::text(
+            "repo-workflows-content_recovery-show-67802d1b",
+        ));
         let mut outcome = Outcome::Open;
         let changed = ui
             .add(
                 egui::TextEdit::multiline(&mut self.query)
                     .desired_rows(2)
-                    .hint_text("Text you remember, such as parse_header"),
+                    .hint_text(crate::i18n::text(
+                        "repo-workflows-content_recovery-show-11f20956",
+                    )),
             )
             .changed();
         if changed {
@@ -26,7 +32,9 @@ impl State {
             if ui
                 .add_enabled(
                     idle && !self.query.trim().is_empty(),
-                    egui::Button::new("Search literal text"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-content_recovery-show-4c76d94b",
+                    )),
                 )
                 .clicked()
             {
@@ -34,19 +42,39 @@ impl State {
             }
             if self.loading() {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label(format!(
-                    "Reading local objects · {}s",
-                    self.began.map_or(0, |at| at.elapsed().as_secs())
+                ui.label(crate::i18n::message(
+                    "repo-workflows-content_recovery-show-5ec718b0",
+                    &[(
+                        "self-began-map-or-0-at-at-elapse-1",
+                        (self.began.map_or(0, |at| at.elapsed().as_secs()))
+                            .clone()
+                            .into(),
+                    )],
                 ));
-                if ui.button("Cancel read").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-content_recovery-show-30ea379c",
+                    ))
+                    .clicked()
+                {
                     self.cancel();
                 }
             }
-            if ui.button("Close").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-7d9eb7ac",
+                ))
+                .clicked()
+            {
                 outcome = Outcome::Cancel;
             }
         });
-        ui.label(egui::RichText::new("Limits: 500 commits, 10000 objects, 15000 file entries, 2 MiB per blob, 64 MiB scanned content, 300 hits, 120 seconds. Binary/non-UTF-8 and oversized content is skipped.").small());
+        ui.label(
+            egui::RichText::new(crate::i18n::text(
+                "repo-workflows-content_recovery-show-1e53ab9e",
+            ))
+            .small(),
+        );
         if let Some(error) = &self.error {
             ui.colored_label(
                 Tokens::get(ui.ctx()).warning,
@@ -56,10 +84,12 @@ impl State {
         let enabled = idle && !self.loading();
         if let Some(preview) = self.preview.clone() {
             ui.separator();
-            ui.label(format!(
-                "Saved content · {} bytes · {}",
-                preview.bytes.len(),
-                &preview.blob[..12]
+            ui.label(crate::i18n::message(
+                "repo-workflows-content_recovery-show-c006906c",
+                &[
+                    ("preview-bytes-len-1", (preview.bytes.len()).clone().into()),
+                    ("preview-blob-12-2", (&preview.blob[..12]).into()),
+                ],
             ));
             if let Some(source) = &preview.source {
                 ui.label(format!(
@@ -70,14 +100,19 @@ impl State {
                 ));
                 ui.label(&source.subject);
             } else {
-                ui.label("Unattached content: original filename and staging time are unknown. It can be recovered as a new file.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-a6dcec6a",
+                ));
             }
             if let (Some(results), Some(index)) = (&self.results, self.selected)
                 && let Some(hit) = results.report.hits.get(index)
             {
-                egui::CollapsingHeader::new(format!(
-                    "{} known places / versions",
-                    hit.provenance.len()
+                egui::CollapsingHeader::new(crate::i18n::message(
+                    "repo-workflows-content_recovery-show-34ac4d52",
+                    &[(
+                        "hit-provenance-len-1",
+                        (hit.provenance.len()).clone().into(),
+                    )],
                 ))
                 .show(ui, |ui| {
                     for (i, source) in hit.provenance.iter().enumerate() {
@@ -116,33 +151,48 @@ impl State {
                     },
                 );
             if preview.display_limited {
-                ui.label("Displayed text is clipped to 2000 lines and 400 characters per line. Recovery uses the complete saved bytes.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-334a8ddd",
+                ));
             }
             ui.separator();
             ui.horizontal(|ui| {
-                ui.label("New file in this repository:");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-cc6d8221",
+                ));
                 if ui.text_edit_singleline(&mut self.file).changed() {
                     self.prepared = None;
                 }
                 if ui
                     .add_enabled(
                         enabled && preview.identity.root_pin.is_some(),
-                        egui::Button::new("Preview file recovery…"),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-content_recovery-show-da1ba0df",
+                        )),
                     )
                     .clicked()
                 {
                     outcome = done(Action::ContentPrepare(Target::File(self.file.clone())));
                 }
             });
-            ui.label("Creates a new regular file on the repository’s machine. Existing, tracked, ignored and linked destinations are refused; staged contents stay unchanged.");
+            ui.label(crate::i18n::text(
+                "repo-workflows-content_recovery-show-8cd42b70",
+            ));
             if let Some(source) = &preview.source {
                 ui.horizontal(|ui| {
-                    ui.label("New branch:");
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-content_recovery-show-50b4d1c2",
+                    ));
                     if ui.text_edit_singleline(&mut self.branch).changed() {
                         self.prepared = None;
                     }
                     if ui
-                        .add_enabled(enabled, egui::Button::new("Preview branch recovery…"))
+                        .add_enabled(
+                            enabled,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-content_recovery-show-1f3ee4b2",
+                            )),
+                        )
                         .clicked()
                     {
                         outcome = done(Action::ContentPrepare(Target::Branch(self.branch.clone())));
@@ -150,19 +200,77 @@ impl State {
                 });
                 if source.origin == Origin::DroppedStash
                     && ui
-                        .add_enabled(enabled, egui::Button::new("Preview return to stash list…"))
+                        .add_enabled(
+                            enabled,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-content_recovery-show-c8d6eb2f",
+                            )),
+                        )
                         .clicked()
                 {
                     outcome = done(Action::ContentPrepare(Target::Stash));
                 }
             }
             if let Some(prepared) = self.prepared.clone() {
-                ui.group(|ui|{
-                    match &prepared.target {Target::File(path)=>{ui.label(format!("Create {}/{path} with {} raw bytes. Nothing existing will be replaced.",prepared.preview.identity.root_pin.as_ref().map(|pin|pin.physical.as_str()).or(prepared.preview.identity.root.as_deref()).unwrap_or("(unavailable root)"),prepared.preview.bytes.len()));},Target::Branch(name)=>{ui.label(format!("Create branch {name} at the saved commit. The complete saved commit is included; HEAD and working files stay unchanged."));},Target::Stash=>{ui.label("Return this dropped stash to the stash list, preserving the current stash. Do not apply it or change staged/working files.");}}
-                    if ui.add_enabled(enabled,egui::Button::new("Recover now")).clicked(){outcome=done(Action::ContentPerform(prepared));}
+                ui.group(|ui| {
+                    match &prepared.target {
+                        Target::File(path) => {
+                            ui.label(crate::i18n::message(
+                                "repo-workflows-content_recovery-show-9cba18de",
+                                &[
+                                    (
+                                        "prepared-preview-identity-root-p-1",
+                                        (prepared
+                                            .preview
+                                            .identity
+                                            .root_pin
+                                            .as_ref()
+                                            .map(|pin| pin.physical.as_str())
+                                            .or(prepared.preview.identity.root.as_deref())
+                                            .unwrap_or(crate::i18n::text(
+                                                "repo-workflows-content_recovery-show-fbdaf564",
+                                            )))
+                                        .into(),
+                                    ),
+                                    ("path", (path).clone().into()),
+                                    (
+                                        "prepared-preview-bytes-len-2",
+                                        (prepared.preview.bytes.len()).clone().into(),
+                                    ),
+                                ],
+                            ));
+                        }
+                        Target::Branch(name) => {
+                            ui.label(crate::i18n::message(
+                                "repo-workflows-content_recovery-show-8d5a103e",
+                                &[("name", (name).clone().into())],
+                            ));
+                        }
+                        Target::Stash => {
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-content_recovery-show-eff2c65f",
+                            ));
+                        }
+                    }
+                    if ui
+                        .add_enabled(
+                            enabled,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-content_recovery-show-93547d7d",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        outcome = done(Action::ContentPerform(prepared));
+                    }
                 });
             }
-            if ui.button("Back to matches").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-beb0df0b",
+                ))
+                .clicked()
+            {
                 self.cancel();
                 self.preview = None;
                 self.prepared = None;
@@ -170,17 +278,34 @@ impl State {
         } else if let Some(results) = &self.results {
             let report = &results.report;
             ui.separator();
-            ui.label(format!("{} matches · {} blobs / {} bytes read · {} binary, {} oversized, {} missing skipped",report.hits.len(),report.scanned,report.bytes,report.binary,report.large,report.missing));
+            ui.label(crate::i18n::message(
+                "repo-workflows-content_recovery-show-52545e10",
+                &[
+                    ("report-hits-len-1", (report.hits.len()).clone().into()),
+                    ("report-scanned-2", (report.scanned).clone().into()),
+                    ("report-bytes-3", (report.bytes).clone().into()),
+                    ("report-binary-4", (report.binary).clone().into()),
+                    ("report-large-5", (report.large).clone().into()),
+                    ("report-missing-6", (report.missing).clone().into()),
+                ],
+            ));
             if report.limited {
-                ui.colored_label(Tokens::get(ui.ctx()).warning,"Search reached a budget or skipped unsupported paths/provenance. These results are incomplete.");
+                ui.colored_label(
+                    Tokens::get(ui.ctx()).warning,
+                    crate::i18n::text("repo-workflows-content_recovery-show-8ef50fb8"),
+                );
             }
             if report.shallow {
-                ui.label("This is a shallow repository; older content may not be present locally.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-content_recovery-show-1762ea22",
+                ));
             }
             for note in &report.notes {
                 ui.label(note);
             }
-            ui.label("Timeline is newest first where a commit date is known. Unattached blobs appear last.");
+            ui.label(crate::i18n::text(
+                "repo-workflows-content_recovery-show-abadbc35",
+            ));
             egui::ScrollArea::vertical()
                 .id_salt("content-matches")
                 .max_height(420.0)
@@ -191,12 +316,20 @@ impl State {
                         let date = hit
                             .when()
                             .map(|when| crate::git::relative_time(when, crate::git::now()))
-                            .unwrap_or_else(|| "Time unknown".into());
+                            .unwrap_or_else(|| {
+                                crate::i18n::text("repo-workflows-content_recovery-show-6f803fc9")
+                                    .into()
+                            });
                         let title = source
                             .map(|source| {
                                 format!("{} · {} · {}", date, source.path, origin(&source.origin))
                             })
-                            .unwrap_or_else(|| format!("{date} · Unattached staged content"));
+                            .unwrap_or_else(|| {
+                                crate::i18n::message(
+                                    "repo-workflows-content_recovery-show-a963e860",
+                                    &[("date", (date).clone().into())],
+                                )
+                            });
                         if ui
                             .add_enabled(
                                 enabled,
@@ -238,10 +371,12 @@ impl State {
 }
 fn origin(origin: &Origin) -> &'static str {
     match origin {
-        Origin::History => "Reflog / history",
-        Origin::Unreachable => "Unreachable commit",
-        Origin::DroppedStash => "Dropped stash",
-        Origin::LiveStash => "Current stash list",
+        Origin::History => crate::i18n::text("repo-workflows-content_recovery-origin-53bdf21a"),
+        Origin::Unreachable => crate::i18n::text("repo-workflows-content_recovery-origin-d8ee810d"),
+        Origin::DroppedStash => {
+            crate::i18n::text("repo-workflows-content_recovery-origin-ebcaaeb6")
+        }
+        Origin::LiveStash => crate::i18n::text("repo-workflows-content_recovery-origin-856aca6d"),
     }
 }
 

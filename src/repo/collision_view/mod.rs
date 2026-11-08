@@ -83,13 +83,22 @@ impl CollisionView {
     fn cannot_check(&self) -> Option<String> {
         let count = self.chosen().len();
         if self.run.is_some() {
-            Some("A check is running".to_owned())
+            Some(
+                crate::i18n::text("repo-workflows-collision_view-cannot-check-76fb9e14").to_owned(),
+            )
         } else if self.target.is_empty() {
-            Some("Pick the branch they land on".to_owned())
+            Some(
+                crate::i18n::text("repo-workflows-collision_view-cannot-check-42af2e23").to_owned(),
+            )
         } else if count == 0 {
-            Some("Tick the branches to check".to_owned())
+            Some(
+                crate::i18n::text("repo-workflows-collision_view-cannot-check-8bcfe01d").to_owned(),
+            )
         } else if count > MOST {
-            Some(format!("At most {MOST} branches at a time"))
+            Some(crate::i18n::message(
+                "repo-workflows-collision_view-cannot-check-c1d9426d",
+                &[("MOST", (MOST).clone().into())],
+            ))
         } else {
             None
         }
@@ -164,7 +173,12 @@ impl RepoTab {
                 view.run = None;
                 match found {
                     Err(e) if e == collision::STOPPED => {
-                        view.note = Some("Stopped; nothing new to show".to_owned());
+                        view.note = Some(
+                            crate::i18n::text(
+                                "repo-workflows-collision_view-check-collisions-96d2bcac",
+                            )
+                            .to_owned(),
+                        );
                     }
                     found => view.result = Some(found),
                 }
@@ -216,18 +230,22 @@ impl RepoTab {
 /// The window's content; whether to start the check, whether to close.
 fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool, bool) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Collision matrix").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-collision_view-body-cf642735",
+        ))
+        .font(theme::semibold(15.0)),
+    );
     ui.add_space(4.0);
     let onto = if view.target.is_empty() {
-        "the branch they land on".to_owned()
+        crate::i18n::text("repo-workflows-collision_view-body-5c35d043").to_owned()
     } else {
         view.target.clone()
     };
     ui.label(
-        RichText::new(format!(
-            "Each pair of branches merged in memory (git merge-tree), and each with {onto}: \
-             nothing is checked out, no branch moves. Branches of the linked worktrees are \
-             ticked."
+        RichText::new(crate::i18n::message(
+            "repo-workflows-collision_view-body-282052b1",
+            &[("onto", (onto).clone().into())],
         ))
         .size(12.0)
         .color(t.text_dim),
@@ -245,7 +263,10 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
     let mut check = false;
     let mut close = false;
     ui.horizontal(|ui| {
-        let label = format!("Check {count} branch{}", if count == 1 { "" } else { "es" });
+        let label = crate::i18n::message(
+            "repo-workflows-collision-check",
+            &[("count", (count).into())],
+        );
         let reason = view.cannot_check();
         if super::primary_button(ui, &label, reason.is_none(), 130.0)
             .on_disabled_hover_text(reason.unwrap_or_default())
@@ -256,15 +277,30 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
         if let Some(run) = &view.run {
             ui.add(crate::spinner::Spinner::new());
             let done = run.done.load(Ordering::Relaxed);
-            ui.label(format!("Merging in memory… {done} of {}", run.total));
-            if ui.button("Stop").clicked() {
+            ui.label(crate::i18n::message(
+                "repo-workflows-collision_view-body-94846973",
+                &[
+                    ("done", (done).clone().into()),
+                    ("run-total-1", (run.total).clone().into()),
+                ],
+            ));
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-collision_view-body-cae7d57b",
+                ))
+                .clicked()
+            {
                 run.cancel.store(true, Ordering::Relaxed);
             }
         } else if let Some(note) = &view.note {
             ui.label(RichText::new(note).size(12.0).color(t.text_faint));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            close = ui.button("Close").clicked();
+            close = ui
+                .button(crate::i18n::text(
+                    "repo-workflows-collision_view-body-7d9eb7ac",
+                ))
+                .clicked();
         });
     });
     match &view.result {
@@ -284,10 +320,12 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
 /// The target and the branches to tick.
 fn pick_branches(ui: &mut Ui, view: &mut CollisionView) {
     ui.horizontal(|ui| {
-        ui.label("Lands on");
+        ui.label(crate::i18n::text(
+            "repo-workflows-collision_view-pick-branches-3bc09abe",
+        ));
         let mut target = view.target.clone();
         let shown = if target.is_empty() {
-            "Pick one…"
+            crate::i18n::text("repo-workflows-collision_view-pick-branches-fb40a427")
         } else {
             target.as_str()
         }
@@ -319,7 +357,9 @@ fn pick_branches(ui: &mut Ui, view: &mut CollisionView) {
         .max_height(150.0)
         .show(ui, |ui| {
             if view.picks.is_empty() {
-                ui.label("There is no other local branch.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-collision_view-pick-branches-6de3bf71",
+                ));
             }
             for (name, on) in &mut view.picks {
                 ui.checkbox(on, name.as_str());

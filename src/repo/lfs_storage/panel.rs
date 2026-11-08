@@ -343,7 +343,13 @@ fn prune(ui: &mut Ui, t: &Tokens, panel: &mut Panel, idle: bool, acts: &mut Vec<
                         panel.confirm_prune = true;
                     }
                 }
-                if panel.confirm_prune && ui.small_button("Cancel").clicked() {
+                if panel.confirm_prune
+                    && ui
+                        .small_button(crate::i18n::text(
+                            "repo-workflows-lfs_storage-prune-19766ed6",
+                        ))
+                        .clicked()
+                {
                     panel.confirm_prune = false;
                 }
             }

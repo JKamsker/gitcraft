@@ -121,7 +121,12 @@ fn dismiss_box(ui: &mut Ui, entry: &Entry, draft: &mut PrDraft, acts: &mut Vec<A
         {
             acts.push(Action::Pr(PrAct::Dismiss));
         }
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-pr_view-dismiss-box-19766ed6",
+            ))
+            .clicked()
+        {
             acts.push(Action::Pr(PrAct::CancelDismiss));
         }
     });
@@ -176,7 +181,11 @@ fn entry_header(
         if let Some(review) = &entry.review_id
             && d.state == "OPEN"
             && d.extras.can_write()
-            && ui.small_button("Dismiss").clicked()
+            && ui
+                .small_button(crate::i18n::text(
+                    "repo-workflows-pr_view-entry-header-48845bff",
+                ))
+                .clicked()
         {
             acts.push(Action::Pr(PrAct::StartDismiss(review.clone())));
         }

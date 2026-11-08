@@ -124,11 +124,17 @@ impl RepoTab {
         self.local_ci_context_default();
         if self.conflict.is_some() || self.rebase.is_some() {
             let editor = if self.conflict.is_some() {
-                "conflict editor"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-d509b2ee")
             } else {
-                "interactive rebase"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-680d5c5f")
             };
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some((
+                crate::i18n::message(
+                    "repo-workflows-ci_view-open-ci-991ae978",
+                    &[("editor", (editor).into())],
+                ),
+                true,
+            ));
             return;
         }
         self.diff = None;
@@ -165,7 +171,10 @@ impl RepoTab {
         view.next = None;
         if projects.is_empty() {
             view.loading = false;
-            view.runs = Some(Err("This repository isn't on GitHub or GitLab.".to_owned()));
+            view.runs = Some(Err(crate::i18n::text(
+                "repo-workflows-ci_view-load-ci-view-4c1d2d4e",
+            )
+            .to_owned()));
             return;
         };
         view.request = next_request();
@@ -343,10 +352,19 @@ impl RepoTab {
                     let what = format!("{} #{}", run.name, run.number);
                     let (label, result) = if rerun {
                         let result = ci::rerun_failed(&path, &project, run.id);
-                        (format!("Re-ran the failed jobs of {what}"), result)
+                        (
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-da60943b",
+                                &[("what", (what).clone().into())],
+                            ),
+                            result,
+                        )
                     } else {
                         (
-                            format!("Cancelled {what}"),
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-07fe25a7",
+                                &[("what", (what).clone().into())],
+                            ),
                             ci::cancel(&path, &project, run.id),
                         )
                     };

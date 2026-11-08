@@ -181,9 +181,9 @@ impl RepoTab {
                     view.confirm_close = true;
                     let n = view.picks.len();
                     view.note = Some((
-                        format!(
-                            "{n} file{} picked and not assembled: close again to drop them",
-                            if n == 1 { "" } else { "s" }
+                        crate::i18n::message(
+                            "repo-workflows-bakeoff-unassembled",
+                            &[("count", (n).into())],
                         ),
                         true,
                     ));
@@ -287,7 +287,7 @@ impl RepoTab {
                     if trees != view.picked_trees {
                         if !view.picks.is_empty() {
                             view.note = Some((
-                                "Picks cleared: the attempts changed since they were made"
+                                crate::i18n::text("repo-workflows-bakeoff-load-bakeoff-c6f043db")
                                     .to_owned(),
                                 true,
                             ));
@@ -376,7 +376,16 @@ impl RepoTab {
                             // Another go at it needs a name of its own.
                             view.branch = next_name(branch);
                             (
-                                format!("Made {branch} at {}", crate::repo::short(commit)),
+                                crate::i18n::message(
+                                    "repo-workflows-bakeoff-assemble-c7f55e42",
+                                    &[
+                                        ("branch", (branch).clone().into()),
+                                        (
+                                            "crate-repo-short-commit-1",
+                                            (crate::repo::short(commit)).into(),
+                                        ),
+                                    ],
+                                ),
                                 false,
                             )
                         }
@@ -410,7 +419,7 @@ impl RepoTab {
         let request = view.request;
         if command.is_empty() {
             view.note = Some((
-                "Type the command that builds the project first".to_owned(),
+                crate::i18n::text("repo-workflows-bakeoff-build-c18d3706").to_owned(),
                 true,
             ));
             return;
@@ -441,8 +450,12 @@ impl RepoTab {
                 if let Some(dir) = status.parent() {
                     let _ = crate::remote::create_dir_all(dir);
                 }
-                crate::remote::write(&status, b"")
-                    .map_err(|e| format!("could not prepare the build's status file: {e}"))?;
+                crate::remote::write(&status, b"").map_err(|e| {
+                    crate::i18n::message(
+                        "repo-workflows-bakeoff-build-06d160c3",
+                        &[("e", (e).to_string().into())],
+                    )
+                })?;
                 Ok((worktree, status))
             },
             move |tab, status, ctx| match status {
@@ -463,7 +476,10 @@ impl RepoTab {
                     }
                     let launched = tab.start_launch_tracked(
                         Launch {
-                            label: format!("build · {name}"),
+                            label: crate::i18n::message(
+                                "repo-workflows-bakeoff-build-c9238812",
+                                &[("name", (name).clone().into())],
+                            ),
                             worktree,
                             run: Some(build::script(&command, &there)),
                             ..Launch::default()

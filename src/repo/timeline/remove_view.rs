@@ -197,7 +197,12 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
                     if widgets::primary_button(ui, "Discard", idle, 80.0).clicked() {
                         acts.push(Action::Timeline(TimelineAct::DiscardRemove));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-timeline-finished-19766ed6",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::AskDiscard(false)));
                     }
                 });
@@ -231,12 +236,23 @@ fn commits(ui: &mut Ui, list: &[(String, String)], total: usize) {
         );
     }
     if total > list.len() {
-        ui.label(RichText::new(format!("and {} more", total - list.len())).color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-workflows-timeline-commits-683768ab",
+                &[("total-list-len-1", (total - list.len()).clone().into())],
+            ))
+            .color(t.text_faint),
+        );
     }
 }
 
 fn close_button(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui.button("Close").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-timeline-close-button-7d9eb7ac",
+        ))
+        .clicked()
+    {
         acts.push(Action::Timeline(TimelineAct::CloseRemove));
     }
 }

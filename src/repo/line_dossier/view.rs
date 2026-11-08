@@ -21,7 +21,9 @@ impl RepoTab {
             ui.label("Committed versions · read only");
         });
         ui.horizontal_wrapped(|ui| {
-            ui.label("Commit");
+            ui.label(crate::i18n::text(
+                "repo-workflows-line_dossier-line-dossier-view-82a9c46f",
+            ));
             ui.add(
                 egui::TextEdit::singleline(&mut self.dossier.revision)
                     .desired_width(160.0)

@@ -17,12 +17,7 @@ pub(super) fn ui(
     locked: bool,
     acts: &mut Vec<Action>,
 ) {
-    faint(
-        ui,
-        "How big the repository is, how long reading it takes, and what would make git faster \
-         here. Every speed-up is git's own, set for this repository: it helps git everywhere, \
-         not only in gitcraft.",
-    );
+    faint(ui, crate::i18n::text("repo-workflows-doctor-ui-c7deeea1"));
     let Some(h) = reading(ui, &state.found) else {
         return;
     };
@@ -35,9 +30,21 @@ pub(super) fn ui(
 /// KiB as it reads best.
 pub(super) fn size(kib: u64) -> String {
     match kib {
-        0..1024 => format!("{kib} KiB"),
-        1024..1_048_576 => format!("{:.1} MiB", kib as f64 / 1024.0),
-        _ => format!("{:.2} GiB", kib as f64 / 1_048_576.0),
+        0..1024 => crate::i18n::message(
+            "repo-workflows-doctor-size-95886483",
+            &[("kib", (kib).clone().into())],
+        ),
+        1024..1_048_576 => crate::i18n::message(
+            "repo-workflows-doctor-size-8333f24e",
+            &[("kib-as-f64-1024-0-1", (kib as f64 / 1024.0).clone().into())],
+        ),
+        _ => crate::i18n::message(
+            "repo-workflows-doctor-size-9d2b746f",
+            &[(
+                "kib-as-f64-1-048-576-0-1",
+                (kib as f64 / 1_048_576.0).clone().into(),
+            )],
+        ),
     }
 }
 
@@ -45,7 +52,7 @@ fn size_card(ui: &mut Ui, h: &Health) {
     let t = Tokens::get(ui.ctx());
     card(
         ui,
-        "Size",
+        crate::i18n::text("repo-workflows-doctor-size-card-1af85190"),
         Some("git count-objects -v, git rev-list --count --all"),
         |ui| {
             let o = &h.objects;
@@ -59,77 +66,111 @@ fn size_card(ui: &mut Ui, h: &Health) {
                         ui.end_row();
                     };
                     if let Some(n) = h.commits {
-                        row(ui, "Commits", n.to_string());
+                        row(
+                            ui,
+                            crate::i18n::text("repo-workflows-doctor-size-card-d09648c6"),
+                            n.to_string(),
+                        );
                     }
                     row(
                         ui,
-                        "Packed objects",
-                        format!("{} in {} packs, {}", o.packed, o.packs, size(o.pack_kib)),
+                        crate::i18n::text("repo-workflows-doctor-size-card-35195164"),
+                        crate::i18n::message(
+                            "repo-workflows-doctor-size-card-1f2fe3f1",
+                            &[
+                                ("o-packed-1", (o.packed).clone().into()),
+                                ("o-packs-2", (o.packs).clone().into()),
+                                ("size-o-pack-kib-3", (size(o.pack_kib)).clone().into()),
+                            ],
+                        ),
                     );
                     row(
                         ui,
-                        "Loose objects",
+                        crate::i18n::text("repo-workflows-doctor-size-card-8757152b"),
                         format!("{}, {}", o.loose, size(o.loose_kib)),
                     );
                     if o.prune_packable > 0 {
-                        row(ui, "Loose and also packed", o.prune_packable.to_string());
+                        row(
+                            ui,
+                            crate::i18n::text("repo-workflows-doctor-size-card-b83a7e1d"),
+                            o.prune_packable.to_string(),
+                        );
                     }
                 });
             if o.garbage > 0 {
                 ui.label(
-                RichText::new(format!(
-                    "{} files in the objects folder aren't objects ({}): left by an interrupted \
-                     operation; git gc reports them.",
-                    o.garbage,
-                    size(o.garbage_kib)
-                ))
-                .color(t.warning),
-            );
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-doctor-size-card-52c9d559",
+                        &[
+                            ("o-garbage-1", (o.garbage).clone().into()),
+                            ("size-o-garbage-kib-2", (size(o.garbage_kib)).clone().into()),
+                        ],
+                    ))
+                    .color(t.warning),
+                );
             }
         },
     );
 }
 
 fn speed_card(ui: &mut Ui, h: &Health, loading: &Loading) {
-    card(ui, "How long reading it takes", None, |ui| {
-        if let Some(took) = h.status_took {
-            dim(
-                ui,
-                format!(
-                    "git status: {} ms (gitcraft runs it on every change it sees).",
-                    took.as_millis()
-                ),
-            );
-        }
-        if loading.times.is_empty() {
-            faint(ui, "No reload of the tab timed yet.");
-        } else {
-            let times: Vec<String> = loading
-                .times
-                .iter()
-                .map(|d| format!("{} ms", d.as_millis()))
-                .collect();
-            dim(
-                ui,
-                format!(
-                    "The tab's last reloads (branches, history, changes, all at once): {}.",
-                    times.join(", ")
-                ),
-            );
-        }
-    });
+    card(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-speed-card-2154776b"),
+        None,
+        |ui| {
+            if let Some(took) = h.status_took {
+                dim(
+                    ui,
+                    crate::i18n::message(
+                        "repo-workflows-doctor-speed-card-0ad7db50",
+                        &[("took-as-millis-1", (took.as_millis()).clone().into())],
+                    ),
+                );
+            }
+            if loading.times.is_empty() {
+                faint(
+                    ui,
+                    crate::i18n::text("repo-workflows-doctor-speed-card-ffe6b51a"),
+                );
+            } else {
+                let times: Vec<String> = loading
+                    .times
+                    .iter()
+                    .map(|d| {
+                        crate::i18n::message(
+                            "repo-workflows-doctor-speed-card-8636e9ce",
+                            &[("d-as-millis-1", (d.as_millis()).clone().into())],
+                        )
+                    })
+                    .collect();
+                dim(
+                    ui,
+                    crate::i18n::message(
+                        "repo-workflows-doctor-speed-card-aebc38ca",
+                        &[("times-join-1", (times.join(", ")).clone().into())],
+                    ),
+                );
+            }
+        },
+    );
 }
 
 fn suggestions_card(ui: &mut Ui, h: &Health, locked: bool, acts: &mut Vec<Action>) {
     let list = health::suggestions(h);
-    card(ui, "What would make it faster", None, |ui| {
-        for (i, s) in list.iter().enumerate() {
-            if i > 0 {
-                ui.separator();
+    card(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-suggestions-card-e930084c"),
+        None,
+        |ui| {
+            for (i, s) in list.iter().enumerate() {
+                if i > 0 {
+                    ui.separator();
+                }
+                suggestion(ui, s, locked, acts);
             }
-            suggestion(ui, s, locked, acts);
-        }
-    });
+        },
+    );
 }
 
 fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>) {
@@ -147,7 +188,11 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
                 widgets::chip(ui, "suggested", t.warning)
             }
             State::Off => widgets::chip(ui, "off", t.text_faint),
-            State::Unsupported => widgets::chip(ui, "not available here", t.text_faint),
+            State::Unsupported => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-suggestion-2b7f0cfe"),
+                t.text_faint,
+            ),
         };
     });
     dim(ui, &s.why);
@@ -160,17 +205,22 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
         State::On => {}
         State::Unsupported if s.title == "File system monitor" => faint(
             ui,
-            "git's own monitor exists on Windows and macOS only (and not on network drives \
-             unless fsmonitor.allowRemote is set); on Linux a Watchman hook can stand in \
-             (core.fsmonitor naming it).",
+            crate::i18n::text("repo-workflows-doctor-suggestion-a96e0fc8"),
         ),
         State::Unsupported => {}
         State::Off => {
             ui.horizontal_wrapped(|ui| {
                 let turn_on = ui
-                    .add_enabled(!locked, egui::Button::new("Turn on"))
+                    .add_enabled(
+                        !locked,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-doctor-suggestion-5a1f096a",
+                        )),
+                    )
                     .on_hover_text(commands.join("\n"))
-                    .on_disabled_hover_text("Wait for the running operation");
+                    .on_disabled_hover_text(crate::i18n::text(
+                        "repo-workflows-doctor-suggestion-b5c82673",
+                    ));
                 if turn_on.clicked() {
                     acts.push(turn_on_action(s, &commands));
                 }
@@ -183,21 +233,21 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
 /// Runs the suggestion's commands; scheduling maintenance (which reaches past the repository:
 /// your global config and the system's scheduler) is asked first.
 fn turn_on_action(s: &Suggestion, commands: &[String]) -> Action {
-    let label = format!("Turn on: {}", s.title.to_lowercase());
+    let label = crate::i18n::message(
+        "repo-workflows-doctor-turn-on-action-d8e3e02d",
+        &[(
+            "s-title-to-lowercase-1",
+            (s.title.to_lowercase()).clone().into(),
+        )],
+    );
     if s.title == "Scheduled maintenance" {
         return Action::Doctor(DoctorAct::Confirm(Confirm {
-            title: "Schedule maintenance?".to_owned(),
-            body: format!(
-                "{} adds this repository to maintenance.repo in your own global git config, sets \
-                 maintenance.auto=false and maintenance.strategy=incremental in its config, and \
-                 schedules git to run in the background: every hour it fetches from the \
-                 remotes into refs/prefetch. The scheduled runs read your own global config, \
-                 not a gitcraft profile's. git maintenance unregister undoes it for this \
-                 repository (and git config --unset maintenance.auto brings automatic gc \
-                 back); git maintenance stop removes the schedule for every repository.",
-                commands.join(", ")
+            title: crate::i18n::text("repo-workflows-doctor-turn-on-action-3c97132f").to_owned(),
+            body: crate::i18n::message(
+                "repo-workflows-doctor-turn-on-action-7cde0a5e",
+                &[("commands-join-1", (commands.join(", ")).clone().into())],
             ),
-            button: "Schedule".to_owned(),
+            button: crate::i18n::text("repo-workflows-doctor-turn-on-action-f4830a1d").to_owned(),
             label,
             ops: s.ops.clone(),
         }));
@@ -212,37 +262,43 @@ fn turn_on_action(s: &Suggestion, commands: &[String]) -> Action {
 fn history_card(ui: &mut Ui, h: &Health, loading: &Loading) {
     let t = Tokens::get(ui.ctx());
     let max = crate::repo::MAX_HISTORY;
-    card(ui, "History in the graph", None, |ui| {
-        dim(
-            ui,
-            format!(
-                "The graph loads {} commits at a time as you scroll, and at most {} in all; \
-                 search loads more as it needs them, up to that limit too. {} loaded now{}.",
-                crate::git::LOG_PAGE,
-                group(max as u64),
-                group(loading.loaded as u64),
-                if loading.more { ", more to load" } else { "" }
-            ),
-        );
-        if h.commits.is_some_and(|n| n > max as u64) {
-            ui.label(
-                RichText::new(format!(
-                    "This repository has {} commits, more than the graph shows: the oldest \
-                     ones are only reachable from the terminal (git log) or a file's history. \
-                     Hiding branches or soloing some narrows the graph to theirs.",
-                    group(h.commits.unwrap_or_default())
-                ))
-                .color(t.warning),
-            );
-        }
-        if !h.commit_graph {
-            faint(
+    card(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-history-card-06c896b6"),
+        None,
+        |ui| {
+            dim(
                 ui,
-                "Each reload reads the history again and rebuilds the graph: with a \
-                 commit-graph, git reads it several times faster.",
+                crate::i18n::message(
+                    "repo-workflows-doctor-history-loaded",
+                    &[
+                        ("page", (crate::git::LOG_PAGE).into()),
+                        ("max", (max).into()),
+                        ("loaded", (loading.loaded).into()),
+                        ("more", (if loading.more { "yes" } else { "no" }).into()),
+                    ],
+                ),
             );
-        }
-    });
+            if h.commits.is_some_and(|n| n > max as u64) {
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-doctor-history-card-cd12e41d",
+                        &[(
+                            "group-h-commits-unwrap-or-defaul-1",
+                            (group(h.commits.unwrap_or_default())).clone().into(),
+                        )],
+                    ))
+                    .color(t.warning),
+                );
+            }
+            if !h.commit_graph {
+                faint(
+                    ui,
+                    crate::i18n::text("repo-workflows-doctor-history-card-5a389005"),
+                );
+            }
+        },
+    );
 }
 
 /// `n` with thin groups of three digits (100 000).

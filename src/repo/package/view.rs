@@ -232,7 +232,10 @@ fn buttons(ui: &mut Ui, acts: &mut Vec<Action>, refresh: bool) {
             acts.push(Action::Package(PackageAct::Refresh));
         }
         if ui
-            .add(egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)))
+            .add(
+                egui::Button::new(crate::i18n::text("repo-workflows-package-buttons-7d9eb7ac"))
+                    .min_size(egui::vec2(80.0, 30.0)),
+            )
             .on_hover_text("Esc")
             .clicked()
         {

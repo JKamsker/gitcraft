@@ -174,7 +174,12 @@ impl RepoTab {
                         done = true;
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-stack-dialogs-19766ed6",
+                            ))
+                            .min_size(egui::vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::CloseDialog));

@@ -788,7 +788,7 @@ pub(in crate::repo) fn show(
                                             }));
                                         }
                                     }
-                                    if ui.small_button("Remove").clicked() {
+                                    if ui.small_button(crate::i18n::text("repo-workflows-review_workflow-show-c3812fc4")).clicked() {
                                         acts.push(Action::Story(StoryAct::Remove {
                                             index: i,
                                             head: f.to.clone(),

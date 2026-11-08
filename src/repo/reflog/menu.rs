@@ -99,10 +99,12 @@ impl RepoTab {
         }
         self.recover_items(ui, pick, acts);
         if self.graph_has(&pick.hash)
-            && crate::menu_item::MenuItem::new("Show in graph")
-                .icon("command")
-                .show(ui)
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-reflog-reflog-menu-items-916e34d4",
+            ))
+            .icon("command")
+            .show(ui)
+            .clicked()
         {
             acts.push(Action::SelectHash(pick.hash.clone()));
         }
@@ -164,14 +166,16 @@ impl RepoTab {
             acts.push(apply_stash(pick));
         }
         let why = no_cherry_pick(pick, head, self.in_head(pick));
-        if crate::menu_item::MenuItem::new("Cherry-pick")
-            .icon("command")
-            .enabled(idle)
-            .refused(why)
-            .show(ui)
-            .on_hover_text(CHERRY_PICK_TIP)
-            .on_disabled_hover_text(why.unwrap_or(BUSY))
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-4c49fdb6",
+        ))
+        .icon("command")
+        .enabled(idle)
+        .refused(why)
+        .show(ui)
+        .on_hover_text(CHERRY_PICK_TIP)
+        .on_disabled_hover_text(why.unwrap_or(BUSY))
+        .clicked()
         {
             acts.push(cherry_pick(pick));
         }

@@ -166,7 +166,13 @@ impl RepoTab {
         }
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                format!("Checkout {}: wait for {busy} to finish", leave.label()),
+                crate::i18n::message(
+                    "repo-workflows-detached-leave-to-28ae5898",
+                    &[
+                        ("leave-label-1", (leave.label()).clone().into()),
+                        ("busy", (busy).clone().into()),
+                    ],
+                ),
                 true,
             ));
             return;
@@ -187,7 +193,9 @@ impl RepoTab {
                     let now = git::head(&path);
                     git::left_behind(&path, &target).map(|commits| (now, commits))
                 });
-                listed.unwrap_or_else(|_| Err("the listing stopped unexpectedly".to_owned()))
+                listed.unwrap_or_else(|_| {
+                    Err(crate::i18n::text("repo-workflows-detached-leave-to-c6023785").to_owned())
+                })
             },
             move |tab, found, ctx| {
                 tab.detached.checking = false;
@@ -195,9 +203,12 @@ impl RepoTab {
                 // and the checkout wouldn't start anyway.
                 if let Some(busy) = &tab.busy_op {
                     tab.status = Some((
-                        format!(
-                            "Didn't check out {}: {busy} started meanwhile",
-                            leave.label()
+                        crate::i18n::message(
+                            "repo-workflows-detached-leave-to-007a4c0e",
+                            &[
+                                ("leave-label-1", (leave.label()).clone().into()),
+                                ("busy", (busy).clone().into()),
+                            ],
                         ),
                         true,
                     ));
@@ -216,10 +227,12 @@ impl RepoTab {
                     }
                     Err(e) => {
                         tab.status = Some((
-                            format!(
-                                "Didn't check out {}: couldn't list the commits it would \
-                                 leave on no branch ({e})",
-                                leave.label()
+                            crate::i18n::message(
+                                "repo-workflows-detached-leave-to-48b0ce4c",
+                                &[
+                                    ("leave-label-1", (leave.label()).clone().into()),
+                                    ("e", (e).clone().into()),
+                                ],
                             ),
                             true,
                         ))
@@ -241,7 +254,10 @@ impl RepoTab {
     pub(super) fn detached_act(&mut self, act: DetachedAct, ctx: &egui::Context) {
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                format!("Wait for {busy} to finish, then check out again"),
+                crate::i18n::message(
+                    "repo-workflows-detached-detached-act-70dad4a3",
+                    &[("busy", (busy).clone().into())],
+                ),
                 true,
             ));
             return;
@@ -276,7 +292,10 @@ fn keep_steps(name: &str, head: &str) -> (String, Vec<Vec<String>>, Undo) {
     let mut undo = vec![expect_ref_at(&format!("refs/heads/{name}"), head)];
     undo.extend(ops(&[&["branch", "-D", "--", name]]));
     (
-        format!("Create branch {name}"),
+        crate::i18n::message(
+            "repo-workflows-detached-keep-steps-d2a49cac",
+            &[("name", (name).into())],
+        ),
         make.clone(),
         Undo::Custom { undo, redo: make },
     )

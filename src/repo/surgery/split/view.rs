@@ -188,7 +188,10 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                 {
                     acts.push(Action::CheckSplit);
                 }
-                if ui.button("Cancel").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6"))
+                    .clicked()
+                {
                     acts.push(Action::CloseSplit);
                 }
                 if editor.busy {
