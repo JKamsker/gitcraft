@@ -52,6 +52,56 @@ pub(crate) enum Entry {
     Pick(Pick),
 }
 
+/// Resolve a presentation label without changing the existing persisted recent key.
+fn app_label(raw: &str, command: &AppCommand) -> String {
+    let id = match command {
+        AppCommand::NewTab => "interaction-palette-new-tab",
+        AppCommand::ReopenTab => "interaction-palette-reopen",
+        AppCommand::Open => "interaction-palette-open",
+        AppCommand::Create => "interaction-palette-create",
+        AppCommand::Clone => "interaction-palette-clone",
+        AppCommand::OpenRemote => "interaction-palette-remote",
+        AppCommand::Teleport => "interaction-palette-teleport",
+        AppCommand::ForgetSignIns => "interaction-palette-forget",
+        AppCommand::Settings => "interaction-palette-settings",
+        AppCommand::Manual => "interaction-palette-manual",
+        AppCommand::CopyDiagnostics => "interaction-palette-diagnostics",
+        AppCommand::MyWork => "interaction-palette-my-work",
+        AppCommand::Themes => "interaction-palette-themes",
+        AppCommand::NewProfile => "interaction-palette-new-profile",
+        AppCommand::Theme(_) => {
+            return crate::i18n::message(
+                "interaction-palette-theme",
+                &[("theme", raw.strip_prefix("Theme: ").unwrap_or(raw).into())],
+            );
+        }
+        AppCommand::Profile(_) => {
+            return crate::i18n::message(
+                "interaction-palette-profile",
+                &[(
+                    "profile",
+                    raw.strip_prefix("Switch to profile: ")
+                        .unwrap_or(raw)
+                        .into(),
+                )],
+            );
+        }
+    };
+    crate::i18n::text(id).to_owned()
+}
+
+fn app_hint(raw: &str) -> &str {
+    match raw {
+        "app" => crate::i18n::text("interaction-palette-app"),
+        "settings" => crate::i18n::text("interaction-palette-settings-kind"),
+        "profile" => crate::i18n::text("interaction-palette-profile-kind"),
+        "tab" => crate::i18n::text("interaction-palette-tab"),
+        "dark theme" => crate::i18n::text("interaction-palette-dark"),
+        "light theme" => crate::i18n::text("interaction-palette-light"),
+        _ => raw,
+    }
+}
+
 impl Item {
     pub(crate) fn new(label: impl Into<String>, hint: &str, run: Entry) -> Self {
         let label = label.into();
@@ -69,7 +119,10 @@ impl Item {
     }
 
     fn app(label: &str, hint: &str, command: AppCommand) -> Self {
-        Self::new(label, hint, Entry::App(command))
+        let display = app_label(label, &command);
+        let mut item = Self::new(display, app_hint(hint), Entry::App(command));
+        item.key = label.to_owned();
+        item
     }
 
     fn shortcut(mut self, keys: &str) -> Self {
@@ -175,7 +228,10 @@ impl App {
             list.extend(rest);
             list.extend(repo.palette_choices(&Pick::Checkout).into_iter().map(|p| {
                 let mut item = Item::from_repo(p);
-                item.label = format!("Check out {}", item.label);
+                item.label = crate::i18n::message(
+                    "interaction-palette-checkout",
+                    &[("branch", item.label.as_str().into())],
+                );
                 item.folded = Folded::new(&item.label);
                 item.len = item.label.chars().count();
                 item.typed_only = true;
@@ -242,5 +298,64 @@ impl App {
                 self.profile_request(crate::settings::ProfileRequest::New, ctx);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_german_palette_ranks_and_activates_with_stable_recent_key_and_command() {
+        crate::i18n::set_language("de");
+        let item = Item::app("New tab", "app", AppCommand::NewTab);
+        assert_eq!(item.key, "New tab");
+        assert_eq!(item.label, "Neuer Tab");
+        assert!(matches!(item.run, Entry::App(AppCommand::NewTab)));
+        let mut recent = super::super::recent::Recent::default();
+        recent.used(&item.key);
+        assert_eq!(recent.rank("New tab"), Some(0));
+        assert_eq!(recent.rank("Neuer Tab"), None);
+        let key = (0, None, String::new(), crate::i18n::generation());
+        let fonts = std::cell::Cell::new(false);
+        let state_key = key.clone();
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (super::super::Palette, bool)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if let super::super::Outcome::Choose(index) = state.0.show(ui.ctx(), &key, &recent)
+                {
+                    assert_eq!(index, 0);
+                    assert!(matches!(
+                        state.0.list()[index].run,
+                        Entry::App(AppCommand::NewTab)
+                    ));
+                    state.1 = true;
+                }
+            },
+            (
+                super::super::Palette {
+                    query: "tab".into(),
+                    selected: 0,
+                    entries: Some((state_key, vec![item])),
+                    step: None,
+                    shown: None,
+                    scroll: 0.0,
+                },
+                false,
+            ),
+        );
+        h.run();
+        h.get_by_label("Neuer Tab, Anwendung").click();
+        h.run();
+        assert!(h.state().1);
+        assert_eq!(h.state().0.list()[0].key, "New tab");
+        crate::i18n::set_language("en-US");
+        let english = Item::app("New tab", "app", AppCommand::NewTab);
+        assert_eq!(english.key, "New tab");
+        assert_eq!(english.label, "New tab");
     }
 }

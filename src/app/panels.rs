@@ -121,21 +121,33 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_width(640.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Manual").font(theme::semibold(16.0)));
+                    ui.label(
+                        RichText::new(crate::i18n::text("interaction-palette-manual-caption"))
+                            .font(theme::semibold(16.0)),
+                    );
                     ui.label(
                         RichText::new(format!("gitcraft {}", update::CURRENT)).color(t.text_faint),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-palette-close"),
+                        )
+                        .clicked()
+                        {
                             close = true;
                         }
-                        let tip = "Copies diagnostics and opens a prefilled issue for review: versions, system, graphics, \
-                                   git, gh, glab and tea (signed in or not, never a token), and \
-                                   the git settings in effect (no name or email)";
+                        let tip = crate::i18n::text("interaction-palette-diagnostic-hint");
                         if ui
-                            .add_enabled(!collecting, egui::Button::new("Copy diagnostics"))
+                            .add_enabled(
+                                !collecting,
+                                egui::Button::new(crate::i18n::text("interaction-palette-copy")),
+                            )
                             .on_hover_text(tip)
-                            .on_disabled_hover_text("Collecting…")
+                            .on_disabled_hover_text(crate::i18n::text(
+                                "interaction-palette-collecting",
+                            ))
                             .clicked()
                         {
                             copy = true;
