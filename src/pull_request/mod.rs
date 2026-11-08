@@ -220,13 +220,13 @@ pub fn files(
 }
 
 /// Whether `oid` is a whole commit id (SHA-1 or SHA-256), nothing else.
-fn is_oid(oid: &str) -> bool {
+pub(crate) fn is_oid(oid: &str) -> bool {
     matches!(oid.len(), 40 | 64) && oid.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Whether `name` is a branch name git takes, and nothing a refspec or an option could be made of:
 /// `git check-ref-format`'s rules.
-fn is_branch_name(name: &str) -> bool {
+pub(crate) fn is_branch_name(name: &str) -> bool {
     let forbidden = |c: char| c.is_ascii_control() || " ~^:?*[\\".contains(c);
     !name.is_empty()
         && !name.starts_with(['-', '/', '.'])
@@ -259,12 +259,18 @@ pub fn tally(checks: &[Check]) -> (usize, usize, usize, usize) {
 /// Forgejo and Gitea, `…/-/merge_requests/12` on GitLab.
 pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
     // The marker nearest the end: a repository may well be called `pull` or `pulls`.
-    let repo = ["/-/merge_requests/", "/pulls/", "/pull/"]
-        .iter()
-        .filter_map(|marker| url.rsplit_once(marker))
-        .filter(|(_, number)| number.split(['/', '#', '?']).next().is_some_and(is_number))
-        .map(|(repo, _)| repo)
-        .max_by_key(|repo| repo.len())?;
+    let repo = [
+        "/-/merge_requests/",
+        "/pulls/",
+        "/pull/",
+        "/pullrequest/",
+        "/pull-requests/",
+    ]
+    .iter()
+    .filter_map(|marker| url.rsplit_once(marker))
+    .filter(|(_, number)| number.split(['/', '#', '?']).next().is_some_and(is_number))
+    .map(|(repo, _)| repo)
+    .max_by_key(|repo| repo.len())?;
     forge::location(repo)
 }
 

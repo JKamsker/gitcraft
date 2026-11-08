@@ -26,9 +26,25 @@ pub struct IssueLink {
 
 /// The rule `#12` → the forge's issue 12, for a repository hosted on `hosting`.
 pub fn forge_rule(hosting: &Hosting) -> IssueRule {
+    if hosting.forge == Forge::Azure {
+        let project = hosting
+            .path
+            .split('/')
+            .take(2)
+            .collect::<Vec<_>>()
+            .join("/");
+        return IssueRule {
+            pattern: r"\B#(\d+)\b".into(),
+            url: format!(
+                "{}/{}/_workitems/edit/$1",
+                hosting.web,
+                crate::pr_post::encode_path(&project)
+            ),
+        };
+    }
     let issues = match hosting.forge {
         Forge::GitLab => "-/issues",
-        Forge::GitHub | Forge::Forgejo | Forge::Gitea => "issues",
+        Forge::GitHub | Forge::Forgejo | Forge::Gitea | Forge::Azure => "issues",
     };
     IssueRule {
         pattern: r"\B#(\d+)\b".to_owned(),

@@ -191,6 +191,7 @@ pub(super) fn assemble(
         },
         native_policy: true,
         merge_blocker: blocker(mr, project, approvals),
+        merge_handoff: false,
         connection_binding: Some(crate::pr_threads::connection_binding()),
         review_revision: Some(revision(mr)),
         native_account: Some(id(viewer, "/id").to_string()),

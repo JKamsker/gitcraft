@@ -66,6 +66,8 @@ pub struct PrExtras {
     /// Native merge policy is authoritative instead of GitHub-specific status strings.
     pub native_policy: bool,
     pub merge_blocker: Option<String>,
+    /// Native provider explicitly hands completion to its forge page.
+    pub merge_handoff: bool,
     pub connection_binding: Option<ConnectionBinding>,
     pub review_revision: Option<String>,
     pub viewer: Option<String>,

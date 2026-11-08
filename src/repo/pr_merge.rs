@@ -125,6 +125,18 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 .small(),
         );
     }
+    if extras.merge_handoff {
+        if ui
+            .button(format!(
+                "Complete on {}",
+                d.forge.map_or("forge", |f| f.name())
+            ))
+            .clicked()
+        {
+            acts.push(Action::OpenUrl(d.url.clone()));
+        }
+        return;
+    }
     let enabled = blocker.is_none() && !draft.posting;
     if draft.confirm_merge {
         ui.label(

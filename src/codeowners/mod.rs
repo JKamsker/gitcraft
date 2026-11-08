@@ -71,6 +71,7 @@ pub(crate) fn locations(forge: Option<Forge>) -> Vec<(&'static str, Flavor)> {
         ],
         // No forge known: GitHub's places, then each other forge's own folder, which says
         // whose file it is.
+        Some(Forge::Azure) => Vec::new(),
         None => vec![
             (".github/CODEOWNERS", Flavor::GitHub),
             ("CODEOWNERS", Flavor::GitHub),
