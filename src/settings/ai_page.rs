@@ -63,43 +63,48 @@ impl Settings {
             ui,
             f,
             "AI",
-            Some(
-                "The sparkles button in the commit box asks an AI command-line tool you already \
-                 have for a commit message, and Review this branch in a branch's menu asks it for \
-                 a review. It runs on the repository's machine (here, in WSL or over SSH) with \
-                 its own sign-in: gitcraft keeps no API key. A message is sent the staged changes \
-                 and your latest commit summaries; a review, the branch's commits and what it \
-                 changes; each with its prompt below.",
-            ),
+            Some(crate::i18n::text("interaction-tools-ai-intro")),
             |card| {
                 card.row("Tool", "ai claude codex copilot gh llm off", |ui| {
                     egui::ComboBox::from_id_salt("settings-ai-tool")
                         .width(layout::fit(ui, super::COMBO_WIDTH + 40.0))
                         .selected_text(self.ai.tool.label())
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.ai.tool, AiTool::Off, "Off");
+                            ui.selectable_value(
+                                &mut self.ai.tool,
+                                AiTool::Off,
+                                crate::i18n::text("interaction-tools-off-choice"),
+                            );
                             for tool in AiTool::CHOICES {
                                 let label = match look.has(tool) {
-                                    Some(false) => {
-                                        format!("{} — not found on this machine", tool.label())
-                                    }
+                                    Some(false) => crate::i18n::message(
+                                        "interaction-tools-not-found",
+                                        &[("tool", tool.label().into())],
+                                    ),
                                     _ => tool.label().to_owned(),
                                 };
                                 ui.selectable_value(&mut self.ai.tool, tool, label);
                             }
                         });
                     let note = match &look {
-                        Look::NotYet | Look::Looking => "Looking for them on this machine…".into(),
-                        Look::Found(found) if found.is_empty() => {
-                            "None of claude, codex or gh copilot is on this machine's PATH".into()
+                        Look::NotYet | Look::Looking => {
+                            crate::i18n::text("interaction-tools-looking").into()
                         }
-                        Look::Found(found) => format!("On this machine: {}", names(found)),
+                        Look::Found(found) if found.is_empty() => {
+                            crate::i18n::text("interaction-tools-none-found").into()
+                        }
+                        Look::Found(found) => crate::i18n::message(
+                            "interaction-tools-found",
+                            &[("tools", names(found).into())],
+                        ),
                         Look::Failed(e) => e.clone(),
                     };
                     ui.horizontal(|ui| {
                         layout::note(ui, note);
                         if matches!(look, Look::Found(_) | Look::Failed(_))
-                            && ui.small_button("Look again").clicked()
+                            && ui
+                                .small_button(crate::i18n::text("interaction-tools-again"))
+                                .clicked()
                         {
                             *HERE
                                 .lock()
@@ -110,7 +115,7 @@ impl Settings {
                 if self.ai.tool == AiTool::Custom {
                     card.row_hint(
                         "Custom command",
-                        "Reads the prompt, prints the answer",
+                        crate::i18n::text("interaction-tools-reads-prompt"),
                         "ai custom command ollama llm script",
                         |ui| {
                             ui.add(
@@ -118,25 +123,23 @@ impl Settings {
                                     .hint_text("ollama run llama3")
                                     .desired_width(layout::fit(ui, super::FIELD_WIDTH)),
                             )
-                            .on_hover_text(
-                                "Run by sh (cmd on Windows) in the repository's folder, on its \
-                                 machine. The prompt comes on its input; what it prints is the \
-                                 answer.",
-                            );
+                            .on_hover_text(crate::i18n::text("interaction-tools-custom-help"));
                             if self.ai.custom_command.trim().is_empty() {
-                                layout::note(ui, "Off until a command is set");
+                                layout::note(ui, crate::i18n::text("interaction-tools-off-until"));
                             }
                         },
                     );
                 }
                 card.row_hint(
                     "Largest diff sent",
-                    "The rest is named, with its line counts",
+                    crate::i18n::text("interaction-tools-rest-named"),
                     "ai size limit kb truncate diff",
                     |ui| {
                         ui.add(
                             egui::DragValue::new(&mut self.ai.max_diff_kb)
                                 .range(MAX_DIFF_KB_RANGE)
+                                .custom_formatter(|value, _| crate::i18n::number(value))
+                                .custom_parser(super::parse_localized_number)
                                 .suffix(" KB"),
                         );
                     },
@@ -147,12 +150,7 @@ impl Settings {
                     "ai prompt template commit message conventional",
                     |ui| {
                         prompt_field(ui, &mut self.ai.commit_prompt, DEFAULT_COMMIT_PROMPT);
-                        layout::note(
-                            ui,
-                            "{conventions} says how the repository's latest summaries are \
-                             written (Conventional Commits when most of them are); {left_out} \
-                             lists the files whose diff didn't fit.",
-                        );
+                        layout::note(ui, crate::i18n::text("interaction-tools-conventions"));
                     },
                 );
                 card.row_hint(
@@ -179,17 +177,58 @@ fn prompt_field(ui: &mut Ui, text: &mut String, default: &str) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(text != default, egui::Button::new("Restore default"))
+            .add_enabled(
+                text != default,
+                egui::Button::new(crate::i18n::text("interaction-tools-restore")),
+            )
             .clicked()
         {
             *text = default.to_owned();
         }
         if !text.contains("{diff}") {
             ui.label(
-                RichText::new("No {diff}: the changes go at the end")
+                RichText::new(crate::i18n::text("interaction-tools-no-diff"))
                     .color(t.text_faint)
                     .small(),
             );
         }
     });
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn prompt_controls_translate_without_changing_template_tokens_or_default_payload() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, text: &mut String| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                prompt_field(ui, text, DEFAULT_COMMIT_PROMPT);
+            },
+            "User-owned instruction 日本語".to_owned(),
+        );
+        h.run();
+        h.get_by_label("Kein {diff}: Die Änderungen werden am Ende angefügt");
+        h.get_by_label("Standard wiederherstellen").click();
+        h.run();
+        assert_eq!(h.state(), DEFAULT_COMMIT_PROMPT);
+        assert!(h.state().contains("{conventions}"));
+        assert!(h.state().contains("{diff}"));
+        assert_eq!(AiTool::Custom.label(), "Eigener Befehl");
+        assert_eq!(
+            serde_json::to_string(&AiTool::Custom).unwrap(),
+            "\"Custom\""
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Restore default");
+        assert_eq!(h.state(), DEFAULT_COMMIT_PROMPT);
+    }
 }

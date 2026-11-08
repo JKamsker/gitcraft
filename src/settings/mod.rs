@@ -1122,7 +1122,7 @@ impl Settings {
                     ui,
                     f,
                     "External tools",
-                    Some(external_tools::INTRO),
+                    Some(external_tools::intro()),
                     |card| self.external_tools_ui(card),
                 );
                 section(
