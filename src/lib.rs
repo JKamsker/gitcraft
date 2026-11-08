@@ -40,6 +40,7 @@ mod mergiraf;
 mod nautilus_scripts;
 mod network;
 mod os_shell;
+mod operation_labels;
 mod package;
 mod parallel_bisect;
 mod portable;
