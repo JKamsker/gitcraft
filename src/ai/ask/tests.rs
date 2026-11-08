@@ -107,7 +107,7 @@ fn a_tool_that_reads_nothing_still_answers() {
     settings.max_diff_kb = 1024;
     let answer = ask_now(&dir, &settings, TIMEOUT);
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(matches!(answer, Err(RunError::Failed(e)) if e.contains("kept its output open")));
+    assert_eq!(answer.map(|a| a.text), Ok("fix: x".to_owned()));
 }
 
 #[test]
