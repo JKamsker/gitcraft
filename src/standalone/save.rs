@@ -37,19 +37,29 @@ impl Output {
     }
     pub fn capture(path: &Path, inputs: &[Snapshot]) -> Result<Self, String> {
         if super::files::null_input(path) {
-            return Err("An empty-input device cannot be the merged output".into());
+            return Err(
+                crate::i18n::text("interaction-standalone-error-output-empty-device").into(),
+            );
         }
         let path = std::path::absolute(path).map_err(|e| e.to_string())?;
         let name = path
             .file_name()
-            .ok_or("The merged result needs a file name")?
+            .ok_or(crate::i18n::text(
+                "interaction-standalone-error-output-filename",
+            ))?
             .to_owned();
         let requested_parent = path
             .parent()
-            .ok_or("No parent for merged result")?
+            .ok_or(crate::i18n::text(
+                "interaction-standalone-error-no-result-parent",
+            ))?
             .to_owned();
-        let parent = std::fs::canonicalize(&requested_parent)
-            .map_err(|e| format!("Could not open output parent: {e}"))?;
+        let parent = std::fs::canonicalize(&requested_parent).map_err(|e| {
+            crate::i18n::message(
+                "interaction-standalone-error-open-parent",
+                &[("detail", (e.to_string()).into())],
+            )
+        })?;
         let parent = Arc::new(Directory::open(&parent).map_err(|e| e.to_string())?);
         let mut output = Self {
             path,
@@ -64,19 +74,23 @@ impl Output {
                 .iter()
                 .any(|i| i.handle.is_some() && i.handle == original.handle)
             {
-                return Err("MERGED aliases an input file; choose a separate output so inputs remain read-only".into());
+                return Err(crate::i18n::text("interaction-standalone-error-output-alias").into());
             }
             if original
                 .handle
                 .as_ref()
-                .ok_or("No output identity")?
+                .ok_or(crate::i18n::text(
+                    "interaction-standalone-error-no-output-identity",
+                ))?
                 .as_file()
                 .metadata()
                 .map_err(|e| e.to_string())?
                 .permissions()
                 .readonly()
             {
-                return Err("The merged output is read-only".into());
+                return Err(
+                    crate::i18n::text("interaction-standalone-error-output-readonly").into(),
+                );
             }
         }
         Ok(output)
@@ -88,23 +102,24 @@ impl Output {
                 self.parent.snapshot(&self.name, &self.path).map(Some)
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(format!(
-                "MERGED must be a plain file, not a link/device: {e}"
+            Err(e) => Err(crate::i18n::message(
+                "interaction-standalone-error-output-plain-file",
+                &[("detail", (e.to_string()).into())],
             )),
         }
     }
     fn guard(&self, inputs: &[Snapshot]) -> Result<(), String> {
         if !self.parent_current() {
-            return Err("The output parent changed identity; reopen the file tool".into());
+            return Err(crate::i18n::text("interaction-standalone-error-parent-identity").into());
         }
         if !same_optional(self.current()?.as_ref(), self.original.as_ref()) {
-            return Err("MERGED changed since opening; reopen before saving. The current file was preserved.".into());
+            return Err(crate::i18n::text("interaction-standalone-error-merged-changed").into());
         }
         for input in inputs {
             if !input.unchanged()? {
-                return Err(format!(
-                    "Input {} changed; reopen before saving",
-                    label(&input.path)
+                return Err(crate::i18n::message(
+                    "interaction-standalone-error-input-changed",
+                    &[("path", (label(&input.path)).into())],
                 ));
             }
         }
@@ -125,7 +140,7 @@ impl Output {
         hook: &mut dyn FnMut(Phase),
     ) -> Result<Saved, String> {
         if bytes.len() as u64 > FILE_LIMIT {
-            return Err("Merged output exceeds 2 MiB".into());
+            return Err(crate::i18n::text("interaction-standalone-error-output-limit").into());
         }
         self.guard(inputs)?;
         let mut lock = Lock::new(Arc::clone(&self.parent), &self.name)?;
@@ -160,9 +175,8 @@ impl Output {
                         .is_some_and(|(a, b)| a.replacement_matches(b)))
             {
                 return Err(
-                "Prepared output did not preserve the captured access policy; original unchanged"
-                    .into(),
-            );
+                    crate::i18n::text("interaction-standalone-error-prepared-policy").into(),
+                );
             }
             // Probe before moving MERGED. Unsupported hard-link filesystems fail with
             // the original destination untouched; there is deliberately no copy fallback.
@@ -170,8 +184,9 @@ impl Output {
                 .dir()?
                 .link(candidate, recovery.dir()?, OsStr::new("probe"))
                 .map_err(|e| {
-                    format!(
-                        "This filesystem cannot install a result atomically without overwrite: {e}"
+                    crate::i18n::message(
+                        "interaction-standalone-error-atomic-install",
+                        &[("detail", (e.to_string()).into())],
                     )
                 })?;
             recovery
@@ -183,7 +198,12 @@ impl Output {
             let backup = if self.original.is_some() {
                 self.parent
                     .move_file(&self.name, recovery.dir()?, previous)
-                    .map_err(|e| format!("Could not preserve the previous result: {e}"))?;
+                    .map_err(|e| {
+                        crate::i18n::message(
+                            "interaction-standalone-error-previous-result",
+                            &[("detail", (e.to_string()).into())],
+                        )
+                    })?;
                 recovery.keep = true;
                 hook(Phase::AfterMove);
                 let displaced = recovery.dir()?.snapshot(
@@ -202,9 +222,9 @@ impl Output {
                 {
                     // Restore only into absence. A concurrent creator keeps its own file.
                     recovery.restore(self);
-                    return Err(recovery.error(
-                    "MERGED or its parent changed during saving; no successful save was reported",
-                ));
+                    return Err(recovery.error(crate::i18n::text(
+                        "interaction-standalone-error-save-identity",
+                    )));
                 }
                 Some(recovery.dir()?.path.join(previous))
             } else {
@@ -218,16 +238,18 @@ impl Output {
                 if backup.is_some() {
                     recovery.restore(self);
                 }
-                return Err(recovery
-                    .error("The output, inputs or access metadata changed before installation"));
+                return Err(recovery.error(crate::i18n::text(
+                    "interaction-standalone-error-before-install",
+                )));
             }
             if let Err(e) = recovery.dir()?.link(candidate, &self.parent, &self.name) {
                 if backup.is_some() {
                     recovery.restore(self);
                 }
-                return Err(recovery.error(&format!(
-                "Could not install without overwrite; a concurrent destination was preserved: {e}"
-            )));
+                return Err(recovery.error(&crate::i18n::message(
+                    "interaction-standalone-error-no-overwrite",
+                    &[("detail", (e.to_string()).into())],
+                )));
             }
             hook(Phase::AfterInstall);
             let installed = self.current().map_err(|e| recovery.error(&e))?;
@@ -236,7 +258,9 @@ impl Output {
                 || inputs.iter().any(|i| i.unchanged() != Ok(true))
                 || !self.displaced_current(&recovery)
             {
-                return Err(recovery.error("Files changed during the save. The current result and displaced bytes were preserved; inspect them before continuing"));
+                return Err(recovery.error(crate::i18n::text(
+                    "interaction-standalone-error-during-save",
+                )));
             }
             Ok(Saved { previous: backup })
         })();
@@ -282,15 +306,21 @@ impl Lock {
         let file = recovery
             .dir()?
             .create(OsStr::new("reservation"), &[])
-            .map_err(|e| recovery.error(&format!("Could not create save reservation: {e}")))?;
+            .map_err(|e| {
+                recovery.error(&crate::i18n::message(
+                    "interaction-standalone-error-create-reservation",
+                    &[("detail", (e.to_string()).into())],
+                ))
+            })?;
         let handle =
             same_file::Handle::from_file(file).map_err(|e| recovery.error(&e.to_string()))?;
         recovery
             .dir()?
             .link(OsStr::new("reservation"), &parent, &name)
             .map_err(|e| {
-                recovery.error(&format!(
-                    "Could not reserve the result (another save may own its lock): {e}"
+                recovery.error(&crate::i18n::message(
+                    "interaction-standalone-error-reserve-result",
+                    &[("detail", (e.to_string()).into())],
                 ))
             })?;
         Ok(Self {
@@ -308,8 +338,14 @@ impl Lock {
     ) -> Result<T, String> {
         match (result, self.release_with(hook)) {
             (result, Ok(())) => result,
-            (Ok(_), Err(release)) => Err(format!("Save may have installed the result; {release}")),
-            (Err(error), Err(release)) => Err(format!("{error}. {release}")),
+            (Ok(_), Err(release)) => Err(crate::i18n::message(
+                "interaction-standalone-error-save-maybe-installed",
+                &[("detail", (release).into())],
+            )),
+            (Err(error), Err(release)) => Err(crate::i18n::message(
+                "interaction-standalone-error-save-and-release",
+                &[("error", (error).into()), ("release", (release).into())],
+            )),
         }
     }
     fn release_with(&mut self, hook: &mut dyn FnMut(Phase)) -> Result<(), String> {
@@ -326,7 +362,7 @@ impl Lock {
                     .and_then(same_file::Handle::from_file)
                     .is_ok_and(|h| self.handle.as_ref() == Some(&h));
             if !owned {
-                return Err("Save lock changed or disappeared; foreign entries preserved".into());
+                return Err(crate::i18n::text("interaction-standalone-error-lock-changed").into());
             }
             hook(Phase::BeforeUnlock); // Capture any late replacement; never unlink it.
             let captured = OsStr::new("released-lock");
@@ -352,12 +388,10 @@ impl Lock {
                 if can_restore {
                     let _ = dir.link(captured, &self.parent, &self.name);
                 }
-                return Err("Foreign save lock captured during release; retained in recovery and restored only into absence".into());
+                return Err(crate::i18n::text("interaction-standalone-error-foreign-lock").into());
             }
             if !self.parent.unchanged() {
-                return Err(
-                    "Save lock parent changed during release; captured entry retained".into(),
-                );
+                return Err(crate::i18n::text("interaction-standalone-error-lock-parent").into());
             }
             // Only private, inspected entries are removed. The mutable public name
             // is never unlinked, even when another creator installs a new lock.
@@ -372,8 +406,10 @@ impl Lock {
             Ok(())
         })();
         result.map_err(|e| {
-            self.recovery
-                .error(&format!("Save lock release uncertain: {e}"))
+            self.recovery.error(&crate::i18n::message(
+                "interaction-standalone-error-lock-release",
+                &[("detail", (e.to_string()).into())],
+            ))
         })
     }
 }
@@ -410,17 +446,20 @@ impl Recovery {
                 Err(e) => return Err(e.to_string()),
             }
         }
-        Err("Could not reserve a recovery directory".into())
+        Err(crate::i18n::text("interaction-standalone-error-recovery-reserve").into())
     }
     fn dir(&self) -> Result<&Directory, String> {
         self.directory
             .as_ref()
-            .ok_or_else(|| "The recovery directory is closed".into())
+            .ok_or_else(|| crate::i18n::text("interaction-standalone-error-recovery-closed").into())
     }
     fn error(&self, message: &str) -> String {
-        format!(
-            "{message}. Recovery directory: {}",
-            label(&self.parent.path.join(&self.name))
+        crate::i18n::message(
+            "interaction-standalone-error-recovery-location",
+            &[
+                ("detail", (message).into()),
+                ("path", (label(&self.parent.path.join(&self.name))).into()),
+            ],
         )
     }
     fn restore(&self, output: &Output) {

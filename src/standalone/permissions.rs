@@ -15,30 +15,37 @@ pub(super) fn candidate(
         // metadata and copies exact access rules. File paths remain environment data.
         let pinned = Snapshot::output(
             &parent.path.join(name),
-            parent
-                .stable_source(name)
-                .map_err(|e| format!("Close other writers before saving: {e}"))?,
+            parent.stable_source(name).map_err(|e| {
+                crate::i18n::message(
+                    "interaction-standalone-error-close-writers",
+                    &[("detail", (e.to_string()).into())],
+                )
+            })?,
         )?;
         if pinned.handle != original.handle
             || pinned.stamp != original.stamp
             || pinned.bytes != original.bytes
             || pinned.access != original.access
         {
-            return Err("MERGED changed before metadata preparation".into());
+            return Err(
+                crate::i18n::text("interaction-standalone-error-merged-before-metadata").into(),
+            );
         }
         {
             use std::os::windows::fs::MetadataExt;
             let attrs = pinned
                 .handle
                 .as_ref()
-                .ok_or("No pinned source")?
+                .ok_or(crate::i18n::text(
+                    "interaction-standalone-error-no-pinned-source",
+                ))?
                 .as_file()
                 .metadata()
                 .map_err(|e| e.to_string())?
                 .file_attributes();
             if attrs & !(0x20 | 0x80) != 0 {
                 return Err(
-                    "Unsupported native output attributes; the original was not changed".into(),
+                    crate::i18n::text("interaction-standalone-error-native-attributes").into(),
                 );
             }
         }
@@ -56,7 +63,9 @@ pub(super) fn candidate(
         let source = original
             .handle
             .as_ref()
-            .ok_or("No source identity")?
+            .ok_or(crate::i18n::text(
+                "interaction-standalone-error-no-source-identity",
+            ))?
             .as_file();
         rustix::fs::fclonefileat(
             source,
@@ -64,7 +73,12 @@ pub(super) fn candidate(
             "replacement",
             rustix::fs::CloneFlags::NOOWNERCOPY,
         )
-        .map_err(|e| format!("This filesystem cannot safely clone output ACL/metadata: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "interaction-standalone-error-clone-metadata",
+                &[("detail", (e.to_string()).into())],
+            )
+        })?;
         let file = dir
             .rewrite_owned(OsStr::new("replacement"), bytes, original)
             .map_err(|e| e.to_string())?;
@@ -72,10 +86,9 @@ pub(super) fn candidate(
         super::access::restore_mac_acl(
             &file,
             &dir.path.join("replacement"),
-            original
-                .access
-                .as_ref()
-                .ok_or("No captured source access policy")?,
+            original.access.as_ref().ok_or(crate::i18n::text(
+                "interaction-standalone-error-no-source-policy",
+            ))?,
         )?;
         return Ok(file);
     }
@@ -88,14 +101,21 @@ pub(super) fn candidate(
         let source = original
             .handle
             .as_ref()
-            .ok_or("No source identity")?
+            .ok_or(crate::i18n::text(
+                "interaction-standalone-error-no-source-identity",
+            ))?
             .as_file();
         #[cfg(unix)]
         unix_mode(&file, source)?;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         copy_xattrs(source, &file)?;
-        #[cfg(not(any(target_os="linux",target_os="android",windows,target_os="macos")))]
-        return Err("Safe preservation of this platform's access metadata is unavailable; the original output was not changed".into());
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "android",
+            windows,
+            target_os = "macos"
+        )))]
+        return Err(crate::i18n::text("interaction-standalone-error-platform-metadata").into());
         #[cfg(windows)]
         let _ = source;
     }
@@ -110,7 +130,12 @@ fn unix_mode(to: &File, from: &File) -> Result<(), String> {
         Some(rustix::process::Uid::from_raw(metadata.uid())),
         Some(rustix::process::Gid::from_raw(metadata.gid())),
     )
-    .map_err(|e| format!("Could not preserve output ownership: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "interaction-standalone-error-output-ownership",
+            &[("detail", (e.to_string()).into())],
+        )
+    })?;
     let mode = metadata.permissions().mode() & 0o777;
     to.set_permissions(std::fs::Permissions::from_mode(mode))
         .map_err(|e| e.to_string())
@@ -125,12 +150,16 @@ fn copy_xattrs(from: &File, to: &File) -> Result<(), String> {
     let size = match flistxattr_query(from) {
         Ok(size) => size,
         Err(rustix::io::Errno::OPNOTSUPP) => {
-            return Err("This filesystem cannot expose the output's access metadata safely; the original was not changed".into());
+            return Err(
+                crate::i18n::text("interaction-standalone-error-filesystem-metadata").into(),
+            );
         }
         Err(e) => return Err(e.to_string()),
     };
     if size > LIMIT {
-        return Err("Output access metadata exceeds 1 MiB; the original was not changed".into());
+        return Err(
+            crate::i18n::text("interaction-standalone-error-access-limit-unchanged").into(),
+        );
     }
     let mut names = vec![0; size];
     let read = flistxattr(from, &mut names[..]).map_err(|e| e.to_string())?;
@@ -156,10 +185,12 @@ fn copy_xattrs(from: &File, to: &File) -> Result<(), String> {
             continue;
         }
         let size = fgetxattr_query(from, name).map_err(|e| e.to_string())?;
-        total = total.checked_add(size).ok_or("Output metadata overflow")?;
+        total = total.checked_add(size).ok_or(crate::i18n::text(
+            "interaction-standalone-error-metadata-overflow",
+        ))?;
         if total > LIMIT {
             return Err(
-                "Output access metadata exceeds 1 MiB; the original was not changed".into(),
+                crate::i18n::text("interaction-standalone-error-access-limit-unchanged").into(),
             );
         }
         let mut value = vec![0; size];
@@ -173,8 +204,12 @@ fn copy_xattrs(from: &File, to: &File) -> Result<(), String> {
             _ => false,
         };
         if !same {
-            fsetxattr(to, name, &value, XattrFlags::empty())
-                .map_err(|e| format!("Could not preserve output access metadata: {e}"))?;
+            fsetxattr(to, name, &value, XattrFlags::empty()).map_err(|e| {
+                crate::i18n::message(
+                    "interaction-standalone-error-preserve-metadata",
+                    &[("detail", (e.to_string()).into())],
+                )
+            })?;
         }
     }
     Ok(())

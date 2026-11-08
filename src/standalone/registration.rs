@@ -103,16 +103,23 @@ fn install(scope: &Scope, plan: &Plan) -> Result<String, String> {
         )?
         .complete()?;
         if !out.status.success() {
-            return Err(format!(
-                "Installed {i} of {} settings; could not write {key}: {}. Retry or apply the previewed commands manually.",
-                plan.entries.len(),
-                String::from_utf8_lossy(&out.stderr).trim()
+            return Err(crate::i18n::message(
+                "interaction-standalone-error-registration-partial",
+                &[
+                    ("installed", (i).into()),
+                    ("total", (plan.entries.len()).into()),
+                    ("key", (*key).into()),
+                    (
+                        "detail",
+                        (String::from_utf8_lossy(&out.stderr).trim().to_owned()).into(),
+                    ),
+                ],
             ));
         }
     }
-    Ok(format!(
-        "Registered {} named-tool settings. Use git difftool --tool=gitcraft or git mergetool --tool=gitcraft.",
-        plan.entries.len()
+    Ok(crate::i18n::message(
+        "interaction-standalone-registration-complete",
+        &[("count", (plan.entries.len()).into())],
     ))
 }
 #[derive(Clone, Default)]
@@ -129,7 +136,10 @@ pub(crate) fn settings_ui(ui: &mut egui::Ui) {
             Scope::Global(std::env::var_os("GIT_CONFIG_GLOBAL")),
         ),
         Err(e) => {
-            ui.label(format!("Could not find this executable: {e}"));
+            ui.label(crate::i18n::message(
+                "interaction-standalone-error-executable",
+                &[("detail", (e.to_string()).into())],
+            ));
         }
     }
 }
@@ -142,11 +152,13 @@ fn panel(ui: &mut egui::Ui, executable: &Path, scope: Scope) {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    ui.label("Writes only the settings below to this machine's global Git config. No repository, profile, merge or file comparison runs.");
+    ui.label(crate::i18n::text(
+        "interaction-standalone-registration-explanation",
+    ));
     ui.add_enabled_ui(!state.pending, |ui| {
         ui.checkbox(
             &mut state.defaults,
-            "Also make gitcraft the default diff and merge tool",
+            crate::i18n::text("interaction-standalone-registration-defaults"),
         );
     });
     let plan = match Plan::new(executable, state.defaults) {
@@ -162,18 +174,27 @@ fn panel(ui: &mut egui::Ui, executable: &Path, scope: Scope) {
         .show(ui, |ui| {
             ui.monospace(&commands);
         });
-    if ui.button("Copy Git tool commands").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "interaction-standalone-registration-copy",
+        ))
+        .clicked()
+    {
         ui.ctx().copy_text(commands);
     }
     let start = ui
         .add_enabled(
             !state.pending,
-            egui::Button::new("Register named Git tools"),
+            egui::Button::new(crate::i18n::text(
+                "interaction-standalone-registration-register",
+            )),
         )
         .clicked();
     if state.pending {
         ui.add(crate::spinner::Spinner::new());
-        ui.label("Writing the listed Git settings…");
+        ui.label(crate::i18n::text(
+            "interaction-standalone-registration-pending",
+        ));
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(50));
     }
@@ -385,6 +406,66 @@ mod tests {
         }
         assert!(!temp.0.join("EXECUTED").exists());
         assert!(!temp.0.join("FILE_EXECUTED").exists());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_registration_panel_is_localized_and_command_preview_stays_literal()
+    -> Result<(), String> {
+        // Plan construction only encodes a supplied path. No executable lookup,
+        // config read/write, install, pool job or native/process operation runs.
+        let executable = Path::new("/literal ' $() & ü/gitcraft");
+        let commands = Plan::new(executable, false)?.commands();
+        assert!(commands.contains("difftool.gitcraft.cmd"));
+        assert!(commands.contains("--diff --"));
+        assert!(commands.contains("\"$LOCAL\" \"$REMOTE\""));
+        assert!(commands.contains("--mergetool --"));
+        assert!(commands.contains("\"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\""));
+        assert!(commands.contains("mergetool.gitcraft.trustExitCode"));
+        let fonts = std::cell::Cell::new(false);
+        crate::i18n::set_language("de");
+        let mut h = Harness::builder().with_size([1400., 700.]).build_ui(|ui| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            panel(ui, executable, Scope::Global(None));
+        });
+        h.run_steps(3);
+        h.get_by_label("gitcraft auch als Standardwerkzeug für Diff und Merge festlegen");
+        h.get_by_label("Git-Werkzeugbefehle kopieren");
+        h.get_by_label("Benannte Git-Werkzeuge registrieren");
+        h.get_by_label(&commands);
+        // Only the pure defaults checkbox is clicked, never the registration action.
+        h.get_by_label("gitcraft auch als Standardwerkzeug für Diff und Merge festlegen")
+            .click();
+        h.run_steps(2);
+        let defaults = Plan::new(executable, true)?.commands();
+        h.get_by_label(&defaults);
+        crate::i18n::set_language("en-US");
+        h.run_steps(2);
+        h.get_by_label("Also make gitcraft the default diff and merge tool");
+        h.get_by_label("Copy Git tool commands");
+        h.get_by_label("Register named Git tools");
+        h.get_by_label(&defaults);
+        let id = egui::Id::new((
+            "standalone-git-registration",
+            format!("{:?}", Scope::Global(None)),
+        ));
+        let state = h
+            .ctx
+            .data_mut(|d| d.get_temp::<Arc<Mutex<State>>>(id))
+            .ok_or("missing panel state")?;
+        let state = state.lock().map_err(|e| e.to_string())?;
+        assert!(state.defaults);
+        assert!(!state.pending);
+        assert!(state.result.is_none());
         Ok(())
     }
 }

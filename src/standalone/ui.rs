@@ -72,7 +72,13 @@ impl ToolApp {
             match result {
                 Ok(saved) => {
                     if let Some(path) = saved.previous {
-                        eprintln!("Previous MERGED preserved at {}", label(&path));
+                        eprintln!(
+                            "{}",
+                            crate::i18n::message(
+                                "interaction-standalone-previous-location",
+                                &[("path", (label(&path)).into())]
+                            )
+                        );
                     }
                     self.finish(0, ctx);
                 }
@@ -142,41 +148,54 @@ impl ToolApp {
         let mut finish = None;
         ui.horizontal_wrapped(|ui| {
             ui.heading(if matches!(self.loaded, Some(Loaded::Merge(_))) {
-                "Merge files"
+                crate::i18n::text("interaction-standalone-merge-title")
             } else {
-                "Compare files"
+                crate::i18n::text("interaction-standalone-compare-title")
             });
             let can_save = idle && matches!(&self.loaded,Some(Loaded::Merge(m)) if m.can_save());
             if matches!(&self.loaded, Some(Loaded::Merge(_)))
                 && ui
-                    .add_enabled(can_save, egui::Button::new("Save and finish"))
+                    .add_enabled(
+                        can_save,
+                        egui::Button::new(crate::i18n::text("interaction-standalone-save-finish")),
+                    )
                     .clicked()
             {
                 save = true;
             }
-            if matches!(&self.loaded, Some(Loaded::Diff(_))) && ui.button("Done").clicked() {
+            if matches!(&self.loaded, Some(Loaded::Diff(_)))
+                && ui
+                    .button(crate::i18n::text("interaction-standalone-done"))
+                    .clicked()
+            {
                 finish = Some(0);
             }
             if ui
-                .add_enabled(idle, egui::Button::new("Cancel file tool"))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text("interaction-standalone-cancel-tool")),
+                )
                 .clicked()
             {
                 finish = Some(1);
             }
         });
-        ui.label("Read-only input snapshots · 2 MiB per file · no repository actions");
+        ui.label(crate::i18n::text("interaction-standalone-snapshot-summary"));
         if self.loading.is_some() {
             ui.add(crate::spinner::Spinner::new());
-            ui.label("Reading file snapshots…");
+            ui.label(crate::i18n::text("interaction-standalone-reading"));
         }
         if self.saving.is_some() {
             ui.add(crate::spinner::Spinner::new());
-            ui.label("Finishing the guarded save. Closing waits for its result.");
+            ui.label(crate::i18n::text("interaction-standalone-saving"));
         }
         if let Some(error) = &self.error {
             ui.colored_label(crate::theme::Tokens::get(&ctx).danger, error);
             if ui
-                .add_enabled(idle, egui::Button::new("Close with error"))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text("interaction-standalone-close-error")),
+                )
                 .clicked()
             {
                 finish = Some(2);
@@ -185,17 +204,22 @@ impl ToolApp {
         match &mut self.loaded {
             Some(Loaded::Diff(diff)) => diff.ui(ui),
             Some(Loaded::Merge(merge)) => {
-                ui.label(format!("MERGED: {}", label(&merge.output.path)));
-                ui.label("Existing MERGED starts unchanged. Saving retains the previous file in a sibling recovery folder.");
+                ui.label(crate::i18n::message(
+                    "interaction-standalone-merged-path",
+                    &[("path", (label(&merge.output.path)).into())],
+                ));
+                ui.label(crate::i18n::text(
+                    "interaction-standalone-merged-explanation",
+                ));
                 if let Some(notice) = &merge.notice {
                     ui.colored_label(crate::theme::Tokens::get(&ctx).warning, notice);
                 }
                 ui.horizontal_wrapped(|ui| {
                     for (side, label) in [
-                        (0, "Use Base file"),
-                        (1, "Use Local file"),
-                        (2, "Use Remote file"),
-                        (3, "Keep current MERGED"),
+                        (0, crate::i18n::text("interaction-standalone-use-base")),
+                        (1, crate::i18n::text("interaction-standalone-use-local")),
+                        (2, crate::i18n::text("interaction-standalone-use-remote")),
+                        (3, crate::i18n::text("interaction-standalone-keep-merged")),
                     ] {
                         if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
                             merge.choose(side);
@@ -203,30 +227,56 @@ impl ToolApp {
                     }
                 });
                 if merge.computed.is_some() {
-                    egui::CollapsingHeader::new("Replace working result with computed merge").show(ui,|ui|{
-                        ui.label("Replaces unsaved edits in this window. MERGED on disk stays unchanged until Save and finish.");
-                        if ui.add_enabled(idle,egui::Button::new("Use computed merge")).clicked()
-                            && let Err(e)=merge.use_computed() {self.error=Some(e);}
+                    egui::CollapsingHeader::new(crate::i18n::text(
+                        "interaction-standalone-computed-heading",
+                    ))
+                    .id_salt("Replace working result with computed merge")
+                    .show(ui, |ui| {
+                        ui.label(crate::i18n::text(
+                            "interaction-standalone-computed-explanation",
+                        ));
+                        if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text(
+                                    "interaction-standalone-use-computed",
+                                )),
+                            )
+                            .clicked()
+                            && let Err(e) = merge.use_computed()
+                        {
+                            self.error = Some(e);
+                        }
                     });
                 }
-                egui::CollapsingHeader::new("Show Base / Local / Remote inputs")
-                    .default_open(merge.editor.is_none())
-                    .show(ui, |ui| {
-                        ui.columns(3, |cols| {
-                            for (col, (name, input)) in cols
-                                .iter_mut()
-                                .zip(["Base", "Local", "Remote"].into_iter().zip(&merge.inputs))
-                            {
-                                col.strong(name);
-                                col.label(label(&input.path));
-                                preview(col, input);
-                            }
-                        });
+                egui::CollapsingHeader::new(crate::i18n::text(
+                    "interaction-standalone-inputs-heading",
+                ))
+                .id_salt("Show Base / Local / Remote inputs")
+                .default_open(merge.editor.is_none())
+                .show(ui, |ui| {
+                    ui.columns(3, |cols| {
+                        for (col, (name, input)) in cols.iter_mut().zip(
+                            [
+                                crate::i18n::text("interaction-standalone-base"),
+                                crate::i18n::text("interaction-standalone-local"),
+                                crate::i18n::text("interaction-standalone-remote"),
+                            ]
+                            .into_iter()
+                            .zip(&merge.inputs),
+                        ) {
+                            col.strong(name);
+                            col.label(label(&input.path));
+                            preview(col, input);
+                        }
                     });
+                });
                 if let Some(editor) = &mut merge.editor {
                     editor.standalone_ui(ui, idle);
                 } else {
-                    ui.label("Choose a whole file to produce an exact byte result.");
+                    ui.label(crate::i18n::text(
+                        "interaction-standalone-choose-whole-file",
+                    ));
                 }
             }
             None => {}
@@ -259,7 +309,10 @@ fn receive<T>(rx: &Receiver<Result<T, String>>) -> Option<Result<T, String>> {
     match rx.try_recv() {
         Ok(result) => Some(result),
         Err(TryRecvError::Empty) => None,
-        Err(TryRecvError::Disconnected) => Some(Err("The file-tool worker stopped".into())),
+        Err(TryRecvError::Disconnected) => Some(Err(crate::i18n::text(
+            "interaction-standalone-error-worker-stopped",
+        )
+        .into())),
     }
 }
 fn preview(ui: &mut egui::Ui, input: &Snapshot) {
@@ -271,19 +324,28 @@ fn preview(ui: &mut egui::Ui, input: &Snapshot) {
     let content = if let Some(text) = text {
         let mut value = text.chars().take(16_000).collect::<String>();
         if value.len() < text.len() {
-            value.push_str("\n… input preview truncated");
+            value = crate::i18n::message(
+                "interaction-standalone-truncated-preview",
+                &[("preview", value.into())],
+            );
         }
         value
     } else {
-        format!(
-            "Binary/non-UTF8 · {} bytes\n{}",
-            input.bytes.len(),
-            input
-                .bytes
-                .iter()
-                .take(512)
-                .map(|b| format!("{b:02x} "))
-                .collect::<String>()
+        crate::i18n::message(
+            "interaction-standalone-binary-preview",
+            &[
+                ("count", (input.bytes.len()).into()),
+                (
+                    "preview",
+                    (input
+                        .bytes
+                        .iter()
+                        .take(512)
+                        .map(|b| format!("{b:02x} "))
+                        .collect::<String>())
+                    .into(),
+                ),
+            ],
         )
     };
     egui::ScrollArea::both()
@@ -470,6 +532,106 @@ mod tests {
             String::from_utf8_lossy(&out.stdout),
             String::from_utf8_lossy(&out.stderr)
         );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_inert_tool_paint_and_byte_previews_follow_selected_language() {
+        // Deliberately bypass ToolApp::new: these empty channels never submit a job.
+        // No snapshot reader, native app, repository, filesystem or process is started.
+        let (_loading_sender, loading) = mpsc::channel();
+        let (_saving_sender, saving) = mpsc::channel();
+        let mut tool = ToolApp {
+            active: Arc::new(AtomicBool::new(true)),
+            outcome: Arc::new(AtomicU8::new(1)),
+            loading: Some(loading),
+            loaded: None,
+            saving: Some(saving),
+            error: Some("opaque native payload: ' $() & ü\n{}".into()),
+            finished: false,
+        };
+        let binary = Snapshot {
+            path: "literal ' $() & ü\npath".into(),
+            bytes: vec![0, 0xff],
+            stamp: None,
+            handle: None,
+            access: None,
+        };
+        let text = Snapshot {
+            path: "text".into(),
+            bytes: "unverändert ' $() & ü\n{}".as_bytes().to_vec(),
+            stamp: None,
+            handle: None,
+            access: None,
+        };
+        let long = Snapshot {
+            path: "long-text".into(),
+            bytes: "ü".repeat(16_001).into_bytes(),
+            stamp: None,
+            handle: None,
+            access: None,
+        };
+        let fonts = std::cell::Cell::new(false);
+        crate::i18n::set_language("de");
+        let mut h = Harness::builder().with_size([1400., 1200.]).build_ui(|ui| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            tool.paint(ui);
+            preview(ui, &binary);
+            preview(ui, &text);
+            preview(ui, &long);
+        });
+        h.run_steps(3);
+        h.get_by_label("Dateien vergleichen");
+        h.get_by_label("Dateiwerkzeug abbrechen");
+        h.get_by_label("Dateikopien werden gelesen…");
+        h.get_by_label("Der abgesicherte Speichervorgang wird abgeschlossen. Das Schließen wartet auf sein Ergebnis.");
+        h.get_by_label("Mit Fehler schließen");
+        h.get_by_label("opaque native payload: ' $() & ü\n{}");
+        h.get_by_label("Binär/nicht UTF-8 · 2 Bytes\n00 ff ");
+        h.get_by_label("unverändert ' $() & ü\n{}");
+        h.get_by_label_contains("… Eingabevorschau gekürzt");
+        assert!(h.query_by_label("Compare files").is_none());
+        crate::i18n::set_language("en-US");
+        h.run_steps(2);
+        h.get_by_label("Compare files");
+        h.get_by_label("Cancel file tool");
+        h.get_by_label("Reading file snapshots…");
+        h.get_by_label("Finishing the guarded save. Closing waits for its result.");
+        h.get_by_label("Close with error");
+        h.get_by_label("Binary/non-UTF8 · 2 bytes\n00 ff ");
+        h.get_by_label_contains("… input preview truncated");
+        assert!(h.query_by_label("Dateien vergleichen").is_none());
+        drop(h);
+        assert!(!tool.finished);
+        assert_eq!(tool.outcome.load(Ordering::Acquire), 1);
+    }
+
+    #[test]
+    fn actual_disconnected_worker_adapter_localizes_without_starting_a_worker() -> Result<(), String>
+    {
+        for (locale, expected) in [
+            ("en-US", "The file-tool worker stopped"),
+            (
+                "de",
+                "Der Hintergrundauftrag des Dateiwerkzeugs wurde beendet",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let (sender, receiver) = mpsc::channel::<Result<(), String>>();
+            drop(sender);
+            let actual = receive(&receiver).ok_or("missing disconnection")?;
+            assert_eq!(actual, Err(expected.to_owned()));
+        }
+        crate::i18n::set_language("en-US");
         Ok(())
     }
 }
