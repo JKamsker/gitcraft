@@ -321,7 +321,7 @@ impl VersionsView {
             ),
             Some(VersionHeading::Since(number)) => crate::i18n::message(
                 "repo-workflows-versions-since-heading",
-                &[("number", (*number).into())],
+                &[("number", number.to_string().into())],
             ),
             None => self.title.clone(),
         }
@@ -384,7 +384,8 @@ mod fluent_versions_tests {
         ] {
             crate::i18n::set_language(lang);
             assert!(view.display_title().contains(title));
-            assert!(view.display_title().contains(number));
+            assert_eq!(view.display_title(), format!("#1234 {title}"));
+            assert!(matches!(view.heading, Some(VersionHeading::Since(1234))));
             assert!(summary(&counts).contains(number));
             assert_eq!(view.title, "Opaque user title");
             assert_eq!(view.old_label, "Old identity");
