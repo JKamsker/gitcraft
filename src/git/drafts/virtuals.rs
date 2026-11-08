@@ -791,16 +791,14 @@ pub fn edit(
                     if b.name == name {
                         b.owned.push(h.clone());
                         if view.source.work.get(&h.path).is_some_and(Option::is_some) {
-                            b.access.insert(
-                                h.path.clone(),
-                                view.source
-                                    .policies
-                                    .get(&h.path)
-                                    .ok_or(crate::i18n::text(
-                                        "backend-full-working-access-policy-missing-refresh-ce10b5",
-                                    ))?
-                                    .clone(),
-                            );
+                            if let Some(policy) = view.source.policies.get(&h.path) {
+                                b.access.insert(h.path.clone(), policy.clone());
+                            } else if native_files::policy_supported(repo) {
+                                return Err(crate::i18n::text(
+                                    "backend-full-working-access-policy-missing-refresh-ce10b5",
+                                )
+                                .into());
+                            }
                             b.permissions.insert(
                                 h.path.clone(),
                                 super::permissions::Pin::capture(repo, &h.path, active)?.bits(),

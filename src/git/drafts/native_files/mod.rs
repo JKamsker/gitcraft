@@ -93,6 +93,11 @@ impl Policy {
     }
 }
 pub(super) type Policies = std::collections::BTreeMap<String, Policy>;
+
+pub(super) fn policy_supported(repo: &Path) -> bool {
+    !crate::remote::is_remote(repo) && cfg!(any(target_os = "macos", target_os = "linux"))
+}
+
 #[derive(Debug)]
 pub(super) struct Snapshot {
     identity: same_file::Handle,
@@ -455,7 +460,7 @@ pub(super) fn capture_policies(
     contents: &super::working_transaction::Contents,
     active: &dyn Fn() -> bool,
 ) -> Result<Policies, String> {
-    if crate::remote::is_remote(repo) || !cfg!(any(target_os = "macos", target_os = "linux")) {
+    if !policy_supported(repo) {
         return Ok(Policies::new());
     }
     #[cfg(unix)]
