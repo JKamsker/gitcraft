@@ -114,6 +114,7 @@ pub(super) fn run(bench: &mut Bench, inputs: &Inputs) -> Result<(), String> {
         link_dir: None,
         wait: Duration::ZERO,
         cancelled: Arc::new(|| false),
+        run: None,
     };
     for (name, args) in [
         ("status", serde_json::json!({})),

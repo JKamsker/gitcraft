@@ -79,7 +79,7 @@ impl RepoTab {
         let is_wip = commit.hash == WIP_HASH;
         // Commits are dragged (the changes row and stashes aren't): egui tells a drag from a
         // click once the pointer moves a few points, so clicks stay clicks.
-        let draggable = !is_wip && self.stash_at(i).is_none();
+        let draggable = !is_wip && self.stash_at(i).is_none() && self.parked_at(i).is_none();
         let sense = if draggable {
             sense | Sense::DRAG
         } else {
@@ -162,6 +162,9 @@ impl RepoTab {
                 &row,
                 background,
             );
+        } else if let Some(parked) = self.parked_at(i) {
+            let x = row.gx + row.cols.graph + 6.0;
+            self.parked_description(&painter, &t, parked, (x, row.mid()), background);
         } else {
             let ci = self.ci_status(&commit.hash);
             let description_cell = cols.description(rect);
@@ -287,6 +290,14 @@ impl RepoTab {
         if commit.hash == WIP_HASH {
             let w = &self.work;
             return labels::changes(w.conflicted.len(), w.staged.len(), w.unstaged.len());
+        }
+        if let Some(parked) = self
+            .resolver
+            .parked
+            .iter()
+            .find(|p| commit.hash.strip_prefix("\u{0}parked:") == Some(p.id.as_str()))
+        {
+            return self.parked_label(parked);
         }
         let when = git::relative_time(commit.time, now);
         if let Some(stash) = self.stashes.iter().find(|s| s.hash == commit.hash) {
@@ -602,7 +613,7 @@ fn truncated(
 }
 
 /// A small rounded count label; returns its width.
-fn pill(
+pub(in crate::repo) fn pill(
     painter: &Painter,
     t: &Tokens,
     left_center: Pos2,

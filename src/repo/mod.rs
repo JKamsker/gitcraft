@@ -124,6 +124,7 @@ mod rehearse;
 mod release;
 mod remerge;
 mod repository_tools;
+mod resolver;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
@@ -477,6 +478,8 @@ pub struct RepoTab {
     timeline_error: Option<String>,
     fold: fold::FoldState,
     agent_calls: agent::Agents,
+    /// An agent resolving the conflicts in the background, if one.
+    resolver: resolver::ResolverState,
 
     busy_op: Option<String>,
     op_started: Option<Instant>,
@@ -789,6 +792,7 @@ impl RepoTab {
             timeline_error: None,
             fold: Default::default(),
             agent_calls: Default::default(),
+            resolver: Default::default(),
             busy_op: None,
             op_started: None,
             running: None,

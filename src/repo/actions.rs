@@ -44,6 +44,8 @@ pub(crate) enum Action {
     ContentPrepare(crate::git::recovery::Target),
     ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
     RepositoryTools(super::repository_tools::Act),
+    /// What the background resolving run is asked (see `resolver`).
+    Resolver(super::resolver::ResolverAct),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// A read-only clipboard payload resolved from the current selected commit.

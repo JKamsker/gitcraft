@@ -65,7 +65,7 @@ pub fn register_commands(program: &str) -> [(&'static str, String); 2] {
 }
 
 const USAGE: &str = "\
-gitcraft mcp [--repo <path>]
+gitcraft mcp [--repo <path>] [--run <id>]
 
 Speaks the Model Context Protocol over stdin and stdout, for coding agents:
 
@@ -74,7 +74,9 @@ Speaks the Model Context Protocol over stdin and stdout, for coding agents:
 
 It works on the git repository it is started in, or the one --repo names (a folder here, or
 one in WSL or over SSH as gitcraft names it: ssh://host/path). Reading tools work on their
-own; the tools that change the repository need a gitcraft window with it open.
+own; the tools that change the repository need a gitcraft window with it open. --run is given
+by gitcraft to an agent it starts to resolve conflicts in the background: it adds the tools
+that report the agent's progress to the window.
 ";
 
 /// How much longer the agent's end waits than the window's: the window's own answer (it took
@@ -84,12 +86,14 @@ const ANSWER_MARGIN: std::time::Duration = std::time::Duration::from_secs(30);
 /// What `gitcraft mcp …` was asked for.
 #[derive(Debug, PartialEq, Eq)]
 enum Command {
-    Serve(Option<PathBuf>),
+    /// The repository (`--repo`), and the background resolving run it reports for (`--run`).
+    Serve(Option<PathBuf>, Option<String>),
     Help,
 }
 
 fn parse(args: &[OsString]) -> Result<Command, String> {
     let mut repo = None;
+    let mut run = None;
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.to_str() {
@@ -97,11 +101,22 @@ fn parse(args: &[OsString]) -> Result<Command, String> {
                 let path = rest.next().ok_or("--repo needs a path")?;
                 repo = Some(PathBuf::from(path));
             }
+            Some("--run") => {
+                let id = rest
+                    .next()
+                    .and_then(|id| id.to_str())
+                    .ok_or("--run needs an id")?;
+                if id.is_empty() || id.len() > 64 || !id.chars().all(|c| c.is_ascii_alphanumeric())
+                {
+                    return Err("--run takes the id gitcraft gave the run".to_owned());
+                }
+                run = Some(id.to_owned());
+            }
             Some("-h" | "--help") => return Ok(Command::Help),
             _ => return Err(format!("unknown argument {}", arg.to_string_lossy())),
         }
     }
-    Ok(Command::Serve(repo))
+    Ok(Command::Serve(repo, run))
 }
 
 /// Runs `gitcraft mcp` with the arguments after `mcp`; returns the exit code.
@@ -111,10 +126,10 @@ pub fn main(args: &[OsString]) -> i32 {
             print!("{USAGE}");
             0
         }
-        Ok(Command::Serve(repo)) => {
+        Ok(Command::Serve(repo, run)) => {
             // No window here to ask ssh's questions in: over SSH it signs in with keys only.
             crate::remote::askpass::no_window();
-            match serve(repo) {
+            match serve(repo, run) {
                 Ok(()) => 0,
                 Err(e) => {
                     eprintln!("gitcraft mcp: {e}");
@@ -143,10 +158,11 @@ pub(crate) fn repository(repo: Option<PathBuf>) -> Result<PathBuf, String> {
     })
 }
 
-fn serve(repo: Option<PathBuf>) -> Result<(), String> {
+fn serve(repo: Option<PathBuf>, run: Option<String>) -> Result<(), String> {
     use rmcp::ServiceExt;
     // Started without a repository, the server still answers, and says so on every call.
-    let server = server::Gitcraft::new(repo, link::dir(), link::ANSWER_WITHIN + ANSWER_MARGIN);
+    let server =
+        server::Gitcraft::new(repo, link::dir(), link::ANSWER_WITHIN + ANSWER_MARGIN).for_run(run);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -185,11 +201,17 @@ mod tests {
 
     #[test]
     fn the_command_line_takes_a_repository_or_asks_for_help() {
-        assert_eq!(parse(&os(&[])), Ok(Command::Serve(None)));
+        assert_eq!(parse(&os(&[])), Ok(Command::Serve(None, None)));
         assert_eq!(
             parse(&os(&["--repo", "/r"])),
-            Ok(Command::Serve(Some("/r".into())))
+            Ok(Command::Serve(Some("/r".into()), None))
         );
+        assert_eq!(
+            parse(&os(&["--run", "r12ab", "--repo", "/r"])),
+            Ok(Command::Serve(Some("/r".into()), Some("r12ab".into())))
+        );
+        assert!(parse(&os(&["--run"])).is_err());
+        assert!(parse(&os(&["--run", "a b"])).is_err());
         assert_eq!(parse(&os(&["--help"])), Ok(Command::Help));
         assert!(parse(&os(&["--repo"])).is_err());
         assert!(parse(&os(&["--stdio"])).is_err());

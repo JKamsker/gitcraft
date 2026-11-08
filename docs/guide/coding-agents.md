@@ -43,9 +43,12 @@ gitcraft is built to work alongside Claude Code, Codex and other agents: an MCP 
   are kept per worktree until they are sent, never published, and collect in NOTES FOR THE
   AGENT under the big area; _Send to agent_ types them into the worktree's agent terminal (a
   terminal named after the agent, or the one picked beside the button) as one message, pasted
-  for you to send with Enter, and clears them. The same _Send to agent_ is on a conflict (each
+  for you to send with Enter, and clears them. The same _Send to agent_ is on a conflict (_Agent → Send to agent's terminal_: each
   conflict's three sides), on a failing CI run's log (its end) and on a pull request's thread
   (with its file and line). Nothing is typed into a program that hasn't asked for pastes.
+- To have conflicts resolved without a terminal or a worktree to look after, _Resolve all with
+  agent_ runs the agent headless in a hidden worktree and shows its progress on a card: see
+  [Merge conflicts](conflicts.md#resolving-in-the-background-with-an-agent).
 
 ## Bake-off: compare attempts
 

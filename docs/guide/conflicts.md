@@ -21,6 +21,67 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
   with it everywhere ([Mergiraf setup](../mergiraf.md)). gitcraft only runs the `mergiraf`
   program: it neither bundles nor links Mergiraf (GPL-3.0), so gitcraft's licence is unchanged.
 
+## Resolving in the background with an agent
+
+- _Resolve all with agent_ on the banner of a merge, rebase, cherry-pick or revert in progress
+  (or _Agent → Resolve in background_ in the conflict editor, for that file) hands the conflicted files
+  to Claude Code, or to Codex when Settings → AI picks it, running headless. You go on working
+  meanwhile. Resolving one file leaves your checkout as it is until you apply the agent's
+  changes; _Resolve all_ puts the merge aside first (below), and brings it back as it was.
+- Files behind the [agent fence](branches-and-worktrees.md#worktrees) never reach the agent: _Resolve all_ leaves them
+  to you (they are put aside with the merge and come back with it), and resolving one of them
+  in the background is refused.
+- _Resolve all with agent_ also tries to put the merge aside before the agent starts, like a
+  stash: the worktree's files, its index as it is (each conflict's sides and what you staged)
+  and the merge itself (`MERGE_HEAD`, its message) are kept, and the worktree is reset to its
+  branch, clean. Check out other branches, commit, anything, in the same worktree. One that
+  can't be put aside (below) stays in the worktree while the agent works: resolve it there
+  rather than switch branches. The graph shows the
+  merge put aside above the commit it was on, with the agent's robot: a turning ring and how far
+  along it is while it works, a dot and _resolved · bring it back_ once it is done (with a
+  notification). _Bring it back_ (the card, or the row's menu) checks out its branch and puts
+  the merge back exactly as it was, then opens the review of what the agent did. It needs a
+  clean worktree and the branch where it was; until then it waits, and it survives closing
+  gitcraft (the agent's work too, once it is done). Files git doesn't track stay where they
+  are, and are never written over: when one (ignored ones too) is where a file of the merge
+  goes, bringing it back stops and says which, and nothing changes. When it can't come back
+  (its branch moved or is gone), _Drop it_ leaves it put aside for good with its files
+  (conflict markers and all) on a branch of their own, `parked/…`: nothing is lost. Files
+  marked assume-unchanged or left out of a sparse checkout, and merges that change
+  submodules, aren't put aside (they are resolved in place). A rebase, or a cherry-pick of several commits, isn't put aside: it is resolved in place.
+  The merge's files are kept as a commit under `refs/gitcraft/parked/`, the rest under
+  `.git/gitcraft/parked/` and `.git/gitcraft/resolver/`.
+- The agent works in a private copy of the checkout: a scratch worktree in the temporary
+  folder, not listed among the worktrees and removed when the run ends (or, after a crash, the
+  next time gitcraft makes one). The operation is replayed there so it sees all of it, and each
+  conflicted file is copied in as it is in your checkout, with what you already chose there.
+- A card over the big area shows its progress: the plan it reported (a step per file and any
+  check it makes) as a bar of steps and a list, each step's note and time, what it is doing
+  now, the time gone and an estimate of the time left (its own at first, then from the steps
+  done). Fold it to a pill that keeps counting; _Show agent_ on the banner brings it back.
+  _Stop_ ends the agent; what it resolved by then can still be applied.
+- When it is done, the card lists each file: resolved, deleted (as one side did), still
+  conflicted, not decided, or changed by you meanwhile (left as you made it). _Apply_ writes
+  the files you tick and marks them resolved (a file that can't be written stays, with the
+  agent's work on it, to apply again); _Discard_ forgets the agent's work. A conflict editor
+  open on a file applied closes, unless it holds choices you haven't saved: those stay.
+- _Review changes_ (or a file's _Review_) shows what you are applying, in the big area: for
+  each conflict its two sides next to each other, named after them, and what the agent wrote
+  in its place ("took main", "kept both, main first", "combined in its own words"), with the
+  agent's note on the file. A file it also changed outside the conflicts says so. _As a diff_
+  shows the file with its conflicts and as the agent left it, line by line (the only view
+  when its text can't be lined up with the conflicts). Tick or untick each file there and
+  apply from the same bar.
+- Claude Code runs `--restricted`: it reads and edits files in its copy only, reads git through
+  gitcraft's own tools, and has no shell; no settings file is read, so hooks or permissions a
+  branch being merged brings (`.claude/settings.json`) don't apply. Codex runs in its
+  `workspace-write` sandbox. `gitcraft mcp` offers an agent started this way its reading tools
+  and the `resolve_plan`, `resolve_step` and `resolve_finish` reports, and none that change
+  the repository. Nothing it does is applied unless it is a plain file (never a link) that you
+  didn't change meanwhile; a file without conflict markers (one side deleted it, or it is
+  binary) is only offered once the agent changed it or said it is done with it. For
+  repositories on this machine only, for now.
+
 ## Warnings before you act
 
 - Conflict warnings before you act: in the menus of branches and pills, _Merge_ and _Rebase_,

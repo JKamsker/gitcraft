@@ -52,6 +52,7 @@ mod pull_request;
 mod release;
 mod remote;
 mod repo;
+pub mod resolver;
 mod safe_read;
 mod settings;
 mod shell_path;

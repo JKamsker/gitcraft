@@ -185,6 +185,8 @@ impl RepoTab {
                 }))
             })())
         });
+        // The merges put aside for an agent: rows of the graph of their own.
+        self.read_parked(ctx);
     }
 
     pub(super) fn reload_status(&mut self, ctx: &egui::Context) {
@@ -724,6 +726,10 @@ impl RepoTab {
         }
         self.commits
             .reserve(self.history.len() + self.stashes.len());
+        // A merge put aside for an agent is something going on, as the changes are: at the top,
+        // its lane running down to the commit it was put aside on.
+        self.commits
+            .extend(super::resolver::parked_rows(&self.resolver.parked));
         for commit in &visible {
             for stash in stashes_on.get(commit.hash.as_str()).into_iter().flatten() {
                 self.commits.push(Arc::new(Commit {

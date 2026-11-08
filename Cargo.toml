@@ -97,7 +97,8 @@ tempfile = "3"
 # Created only after opt-in, in the running native event loop.
 tray-icon = { version = "=0.26.1", default-features = false }
 
-# Reading a repository's file without following a link swapped in on the way (safe_read.rs).
+# Reading a repository's file without following a link swapped in on the way (safe_read.rs);
+# telling that an agent ended without reaping it, which keeps its process group's id its own (ai/run.rs).
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs", "process"] }
 

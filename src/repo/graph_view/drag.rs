@@ -70,6 +70,10 @@ impl RepoTab {
         let Some(payload) = self.dragged(ui.ctx()) else {
             return;
         };
+        // A merge put aside is no commit to drop anything on.
+        if self.parked_at(row.i).is_some() {
+            return;
+        }
         let pointer = ui.ctx().pointer_interact_pos();
         let over_row = resp.contains_pointer();
         // The pill takes the drop when it is under the pointer and takes what is dragged;

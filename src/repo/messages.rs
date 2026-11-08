@@ -416,6 +416,8 @@ impl RepoTab {
         self.agent_step(ctx);
         self.poll_outbox(ctx);
         self.poll_deferred(ctx);
+        // An agent resolving conflicts that ended is seen to here, the tab shown or not.
+        self.resolver_poll(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
         self.poll_saved_views(ctx);
         self.poll_content_recovery(ctx);
