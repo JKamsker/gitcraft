@@ -29,11 +29,14 @@ fn merge(repo: &Path, base: &str, ours: &str, theirs: &str) -> Result<Option<Str
         &[0, 1],
     )
     .map_err(|e| {
-        format!("could not play the commits through (git 2.40 or newer is needed): {e}")
+        crate::i18n::message(
+            "repo-workflows-surgery-merge-7ec9d56b",
+            &[("e", (e).clone().into())],
+        )
     })?;
     let mut lines = out.lines();
     let Some(tree) = lines.next().map(str::trim).filter(|t| !t.is_empty()) else {
-        return Err("git merge-tree gave no tree".to_owned());
+        return Err(crate::i18n::text("repo-workflows-surgery-merge-810c20dd").to_owned());
     };
     Ok((!lines.any(|l| !l.trim().is_empty())).then(|| tree.to_owned()))
 }
@@ -81,9 +84,9 @@ pub(crate) fn absorbed(
     for commit in commits_from(repo, oldest, head)? {
         let parent = format!("{commit}^");
         let Some(mut tree) = merge(repo, &parent, &state, &commit)? else {
-            return Err(format!(
-                "{} no longer fits once the fixes before it are in: absorb by hand",
-                short(&commit)
+            return Err(crate::i18n::message(
+                "repo-workflows-surgery-absorbed-4b7f1a77",
+                &[("short-commit-1", (short(&commit)).clone().into())],
             ));
         };
         if let Some(fixed) = fixes.get(&commit) {
@@ -91,9 +94,9 @@ pub(crate) fn absorbed(
             let ours = git::commit_tree(repo, &tree, &state, "absorb", None)?;
             let fix = git::commit_tree(repo, fixed, head, "fixup", None)?;
             tree = merge(repo, head, &ours, &fix)?.ok_or_else(|| {
-                format!(
-                    "the fixes for {} change lines a later commit changes too: leave them staged, or absorb them by hand",
-                    short(&commit)
+                crate::i18n::message(
+                    "repo-workflows-surgery-absorbed-0ecdae65",
+                    &[("short-commit-1", (short(&commit)).clone().into())],
                 )
             })?;
         }
@@ -102,10 +105,7 @@ pub(crate) fn absorbed(
         state = git::commit_tree_signed(repo, &tree, &state, &message, Some(&author), sign)?;
     }
     if git::tree_of(repo, &state)? != absorbed {
-        return Err(
-            "the branch would end up with other files than HEAD and the fixes: absorb by hand"
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-surgery-absorbed-d6840076").to_owned());
     }
     Ok(state)
 }

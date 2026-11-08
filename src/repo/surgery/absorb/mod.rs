@@ -266,19 +266,13 @@ impl AbsorbEditor {
 
     pub fn problem(&self) -> Option<String> {
         if self.hunks.is_empty() {
-            return Some(
-                "Nothing staged changes lines an earlier commit has: new files and whole-file changes stay staged"
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-2d960e1c").to_owned());
         }
         if self.targets.is_empty() {
-            return Some(
-                "The branch has no commits of its own to put fixes in (every one is on another branch or a remote)"
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-e836ee78").to_owned());
         }
         if self.choice.iter().all(Option::is_none) {
-            return Some("Pick a commit for at least one change".to_owned());
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-ed9bc2e2").to_owned());
         }
         None
     }
@@ -341,9 +335,7 @@ pub(crate) fn prepare(
     )
     .is_err()
     {
-        return Err(
-            "what is staged changed since this was opened: close it and open it again".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-surgery-prepare-9e68dba0").to_owned());
     }
     let rest_patch = git::patch_between(repo, &absorbed, &staged_tree)?;
     let rest = !rest_patch.is_empty();
@@ -362,7 +354,7 @@ pub(crate) fn prepare(
         .map(|(t, _)| *t)
         .max()
         .and_then(|t| targets.get(t))
-        .ok_or("no commit gets fixes")?;
+        .ok_or(crate::i18n::text("repo-workflows-surgery-prepare-6f254528"))?;
     let new_head = history::absorbed(repo, head, oldest, &fixes, &absorbed)?;
     Ok(Checked {
         fixups,

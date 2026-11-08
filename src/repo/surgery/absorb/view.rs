@@ -53,11 +53,17 @@ fn header(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) {
             ui.horizontal(|ui| {
                 icons::inline(ui, "git-merge", 16.0, t.icon);
                 ui.label(
-                    RichText::new("Distribute staged fixes into the commits they belong to")
+                    RichText::new(crate::i18n::text("repo-workflows-surgery-header-104e7aed"))
                         .font(theme::medium(13.0)),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::small_button(ui, "x", "Cancel (Esc)").clicked() {
+                    if icons::small_button(
+                        ui,
+                        "x",
+                        crate::i18n::text("repo-workflows-surgery-header-862c2324"),
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::CloseAbsorb);
                     }
                 });
@@ -79,27 +85,49 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                 let free = idle && !editor.busy;
                 if let Some(checked) = &editor.checked {
                     let n = checked.fixups.len();
-                    let label = format!("Absorb into {n} commit{}", if n == 1 { "" } else { "s" });
+                    let label = crate::i18n::message(
+                        "repo-workflows-surgery-absorb-count",
+                        &[("count", (n).into())],
+                    );
                     if widgets::primary_button(ui, &label, free, 160.0).clicked() {
                         acts.push(Action::RunAbsorb);
                     }
-                    if ui.add_enabled(free, egui::Button::new("Back")).clicked() {
+                    if ui
+                        .add_enabled(
+                            free,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-surgery-footer-76900f1b",
+                            )),
+                        )
+                        .clicked()
+                    {
                         editor.checked = None;
                     }
-                } else if widgets::primary_button(ui, "Check", problem.is_none() && free, 100.0)
-                    .clicked()
+                } else if widgets::primary_button(
+                    ui,
+                    crate::i18n::text("repo-workflows-surgery-footer-9d60841e"),
+                    problem.is_none() && free,
+                    100.0,
+                )
+                .clicked()
                 {
                     acts.push(Action::CheckAbsorb);
                 }
-                if ui.button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6")).clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6"))
+                    .clicked()
+                {
                     acts.push(Action::CloseAbsorb);
                 }
                 if editor.git_absorb
                     && ui
-                        .add_enabled(free, egui::Button::new("Run git-absorb instead"))
-                        .on_hover_text(
-                            "The installed git-absorb picks the commits itself (with its own limits, at most 10 commits by default), ignoring the picks here, and rebases its fixups in",
+                        .add_enabled(
+                            free,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-surgery-footer-032f55a8",
+                            )),
                         )
+                        .on_hover_text(crate::i18n::text("repo-workflows-surgery-footer-605de48c"))
                         .clicked()
                 {
                     acts.push(Action::RunGitAbsorb);
@@ -109,7 +137,13 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     let (text, color) = match (&editor.error, &problem, &editor.checked) {
-                        (Some(e), _, _) => (format!("Can't absorb them this way: {e}"), t.danger),
+                        (Some(e), _, _) => (
+                            crate::i18n::message(
+                                "repo-workflows-surgery-footer-9eaa6ed1",
+                                &[("e", (e).clone().into())],
+                            ),
+                            t.danger,
+                        ),
                         (None, Some(p), _) => (p.clone(), t.text_dim),
                         (None, None, Some(c)) => {
                             let oldest = c
@@ -123,20 +157,21 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor, idle: bool, acts: 
                                 .iter()
                                 .filter(|(i, _)| editor.targets.get(*i).is_some_and(|t| t.pushed))
                                 .count();
-                            let text = format!(
-                                "Checked. Absorbing rewrites the branch from {}{}{}; Ctrl+Z undoes it",
-                                oldest.map(|t| short(&t.hash)).unwrap_or_default(),
-                                if c.rest { ", the rest staying staged" } else { "" },
-                                if pushed > 0 {
-                                    " · pushed commits change: push with force (with lease) after"
-                                } else {
-                                    ""
-                                },
+                            let text = crate::i18n::message(
+                                "repo-workflows-surgery-checked-absorb",
+                                &[
+                                    (
+                                        "oldest",
+                                        (oldest.map(|t| short(&t.hash)).unwrap_or_default()).into(),
+                                    ),
+                                    ("rest", (if c.rest { "yes" } else { "no" }).into()),
+                                    ("pushed", (if pushed > 0 { "yes" } else { "no" }).into()),
+                                ],
                             );
                             (text, if pushed > 0 { t.warning } else { t.text_dim })
                         }
                         (None, None, None) => (
-                            "Check to see each commit's fixup and what stays staged".to_owned(),
+                            crate::i18n::text("repo-workflows-surgery-footer-afd6deb3").to_owned(),
                             t.text_dim,
                         ),
                     };
@@ -163,24 +198,33 @@ fn verdict(
     };
     match found {
         Match::Clear(i) => (
-            format!("its lines were last changed by {}", name(i)),
+            crate::i18n::message(
+                "repo-workflows-surgery-verdict-b5ced75e",
+                &[("name-i-1", (name(i)).clone().into())],
+            ),
             t.success,
         ),
         Match::Several(i) => (
-            format!(
-                "several commits changed these lines ({}, or older ones): {} is suggested, the newest; pick it to absorb",
-                touched
-                    .iter()
-                    .map(|&i| name(i))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                name(i)
+            crate::i18n::message(
+                "repo-workflows-surgery-verdict-e6cd9adf",
+                &[
+                    (
+                        "touched-iter-map-i-name-i-collec-1",
+                        (touched
+                            .iter()
+                            .map(|&i| name(i))
+                            .collect::<Vec<_>>()
+                            .join(", "))
+                        .clone()
+                        .into(),
+                    ),
+                    ("name-i-2", (name(i)).clone().into()),
+                ],
             ),
             t.warning,
         ),
         Match::None => (
-            "no commit of the branch changed these lines: it stays staged unless you pick one"
-                .to_owned(),
+            crate::i18n::text("repo-workflows-surgery-verdict-4f2f85d1").to_owned(),
             t.text_faint,
         ),
     }
@@ -196,8 +240,16 @@ fn target_text(editor: &AbsorbEditor, i: usize, touched: bool, suggested: bool) 
         if touched { "● " } else { "   " },
         short(&c.hash),
         c.summary,
-        if c.pushed { "  (pushed)" } else { "" },
-        if suggested { "  (suggested)" } else { "" },
+        if c.pushed {
+            crate::i18n::text("repo-workflows-surgery-target-text-252d53a4")
+        } else {
+            ""
+        },
+        if suggested {
+            crate::i18n::text("repo-workflows-surgery-target-text-ea3d92f5")
+        } else {
+            ""
+        },
     )
 }
 
@@ -218,7 +270,7 @@ fn picker(
     };
     let shown = match choice {
         Some(c) => target_text(editor, c, hunk.touched.contains(&c), suggested == Some(c)),
-        None => "Leave staged".to_owned(),
+        None => crate::i18n::text("repo-workflows-surgery-picker-e45ce620").to_owned(),
     };
     egui::ComboBox::from_id_salt("into")
         .width(320.0)
@@ -226,7 +278,10 @@ fn picker(
         .selected_text(shown.trim_start())
         .show_ui(ui, |ui| {
             if ui
-                .selectable_label(choice.is_none(), "Leave staged")
+                .selectable_label(
+                    choice.is_none(),
+                    crate::i18n::text("repo-workflows-surgery-picker-e45ce620"),
+                )
                 .clicked()
             {
                 *chosen = Some((h, None));
@@ -239,7 +294,7 @@ fn picker(
                 let text = target_text(editor, i, hunk.touched.contains(&i), suggested == Some(i));
                 if ui
                     .selectable_label(choice == Some(i), text)
-                    .on_hover_text("● changed these lines")
+                    .on_hover_text(crate::i18n::text("repo-workflows-surgery-picker-1c448d60"))
                     .clicked()
                 {
                     *chosen = Some((h, Some(i)));
@@ -283,9 +338,12 @@ fn hunks(ui: &mut Ui, t: &Tokens, editor: &mut AbsorbEditor) {
             }
             if !editor.whole.is_empty() {
                 ui.label(
-                    RichText::new(format!(
-                        "Staying staged (new files, and whole-file changes: binary, deleted, links, mode changes): {}",
-                        editor.whole.join(", ")
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-surgery-hunks-372dc43f",
+                        &[(
+                            "editor-whole-join-1",
+                            (editor.whole.join(", ")).clone().into(),
+                        )],
                     ))
                     .color(t.text_faint)
                     .small(),
@@ -333,7 +391,13 @@ fn card(
                                 )
                                 .truncate(),
                             );
-                            ui.label(RichText::new(format!("line {at}")).color(t.text_faint));
+                            ui.label(
+                                RichText::new(crate::i18n::message(
+                                    "repo-workflows-surgery-card-204fd472",
+                                    &[("at", (at).clone().into())],
+                                ))
+                                .color(t.text_faint),
+                            );
                         });
                     });
                 });
@@ -345,9 +409,15 @@ fn card(
                 }
                 if hunk.lines.len() > SHOWN {
                     ui.label(
-                        RichText::new(format!("… {} more lines", hunk.lines.len() - SHOWN))
-                            .color(t.text_faint)
-                            .small(),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-surgery-card-f5133568",
+                            &[(
+                                "hunk-lines-len-shown-1",
+                                (hunk.lines.len() - SHOWN).clone().into(),
+                            )],
+                        ))
+                        .color(t.text_faint)
+                        .small(),
                     );
                 }
             });
@@ -379,9 +449,17 @@ fn preview(ui: &mut Ui, t: &Tokens, editor: &AbsorbEditor) {
         Some((target, _)) => editor
             .targets
             .get(*target)
-            .map(|c| format!("Into {} {}", short(&c.hash), c.summary))
+            .map(|c| {
+                crate::i18n::message(
+                    "repo-workflows-surgery-preview-a1b3c4c7",
+                    &[
+                        ("short-c-hash-1", (short(&c.hash)).clone().into()),
+                        ("c-summary-2", (c.summary).clone().into()),
+                    ],
+                )
+            })
             .unwrap_or_default(),
-        None => "Stays staged".to_owned(),
+        None => crate::i18n::text("repo-workflows-surgery-preview-c01b65ee").to_owned(),
     };
     egui::ScrollArea::both()
         .id_salt(("absorb_preview", editor.id))

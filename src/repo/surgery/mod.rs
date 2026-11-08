@@ -52,10 +52,7 @@ pub(crate) fn rebase_plan(
     plan: impl FnOnce(Vec<Entry>) -> Result<Vec<Entry>, String>,
 ) -> Result<RebaseEditor, String> {
     if commits.iter().any(|c| c.merge) {
-        return Err(
-            "merges came after the commit, which this would flatten: rebase them in the terminal with --rebase-merges"
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-surgery-rebase-plan-28ab1d38").to_owned());
     }
     let mut editor = RebaseEditor::new(onto.to_owned(), onto.to_owned(), commits);
     editor.entries = plan(std::mem::take(&mut editor.entries))?;
@@ -72,10 +69,18 @@ impl RepoTab {
     /// commit.
     pub(super) fn surgery_refusal(&self, hash: &str) -> Option<String> {
         if self.refs.current.is_none() {
-            return Some("HEAD is detached: check out a branch first".to_owned());
+            return Some(
+                crate::i18n::text("repo-workflows-surgery-surgery-refusal-7776bacf").to_owned(),
+            );
         }
         if let Some(state) = self.work.in_progress {
-            return Some(format!("A {} is in progress", state.label().to_lowercase()));
+            return Some(crate::i18n::message(
+                "repo-workflows-surgery-surgery-refusal-fda39bd7",
+                &[(
+                    "state-label-to-lowercase-1",
+                    (state.label().to_lowercase()).clone().into(),
+                )],
+            ));
         }
         let line = quick_edit::first_parents(&self.commits, &self.index, &self.refs.head);
         quick_edit::refusal(Edit::Drop, &line, hash).map(str::to_owned)
@@ -90,12 +95,16 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let refused = self.surgery_refusal(hash);
-        let button = crate::menu_item::MenuItem::new("Split commit…")
-            .icon("command")
-            .enabled(idle)
-            .refused(refused.as_deref())
-            .show(ui)
-            .on_hover_text("Divide its changes between two or more new commits");
+        let button = crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-surgery-surgery-items-16dd0bf3",
+        ))
+        .icon("command")
+        .enabled(idle)
+        .refused(refused.as_deref())
+        .show(ui)
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-surgery-surgery-items-120354c9",
+        ));
         let button = match &refused {
             Some(why) => button.on_disabled_hover_text(why),
             None => button,
@@ -103,10 +112,16 @@ impl RepoTab {
         if button.clicked() {
             acts.push(Action::OpenSplit(hash.to_owned()));
         }
-        let button = crate::menu_item::MenuItem::new("Move changes to another commit…").icon("command").enabled(idle).refused(refused.as_deref()).show(ui)
-            .on_hover_text(
-                "Take some of its files, hunks or lines out, into another commit of the branch or the working changes",
-            );
+        let button = crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-surgery-surgery-items-a795cec5",
+        ))
+        .icon("command")
+        .enabled(idle)
+        .refused(refused.as_deref())
+        .show(ui)
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-surgery-surgery-items-425b56ce",
+        ));
         let button = match &refused {
             Some(why) => button.on_disabled_hover_text(why),
             None => button,
@@ -143,9 +158,12 @@ impl RepoTab {
             },
             move |tab, result: Result<(Vec<String>, String), String>, ctx| match result {
                 Ok(_) if tab.busy_op.is_some() => {
-                    let why = format!(
-                        "{} is still running, try again when it's done",
-                        tab.busy_op.as_deref().unwrap_or_default()
+                    let why = crate::i18n::message(
+                        "repo-workflows-surgery-rewrite-with-c60e3a40",
+                        &[(
+                            "tab-busy-op-as-deref-unwrap-or-d-1",
+                            (tab.busy_op.as_deref().unwrap_or_default()).clone().into(),
+                        )],
                     );
                     let _ = started(tab, Err(why));
                 }

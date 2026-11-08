@@ -5542,7 +5542,273 @@ repo-workflows-stack-title-row-569c1ff8 = { $title }
 
 repo-workflows-stack-title-row-f3da38c2 = { $n } neu aufzubauen · { $g } nicht mehr vorhanden
 
+repo-workflows-surgery-absorbed-0ecdae65 = Die Korrekturen für { $short-commit-1 } ändern Zeilen, die auch ein späterer Commit ändert: vorgemerkt lassen oder manuell einarbeiten
+
+repo-workflows-surgery-absorbed-4b7f1a77 = { $short-commit-1 } passt nach den vorherigen Korrekturen nicht mehr: manuell einarbeiten
+
+repo-workflows-surgery-absorbed-d6840076 = Der Branch hätte anschließend andere Dateien als HEAD mit den Korrekturen: manuell einarbeiten
+
+repo-workflows-surgery-card-204fd472 = Zeile { $at }
+
+repo-workflows-surgery-card-f5133568 = … { $hunk-lines-len-shown-1 } weitere Zeilen
+
+repo-workflows-surgery-changes-4a2b6fd2 = (noch keine Zusammenfassung)
+
+repo-workflows-surgery-changes-a2e10493 = Klicks verschieben nach
+
+repo-workflows-surgery-changes-d37a4bd0 = Klicks gehen an
+
+repo-workflows-surgery-destinations-6f10c3fa = Klicken Sie rechts auf die zu verschiebenden Dateien, Hunks oder Zeilen (Markierung 2; erneut klicken zum Behalten), dann auf das Ziel.
+
+repo-workflows-surgery-destinations-9b4ffd73 = Aus dem Commit herausnehmen und vormerken; die Dateien dürfen keine weiteren Änderungen haben
+
+repo-workflows-surgery-destinations-9e3eee5d = { $short-editor-hash-1 }  dieser Commit
+
+repo-workflows-surgery-destinations-a3863fa7 = Kein anderer Commit des Branches kann sie aufnehmen: Als Nächstes folgt ein Merge oder der erste Commit.
+
+repo-workflows-surgery-destinations-aea2bb52 = Ältere Commits sind noch nicht geladen: Scrollen Sie im Graphen nach unten, um sie zu laden.
+
+repo-workflows-surgery-destinations-b4861450 = Arbeitsänderungen (vorgemerkt)
+
+repo-workflows-surgery-draw-row-1b11239e = Zeilen anzeigen
+
+repo-workflows-surgery-draw-row-5359fb45 = Zeilen einklappen
+
+repo-workflows-surgery-draw-row-5d5aa815 = { $file-path-1 } Zeile { $i-1-2 } zuweisen: { $line-text-3 }
+
+repo-workflows-surgery-draw-row-82048030 = die ganze Datei
+
+repo-workflows-surgery-draw-row-b23760b8 = Datei { $file-path-1 } zuweisen: { $tip-editor-f-editor-units-get-f--2 }
+
+repo-workflows-surgery-draw-row-bff8613c = dieser Hunk
+
+repo-workflows-surgery-draw-row-cdd88a94 = diese Zeile
+
+repo-workflows-surgery-draw-row-f1e7c811 = Nur ganze Datei: { $why }
+
+repo-workflows-surgery-ends-as-810c20dd = git merge-tree hat keinen Baum zurückgegeben
+
+repo-workflows-surgery-ends-as-a54fc1a0 = Das Umschreiben konnte nicht durchgespielt werden (Git 2.40 oder neuer erforderlich): { $e }
+
+repo-workflows-surgery-files-of-758821ec = Git hat { $paths-len-1 } Dateien aufgelistet, der Patch enthält jedoch { $sections-len-2 }
+
+repo-workflows-surgery-files-of-caaf4495 = { $path } ist kein UTF-8-Text (Latin-1 usw.). Seine Zeilen können hier nicht aufgeteilt werden. Verwenden Sie das Terminal.
+
+repo-workflows-surgery-footer-032f55a8 = Stattdessen git-absorb ausführen
+
+repo-workflows-surgery-footer-11188750 = Aufteilung prüfen
+
 repo-workflows-surgery-footer-19766ed6 = Abbrechen
+
+repo-workflows-surgery-footer-42680e0d = Änderungen verschieben
+
+repo-workflows-surgery-footer-50c6afff = Geprüft. Das Einarbeiten schreibt den Branch ab { $oldest-map-t-short-t-hash-unwrap-1 }{ $if-c-rest-the-rest-staying-stage-2 }{ $if-pushed-0-pushed-commits-chang-3 } um; Strg+Z macht dies rückgängig
+
+repo-workflows-surgery-footer-57647e2c = { " " }· gepushte Commits ändern sich: anschließend mit Force und Lease pushen
+
+repo-workflows-surgery-footer-605de48c = Das installierte git-absorb wählt die Commits selbst (mit eigenen Grenzen, standardmäßig höchstens 10 Commits), ignoriert die Auswahl hier und arbeitet seine Fixups per Rebase ein
+
+repo-workflows-surgery-footer-76900f1b = Zurück
+
+repo-workflows-surgery-footer-9d60841e = Prüfen
+
+repo-workflows-surgery-footer-9eaa6ed1 = So können die Korrekturen nicht eingearbeitet werden: { $e }
+
+repo-workflows-surgery-footer-afd6deb3 = Prüfen, um das Fixup jedes Commits und die verbleibenden vorgemerkten Änderungen zu sehen
+
+repo-workflows-surgery-footer-b5292604 = Verschiebung prüfen
+
+repo-workflows-surgery-footer-c94b3ae3 = , der Rest bleibt vorgemerkt
+
+repo-workflows-surgery-footer-df9d2856 = Commit aufteilen
+
+repo-workflows-surgery-group-card-45e7c009 = Diesen Commit entfernen: Seine Änderungen gehen an Commit { $heir-1-1 }
+
+repo-workflows-surgery-group-card-526e0087 = Beschreibung
+
+repo-workflows-surgery-group-card-77f7cfc2 = Zusammenfassung (erforderlich)
+
+repo-workflows-surgery-group-card-7aca66ea = Diesen Commit entfernen: Seine Änderungen gehen an den nächsten
+
+repo-workflows-surgery-groups-25dc2988 = Commit hinzufügen
+
+repo-workflows-surgery-groups-536f4c75 = Höchstens { $MAX-GROUPS } Commits
+
+repo-workflows-surgery-groups-e87a043a = Wählen Sie einen Commit aus (oder drücken Sie seine Nummer) und klicken Sie rechts auf Dateien, Hunks oder Zeilen, um sie hinzuzufügen.
+
+repo-workflows-surgery-header-08e79585 = Änderungen verschieben aus
+
+repo-workflows-surgery-header-104e7aed = Vorgemerkte Korrekturen in die zugehörigen Commits einarbeiten
+
+repo-workflows-surgery-header-32afaa78 = Aufteilen
+
+repo-workflows-surgery-header-862c2324 = Abbrechen (Esc)
+
+repo-workflows-surgery-hunks-372dc43f = Bleibt vorgemerkt (neue Dateien und Änderungen ganzer Dateien: Binärdateien, gelöschte Dateien, Links, Modusänderungen): { $editor-whole-join-1 }
+
+repo-workflows-surgery-merge-7ec9d56b = Commits konnten nicht durchgespielt werden (Git 2.40 oder neuer erforderlich): { $e }
+
+repo-workflows-surgery-merge-810c20dd = git merge-tree hat keinen Baum zurückgegeben
+
+repo-workflows-surgery-moving-26c84ac3 = Wird verschoben
+
+repo-workflows-surgery-moving-4c6a80bb = Bleibt in { $short-editor-hash-1 }
+
+repo-workflows-surgery-note-4656ae85 = Verschiebung prüfen, um Verbleibendes und zu Verschiebendes zu sehen
+
+repo-workflows-surgery-note-85eaa81d = Geprüft: Verbleibendes und zu Verschiebendes. Die Verschiebung schreibt den Branch ab dem älteren Commit um · Strg+Z macht dies rückgängig
+
+repo-workflows-surgery-note-a227d3be = So können die Änderungen nicht verschoben werden: { $e }
+
+repo-workflows-surgery-note-a3a06218 = Geprüft: { $c-trees-len-saturating-sub-1-1 } Commits, zusammen genau der alte Commit. Nach dem Aufteilen werden die folgenden Commits erneut angewendet · Strg+Z macht dies rückgängig
+
+repo-workflows-surgery-note-c96c4852 = Aufteilung prüfen, um den Patch jedes neuen Commits zu sehen
+
+repo-workflows-surgery-note-e5a23195 = So kann der Commit nicht aufgeteilt werden: { $e }
+
+repo-workflows-surgery-open-absorb-2cddd12d = Vorgemerkte Korrekturen verteilen: Schließen Sie zunächst den geöffneten Editor
+
+repo-workflows-surgery-open-absorb-3373a6f7 = Vorgemerkte Korrekturen verteilen: HEAD ist losgelöst. Checken Sie zunächst einen Branch aus.
+
+repo-workflows-surgery-open-absorb-55d2e258 = Vorgemerkte Korrekturen verteilen: nichts vorgemerkt. Merken Sie zunächst die Korrekturen vor.
+
+repo-workflows-surgery-open-absorb-55f28458 = Vorgemerkte Korrekturen verteilen: Zwischenzeitlich wurde ein anderer Editor geöffnet
+
+repo-workflows-surgery-open-absorb-5ebbefda = Vorgemerkte Korrekturen verteilen: wird gelesen…
+
+repo-workflows-surgery-open-absorb-ed3b6cd2 = Vorgemerkte Korrekturen verteilen: { $e }
+
+repo-workflows-surgery-open-absorb-edcc444b = Vorgemerkte Korrekturen verteilen: Ein Vorgang läuft: { $state-label-to-lowercase-1 }
+
+repo-workflows-surgery-open-move-9a352cd5 = Änderungen verschieben: { $why }
+
+repo-workflows-surgery-open-move-9a3c16a9 = Änderungen verschieben: { $short-hash-1 } wird gelesen…
+
+repo-workflows-surgery-open-move-9c9e42d2 = Änderungen verschieben: { $e }
+
+repo-workflows-surgery-open-split-01ee6f3c = Commit aufteilen: Schließen Sie zunächst den Editor für vorgemerkte Korrekturen
+
+repo-workflows-surgery-open-split-94f66e94 = Commit aufteilen: { $e }
+
+repo-workflows-surgery-open-split-a472a361 = Commit aufteilen: { $short-hash-1 } wird gelesen…
+
+repo-workflows-surgery-open-split-ad93af6b = Commit aufteilen: { $why }
+
+repo-workflows-surgery-picker-1c448d60 = ● hat diese Zeilen geändert
+
+repo-workflows-surgery-picker-e45ce620 = Vorgemerkt lassen
+
+repo-workflows-surgery-prepare-17c56a59 = Zu Verschiebendes: { $e }
+
+repo-workflows-surgery-prepare-1a3632ec = Commit { $g-1-1 }: { $e-2 }
+
+repo-workflows-surgery-prepare-6f254528 = Keinem Commit werden Korrekturen zugewiesen
+
+repo-workflows-surgery-prepare-9e68dba0 = Die vorgemerkten Änderungen haben sich seit dem Öffnen geändert: schließen und erneut öffnen
+
+repo-workflows-surgery-prepare-9ee5bdbf = Commit { $g-1-1 } würde nichts ändern: Die vorherigen Commits enthalten seine Änderungen bereits (eine nach einer letzten Zeile ohne Zeilenumbruch hinzugefügte Zeile ergänzt diesen)
+
+repo-workflows-surgery-prepare-d129ae6d = Verbleibendes: { $e }
+
+repo-workflows-surgery-preview-a1b3c4c7 = In { $short-c-hash-1 } { $c-summary-2 }
+
+repo-workflows-surgery-preview-c01b65ee = Bleibt vorgemerkt
+
+repo-workflows-surgery-preview-line-4a4c8a43 = · nichts: { $short-editor-hash-1 } entfällt
+
+repo-workflows-surgery-problem-2d960e1c = Keine vorgemerkte Änderung betrifft Zeilen eines früheren Commits. Neue Dateien und Änderungen ganzer Dateien bleiben vorgemerkt.
+
+repo-workflows-surgery-problem-45b607f4 = Dieser Commit enthält nur eine Änderung: Es gibt nichts aufzuteilen
+
+repo-workflows-surgery-problem-552d4c58 = Commit { $g-1-1 } enthält noch keine Änderungen: Klicken Sie rechts auf Dateien, Hunks oder Zeilen, um sie hinzuzufügen
+
+repo-workflows-surgery-problem-5cf54a16 = Wählen Sie links das Ziel
+
+repo-workflows-surgery-problem-c7982ff3 = Klicken Sie auf die zu verschiebenden Dateien, Hunks oder Zeilen: Sie erhalten die Markierung 2
+
+repo-workflows-surgery-problem-cd79fde0 = Commit { $g-1-1 } benötigt eine Zusammenfassung
+
+repo-workflows-surgery-problem-e836ee78 = Der Branch hat keine eigenen Commits, in die Korrekturen eingearbeitet werden könnten (alle liegen auf einem anderen Branch oder Remote)
+
+repo-workflows-surgery-problem-ed9bc2e2 = Wählen Sie für mindestens eine Änderung einen Commit
+
+repo-workflows-surgery-read-6a75c5d8 = Ein Merge-Commit kann nicht aufgeteilt werden
+
+repo-workflows-surgery-read-c35ba44e = Der erste Commit hat keinen Eltern-Commit, von dem er aufgeteilt werden könnte
+
+repo-workflows-surgery-rebase-plan-28ab1d38 = Nach diesem Commit folgen Merges, die hierbei abgeflacht würden: Führen Sie den Rebase im Terminal mit --rebase-merges aus
+
+repo-workflows-surgery-rewrite-with-c60e3a40 = { $tab-busy-op-as-deref-unwrap-or-d-1 } läuft noch. Versuchen Sie es erneut, sobald der Vorgang beendet ist
+
+repo-workflows-surgery-run-move-145a2a94 = Der Branch hat keine umzuschreibenden Commits
+
+repo-workflows-surgery-run-move-97891621 = Der Commit befindet sich nicht mehr auf dem ausgecheckten Branch
+
+repo-workflows-surgery-run-move-9a1d6978 = Ein dazwischenliegender Commit macht diese Zeilen rückgängig oder stellt sie wieder her, sodass der Branch anders enden würde: manuell verschieben
+
+repo-workflows-surgery-run-move-afb8b0ad = Änderungen von { $short-hash-1 } in die Arbeitsänderungen verschieben
+
+repo-workflows-surgery-run-move-b5726a1d = Änderungen von { $short-hash-1 } nach { $short-t-hash-2 } verschieben
+
+repo-workflows-surgery-run-move-d1994fc1 = Die Verschiebung wurde nicht geprüft
+
+repo-workflows-surgery-run-split-609071bf = Der Branch enthält den Commit nicht mehr
+
+repo-workflows-surgery-run-split-6da7c69e = Der Commit folgt auf dem ausgecheckten Branch nicht mehr direkt auf seinen Eltern-Commit
+
+repo-workflows-surgery-run-split-ddd763c5 = { $short-hash-1 } in { $messages-len-2 } aufteilen
+
+repo-workflows-surgery-set-dest-0c40c6af = Wird in die Arbeitsänderungen verschoben (vorgemerkt)
+
+repo-workflows-surgery-set-dest-556c2e6e = Wird nach { $short-t-hash-1 } { $t-summary-2 } verschoben
+
+repo-workflows-surgery-surgery-items-120354c9 = Seine Änderungen auf zwei oder mehr neue Commits verteilen
+
+repo-workflows-surgery-surgery-items-16dd0bf3 = Commit aufteilen…
+
+repo-workflows-surgery-surgery-items-425b56ce = Einige seiner Dateien, Hunks oder Zeilen in einen anderen Commit des Branches oder in die Arbeitsänderungen verschieben
+
+repo-workflows-surgery-surgery-items-a795cec5 = Änderungen in einen anderen Commit verschieben…
+
+repo-workflows-surgery-surgery-refusal-7776bacf = HEAD ist losgelöst: Checken Sie zunächst einen Branch aus
+
+repo-workflows-surgery-surgery-refusal-fda39bd7 = Ein Vorgang läuft: { $state-label-to-lowercase-1 }
+
+repo-workflows-surgery-target-text-252d53a4 = { "   " }(gepusht)
+
+repo-workflows-surgery-target-text-ea3d92f5 = { "   " }(vorgeschlagen)
+
+repo-workflows-surgery-tip-182c90c3 = { $name } in { $short-editor-hash-1 } behalten
+
+repo-workflows-surgery-tip-4e078e93 = { $name } verschieben (Ziel links auswählen)
+
+repo-workflows-surgery-tip-9b5f8a9f = { $name } in die Arbeitsänderungen verschieben
+
+repo-workflows-surgery-tip-9e1cf75b = { $name } in Commit { $editor-active-1-1 } aufnehmen
+
+repo-workflows-surgery-tip-abb8d5a0 = { $name } nach { $short-t-hash-1 } verschieben
+
+repo-workflows-surgery-todo-41cdda9e = Der Ziel-Commit befindet sich nicht mehr auf dem Branch
+
+repo-workflows-surgery-todo-97891621 = Der Commit befindet sich nicht mehr auf dem ausgecheckten Branch
+
+repo-workflows-surgery-verdict-4f2f85d1 = Kein Commit des Branches hat diese Zeilen geändert: Sie bleiben vorgemerkt, solange Sie keinen Commit auswählen
+
+repo-workflows-surgery-verdict-b5ced75e = Diese Zeilen wurden zuletzt von { $name-i-1 } geändert
+
+repo-workflows-surgery-verdict-e6cd9adf = Mehrere Commits haben diese Zeilen geändert ({ $touched-iter-map-i-name-i-collec-1 } oder ältere): { $name-i-2 } wird als neuester vorgeschlagen. Wählen Sie ihn zum Einarbeiten aus.
+
+repo-workflows-surgery-why-whole-070ca29b = keine geänderten Zeilen
+
+repo-workflows-surgery-why-whole-2dab3c8e = eine Binärdatei
+
+repo-workflows-surgery-why-whole-c7123097 = sein Modus ändert sich
+
+repo-workflows-surgery-why-whole-f5d6a31f = ein symbolischer Link
+
+repo-workflows-surgery-why-whole-fa288625 = zu lang, um einzelne Zeilen auszuwählen
+
+repo-workflows-surgery-why-whole-fcedacb9 = ein Submodul
 
 repo-workflows-test_lane-test-banner-7d9eb7ac = Schließen
 
@@ -5872,4 +6138,29 @@ repo-workflows-stack-behind-count = Neuaufbau erforderlich ({ $count ->
         [one] ein Commit im Eltern-Branch
        *[other] { $count } Commits im Eltern-Branch
     })
+
+repo-workflows-surgery-absorb-count = { $count ->
+        [one] In einen Commit einarbeiten
+       *[other] In { $count } Commits einarbeiten
+    }
+
+repo-workflows-surgery-group-summary = Commit { $index } · { $count ->
+        [one] eine Änderung
+       *[other] { $count } Änderungen
+    }
+
+repo-workflows-surgery-preview-files = · { $count ->
+        [one] eine Datei
+       *[other] { $count } Dateien
+    }: { $text }
+
+repo-workflows-surgery-checked-absorb = Geprüft. Das Einarbeiten schreibt den Branch ab { $oldest } um.{ $rest ->
+        [yes] { " Der Rest bleibt vorgemerkt." }
+       *[no] { "" }
+    }{ $pushed ->
+        [yes] { " Gepushte Commits ändern sich: anschließend mit Force und Lease pushen." }
+       *[no] { "" }
+    } Strg+Z macht dies rückgängig.
+
+repo-workflows-surgery-binary-preview = (Binärinhalt)
 

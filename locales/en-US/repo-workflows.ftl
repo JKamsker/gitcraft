@@ -5542,7 +5542,273 @@ repo-workflows-stack-title-row-569c1ff8 = { $title }
 
 repo-workflows-stack-title-row-f3da38c2 = { $n } to restack · { $g } gone
 
+repo-workflows-surgery-absorbed-0ecdae65 = the fixes for { $short-commit-1 } change lines a later commit changes too: leave them staged, or absorb them by hand
+
+repo-workflows-surgery-absorbed-4b7f1a77 = { $short-commit-1 } no longer fits once the fixes before it are in: absorb by hand
+
+repo-workflows-surgery-absorbed-d6840076 = the branch would end up with other files than HEAD and the fixes: absorb by hand
+
+repo-workflows-surgery-card-204fd472 = line { $at }
+
+repo-workflows-surgery-card-f5133568 = … { $hunk-lines-len-shown-1 } more lines
+
+repo-workflows-surgery-changes-4a2b6fd2 = (no summary yet)
+
+repo-workflows-surgery-changes-a2e10493 = Clicks move to
+
+repo-workflows-surgery-changes-d37a4bd0 = Clicks go to
+
+repo-workflows-surgery-destinations-6f10c3fa = Click the files, hunks or lines to move on the right (chip 2; click again to keep them), then pick where they go.
+
+repo-workflows-surgery-destinations-9b4ffd73 = Out of the commit, staged; their files must have no other changes
+
+repo-workflows-surgery-destinations-9e3eee5d = { $short-editor-hash-1 }  this commit
+
+repo-workflows-surgery-destinations-a3863fa7 = No other commit of the branch can take them: a merge or the first commit is next.
+
+repo-workflows-surgery-destinations-aea2bb52 = Older commits aren't loaded yet: scroll the graph down to load them.
+
+repo-workflows-surgery-destinations-b4861450 = Working changes (staged)
+
+repo-workflows-surgery-draw-row-1b11239e = Show its lines
+
+repo-workflows-surgery-draw-row-5359fb45 = Fold its lines
+
+repo-workflows-surgery-draw-row-5d5aa815 = Assign { $file-path-1 } line { $i-1-2 }: { $line-text-3 }
+
+repo-workflows-surgery-draw-row-82048030 = the whole file
+
+repo-workflows-surgery-draw-row-b23760b8 = Assign file { $file-path-1 }: { $tip-editor-f-editor-units-get-f--2 }
+
+repo-workflows-surgery-draw-row-bff8613c = this hunk
+
+repo-workflows-surgery-draw-row-cdd88a94 = this line
+
+repo-workflows-surgery-draw-row-f1e7c811 = whole file only: { $why }
+
+repo-workflows-surgery-ends-as-810c20dd = git merge-tree gave no tree
+
+repo-workflows-surgery-ends-as-a54fc1a0 = could not play the rewrite through (git 2.40 or newer is needed): { $e }
+
+repo-workflows-surgery-files-of-758821ec = git listed { $paths-len-1 } files but its patch has { $sections-len-2 }
+
+repo-workflows-surgery-files-of-caaf4495 = { $path } isn't UTF-8 text (Latin-1…), whose lines can't be picked apart here: do it in the terminal
+
+repo-workflows-surgery-footer-032f55a8 = Run git-absorb instead
+
+repo-workflows-surgery-footer-11188750 = Check split
+
 repo-workflows-surgery-footer-19766ed6 = Cancel
+
+repo-workflows-surgery-footer-42680e0d = Move changes
+
+repo-workflows-surgery-footer-50c6afff = Checked. Absorbing rewrites the branch from { $oldest-map-t-short-t-hash-unwrap-1 }{ $if-c-rest-the-rest-staying-stage-2 }{ $if-pushed-0-pushed-commits-chang-3 }; Ctrl+Z undoes it
+
+repo-workflows-surgery-footer-57647e2c = { " " }· pushed commits change: push with force (with lease) after
+
+repo-workflows-surgery-footer-605de48c = The installed git-absorb picks the commits itself (with its own limits, at most 10 commits by default), ignoring the picks here, and rebases its fixups in
+
+repo-workflows-surgery-footer-76900f1b = Back
+
+repo-workflows-surgery-footer-9d60841e = Check
+
+repo-workflows-surgery-footer-9eaa6ed1 = Can't absorb them this way: { $e }
+
+repo-workflows-surgery-footer-afd6deb3 = Check to see each commit's fixup and what stays staged
+
+repo-workflows-surgery-footer-b5292604 = Check move
+
+repo-workflows-surgery-footer-c94b3ae3 = , the rest staying staged
+
+repo-workflows-surgery-footer-df9d2856 = Split commit
+
+repo-workflows-surgery-group-card-45e7c009 = Take this commit out: its changes go to commit { $heir-1-1 }
+
+repo-workflows-surgery-group-card-526e0087 = Description
+
+repo-workflows-surgery-group-card-77f7cfc2 = Summary (required)
+
+repo-workflows-surgery-group-card-7aca66ea = Take this commit out: its changes go to the one after it
+
+repo-workflows-surgery-groups-25dc2988 = Add a commit
+
+repo-workflows-surgery-groups-536f4c75 = At most { $MAX-GROUPS } commits
+
+repo-workflows-surgery-groups-e87a043a = Select a commit (or press its number), then click files, hunks or lines on the right to put them in it.
+
+repo-workflows-surgery-header-08e79585 = Move changes out of
+
+repo-workflows-surgery-header-104e7aed = Distribute staged fixes into the commits they belong to
+
+repo-workflows-surgery-header-32afaa78 = Split
+
+repo-workflows-surgery-header-862c2324 = Cancel (Esc)
+
+repo-workflows-surgery-hunks-372dc43f = Staying staged (new files, and whole-file changes: binary, deleted, links, mode changes): { $editor-whole-join-1 }
+
+repo-workflows-surgery-merge-7ec9d56b = could not play the commits through (git 2.40 or newer is needed): { $e }
+
+repo-workflows-surgery-merge-810c20dd = git merge-tree gave no tree
+
+repo-workflows-surgery-moving-26c84ac3 = Moves
+
+repo-workflows-surgery-moving-4c6a80bb = Stays in { $short-editor-hash-1 }
+
+repo-workflows-surgery-note-4656ae85 = Check the move to see what stays in the commit and what moves
+
+repo-workflows-surgery-note-85eaa81d = Checked: what stays and what moves. Moving rewrites the branch from the older commit · Ctrl+Z undoes it
+
+repo-workflows-surgery-note-a227d3be = Can't move them this way: { $e }
+
+repo-workflows-surgery-note-a3a06218 = Checked: { $c-trees-len-saturating-sub-1-1 } commits, together exactly the old one. Splitting replays the commits after it · Ctrl+Z undoes it
+
+repo-workflows-surgery-note-c96c4852 = Check the split to see each new commit's patch
+
+repo-workflows-surgery-note-e5a23195 = Can't split it this way: { $e }
+
+repo-workflows-surgery-open-absorb-2cddd12d = Distribute staged fixes: close the editor that is open first
+
+repo-workflows-surgery-open-absorb-3373a6f7 = Distribute staged fixes: HEAD is detached, check out a branch first
+
+repo-workflows-surgery-open-absorb-55d2e258 = Distribute staged fixes: nothing is staged, stage the fixes first
+
+repo-workflows-surgery-open-absorb-55f28458 = Distribute staged fixes: another editor opened meanwhile
+
+repo-workflows-surgery-open-absorb-5ebbefda = Distribute staged fixes: reading…
+
+repo-workflows-surgery-open-absorb-ed3b6cd2 = Distribute staged fixes: { $e }
+
+repo-workflows-surgery-open-absorb-edcc444b = Distribute staged fixes: a { $state-label-to-lowercase-1 } is in progress
+
+repo-workflows-surgery-open-move-9a352cd5 = Move changes: { $why }
+
+repo-workflows-surgery-open-move-9a3c16a9 = Move changes: reading { $short-hash-1 }…
+
+repo-workflows-surgery-open-move-9c9e42d2 = Move changes: { $e }
+
+repo-workflows-surgery-open-split-01ee6f3c = Split commit: close the staged fixes editor first
+
+repo-workflows-surgery-open-split-94f66e94 = Split commit: { $e }
+
+repo-workflows-surgery-open-split-a472a361 = Split commit: reading { $short-hash-1 }…
+
+repo-workflows-surgery-open-split-ad93af6b = Split commit: { $why }
+
+repo-workflows-surgery-picker-1c448d60 = ● changed these lines
+
+repo-workflows-surgery-picker-e45ce620 = Leave staged
+
+repo-workflows-surgery-prepare-17c56a59 = what moves: { $e }
+
+repo-workflows-surgery-prepare-1a3632ec = commit { $g-1-1 }: { $e-2 }
+
+repo-workflows-surgery-prepare-6f254528 = no commit gets fixes
+
+repo-workflows-surgery-prepare-9e68dba0 = what is staged changed since this was opened: close it and open it again
+
+repo-workflows-surgery-prepare-9ee5bdbf = commit { $g-1-1 } would change nothing: the commits before it already make its changes (a line added after a last line without a newline gives it one)
+
+repo-workflows-surgery-prepare-d129ae6d = what stays: { $e }
+
+repo-workflows-surgery-preview-a1b3c4c7 = Into { $short-c-hash-1 } { $c-summary-2 }
+
+repo-workflows-surgery-preview-c01b65ee = Stays staged
+
+repo-workflows-surgery-preview-line-4a4c8a43 = · nothing: { $short-editor-hash-1 } is dropped
+
+repo-workflows-surgery-problem-2d960e1c = Nothing staged changes lines an earlier commit has: new files and whole-file changes stay staged
+
+repo-workflows-surgery-problem-45b607f4 = This commit has only one change: there is nothing to split
+
+repo-workflows-surgery-problem-552d4c58 = Commit { $g-1-1 } has no changes yet: click files, hunks or lines on the right to put them in it
+
+repo-workflows-surgery-problem-5cf54a16 = Pick on the left where they go
+
+repo-workflows-surgery-problem-c7982ff3 = Click the files, hunks or lines to move: they get the chip 2
+
+repo-workflows-surgery-problem-cd79fde0 = Commit { $g-1-1 } needs a summary
+
+repo-workflows-surgery-problem-e836ee78 = The branch has no commits of its own to put fixes in (every one is on another branch or a remote)
+
+repo-workflows-surgery-problem-ed9bc2e2 = Pick a commit for at least one change
+
+repo-workflows-surgery-read-6a75c5d8 = a merge commit can't be split
+
+repo-workflows-surgery-read-c35ba44e = the first commit has no parent to split it from
+
+repo-workflows-surgery-rebase-plan-28ab1d38 = merges came after the commit, which this would flatten: rebase them in the terminal with --rebase-merges
+
+repo-workflows-surgery-rewrite-with-c60e3a40 = { $tab-busy-op-as-deref-unwrap-or-d-1 } is still running, try again when it's done
+
+repo-workflows-surgery-run-move-145a2a94 = the branch has no commits to rewrite
+
+repo-workflows-surgery-run-move-97891621 = the commit is no longer on the checked-out branch
+
+repo-workflows-surgery-run-move-9a1d6978 = a commit in between undoes or redoes these lines, so the branch would end up different: move them by hand
+
+repo-workflows-surgery-run-move-afb8b0ad = Move changes from { $short-hash-1 } to the working changes
+
+repo-workflows-surgery-run-move-b5726a1d = Move changes from { $short-hash-1 } to { $short-t-hash-2 }
+
+repo-workflows-surgery-run-move-d1994fc1 = the move was not checked
+
+repo-workflows-surgery-run-split-609071bf = the branch no longer has the commit
+
+repo-workflows-surgery-run-split-6da7c69e = the commit is no longer on the checked-out branch after its parent
+
+repo-workflows-surgery-run-split-ddd763c5 = Split { $short-hash-1 } into { $messages-len-2 }
+
+repo-workflows-surgery-set-dest-0c40c6af = Moves to the working changes (staged)
+
+repo-workflows-surgery-set-dest-556c2e6e = Moves to { $short-t-hash-1 } { $t-summary-2 }
+
+repo-workflows-surgery-surgery-items-120354c9 = Divide its changes between two or more new commits
+
+repo-workflows-surgery-surgery-items-16dd0bf3 = Split commit…
+
+repo-workflows-surgery-surgery-items-425b56ce = Take some of its files, hunks or lines out, into another commit of the branch or the working changes
+
+repo-workflows-surgery-surgery-items-a795cec5 = Move changes to another commit…
+
+repo-workflows-surgery-surgery-refusal-7776bacf = HEAD is detached: check out a branch first
+
+repo-workflows-surgery-surgery-refusal-fda39bd7 = A { $state-label-to-lowercase-1 } is in progress
+
+repo-workflows-surgery-target-text-252d53a4 = { "  " }(pushed)
+
+repo-workflows-surgery-target-text-ea3d92f5 = { "  " }(suggested)
+
+repo-workflows-surgery-tip-182c90c3 = Keep { $name } in { $short-editor-hash-1 }
+
+repo-workflows-surgery-tip-4e078e93 = Move { $name } (pick where on the left)
+
+repo-workflows-surgery-tip-9b5f8a9f = Move { $name } to the working changes
+
+repo-workflows-surgery-tip-9e1cf75b = Put { $name } in commit { $editor-active-1-1 }
+
+repo-workflows-surgery-tip-abb8d5a0 = Move { $name } to { $short-t-hash-1 }
+
+repo-workflows-surgery-todo-41cdda9e = the commit to move them to is no longer on the branch
+
+repo-workflows-surgery-todo-97891621 = the commit is no longer on the checked-out branch
+
+repo-workflows-surgery-verdict-4f2f85d1 = no commit of the branch changed these lines: it stays staged unless you pick one
+
+repo-workflows-surgery-verdict-b5ced75e = its lines were last changed by { $name-i-1 }
+
+repo-workflows-surgery-verdict-e6cd9adf = several commits changed these lines ({ $touched-iter-map-i-name-i-collec-1 }, or older ones): { $name-i-2 } is suggested, the newest; pick it to absorb
+
+repo-workflows-surgery-why-whole-070ca29b = no lines changed
+
+repo-workflows-surgery-why-whole-2dab3c8e = a binary file
+
+repo-workflows-surgery-why-whole-c7123097 = its mode changes
+
+repo-workflows-surgery-why-whole-f5d6a31f = a symbolic link
+
+repo-workflows-surgery-why-whole-fa288625 = too long to pick lines from
+
+repo-workflows-surgery-why-whole-fcedacb9 = a submodule
 
 repo-workflows-test_lane-test-banner-7d9eb7ac = Close
 
@@ -5874,4 +6140,29 @@ repo-workflows-stack-behind-count = Needs restack ({ $count ->
         [one] 1 parent commit
        *[other] { $count } parent commits
     })
+
+repo-workflows-surgery-absorb-count = Absorb into { $count ->
+        [one] 1 commit
+       *[other] { $count } commits
+    }
+
+repo-workflows-surgery-group-summary = Commit { $index } · { $count ->
+        [one] one change
+       *[other] { $count } changes
+    }
+
+repo-workflows-surgery-preview-files = · { $count ->
+        [one] one file
+       *[other] { $count } files
+    }: { $text }
+
+repo-workflows-surgery-checked-absorb = Checked. Absorbing rewrites the branch from { $oldest }{ $rest ->
+        [yes] , the rest staying staged
+       *[no] { "" }
+    }{ $pushed ->
+        [yes] { " · pushed commits change: push with force (with lease) after" }
+       *[no] { "" }
+    }; Ctrl+Z undoes it
+
+repo-workflows-surgery-binary-preview = (binary contents)
 
