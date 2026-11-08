@@ -1,0 +1,37 @@
+{
+  "application_commit": "76a1eab871b314dad0fe0a2f1a087c92c3dd5034",
+  "base_commit": "ac47ef048f1d6d8175055dab60f04f17295e0a21",
+  "merged_pr176_head": "e04fdbe653ffe0220419a89606bb6f4fab60796e",
+  "branch": "t3/fix-resolver-process-parking",
+  "logs_sha256_uncompressed": {
+    "final-check.log.gz": "e593605a0bf993b0527bb61afb1c2f6e69c195dd88e12e32b84f3eac46c5f3f6",
+    "final-recording.log.gz": "1a3418aa31dd123ce87bb0ffa2c8cc9d4710f27e91b57e35ea053386bcb6ac11",
+    "process-tests.log.gz": "8af4981ed11d40e043d01187ac0106de2bc3ae1a3c4d117465f077bf7c50b5c5",
+    "record-tests.log.gz": "26e114b76d5853fa37d80d2049885e09bd04f39285bcc945f21178ffc089f583",
+    "selection-tests.log.gz": "86c8fc1113ed5c96007986f9bad8288ffa02ace4e12e05a4825097050f790f4e",
+    "park-tests.log.gz": "0853c316b0e20fea2398c42401b5f2219afa5b618d9f559c39eba72f6479a155",
+    "pure-lines.log.gz": "0321e0b84a2c2c23315eba0a920a3969b7e1329ee0cdc184410127f339998b85",
+    "pure-atomic.log.gz": "0eadfe4535382b5ff0145ee28e717b429d2d33ba7e91e382e651ab8934cf27b9",
+    "format.log.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-pure-atomic.log.gz": "e8644b1e8131413bfd690f3ae03c3cf6e9db56f7a46bc69bde2badc4b07f33ae",
+    "final-clippy2.log.gz": "77c9a1f605cfe90642514107adabc287b81939746fae5f9cdafd25d7e7762eb5",
+    "final-format2.log.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "checks": {
+    "cargo_check_locked_tests": "passed",
+    "cargo_fmt_check": "passed",
+    "owned_process_recording_tests": "18 passed; rerun on final source; original gate preceded real tests",
+    "resolver_process_tests": "4 passed; included owned-child execution after push and synthetic gates",
+    "done_file_selection": "1 passed",
+    "run_record_roundtrip": "1 passed",
+    "standalone_production_line_parser": "1 passed",
+    "standalone_production_atomic_replace": "1 passed",
+    "parking_tests": "27 failed during fixture setup: host Git 2.43.0 rejects existing --no-lazy-fetch option; no behavioral pass claimed",
+    "final_atomic_production_helper": "1 passed on a7eae4a5135be66cb68085c12020ea54491588a5 after redundant-borrow cleanup; production helper unchanged in application_commit",
+    "strict_clippy_locked_tests": "passed on application_commit: cargo clippy --locked --tests -- -D warnings",
+    "final_format_check": "passed on application_commit"
+  },
+  "final_integration_and_independent_review": "parent responsibility; no PR or CI started",
+  "prior_test_commit": "68801c148fd2727f9c50d3dfff3d03c94b1d2584",
+  "prior_test_binding": "Since prior_test_commit, production code only removes three redundant borrows in workspace::replace_with_temp; regression tests propagate fixture errors instead of unwrap. All other production source unchanged. Original test logs remain bound to prior_test_commit; no new application test execution claimed."
+}
