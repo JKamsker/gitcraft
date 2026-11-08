@@ -30,15 +30,19 @@ impl Policy {
     }
     #[cfg(not(unix))]
     fn read(_: &File, _: &Path) -> Result<Self, String> {
-        Err("Full native working-state policy is unavailable on this platform".into())
+        Err(crate::i18n::text(
+            "backend-full-native-working-state-policy-is-unavailable-on-this-platform-03a82e",
+        )
+        .into())
     }
     #[cfg(unix)]
     fn install(&self, file: &File, path: &Path) -> Result<(), String> {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         if self.platform != std::env::consts::OS {
-            return Err(
-                "Saved access policy belongs to another platform; no public file changed".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-saved-access-policy-belongs-to-another-platform-no-public-file-ch-40c5c1",
+            )
+            .into());
         }
         let meta = file.metadata().map_err(|e| e.to_string())?;
         if meta.uid() != self.uid || meta.gid() != self.gid {
@@ -53,19 +57,23 @@ impl Policy {
         file.set_permissions(std::fs::Permissions::from_mode(self.mode))
             .map_err(|e| e.to_string())?;
         if Self::read(file, path)? != *self {
-            return Err(
-                "Full access policy could not be preserved on the private candidate".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-full-access-policy-could-not-be-preserved-on-the-private-candidat-0122a6",
+            )
+            .into());
         }
         Ok(())
     }
     #[cfg(not(unix))]
     fn install(&self, _: &File, _: &Path) -> Result<(), String> {
-        Err("Native policy restoration unavailable".into())
+        Err(crate::i18n::text("backend-native-policy-restoration-unavailable-3fe736").into())
     }
     pub(super) fn validate(&self) -> Result<(), String> {
         if self.platform != std::env::consts::OS || self.mode > 0o7777 {
-            return Err("Saved full access policy is unsupported on this platform".into());
+            return Err(crate::i18n::text(
+                "backend-saved-full-access-policy-is-unsupported-on-this-platform-f74459",
+            )
+            .into());
         }
         Ok(())
     }
@@ -107,7 +115,7 @@ impl Snapshot {
             Err(e) => return Err(e.to_string()),
         };
         if !file.metadata().map_err(|e| e.to_string())?.is_file() {
-            return Err("Regular no-follow file required".into());
+            return Err(crate::i18n::text("backend-regular-no-follow-file-required-63382e").into());
         }
         let path = dir.path.join(name);
         let before = Policy::read(&file, &path)?;
@@ -117,11 +125,17 @@ impl Snapshot {
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         if bytes.len() > limit {
-            return Err("File exceeds bounded snapshot allowance".into());
+            return Err(crate::i18n::text(
+                "backend-file-exceeds-bounded-snapshot-allowance-bb90f5",
+            )
+            .into());
         }
         let after = Policy::read(&file, &path)?;
         if before != after || !dir.unchanged() {
-            return Err("File policy or directory changed while snapshotting".into());
+            return Err(crate::i18n::text(
+                "backend-file-policy-or-directory-changed-while-snapshotting-368aab",
+            )
+            .into());
         }
         Ok(Some(Self {
             identity: same_file::Handle::from_file(file).map_err(|e| e.to_string())?,
@@ -152,7 +166,7 @@ fn recovery(parent: &Directory) -> Result<Arc<Directory>, String> {
             Err(e) => return Err(e.to_string()),
         }
     }
-    Err("Cannot create a private recovery directory".into())
+    Err(crate::i18n::text("backend-cannot-create-a-private-recovery-directory-faca9e").into())
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Captured {
@@ -191,7 +205,7 @@ impl Replacement {
         git_mode: Option<&str>,
     ) -> Result<Self, String> {
         if !parent.unchanged() {
-            return Err("Parent directory changed".into());
+            return Err(crate::i18n::text("backend-parent-directory-changed-9ad539").into());
         }
         let recovery = recovery(&parent)?;
         let candidate = if let Some(bytes) = bytes {
@@ -208,10 +222,11 @@ impl Replacement {
                 original_policy.with_git_mode(mode)
             });
             desired.install(&file, &recovery.path.join("candidate"))?;
-            let snapshot = Snapshot::read(&recovery, "candidate", bytes.len())?
-                .ok_or("Private candidate disappeared")?;
+            let snapshot = Snapshot::read(&recovery, "candidate", bytes.len())?.ok_or(
+                crate::i18n::text("backend-private-candidate-disappeared-5b38b0"),
+            )?;
             if snapshot.identity != identity || snapshot.bytes != bytes {
-                return Err("Private candidate changed".into());
+                return Err(crate::i18n::text("backend-private-candidate-changed-a23c2e").into());
             }
             Some(snapshot)
         } else {
@@ -231,12 +246,18 @@ impl Replacement {
     }
     pub(super) fn publish(&mut self) -> Result<(), String> {
         if !self.parent.unchanged() || !self.recovery.unchanged() {
-            return Err(format!("Directory moved; recovery {}", self.evidence()));
+            return Err(crate::i18n::message(
+                "backend-directory-moved-recovery-09ef49",
+                &[("evidence", (self.evidence()).to_string().into())],
+            ));
         }
         match &self.before {
             Some(before) => {
                 if !before.same_at(&self.parent, &self.name) {
-                    return Err("File/policy changed before publication".into());
+                    return Err(crate::i18n::text(
+                        "backend-file-policy-changed-before-publication-7164b3",
+                    )
+                    .into());
                 }
                 self.parent
                     .move_file(
@@ -252,9 +273,12 @@ impl Replacement {
                         &self.parent,
                         OsStr::new(&self.name),
                     );
-                    return Err(format!(
-                        "Captured a concurrent edit; create-only restoration {restored:?}; evidence {}",
-                        self.evidence()
+                    return Err(crate::i18n::message(
+                        "backend-captured-a-concurrent-edit-create-only-restoration-restored-evide-fba254",
+                        &[
+                            ("restored", format!("{:?}", restored).into()),
+                            ("evidence", (self.evidence()).to_string().into()),
+                        ],
                     ));
                 }
             }
@@ -268,9 +292,12 @@ impl Replacement {
                     OsStr::new(&self.name),
                 )
                 .map_err(|e| {
-                    format!(
-                        "Create-only installation refused: {e}; evidence {}",
-                        self.evidence()
+                    crate::i18n::message(
+                        "backend-create-only-installation-refused-e-evidence-501da1",
+                        &[
+                            ("detail", (e).to_string().into()),
+                            ("evidence", (self.evidence()).to_string().into()),
+                        ],
                     )
                 })?;
             self.applied = true;
@@ -287,9 +314,9 @@ impl Replacement {
             .as_ref()
             .is_none_or(|s| s.same_at(&self.recovery, "original"));
         if !same || !original || !self.parent.unchanged() || !self.recovery.unchanged() {
-            return Err(format!(
-                "Publication changed; retain all evidence {}",
-                self.evidence()
+            return Err(crate::i18n::message(
+                "backend-publication-changed-retain-all-evidence-a3486e",
+                &[("evidence", (self.evidence()).to_string().into())],
             ));
         }
         Ok(())
@@ -299,9 +326,9 @@ impl Replacement {
             return Ok(());
         }
         if !self.parent.unchanged() || !self.recovery.unchanged() {
-            return Err(format!(
-                "Rollback parent identity moved; no pathname-based restoration attempted. Evidence is retained in the held directory formerly at {}",
-                self.evidence()
+            return Err(crate::i18n::message(
+                "backend-rollback-parent-identity-moved-no-pathname-based-restoration-atte-3c6f70",
+                &[("evidence", (self.evidence()).to_string().into())],
             ));
         }
         // Capture first. Classification examines the entry actually displaced,
@@ -320,9 +347,12 @@ impl Replacement {
                 Captured::Owned
             }
             Err(e) => {
-                return Err(format!(
-                    "Rollback capture refused: {e}; evidence {}",
-                    self.evidence()
+                return Err(crate::i18n::message(
+                    "backend-rollback-capture-refused-e-evidence-96ecb6",
+                    &[
+                        ("detail", (e).to_string().into()),
+                        ("evidence", (self.evidence()).to_string().into()),
+                    ],
                 ));
             }
         };
@@ -336,9 +366,12 @@ impl Replacement {
                     self.recovery
                         .link(OsStr::new("original"), &self.parent, OsStr::new(&self.name))
                         .map_err(|e| {
-                            format!(
-                                "Create-only rollback refused: {e}; evidence {}",
-                                self.evidence()
+                            crate::i18n::message(
+                                "backend-create-only-rollback-refused-e-evidence-cacf21",
+                                &[
+                                    ("detail", (e).to_string().into()),
+                                    ("evidence", (self.evidence()).to_string().into()),
+                                ],
                             )
                         })?;
                 }
@@ -347,16 +380,16 @@ impl Replacement {
                     None => Snapshot::read(&self.parent, &self.name, super::FILE_LIMIT)?.is_none(),
                 };
                 if !restored {
-                    return Err(format!(
-                        "Rollback postcheck changed; evidence {}",
-                        self.evidence()
+                    return Err(crate::i18n::message(
+                        "backend-rollback-postcheck-changed-evidence-cf46e2",
+                        &[("evidence", (self.evidence()).to_string().into())],
                     ));
                 }
                 if let Some(candidate) = &self.candidate {
                     if !candidate.same_at(&self.recovery, "rollback-current") {
-                        return Err(format!(
-                            "Captured candidate was edited during rollback; editor bytes retained at {}/rollback-current; original restored create-only",
-                            self.evidence()
+                        return Err(crate::i18n::message(
+                            "backend-captured-candidate-was-edited-during-rollback-editor-bytes-retain-11f70f",
+                            &[("evidence", (self.evidence()).to_string().into())],
                         ));
                     }
                 }
@@ -369,15 +402,18 @@ impl Replacement {
                     &self.parent,
                     OsStr::new(&self.name),
                 );
-                Err(format!(
-                    "Concurrent editor save retained; create-only restoration {restored:?}; exact evidence {}/rollback-current; original backup {}/original",
-                    self.evidence(),
-                    self.evidence()
+                Err(crate::i18n::message(
+                    "backend-concurrent-editor-save-retained-create-only-restoration-restored-9fb8f4",
+                    &[
+                        ("restored", format!("{:?}", restored).into()),
+                        ("evidence", (self.evidence()).to_string().into()),
+                        ("evidence3", (self.evidence()).to_string().into()),
+                    ],
                 ))
             }
-            Restore::Retain => Err(format!(
-                "Rollback outcome needs inspection; captured entry and original retained at {}",
-                self.evidence()
+            Restore::Retain => Err(crate::i18n::message(
+                "backend-rollback-outcome-needs-inspection-captured-entry-and-original-ret-4668fe",
+                &[("evidence", (self.evidence()).to_string().into())],
             )),
         }
     }

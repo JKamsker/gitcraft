@@ -265,7 +265,7 @@ pub(crate) fn blob(
     let size = std::str::from_utf8(&size)
         .ok()
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .ok_or("Invalid blob size")?;
+        .ok_or(crate::i18n::text("backend-invalid-blob-size-924b45"))?;
     if size > FILE_LIMIT {
         return Err("File comparison is limited to 2 MiB per version".into());
     }

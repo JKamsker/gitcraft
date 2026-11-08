@@ -22,7 +22,7 @@ fn read_paths(
 ) -> Result<BTreeMap<String, Option<(String, Vec<u8>)>>, String> {
     paths.iter().map(|p|{
         let mode=s.index.get(p).map_or("100644",|e|e.mode.as_str());
-        if !matches!(mode,"100644"|"100755"){return Err("Turn reversal supports regular files; links and submodules need manual resolution".into());}
+        if !matches!(mode,"100644"|"100755"){return Err(crate::i18n::text("backend-turn-reversal-supports-regular-files-links-and-submodules-need-ma-403e2b").into());}
         Ok((p.clone(),read_file(ctx,p,mode,active)?))
     }).collect()
 }
@@ -33,7 +33,10 @@ pub fn inverse_preview(
     active: &dyn Fn() -> bool,
 ) -> Result<Inverse, String> {
     if !oid_valid(parent) || !oid_valid(turn) {
-        return Err("Select an immutable saved turn with a parent".into());
+        return Err(crate::i18n::text(
+            "backend-select-an-immutable-saved-turn-with-a-parent-1cf099",
+        )
+        .into());
     }
     let ctx = Context::new(repo, active)?;
     let paths = ctx.run(
@@ -54,7 +57,10 @@ pub fn inverse_preview(
     )?;
     let paths = untracked_paths(paths)?.into_iter().collect::<Vec<_>>();
     if paths.is_empty() || paths.len() > MAX_FILES {
-        return Err("Turn is empty or exceeds the 2000-file reversal limit".into());
+        return Err(crate::i18n::text(
+            "backend-turn-is-empty-or-exceeds-the-2000-file-reversal-limit-2623c0",
+        )
+        .into());
     }
     let now = source(&ctx, active)?;
     let files = read_paths(&ctx, &paths, &now, active)?;
@@ -65,20 +71,26 @@ pub fn inverse_preview(
         .sum::<usize>()
         > TOTAL_LIMIT
     {
-        return Err("Turn reversal exceeds 32 MiB".into());
+        return Err(crate::i18n::text("backend-turn-reversal-exceeds-32-mib-7dc25f").into());
     }
     // Mode changes, links and gitlinks are checked from both immutable trees, even if the
     // current index no longer contains the path.
     for rev in [parent, turn] {
         let data = ctx.run(&["ls-tree", "-r", "-z", rev], vec![], &[0], active)?;
         for row in data.split(|b| *b == 0).filter(|r| !r.is_empty()) {
-            let row = std::str::from_utf8(row).map_err(|_| "Turn paths must be UTF-8")?;
-            let (info, path) = row.split_once('\t').ok_or("Invalid tree")?;
+            let row = std::str::from_utf8(row)
+                .map_err(|_| crate::i18n::text("backend-turn-paths-must-be-utf-8-37109e"))?;
+            let (info, path) = row
+                .split_once('\t')
+                .ok_or(crate::i18n::text("backend-invalid-tree-c5c836"))?;
             if paths.iter().any(|p| p == path)
                 && !info.starts_with("100644 blob ")
                 && !info.starts_with("100755 blob ")
             {
-                return Err("Turn contains links or gitlinks; resolve those manually".into());
+                return Err(crate::i18n::text(
+                    "backend-turn-contains-links-or-gitlinks-resolve-those-manually-bd0eb0",
+                )
+                .into());
             }
         }
     }
@@ -117,7 +129,26 @@ pub fn inverse_preview(
     }
     tree(&ctx, &entries, active)?;
     super::restore::raw_attributes(&ctx, active)?;
-    ctx.run(&["-c","core.autocrlf=false","apply","--cached","--binary","--whitespace=nowarn","-"],patch.clone(),&[0],active).map_err(|_|"Later changes overlap this turn. Nothing was changed; inspect the turn and resolve the overlap explicitly".to_owned())?;
+    ctx.run(
+        &[
+            "-c",
+            "core.autocrlf=false",
+            "apply",
+            "--cached",
+            "--binary",
+            "--whitespace=nowarn",
+            "-",
+        ],
+        patch.clone(),
+        &[0],
+        active,
+    )
+    .map_err(|_| {
+        crate::i18n::text(
+            "backend-later-changes-overlap-this-turn-nothing-was-changed-inspect-the-t-9aac0a",
+        )
+        .to_owned()
+    })?;
     let mut target = BTreeMap::new();
     for path in &paths {
         let rows = ctx.run(
@@ -133,25 +164,26 @@ pub fn inverse_preview(
             &[0],
             active,
         )?;
-        let row = std::str::from_utf8(&rows).map_err(|_| "Invalid result path")?;
+        let row = std::str::from_utf8(&rows)
+            .map_err(|_| crate::i18n::text("backend-invalid-result-path-0ce530"))?;
         let data = if row.is_empty() {
             None
         } else {
             let info = row
                 .split_once('\t')
-                .ok_or("Invalid result index")?
+                .ok_or(crate::i18n::text("backend-invalid-result-index-53c3ce"))?
                 .0
                 .split_whitespace()
                 .collect::<Vec<_>>();
             if info.len() != 3 || !matches!(info[0], "100644" | "100755") {
-                return Err("Unsupported result mode".into());
+                return Err(crate::i18n::text("backend-unsupported-result-mode-958628").into());
             }
             let size = ctx
                 .text(&["cat-file", "-s", info[1]], vec![], active)?
                 .parse::<usize>()
-                .map_err(|_| "Invalid blob size")?;
+                .map_err(|_| crate::i18n::text("backend-invalid-blob-size-924b45"))?;
             if size > FILE_LIMIT {
-                return Err("Result exceeds 8 MiB".into());
+                return Err(crate::i18n::text("backend-result-exceeds-8-mib-53d56f").into());
             }
             Some((
                 info[0].into(),
@@ -161,7 +193,9 @@ pub fn inverse_preview(
         target.insert(path.clone(), data);
     }
     if source(&ctx, active)? != now || read_paths(&ctx, &paths, &now, active)? != files {
-        return Err("Checkout changed during preview; reopen it".into());
+        return Err(
+            crate::i18n::text("backend-checkout-changed-during-preview-reopen-it-67a5ba").into(),
+        );
     }
     Ok(Inverse {
         turn: turn.into(),
@@ -189,25 +223,30 @@ pub fn inverse_apply(
             || read_paths(&ctx, &p.paths, &p.source, active)? != *p.files
             || native_files::capture_policies(repo, &p.files, active)? != *p.policies
         {
-            return Err(
-                "HEAD, index or working files changed since the turn preview; reopen it".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-head-index-or-working-files-changed-since-the-turn-preview-reopen-944e9e",
+            )
+            .into());
         }
         Ok(())
     };
     verify()?;
     let backup = capture_preserving_paths(
         repo,
-        "Before reverting one agent turn",
+        crate::i18n::text("backend-before-reverting-one-agent-turn-d74e04"),
         None,
         &p.paths,
         active,
     )?
-    .ok_or("Could not protect current work")?;
+    .ok_or(crate::i18n::text(
+        "backend-could-not-protect-current-work-b0d371",
+    ))?;
     verify()?;
     let check = || -> Result<(), String> {
         if source(&ctx, active)? != *p.source {
-            return Err("HEAD or index changed while reverting".into());
+            return Err(
+                crate::i18n::text("backend-head-or-index-changed-while-reverting-cc7a49").into(),
+            );
         }
         Ok(())
     };
@@ -255,14 +294,16 @@ fn decode_review(bytes: &[u8]) -> Result<ReviewState, String> {
             || state.boundary.as_ref().is_some_and(|oid| !oid_valid(oid))
             || state.known.len() > 10000
         {
-            return Err("Unsupported review boundary state".into());
+            return Err(
+                crate::i18n::text("backend-unsupported-review-boundary-state-b545e8").into(),
+            );
         }
         return Ok(state);
     }
-    let known: BTreeSet<String> =
-        serde_json::from_slice(bytes).map_err(|_| "Review state is invalid")?;
+    let known: BTreeSet<String> = serde_json::from_slice(bytes)
+        .map_err(|_| crate::i18n::text("backend-review-state-is-invalid-a15bd5"))?;
     if known.len() > 10000 {
-        return Err("Review history exceeds 10000 hunks".into());
+        return Err(crate::i18n::text("backend-review-history-exceeds-10000-hunks-56e7b7").into());
     }
     Ok(ReviewState {
         schema: 1,
@@ -286,7 +327,10 @@ fn load_review(
         .source(&["symbolic-ref", "-q", &reference], vec![], &[0, 1], active)?
         .is_empty()
     {
-        return Err("Review state must be a direct worktree/session ref".into());
+        return Err(crate::i18n::text(
+            "backend-review-state-must-be-a-direct-worktree-session-ref-ee7eea",
+        )
+        .into());
     }
     let old = String::from_utf8(ctx.source(
         &["rev-parse", "--verify", "-q", &reference],
@@ -294,7 +338,7 @@ fn load_review(
         &[0, 1],
         active,
     )?)
-    .map_err(|_| "Invalid review ref")?
+    .map_err(|_| crate::i18n::text("backend-invalid-review-ref-5ca2f2"))?
     .trim()
     .to_owned();
     let state = if old.is_empty() {
@@ -307,9 +351,9 @@ fn load_review(
         let size = ctx
             .text(&["cat-file", "-s", &old], vec![], active)?
             .parse::<usize>()
-            .map_err(|_| "Invalid review data")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-review-data-a42396"))?;
         if size > 1024 * 1024 {
-            return Err("Review state exceeds 1 MiB".into());
+            return Err(crate::i18n::text("backend-review-state-exceeds-1-mib-226894").into());
         }
         decode_review(&ctx.run(&["cat-file", "blob", &old], vec![], &[0], active)?)?
     };
@@ -322,13 +366,16 @@ fn session_turns(
     let ctx = Context::new(repo, active)?;
     let top =
         String::from_utf8(ctx.source(&["rev-parse", "--show-toplevel"], vec![], &[0], active)?)
-            .map_err(|_| "Worktree must be UTF-8")?;
+            .map_err(|_| crate::i18n::text("backend-worktree-must-be-utf-8-de53d2"))?;
     if !active() {
-        return Err("Review cancelled".into());
+        return Err(crate::i18n::text("backend-review-cancelled-519921").into());
     }
     let turns = crate::agent::checkpoint::turns(repo, top.trim_end_matches(['\r', '\n']))?;
     if turns.len() > 10000 {
-        return Err("Review turn inventory exceeds 10000 saved turns".into());
+        return Err(crate::i18n::text(
+            "backend-review-turn-inventory-exceeds-10000-saved-turns-4de5d1",
+        )
+        .into());
     }
     Ok(turns)
 }
@@ -348,7 +395,9 @@ fn aggregate_span(
     let end = session_turns
         .iter()
         .position(|turn| turn.commit == endpoint)
-        .ok_or("Selected saved endpoint is no longer in this worktree/session; refresh")?;
+        .ok_or(crate::i18n::text(
+            "backend-selected-saved-endpoint-is-no-longer-in-this-worktree-session-ref-4207e0",
+        ))?;
     let selected = &session_turns[..=end];
     if selected
         .windows(2)
@@ -356,10 +405,18 @@ fn aggregate_span(
         || !oid_valid(endpoint)
         || !oid_valid(&selected[0].parent)
     {
-        return Err("Saved session chain changed or has no immutable initial parent; inspect individual turns".into());
+        return Err(crate::i18n::text(
+            "backend-saved-session-chain-changed-or-has-no-immutable-initial-parent-in-b15edc",
+        )
+        .into());
     }
     if let Some(boundary) = boundary {
-        let begin=selected.iter().position(|turn|turn.commit==boundary).ok_or("Last-looked boundary is outside the selected saved session endpoint; refresh the session before advancing")?;
+        let begin = selected
+            .iter()
+            .position(|turn| turn.commit == boundary)
+            .ok_or(crate::i18n::text(
+                "backend-last-looked-boundary-is-outside-the-selected-saved-session-endpoi-e0e42e",
+            ))?;
         Ok((boundary.into(), end - begin))
     } else {
         Ok((selected[0].parent.clone(), selected.len()))
@@ -381,7 +438,10 @@ pub fn aggregate_review(
     )?;
     let mut review = review(repo, &parent, endpoint, session, active)?;
     if review.boundary != state.boundary {
-        return Err("Last-looked boundary changed during aggregate preparation; reload".into());
+        return Err(crate::i18n::text(
+            "backend-last-looked-boundary-changed-during-aggregate-preparation-reload-68990d",
+        )
+        .into());
     }
     review.aggregate = Some(Aggregate {
         session: session.into(),
@@ -517,7 +577,7 @@ pub fn review(
         active,
     )?;
     if stat.len() > 128 * 1024 {
-        return Err("Turn has too many files for review".into());
+        return Err(crate::i18n::text("backend-turn-has-too-many-files-for-review-acb5bf").into());
     }
     let raw = ctx.run(
         &[
@@ -536,9 +596,13 @@ pub fn review(
         active,
     )?;
     if raw.len() > TOTAL_LIMIT {
-        return Err("Turn diff exceeds 32 MiB; inspect files separately".into());
+        return Err(crate::i18n::text(
+            "backend-turn-diff-exceeds-32-mib-inspect-files-separately-78dc2b",
+        )
+        .into());
     }
-    let raw = String::from_utf8(raw).map_err(|_| "Turn diff cannot be displayed as UTF-8")?;
+    let raw = String::from_utf8(raw)
+        .map_err(|_| crate::i18n::text("backend-turn-diff-cannot-be-displayed-as-utf-8-1fdb24"))?;
     let hunks = split(&raw, &known);
     Ok(Review {
         parent: parent.into(),
@@ -565,13 +629,16 @@ pub fn mark_reviewed(
             review
                 .hunks
                 .get(i)
-                .ok_or("Invalid reviewed hunk")?
+                .ok_or(crate::i18n::text("backend-invalid-reviewed-hunk-4cc919"))?
                 .digest
                 .clone(),
         );
     }
     if known.len() > 10000 {
-        return Err("Review history reached 10000 hunks; choose another session".into());
+        return Err(crate::i18n::text(
+            "backend-review-history-reached-10000-hunks-choose-another-session-606a19",
+        )
+        .into());
     }
     save_review(
         &ctx,
@@ -591,11 +658,14 @@ fn save_review(
     active: &dyn Fn() -> bool,
 ) -> Result<Review, String> {
     if review.reference != review_ref(&ctx.id, &review.session) {
-        return Err("Review belongs to a different worktree/session".into());
+        return Err(crate::i18n::text(
+            "backend-review-belongs-to-a-different-worktree-session-a9bcc4",
+        )
+        .into());
     }
     let bytes = serde_json::to_vec(&state).map_err(|e| e.to_string())?;
     if bytes.len() > 1024 * 1024 {
-        return Err("Review state exceeds 1 MiB".into());
+        return Err(crate::i18n::text("backend-review-state-exceeds-1-mib-226894").into());
     }
     let oid = ctx.blob(bytes, active)?;
     let zero = "0".repeat(oid.len());
@@ -616,7 +686,10 @@ fn save_review(
         active,
     )
     .map_err(|_| {
-        "Review marks or boundary changed concurrently; reload the saved review".to_owned()
+        crate::i18n::text(
+            "backend-review-marks-or-boundary-changed-concurrently-reload-the-saved-re-b2c7fd",
+        )
+        .to_owned()
     })?;
     let mut updated = review.clone();
     updated.old = oid;
@@ -643,12 +716,11 @@ fn finish_state(
     review: &Review,
     turns: &[crate::agent::checkpoint::Turn],
 ) -> Result<ReviewState, String> {
-    let aggregate = review
-        .aggregate
-        .as_ref()
-        .ok_or("Open an aggregate saved-turn review first")?;
+    let aggregate = review.aggregate.as_ref().ok_or(crate::i18n::text(
+        "backend-open-an-aggregate-saved-turn-review-first-940957",
+    ))?;
     if aggregate.session != review.session || aggregate.last_looked != review.boundary {
-        return Err("Review boundary context changed".into());
+        return Err(crate::i18n::text("backend-review-boundary-context-changed-a8e004").into());
     }
     let (base, _) = aggregate_span(
         turns,
@@ -657,12 +729,15 @@ fn finish_state(
         review.boundary.as_deref(),
     )?;
     if base != review.parent {
-        return Err("Aggregate baseline changed; reopen before advancing its boundary".into());
+        return Err(crate::i18n::text(
+            "backend-aggregate-baseline-changed-reopen-before-advancing-its-boundary-533f5d",
+        )
+        .into());
     }
     let mut known = review.known.clone();
     known.extend(review.hunks.iter().map(|hunk| hunk.digest.clone()));
     if known.len() > 10000 {
-        return Err("Review history reached 10000 hunks".into());
+        return Err(crate::i18n::text("backend-review-history-reached-10000-hunks-50df7f").into());
     }
     Ok(ReviewState {
         schema: 1,

@@ -291,7 +291,7 @@ impl<'a> Trace<'a> {
         let size = std::str::from_utf8(&size)
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
-            .ok_or("Invalid blob size")?;
+            .ok_or(crate::i18n::text("backend-invalid-blob-size-924b45"))?;
         if size > FILE || self.bytes.saturating_add(size) > TOTAL {
             return Err("Line history reached its2MiB/file or32MiB snapshot budget".into());
         }

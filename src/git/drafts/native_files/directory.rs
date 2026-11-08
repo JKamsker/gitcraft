@@ -31,14 +31,18 @@ impl Directory {
             .open(self.path.join(name))?;
         let meta = file.metadata()?;
         if !meta.is_file() || meta.file_attributes() & 0x400 != 0 {
-            return Err(io::Error::other("The output changed type"));
+            return Err(io::Error::other(crate::i18n::text(
+                "backend-the-output-changed-type-990056",
+            )));
         }
         Ok(file)
     }
     #[cfg(unix)]
     pub fn from_file(path: PathBuf, file: File) -> io::Result<Self> {
         if !file.metadata()?.is_dir() {
-            return Err(io::Error::other("Held parent is not a directory"));
+            return Err(io::Error::other(crate::i18n::text(
+                "backend-held-parent-is-not-a-directory-a8a0ba",
+            )));
         }
         Ok(Self {
             path,
@@ -72,15 +76,17 @@ impl Directory {
                     .open(&at)?;
                 let meta = file.metadata()?;
                 if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
-                    return Err(io::Error::other(
-                        "The output parent contains a link or is not a directory",
-                    ));
+                    return Err(io::Error::other(crate::i18n::text(
+                        "backend-the-output-parent-contains-a-link-or-is-not-a-directory-4839ff",
+                    )));
                 }
                 held.push(file);
             }
-            let file = held
-                .pop()
-                .ok_or_else(|| io::Error::other("No output parent directory"))?;
+            let file = held.pop().ok_or_else(|| {
+                io::Error::other(crate::i18n::text(
+                    "backend-no-output-parent-directory-b2934c",
+                ))
+            })?;
             (file, held)
         };
         #[cfg(not(any(unix, windows)))]
@@ -156,7 +162,9 @@ impl Directory {
             {
                 use std::os::windows::fs::MetadataExt;
                 if file.metadata()?.file_attributes() & 0x400 != 0 {
-                    return Err(io::Error::other("The merge output is a link/reparse point"));
+                    return Err(io::Error::other(crate::i18n::text(
+                        "backend-the-merge-output-is-a-link-reparse-point-2d47b7",
+                    )));
                 }
             }
             Ok(file)
@@ -246,6 +254,8 @@ fn check_name(name: &OsStr) -> io::Result<()> {
     if matches!(components.next(), Some(Component::Normal(_))) && components.next().is_none() {
         Ok(())
     } else {
-        Err(io::Error::other("Expected one native file basename"))
+        Err(io::Error::other(crate::i18n::text(
+            "backend-expected-one-native-file-basename-175483",
+        )))
     }
 }

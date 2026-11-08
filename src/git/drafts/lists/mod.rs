@@ -46,8 +46,11 @@ pub(super) fn entries(
     let raw = ctx.run(&["ls-tree", "-rz", rev], vec![], &[0], active)?;
     let mut out = BTreeMap::new();
     for row in raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
-        let row = std::str::from_utf8(row).map_err(|_| "Changelist paths must be UTF-8")?;
-        let (info, path) = row.split_once('\t').ok_or("Invalid tree")?;
+        let row = std::str::from_utf8(row)
+            .map_err(|_| crate::i18n::text("backend-changelist-paths-must-be-utf-8-4d79f3"))?;
+        let (info, path) = row
+            .split_once('\t')
+            .ok_or(crate::i18n::text("backend-invalid-tree-c5c836"))?;
         valid_path(path)?;
         let p = info.split_whitespace().collect::<Vec<_>>();
         if p.len() != 3 {
@@ -73,10 +76,10 @@ fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Li
         .source(&["symbolic-ref", "-q", &reference], vec![], &[0, 1], active)?
         .is_empty()
     {
-        return Err(
-            "Changelist state must be a direct application ref; no state write was attempted"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-changelist-state-must-be-a-direct-application-ref-no-state-write-6592ce",
+        )
+        .into());
     }
     let old = String::from_utf8(ctx.source(
         &["rev-parse", "--verify", "-q", &reference],
@@ -84,7 +87,7 @@ fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Li
         &[0, 1],
         active,
     )?)
-    .map_err(|_| "Invalid list ref")?
+    .map_err(|_| crate::i18n::text("backend-invalid-list-ref-bd1015"))?
     .trim()
     .to_owned();
     let lists = if old.is_empty() {
@@ -94,12 +97,14 @@ fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Li
         let size = ctx
             .text(&["cat-file", "-s", &spec], vec![], active)?
             .parse::<usize>()
-            .map_err(|_| "Invalid lists size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-lists-size-334524"))?;
         if size > 2 * 1024 * 1024 {
-            return Err("Changelist registry exceeds 2 MiB".into());
+            return Err(
+                crate::i18n::text("backend-changelist-registry-exceeds-2-mib-cd36e1").into(),
+            );
         }
         serde_json::from_slice(&ctx.run(&["cat-file", "blob", &spec], vec![], &[0], active)?)
-            .map_err(|_| "Invalid changelist registry")?
+            .map_err(|_| crate::i18n::text("backend-invalid-changelist-registry-8193c3"))?
     };
     Ok((reference, old, lists))
 }
@@ -114,28 +119,32 @@ impl SnapshotBudget {
             remaining: TOTAL_LIMIT,
         };
         for size in sizes {
-            out.remaining = out
-                .remaining
-                .checked_sub(size)
-                .ok_or("Working snapshot exceeds 32 MiB")?;
+            out.remaining = out.remaining.checked_sub(size).ok_or(crate::i18n::text(
+                "backend-working-snapshot-exceeds-32-mib-71d863",
+            ))?;
         }
         Ok(out)
     }
     pub(super) fn allowance(&self) -> Result<usize, String> {
         if self.remaining == 0 {
-            Err("Working snapshot exhausted its 32 MiB allowance before the next file read".into())
+            Err(crate::i18n::text(
+                "backend-working-snapshot-exhausted-its-32-mib-allowance-before-the-next-f-c0be03",
+            )
+            .into())
         } else {
             Ok(self.remaining.min(FILE_LIMIT))
         }
     }
     pub(super) fn retain(&mut self, size: usize) -> Result<(), String> {
         if size > self.remaining.min(FILE_LIMIT) {
-            return Err("File reader exceeded its remaining snapshot allowance".into());
+            return Err(crate::i18n::text(
+                "backend-file-reader-exceeded-its-remaining-snapshot-allowance-4576a2",
+            )
+            .into());
         }
-        self.remaining = self
-            .remaining
-            .checked_sub(size)
-            .ok_or("Working snapshot overflow")?;
+        self.remaining = self.remaining.checked_sub(size).ok_or(crate::i18n::text(
+            "backend-working-snapshot-overflow-8e6d8f",
+        ))?;
         Ok(())
     }
 }
@@ -145,9 +154,9 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
     let now = source(&ctx, active)?;
     let head = entries(
         &ctx,
-        now.head
-            .as_deref()
-            .ok_or("Make an initial commit before using changelists")?,
+        now.head.as_deref().ok_or(crate::i18n::text(
+            "backend-make-an-initial-commit-before-using-changelists-e503e2",
+        ))?,
         active,
     )?;
     let index_tree = tree(&ctx, &now.index, active)?;
@@ -170,7 +179,10 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         paths.extend(list.paths.iter().cloned());
     }
     if paths.len() > MAX_FILES {
-        return Err("Changelists support up to 2000 changed paths".into());
+        return Err(crate::i18n::text(
+            "backend-changelists-support-up-to-2000-changed-paths-f28952",
+        )
+        .into());
     }
     let mut work = BTreeMap::new();
     let mut budget = SnapshotBudget::from_sizes([])?;
@@ -178,7 +190,10 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         super::restore::included(&ctx, &now, p, active)?;
         let mode = now.index.get(p).map_or("100644", |e| e.mode.as_str());
         if !matches!(mode, "100644" | "100755") {
-            return Err(format!("Changelists require regular files: {p}"));
+            return Err(crate::i18n::message(
+                "backend-changelists-require-regular-files-p-5d56fd",
+                &[("pointer", (p).to_string().into())],
+            ));
         }
         let limit = budget.allowance()?;
         let data = read_file_limited(&ctx, p, mode, limit, active)?;
@@ -186,7 +201,9 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         work.insert(p.clone(), data);
     }
     if source(&ctx, active)? != now {
-        return Err("Index moved while reading lists; reload".into());
+        return Err(
+            crate::i18n::text("backend-index-moved-while-reading-lists-reload-5ea823").into(),
+        );
     }
     Ok(View {
         lists,
@@ -201,11 +218,17 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
 }
 fn verify(ctx: &Context, view: &View, work: bool, active: &dyn Fn() -> bool) -> Result<(), String> {
     if state(ctx, active)?.1 != view.version || source(ctx, active)? != *view.source {
-        return Err("Changelists, HEAD or staged contents changed; reopen the lists".into());
+        return Err(crate::i18n::text(
+            "backend-changelists-head-or-staged-contents-changed-reopen-the-lists-f336ff",
+        )
+        .into());
     }
     if work {
         if native_files::capture_policies(&ctx.repo, &view.work, active)? != *view.policies {
-            return Err("Working-file full access policy changed since preview".into());
+            return Err(crate::i18n::text(
+                "backend-working-file-full-access-policy-changed-since-preview-5345af",
+            )
+            .into());
         }
         for (p, expected) in view.work.iter() {
             if read_file(
@@ -215,7 +238,10 @@ fn verify(ctx: &Context, view: &View, work: bool, active: &dyn Fn() -> bool) -> 
                 active,
             )? != *expected
             {
-                return Err(format!("{p} changed since preview; reopen the lists"));
+                return Err(crate::i18n::message(
+                    "backend-p-changed-since-preview-reopen-the-lists-520f7d",
+                    &[("pointer", (p).to_string().into())],
+                ));
             }
         }
     }
@@ -223,12 +249,14 @@ fn verify(ctx: &Context, view: &View, work: bool, active: &dyn Fn() -> bool) -> 
 }
 fn state_tree(ctx: &Context, lists: &Lists, active: &dyn Fn() -> bool) -> Result<String, String> {
     if lists.lists.len() > 100 {
-        return Err("At most 100 changelists are supported".into());
+        return Err(
+            crate::i18n::text("backend-at-most-100-changelists-are-supported-2e4f0a").into(),
+        );
     }
     let mut tree = BTreeMap::new();
     let data = serde_json::to_vec(lists).map_err(|e| e.to_string())?;
     if data.len() > 2 * 1024 * 1024 {
-        return Err("Changelist metadata exceeds 2 MiB".into());
+        return Err(crate::i18n::text("backend-changelist-metadata-exceeds-2-mib-d8e8dd").into());
     }
     tree.insert(
         "lists.json".into(),
@@ -286,15 +314,20 @@ fn publish(
     } else {
         &view.version
     };
-    let branch = view
-        .source
-        .branch
-        .as_deref()
-        .ok_or("Check out a local branch first")?;
+    let branch = view.source.branch.as_deref().ok_or(crate::i18n::text(
+        "backend-check-out-a-local-branch-first-5c009c",
+    ))?;
     if !branch.starts_with("refs/heads/") {
-        return Err("Changelist publication requires a local branch".into());
+        return Err(crate::i18n::text(
+            "backend-changelist-publication-requires-a-local-branch-4633d4",
+        )
+        .into());
     }
-    let head = view.source.head.as_deref().ok_or("No initial commit")?;
+    let head = view
+        .source
+        .head
+        .as_deref()
+        .ok_or(crate::i18n::text("backend-no-initial-commit-df294a"))?;
     let mut tx = "start\n".to_owned();
     tx.push_str(&format!("update HEAD {} {head}\n", commit.unwrap_or(head)));
     tx.push_str(&direct_update(&view.reference, &new, old));
@@ -358,7 +391,10 @@ pub fn edit(
     match edit {
         Edit::Create(name, message) => {
             if name.trim().is_empty() || name.len() > 128 || message.len() > 64 * 1024 {
-                return Err("Use a name up to 128 bytes and message up to 64 KiB".into());
+                return Err(crate::i18n::text(
+                    "backend-use-a-name-up-to-128-bytes-and-message-up-to-64-kib-dfaeda",
+                )
+                .into());
             }
             static IDS: AtomicU64 = AtomicU64::new(1);
             lists.lists.push(List {
@@ -376,32 +412,34 @@ pub fn edit(
         }
         Edit::Message(id, message) => {
             if message.len() > 64 * 1024 {
-                return Err("Message exceeds 64 KiB".into());
+                return Err(crate::i18n::text("backend-message-exceeds-64-kib-8bc64e").into());
             }
             lists
                 .lists
                 .iter_mut()
                 .find(|l| l.id == id)
-                .ok_or("List disappeared")?
+                .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?
                 .message = message;
         }
         Edit::Rename(id, name) => {
             if name.trim().is_empty() || name.len() > 128 {
-                return Err("Use a name up to 128 bytes".into());
+                return Err(crate::i18n::text("backend-use-a-name-up-to-128-bytes-dda20c").into());
             }
             lists
                 .lists
                 .iter_mut()
                 .find(|l| l.id == id)
-                .ok_or("List disappeared")?
+                .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?
                 .name = name;
         }
         Edit::Assign(id, path) => {
             if !view.paths.contains(&path) {
-                return Err("Path is not in this snapshot".into());
+                return Err(
+                    crate::i18n::text("backend-path-is-not-in-this-snapshot-d80a18").into(),
+                );
             }
             if !id.is_empty() && lists.lists.iter().all(|l| l.id != id || l.shelf.is_some()) {
-                return Err("Choose an active list".into());
+                return Err(crate::i18n::text("backend-choose-an-active-list-be27a5").into());
             }
             for list in &mut lists.lists {
                 if list.shelf.is_none() {
@@ -414,7 +452,7 @@ pub fn edit(
         }
     }
     publish(&ctx, view, &lists, None, "", active)?.confirmed()?;
-    Ok("Changelist saved".into())
+    Ok(crate::i18n::text("backend-changelist-saved-f554ef").into())
 }
 pub(super) fn data(
     ctx: &Context,
@@ -422,7 +460,7 @@ pub(super) fn data(
     active: &dyn Fn() -> bool,
 ) -> Result<Contents, String> {
     if entries.len() > MAX_FILES {
-        return Err("Snapshot exceeds 2000 paths".into());
+        return Err(crate::i18n::text("backend-snapshot-exceeds-2000-paths-daa6c1").into());
     }
     let mut budget = SnapshotBudget::from_sizes([])?;
     entries
@@ -430,18 +468,18 @@ pub(super) fn data(
         .map(|(p, e)| {
             let bytes = if let Some(e) = e {
                 if !matches!(e.mode.as_str(), "100644" | "100755") {
-                    return Err("Only regular changelist files are supported".into());
+                    return Err(crate::i18n::text("backend-only-regular-changelist-files-are-supported-552983").into());
                 }
                 let size = ctx
                     .text(&["cat-file", "-s", &e.oid], vec![], active)?
                     .parse::<usize>()
-                    .map_err(|_| "Invalid blob")?;
+                    .map_err(|_| crate::i18n::text("backend-invalid-blob-0dd843"))?;
                 if size > budget.allowance()? {
-                    return Err("Changelist blob exceeds the remaining 32 MiB / 8 MiB per-file allowance; object was not loaded".into());
+                    return Err(crate::i18n::text("backend-changelist-blob-exceeds-the-remaining-32-mib-8-mib-per-file-allow-8db5e7").into());
                 }
                 let bytes = ctx.run(&["cat-file", "blob", &e.oid], vec![], &[0], active)?;
                 if bytes.len() != size {
-                    return Err("Snapshot blob size changed".into());
+                    return Err(crate::i18n::text("backend-snapshot-blob-size-changed-be9c65").into());
                 }
                 budget.retain(bytes.len())?;
                 Some((e.mode.clone(), bytes))
@@ -494,7 +532,10 @@ fn final_index(
         private_index_file(ctx, name, &ctx.shared_file, bytes, active)?;
     }
     if ctx.run(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)? != source.raw {
-        return Err("Captured index could not be reproduced; no public index was changed".into());
+        return Err(crate::i18n::text(
+            "backend-captured-index-could-not-be-reproduced-no-public-index-was-change-526a6b",
+        )
+        .into());
     }
     // Materialize split entries in the private cache; transient daemon caches must
     // not be published. Git rejects index formats/extensions it cannot interpret.
@@ -509,7 +550,14 @@ fn final_index(
         &[0],
         active,
     )?;
-    let input = selected_index_records(selected, source.head.as_ref().ok_or("No HEAD")?.len());
+    let input = selected_index_records(
+        selected,
+        source
+            .head
+            .as_ref()
+            .ok_or(crate::i18n::text("backend-no-head-f43258"))?
+            .len(),
+    );
     if !input.is_empty() {
         ctx.run(&["update-index", "-z", "--index-info"], input, &[0], active)?;
     }
@@ -523,9 +571,10 @@ pub fn commit(
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     if remote::is_remote(repo) {
-        return Err(
-            "Changelist commit requires a native checkout; remote files were not changed".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-changelist-commit-requires-a-native-checkout-remote-files-were-no-245a50",
+        )
+        .into());
     }
     let ctx = Context::new(repo, active)?;
     verify(&ctx, view, true, active)?;
@@ -534,9 +583,12 @@ pub fn commit(
         .lists
         .iter()
         .find(|l| l.id == id)
-        .ok_or("List disappeared")?;
+        .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?;
     if list.shelf.is_some() || list.paths.is_empty() || list.message.trim().is_empty() {
-        return Err("Use an active nonempty list and draft commit message".into());
+        return Err(crate::i18n::text(
+            "backend-use-an-active-nonempty-list-and-draft-commit-message-345cd8",
+        )
+        .into());
     }
     let work = list
         .paths
@@ -546,7 +598,9 @@ pub fn commit(
                 p.clone(),
                 view.work
                     .get(p)
-                    .ok_or("Path missing from snapshot")?
+                    .ok_or(crate::i18n::text(
+                        "backend-path-missing-from-snapshot-dfcb5f",
+                    ))?
                     .clone(),
             ))
         })
@@ -568,20 +622,26 @@ pub fn commit(
         == ctx.text(
             &[
                 "rev-parse",
-                &format!("{}^{{tree}}", view.source.head.as_deref().ok_or("No HEAD")?),
+                &format!(
+                    "{}^{{tree}}",
+                    view.source
+                        .head
+                        .as_deref()
+                        .ok_or(crate::i18n::text("backend-no-head-f43258"))?
+                ),
             ],
             vec![],
             active,
         )?
     {
-        return Err("List has no changes against HEAD".into());
+        return Err(crate::i18n::text("backend-list-has-no-changes-against-head-b979cc").into());
     }
     let name =
         String::from_utf8(ctx.source(&["config", "--get", "user.name"], vec![], &[0], active)?)
-            .map_err(|_| "Invalid author")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-author-96cc99"))?;
     let email =
         String::from_utf8(ctx.source(&["config", "--get", "user.email"], vec![], &[0], active)?)
-            .map_err(|_| "Invalid author")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-author-96cc99"))?;
     let name = format!("user.name={}", name.trim());
     let email = format!("user.email={}", email.trim());
     let new = ctx.text(
@@ -593,7 +653,10 @@ pub fn commit(
             "commit-tree",
             &tree,
             "-p",
-            view.source.head.as_deref().ok_or("No HEAD")?,
+            view.source
+                .head
+                .as_deref()
+                .ok_or(crate::i18n::text("backend-no-head-f43258"))?,
         ],
         list.message.as_bytes().to_vec(),
         active,
@@ -605,12 +668,12 @@ pub fn commit(
         .lists
         .iter_mut()
         .find(|l| l.id == id)
-        .ok_or("List disappeared")?
+        .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?
         .paths
         .clear();
     capture_preserving_paths(
         repo,
-        "Before committing a changelist",
+        crate::i18n::text("backend-before-committing-a-changelist-f40288"),
         None,
         &list.paths.iter().cloned().collect::<Vec<_>>(),
         active,
@@ -619,10 +682,14 @@ pub fn commit(
     let mut index = index::Index::new(&ctx, &view.source, bytes)?;
     match publish(&ctx, view, &lists, Some(&new), &index.evidence(), active) {
         Ok(native_files::CommitOutcome::Committed) => {
-            let evidence=index.accept().map_err(|e|format!("Refs committed; index release needs attention and no rollback was attempted: {e}"))?;
-            Ok(format!(
-                "Committed only {} as {new}; other lists and staged contents retained. Index recovery: {evidence}",
-                list.name
+            let evidence=index.accept().map_err(|e|crate::i18n::message("backend-refs-committed-index-release-needs-attention-and-no-rollback-was-f6b682", &[("detail", (e).to_string().into())]))?;
+            Ok(crate::i18n::message(
+                "backend-committed-only-as-new-other-lists-and-staged-contents-retained-in-d6a6b8",
+                &[
+                    ("name", (list.name).to_string().into()),
+                    ("new", (new).to_string().into()),
+                    ("evidence", (evidence).to_string().into()),
+                ],
             ))
         }
         Ok(native_files::CommitOutcome::Unknown(reason)) => {
@@ -630,7 +697,13 @@ pub fn commit(
         }
         Err(error) => {
             let rollback = index.abort();
-            Err(format!("{error}; index abort: {rollback:?}"))
+            Err(crate::i18n::message(
+                "backend-error-index-abort-rollback-db7f35",
+                &[
+                    ("detail", (error).to_string().into()),
+                    ("rollback", format!("{:?}", rollback).into()),
+                ],
+            ))
         }
     }
 }
@@ -648,9 +721,13 @@ fn require_restore_ownership(lists: &Lists, restoring: &List) -> Result<(), Stri
                 .map(|path| (other, path))
         })
     {
-        return Err(format!(
-            "Cannot unshelve {}: {path} belongs to active changelist {}. Release that ownership first; nothing was changed",
-            restoring.name, other.name
+        return Err(crate::i18n::message(
+            "backend-cannot-unshelve-path-belongs-to-active-changelist-release-that-ow-dd2312",
+            &[
+                ("name", (restoring.name).to_string().into()),
+                ("path", (path).to_string().into()),
+                ("name3", (other.name).to_string().into()),
+            ],
         ));
     }
     Ok(())
@@ -664,9 +741,10 @@ pub fn shelve(
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     if remote::is_remote(repo) {
-        return Err(
-            "Changelist shelving requires a native checkout; remote files were not changed".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-changelist-shelving-requires-a-native-checkout-remote-files-were-7c1c58",
+        )
+        .into());
     }
     let ctx = Context::new(repo, active)?;
     verify(&ctx, view, true, active)?;
@@ -675,9 +753,9 @@ pub fn shelve(
         .lists
         .iter()
         .find(|l| l.id == id)
-        .ok_or("List disappeared")?;
+        .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?;
     if list.paths.is_empty() {
-        return Err("Choose a nonempty changelist".into());
+        return Err(crate::i18n::text("backend-choose-a-nonempty-changelist-9521ca").into());
     }
     if restore {
         require_restore_ownership(&view.lists, list)?;
@@ -690,7 +768,9 @@ pub fn shelve(
                 p.clone(),
                 view.work
                     .get(p)
-                    .ok_or("Path missing from snapshot")?
+                    .ok_or(crate::i18n::text(
+                        "backend-path-missing-from-snapshot-dfcb5f",
+                    ))?
                     .clone(),
             ))
         })
@@ -700,9 +780,12 @@ pub fn shelve(
         .lists
         .iter_mut()
         .find(|l| l.id == id)
-        .ok_or("List disappeared")?;
+        .ok_or(crate::i18n::text("backend-list-disappeared-27ce5f"))?;
     let (target, next_index) = if restore {
-        let shelf = list.shelf.as_ref().ok_or("List is not shelved")?;
+        let shelf = list
+            .shelf
+            .as_ref()
+            .ok_or(crate::i18n::text("backend-list-is-not-shelved-a61b98"))?;
         let base = data(&ctx, &shelf.base, active)?;
         if current != base
             || shelf
@@ -710,14 +793,17 @@ pub fn shelve(
                 .iter()
                 .any(|(p, e)| view.source.index.get(p) != e.as_ref())
         {
-            return Err("Shelved paths have new staged or working edits. Resolve those separately; nothing was overwritten".into());
+            return Err(crate::i18n::text(
+                "backend-shelved-paths-have-new-staged-or-working-edits-resolve-those-sepa-399352",
+            )
+            .into());
         }
         let target = data(&ctx, &shelf.work, active)?;
         owned.shelf = None;
         (target, shelf.index.clone())
     } else {
         if list.shelf.is_some() {
-            return Err("List is already shelved".into());
+            return Err(crate::i18n::text("backend-list-is-already-shelved-898c2c").into());
         }
         let base = list
             .paths
@@ -759,9 +845,9 @@ pub fn shelve(
     capture_preserving_paths(
         repo,
         if restore {
-            "Before unshelving one changelist"
+            crate::i18n::text("backend-before-unshelving-one-changelist-32b46b")
         } else {
-            "Before shelving one changelist"
+            crate::i18n::text("backend-before-shelving-one-changelist-f97389")
         },
         None,
         &list.paths.iter().cloned().collect::<Vec<_>>(),
@@ -775,9 +861,12 @@ pub fn shelve(
         match publish(&ctx, view, &lists, None, &evidence, active) {
             Ok(native_files::CommitOutcome::Committed) => match index.accept() {
                 Ok(_) => Ok(native_files::CommitOutcome::Committed),
-                Err(error) => Ok(native_files::CommitOutcome::Unknown(format!(
-                    "Refs committed but index release needs attention: {error}; {}",
-                    index.uncertain()
+                Err(error) => Ok(native_files::CommitOutcome::Unknown(crate::i18n::message(
+                    "backend-refs-committed-but-index-release-needs-attention-error-6be47a",
+                    &[
+                        ("detail", (error).to_string().into()),
+                        ("index", (index.uncertain()).to_string().into()),
+                    ],
                 ))),
             },
             Ok(native_files::CommitOutcome::Unknown(reason)) => Ok(
@@ -785,7 +874,13 @@ pub fn shelve(
             ),
             Err(error) => {
                 let rollback = index.abort();
-                Err(format!("{error}; index abort: {rollback:?}"))
+                Err(crate::i18n::message(
+                    "backend-error-index-abort-rollback-db7f35",
+                    &[
+                        ("detail", (error).to_string().into()),
+                        ("rollback", format!("{:?}", rollback).into()),
+                    ],
+                ))
             }
         }
     };
@@ -803,9 +898,17 @@ pub fn shelve(
         },
         active,
     )?;
-    Ok(format!(
-        "{} {}; other lists retained. {evidence}",
-        if restore { "Unshelved" } else { "Shelved" },
-        list.name
+    Ok(crate::i18n::message(
+        "backend-other-lists-retained-evidence-cab32f",
+        &[
+            (
+                "if",
+                (if restore { "Unshelved" } else { "Shelved" })
+                    .to_string()
+                    .into(),
+            ),
+            ("name", (list.name).to_string().into()),
+            ("evidence", (evidence).to_string().into()),
+        ],
     ))
 }

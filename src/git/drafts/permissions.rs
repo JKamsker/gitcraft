@@ -44,7 +44,7 @@ fn native_mode(
     let pin = identity
         .root_pin
         .as_ref()
-        .ok_or("Missing working-root pin")?;
+        .ok_or(crate::i18n::text("backend-missing-working-root-pin-117323"))?;
     let (dir, name) = crate::git::recovery::pinned_parent(
         Path::new(&pin.physical),
         Path::new(&identity.common),
@@ -62,7 +62,10 @@ fn native_mode(
     );
     let meta = file.metadata().map_err(|e| e.to_string())?;
     if !meta.is_file() {
-        return Err("Permission restoration requires a regular file".into());
+        return Err(crate::i18n::text(
+            "backend-permission-restoration-requires-a-regular-file-0bc5a9",
+        )
+        .into());
     }
     let before = meta.permissions().mode() & 0o777;
     if let (Some(mode), Some(expected)) = (mode, expected) {
@@ -72,7 +75,10 @@ fn native_mode(
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         if bytes != expected {
-            return Err("Recovered file changed before permission restoration".into());
+            return Err(crate::i18n::text(
+                "backend-recovered-file-changed-before-permission-restoration-fd07d2",
+            )
+            .into());
         }
         file.set_permissions(std::fs::Permissions::from_mode(mode))
             .map_err(|e| e.to_string())?;
@@ -96,10 +102,9 @@ fn remote_mode(
     active: &dyn Fn() -> bool,
 ) -> Result<u32, String> {
     use base64::Engine;
-    let pin = identity
-        .root_pin
-        .as_ref()
-        .ok_or("Missing remote root identity")?;
+    let pin = identity.root_pin.as_ref().ok_or(crate::i18n::text(
+        "backend-missing-remote-root-identity-18406b",
+    ))?;
     let script = r#"import os,sys,json,stat,base64
 q=json.load(sys.stdin)
 fd=os.open('.',os.O_RDONLY|os.O_DIRECTORY)
@@ -126,18 +131,21 @@ try:
 finally:os.close(fd)
 "#;
     if !active() {
-        return Err("Draft permissions cancelled".into());
+        return Err(crate::i18n::text("backend-draft-permissions-cancelled-52db5c").into());
     }
-    let output=git::forecast_remote(identity.host.as_ref().ok_or("Missing remote host")?,remote::Request {
+    let output=git::forecast_remote(identity.host.as_ref().ok_or(crate::i18n::text("backend-missing-remote-host-584e40"))?,remote::Request {
         cwd:Some(pin.physical.clone()),script:format!("exec python3 -c {}",remote::sh_quote(script)),
         stdin:Some(serde_json::json!({"root":pin.physical,"device":pin.device_inode().map(|p|p.0),"inode":pin.device_inode().map(|p|p.1),"path":path,"mode":mode,"expected":expected.map(|b|base64::engine::general_purpose::STANDARD.encode(b))}).to_string().into_bytes()),..Default::default()
     },active)?;
     if output.code != 0 {
-        return Err("Remote permission preservation requires Python 3 and stable regular files; no unsafe chmod was attempted".into());
+        return Err(crate::i18n::text(
+            "backend-remote-permission-preservation-requires-python-3-and-stable-regul-c8957f",
+        )
+        .into());
     }
     std::str::from_utf8(&output.stdout)
-        .map_err(|_| "Invalid remote permissions")?
+        .map_err(|_| crate::i18n::text("backend-invalid-remote-permissions-c99226"))?
         .trim()
         .parse::<u32>()
-        .map_err(|_| "Invalid remote permissions".into())
+        .map_err(|_| crate::i18n::text("backend-invalid-remote-permissions-c99226").into())
 }

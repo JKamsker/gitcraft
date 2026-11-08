@@ -319,7 +319,11 @@ fn live(ctx: &Context, view: &lists::View, active: &dyn Fn() -> bool) -> Result<
         }
     }
     let work_tree = tree(ctx, &work, active)?;
-    let base = view.source.head.as_deref().ok_or("No HEAD")?;
+    let base = view
+        .source
+        .head
+        .as_deref()
+        .ok_or(crate::i18n::text("backend-no-head-f43258"))?;
     let raw = ctx.run(
         &[
             "diff",
@@ -496,7 +500,12 @@ fn publish(
     active: &dyn Fn() -> bool,
 ) -> Result<native_files::CommitOutcome, String> {
     let new = root(ctx, value, active)?;
-    let head = view.source.source.head.as_deref().ok_or("No HEAD")?;
+    let head = view
+        .source
+        .source
+        .head
+        .as_deref()
+        .ok_or(crate::i18n::text("backend-no-head-f43258"))?;
     let branch = view
         .source
         .source
@@ -699,7 +708,7 @@ pub fn edit(
         Edit::Message(name, message) => {
             anchor(view)?;
             if message.len() > 64 * 1024 {
-                return Err("Message exceeds 64 KiB".into());
+                return Err(crate::i18n::text("backend-message-exceeds-64-kib-8bc64e").into());
             }
             next.mode
                 .as_mut()

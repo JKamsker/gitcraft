@@ -20,17 +20,27 @@ impl Eq for IndexSnapshot {}
 impl IndexSnapshot {
     pub(in crate::git) fn capture(path: &Path) -> Result<Option<Self>, String> {
         if !cfg!(any(target_os = "macos", target_os = "linux")) {
-            return Err("Native index publication is unavailable on this platform".into());
+            return Err(crate::i18n::text(
+                "backend-native-index-publication-is-unavailable-on-this-platform-3fda01",
+            )
+            .into());
         }
-        let parent = path.parent().ok_or("Missing index parent")?;
+        let parent = path
+            .parent()
+            .ok_or(crate::i18n::text("backend-missing-index-parent-f550c8"))?;
         if std::fs::canonicalize(parent).map_err(|e| e.to_string())? != parent {
-            return Err("Index parent must be a physical native directory".into());
+            return Err(crate::i18n::text(
+                "backend-index-parent-must-be-a-physical-native-directory-f351f4",
+            )
+            .into());
         }
         let directory = Arc::new(Directory::open(parent).map_err(|e| e.to_string())?);
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or("Index basename must be UTF-8")?
+            .ok_or(crate::i18n::text(
+                "backend-index-basename-must-be-utf-8-45a39e",
+            ))?
             .to_owned();
         Ok(
             Snapshot::read(&directory, &name, 32 * 1024 * 1024)?.map(|snapshot| Self {
@@ -71,15 +81,21 @@ impl IndexTransaction {
     /// its exact evidence path. This never executes Git or follows index.lock bytes.
     pub(in crate::git) fn new(before: &IndexSnapshot, after: Vec<u8>) -> Result<Self, String> {
         if after.len() > 32 * 1024 * 1024 {
-            return Err("Prepared index exceeds 32 MiB".into());
+            return Err(crate::i18n::text("backend-prepared-index-exceeds-32-mib-7b2bd0").into());
         }
         if !before.unchanged() {
-            return Err("Index or retained parent changed before publication".into());
+            return Err(crate::i18n::text(
+                "backend-index-or-retained-parent-changed-before-publication-2f4e23",
+            )
+            .into());
         }
         let observed = Snapshot::read(&before.directory, &before.name, 32 * 1024 * 1024)?
-            .ok_or("Index disappeared")?;
+            .ok_or(crate::i18n::text("backend-index-disappeared-2b459a"))?;
         if &observed != before.snapshot.as_ref() {
-            return Err("Index bytes/identity/full policy changed".into());
+            return Err(crate::i18n::text(
+                "backend-index-bytes-identity-full-policy-changed-7f1ef7",
+            )
+            .into());
         }
         let policy = observed.policy.clone();
         let replacement = Replacement::prepare(
@@ -97,7 +113,7 @@ impl IndexTransaction {
             .map_err(|e| e.to_string())?;
         let created = same_file::Handle::from_file(file).map_err(|e| e.to_string())?;
         let lock = Snapshot::read(&replacement.recovery, "index-lock", 0)?
-            .ok_or("Private lock disappeared")?;
+            .ok_or(crate::i18n::text("backend-private-lock-disappeared-a23815"))?;
         let private = same_file::Handle::from_file(
             replacement
                 .recovery
@@ -106,9 +122,9 @@ impl IndexTransaction {
         )
         .map_err(|e| e.to_string())?;
         if private != created {
-            return Err(format!(
-                "Private lock changed; retained {}",
-                replacement.evidence()
+            return Err(crate::i18n::message(
+                "backend-private-lock-changed-retained-e393a1",
+                &[("replacement", (replacement.evidence()).to_string().into())],
             ));
         }
         replacement
@@ -119,10 +135,7 @@ impl IndexTransaction {
                 OsStr::new(&lock_name),
             )
             .map_err(|e| {
-                format!(
-                    "Index is locked or create-only lock is unavailable: {e}; private evidence {}",
-                    replacement.evidence()
-                )
+                crate::i18n::message("backend-index-is-locked-or-create-only-lock-is-unavailable-e-private-evid-46d356", &[("detail", (e).to_string().into()), ("replacement", (replacement.evidence()).to_string().into())])
             })?;
         let mut transaction = Self {
             replacement,
@@ -135,29 +148,41 @@ impl IndexTransaction {
                 .lock
                 .same_at(&transaction.replacement.parent, &transaction.lock_name)
             {
-                return Err("Index lock identity/bytes/policy changed before publication".into());
+                return Err(crate::i18n::text(
+                    "backend-index-lock-identity-bytes-policy-changed-before-publication-0ed5ca",
+                )
+                .into());
             }
             transaction.replacement.publish()?;
             if !transaction
                 .lock
                 .same_at(&transaction.replacement.parent, &transaction.lock_name)
             {
-                return Err("Index lock changed during publication".into());
+                return Err(crate::i18n::text(
+                    "backend-index-lock-changed-during-publication-fec309",
+                )
+                .into());
             }
             Ok(())
         })();
         if let Err(error) = published {
             let rollback = transaction.abort();
-            return Err(format!("{error}. Abort receipt: {rollback:?}"));
+            return Err(crate::i18n::message(
+                "backend-error-abort-receipt-rollback-f875d0",
+                &[
+                    ("detail", (error).to_string().into()),
+                    ("rollback", format!("{:?}", rollback).into()),
+                ],
+            ));
         }
         Ok(transaction)
     }
     fn release_lock(&self) -> Result<(), String> {
         let r = &self.replacement;
         if !r.parent.unchanged() || !r.recovery.unchanged() {
-            return Err(format!(
-                "Lock parent moved; evidence retained in held directory formerly {}",
-                r.evidence()
+            return Err(crate::i18n::message(
+                "backend-lock-parent-moved-evidence-retained-in-held-directory-formerly-0c41fb",
+                &[("r", (r.evidence()).to_string().into())],
             ));
         }
         // Capture first: no check-then-unlink of the public lock pathname.
@@ -168,9 +193,12 @@ impl IndexTransaction {
                 OsStr::new("released-lock"),
             )
             .map_err(|e| {
-                format!(
-                    "Lock release capture failed: {e}; evidence {}",
-                    r.evidence()
+                crate::i18n::message(
+                    "backend-lock-release-capture-failed-e-evidence-0c66f8",
+                    &[
+                        ("detail", (e).to_string().into()),
+                        ("r", (r.evidence()).to_string().into()),
+                    ],
                 )
             })?;
         let observed = Snapshot::read(&r.recovery, "released-lock", 32 * 1024 * 1024);
@@ -190,14 +218,19 @@ impl IndexTransaction {
             &r.parent,
             OsStr::new(&self.lock_name),
         );
-        Err(format!(
-            "A foreign/changed lock was captured and preserved; create-only return {restored:?}; exact evidence {}/released-lock",
-            r.evidence()
+        Err(crate::i18n::message(
+            "backend-a-foreign-changed-lock-was-captured-and-preserved-create-only-ret-59caa2",
+            &[
+                ("restored", format!("{:?}", restored).into()),
+                ("r", (r.evidence()).to_string().into()),
+            ],
         ))
     }
     pub(in crate::git) fn accept(&mut self) -> Result<String, String> {
         if self.finished {
-            return Err("Index transaction already resolved".into());
+            return Err(
+                crate::i18n::text("backend-index-transaction-already-resolved-f3e97e").into(),
+            );
         }
         self.finished = true;
         self.replacement.verify_installed()?;
@@ -206,15 +239,25 @@ impl IndexTransaction {
     }
     pub(in crate::git) fn abort(&mut self) -> Result<String, String> {
         if self.finished {
-            return Err("Index transaction already resolved; no rollback attempted".into());
+            return Err(crate::i18n::text(
+                "backend-index-transaction-already-resolved-no-rollback-attempted-db597e",
+            )
+            .into());
         }
         self.finished = true;
         let rollback = self.replacement.rollback();
         let lock = self.release_lock();
         if rollback.is_err() || lock.is_err() {
-            return Err(format!(
-                "Index rollback {rollback:?}; lock release {lock:?}; evidence {}",
-                self.replacement.evidence()
+            return Err(crate::i18n::message(
+                "backend-index-rollback-rollback-lock-release-lock-evidence-242d6f",
+                &[
+                    ("rollback", format!("{:?}", rollback).into()),
+                    ("lock", format!("{:?}", lock).into()),
+                    (
+                        "replacement",
+                        (self.replacement.evidence()).to_string().into(),
+                    ),
+                ],
             ));
         }
         Ok(self.replacement.evidence())
@@ -224,9 +267,12 @@ impl IndexTransaction {
     }
     pub(in crate::git) fn retain(&mut self) -> String {
         self.finished = true;
-        format!(
-            "Index/lock and all original/candidate entries retained at {}",
-            self.replacement.evidence()
+        crate::i18n::message(
+            "backend-index-lock-and-all-original-candidate-entries-retained-at-393f61",
+            &[(
+                "replacement",
+                (self.replacement.evidence()).to_string().into(),
+            )],
         )
     }
 }

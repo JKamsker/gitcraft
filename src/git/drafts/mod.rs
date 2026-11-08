@@ -157,10 +157,10 @@ fn capture_preserving_paths(
         }
     }
     if candidates.len() > MAX_FILES {
-        return Err(
-            "Draft has over 2000 changed/untracked files; make a manual backup before continuing"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-draft-has-over-2000-changed-untracked-files-make-a-manual-backup-b502fa",
+        )
+        .into());
     }
     if candidates.is_empty() {
         cleanup_in(
@@ -180,9 +180,10 @@ fn capture_preserving_paths(
     for path in candidates {
         let index = before.index.get(&path).cloned();
         if index.as_ref().is_some_and(|e| e.mode == "160000") {
-            return Err(
-                "Drafts exclude submodule contents; back up submodule changes separately".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-drafts-exclude-submodule-contents-back-up-submodule-changes-separ-a309a6",
+            )
+            .into());
         }
         let data = read_file(
             &ctx,
@@ -194,7 +195,7 @@ fn capture_preserving_paths(
             total += bytes.len();
             if total > TOTAL_LIMIT {
                 return Err(
-                    "Draft content exceeds 32 MiB; make a manual backup before continuing".into(),
+                    crate::i18n::text("backend-draft-content-exceeds-32-mib-make-a-manual-backup-before-continui-5603e0").into(),
                 );
             }
             Some(Entry {
@@ -222,9 +223,10 @@ fn capture_preserving_paths(
     }
     let work_tree = tree(&ctx, &work, &active)?;
     if source(&ctx, &active)? != before {
-        return Err(
-            "HEAD or index changed while making a draft; it will retry after a pause".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-head-or-index-changed-while-making-a-draft-it-will-retry-after-a-c7f805",
+        )
+        .into());
     }
     tree(&ctx, &before.index, &active)?;
     cached_index(&ctx, &before, &active)?;
@@ -236,9 +238,10 @@ fn capture_preserving_paths(
             &active,
         )?)? != untracked
     {
-        return Err(
-            "Working changes moved while making a draft; it will retry after a pause".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-working-changes-moved-while-making-a-draft-it-will-retry-after-a-1f8fd4",
+        )
+        .into());
     }
     for (path, expected) in observed {
         if read_file(
@@ -251,9 +254,10 @@ fn capture_preserving_paths(
             &active,
         )? != expected
         {
-            return Err(
-                "A working file changed while making a draft; it will retry after a pause".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-a-working-file-changed-while-making-a-draft-it-will-retry-after-a-3a7281",
+            )
+            .into());
         }
     }
     let existing = list_in(&ctx, &active)?;
@@ -292,7 +296,10 @@ fn capture_preserving_paths(
     };
     let bytes = serde_json::to_vec(&metadata).map_err(|e| e.to_string())?;
     if bytes.len() > 1024 * 1024 {
-        return Err("Draft metadata exceeds 1 MiB; make a manual backup".into());
+        return Err(crate::i18n::text(
+            "backend-draft-metadata-exceeds-1-mib-make-a-manual-backup-91327e",
+        )
+        .into());
     }
     let meta = ctx.blob(bytes, &active)?;
     let input = format!(
@@ -343,18 +350,26 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
     let raw = ctx.source(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)?;
     let (mut index, mut skip) = (BTreeMap::new(), BTreeSet::new());
     for record in raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
-        let record = std::str::from_utf8(record).map_err(|_| "Draft paths must be UTF-8")?;
-        let (info, path) = record.split_once('\t').ok_or("Cannot read index entry")?;
+        let record = std::str::from_utf8(record)
+            .map_err(|_| crate::i18n::text("backend-draft-paths-must-be-utf-8-7ae280"))?;
+        let (info, path) = record
+            .split_once('\t')
+            .ok_or(crate::i18n::text("backend-cannot-read-index-entry-6979bd"))?;
         valid_path(path)?;
         let parts: Vec<_> = info.split_whitespace().collect();
         let [tag, mode, oid, stage] = parts.as_slice() else {
-            return Err("Cannot read index entry".into());
+            return Err(crate::i18n::text("backend-cannot-read-index-entry-6979bd").into());
         };
         if *stage != "0" {
-            return Err("Drafts are unavailable while the index contains conflicts; resolve or back up the conflict first".into());
+            return Err(crate::i18n::text(
+                "backend-drafts-are-unavailable-while-the-index-contains-conflicts-resolve-6a5dd9",
+            )
+            .into());
         }
         if !matches!(*mode, "100644" | "100755" | "120000" | "160000") || !oid_valid(oid) {
-            return Err("Unsupported index entry for drafts".into());
+            return Err(
+                crate::i18n::text("backend-unsupported-index-entry-for-drafts-ed55d1").into(),
+            );
         }
         if tag.eq_ignore_ascii_case("S") {
             skip.insert(path.to_owned());
@@ -367,7 +382,10 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
             },
         );
         if index.len() > MAX_INDEX {
-            return Err("Drafts support at most 20000 index entries".into());
+            return Err(crate::i18n::text(
+                "backend-drafts-support-at-most-20000-index-entries-bd3f0a",
+            )
+            .into());
         }
     }
     let text = |args: &[&str]| -> Result<Option<String>, String> {
@@ -381,7 +399,10 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
         if !remote::is_remote(&ctx.repo) && cfg!(any(target_os = "macos", target_os = "linux")) {
             let snapshot = index_transaction::IndexSnapshot::capture(Path::new(&ctx.index_file))?;
             if snapshot.as_ref().map(|s| s.bytes()).unwrap_or_default() != cache {
-                return Err("Index/policy changed while reading source".into());
+                return Err(crate::i18n::text(
+                    "backend-index-policy-changed-while-reading-source-3a58e5",
+                )
+                .into());
             }
             snapshot.map(std::sync::Arc::new)
         } else {
@@ -397,13 +418,16 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
                 .shared_file
                 .rsplit(['/', '\\'])
                 .next()
-                .ok_or("Invalid shared index path")?;
+                .ok_or(crate::i18n::text(
+                    "backend-invalid-shared-index-path-cecec6",
+                ))?;
             if !name.strip_prefix("sharedindex.").is_some_and(oid_valid) {
-                return Err("Invalid shared index path".into());
+                return Err(crate::i18n::text("backend-invalid-shared-index-path-cecec6").into());
             }
             Some((
                 name.into(),
-                internal_file(ctx, &ctx.shared_file, active)?.ok_or("Shared index disappeared")?,
+                internal_file(ctx, &ctx.shared_file, active)?
+                    .ok_or(crate::i18n::text("backend-shared-index-disappeared-8b3784"))?,
             ))
         },
         raw,
@@ -423,7 +447,9 @@ fn internal_file(
 ) -> Result<Option<Vec<u8>>, String> {
     const LIMIT: u64 = 32 * 1024 * 1024;
     if let Some(target) = remote::parse(&ctx.repo) {
-        let (parent, name) = path.rsplit_once('/').ok_or("Invalid Git metadata path")?;
+        let (parent, name) = path.rsplit_once('/').ok_or(crate::i18n::text(
+            "backend-invalid-git-metadata-path-f4a8cd",
+        ))?;
         let script = read_script(parent, name, LIMIT)?;
         let out = git::forecast_remote(
             &target.host,
@@ -443,25 +469,36 @@ fn internal_file(
         {
             return Ok(Some(out.stdout[8..].to_vec()));
         }
-        return Err("Cannot read a regular index/cache file within 32 MiB".into());
+        return Err(crate::i18n::text(
+            "backend-cannot-read-a-regular-index-cache-file-within-32-mib-136f8d",
+        )
+        .into());
     }
     let path = Path::new(path);
     match std::fs::symlink_metadata(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e.to_string()),
         Ok(meta) if !meta.is_file() || meta.file_type().is_symlink() => {
-            return Err("Index/cache links and special files are not supported".into());
+            return Err(crate::i18n::text(
+                "backend-index-cache-links-and-special-files-are-not-supported-fcc001",
+            )
+            .into());
         }
         _ => {}
     }
-    let parent = path.parent().ok_or("Invalid index path")?;
+    let parent = path
+        .parent()
+        .ok_or(crate::i18n::text("backend-invalid-index-path-d4427c"))?;
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
-        .ok_or("Index path is not UTF-8")?;
+        .ok_or(crate::i18n::text("backend-index-path-is-not-utf-8-4ef0dd"))?;
     crate::safe_read::read_inside(parent, name, LIMIT)
         .map(Some)
-        .ok_or_else(|| "Index/cache file is unreadable or exceeds 32 MiB".into())
+        .ok_or_else(|| {
+            crate::i18n::text("backend-index-cache-file-is-unreadable-or-exceeds-32-mib-0ad77d")
+                .into()
+        })
 }
 
 fn private_index_file(
@@ -487,12 +524,17 @@ fn private_index_file(
             active,
         )?;
         if out.code != 0 {
-            return Err("Cannot copy the private index cache".into());
+            return Err(
+                crate::i18n::text("backend-cannot-copy-the-private-index-cache-6185c5").into(),
+            );
         }
     } else {
         let metadata = std::fs::symlink_metadata(source_path).map_err(|e| e.to_string())?;
         if !metadata.is_file() || metadata.file_type().is_symlink() {
-            return Err("Index/cache links and special files are not supported".into());
+            return Err(crate::i18n::text(
+                "backend-index-cache-links-and-special-files-are-not-supported-fcc001",
+            )
+            .into());
         }
         let modified = metadata.modified().map_err(|e| e.to_string())?;
         std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
@@ -518,13 +560,19 @@ fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Res
     if !state.cache.is_empty() {
         private_index_file(ctx, "index", &ctx.index_file, &state.cache, active)?;
     } else if !state.raw.is_empty() {
-        return Err("Index disappeared while preparing the draft".into());
+        return Err(crate::i18n::text(
+            "backend-index-disappeared-while-preparing-the-draft-1afbba",
+        )
+        .into());
     }
     if let Some((name, bytes)) = &state.shared {
         private_index_file(ctx, name, &ctx.shared_file, bytes, active)?;
     }
     if ctx.run(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)? != state.raw {
-        return Err("Index moved while copying its private stat cache".into());
+        return Err(crate::i18n::text(
+            "backend-index-moved-while-copying-its-private-stat-cache-3454e3",
+        )
+        .into());
     }
     // Preserve the source index's mtime when copying: advancing it makes Git skip
     // its racy-stat content check for same-size edits made in the original tick.
@@ -544,8 +592,11 @@ fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Res
     let mut assume = Vec::new();
     for record in state.raw.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         if record.first().is_some_and(u8::is_ascii_lowercase) {
-            let record = std::str::from_utf8(record).map_err(|_| "Invalid index")?;
-            let (_, path) = record.split_once('\t').ok_or("Invalid index")?;
+            let record = std::str::from_utf8(record)
+                .map_err(|_| crate::i18n::text("backend-invalid-index-bb1331"))?;
+            let (_, path) = record
+                .split_once('\t')
+                .ok_or(crate::i18n::text("backend-invalid-index-bb1331"))?;
             assume.extend_from_slice(path.as_bytes());
             assume.push(0);
         }
@@ -622,7 +673,8 @@ fn paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
         .split(|b| *b == 0)
         .filter(|b| !b.is_empty())
         .map(|p| {
-            let p = std::str::from_utf8(p).map_err(|_| "Draft paths must be UTF-8")?;
+            let p = std::str::from_utf8(p)
+                .map_err(|_| crate::i18n::text("backend-draft-paths-must-be-utf-8-7ae280"))?;
             valid_path(p)?;
             Ok(p.to_owned())
         })
@@ -633,7 +685,8 @@ fn paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
 fn untracked_paths(bytes: Vec<u8>) -> Result<BTreeSet<String>, String> {
     let mut result = BTreeSet::new();
     for name in bytes.split(|b| *b == 0).filter(|s| !s.is_empty()) {
-        let name = std::str::from_utf8(name).map_err(|_| "Draft paths must be UTF-8")?;
+        let name = std::str::from_utf8(name)
+            .map_err(|_| crate::i18n::text("backend-draft-paths-must-be-utf-8-7ae280"))?;
         if let Some(directory) = name.strip_suffix('/') {
             valid_path(directory)?;
         } else {
@@ -670,7 +723,10 @@ fn read_script(root: &str, rel: &str, limit: u64) -> Result<String, String> {
             ));
         }
     }
-    script.push_str(&remote::read_within_script(root, rel, limit).ok_or("Unsafe draft path")?);
+    script.push_str(
+        &remote::read_within_script(root, rel, limit)
+            .ok_or(crate::i18n::text("backend-unsafe-draft-path-12307a"))?,
+    );
     Ok(script)
 }
 
@@ -678,19 +734,28 @@ fn read_script(root: &str, rel: &str, limit: u64) -> Result<String, String> {
 fn missing_inside(root: &Path, rel: &str) -> Result<(), String> {
     use rustix::fs::{AtFlags, Mode, OFlags, open, openat, statat};
     let names: Vec<_> = rel.split('/').collect();
-    let (last, folders) = names.split_last().ok_or("Invalid draft path")?;
+    let (last, folders) = names
+        .split_last()
+        .ok_or(crate::i18n::text("backend-invalid-draft-path-58bc4d"))?;
     let flags = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW;
     let mut dir = open(root, flags - OFlags::NOFOLLOW, Mode::empty()).map_err(|e| e.to_string())?;
     for folder in folders {
         match openat(&dir, *folder, flags, Mode::empty()) {
             Ok(next) => dir = next,
             Err(rustix::io::Errno::NOENT) => return Ok(()),
-            Err(e) => return Err(format!("Cannot verify missing draft path: {e}")),
+            Err(e) => {
+                return Err(crate::i18n::message(
+                    "backend-cannot-verify-missing-draft-path-e-599e53",
+                    &[("detail", (e).to_string().into())],
+                ));
+            }
         }
     }
     match statat(&dir, *last, AtFlags::SYMLINK_NOFOLLOW) {
         Err(rustix::io::Errno::NOENT) => Ok(()),
-        _ => Err("Draft path changed or cannot be safely read".into()),
+        _ => Err(
+            crate::i18n::text("backend-draft-path-changed-or-cannot-be-safely-read-7b72b8").into(),
+        ),
     }
 }
 #[cfg(not(unix))]
@@ -706,16 +771,22 @@ fn missing_inside(root: &Path, rel: &str) -> Result<(), String> {
                 {
                     use std::os::windows::fs::MetadataExt;
                     if meta.file_attributes() & 0x400 != 0 {
-                        return Err("Draft path crosses a reparse point".into());
+                        return Err(crate::i18n::text(
+                            "backend-draft-path-crosses-a-reparse-point-dd9a8e",
+                        )
+                        .into());
                     }
                 }
                 if meta.file_type().is_symlink() || !meta.is_dir() {
-                    return Err("Draft path changed or crosses a link".into());
+                    return Err(crate::i18n::text(
+                        "backend-draft-path-changed-or-crosses-a-link-7acb39",
+                    )
+                    .into());
                 }
             }
         }
     }
-    Err("Draft path changed; retry after a pause".into())
+    Err(crate::i18n::text("backend-draft-path-changed-retry-after-a-pause-e68c36").into())
 }
 
 fn valid_path(path: &str) -> Result<(), String> {
@@ -729,7 +800,10 @@ fn valid_path(path: &str) -> Result<(), String> {
             .split('/')
             .any(|p| p.is_empty() || matches!(p, "." | "..") || p.eq_ignore_ascii_case(".git"))
     {
-        Err(format!("Drafts cannot safely read this path: {path:?}"))
+        Err(crate::i18n::message(
+            "backend-drafts-cannot-safely-read-this-path-path-6f6fed",
+            &[("path", format!("{:?}", path).into())],
+        ))
     } else {
         Ok(())
     }
@@ -756,7 +830,7 @@ fn read_file_limited(
     valid_path(path)?;
     let limit = limit.min(FILE_LIMIT);
     if !active() {
-        return Err("Draft cancelled".into());
+        return Err(crate::i18n::text("backend-draft-cancelled-426ba2").into());
     }
     if let Some(target) = remote::parse(&ctx.repo) {
         let script = read_script(&ctx.worktree, path, limit as u64)?;
@@ -782,8 +856,9 @@ fn read_file_limited(
                 out.stdout[8..].to_vec(),
             )));
         }
-        return Err(format!(
-            "Cannot draft {path}: only regular files within 8 MiB are supported; links are not followed"
+        return Err(crate::i18n::message(
+            "backend-cannot-draft-path-only-regular-files-within-8-mib-are-supported-l-80a0a0",
+            &[("path", (path).to_string().into())],
         ));
     }
     let root = Path::new(&ctx.worktree);
@@ -795,17 +870,26 @@ fn read_file_limited(
         Err(e) => return Err(e.to_string()),
     };
     if !meta.is_file() || meta.file_type().is_symlink() {
-        return Err(format!(
-            "Cannot draft {path}: symbolic links, submodules and special files are not followed"
+        return Err(crate::i18n::message(
+            "backend-cannot-draft-path-symbolic-links-submodules-and-special-files-are-b6ff13",
+            &[("path", (path).to_string().into())],
         ));
     }
     if meta.len() > limit as u64 {
-        return Err(format!(
-            "Cannot draft {path}: exceeds remaining snapshot allowance of {limit} bytes"
+        return Err(crate::i18n::message(
+            "backend-cannot-draft-path-exceeds-remaining-snapshot-allowance-of-limit-b-dc54e5",
+            &[
+                ("path", (path).to_string().into()),
+                ("limit", (limit).to_string().into()),
+            ],
         ));
     }
-    let bytes = crate::safe_read::read_inside(root, path, limit as u64)
-        .ok_or_else(|| format!("Cannot draft {path}: file changed, is linked, or exceeds its remaining snapshot allowance"))?;
+    let bytes = crate::safe_read::read_inside(root, path, limit as u64).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-cannot-draft-path-file-changed-is-linked-or-exceeds-its-remaining-294df6",
+            &[("path", (path).to_string().into())],
+        )
+    })?;
     #[cfg(unix)]
     let mode = {
         use std::os::unix::fs::PermissionsExt;
@@ -834,9 +918,13 @@ fn list_in(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Vec<Draft>, Strin
         &[0],
         active,
     )?;
-    let refs = std::str::from_utf8(&refs).map_err(|_| "Invalid draft refs")?;
+    let refs = std::str::from_utf8(&refs)
+        .map_err(|_| crate::i18n::text("backend-invalid-draft-refs-3d3d89"))?;
     if refs.lines().count() > 200 {
-        return Err("Too many draft refs; inspect refs/gitcraft/drafts in the terminal".into());
+        return Err(crate::i18n::text(
+            "backend-too-many-draft-refs-inspect-refs-gitcraft-drafts-in-the-terminal-814e26",
+        )
+        .into());
     }
     let mut drafts = Vec::new();
     for line in refs.lines() {
@@ -851,7 +939,10 @@ fn list_in(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Vec<Draft>, Strin
             drafts.push(Draft { id, metadata });
         }
         if drafts.len() > 200 {
-            return Err("Too many draft refs; inspect refs/gitcraft/drafts in the terminal".into());
+            return Err(crate::i18n::text(
+                "backend-too-many-draft-refs-inspect-refs-gitcraft-drafts-in-the-terminal-814e26",
+            )
+            .into());
         }
     }
     drafts.sort_by(|a, b| {
@@ -867,7 +958,7 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
     let leaf = id
         .reference
         .strip_prefix(&namespace)
-        .ok_or("Invalid draft identity")?;
+        .ok_or(crate::i18n::text("backend-invalid-draft-identity-be5f3f"))?;
     let parts: Vec<_> = leaf.split('-').collect();
     if parts.len() != 3
         || parts
@@ -875,10 +966,10 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
             .any(|s| s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()))
         || !oid_valid(&id.tree)
     {
-        return Err("Invalid draft identity".into());
+        return Err(crate::i18n::text("backend-invalid-draft-identity-be5f3f").into());
     }
     if ctx.text(&["cat-file", "-t", &id.tree], vec![], active)? != "tree" {
-        return Err("Draft root is not a tree".into());
+        return Err(crate::i18n::text("backend-draft-root-is-not-a-tree-cf96bf").into());
     }
     let bytes = ctx.run(
         &["cat-file", "blob", &format!("{}:metadata.json", id.tree)],
@@ -887,10 +978,10 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
         active,
     )?;
     if bytes.len() > 1024 * 1024 {
-        return Err("Draft metadata is too large".into());
+        return Err(crate::i18n::text("backend-draft-metadata-is-too-large-a9a01f").into());
     }
-    let meta: Metadata =
-        serde_json::from_slice(&bytes).map_err(|_| "Incompatible draft metadata")?;
+    let meta: Metadata = serde_json::from_slice(&bytes)
+        .map_err(|_| crate::i18n::text("backend-incompatible-draft-metadata-ea032a"))?;
     if meta.version != 1
         || meta.worktree != ctx.id
         || !oid_valid(&meta.index_tree)
@@ -904,7 +995,10 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
             .as_ref()
             .is_some_and(|branch| branch.len() > 4096 || branch.chars().any(char::is_control))
     {
-        return Err("Unsupported draft metadata version or contents".into());
+        return Err(crate::i18n::text(
+            "backend-unsupported-draft-metadata-version-or-contents-7828f5",
+        )
+        .into());
     }
     for (name, oid) in [("index", &meta.index_tree), ("work", &meta.work_tree)] {
         if ctx.text(
@@ -918,13 +1012,16 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
             active,
         )? != *oid
         {
-            return Err("Draft metadata does not match its protected trees".into());
+            return Err(crate::i18n::text(
+                "backend-draft-metadata-does-not-match-its-protected-trees-a37158",
+            )
+            .into());
         }
     }
     let mut paths = BTreeSet::new();
     for file in &meta.files {
         if !paths.insert(&file.path) {
-            return Err("Duplicate draft file entry".into());
+            return Err(crate::i18n::text("backend-duplicate-draft-file-entry-414dd7").into());
         }
         valid_path(&file.path)?;
         for entry in [&file.index, &file.work].into_iter().flatten() {
@@ -934,7 +1031,7 @@ fn metadata(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<Metadat
                     "100644" | "100755" | "120000" | "160000"
                 )
             {
-                return Err("Invalid draft file entry".into());
+                return Err(crate::i18n::text("backend-invalid-draft-file-entry-ad48eb").into());
             }
         }
     }
@@ -949,11 +1046,14 @@ fn current(ctx: &Context, id: &Id, active: &dyn Fn() -> bool) -> Result<(), Stri
         active,
     )?;
     if std::str::from_utf8(&now)
-        .map_err(|_| "Invalid draft ref")?
+        .map_err(|_| crate::i18n::text("backend-invalid-draft-ref-f6f5f2"))?
         .trim()
         != id.tree
     {
-        return Err("This draft ref changed; reopen Earlier versions".into());
+        return Err(crate::i18n::text(
+            "backend-this-draft-ref-changed-reopen-earlier-versions-a2e9f9",
+        )
+        .into());
     }
     Ok(())
 }
