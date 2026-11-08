@@ -99,7 +99,10 @@ fn caught<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
             .map(|s| (*s).to_owned())
             .or_else(|| p.downcast_ref::<String>().cloned())
             .unwrap_or_default();
-        Err(format!("Internal error: {said}"))
+        Err(crate::i18n::message(
+            "repo-workflows-unity-caught-ff2cd16f",
+            &[("said", (said).clone().into())],
+        ))
     })
 }
 
@@ -285,7 +288,10 @@ impl RepoTab {
             return;
         }
         self.unity.busy = Some(doing.to_owned());
-        let failed = format!("{doing} failed");
+        let failed = crate::i18n::message(
+            "repo-workflows-unity-unity-job-bdc09466",
+            &[("doing", (doing).clone().into())],
+        );
         let path = self.path.clone();
         self.then_or(
             ctx,
@@ -317,9 +323,9 @@ impl RepoTab {
             return;
         }
         let block = git::attributes_block(&missing);
-        let done = format!(
-            "Added {} lines to .gitattributes: commit it to share them",
-            missing.len()
+        let done = crate::i18n::message(
+            "repo-workflows-unity-add-attributes-ec651afe",
+            &[("missing-len-1", (missing.len()).clone().into())],
         );
         self.unity_job(("Adding lines to .gitattributes", done), ctx, move |repo| {
             git::append_block(repo, ".gitattributes", &block)
@@ -331,9 +337,12 @@ impl RepoTab {
             return;
         };
         let block = git::ignore_block(project, &setup.unignored);
-        let done = format!(
-            "Ignored {}: commit .gitignore to share it",
-            setup.unignored.join(", ")
+        let done = crate::i18n::message(
+            "repo-workflows-unity-add-ignores-e8e18aea",
+            &[(
+                "setup-unignored-join-1",
+                (setup.unignored.join(", ")).clone().into(),
+            )],
         );
         self.unity_job(("Adding lines to .gitignore", done), ctx, move |repo| {
             git::append_block(repo, ".gitignore", &block)
@@ -346,9 +355,9 @@ impl RepoTab {
             return;
         };
         let folders = setup.tracked_generated.clone();
-        let done = format!(
-            "{} taken out of git (kept on disk): commit to share it",
-            folders.join(", ")
+        let done = crate::i18n::message(
+            "repo-workflows-unity-untrack-generated-fc9783a8",
+            &[("folders-join-1", (folders.join(", ")).clone().into())],
         );
         self.unity_job(
             ("Taking generated folders out of git", done),
@@ -361,9 +370,9 @@ impl RepoTab {
     /// keeps the choice in the repository's config.
     fn choose_tool(&mut self, ctx: &egui::Context) {
         let title = if cfg!(target_os = "macos") {
-            "UnityYAMLMerge (in Unity.app/Contents/Tools)"
+            crate::i18n::text("repo-workflows-unity-choose-tool-61dcc5f4")
         } else {
-            "UnityYAMLMerge (in the editor's Editor/Data/Tools folder)"
+            crate::i18n::text("repo-workflows-unity-choose-tool-05ee7795")
         };
         let Some(file) = rfd::FileDialog::new().set_title(title).pick_file() else {
             return;
@@ -374,7 +383,10 @@ impl RepoTab {
             return;
         }
         let value = file.to_string_lossy().into_owned();
-        let done = format!("Using UnityYAMLMerge at {value}");
+        let done = crate::i18n::message(
+            "repo-workflows-unity-choose-tool-1861f75d",
+            &[("value", (value).clone().into())],
+        );
         self.unity_job(("Saving the choice", done), ctx, move |repo| {
             git::run(
                 Some(repo),
@@ -392,7 +404,7 @@ impl RepoTab {
             ));
             return;
         };
-        let done = "Registered UnityYAMLMerge as this repository's merge driver".to_owned();
+        let done = crate::i18n::text("repo-workflows-unity-register-driver-57fdd53f").to_owned();
         self.unity_job(("Registering UnityYAMLMerge", done), ctx, move |repo| {
             smart_merge::register(repo, &tool)
         });
@@ -479,8 +491,11 @@ impl RepoTab {
             let mut add = vec!["--literal-pathspecs", "add", "--"];
             add.extend(stage);
             fixes.push((
-                "Stage the missing halves",
-                op("Stage the missing halves", &add),
+                crate::i18n::text("repo-workflows-unity-meta-fixes-3bb415b3"),
+                op(
+                    crate::i18n::text("repo-workflows-unity-meta-fixes-3bb415b3"),
+                    &add,
+                ),
             ));
         }
         let delete = of(&[MetaKind::DeletedWithoutMeta], true);
@@ -488,8 +503,11 @@ impl RepoTab {
             let mut rm = vec!["--literal-pathspecs", "rm", "-q", "--"];
             rm.extend(delete);
             fixes.push((
-                "Delete the .meta too",
-                op("Delete the .meta files too", &rm),
+                crate::i18n::text("repo-workflows-unity-meta-fixes-a2c5406b"),
+                op(
+                    crate::i18n::text("repo-workflows-unity-meta-fixes-ff8580ac"),
+                    &rm,
+                ),
             ));
         }
         let restore = of(&[MetaKind::MetaDeletedAssetKept], false);
@@ -503,7 +521,13 @@ impl RepoTab {
                 "--",
             ];
             back.extend(restore);
-            fixes.push(("Keep the .meta", op("Keep the .meta files", &back)));
+            fixes.push((
+                crate::i18n::text("repo-workflows-unity-meta-fixes-8f9d320c"),
+                op(
+                    crate::i18n::text("repo-workflows-unity-meta-fixes-e0871b1a"),
+                    &back,
+                ),
+            ));
         }
         fixes
     }

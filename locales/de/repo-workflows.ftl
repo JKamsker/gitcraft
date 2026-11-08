@@ -6262,6 +6262,280 @@ repo-workflows-timeline-undo-a8283ade = Rückgängig
 
 repo-workflows-timeline-undo-bf959af0 = { $entry-label-1 } rückgängig machen
 
+repo-workflows-tour-open-tour-a6cb5dc1 = Beenden oder schließen Sie zunächst den Editor
+
+repo-workflows-tour-tour-view-009719be = { $n } <{ $e }> ({ $c } Commits)
+
+repo-workflows-tour-tour-view-0715e061 = Im aufgezeichneten HEAD-Baum war keine README oder Beitragsdokumentation verfügbar.
+
+repo-workflows-tour-tour-view-095444dc = Identität für dieses Repository festlegen
+
+repo-workflows-tour-tour-view-0e4924f9 = Einrichtungscheckliste
+
+repo-workflows-tour-tour-view-152f32cc = Beobachtete Präfixe: { $report-branches-iter-filter-s-s--1 } release/*-Branches, { $report-tags-iter-filter-s-s-star-2 } v*-Tags
+
+repo-workflows-tour-tour-view-164d7e81 = Submodule
+
+repo-workflows-tour-tour-view-17cc361f = README und Beitragsregeln
+
+repo-workflows-tour-tour-view-17f176ca = { $report-branches-len-1 } Branches/Remotes; { $report-tags-len-2 } Tags (bis zu 2.000 Namen)
+
+repo-workflows-tour-tour-view-2189fda2 = Submodulinitialisierung prüfen…
+
+repo-workflows-tour-tour-view-2cf3aea7 = Rundgang schließen
+
+repo-workflows-tour-tour-view-3174faca = Rundgang durch dieses Repository
+
+repo-workflows-tour-tour-view-325dcc8e = Letzte Aktivität: { $report-since-1 } bis { $report-through-2 }
+
+repo-workflows-tour-tour-view-4015deeb = git-lfs für diesen Rechner herunterladen
+
+repo-workflows-tour-tour-view-49fa26c7 = Der Verlauf deutet auf Gewohnheiten hin, nicht auf Regeln. Schriftliche Beitragsregeln sind maßgeblich; Signaturen und Sign-offs unten wurden beobachtet, nicht geprüft.
+
+repo-workflows-tour-tour-view-55b8885f = Erreichbare Refs und HEAD werden einmal gezählt. Dokumente und Metadaten lösen niemals einen Lazy Fetch aus. Nach Änderungen am Repository oder an der Mailmap aktualisieren.
+
+repo-workflows-tour-tour-view-5b0a8af2 = Signed-off-by-Zeile kopieren
+
+repo-workflows-tour-tour-view-6a2e97ea = { $n } Commits · { $string-from-utf8-lossy-path-1 }
+
+repo-workflows-tour-tour-view-6df591db = Git LFS
+
+repo-workflows-tour-tour-view-6f54c5e0 = Lesen Sie vor der Installation von Husky, Lefthook oder pre-commit die obigen Beitragsdokumente. Dieser Rundgang führt niemals Projektskripte aus. Aktivieren Sie EditorConfig in Ihrem Editor. Wählen Sie für Signaturen unter Einstellungen → Git → Commit-Signatur einen lokalen Schlüssel. Ein Signatur-Header belegt weder Vertrauen noch Gültigkeit.
+
+repo-workflows-tour-tour-view-712320ba = Rundgang abbrechen
+
+repo-workflows-tour-tour-view-75d74f36 = { $w-inspected-1 } Commits untersucht: { $w-merges-2 } Merges, { $w-conventional-3 } Betreffzeilen nach Art von Conventional Commits, { $w-signature-headers-4 } Signatur-Header, { $w-signoffs-5 } Nachrichten mit Signed-off-by-Zeilen
+
+repo-workflows-tour-tour-view-78ab5e15 = Keine der aufgeführten Werkzeugmarkierungen
+
+repo-workflows-tour-tour-view-7ba62dbe = Die Stichprobe enthält Merge-Commits. Dies belegt keine Merge-Richtlinie.
+
+repo-workflows-tour-tour-view-7bfe85f2 = Submodule initialisieren
+
+repo-workflows-tour-tour-view-8e490f8b = Beobachteter Entwicklungsablauf
+
+repo-workflows-tour-tour-view-939f2714 = Erkannt: { $if-report-needs-is-empty-no-list-1 }
+
+repo-workflows-tour-tour-view-952aa9de = Lokale Git-LFS-Hooks installieren
+
+repo-workflows-tour-tour-view-969ccbd3 = E-Mail
+
+repo-workflows-tour-tour-view-96c17e04 = Autor dieses Repositorys festlegen (nur öffentliche Identität):
+
+repo-workflows-tour-tour-view-aaf81fb7 = Repository wird im Hintergrund gelesen…
+
+repo-workflows-tour-tour-view-af4145bc = Der Verlauf hat die Scangrenze von 64 MiB erreicht.
+
+repo-workflows-tour-tour-view-b71999b4 = Branches: { $report-branches-iter-take-30-clo-1 }
+
+repo-workflows-tour-tour-view-d00db6bc = Am häufigsten geänderte Dateien
+
+repo-workflows-tour-tour-view-d65a30c1 = Hook-, EditorConfig- und Signatur-Einrichtung prüfen
+
+repo-workflows-tour-tour-view-dcd1d522 = Name
+
+repo-workflows-tour-tour-view-ddb4a38f = Auszug auf 6.000 Zeichen begrenzt.
+
+repo-workflows-tour-tour-view-dfbf1d23 = Tags: { $report-tags-iter-take-30-cloned--1 }
+
+repo-workflows-tour-tour-view-e64cb6f2 = Die von diesem Repository benannten Submodule herunterladen und auschecken? Prüfen Sie vor dem Fortfahren .gitmodules.
+
+repo-workflows-tour-tour-view-e78ace8e = { $report-recent-commits-1 } Commits nach Committer-Datum stichprobenartig erfasst, mit UTC-Daten. Bei teilweisem oder flachem Verlauf können die Zahlen unvollständig sein. Mitwirkende sind häufig Beteiligte, keine Ordnerverantwortlichen.
+
+repo-workflows-tour-tour-view-f0a6629b = LFS-Hooks lokal installieren
+
+repo-workflows-tour-tour-view-f2c602f9 = Branch- und Tag-Namen
+
+repo-workflows-tour-tour-view-f462deb1 = Keine Merge-Commits in dieser Stichprobe. Daraus allein lässt sich nicht zwischen Squash-, Rebase- oder linearer Entwicklung unterscheiden.
+
+repo-workflows-tour-tour-view-f98bf467 = Rundgang aktualisieren
+
+repo-workflows-unity-add-attributes-0b9b6295 = Zeilen werden zu .gitattributes hinzugefügt
+
+repo-workflows-unity-add-attributes-ec651afe = { $missing-len-1 } Zeilen zu .gitattributes hinzugefügt: committen, um sie zu teilen
+
+repo-workflows-unity-add-ignores-52181c32 = Zeilen werden zu .gitignore hinzugefügt
+
+repo-workflows-unity-add-ignores-e8e18aea = { $setup-unignored-join-1 } ignoriert: .gitignore committen, um dies zu teilen
+
+repo-workflows-unity-caught-ff2cd16f = Interner Fehler: { $said }
+
+repo-workflows-unity-checks-07cd7cdf = git rm -r --cached: aus Git entfernt, auf dem Datenträger behalten. Committen, um dies zu teilen.
+
+repo-workflows-unity-checks-1ba49cd4 = Assets werden als Text gespeichert (Force Text): Git kann sie vergleichen und mergen.
+
+repo-workflows-unity-checks-1c43ea2f = Kein Smart Merge für { $yaml-len-1 } Unity-YAML-Typen ({ $some-of-yaml-2 }).
+
+repo-workflows-unity-checks-26c0a145 = Visible Meta Files
+
+repo-workflows-unity-checks-27b09b87 = Hängt Zeilen mit merge=unityyamlmerge eol=lf an .gitattributes an. Committen, um sie zu teilen.
+
+repo-workflows-unity-checks-36e9ce17 = .meta-Dateien sind verborgen: Machen Sie sie sichtbar, damit sie mit ihren Assets committet werden.
+
+repo-workflows-unity-checks-395e243e = Die Speicherart der Assets konnte nicht gelesen werden (ProjectSettings/EditorSettings.asset).
+
+repo-workflows-unity-checks-3cdb2b44 = Nicht ignoriert: { $setup-unignored-join-1 }.
+
+repo-workflows-unity-checks-45316f68 = Szenen, Prefabs und andere YAML-Dateien von Unity werden mit Smart Merge und LF-Zeilenenden gemergt.
+
+repo-workflows-unity-checks-50526421 = In Unity: Edit → Project Settings → Editor → Asset Serialization → Mode: Force Text
+
+repo-workflows-unity-checks-78c80640 = Projekt wird geprüft…
+
+repo-workflows-unity-checks-83893d2c = Von Unity generierte Ordner (Library, Temp, Logs usw.) werden ignoriert.
+
+repo-workflows-unity-checks-905615a3 = Die Sichtbarkeit von .meta-Dateien konnte nicht gelesen werden (ProjectSettings/VersionControlSettings.asset).
+
+repo-workflows-unity-checks-9d25cdb4 = Hängt filter=lfs-Zeilen an .gitattributes an. Bereits committete Dateien bleiben unverändert, bis `git lfs migrate import` sie verschiebt.
+
+repo-workflows-unity-checks-a5316b9c = Der Version-Control-Modus ist { $m }: Verwenden Sie für Git „Visible Meta Files“.
+
+repo-workflows-unity-checks-aa43c4de = Hinzufügen
+
+repo-workflows-unity-checks-aa9a77c3 = Versioniert, obwohl Unity sie generiert: { $setup-tracked-generated-join-1 }.
+
+repo-workflows-unity-checks-b10c6093 = .meta-Dateien sind sichtbar und können mit ihren Assets committet werden.
+
+repo-workflows-unity-checks-b18a0b47 = Nicht mehr versionieren
+
+repo-workflows-unity-checks-be32fbfa = Optional: Dieses Repository verwendet kein LFS (oder git-lfs ist nicht installiert).
+
+repo-workflows-unity-checks-bfe76618 = Übliche Unity-Binärdateien (Texturen, Modelle, Audio) werden in LFS gespeichert.
+
+repo-workflows-unity-checks-d41c81db = Projekt konnte nicht geprüft werden: { $e }
+
+repo-workflows-unity-checks-d4b3a742 = Assets werden nicht als Text gespeichert: Git kann Szenen und Prefabs nicht mergen.
+
+repo-workflows-unity-checks-d4bedd88 = Nicht in LFS: { $bins-len-1 } Binärtypen ({ $some-of-bins-2 }).
+
+repo-workflows-unity-checks-def8323f = Hängt sie an .gitignore an. Committen, um dies zu teilen.
+
+repo-workflows-unity-checks-f64c2525 = Ignorieren
+
+repo-workflows-unity-choose-tool-05ee7795 = UnityYAMLMerge (im Ordner Editor/Data/Tools des Editors)
+
+repo-workflows-unity-choose-tool-1861f75d = UnityYAMLMerge unter { $value } wird verwendet
+
+repo-workflows-unity-choose-tool-34706d9f = Auswahl wird gespeichert
+
+repo-workflows-unity-choose-tool-61dcc5f4 = UnityYAMLMerge (unter Unity.app/Contents/Tools)
+
+repo-workflows-unity-choose-tool-af82d6a2 = { $file-display-1 } ist nicht UnityYAMLMerge
+
+repo-workflows-unity-describe-0f6c58c7 = { $p-path-1 } ist ohne { $p-partner-2 } vorgemerkt: Andere erhalten dafür eine neue GUID und die Verweise gehen kaputt.
+
+repo-workflows-unity-describe-303d18ef = { $p-path-1 } wird gelöscht, aber { $p-partner-2 } bleibt erhalten: Unity warnt vor dem Überbleibsel.
+
+repo-workflows-unity-describe-bae58a49 = { $p-path-1 } wird gelöscht, aber { $p-partner-2 } bleibt erhalten: Unity erstellt eine neue Datei mit neuer GUID und die Verweise gehen kaputt.
+
+repo-workflows-unity-describe-c35a1fe3 = { $p-path-1 } ist ohne { $p-partner-2 } vorgemerkt: Ist dies ein leerer Ordner, speichert Git ihn nicht (Datei hinzufügen oder .meta weglassen); andernfalls löscht Unity die .meta-Datei.
+
+repo-workflows-unity-header-2fd224a8 = in { $p-root-1 }
+
+repo-workflows-unity-header-464ed4ae = im Stammverzeichnis
+
+repo-workflows-unity-header-77866eb1 = Unity einrichten
+
+repo-workflows-unity-header-961b2a04 = Schließen (Esc)
+
+repo-workflows-unity-header-fb7099ad = Erneut prüfen
+
+repo-workflows-unity-meta-fixes-3bb415b3 = Fehlende Gegenstücke vormerken
+
+repo-workflows-unity-meta-fixes-8f9d320c = Die .meta-Datei behalten
+
+repo-workflows-unity-meta-fixes-a2c5406b = Auch die .meta-Datei löschen
+
+repo-workflows-unity-meta-fixes-e0871b1a = Die .meta-Dateien behalten
+
+repo-workflows-unity-meta-fixes-ff8580ac = Auch die .meta-Dateien löschen
+
+repo-workflows-unity-register-b9569c8c = UnityYAMLMerge läuft auf diesem Computer. Ein Repository auf einem anderen Rechner benötigt eine eigene Einrichtung.
+
+repo-workflows-unity-register-driver-57fdd53f = UnityYAMLMerge als Merge-Treiber dieses Repositorys registriert
+
+repo-workflows-unity-register-driver-5d4e5077 = UnityYAMLMerge wird registriert
+
+repo-workflows-unity-register-driver-f6c55b48 = UnityYAMLMerge wurde nicht gefunden: zunächst auswählen
+
+repo-workflows-unity-run-for-1f1e4005 = UnityYAMLMerge konnte nicht ausgeführt werden: { $e }
+
+repo-workflows-unity-run-for-a1f34048 = UnityYAMLMerge: { $e }
+
+repo-workflows-unity-run-for-ca1ae15d = UnityYAMLMerge wurde nach { $limit-as-secs-1 } s ohne Abschluss gestoppt
+
+repo-workflows-unity-smart-merge-1ff6c570 = UnityYAMLMerge wurde in den Unity-Hub-Editoren nicht gefunden: Wählen Sie es aus, wenn Unity anderswo installiert ist.
+
+repo-workflows-unity-smart-merge-4822ac9a = Zunächst UnityYAMLMerge auswählen
+
+repo-workflows-unity-smart-merge-52f6735a = Dieses Repository befindet sich auf einem anderen Rechner: Registrieren Sie UnityYAMLMerge dort. „Mit UnityYAMLMerge lösen“ funktioniert weiterhin von hier aus.
+
+repo-workflows-unity-smart-merge-58740afb = Auf dem Rechner des Repositorys registrieren
+
+repo-workflows-unity-smart-merge-6b8c12f4 = UnityYAMLMerge mergt Szenen und Prefabs anhand ihrer Struktur. Nach der Registrierung führt Git es selbst für Dateien mit merge=unityyamlmerge in .gitattributes aus. In beiden Fällen bietet der Konflikteditor „Mit UnityYAMLMerge lösen“ an.
+
+repo-workflows-unity-smart-merge-7ca41615 = Auswählen…
+
+repo-workflows-unity-smart-merge-8fec67ee = Als Merge-Treiber für Unity-YAML-Dateien registriert.
+
+repo-workflows-unity-smart-merge-a472cbc6 = { " " }(derzeit: { $d })
+
+repo-workflows-unity-smart-merge-a4fecc79 = Nicht als Merge-Treiber dieses Repositorys registriert.
+
+repo-workflows-unity-smart-merge-bb7234ec = Registrieren
+
+repo-workflows-unity-smart-merge-c7b982e4 = Smart Merge
+
+repo-workflows-unity-smart-merge-cf3161f1 = UnityYAMLMerge aus dem Tools-Ordner eines Editors auswählen
+
+repo-workflows-unity-smart-merge-conflict-5a10252d = UnityYAMLMerge wurde nicht gefunden: unter „Unity einrichten…“ auswählen
+
+repo-workflows-unity-smart-merge-dfedc705 = Erneut registrieren
+
+repo-workflows-unity-smart-merge-done-7e870a3e = UnityYAMLMerge hat in { $path } { $n } Konflikte zur Auswahl hinterlassen
+
+repo-workflows-unity-smart-merge-done-afe126d0 = UnityYAMLMerge hat { $path } gemergt: Ergebnis prüfen, dann speichern
+
+repo-workflows-unity-smart-merge-f6ef6d29 = Setzt merge.unityyamlmerge und mergetool.unityyamlmerge in der Konfiguration dieses Repositorys{ $state-driver-as-deref-map-d-form-1 }
+
+repo-workflows-unity-solve-183ec676 = UnityYAMLMerge: { $line }
+
+repo-workflows-unity-solve-6ee66918 = Ihre Version von { $path } konnte nicht gelesen werden: { $e }
+
+repo-workflows-unity-solve-8c26b794 = { $path } konnte nicht kopiert werden: { $e }
+
+repo-workflows-unity-solve-ac1127b1 = UnityYAMLMerge konnte { $path } nicht mergen ({ $out-status-1 })
+
+repo-workflows-unity-solve-ac6f5e99 = Die andere Version von { $path } konnte nicht gelesen werden: { $e }
+
+repo-workflows-unity-solve-f176e899 = UnityYAMLMerge hat kein Ergebnis hinterlassen: { $e }
+
+repo-workflows-unity-unity-banners-2a61050c = Für dieses Repository (gitcraft.unityHint in seiner Konfiguration)
+
+repo-workflows-unity-unity-banners-3a5a7236 = Dieses Unity-Projekt ist noch nicht vollständig für Git eingerichtet: { $problem }.
+
+repo-workflows-unity-unity-banners-8d26b8f8 = Unity einrichten…
+
+repo-workflows-unity-unity-banners-b610e7b8 = Unity: { $many-len-1 } Assets und .meta-Dateien passen nicht zusammen ({ $many-0-path-2 } und weitere; zum Anzeigen aller darüber fahren).
+
+repo-workflows-unity-unity-banners-d16d035f = Nicht erneut anzeigen
+
+repo-workflows-unity-unity-banners-e1614a83 = und { $more } weitere
+
+repo-workflows-unity-unity-job-bdc09466 = { $doing } fehlgeschlagen
+
+repo-workflows-unity-unity-job-bfc4a245 = { $failed }: { $e }
+
+repo-workflows-unity-unity-panel-a07caecd = Hier ist kein Unity-Projekt mehr vorhanden.
+
+repo-workflows-unity-untrack-generated-b0c9a9c5 = Generierte Ordner werden aus Git entfernt
+
+repo-workflows-unity-untrack-generated-fc9783a8 = { $folders-join-1 } aus Git entfernt (auf dem Datenträger behalten): committen, um dies zu teilen
+
+repo-workflows-unity-vcs-place-49a234f8 = In Unity: Edit → Project Settings → Editor → Version Control → Mode: Visible Meta Files
+
+repo-workflows-unity-vcs-place-bc141862 = In Unity: Edit → Project Settings → Version Control → Mode: Visible Meta Files
+
 repo-workflows-working_drafts-history-7d9eb7ac = Schließen
 
 repo-workflows-working_drafts-recovery-19766ed6 = Abbrechen
@@ -6648,4 +6922,15 @@ repo-workflows-timeline-signatures-dropped = { $count ->
         [one] eine Signatur entfernt
        *[other] { $count } Signaturen entfernt
     }
+
+repo-workflows-tour-scan-summary = { $count ->
+        [one] Ein eindeutiger Commit untersucht
+       *[other] { $count } eindeutige Commits untersucht
+    }{ $partial ->
+        [yes] { " (teilweiser Verlauf)" }
+       *[no] { " (erreichbarer Verlauf)" }
+    }{ $shallow ->
+        [yes] { " · flacher Klon" }
+       *[no] { "" }
+    } · Dokumente unter { $head }
 
