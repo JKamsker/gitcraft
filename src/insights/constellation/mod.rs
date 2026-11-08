@@ -321,10 +321,11 @@ impl Model {
 }
 
 /// The flags of branch `b`: unpublished, merged (`merged` holds the branches the default
-/// branch `target` contains), and how the builds of its tip went.
+/// branch `target` contains; one at its very tip has no commits of its own to have been
+/// merged), and how the builds of its tip went.
 pub fn branch_flags(
     b: &BranchIn,
-    target: Option<&str>,
+    target: Option<&Target>,
     merged: Option<&HashSet<String>>,
     builds: Option<&HashMap<String, CheckState>>,
 ) -> Vec<(Flag, Evidence)> {
@@ -332,7 +333,8 @@ pub fn branch_flags(
     if b.upstream.is_empty() || b.gone || b.ahead > 0 {
         flags.push((Flag::Unpublished, Evidence::Observed));
     }
-    if target != Some(b.name.as_str()) && merged.is_some_and(|m| m.contains(&b.name)) {
+    let own_commits = target.is_none_or(|t| t.name != b.name && t.tip != b.tip);
+    if own_commits && merged.is_some_and(|m| m.contains(&b.name)) {
         flags.push((Flag::Merged, Evidence::Observed));
     }
     if let Some(flag) = builds
@@ -422,6 +424,8 @@ pub fn build(s: &Snapshot, forge: &Forge, now: i64) -> Model {
         }
         if Some(b.name.as_str()) == target {
             detail.push("the default branch".to_owned());
+        } else if s.target.as_ref().is_some_and(|t| t.tip == b.tip) {
+            detail.push("no commits of its own: at the default branch's tip".to_owned());
         } else if s.merged.is_none() {
             detail.push("merged: not known (no default branch found)".to_owned());
         }
@@ -432,7 +436,7 @@ pub fn build(s: &Snapshot, forge: &Forge, now: i64) -> Model {
             kind: Kind::Branch,
             key: b.name.clone(),
             label: b.name.clone(),
-            flags: branch_flags(b, target, s.merged.as_ref(), builds),
+            flags: branch_flags(b, s.target.as_ref(), s.merged.as_ref(), builds),
             detail,
             commit: Some(b.tip.clone()),
         });

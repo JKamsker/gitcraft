@@ -385,8 +385,8 @@ fn explain(ui: &mut Ui, built: &Built) {
     ui.add(
         egui::Label::new(faint(format!(
             "Size: lines at the sample (factual) · Churn: lines changed in the window of commits \
-             up to it (factual) · Complexity: branch points, {} — Rust and C-like files only, \
-             others not measured · Tests: the test lane's verdict on the sample's tree, when \
+             up to it (factual) · Complexity: branch points, {} — Rust, C-like, Go and \
+             JavaScript/TypeScript files only, others not measured · Tests: the test lane's verdict on the sample's tree, when \
              one was recorded",
             analyzer::LABEL
         )))

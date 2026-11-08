@@ -280,9 +280,10 @@ fn a_real_worktree_changes_state_after_a_commit() -> Result<(), String> {
         (Kind::Worktree, &wt_key),
         Link::CheckedOut
     ));
-    // At the default branch's tip, both are merged; no upstream: unpublished.
+    // At the default branch's tip, with no commits of their own: not called merged; no
+    // upstream: unpublished.
     assert_eq!(first.target.as_ref().map(|t| t.name.as_str()), Some("main"));
-    assert!(flags(&m, Kind::Branch, "feat").contains(&Flag::Merged));
+    assert!(!flags(&m, Kind::Branch, "feat").contains(&Flag::Merged));
     assert!(flags(&m, Kind::Branch, "old").contains(&Flag::Unpublished));
     assert!(first.provenance.partial.is_none());
 
@@ -310,6 +311,12 @@ fn a_real_worktree_changes_state_after_a_commit() -> Result<(), String> {
     assert!(!disk.partial);
     let cut = read::disk_usage(&wt, 1)?;
     assert!(cut.partial);
+    // A worktree kept inside another is counted on its own, not in the other's figure too.
+    let nested = wt.join("nested");
+    std::fs::create_dir_all(nested.join("deep")).map_err(|e| e.to_string())?;
+    std::fs::write(nested.join(".git"), "gitdir: elsewhere\n").map_err(|e| e.to_string())?;
+    std::fs::write(nested.join("deep/big.txt"), "x").map_err(|e| e.to_string())?;
+    assert_eq!(read::disk_usage(&wt, read::DISK_ENTRIES)?.files, 2);
     assert!(read::disk_usage(&repo.path().join("nope"), 10).is_err());
     Ok(())
 }

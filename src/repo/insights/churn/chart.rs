@@ -85,7 +85,7 @@ fn size_text(p: &Point) -> String {
 
 fn complexity_text(p: &Point) -> String {
     match p.complexity {
-        None => "not measured (no Rust or C-like file read)".to_owned(),
+        None => "not measured (no file of a language the heuristic reads was read)".to_owned(),
         Some(n) => {
             let bound = if p.complete { "" } else { "at least " };
             let of = if p.measured < p.files {

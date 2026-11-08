@@ -174,7 +174,16 @@ fn list(
     let mut out = Vec::new();
     let named: Vec<&str> = paths.iter().copied().filter(|p| !p.is_empty()).collect();
     if !named.is_empty() {
-        let mut args = vec!["ls-tree", "-r", "-z", "--full-tree", rev, "--"];
+        // The paths are names, not patterns (a file named `:!x`).
+        let mut args = vec![
+            "--literal-pathspecs",
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-tree",
+            rev,
+            "--",
+        ];
         args.extend(named);
         out.extend(parse_tree(&git::run(Some(repo), &args)?));
     }

@@ -294,7 +294,9 @@ pub struct Disk {
 pub const DISK_ENTRIES: usize = 200_000;
 
 /// What the folder at `dir` takes, its `.git` aside, looking at no more than `budget` entries.
-/// Symbolic links are counted as themselves, not followed.
+/// Symbolic links are counted as themselves, not followed; a folder with a `.git` of its own
+/// inside it (another worktree kept there, a submodule, a nested repository) is counted on its
+/// own, not again here.
 pub fn disk_usage(dir: &Path, budget: usize) -> Result<Disk, String> {
     let mut disk = Disk::default();
     let mut seen = 0usize;
@@ -323,7 +325,9 @@ pub fn disk_usage(dir: &Path, budget: usize) -> Result<Disk, String> {
                 continue;
             };
             if meta.is_dir() {
-                stack.push(entry.path());
+                if entry.path().join(".git").symlink_metadata().is_err() {
+                    stack.push(entry.path());
+                }
             } else {
                 disk.files += 1;
                 disk.bytes += meta.len();
