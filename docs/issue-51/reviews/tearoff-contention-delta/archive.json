@@ -1,0 +1,108 @@
+{
+  "report_sha256": "ec06f886ff9618f9c83e88785758881bcd7957e0757705d383dd973c89343393",
+  "manifest_sha256": "96b4d9af9921e81c84762c002efd52b15dcb77037b66cf743b859f38644805eb",
+  "artifacts": [
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/close_root.rs",
+      "sha256": "3ff913c13b7aeecb781d6e3bd4d99a96eae6fed9176ebe931b57996ed0ecf341",
+      "bytes": 168,
+      "archive": "evidence-000-close_root.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/defer_close.rs",
+      "sha256": "b48e51d4c4e30e2acf252a30e0d4bb8b8e66bffcc085b495bb2ab63852e3661b",
+      "bytes": 278,
+      "archive": "evidence-001-defer_close.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/extractions.json",
+      "sha256": "627e409b58918d7e296a7f4205c7a7f946b638a27386b54f95c51070d80d6acc",
+      "bytes": 2877,
+      "archive": "evidence-002-extractions.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/logic_tick.rs",
+      "sha256": "b4e6ab1f88109edd00b837ec8e4c7cf0166d0a120483a973876a677b965c48c7",
+      "bytes": 681,
+      "archive": "evidence-003-logic_tick.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/logic_wrapper.rs",
+      "sha256": "445438a467876fe86d805ad346327d52c9d7c1d44883f21d59da3242849d2acd",
+      "bytes": 123,
+      "archive": "evidence-004-logic_wrapper.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe",
+      "sha256": "3848565e6c1b895e7e1965f1c180f429ba6fda86524d2e84770acdced0a50126",
+      "bytes": 6228680,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe.log",
+      "sha256": "063a6772fcbabb47583e3952264aad0ec92167bf11fd631d6a611104a52eba3b",
+      "bytes": 306,
+      "archive": "evidence-006-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe.rs",
+      "sha256": "b48dc3498b22b5a93505ed9e2eac86d30011f7a50289dc976ca164316de2c549",
+      "bytes": 5810,
+      "archive": "evidence-007-probe.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/root_close_request.rs",
+      "sha256": "13e8c831c493fd252de17a1344dc243c02ce331ff2466eab215f5438c6113699",
+      "bytes": 603,
+      "archive": "evidence-008-root_close_request.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/ui_tick.rs",
+      "sha256": "437d8a2385d6582ea7bf28cb34c75c2aa59df752f05c20171cbdb5019d534788",
+      "bytes": 718,
+      "archive": "evidence-009-ui_tick.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-contention-evidence/ui_wrapper.rs",
+      "sha256": "795e99a1f0d54c23f3d2e459568903decf9db3a0bda2efe831fb7e879cbfbf9a",
+      "bytes": 108,
+      "archive": "evidence-010-ui_wrapper.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-contention-delta-review.md",
+      "sha256": "ec06f886ff9618f9c83e88785758881bcd7957e0757705d383dd973c89343393",
+      "bytes": 4342,
+      "archive": "evidence-011-gitcraft-51-tearoff-contention-delta-review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r2-manifest.json",
+      "sha256": "8b7e9448cd1a9806202596024216446289e11e784f4f2dd1659501edd6e2c241",
+      "bytes": 11151,
+      "archive": "evidence-012-gitcraft-51-tearoff-review-r2-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r2.md",
+      "sha256": "9fde67108f6c05f9d118db96146f5fcc353c22255ec3078ea6a7cdfef87fbf6a",
+      "bytes": 12621,
+      "archive": "evidence-013-gitcraft-51-tearoff-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-both-contention-validation.json",
+      "sha256": "e25e0ded9080f7cdf0dca0dcaaa36c8b891e34e039b6a6e806327ffaebf09c20",
+      "bytes": 1308,
+      "archive": "evidence-014-gitcraft-interaction-both-contention-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-e12121f9-close-0.log",
+      "sha256": "651dc8aa7b143fe2c90a28ec9b0068041f69feec2cfda0880febeac6e649570c",
+      "bytes": 1314,
+      "archive": "evidence-015-gitcraft-interaction-e12121f9-close-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-e12121f9-close-1.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "bytes": 72,
+      "archive": "evidence-016-gitcraft-interaction-e12121f9-close-1.log.gz"
+    }
+  ]
+}

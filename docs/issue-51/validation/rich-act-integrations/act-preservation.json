@@ -1,0 +1,31 @@
+{
+  "owner": "12e7641c917d92482788f5f8a3449ffca425f83f",
+  "files": [
+    {
+      "path": "src/repo/local_ci/run.rs",
+      "sha256": "a8d0152180e7e734fdec46f1fed12d1c094c357a80996c3d9aa8678a9671c006",
+      "matches_reviewed": true
+    },
+    {
+      "path": "src/repo/local_ci/mod.rs",
+      "sha256": "df0fe088d1ebab8380185fe2875db98edc7ca94a286a3e1e0323d55937f95b22",
+      "matches_reviewed": true
+    },
+    {
+      "path": "src/repo/local_ci/tests.rs",
+      "sha256": "dc289092aa68e355845c9b6d3b41f67d4a035d8d2c218cc084cd6110927a1dbc",
+      "matches_reviewed": true
+    },
+    {
+      "path": "src/repo/local_ci/model.rs",
+      "sha256": "3fb4a13d8a45a14fbee663da66b191efa9d4e487752f4354ca3900f1bf5a6be0",
+      "matches_reviewed": true
+    },
+    {
+      "path": "src/repo/local_ci/context.rs",
+      "sha256": "688f68c72f8ba1b8150718255bf2019dd5d3dc1005151eb8bb38b4099b6aaf76",
+      "matches_reviewed": true
+    }
+  ],
+  "process_port": "exact previously scoped-reviewed stdout callback addition; no supervisor acceptance inferred"
+}
