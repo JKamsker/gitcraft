@@ -478,7 +478,7 @@ pub(crate) fn shortcut_groups(
 ) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
     let from_keymap = |rows: &[keymap::Row]| {
         rows.iter()
-            .map(|r| (keymap::row_keys(ctx, r), r.what))
+            .map(|r| (keymap::row_keys(ctx, r), crate::i18n::text(r.what)))
             .collect::<Vec<_>>()
     };
     let mut groups = vec![

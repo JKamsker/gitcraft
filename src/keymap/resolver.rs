@@ -288,7 +288,9 @@ pub(crate) fn which_key(ctx: &Context, refused: impl Fn(Command) -> Option<Strin
             .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -28.0])
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label("Chord pending · Escape cancels");
+                    ui.label(crate::i18n::text(
+                        "interaction-control-chord-pending-escape-cancels",
+                    ));
                     for c in config::commands().filter(|&c| r.eligible(c)) {
                         let seq = config::effective(&r.config, c);
                         if seq.len() > r.prefix.len() && seq[..r.prefix.len()] == r.prefix {

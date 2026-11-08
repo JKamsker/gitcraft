@@ -122,7 +122,7 @@ impl Resident {
 pub(crate) fn menu(recent: &[std::path::PathBuf], text: &str) -> Vec<Entry> {
     let mut rows = vec![
         Entry {
-            title: "Show gitcraft".into(),
+            title: crate::i18n::text("interaction-control-show-gitcraft").into(),
             action: Some(Action::Show),
         },
         Entry {
@@ -139,7 +139,7 @@ pub(crate) fn menu(recent: &[std::path::PathBuf], text: &str) -> Vec<Entry> {
             }),
     );
     rows.push(Entry {
-        title: "Quit gitcraft".into(),
+        title: crate::i18n::text("interaction-control-quit-gitcraft").into(),
         action: Some(Action::Quit),
     });
     rows
@@ -149,8 +149,8 @@ pub(crate) fn menu(recent: &[std::path::PathBuf], text: &str) -> Vec<Entry> {
 fn notify_fallback() {
     if let Ok(pool) = crate::tasks::pool() {
         let _ = pool.submit(Default::default(), crate::tasks::Priority::Background, None, Box::new(|| {
-            let _ = notify_rust::Notification::new().appname("gitcraft").summary("gitcraft is still running")
-                .body("This desktop has no available tray host. Open gitcraft from the launcher to show its window; use Quit gitcraft in its tab menu, or gitcraft --quit, to exit.").show();
+            let _ = notify_rust::Notification::new().appname("gitcraft").summary(crate::i18n::text("interaction-control-gitcraft-is-still-running"))
+                .body(crate::i18n::text("interaction-control-this-desktop-has-no-available-tray-host-open-gitcraft-from-the-launcher-to-")).show();
         }));
     }
 }

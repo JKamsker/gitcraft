@@ -46,7 +46,7 @@ impl Stroke {
     pub(crate) fn label(&self) -> String {
         Key::from_name(&self.key)
             .map(|k| super::combo(self.modifiers(), k))
-            .unwrap_or_else(|| "Invalid key".into())
+            .unwrap_or_else(|| crate::i18n::text("interaction-control-invalid-key").into())
     }
 
     fn equivalent(&self, other: &Self) -> bool {
@@ -87,17 +87,28 @@ fn overlaps(a: Command, b: Command) -> bool {
 pub(crate) fn validate(overrides: &Overrides) -> Result<(), String> {
     for (id, sequence) in overrides {
         if !commands().any(|c| c.id() == id) {
-            return Err(format!("Unknown action: {id}"));
+            return Err(crate::i18n::message(
+                "interaction-key-unknown-action",
+                &[("id", id.as_str().into())],
+            ));
         }
         if sequence.len() > 4 {
-            return Err("Use at most four keys in a chord".into());
+            return Err(
+                crate::i18n::text("interaction-control-use-at-most-four-keys-in-a-chord").into(),
+            );
         }
         for s in sequence {
             if Key::from_name(&s.key).is_none() {
-                return Err(format!("Unknown key: {}", s.key));
+                return Err(crate::i18n::message(
+                    "interaction-key-unknown-key",
+                    &[("key", s.key.as_str().into())],
+                ));
             }
             if s.key == "Escape" {
-                return Err("Escape is reserved to cancel a chord or editor".into());
+                return Err(crate::i18n::text(
+                    "interaction-control-escape-is-reserved-to-cancel-a-chord-or-editor",
+                )
+                .into());
             }
         }
     }
@@ -111,10 +122,9 @@ pub(crate) fn validate(overrides: &Overrides) -> Result<(), String> {
                 continue;
             }
             if x.iter().zip(y).all(|(x, y)| x.equivalent(y)) {
-                return Err(format!(
-                    "{} conflicts with {} (same keys or chord prefix)",
-                    a.title(),
-                    b.title()
+                return Err(crate::i18n::message(
+                    "interaction-key-conflict",
+                    &[("first", a.title().into()), ("second", b.title().into())],
                 ));
             }
         }

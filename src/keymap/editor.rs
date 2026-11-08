@@ -18,11 +18,11 @@ pub(crate) fn capturing(ctx: &egui::Context) -> bool {
 }
 
 pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
-    ui.label("Select Change, press up to four keys in the capture control, then Tab to Save. Empty bindings disable an action. Escape cancels. Use Add Tab key or Add Shift+Tab key to include navigation keys in a shortcut.");
+    ui.label(crate::i18n::text("interaction-control-select-change-press-up-to-four-keys-in-the-capture-control-then-tab-to-save"));
     if let Err(error) = config::validate(overrides) {
         ui.colored_label(
             crate::theme::Tokens::get(ui.ctx()).danger,
-            format!("Saved bindings are invalid; defaults are active: {error}"),
+            crate::i18n::message("interaction-key-invalid-saved", &[("detail", error.into())]),
         );
     }
     let edit_id = Id::new(("key-binding-editor", ui.ctx().viewport_id()));
@@ -75,13 +75,17 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
                 .map(Stroke::label)
                 .collect::<Vec<_>>()
                 .join(" → ");
-            let capture = ui.button(format!(
-                "Capture shortcut: {}",
-                if sequence.is_empty() {
-                    "No keys"
-                } else {
-                    &sequence
-                }
+            let capture = ui.button(crate::i18n::message(
+                "interaction-key-capture",
+                &[(
+                    "keys",
+                    if sequence.is_empty() {
+                        crate::i18n::text("interaction-control-no-keys")
+                    } else {
+                        &sequence
+                    }
+                    .into(),
+                )],
             ));
             edit.capture_id = Some(capture.id);
             if edit.focus_capture || capture.clicked() {
@@ -93,23 +97,38 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
             }
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(validation.is_ok(), egui::Button::new("Save binding"))
+                    .add_enabled(
+                        validation.is_ok(),
+                        egui::Button::new(crate::i18n::text("interaction-control-save-binding")),
+                    )
                     .clicked()
                 {
                     *overrides = candidate;
                     cancelled = true;
                 }
-                if ui.button("Clear captured keys").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-control-clear-captured-keys"))
+                    .clicked()
+                {
                     edit.sequence.clear();
                 }
-                if ui.button("Cancel").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-control-cancel"))
+                    .clicked()
+                {
                     cancelled = true;
                 }
             });
             ui.horizontal(|ui| {
                 for (label, modifiers) in [
-                    ("Add Tab key", egui::Modifiers::NONE),
-                    ("Add Shift+Tab key", egui::Modifiers::SHIFT),
+                    (
+                        crate::i18n::text("interaction-control-add-tab-key"),
+                        egui::Modifiers::NONE,
+                    ),
+                    (
+                        crate::i18n::text("interaction-control-add-shift-tab-key"),
+                        egui::Modifiers::SHIFT,
+                    ),
                 ] {
                     if ui
                         .add_enabled(edit.sequence.len() < 4, egui::Button::new(label))
@@ -127,7 +146,10 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
             editing = None;
         }
     }
-    if ui.button("Reset all shortcuts").clicked() {
+    if ui
+        .button(crate::i18n::text("interaction-control-reset-all-shortcuts"))
+        .clicked()
+    {
         overrides.clear();
         editing = None;
     }
@@ -143,8 +165,15 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
                         .map(Stroke::label)
                         .collect::<Vec<_>>()
                         .join(" → ");
-                    ui.monospace(if keys.is_empty() { "Unbound" } else { &keys });
-                    if ui.button("Change").clicked() {
+                    ui.monospace(if keys.is_empty() {
+                        crate::i18n::text("interaction-control-unbound")
+                    } else {
+                        &keys
+                    });
+                    if ui
+                        .button(crate::i18n::text("interaction-control-change"))
+                        .clicked()
+                    {
                         editing = Some(Editing {
                             command,
                             sequence: Vec::new(),
@@ -153,10 +182,16 @@ pub(crate) fn page(overrides: &mut Overrides, ui: &mut Ui) {
                             last_seen: ui.ctx().cumulative_pass_nr(),
                         });
                     }
-                    if ui.button("Unbind").clicked() {
+                    if ui
+                        .button(crate::i18n::text("interaction-control-unbind"))
+                        .clicked()
+                    {
                         overrides.insert(command.id().into(), Vec::new());
                     }
-                    if ui.button("Reset").clicked() {
+                    if ui
+                        .button(crate::i18n::text("interaction-control-reset"))
+                        .clicked()
+                    {
                         overrides.remove(command.id());
                     }
                     ui.end_row();
@@ -397,5 +432,42 @@ mod tests {
                 .drop_without_applying_deltas();
         }
         assert!(!capturing(&h.ctx));
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn german_editor_saves_real_binding_with_stable_action_ids_and_numbered_tab_keys()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let before = crate::keymap::label(&ctx, Command::GoToTab(1));
+        crate::i18n::set_language("de");
+        assert_eq!(Command::GoToTab(1).id(), "tab_1");
+        assert_eq!(crate::keymap::label(&ctx, Command::GoToTab(1)), before);
+        assert_eq!(Command::NewTab.title(), "Neuer Tab");
+        let mut h =
+            Harness::new_ui_state(|ui, overrides| page(overrides, ui), Overrides::default());
+        h.get_all_by_label("Ändern")
+            .next()
+            .ok_or("missing Change control")?
+            .click();
+        h.run();
+        h.key_press(Key::F8);
+        h.run();
+        h.get_by_label("Tastenkürzel aufnehmen: F8");
+        h.get_by_label("Belegung speichern").click();
+        h.run();
+        assert_eq!(
+            h.state().get("new_tab"),
+            Some(&vec![Stroke::new(Key::F8, egui::Modifiers::NONE)])
+        );
+        let json = serde_json::to_string(h.state()).map_err(|e| e.to_string())?;
+        assert!(json.contains("new_tab"));
+        assert!(!json.contains("Neuer Tab"));
+        Ok(())
     }
 }

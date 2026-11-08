@@ -46,18 +46,22 @@ pub fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String {
 
 /// `n` things: "1 file", "3 files".
 pub fn count(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
+    format!(
+        "{} {}",
+        crate::i18n::number(n),
+        if n == 1 { one } else { many }
+    )
 }
 
 /// A commit of the graph: its short hash, summary, author, how long ago, and the branches and
 /// tags on it (each already said as "branch dev", "tag v1").
 pub fn commit(short: &str, summary: &str, author: &str, when: &str, refs: &[String]) -> String {
     let summary = if summary.trim().is_empty() {
-        "no message"
+        crate::i18n::text("interaction-a11y-no-message")
     } else {
         summary
     };
-    let head = format!("commit {}", short.trim());
+    let head = crate::i18n::message("interaction-a11y-commit", &[("hash", short.trim().into())]);
     join(
         [head.as_str(), summary, author, when]
             .into_iter()
@@ -68,12 +72,24 @@ pub fn commit(short: &str, summary: &str, author: &str, when: &str, refs: &[Stri
 /// The changes row on top of the graph, with what it holds.
 pub fn changes(conflicted: usize, staged: usize, unstaged: usize) -> String {
     let parts = [
-        (conflicted, count(conflicted, "conflict", "conflicts")),
-        (staged, format!("{staged} staged")),
-        (unstaged, format!("{unstaged} unstaged")),
+        (
+            conflicted,
+            crate::i18n::message(
+                "interaction-a11y-conflicts",
+                &[("count", conflicted.into())],
+            ),
+        ),
+        (
+            staged,
+            crate::i18n::message("interaction-a11y-staged", &[("count", staged.into())]),
+        ),
+        (
+            unstaged,
+            crate::i18n::message("interaction-a11y-unstaged", &[("count", unstaged.into())]),
+        ),
     ];
     join(
-        std::iter::once("Uncommitted changes".to_owned())
+        std::iter::once(crate::i18n::text("interaction-a11y-uncommitted-changes").to_owned())
             .chain(parts.into_iter().filter(|(n, _)| *n > 0).map(|(_, s)| s)),
     )
 }
@@ -81,21 +97,22 @@ pub fn changes(conflicted: usize, staged: usize, unstaged: usize) -> String {
 /// What git's status letter means.
 pub fn file_status(code: char) -> &'static str {
     match code {
-        'A' => "added",
-        '?' => "untracked",
-        'M' => "modified",
-        'D' => "deleted",
-        'R' => "renamed",
-        'C' => "copied",
-        'T' => "type changed",
-        'U' => "conflicted",
+        'A' => crate::i18n::text("interaction-a11y-added"),
+        '?' => crate::i18n::text("interaction-a11y-untracked"),
+        'M' => crate::i18n::text("interaction-a11y-modified"),
+        'D' => crate::i18n::text("interaction-a11y-deleted"),
+        'R' => crate::i18n::text("interaction-a11y-renamed"),
+        'C' => crate::i18n::text("interaction-a11y-copied"),
+        'T' => crate::i18n::text("interaction-a11y-type-changed"),
+        'U' => crate::i18n::text("interaction-a11y-conflicted"),
         _ => "",
     }
 }
 
 /// A file of a list of changes: its path, what happened to it, and where it came from.
 pub fn file(path: &str, code: char, old_path: Option<&str>) -> String {
-    let from = old_path.map(|old| format!("from {old}"));
+    let from =
+        old_path.map(|old| crate::i18n::message("interaction-a11y-from", &[("path", old.into())]));
     join([path, file_status(code), from.as_deref().unwrap_or("")])
 }
 
@@ -111,11 +128,17 @@ pub fn ref_name(full: &str) -> &str {
 /// A branch of the sidebar: its name, whether it is checked out, how far it is from its
 /// upstream.
 pub fn branch(name: &str, current: bool, ahead: usize, behind: usize) -> String {
-    let ahead = (ahead > 0).then(|| format!("{ahead} ahead"));
-    let behind = (behind > 0).then(|| format!("{behind} behind"));
+    let ahead = (ahead > 0)
+        .then(|| crate::i18n::message("interaction-a11y-ahead", &[("count", ahead.into())]));
+    let behind = (behind > 0)
+        .then(|| crate::i18n::message("interaction-a11y-behind", &[("count", behind.into())]));
     join([
-        format!("branch {name}").as_str(),
-        if current { "checked out" } else { "" },
+        crate::i18n::message("interaction-a11y-branch", &[("name", name.into())]).as_str(),
+        if current {
+            crate::i18n::text("interaction-a11y-checked-out")
+        } else {
+            ""
+        },
         ahead.as_deref().unwrap_or(""),
         behind.as_deref().unwrap_or(""),
     ])
@@ -129,7 +152,15 @@ pub fn with_notes(base: &str, notes: &[(bool, &str)]) -> String {
 
 /// A header that folds what is under it: its name, how much it holds, open or closed.
 pub fn section(name: &str, count: &str, open: bool) -> String {
-    join([name, count, if open { "open" } else { "closed" }])
+    join([
+        name,
+        count,
+        if open {
+            crate::i18n::text("interaction-a11y-open")
+        } else {
+            crate::i18n::text("interaction-a11y-closed")
+        },
+    ])
 }
 
 /// A worktree: where it is, its branch (or a detached HEAD), its uncommitted changes, and the
@@ -142,10 +173,10 @@ pub fn worktree(
 ) -> String {
     let changes = changes
         .filter(|n| *n > 0)
-        .map(|n| count(n, "change", "changes"));
+        .map(|n| crate::i18n::message("interaction-a11y-changes", &[("count", n.into())]));
     let base = join([
-        format!("worktree {path}").as_str(),
-        branch.unwrap_or("detached HEAD"),
+        crate::i18n::message("interaction-a11y-worktree", &[("path", path.into())]).as_str(),
+        branch.unwrap_or(crate::i18n::text("interaction-a11y-detached-head")),
         changes.as_deref().unwrap_or(""),
     ]);
     with_notes(&base, notes)
@@ -153,17 +184,26 @@ pub fn worktree(
 
 /// A pull request of the sidebar.
 pub fn pull_request(number: u64, title: &str, author: &str, branch: &str, draft: bool) -> String {
-    let number = format!("pull request {number}");
+    let number = crate::i18n::message(
+        "interaction-a11y-pull-request",
+        &[("number", number.to_string().into())],
+    );
     with_notes(
         &join([number.as_str(), title, author, branch]),
-        &[(draft, "draft")],
+        &[(draft, crate::i18n::text("interaction-a11y-draft"))],
     )
 }
 
 /// A submodule: its path, its commit (or `git describe` of it), whether it has changes.
 pub fn submodule(path: &str, commit: &str, modified: bool) -> String {
-    let base = join([format!("submodule {path}").as_str(), commit]);
-    with_notes(&base, &[(modified, "modified")])
+    let base = join([
+        crate::i18n::message("interaction-a11y-submodule", &[("path", path.into())]).as_str(),
+        commit,
+    ]);
+    with_notes(
+        &base,
+        &[(modified, crate::i18n::text("interaction-a11y-modified"))],
+    )
 }
 
 /// A stash: `stash@{2}` is said "stash 2", then its message.
@@ -171,7 +211,7 @@ pub fn stash(name: &str, message: &str) -> String {
     let number = name
         .strip_prefix("stash@{")
         .and_then(|rest| rest.strip_suffix('}'))
-        .map(|n| format!("stash {n}"));
+        .map(|n| crate::i18n::message("interaction-a11y-stash", &[("number", n.into())]));
     join([number.as_deref().unwrap_or(name), message])
 }
 
@@ -206,4 +246,53 @@ pub fn without_keys(text: &str) -> &str {
 pub(crate) fn hidden_control(c: char) -> bool {
     c.is_control()
         || matches!(c, '\u{061c}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}'..='\u{2069}' | '\u{feff}')
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn german_semantic_names_localize_counts_and_states_and_preserve_repository_identifiers() {
+        crate::i18n::set_language("de");
+        assert_eq!(
+            changes(2, 1234, 0),
+            "Nicht committete Änderungen, 2 Konflikte, 1.234 gestagt"
+        );
+        assert_eq!(
+            branch("topic/$(literal)", true, 2, 0),
+            "Branch topic/$(literal), ausgecheckt, 2 voraus"
+        );
+        assert_eq!(
+            file("src/日本語.rs", 'R', Some("old/ä.rs")),
+            "src/日本語.rs, umbenannt, von old/ä.rs"
+        );
+        assert_eq!(
+            ref_name("refs/remotes/origin/topic/$(literal)"),
+            "origin/topic/$(literal)"
+        );
+        assert_eq!(
+            commit("a301da9", "", "Jöns", "", &[]),
+            "Commit a301da9, keine Nachricht, Jöns"
+        );
+        assert_eq!(
+            stash("stash@{12}", "user supplied message"),
+            "Stash 12, user supplied message"
+        );
+        let rows = crate::tray::menu(&["/repo with spaces/$(literal)".into()], "recorded status");
+        assert_eq!(rows[0].title, "gitcraft anzeigen");
+        assert_eq!(rows[0].action, Some(crate::tray::Action::Show));
+        assert!(
+            rows.iter()
+                .any(|r| r.action == Some(crate::tray::Action::Launch(vec!["--clone".into()])))
+        );
+        assert!(rows.iter().any(|r| r.action
+            == Some(crate::tray::Action::Launch(vec![
+                "/repo with spaces/$(literal)".into()
+            ]))));
+        assert_eq!(
+            rows.last().map(|r| r.title.as_str()),
+            Some("gitcraft beenden")
+        );
+    }
 }
