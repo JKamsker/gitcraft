@@ -8,14 +8,21 @@
 //! reflog or config of the repository changes, nor does anything of its hooks run. Every git
 //! call goes through [`super::run`], so a repository in WSL or over SSH is simulated there.
 
+mod failure;
 mod picks;
 mod reach;
 mod scratch;
 mod version;
 
+pub(crate) use failure::Failure;
+pub(crate) use picks::replay_with_witness;
 pub use picks::{Replay, Replayed, Stop, rebase_picks, replay};
 pub(crate) use reach::unreachable_bounded;
 pub use reach::{Merge, is_ancestor, leaving, merge, unreachable};
+pub(crate) use reach::{
+    leaving_with_witness, merge_with_witness, unreachable_bounded_with_witness,
+    unreachable_with_witness,
+};
 pub use version::GitVersion;
 
 /// What a simulation ran on.
@@ -86,34 +93,28 @@ pub fn partial_clone(repo: &std::path::Path) -> bool {
 }
 
 /// Refuses to work in a partial clone (see [`partial_clone`]).
-fn not_partial(repo: &std::path::Path) -> Result<(), String> {
+fn not_partial(repo: &std::path::Path) -> Result<(), Failure> {
     if partial_clone(repo) {
-        Err(crate::i18n::text(
-            "backend-this-is-a-partial-clone-working-it-out-would-download-files-from-7e1a13",
-        )
-        .to_owned())
+        Err(Failure::PartialClone)
     } else {
         Ok(())
     }
 }
 
 /// The full object name `rev` resolves to, as a commit.
-fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, String> {
-    super::resolve(repo, rev)
+fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, Failure> {
+    super::resolve(repo, rev).map_err(Failure::Opaque)
 }
 
 /// The tree of the commit `oid`.
-fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, String> {
+fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, Failure> {
     super::run(
         Some(repo),
         &["rev-parse", "--verify", "-q", &format!("{oid}^{{tree}}")],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| {
-        crate::i18n::message(
-            "backend-oid-has-no-tree-0ea71d",
-            &[("oid", (oid).to_string().into())],
-        )
+    .map_err(|_| Failure::NoTree {
+        oid: oid.to_owned(),
     })
 }
 

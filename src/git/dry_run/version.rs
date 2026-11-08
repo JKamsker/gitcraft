@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use super::Failure;
+
 /// A git version: major, minor, patch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GitVersion(pub u32, pub u32, pub u32);
@@ -25,14 +27,16 @@ impl GitVersion {
         Some(Self(major, minor, patch))
     }
 
-    /// The git that runs for `repo` (on its machine, for one in WSL or over SSH).
+    /// Compatibility String interface; cached previews use [`Self::of_with_witness`].
     pub fn of(repo: &Path) -> Result<Self, String> {
+        Self::of_with_witness(repo).map_err(|failure| failure.display())
+    }
+
+    /// The git that runs for `repo` (on its machine, for one in WSL or over SSH).
+    pub(crate) fn of_with_witness(repo: &Path) -> Result<Self, Failure> {
         let printed = super::super::run(Some(repo), &["version"])?;
-        Self::parse(&printed).ok_or_else(|| {
-            crate::i18n::message(
-                "backend-unknown-git-version-757618",
-                &[("printed", (printed.trim()).to_string().into())],
-            )
+        Self::parse(&printed).ok_or_else(|| Failure::UnknownVersion {
+            printed: printed.trim().to_owned(),
         })
     }
 
