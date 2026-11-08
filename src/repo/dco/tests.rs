@@ -350,14 +350,16 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
         let mut tab = RepoTab::new_deferred("/nonexistent/dco-completion-recording".into(), &ctx);
         tab.tx.cancel.cancel(); // no queued reader, command or process can execute
         tab.dco.running = Some(plan.clone());
+        let stale_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         if result.is_err() {
+            let recorded = stale_calls.clone();
             tab.dco.review_after = Some(super::ReviewAfter {
                 label: label.into(),
                 heads: (plan.head.clone(), "d".repeat(40)),
                 timeline_kept: true,
                 rewrite_kept: false,
-                then: Box::new(|_, _| {
-                    panic!("stale continuation resumed after failed local rewrite")
+                then: Box::new(move |_, _| {
+                    recorded.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }),
             });
         }
@@ -376,6 +378,7 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
             },
         };
         tab.dco_op_done(label, &result, &ctx);
+        assert_eq!(stale_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert!(tab.dco.running.is_none());
         assert!(tab.dialog.is_none() && tab.busy_op.is_none() && tab.running.is_none());
         assert!(tab.preflight_pending.is_none() && tab.last_op.is_none());
@@ -454,9 +457,21 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
                 match field {
                     "label" => other.label = "Sign off the commits of another".into(),
                     "before" => {
-                        other.undo.as_mut().unwrap().heads.as_mut().unwrap().0 = "e".repeat(40)
+                        other
+                            .undo
+                            .as_mut()
+                            .and_then(|undo| undo.heads.as_mut())
+                            .ok_or("Local entry lost its undo heads")?
+                            .0 = "e".repeat(40)
                     }
-                    _ => other.undo.as_mut().unwrap().heads.as_mut().unwrap().1 = "e".repeat(40),
+                    _ => {
+                        other
+                            .undo
+                            .as_mut()
+                            .and_then(|undo| undo.heads.as_mut())
+                            .ok_or("Local entry lost its undo heads")?
+                            .1 = "e".repeat(40)
+                    }
                 }
                 unrelated_ids.push(tab.timeline.push(other));
             }

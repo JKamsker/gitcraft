@@ -381,6 +381,7 @@ impl Plan {
     /// The steps that put the commits as they were back, on the remote first and then here:
     /// only while the branch (and the remote's, as last seen) are still at the signed-off
     /// commits.
+    #[cfg(test)]
     pub(crate) fn undo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local();
         let mut steps = vec![expect_symref("HEAD", &local), expect_ref(&local)];
@@ -399,6 +400,7 @@ impl Plan {
     }
 
     /// The steps that sign them off again after an undo.
+    #[cfg(test)]
     pub(crate) fn redo_steps(&self) -> Vec<Vec<String>> {
         let local = self.local();
         let mut steps = vec![
@@ -445,6 +447,7 @@ impl Plan {
 /// A push of `what` (a commit or a ref) to `push`'s branch that replaces what is there only if
 /// it is still what was last fetched of it (the remote-tracking branch, which the undo checks
 /// first).
+#[cfg(test)]
 fn back_push(push: &PushTarget, what: &str) -> Vec<String> {
     let lease = match &push.tracking {
         Some(_) => format!("--force-with-lease={}", push.remote_ref),

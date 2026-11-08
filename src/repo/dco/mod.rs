@@ -41,7 +41,7 @@ struct ReviewAfter {
     heads: (String, String),
     timeline_kept: bool,
     rewrite_kept: bool,
-    then: Box<dyn FnOnce(&mut RepoTab, &Context) + Send>,
+    then: super::messages::Continuation,
 }
 
 /// The commits of a pull request, with whether each is signed off.
