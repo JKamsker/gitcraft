@@ -1083,6 +1083,8 @@ pub fn single_instance(
 /// menu or a file manager starts gitcraft without one).
 pub fn tell(message: &str, error: bool) {
     use std::io::IsTerminal;
+    let display = panels::display_app_message(message);
+    let message = display.as_str();
     let terminal = !cfg!(all(windows, not(debug_assertions))) && std::io::stderr().is_terminal();
     match (terminal, error) {
         (true, true) => eprintln!("gitcraft: {message}"),
@@ -1100,6 +1102,8 @@ pub fn tell(message: &str, error: bool) {
 }
 
 pub fn report_failed_start(message: &str) {
+    let display = panels::display_app_message(message);
+    let message = display.as_str();
     eprintln!("gitcraft: {message}");
     // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
     // menu would end with nothing shown: a desktop notification says it instead.

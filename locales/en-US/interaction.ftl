@@ -1719,3 +1719,42 @@ interaction-browser-limit = Only the first { $max } folders are listed.
 interaction-browser-missing = There is no folder { $dir } on { $host }.
 interaction-browser-list-failed = Could not list { $dir } on { $host }: { $detail }
 interaction-browser-list-invalid = Could not list { $dir } on { $host }.
+interaction-launch-unknown-option = unknown option { $flag }
+interaction-launch-with-usage = { $reason }
+
+    { $usage }
+interaction-launch-scheme-0 = Not a gitcraft link gitcraft can open (too long)
+interaction-launch-scheme-1 = Not a gitcraft link gitcraft can open (no gitcraft://)
+interaction-launch-scheme-2 = Not a gitcraft link gitcraft can open (no ?url=)
+interaction-launch-scheme-3 = Not a gitcraft link gitcraft can open (it only opens: gitcraft://open?url=…)
+interaction-launch-scheme-4 = Not a gitcraft link gitcraft can open (url is given twice)
+interaction-launch-scheme-5 = Not a gitcraft link gitcraft can open (only url= is taken)
+interaction-launch-scheme-6 = Not a gitcraft link gitcraft can open (no url=)
+interaction-launch-web-0 = { $url } is not a link gitcraft can open: it is too long
+interaction-launch-web-1 = { $url } is not a link gitcraft can open: it has spaces or control characters
+interaction-launch-web-2 = { $url } is not a link gitcraft can open: only https:// (or http://) links are opened
+interaction-launch-web-3 = { $url } is not a link gitcraft can open: its host isn't a host name
+interaction-launch-web-4 = { $url } is not a link gitcraft can open: its path isn't a forge's
+interaction-launch-web-5 = { $url } is not a link gitcraft can open: it doesn't point at a repository, pull request, commit or file
+interaction-launch-line = { $value } is not a line number (the first line is 1)
+interaction-launch-compare = Name the two commits as a..b (or a...b), not { $value }
+interaction-launch-rev-option = { $value } is not a commit: it starts with -
+interaction-launch-rev-name = { $value } is not a commit name
+interaction-launch-file = { $path } is not a file
+interaction-launch-folder = No such folder: { $path }
+interaction-launch-editor = { $name }: finish or close the conflict or rebase editor first, then run the command again
+interaction-launch-directory = { $path } is a folder: give a file (or open the folder with gitcraft { $path })
+interaction-launch-missing-linked-file = { $path } isn't in { $root }: fetch, then open the link again
+interaction-launch-missing-linked-commit = Commit { $hash } isn't in { $root }: fetch, then open the link again
+interaction-launch-commits-text = The commits to compare are not valid text
+interaction-launch-commit-text = The commit is not valid text
+interaction-launch-no-commit = No commit given
+interaction-launch-too-many = too many arguments
+interaction-launch-log-count = log takes a file
+interaction-launch-blame-count = blame takes a file, and :<line> if you like
+interaction-launch-show-count = show takes a commit
+interaction-launch-compare-count = compare takes two commits, as a..b
+interaction-launch-dialog = This command opens a dialog in the window
+interaction-launch-percent = a broken %-escape
+interaction-launch-not-text = it isn't valid text
+interaction-launch-linked-pr = { $root } has { $repo } only as another remote than origin, whose pull requests it shows: open #{ $number } on the forge, or clone { $repo } itself

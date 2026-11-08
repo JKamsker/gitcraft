@@ -275,5 +275,6 @@ pub(super) fn display_app_message(raw: &str) -> String {
         .or_else(|| super::remote_open::display_message(raw))
         .or_else(|| super::repo_scan::display_error(raw))
         .or_else(|| super::draft_saving::display_notice(raw))
+        .or_else(|| crate::launch::display_message(raw))
         .unwrap_or_else(|| crate::git::display_error(raw))
 }

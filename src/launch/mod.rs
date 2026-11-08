@@ -2,6 +2,8 @@
 //! it ([`args`]) and making sense of it on disk ([`resolve`]).
 
 pub mod args;
+mod display;
+pub use display::message as display_message;
 pub mod link;
 pub mod open_link;
 pub mod resolve;

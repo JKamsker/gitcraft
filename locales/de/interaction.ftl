@@ -1713,3 +1713,42 @@ interaction-browser-limit = Nur die ersten { $max } Ordner werden aufgelistet.
 interaction-browser-missing = Auf { $host } gibt es keinen Ordner { $dir }.
 interaction-browser-list-failed = Der Ordner { $dir } auf { $host } konnte nicht aufgelistet werden: { $detail }
 interaction-browser-list-invalid = Der Ordner { $dir } auf { $host } konnte nicht aufgelistet werden.
+interaction-launch-unknown-option = unbekannte Option { $flag }
+interaction-launch-with-usage = { $reason }
+
+    { $usage }
+interaction-launch-scheme-0 = Kein Link, den gitcraft öffnen kann (zu lang)
+interaction-launch-scheme-1 = Kein Link, den gitcraft öffnen kann (gitcraft:// fehlt)
+interaction-launch-scheme-2 = Kein Link, den gitcraft öffnen kann (?url= fehlt)
+interaction-launch-scheme-3 = Kein Link, den gitcraft öffnen kann (unterstützt wird nur gitcraft://open?url=…)
+interaction-launch-scheme-4 = Kein Link, den gitcraft öffnen kann (url ist zweimal angegeben)
+interaction-launch-scheme-5 = Kein Link, den gitcraft öffnen kann (nur url= wird akzeptiert)
+interaction-launch-scheme-6 = Kein Link, den gitcraft öffnen kann (url= fehlt)
+interaction-launch-web-0 = gitcraft kann den Link { $url } nicht öffnen: der Link ist zu lang
+interaction-launch-web-1 = gitcraft kann den Link { $url } nicht öffnen: der Link enthält Leerzeichen oder Steuerzeichen
+interaction-launch-web-2 = gitcraft kann den Link { $url } nicht öffnen: nur https://- oder http://-Links werden geöffnet
+interaction-launch-web-3 = gitcraft kann den Link { $url } nicht öffnen: der Host ist kein gültiger Hostname
+interaction-launch-web-4 = gitcraft kann den Link { $url } nicht öffnen: der Pfad gehört nicht zu einer Forge
+interaction-launch-web-5 = gitcraft kann den Link { $url } nicht öffnen: der Link verweist nicht auf ein Repository, einen Pull Request, einen Commit oder eine Datei
+interaction-launch-line = { $value } ist keine Zeilennummer (die erste Zeile ist 1)
+interaction-launch-compare = Gib die beiden Commits als a..b (oder a...b) an, statt { $value }
+interaction-launch-rev-option = { $value } ist kein Commit: Die Angabe beginnt mit -
+interaction-launch-rev-name = { $value } ist kein Commit-Name
+interaction-launch-file = { $path } ist keine Datei
+interaction-launch-folder = Ordner nicht gefunden: { $path }
+interaction-launch-editor = { $name }: Beende oder schließe zuerst den Konflikt- oder Rebase-Editor und führe dann den Befehl erneut aus
+interaction-launch-directory = { $path } ist ein Ordner: Gib eine Datei an (oder öffne den Ordner mit gitcraft { $path })
+interaction-launch-missing-linked-file = { $path } ist nicht in { $root }: Führe Fetch aus und öffne den Link erneut
+interaction-launch-missing-linked-commit = Commit { $hash } ist nicht in { $root }: Führe Fetch aus und öffne den Link erneut
+interaction-launch-commits-text = Die zu vergleichenden Commits sind kein gültiger Text
+interaction-launch-commit-text = Der Commit ist kein gültiger Text
+interaction-launch-no-commit = Kein Commit angegeben
+interaction-launch-too-many = zu viele Argumente
+interaction-launch-log-count = log erwartet eine Datei
+interaction-launch-blame-count = blame erwartet eine Datei und optional :<line>
+interaction-launch-show-count = show erwartet einen Commit
+interaction-launch-compare-count = compare erwartet zwei Commits als a..b
+interaction-launch-dialog = Dieser Befehl öffnet einen Dialog im Fenster
+interaction-launch-percent = eine ungültige %-Kodierung
+interaction-launch-not-text = kein gültiger Text
+interaction-launch-linked-pr = { $root } hat { $repo } nur als zusätzliches Remote; die Pull Requests werden für origin angezeigt: Öffne #{ $number } auf der Forge oder klone { $repo } selbst

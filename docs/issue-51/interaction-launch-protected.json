@@ -1,0 +1,17 @@
+{
+  "base": "fffac6538fb00b1a529c93fbc987bb42c5db6379",
+  "protected_files": {
+    "src/main.rs": "d56bbd95cb7dc64fc61278c2f073b530aec631b0695f1b2f00dc6b8991daff61",
+    "src/app/launch.rs": "77bf3ae9c0d4988c4ec4eb8575c8e6462c0b200f2765154509fb63ec489f9549",
+    "src/launch/args.rs": "f5df4c20ea7a317a487aee785fe9967dccd2f80842c97fcbffdcf68d5bba7b2b",
+    "src/launch/args_tests.rs": "8368af10b92b9b253b01a30f0e82b10c7d1f5f1db89e50bcf7b1199f6522f851",
+    "src/launch/link.rs": "36b87bd91b284dac4d30835b77adfe4ff21c555caa9d2ed88dd9cd03866716bb",
+    "src/launch/link_tests.rs": "73c93fa92f1a0b6d31b3b1731afed50204ac181ce41a35bdd632447cf54beab8",
+    "src/launch/resolve.rs": "51dfbc1f7b846654f14b317d65b6de61ff11f113935ee4beb360118625f88951",
+    "src/launch/resolve_tests.rs": "5ecc33405abb9541b285bf404d0c91404599966a6ca30c101b9eece033d2aa1c",
+    "src/launch/open_link.rs": "f6f3e086c308a8cddd3ba1f38c1dbf5747e3e9173d7d5a1faa108c3ad06da6cd"
+  },
+  "scope": "Launch parser/resolver/protocol producers and actual main ordering unchanged; only display module/export/shared human paint wiring",
+  "launch_actions_without_two_display_export_lines_sha256": "b8da24deb4fb646c2ffa20e9848fd6f4aa3c173c89dce6c65e6411c7de8ba4c1",
+  "app_without_two_human_paint_calls_sha256": "f849018d5ea44a5de16612a202ce9136be1ee4b25067402b0cb05b6952e71908"
+}
