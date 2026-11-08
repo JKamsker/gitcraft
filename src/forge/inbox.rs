@@ -138,6 +138,21 @@ pub fn is_no_login(err: &str) -> bool {
     err.starts_with("no ") && err.contains(" login known for ")
 }
 
+/// Resolve application-owned protocol errors only when presenting them. The original
+/// error remains available to retry/login control flow through `gives_up`/`is_no_login`.
+pub fn display_error(error: &str) -> String {
+    if let Some(rest) = error.strip_prefix("no ")
+        && let Some((forge, rest)) = rest.split_once(" login known for ")
+        && let Some((host, _)) = rest.split_once(": add one with `tea login add`")
+    {
+        return crate::i18n::message(
+            "backend-inbox-no-login",
+            &[("forge", forge.into()), ("host", host.into())],
+        );
+    }
+    error.to_owned()
+}
+
 /// The checks of GitHub's `statusCheckRollup`: check runs (`status`, `conclusion`) and commit
 /// statuses (`state`).
 pub(super) fn github_checks(rollup: Option<&Value>) -> Checks {
