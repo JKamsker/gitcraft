@@ -158,6 +158,10 @@ impl Form {
             });
         }
         if self.pending {
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "Keep the existing pending-indicator repaint behavior in this lint-only unit; migrating to the throttled crate spinner requires a separate behavior change"
+            )]
             ui.spinner();
             ui.label("Reading copies; closing this dialog cancels its jobs.");
         }

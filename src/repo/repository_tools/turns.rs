@@ -338,7 +338,8 @@ mod tests {
 mod aggregate_tests {
     use super::*;
     #[test]
-    fn pure_aggregate_review_panel_names_its_endpoint_and_keeps_boundary_approval_explicit() {
+    fn pure_aggregate_review_panel_names_its_endpoint_and_keeps_boundary_approval_explicit()
+    -> Result<(), String> {
         let mut state = State {
             id: 1,
             query: String::new(),
@@ -383,7 +384,7 @@ mod aggregate_tests {
         assert!(texts.contains("saved turns only"));
         assert!(texts.contains("current unsaved files are excluded"));
         assert!(!texts.contains("Preview reverting only this turn"));
-        let position = position.expect("explicit saved-endpoint approval action");
+        let position = position.ok_or("explicit saved-endpoint approval action")?;
         let mut output = ctx.run_ui(
             egui::RawInput {
                 events: vec![
@@ -407,5 +408,6 @@ mod aggregate_tests {
         );
         output.textures_delta.clear();
         assert!(acts.iter().any(|act|matches!(act,Action::RepositoryTools(Act::FinishAggregate(review)) if review.turn=="c".repeat(40))));
+        Ok(())
     }
 }

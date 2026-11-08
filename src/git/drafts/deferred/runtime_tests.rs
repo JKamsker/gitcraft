@@ -166,7 +166,10 @@ fn deferred_owned_stack_uses_parent_candidate_and_refuses_stale_source_tip() -> 
     let v = read(f.path(), &active)?;
     let j = &v.jobs.jobs[0];
     assert_eq!(j.cursor, 2);
-    assert_eq!(j.steps[1].onto, j.steps[0].result.clone().unwrap());
+    assert_eq!(
+        j.steps[1].onto,
+        j.steps[0].result.clone().ok_or("expected Some")?
+    );
     assert_eq!(f.git(&["rev-parse", "parent"])?, parent);
     assert_eq!(f.git(&["rev-parse", "child"])?, child);
     f.git(&["update-ref", "refs/heads/parent", &onto, &parent])?;

@@ -58,12 +58,13 @@ fn subtree_pure_registry_rejects_overlap_traversal_and_foreign_candidates() {
     assert!(validate(&r, Path::new("/repo/.git")).is_err());
 }
 #[test]
-fn subtree_pure_helper_recording_distinguishes_history_and_split() {
+fn subtree_pure_helper_recording_distinguishes_history_and_split() -> Result<(), String> {
     let mut s = source();
     let old = "b".repeat(40);
     let upstream = "a".repeat(40);
     assert_eq!(
-        subtree_words(&s, Kind::Update, &old, Some(&upstream), false).unwrap(),
+        subtree_words(&s, Kind::Update, &old, Some(&upstream), false)
+            .map_err(|error| error.to_string())?,
         vec![
             "subtree",
             "add",
@@ -73,21 +74,24 @@ fn subtree_pure_helper_recording_distinguishes_history_and_split() {
         ]
     );
     assert_eq!(
-        subtree_words(&s, Kind::Update, &old, Some(&upstream), true).unwrap()[1],
+        subtree_words(&s, Kind::Update, &old, Some(&upstream), true)
+            .map_err(|error| error.to_string())?[1],
         "merge"
     );
     s.history = History::Full;
-    let full = subtree_words(&s, Kind::Update, &old, Some(&upstream), true).unwrap();
+    let full = subtree_words(&s, Kind::Update, &old, Some(&upstream), true)
+        .map_err(|error| error.to_string())?;
     assert!(!full.iter().any(|w| w == "--squash"));
     assert_eq!(full.last(), Some(&upstream));
     assert_eq!(
-        subtree_words(&s, Kind::Split, &old, None, true).unwrap(),
+        subtree_words(&s, Kind::Split, &old, None, true).map_err(|error| error.to_string())?,
         vec!["subtree", "split", "--prefix=vendor/a folder", old.as_str()]
     );
     assert!(subtree_words(&s, Kind::Update, &old, None, true).is_err());
+    Ok(())
 }
 #[test]
-fn subtree_pure_recorded_fetch_and_push_pin_exact_objects() {
+fn subtree_pure_recorded_fetch_and_push_pin_exact_objects() -> Result<(), String> {
     let s = source();
     let pin = "refs/gitcraft/subtrees/fetch/attempt-1";
     let words = fetch_words(&s, pin);
@@ -105,7 +109,7 @@ fn subtree_pure_recorded_fetch_and_push_pin_exact_objects() {
     let mut c = candidate();
     c.kind = Kind::Split;
     c.stage = Stage::SplitReady;
-    let ops = push_words(&s, &c).unwrap();
+    let ops = push_words(&s, &c).map_err(|error| error.to_string())?;
     assert_eq!(ops.len(), 1);
     assert_eq!(
         ops[0].last(),
@@ -116,6 +120,7 @@ fn subtree_pure_recorded_fetch_and_push_pin_exact_objects() {
             .iter()
             .any(|w| w == "HEAD" || w.starts_with("--force") || w == "--set-upstream")
     );
+    Ok(())
 }
 #[test]
 fn subtree_pure_acceptance_requires_exact_clean_original_receipt() {
@@ -141,7 +146,7 @@ fn subtree_pure_acceptance_requires_exact_clean_original_receipt() {
     assert!(accept_allowed(&c, &c.branch, &c.old, true).is_err());
 }
 #[test]
-fn subtree_pure_ambiguous_sends_require_renewed_human_review() {
+fn subtree_pure_ambiguous_sends_require_renewed_human_review() -> Result<(), String> {
     let mut c = candidate();
     c.kind = Kind::Split;
     for stage in [Stage::Sending, Stage::Paused] {
@@ -161,12 +166,13 @@ fn subtree_pure_ambiguous_sends_require_renewed_human_review() {
         sources: vec![source()],
         candidates: vec![c],
     };
-    let saved = serde_json::to_vec(&r).unwrap();
-    let restored: Registry = serde_json::from_slice(&saved).unwrap();
+    let saved = serde_json::to_vec(&r).map_err(|error| error.to_string())?;
+    let restored: Registry = serde_json::from_slice(&saved).map_err(|error| error.to_string())?;
     assert_eq!(restored.candidates[0].stage, Stage::Sending);
     assert!(!publishable(&restored.candidates[0], false));
     assert_eq!(restored.candidates[0].old, "b".repeat(40));
     assert_eq!(restored.candidates[0].identity.as_deref(), Some("12:34"));
+    Ok(())
 }
 #[test]
 fn subtree_pure_state_bound_is_enforced_before_candidate_adoption() {
@@ -209,12 +215,13 @@ impl View {
     }
 }
 #[test]
-fn subtree_pure_association_records_reviewed_baseline_without_changing_tree() {
+fn subtree_pure_association_records_reviewed_baseline_without_changing_tree() -> Result<(), String>
+{
     let mut s = source();
     let mut c = candidate();
     c.kind = Kind::Associate;
-    let base = c.upstream.as_deref().unwrap();
-    let squash = baseline_words(&s, base).unwrap();
+    let base = c.upstream.as_deref().ok_or("expected Some")?;
+    let squash = baseline_words(&s, base).ok_or("expected Some")?;
     assert_eq!(squash[0], "commit-tree");
     assert_eq!(squash[1], format!("{base}^{{tree}}"));
     assert!(!squash.iter().any(|w| w == "-p"));
@@ -235,4 +242,5 @@ fn subtree_pure_association_records_reviewed_baseline_without_changing_tree() {
     for name in ["a:b", "refs/../victim", "a.lock", "a\nb", "a b"] {
         assert!(!branch_name(name));
     }
+    Ok(())
 }

@@ -6,7 +6,7 @@ mod picker;
 mod view;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 static COMPARISONS: AtomicU64 = AtomicU64::new(1);
 fn next_request() -> u64 {
@@ -567,11 +567,11 @@ impl Bakeoff {
         &mut self,
         request: u64,
         n: usize,
-        status: &PathBuf,
+        status: &Path,
         launched: Result<std::sync::Arc<std::sync::atomic::AtomicBool>, String>,
     ) {
         if self.request != request
-            || self.statuses.get(n) != Some(&Some(status.clone()))
+            || self.statuses.get(n) != Some(&Some(status.to_path_buf()))
             || self.builds.get(n) != Some(&Some(Built::Preparing))
         {
             return;
@@ -605,7 +605,8 @@ impl Bakeoff {
 mod generation_tests {
     use super::*;
     #[test]
-    fn pure_bakeoff_recorded_launch_failure_is_retryable_and_stale_launch_receipts_are_rejected() {
+    fn pure_bakeoff_recorded_launch_failure_is_retryable_and_stale_launch_receipts_are_rejected()
+    -> Result<(), String> {
         let mut view = Bakeoff::new(
             vec![Attempt {
                 name: "a".into(),
@@ -633,12 +634,19 @@ mod generation_tests {
             Err("recorded PTY spawn failure".into()),
         );
         assert_eq!(view.builds[0], Some(Built::Unavailable));
-        assert!(view.note.as_ref().unwrap().0.contains("spawn failure"));
+        assert!(
+            view.note
+                .as_ref()
+                .ok_or("expected Some")?
+                .0
+                .contains("spawn failure")
+        );
         // Retry owns a different status path; no receipt from the old run wins.
         view.statuses[0] = Some(PathBuf::from("fresh-owned-receipt"));
         view.builds[0] = Some(Built::Preparing);
         view.accept_builds(view.request, vec![(0, status, Built::Passed)]);
         assert_eq!(view.builds[0], Some(Built::Preparing));
+        Ok(())
     }
     #[test]
     fn pure_bakeoff_closed_or_reloaded_comparisons_reject_old_build_statuses() {

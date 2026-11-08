@@ -472,8 +472,10 @@ impl<'a> Rows<'a> {
                 .filter(|l| l.kind == Kind::Del)
                 .filter_map(|l| l.old)
                 .collect::<Vec<_>>();
-            let alternate = if !new.is_empty() && !old.is_empty() {
-                Some((*old.first().unwrap(), *old.last().unwrap()))
+            let alternate = if !new.is_empty() {
+                old.first()
+                    .zip(old.last())
+                    .map(|(&first, &last)| (first, last))
             } else {
                 None
             };

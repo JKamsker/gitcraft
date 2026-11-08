@@ -222,24 +222,6 @@ fn request_with_authority(
     ))
 }
 
-/// A streaming request file is private and written before exec. Payload/environment/input
-/// stay out of argv. fd 0 remains a separate controller lease, never user stdin.
-pub(super) fn streaming(
-    req: &Request,
-    nonce: &str,
-    record: Option<&str>,
-) -> Result<String, String> {
-    streaming_with_authority(req, nonce, record, None, false)
-}
-pub(super) fn streaming_with_authority(
-    req: &Request,
-    nonce: &str,
-    record: Option<&str>,
-    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
-    cleanup: bool,
-) -> Result<String, String> {
-    streaming_bounded(req, nonce, record, workspace, cleanup, 64 << 20)
-}
 pub(super) fn streaming_bounded(
     req: &Request,
     nonce: &str,

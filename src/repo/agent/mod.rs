@@ -230,6 +230,10 @@ impl RepoTab {
                 .iter()
                 .filter(|s| s.first().is_some_and(|v| v.starts_with('\0')))
                 .collect();
+            #[expect(
+                clippy::expect_used,
+                reason = "Serializing references to vectors of UTF-8 strings into a Vec cannot fail; preserve the exact approval digest bytes"
+            )]
             let bytes = serde_json::to_vec(&guards).expect("string vectors serialize");
             let digest = Sha256::digest(bytes)
                 .iter()

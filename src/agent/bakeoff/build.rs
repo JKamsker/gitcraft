@@ -166,7 +166,10 @@ mod workspace_tests {
         assert_ne!(a, b);
         assert_eq!(crate::git::run(Some(&a), &["show", "HEAD:file"])?, "base\n");
         assert!(!a.join("later").exists());
-        assert_eq!(std::fs::read(r.path().join(".git/index")).unwrap(), index);
+        assert_eq!(
+            std::fs::read(r.path().join(".git/index")).map_err(|error| error.to_string())?,
+            index
+        );
         assert_eq!(r.git(&["rev-parse", "attempt"])?.trim(), base);
         assert!(workspace(r.path(), "HEAD", &base).is_err());
         // These owned fixtures are clean: ordinary removal refuses dirty workspaces.

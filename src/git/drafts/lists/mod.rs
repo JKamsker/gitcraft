@@ -320,8 +320,7 @@ fn publish(
         ctx,
         "changelists",
         &view.reference,
-        &view.version,
-        &new,
+        (&view.version, &new),
         &view.source,
         evidence,
         active,
@@ -791,8 +790,7 @@ pub fn shelve(
     };
     let evidence = working_transaction::apply_with_commit(
         repo,
-        &current,
-        &target,
+        (&current, &target),
         &view.policies,
         &check,
         &commit,

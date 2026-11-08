@@ -593,8 +593,7 @@ fn publish(
         ctx,
         "virtuals",
         &view.reference,
-        &view.version,
-        &new,
+        (&view.version, &new),
         &view.source.source,
         evidence,
         active,
@@ -654,10 +653,8 @@ pub fn edit(
     snapshot(&ctx, view, true, active)?;
     let mut next = view.state.clone();
     let mut moves = Vec::new();
-    if !matches!(&edit, Edit::Leave) {
-        if view.stale.is_some() {
-            return Err(view.stale.clone().unwrap_or_default());
-        }
+    if !matches!(&edit, Edit::Leave) && view.stale.is_some() {
+        return Err(view.stale.clone().unwrap_or_default());
     }
     match edit {
         Edit::Create(name) => {
@@ -900,8 +897,7 @@ pub fn toggle(
     snapshot(&ctx, view, true, active)?;
     let evidence = working_transaction::apply_with_commit(
         repo,
-        &before,
-        &target,
+        (&before, &target),
         &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
         &|evidence| publish(&ctx, view, &next, &[], evidence, active),
@@ -1087,8 +1083,7 @@ pub fn undo(repo: &Path, view: &View, active: &dyn Fn() -> bool) -> Result<Strin
     previous.undo = None;
     let evidence = working_transaction::apply_with_commit(
         repo,
-        &before,
-        &target,
+        (&before, &target),
         &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
         &|evidence| publish(&ctx, view, &previous, &moves, evidence, active),

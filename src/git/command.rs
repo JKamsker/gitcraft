@@ -173,7 +173,7 @@ pub(super) struct Extra {
     tool: bool,
     /// Find out which hook failed, if one does (see [`super::hooks`]).
     trace_hooks: bool,
-    /// On another machine: a test of a parallel bisect (see [`run_for_test`]).
+    /// On another machine: a test of a parallel bisect (see [`run_for_test_input`]).
     test: Option<std::time::Duration>,
     /// How long it may run on another machine before it is stopped there.
     timeout: Option<std::time::Duration>,
@@ -880,14 +880,6 @@ pub struct Exit {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
-}
-
-/// Runs git with `args` in `dir` for a parallel bisect's tests, whatever it exits with. On
-/// another machine it gets a shell of its own (as many run side by side as there are tests at
-/// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
-/// stops it (see `parallel_bisect::runner`).
-pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
-    run_for_test_input(dir, args, limit, None)
 }
 
 pub(crate) fn run_for_test_input(

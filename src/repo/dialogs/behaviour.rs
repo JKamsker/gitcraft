@@ -275,7 +275,8 @@ impl Form {
         }
         ui.horizontal(|ui| {
             if let Some(token) = &self.active {
-                ui.spinner();
+                #[expect(clippy::disallowed_methods, reason = "Keep the existing pending-indicator repaint behavior in this lint-only unit; migrating to the throttled crate spinner requires a separate behavior change")]
+            ui.spinner();
                 if ui.button("Stop and join owned work").clicked() {
                     token.cancel();
                 }
@@ -413,10 +414,10 @@ impl Form {
             .iter()
             .enumerate()
             .filter_map(|(i, f)| {
-                if let Frame::Observed(Observation::Stable(sample)) = f {
-                    if let Value::Number(n) = sample.value {
-                        return Some((i, n));
-                    }
+                if let Frame::Observed(Observation::Stable(sample)) = f
+                    && let Value::Number(n) = sample.value
+                {
+                    return Some((i, n));
                 }
                 None
             })
@@ -478,7 +479,7 @@ mod tests {
                 summary: format!("frame {i}"),
             })
             .collect();
-        form.tx.send(Event::Loaded(commits)).unwrap();
+        assert!(form.tx.send(Event::Loaded(commits)).is_ok());
         form.poll();
         form
     }
@@ -528,7 +529,7 @@ mod tests {
         assert!(form.active.is_none());
     }
     #[test]
-    fn recording_late_worker_error_survives_cancelled_token_and_completion() {
+    fn recording_late_worker_error_survives_cancelled_token_and_completion() -> Result<(), String> {
         let mut form = form();
         let token = form.scope.0.child();
         token.cancel();
@@ -536,13 +537,14 @@ mod tests {
         form.frames[0] = Frame::Queued;
         form.tx
             .send(Event::Frame(0, Err("late concrete owner error".into())))
-            .unwrap();
+            .map_err(|error| error.to_string())?;
         form.tx
             .send(Event::Done(Err("workspace cleanup unknown".into())))
-            .unwrap();
+            .map_err(|error| error.to_string())?;
         form.poll();
         assert!(matches!(&form.frames[0], Frame::Failed(e) if e == "late concrete owner error"));
         assert_eq!(form.error.as_deref(), Some("workspace cleanup unknown"));
         assert!(form.active.is_none());
+        Ok(())
     }
 }

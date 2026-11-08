@@ -315,7 +315,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ui.label(format!("Replay {} after {} onto {}",s.branch,s.old_base,s.onto));
                 if s.made&&ui.link(s.worktree.display().to_string()).clicked(){acts.push(Action::OpenWorktree(s.worktree.clone()));}
                 for p in &s.conflicts{ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger,format!("Conflict waiting: {p}"));}
-                if let Some(new)=&s.result {if ui.button(format!("Compare candidate of {}",s.branch)).clicked(){acts.push(Action::Compare{base:s.old.clone(),base_label:format!("original {}",s.branch),target:Some(new.clone()),target_label:format!("candidate {}",s.branch),since_fork:false});}}
+                if let Some(new)=&s.result&& ui.button(format!("Compare candidate of {}",s.branch)).clicked(){acts.push(Action::Compare{base:s.old.clone(),base_label:format!("original {}",s.branch),target:Some(new.clone()),target_label:format!("candidate {}",s.branch),since_fork:false});}
             }
             ui.horizontal_wrapped(|ui|{
                 if !job.cancelled&&job.cursor<job.steps.len()&&ui.button("Continue / reconcile candidate worktree").clicked(){acts.push(Action::RepositoryTools(Act::ContinueDeferred(Box::new(view.clone()),job.id.clone())));}
@@ -332,7 +332,8 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
 mod tests {
     use super::*;
     #[test]
-    fn pure_deferred_panel_keeps_conflicts_reachable_and_rejects_late_marker_snapshots() {
+    fn pure_deferred_panel_keeps_conflicts_reachable_and_rejects_late_marker_snapshots()
+    -> Result<(), String> {
         let view = logic::tests::view();
         let mut cache = Cache::default();
         cache.observe(20, &view);
@@ -390,7 +391,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .expect("retained candidate worktree link");
+            .ok_or("retained candidate worktree link")?;
         output.textures_delta.clear();
         let mut output = ctx.run_ui(
             egui::RawInput {
@@ -418,5 +419,6 @@ mod tests {
             acts.iter()
                 .any(|a| matches!(a,Action::OpenWorktree(p) if p==&path))
         );
+        Ok(())
     }
 }

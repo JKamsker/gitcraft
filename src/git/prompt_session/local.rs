@@ -26,16 +26,17 @@ fn discover(
         let path = entry.path();
         if m.is_dir() {
             discover(root, &path, depth + 1, visited, files);
-        } else if m.is_file() && path.extension().is_some_and(|e| e == "jsonl") {
-            if let Some(rel) = path.strip_prefix(root).ok().and_then(|p| p.to_str()) {
-                let time = entry
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map_or(0, |t| t.as_secs());
-                files.push((time, rel.replace('\\', "/")));
-            }
+        } else if m.is_file()
+            && path.extension().is_some_and(|e| e == "jsonl")
+            && let Some(rel) = path.strip_prefix(root).ok().and_then(|p| p.to_str())
+        {
+            let time = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |t| t.as_secs());
+            files.push((time, rel.replace('\\', "/")));
         }
     }
 }
