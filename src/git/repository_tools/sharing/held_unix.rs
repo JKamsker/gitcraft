@@ -247,45 +247,77 @@ impl Ownership {
         nonce: &str,
     ) -> Result<(), String> {
         self.current(true)?;
-        for (suffix, bytes) in [("pack", pack), ("idx", index)] {
-            let name = format!("pack-{hash}.{suffix}");
-            let private = format!(".gitcraft-{nonce}.{suffix}");
-            let mut source = File::from(
+        // Private entries are relative to a retained 0700 staging-directory handle.
+        // Cleanup never resolves a replaceable .gitcraft-* pathname in objects/pack.
+        let staging = format!(".gitcraft-{nonce}");
+        fs::mkdirat(
+            self.pack.as_ref(),
+            staging.as_str(),
+            Mode::RUSR | Mode::WUSR | Mode::XUSR,
+        )
+        .map_err(err)?;
+        let stage = PackStage {
+            directory: File::from(
                 fs::openat(
                     self.pack.as_ref(),
-                    private.as_str(),
-                    OFlags::RDWR
-                        | OFlags::CREATE
-                        | OFlags::EXCL
-                        | OFlags::NOFOLLOW
-                        | OFlags::CLOEXEC,
-                    Mode::RUSR | Mode::WUSR,
+                    staging.as_str(),
+                    flags() | OFlags::DIRECTORY,
+                    Mode::empty(),
                 )
                 .map_err(err)?,
-            );
-            source.write_all(bytes).map_err(err)?;
-            source.sync_all().map_err(err)?;
-            match fs::renameat_with(
-                self.pack.as_ref(),
-                private.as_str(),
-                self.pack.as_ref(),
-                name.as_str(),
-                RenameFlags::NOREPLACE,
-            ) {
-                Ok(()) => (),
-                Err(rustix::io::Errno::EXIST) => {
-                    let existing = regular(&self.pack, &name)?;
-                    if read(&existing, 128 << 20)? != bytes {
-                        return Err(err("an existing pack differs and was not overwritten"));
+            ),
+        };
+        let result = (|| {
+            for (suffix, bytes) in [("pack", pack), ("idx", index)] {
+                let name = format!("pack-{hash}.{suffix}");
+                let mut source = File::from(
+                    fs::openat(
+                        &stage.directory,
+                        suffix,
+                        OFlags::RDWR
+                            | OFlags::CREATE
+                            | OFlags::EXCL
+                            | OFlags::NOFOLLOW
+                            | OFlags::CLOEXEC,
+                        Mode::RUSR | Mode::WUSR,
+                    )
+                    .map_err(err)?,
+                );
+                source.write_all(bytes).map_err(err)?;
+                source.sync_all().map_err(err)?;
+                match fs::renameat_with(
+                    &stage.directory,
+                    suffix,
+                    self.pack.as_ref(),
+                    name.as_str(),
+                    RenameFlags::NOREPLACE,
+                ) {
+                    Ok(()) => {
+                        let installed = regular(&self.pack, &name)?;
+                        if identity(&installed)? != identity(&source)? {
+                            return Err(err("installed pack identity changed"));
+                        }
                     }
-                    fs::unlinkat(self.pack.as_ref(), private.as_str(), AtFlags::empty())
-                        .map_err(err)?;
+                    Err(rustix::io::Errno::EXIST) => {
+                        let existing = regular(&self.pack, &name)?;
+                        if read(&existing, 128 << 20)? != bytes {
+                            return Err(err("an existing pack differs and was not overwritten"));
+                        }
+                    }
+                    Err(e) => return Err(err(e)),
                 }
-                Err(e) => return Err(err(e)),
             }
+            self.pack.sync_all().map_err(err)?;
+            self.current(true)
+        })();
+        let cleanup = stage.cleanup();
+        match (result, cleanup) {
+            (Ok(()), Ok(())) => Ok(()),
+            (result, cleanup) => Err(format!(
+                "Pack installation: {}; staging cleanup: {cleanup:?}; retained private directory .git/objects/pack/{staging}",
+                result.err().unwrap_or_else(|| "completed".into())
+            )),
         }
-        self.pack.sync_all().map_err(err)?;
-        self.current(true)
     }
 }
 pub(super) struct Lock<'a>(&'a Ownership);
@@ -293,5 +325,55 @@ impl Drop for Lock<'_> {
     fn drop(&mut self) {
         let _ = fs::flock(self.0.alternate.as_ref(), fs::FlockOperation::Unlock);
         self.0.locked.store(false, Ordering::Release);
+    }
+}
+
+struct PackStage {
+    directory: File,
+}
+fn retire_pack_stage(mut remove: impl FnMut(&str) -> Result<(), String>) -> Result<(), String> {
+    let mut errors = Vec::new();
+    for name in ["pack", "idx"] {
+        if let Err(e) = remove(name) {
+            errors.push(e);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+impl PackStage {
+    fn cleanup(&self) -> Result<(), String> {
+        retire_pack_stage(
+            |name| match fs::unlinkat(&self.directory, name, AtFlags::empty()) {
+                Ok(()) | Err(rustix::io::Errno::NOENT) => Ok(()),
+                Err(e) => Err(e.to_string()),
+            },
+        )
+    }
+}
+impl Drop for PackStage {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+#[cfg(test)]
+mod pack_cleanup_recording {
+    use super::*;
+    #[test]
+    fn staging_cleanup_is_relative_fixed_and_attempts_both_files_after_failure() {
+        let mut names = Vec::new();
+        let result = retire_pack_stage(|name| {
+            names.push(name.to_owned());
+            if name == "pack" {
+                Err("recorded failure".into())
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(names, ["pack", "idx"]);
+        assert!(result.unwrap_err().contains("recorded failure"));
     }
 }

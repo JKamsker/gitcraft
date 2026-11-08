@@ -395,10 +395,15 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
             .map_err(|e| e.to_string())?
             .as_nanos()
     );
-    plan.ownership.install(hash, &pack, &index, &nonce)?;
-    plan.check()?;
+    let receipt = format!(
+        "Verified pack .git/objects/pack/pack-{hash}.pack and .idx may remain; the alternate link has not been detached"
+    );
+    plan.ownership
+        .install(hash, &pack, &index, &nonce)
+        .map_err(|e| format!("{e}. {receipt}"))?;
+    plan.check().map_err(|e| format!("{e}. {receipt}"))?;
     if runner.control.is_cancelled() {
-        return Err(crate::git::CANCELLED.into());
+        return Err(format!("{}. {receipt}", crate::git::CANCELLED));
     }
     let backup = format!("alternates.gitcraft-backup-{nonce}");
     plan.ownership.detach(&backup)?;
