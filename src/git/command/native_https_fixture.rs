@@ -411,8 +411,11 @@ fn native_https_selected_credential_contract() -> Result<(), String> {
     write(&root, "server.py", SERVER)?;
     let profile = std::fs::read(root.join("profile")).map_err(|e| e.to_string())?;
     let result = run_fixture(&root, &git, &python, &openssl);
+    let after_profile = std::fs::read(root.join("profile")).map_err(|e| {
+        format!("private profile verification failed: {e}; fixture result={result:?}")
+    })?;
     let unchanged = std::env::vars_os().collect::<std::collections::BTreeMap<_, _>>() == before
-        && std::fs::read(root.join("profile")).map_err(|e| e.to_string())? == profile;
+        && after_profile == profile;
     if !unchanged {
         return Err(format!(
             "parent environment/private profile changed; result={result:?}"
