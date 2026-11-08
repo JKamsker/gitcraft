@@ -101,7 +101,7 @@ impl RepoTab {
                                 state.preview = None;
                             }
                             Err(error) => {
-                                state.result = error;
+                                state.remember_result(LocalResult::Failed { detail: error });
                                 state.snapshot = None;
                                 state.preview = None;
                             }
@@ -492,6 +492,7 @@ fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
 
 #[derive(Clone)]
 enum LocalResult {
+    Failed { detail: String },
     ProfileChanged,
     Prepared,
     Received,
@@ -503,6 +504,7 @@ enum LocalResult {
 impl LocalResult {
     fn raw(&self) -> String {
         match self {
+            Self::Failed { detail } => format!("{detail}\nIf cancelled or partially completed, inspect Git/b4/mail state before retrying. Apply conflicts use the existing Continue/Abort operation controls."),
 Self::ProfileChanged => "Profile changed. Operation cancelled; inspect repository and mail state before retrying.".into(),
 Self::Prepared => "Prepared branch read".into(),
 Self::Received => "Series fetched; review the cover, patches and trailers before applying".into(),
@@ -513,7 +515,13 @@ Self::RecipientsChanged => "Recipients changed; generate a new preview".into(),
 }
     }
     fn display(&self) -> String {
-        crate::i18n::text(match self {
+        let id = match self {
+            Self::Failed { detail } => {
+                return crate::i18n::message(
+                    "repo-workflows-email-email-window-632693ae",
+                    &[("error", detail.as_str().into())],
+                );
+            }
             Self::ProfileChanged => "repo-workflows-email-email-window-8c1d9c9f",
             Self::Prepared => "repo-workflows-email-email-window-b8c5cd6e",
             Self::Received => "repo-workflows-email-email-window-624d6ba0",
@@ -521,8 +529,8 @@ Self::RecipientsChanged => "Recipients changed; generate a new preview".into(),
             Self::WorkerEnded => "repo-workflows-email-email-window-c6755006",
             Self::Running => "repo-workflows-email-email-act-5474eef8",
             Self::RecipientsChanged => "repo-workflows-email-email-act-3eece223",
-        })
-        .into()
+        };
+        crate::i18n::text(id).into()
     }
 }
 
@@ -581,6 +589,39 @@ mod fluent_r1_result_tests {
                 crate::i18n::set_language(lang);
                 assert_eq!(h.state().display_result(), raw);
             }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_failure_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_r1_email_cached_failure_retains_retry_hint_and_opaque_multiline_details() {
+        let detail = "provider;\nIf cancelled or partially completed: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = State::default();
+        state.remember_result(LocalResult::Failed {
+            detail: detail.into(),
+        });
+        let raw = state.result.clone();
+        let mut h = Harness::new_ui_state(|ui, state: &mut State| state.result_ui(ui), state);
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            let shown = h.state().display_result();
+            h.get_by_label(&shown);
+            assert!(shown.contains(detail));
+            assert!(shown.contains(if lang == "de" {
+                "Prüfen Sie nach Abbruch"
+            } else {
+                "If cancelled or partially completed"
+            }));
+            assert_eq!(h.state().result, raw);
+            assert!(h.state().pending.is_none());
+            assert!(!h.state().trust && !h.state().confirm);
         }
         crate::i18n::set_language("en-US");
     }

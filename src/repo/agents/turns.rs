@@ -401,7 +401,7 @@ mod fluent_r1_caption_tests {
             else {
                 panic!("actual source must compare")
             };
-            assert_eq!(base, if after { &turn.commit } else { &turn.parent });
+            assert_eq!(&base, if after { &turn.commit } else { &turn.parent });
             assert_eq!(
                 target.as_ref(),
                 if after { None } else { Some(&turn.commit) }
