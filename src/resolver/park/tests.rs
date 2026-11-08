@@ -641,3 +641,31 @@ fn dropping_to_a_branch_keeps_accessible_byte_exact_recovery() -> Result<(), Str
     );
     Ok(())
 }
+
+#[test]
+fn a_filtered_clean_file_is_also_kept_byte_exact() -> Result<(), String> {
+    let repo = mid_merge("park-clean-raw")?;
+    write(repo.path(), ".gitattributes", "notes.txt text eol=lf\n")?;
+    repo.git(&["add", ".gitattributes"])?;
+    write(repo.path(), "notes.txt", "notes\r\n")?;
+    assert!(repo.git(&["diff", "--", "notes.txt"])?.is_empty());
+    let parked = park(repo.path(), "clean-raw", &["a.txt".into()])?;
+    assert!(parked.raw.contains(&"notes.txt".into()));
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(std::fs::read(repo.path().join("notes.txt")).unwrap(), b"notes\r\n");
+    Ok(())
+}
+
+#[test]
+fn recovery_archive_collision_keeps_both_originals() -> Result<(), String> {
+    let repo = mid_merge("park-recovery-collision")?;
+    let parked = park(repo.path(), "collision", &["a.txt".into()])?;
+    let archive = crate::agent::repo_file(repo.path(), "parked-recovery/collision")?;
+    std::fs::create_dir_all(&archive).map_err(|e| e.to_string())?;
+    std::fs::write(archive.join("existing"), b"mine").map_err(|e| e.to_string())?;
+    assert!(drop_to_branch(repo.path(), &parked).is_err());
+    assert_eq!(std::fs::read(archive.join("existing")).unwrap(), b"mine");
+    assert_eq!(list(repo.path())?, vec![parked.clone()]);
+    assert!(folder(repo.path(), &parked.id)?.join("raw/a.txt").is_file());
+    Ok(())
+}

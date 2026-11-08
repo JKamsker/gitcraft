@@ -64,7 +64,7 @@ pub struct Parked {
     pub files: Vec<String>,
     /// How many unmerged entries the index had: it has as many once back.
     pub unmerged: usize,
-    /// The changed files kept byte for byte (under `raw/`).
+    /// The tracked regular files kept byte for byte (under `raw/`).
     pub raw: Vec<String>,
     /// git's files of the operation that were kept (of [`STATE_FILES`]).
     pub state_files: Vec<String>,
@@ -265,20 +265,18 @@ fn raw_unchanged(repo: &Path, dir: &Path) -> bool {
     let Ok(paths) = run(repo, &["ls-files", "--cached", "-z"]) else {
         return false;
     };
-    paths
-        .split('\0')
-        .filter(|p| !p.is_empty())
-        .chain(parked.raw.iter().map(String::as_str))
-        .all(|path| {
-            let now = repo.join(path);
-            if parked.raw.iter().any(|p| p == path) {
-                crate::safe_read::read_inside(repo, path, u64::MAX - 1).is_some_and(|bytes| {
-                    std::fs::read(dir.join("raw").join(path)).is_ok_and(|kept| kept == bytes)
-                })
-            } else {
-                !std::fs::symlink_metadata(now).is_ok_and(|m| m.is_file())
-            }
-        })
+    let raw: std::collections::BTreeSet<&str> = parked.raw.iter().map(String::as_str).collect();
+    let mut tracked: std::collections::BTreeSet<&str> = paths.split('\0').filter(|p| !p.is_empty()).collect();
+    tracked.extend(raw.iter().copied());
+    tracked.into_iter().all(|path| {
+        if raw.contains(path) {
+            crate::safe_read::read_inside(repo, path, u64::MAX - 1).is_some_and(|bytes| {
+                std::fs::read(dir.join("raw").join(path)).is_ok_and(|kept| kept == bytes)
+            })
+        } else {
+            !std::fs::symlink_metadata(repo.join(path)).is_ok_and(|m| m.is_file())
+        }
+    })
 }
 
 /// Takes `dir` for a merge put aside: none is there yet, or it isn't written over.
@@ -462,8 +460,8 @@ fn keep(
     Ok(parked)
 }
 
-/// The files whose bytes are kept: the conflicted ones (`files`) and those the merge's files
-/// change, but for names a path to a file can't take as it is (`-x`: git's round trip then).
+/// The tracked files whose bytes are kept, including filtered files that appear clean.
+/// Only regular files are copied; Git retains symlinks in the snapshot tree.
 fn raw_paths(repo: &Path, parked: &Parked, files: &[String]) -> Result<Vec<String>, String> {
     let args = [
         "diff-tree",
