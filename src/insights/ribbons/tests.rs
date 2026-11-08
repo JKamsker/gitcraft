@@ -54,8 +54,24 @@ fn exact_matches_are_observed_and_similar_ones_inferred() {
         pairs: vec![
             moved,
             pair(PairKind::Same, Some(("a", 1)), Some(("a2", 2))),
-            pair(PairKind::Changed, Some(("b", 2)), Some(("b2", 3))),
+            Pair {
+                body: [
+                    "@@ Metadata",
+                    "  ## Commit message ##",
+                    "-    commit b",
+                    "+    commit b, reworded",
+                ]
+                .map(str::to_owned)
+                .to_vec(),
+                ..pair(PairKind::Changed, Some(("b", 2)), Some(("b2", 3)))
+            },
             pair(PairKind::Changed, Some(("d", 4)), Some(("d2", 4))),
+            Pair {
+                body: [" ## f ##", "-+new line here", "++new  line   here"]
+                    .map(str::to_owned)
+                    .to_vec(),
+                ..pair(PairKind::Changed, Some(("e", 5)), Some(("e2", 5)))
+            },
         ],
     };
     let patches: HashMap<String, Patch> = [
@@ -63,6 +79,8 @@ fn exact_matches_are_observed_and_similar_ones_inferred() {
         ("b2", patch("p-b", &["+f\u{1f}x"])),
         ("d", patch("p-d", &["+g\u{1f}y"])),
         ("d2", patch("p-d2", &["+g\u{1f}z"])),
+        ("e", patch("p-e", &["+f\u{1f}x"])),
+        ("e2", patch("p-e", &["+f\u{1f}x"])),
     ]
     .into_iter()
     .map(|(h, p)| (h.to_owned(), p))
@@ -85,13 +103,15 @@ fn exact_matches_are_observed_and_similar_ones_inferred() {
                 Evidence::Observed
             ),
             ("d".into(), "d2".into(), Class::Modified, Evidence::Inferred),
+            // The same patch-id, the message the same: the patch changed in whitespace.
+            ("e".into(), "e2".into(), Class::Modified, Evidence::Observed),
         ]
     );
     // Old commits oldest first, new ones too.
     let olds: Vec<&str> = r.old.iter().map(|e| e.commit.hash.as_str()).collect();
-    assert_eq!(olds, ["a", "b", "c", "d"]);
+    assert_eq!(olds, ["a", "b", "c", "d", "e"]);
     let news: Vec<&str> = r.new.iter().map(|e| e.commit.hash.as_str()).collect();
-    assert_eq!(news, ["c2", "a2", "b2", "d2"]);
+    assert_eq!(news, ["c2", "a2", "b2", "d2", "e2"]);
     assert!(r.new[0].moved);
     // Without patch-ids a changed pair stays a similarity match.
     let r = classify(&diff, &HashMap::new());

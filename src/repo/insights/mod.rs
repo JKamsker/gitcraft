@@ -243,12 +243,19 @@ impl RepoTab {
 
     /// Shows the insights page in the big area at `kind`, read the first time it is shown.
     pub(super) fn open_insights(&mut self, kind: Kind, ctx: &egui::Context) {
-        if self.conflict.is_some() || self.rebase.is_some() {
-            let editor = if self.conflict.is_some() {
-                "conflict editor"
-            } else {
-                "interactive rebase"
-            };
+        // Those editors hold choices written nowhere yet and are drawn over the page.
+        let editor = if self.conflict.is_some() {
+            Some("conflict editor")
+        } else if self.rebase.is_some() {
+            Some("interactive rebase")
+        } else if self.split.is_some() {
+            Some("commit split")
+        } else if self.absorb.is_some() {
+            Some("absorb editor")
+        } else {
+            None
+        };
+        if let Some(editor) = editor {
             self.status = Some((format!("Finish or close the {editor} first"), true));
             return;
         }

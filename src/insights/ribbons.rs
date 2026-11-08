@@ -263,10 +263,17 @@ fn paired(pair: &Pair, patches: &HashMap<String, Patch>) -> (Class, Evidence, St
             "range-diff: the same patch and message".to_owned(),
         ),
         _ => match (a, b) {
-            (Some(a), Some(b)) if a == b => (
+            (Some(a), Some(b)) if a == b && message_changed(&pair.body) => (
                 Class::Reworded,
                 Evidence::Observed,
                 "the same patch-id; range-diff: the message changed".to_owned(),
+            ),
+            // patch-id doesn't see whitespace: the patch changed in that alone.
+            (Some(a), Some(b)) if a == b => (
+                Class::Modified,
+                Evidence::Observed,
+                "the same patch-id and message; range-diff: the patch changed in whitespace"
+                    .to_owned(),
             ),
             (Some(_), Some(_)) => (
                 Class::Modified,
@@ -280,6 +287,22 @@ fn paired(pair: &Pair, patches: &HashMap<String, Patch>) -> (Class, Evidence, St
             ),
         },
     }
+}
+
+/// Whether range-diff's `body` of a pair changes a line of its commit message section.
+fn message_changed(body: &[String]) -> bool {
+    let mut in_message = false;
+    for line in body {
+        let mut chars = line.chars();
+        let mark = chars.next();
+        let rest = chars.as_str();
+        if rest.trim_start().starts_with("## ") {
+            in_message = rest.trim() == "## Commit message ##";
+        } else if in_message && matches!(mark, Some('-' | '+')) {
+            return true;
+        }
+    }
+    false
 }
 
 /// How many of `lines` are found in `other`, each line of `other` counted once.

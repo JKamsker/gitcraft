@@ -85,7 +85,17 @@ impl RepoTab {
                     return;
                 }
                 let shown = state.source.clone();
-                match shown.or_else(|| tab.ribbons_sources().into_iter().next()) {
+                let sources = tab.ribbons_sources();
+                // A pull request is compared at its head now, which may have moved since.
+                let shown = shown.map(|source| match source {
+                    Source::Pr { number, .. } => sources
+                        .iter()
+                        .find(|s| matches!(s, Source::Pr { number: n, .. } if *n == number))
+                        .cloned()
+                        .unwrap_or(source),
+                    other => other,
+                });
+                match shown.or_else(|| sources.into_iter().next()) {
                     Some(source) => tab.ribbons_read(source, ctx),
                     None => {
                         if let Some(state) = tab.ribbons_state() {

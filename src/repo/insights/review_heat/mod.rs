@@ -140,7 +140,14 @@ impl RepoTab {
                 if let Some(state) = self.review_heat_state() {
                     state.selected = cell;
                 }
-                self.open_diff(key.clone(), ctx);
+                // Another line of the file shown only scrolls: opening it again would close it.
+                let shown = self
+                    .diff
+                    .as_ref()
+                    .is_some_and(|d| d.key == key && d.lines.is_none());
+                if !shown || at.is_none() {
+                    self.open_diff(key.clone(), ctx);
+                }
                 if let Some(at) = at {
                     self.review_heat_jump(key, at);
                 }
