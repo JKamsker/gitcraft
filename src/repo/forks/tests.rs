@@ -1659,11 +1659,20 @@ fn review19_conflict_continuation_pins_its_tip_and_original_explicit_lease()
         let approved = crate::repo::push_preflight::test_support::approve(&mut tab, &ctx);
         if mode == "push" {
             assert!(approved.is_ok(), "{approved:?}");
+        } else {
+            assert!(
+                approved.is_err(),
+                "{mode}: a stale checklist must refuse publication"
+            );
+            // A declined checklist has no OpDone. Dismissing it and processing
+            // the next ordinary frame retires the pending fork action.
+            tab.dialog = None;
+            tab.forks_frame(&ctx);
         }
         drain_until(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         assert_eq!(git::head(&w.me), expected_local);
         assert_eq!(git::resolve(&w.fork, "fix")?, expected_fork);
-        assert!(tab.forks.running.is_none());
+        assert!(tab.forks.running.is_none(), "{mode}: {approved:?}");
         if mode == "push" {
             assert!(
                 tab.timeline
