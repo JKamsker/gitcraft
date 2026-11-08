@@ -279,6 +279,11 @@ fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
         .show(ui, |ui| {
             ui.monospace(&message.headers);
             ui.add(egui::Label::new(&message.body).selectable(true));
+            egui::CollapsingHeader::new("Raw RFC822 message")
+                .id_salt((salt, index, "raw"))
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(&message.raw).selectable(true));
+                });
         });
     }
 }
