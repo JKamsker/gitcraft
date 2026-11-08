@@ -130,6 +130,7 @@ impl RepoTab {
         self.graph_motion.schedule_expiry(ui.ctx());
         self.celebration_ui(ui);
         self.graph_walk_header(ui);
+        self.graph_stacks(ui, acts);
         let map_area = ui.available_rect_before_wrap();
         let map_rect = egui::Rect::from_min_max(
             egui::pos2(map_area.right() - 78.0, map_area.top()),

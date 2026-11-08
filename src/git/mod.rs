@@ -61,6 +61,7 @@ mod reflog;
 mod refs;
 mod rehearse;
 mod remerge;
+pub(crate) mod repository_tools;
 mod revert;
 mod reviewed;
 mod rewrites;
@@ -399,3 +400,5 @@ pub(crate) mod drafts;
 mod push_hooks;
 pub(crate) use bundles::bundle_git_path;
 pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};
+
+pub(crate) mod prompt_session;

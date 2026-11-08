@@ -58,6 +58,7 @@ pub enum Dialog {
         selected: std::collections::BTreeSet<usize>,
     },
     ContentRecovery,
+    RepositoryTools(Box<super::repository_tools::State>),
     GerritReview {
         remote: String,
         head: String,
@@ -529,6 +530,10 @@ impl RepoTab {
                     skip_hooks,
                     web_warning,
                 } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks, web_warning.as_deref()),
+                Dialog::RepositoryTools(state) => {
+                    super::repository_tools::show(ui, state, acts);
+                    if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
+                }
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");

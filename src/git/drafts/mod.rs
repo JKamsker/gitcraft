@@ -1,13 +1,21 @@
 //! Opt-in local history of working changes. Roots are trees (not WIP commits); separate
 //! index/work trees keep staged contents distinct and make every saved blob GC-reachable.
 mod context;
+pub mod deferred;
+pub(in crate::git) mod index_transaction;
+pub mod lists;
+mod native_files;
 mod permissions;
+pub mod publication;
 mod restore;
 #[cfg(test)]
 mod tests;
+pub mod turn;
+pub mod virtuals;
+mod working_transaction;
 
 use crate::{git, remote};
-use context::Context;
+pub(in crate::git) use context::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -75,6 +83,7 @@ impl Default for Retention {
 struct Source {
     raw: Vec<u8>,
     cache: Vec<u8>,
+    cache_snapshot: Option<std::sync::Arc<index_transaction::IndexSnapshot>>,
     shared: Option<(String, Vec<u8>)>,
     index: BTreeMap<String, Entry>,
     skip: BTreeSet<String>,
@@ -112,6 +121,16 @@ fn capture_preserving(
     force_path: Option<&str>,
     requested: &dyn Fn() -> bool,
 ) -> Result<Option<Draft>, String> {
+    let paths = force_path.map(|p| vec![p.to_owned()]).unwrap_or_default();
+    capture_preserving_paths(repo, reason, keep, &paths, requested)
+}
+fn capture_preserving_paths(
+    repo: &Path,
+    reason: &str,
+    keep: Option<&Id>,
+    force_paths: &[String],
+    requested: &dyn Fn() -> bool,
+) -> Result<Option<Draft>, String> {
     let start = std::time::Instant::now();
     let active = || requested() && start.elapsed() < std::time::Duration::from_secs(120);
     let ctx = Context::new(repo, &active)?;
@@ -127,7 +146,7 @@ fn capture_preserving(
         &active,
     )?)?;
     candidates.extend(untracked.iter().cloned());
-    if let Some(path) = force_path {
+    for path in force_paths {
         valid_path(path)?;
         candidates.insert(path.to_owned());
     }
@@ -356,8 +375,20 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
         let s = String::from_utf8(bytes).map_err(|_| "Invalid HEAD")?;
         Ok((!s.trim().is_empty()).then(|| s.trim().to_owned()))
     };
+    let cache = internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default();
+    let cache_snapshot =
+        if !remote::is_remote(&ctx.repo) && cfg!(any(target_os = "macos", target_os = "linux")) {
+            let snapshot = index_transaction::IndexSnapshot::capture(Path::new(&ctx.index_file))?;
+            if snapshot.as_ref().map(|s| s.bytes()).unwrap_or_default() != cache {
+                return Err("Index/policy changed while reading source".into());
+            }
+            snapshot.map(std::sync::Arc::new)
+        } else {
+            None
+        };
     Ok(Source {
-        cache: internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default(),
+        cache,
+        cache_snapshot,
         shared: if ctx.shared_file.is_empty() {
             None
         } else {
@@ -471,6 +502,15 @@ fn private_index_file(
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Concrete read-only subtree consumer: copy the existing index and split dependency
+/// into the empty private context, using the same stat-cache checks as draft capture.
+pub(in crate::git) fn inspection_index(
+    ctx: &Context,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    cached_index(ctx, &source(ctx, active)?, active)
 }
 
 fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Result<(), String> {
@@ -703,12 +743,22 @@ fn read_file(
     fallback: &str,
     active: &dyn Fn() -> bool,
 ) -> Result<Option<(String, Vec<u8>)>, String> {
+    read_file_limited(ctx, path, fallback, FILE_LIMIT, active)
+}
+fn read_file_limited(
+    ctx: &Context,
+    path: &str,
+    fallback: &str,
+    limit: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<(String, Vec<u8>)>, String> {
     valid_path(path)?;
+    let limit = limit.min(FILE_LIMIT);
     if !active() {
         return Err("Draft cancelled".into());
     }
     if let Some(target) = remote::parse(&ctx.repo) {
-        let script = read_script(&ctx.worktree, path, FILE_LIMIT as u64)?;
+        let script = read_script(&ctx.worktree, path, limit as u64)?;
         let out = git::forecast_remote(
             &target.host,
             remote::Request {
@@ -723,7 +773,7 @@ fn read_file(
         }
         if out.code == 0
             && out.stdout.len() >= 8
-            && out.stdout.len() - 8 <= FILE_LIMIT
+            && out.stdout.len() - 8 <= limit
             && (out.stdout.starts_with(b"F100644\n") || out.stdout.starts_with(b"F100755\n"))
         {
             return Ok(Some((
@@ -748,8 +798,13 @@ fn read_file(
             "Cannot draft {path}: symbolic links, submodules and special files are not followed"
         ));
     }
-    let bytes = crate::safe_read::read_inside(root, path, FILE_LIMIT as u64)
-        .ok_or_else(|| format!("Cannot draft {path}: file changed, is linked, or exceeds 8 MiB"))?;
+    if meta.len() > limit as u64 {
+        return Err(format!(
+            "Cannot draft {path}: exceeds remaining snapshot allowance of {limit} bytes"
+        ));
+    }
+    let bytes = crate::safe_read::read_inside(root, path, limit as u64)
+        .ok_or_else(|| format!("Cannot draft {path}: file changed, is linked, or exceeds its remaining snapshot allowance"))?;
     #[cfg(unix)]
     let mode = {
         use std::os::unix::fs::PermissionsExt;

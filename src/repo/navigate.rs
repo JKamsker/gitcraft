@@ -148,6 +148,21 @@ impl RepoTab {
         lines: Option<Vec<git::LineRange>>,
         ctx: &egui::Context,
     ) {
+        if let DiffKey::Work(file) = &key
+            && file.area == git::Area::Conflicted
+            && self
+                .submodules
+                .iter()
+                .any(|sub| sub.path == file.path && sub.state == git::SubmoduleState::Conflicted)
+        {
+            self.diff = None;
+            self.conflict = None;
+            self.repository_tools_act(
+                super::repository_tools::Act::SubmoduleConflict(file.path.clone()),
+                ctx,
+            );
+            return;
+        }
         self.tour = None;
         if self
             .diff

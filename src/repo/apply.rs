@@ -72,6 +72,7 @@ impl RepoTab {
             Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
             Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
+            Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::DvcPull => {
                 self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
             }
@@ -156,6 +157,8 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::LoadPromptSession(hash) => self.load_prompt_session(hash, ctx),
+            Action::ShowPromptHunk(seed) => self.show_prompt_hunk(seed, ctx),
             Action::OpenLineDossier(seed) => {
                 self.symbols.close();
                 self.open_line_dossier(seed, ctx)

@@ -364,6 +364,11 @@ impl RepoTab {
         {
             acts.push(push);
         }
+        if ui.button("Pull and push routes…").clicked() {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::Routes(b.name.clone()),
+            ));
+        }
         self.force_push_item(ui, acts, b, idle);
         if let Some(remote) = self.default_remote()
             && ui
@@ -434,58 +439,20 @@ impl RepoTab {
     /// Force push (with lease) of `b` to the branch it tracks, when that has commits `b`
     /// hasn't (a plain push is refused). Hovering it shows what would leave the remote.
     fn force_push_item(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
-        let (_, behind) = b.ahead_behind();
-        if behind == 0 || b.upstream_gone() {
+        if self.remotes.is_empty() {
             return;
         }
-        let Some((remote, name)) = self.split_upstream(&b.upstream) else {
-            return;
-        };
-        let Some(tracked) = self
-            .refs
-            .remotes
-            .iter()
-            .flat_map(|(_, list)| list)
-            .find(|r| r.name == b.upstream)
-        else {
-            return;
-        };
-        let button = ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Force push to {} (with lease)…", b.upstream)),
-            )
-            .on_hover_text(format!(
-                "Replace {} with {}, unless someone pushed to it since it was fetched",
-                b.upstream, b.name
-            ));
+        let button = ui.add_enabled(
+            idle,
+            egui::Button::new("Force push via push route (with lease)…"),
+        );
         offer(&button, || GhostOp::ForcePush {
             branch: b.name.clone(),
         });
         if button.clicked() {
-            acts.push(Action::Dialog(Dialog::confirm(
-                "Force push",
-                format!(
-                    "Replace “{name}” on {remote} with {}? {} it has that {} hasn't {} it, for \
-                     everyone.",
-                    b.name,
-                    if behind == 1 {
-                        "The commit".to_owned()
-                    } else {
-                        format!("The {behind} commits")
-                    },
-                    b.name,
-                    if behind == 1 { "leaves" } else { "leave" },
-                ),
-                "Force push",
-                ops(&[&[
-                    "push",
-                    &format!("--force-with-lease=refs/heads/{name}:{}", tracked.target),
-                    &remote,
-                    &format!("refs/heads/{}:refs/heads/{name}", b.name),
-                ]]),
-                None,
-            )));
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::ForceBranch(b.name.clone(), b.target.clone()),
+            ));
         }
     }
 

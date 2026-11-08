@@ -394,6 +394,36 @@ mod tests {
         vec![args.iter().map(|s| (*s).into()).collect()]
     }
     #[test]
+    fn merge_pure_reviewed_echo_uses_exact_source_and_retains_dispatch_authorization() {
+        let approved = vec![crate::push_preflight::APPROVED.into(), "prepared-id".into()];
+        let original = vec![
+            "push".into(),
+            "--force-with-lease=refs/heads/main:old".into(),
+            "--".into(),
+            "original-remote".into(),
+            format!("{}:refs/heads/main", "a".repeat(40)),
+        ];
+        let evidence = evidence_steps(&[approved.clone()], |id| {
+            assert_eq!(id, "prepared-id");
+            Ok(original.clone())
+        })
+        .unwrap();
+        assert_eq!(evidence, [original]);
+        let bound = bind_step(
+            &approved,
+            vec!["-c".into(), "gitcraft.commandSource=retained".into()],
+        );
+        assert_eq!(&bound[..2], approved);
+        assert_eq!(&bound[2..], ["-c", "gitcraft.commandSource=retained"]);
+        assert!(contains_push(&[bound.clone()]));
+        assert!(
+            evidence_steps(&[bound], |_| panic!(
+                "must refuse nested evidence before lookup"
+            ))
+            .is_err()
+        );
+    }
+    #[test]
     fn r2_pure_echo_rejects_git_context_prefixes_and_retains_lease_options() {
         for prefix in [
             vec!["--git-dir=/other.git"],

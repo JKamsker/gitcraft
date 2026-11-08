@@ -3,6 +3,7 @@
 //! branch's parent (see [`crate::git::stack`]).
 
 mod dialog;
+mod graph;
 mod model;
 mod publish;
 mod restack;

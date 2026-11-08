@@ -1583,6 +1583,7 @@ dependencies = [
  "bitflags 2.13.2",
  "log",
  "scopeguard",
+ "serde",
  "uuid",
 ]
 
@@ -1955,6 +1956,7 @@ dependencies = [
  "sha2",
  "syn 2.0.119",
  "syntect",
+ "tempfile",
  "tokio",
  "toml_edit",
  "tree-sitter",
@@ -1969,6 +1971,7 @@ dependencies = [
  "ureq 2.12.1",
  "url",
  "vt100",
+ "winapi-util",
  "windows 0.62.2",
  "windows-sys 0.61.2",
  "winresource",

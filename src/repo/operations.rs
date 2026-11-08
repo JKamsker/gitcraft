@@ -594,6 +594,11 @@ fn run_step(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<String, String> {
+    let routed = git::repository_tools::routes::rewrite_plain_push(path, args)?;
+    let routed_args: Vec<&str> = routed
+        .as_ref()
+        .map_or_else(|| args.to_vec(), |v| v.iter().map(String::as_str).collect());
+    let args = routed_args.as_slice();
     let Some(control) = control else {
         return if quiet {
             git::run_unattended(Some(path), args, creds)
@@ -696,7 +701,7 @@ fn merge_pure_reviewed_echo_operands_are_strict_and_survive_retry() -> Result<()
     Ok(())
 }
 
-fn run_reviewed_push(
+pub(crate) fn run_reviewed_push(
     original: &[String],
     capture: impl FnOnce(&[&str]) -> Result<git::RouteBinding, String>,
     execute: impl FnOnce() -> Result<String, String>,

@@ -92,6 +92,7 @@ mod navigate;
 mod navigation;
 mod offline;
 pub(crate) mod operations;
+pub(crate) use operations::run_reviewed_push;
 mod owners;
 mod package;
 mod palette;
@@ -116,6 +117,7 @@ mod reflog;
 mod rehearse;
 mod release;
 mod remerge;
+mod repository_tools;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
@@ -354,6 +356,10 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    deferred: repository_tools::DeferredCache,
+    prompt_session: prompt_session::State,
+    outbox_last: Option<std::time::Instant>,
+    outbox_reading: bool,
     /// The release being prepared or cut (its dialog).
     release: Option<release::ReleaseView>,
     /// The hotfix flow: the dialog that finishes one, and the push after it.
@@ -692,6 +698,10 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            deferred: Default::default(),
+            prompt_session: Default::default(),
+            outbox_last: None,
+            outbox_reading: false,
             release: None,
             hotfix: hotfix::Hotfix::default(),
             package: None,
@@ -880,3 +890,5 @@ pub(crate) fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
         .map(|args| args.iter().map(|a| (*a).to_owned()).collect())
         .collect()
 }
+
+mod prompt_session;

@@ -911,3 +911,87 @@ fn current_porcelain_push_and_skip_hook_policy_keep_lease_and_lfs_guards() -> Re
     assert_eq!(f.receiver_head()?, tip);
     Ok(())
 }
+
+#[test]
+fn routed_submodule_checks_survive_preflight_without_enabling_child_publication()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    let plan = scan(
+        &f.repo,
+        vec![vec![
+            "push".into(),
+            "--recurse-submodules=check".into(),
+            "origin".into(),
+            "HEAD:refs/heads/main".into(),
+        ]],
+        f.profile(),
+        &|| true,
+    )?;
+    let args = push_args(&plan)?;
+    assert_eq!(
+        args.iter()
+            .filter(|s| s.starts_with("--recurse-submodules="))
+            .cloned()
+            .collect::<Vec<_>>(),
+        vec!["--recurse-submodules=check"]
+    );
+    assert!(parse(&["--recurse-submodules=on-demand".into()]).is_err());
+    execute(&f.repo, &plan, None)?;
+    assert_eq!(f.receiver_head()?, plan.head);
+    Ok(())
+}
+
+/// Supplied metadata only: no Fixture, Git, helper, filesystem or transport.
+#[test]
+fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), String> {
+    let oid = "a".repeat(40);
+    let plan = Plan {
+        branch: "refs/heads/topic".into(),
+        remote: "team".into(),
+        destination: "refs/heads/topic".into(),
+        head: oid.clone(),
+        base: None,
+        commits: vec![],
+        findings: vec![],
+        targets: vec![],
+        expected_name: String::new(),
+        expected_email: String::new(),
+        expected_accounts: BTreeMap::new(),
+        profile: UserProfile::default(),
+        force: false,
+        deleting: false,
+        tracking: false,
+        lfs_objects: BTreeSet::new(),
+        skip_hooks: false,
+        push_oid: oid,
+        original: vec![],
+        urls: vec!["https://push.invalid/team/project".into()],
+        checkout: String::new(),
+        checkout_oid: String::new(),
+        config: String::new(),
+        config_before_push: String::new(),
+        local_refs: BTreeMap::new(),
+        extras: vec![],
+        tracking_ref: None,
+        lfs_config: vec![],
+        receive_pack: "git-receive-pack".into(),
+    };
+    let receipt = ReviewedSend::from_echo(push_args(&plan)?, None);
+    receipt.check_plan(&plan)?;
+    for field in 0..6 {
+        let mut changed = plan.clone();
+        match field {
+            0 => changed.push_oid = "b".repeat(40),
+            1 => changed.destination = "refs/heads/other".into(),
+            2 => changed.remote = "different-receiver".into(),
+            3 => changed.base = Some("c".repeat(40)),
+            4 => changed.force = true, // no inspected lease: refuse even before dispatch
+            _ => changed.extras.push("--recurse-submodules=check".into()),
+        }
+        assert!(
+            receipt.check_plan(&changed).is_err(),
+            "changed field {field}"
+        );
+    }
+    Ok(())
+}
