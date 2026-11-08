@@ -381,7 +381,9 @@ mod tests {
         (h, code)
     }
     fn settle(h: &mut Harness<'_, ToolApp>) -> Result<(), String> {
-        let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        // Windows metadata preservation starts a bounded native helper per snapshot.
+        let seconds = if cfg!(windows) { 120 } else { 10 };
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(seconds);
         loop {
             h.run_steps(1);
             if h.state().loading.is_none() && h.state().saving.is_none() {

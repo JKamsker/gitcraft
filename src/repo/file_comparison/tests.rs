@@ -164,7 +164,9 @@ fn harness(r: &Repo, page: Page) -> Result<Harness<'static, (RepoTab, bool)>, St
         ))
 }
 fn settle(h: &mut Harness<'_, (RepoTab, bool)>) -> Result<(), String> {
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    // Windows metadata preservation starts a bounded native helper per snapshot.
+    let seconds = if cfg!(windows) { 120 } else { 5 };
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(seconds);
     loop {
         h.run_steps(1);
         if h.state().0.busy_op.is_none()

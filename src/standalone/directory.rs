@@ -206,6 +206,23 @@ impl Directory {
             Ok(file)
         }
     }
+    #[cfg(windows)]
+    pub(crate) fn read_writable(&self, name: &OsStr) -> io::Result<File> {
+        use std::os::windows::fs::OpenOptionsExt;
+        let identity = same_file::Handle::from_file(self.read(name)?)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0x1 | 0x2 | 0x4)
+            .custom_flags(0x0020_0000)
+            .open(self.path.join(name))?;
+        if same_file::Handle::from_file(file.try_clone()?)? != identity {
+            return Err(io::Error::other(crate::i18n::text(
+                "interaction-standalone-error-replacement-identity",
+            )));
+        }
+        Ok(file)
+    }
     pub(super) fn snapshot(
         &self,
         name: &OsStr,
