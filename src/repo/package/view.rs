@@ -36,7 +36,12 @@ impl RepoTab {
 
 fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("What a package will publish").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-package-contents-b60559a9",
+        ))
+        .font(theme::semibold(15.0)),
+    );
     let list = match &view.packages {
         None => {
             ui.add(crate::spinner::Spinner::new());
@@ -44,16 +49,21 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
             return;
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, format!("Couldn't find the packages: {e}"));
+            ui.colored_label(
+                t.danger,
+                crate::i18n::message(
+                    "repo-workflows-package-contents-e237505e",
+                    &[("e", (e).clone().into())],
+                ),
+            );
             buttons(ui, acts, true);
             return;
         }
         Some(Ok(list)) if list.is_empty() => {
             ui.label(
-                RichText::new(
-                    "Nothing here is published: package.json is private, or every crate has \
-                     publish = false.",
-                )
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-package-contents-8ed27415",
+                ))
                 .color(t.text_dim),
             );
             buttons(ui, acts, true);
@@ -63,7 +73,12 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
     };
     let pkg = &list[view.selected.min(list.len() - 1)];
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Package").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-package-contents-59de121d",
+            ))
+            .color(t.text_dim),
+        );
         egui::ComboBox::from_id_salt("package-choice")
             .selected_text(format!("{} {}", pkg.name, pkg.version))
             .show_ui(ui, |ui| {
@@ -80,14 +95,24 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
             });
     });
     ui.label(
-        RichText::new(format!(
-            "From {}, run in {}",
-            pkg.ecosystem.tool(),
-            if pkg.dir.is_empty() {
-                "the repository's root"
-            } else {
-                &pkg.dir
-            }
+        RichText::new(crate::i18n::message(
+            "repo-workflows-package-contents-a2e9d64e",
+            &[
+                (
+                    "pkg-ecosystem-tool-1",
+                    (pkg.ecosystem.tool()).clone().into(),
+                ),
+                (
+                    "if-pkg-dir-is-empty-the-reposito-2",
+                    (if pkg.dir.is_empty() {
+                        crate::i18n::text("repo-workflows-package-contents-d5728cc3")
+                    } else {
+                        &pkg.dir
+                    })
+                    .clone()
+                    .into(),
+                ),
+            ],
         ))
         .color(t.text_faint)
         .small(),
@@ -97,13 +122,25 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
         None => {
             ui.add(crate::spinner::Spinner::new());
             ui.label(
-                RichText::new(format!("Asking {}…", pkg.ecosystem.tool()))
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-package-contents-b32a9827",
+                    &[(
+                        "pkg-ecosystem-tool-1",
+                        (pkg.ecosystem.tool()).clone().into(),
+                    )],
+                ))
+                .color(t.text_faint)
+                .small(),
             );
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, format!("Couldn't list the package: {e}"));
+            ui.colored_label(
+                t.danger,
+                crate::i18n::message(
+                    "repo-workflows-package-contents-89bee303",
+                    &[("e", (e).clone().into())],
+                ),
+            );
         }
         Some(Ok(report)) => {
             egui::ScrollArea::vertical()
@@ -134,38 +171,91 @@ fn report_ui(
     }
     notes(
         ui,
-        "LOOKS SHIPPED BY ACCIDENT",
+        crate::i18n::text("repo-workflows-package-report-ui-fefc6039"),
         &report.accidental,
         t.warning,
     );
-    notes(ui, "USUALLY SHIPPED, LEFT OUT", &report.missing, t.warning);
-    heading(ui, &format!("COMPARED WITH {}", registry.to_uppercase()));
+    notes(
+        ui,
+        crate::i18n::text("repo-workflows-package-report-ui-fa5b38db"),
+        &report.missing,
+        t.warning,
+    );
+    heading(
+        ui,
+        &crate::i18n::message(
+            "repo-workflows-package-report-ui-b2667be4",
+            &[(
+                "registry-to-uppercase-1",
+                (registry.to_uppercase()).clone().into(),
+            )],
+        ),
+    );
     match published {
         None => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
-                faint(ui, &format!("Asking {registry}…"));
+                faint(
+                    ui,
+                    &crate::i18n::message(
+                        "repo-workflows-package-report-ui-b413d4db",
+                        &[("registry", (registry).clone().into())],
+                    ),
+                );
             });
         }
-        Some(Ok(None)) => faint(ui, &format!("Never published on {registry}.")),
-        Some(Err(e)) => faint(ui, &format!("Couldn't compare: {e}")),
+        Some(Ok(None)) => faint(
+            ui,
+            &crate::i18n::message(
+                "repo-workflows-package-report-ui-b47c6e02",
+                &[("registry", (registry).clone().into())],
+            ),
+        ),
+        Some(Err(e)) => faint(
+            ui,
+            &crate::i18n::message(
+                "repo-workflows-package-report-ui-74f3a93b",
+                &[("e", (e).clone().into())],
+            ),
+        ),
         Some(Ok(Some(p))) => {
             if p.added.is_empty() && p.gone.is_empty() {
-                faint(ui, &format!("Same files as {} on {registry}.", p.version));
+                faint(
+                    ui,
+                    &crate::i18n::message(
+                        "repo-workflows-package-report-ui-ef333981",
+                        &[
+                            ("p-version-1", (p.version).clone().into()),
+                            ("registry", (registry).clone().into()),
+                        ],
+                    ),
+                );
             }
             for f in p.added.iter().take(SHOWN) {
-                let tip = format!("New since {}", p.version);
+                let tip = crate::i18n::message(
+                    "repo-workflows-package-report-ui-6c125757",
+                    &[("p-version-1", (p.version).clone().into())],
+                );
                 line(ui, &format!("+ {f}"), t.success, &tip);
             }
             more(ui, p.added.len());
             for f in p.gone.iter().take(SHOWN) {
-                let tip = format!("In {}, not in this one", p.version);
+                let tip = crate::i18n::message(
+                    "repo-workflows-package-report-ui-47ec594b",
+                    &[("p-version-1", (p.version).clone().into())],
+                );
                 line(ui, &format!("− {f}"), t.danger, &tip);
             }
             more(ui, p.gone.len());
         }
     }
-    heading(ui, &format!("FILES ({})", report.files.len()));
+    heading(
+        ui,
+        &crate::i18n::message(
+            "repo-workflows-package-report-ui-d4826304",
+            &[("report-files-len-1", (report.files.len()).clone().into())],
+        ),
+    );
     for (f, size) in report.files.iter().take(SHOWN) {
         let text = match size {
             Some(s) => format!("{f}  ·  {}", crate::git::human_size(*s)),
@@ -179,7 +269,10 @@ fn report_ui(
 fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
     heading(ui, &format!("{title} ({})", notes.len()));
     if notes.is_empty() {
-        faint(ui, "None found.");
+        faint(
+            ui,
+            crate::i18n::text("repo-workflows-package-notes-adea78e6"),
+        );
     }
     for n in notes.iter().take(SHOWN) {
         line(ui, &format!("{} — {}", n.path, n.why), color, "");
@@ -190,7 +283,13 @@ fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
 /// The count of the rows of a list of `len` not shown.
 fn more(ui: &mut Ui, len: usize) {
     if len > SHOWN {
-        faint(ui, &format!("and {} more", len - SHOWN));
+        faint(
+            ui,
+            &crate::i18n::message(
+                "repo-workflows-package-more-683768ab",
+                &[("len-shown-1", (len - SHOWN).clone().into())],
+            ),
+        );
     }
 }
 
@@ -224,9 +323,10 @@ fn buttons(ui: &mut Ui, acts: &mut Vec<Action>, refresh: bool) {
         if ui
             .add_enabled(
                 refresh,
-                egui::Button::new("Refresh").min_size(egui::vec2(80.0, 30.0)),
+                egui::Button::new(crate::i18n::text("repo-workflows-package-buttons-0e916101"))
+                    .min_size(egui::vec2(80.0, 30.0)),
             )
-            .on_hover_text("Lists the packages and their files again, after a change to them")
+            .on_hover_text(crate::i18n::text("repo-workflows-package-buttons-8a24ec7c"))
             .clicked()
         {
             acts.push(Action::Package(PackageAct::Refresh));

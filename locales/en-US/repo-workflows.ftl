@@ -324,17 +324,13 @@ repo-workflows-agents-terminal-choice-c22c5ccf = The terminal the notes are type
 
 repo-workflows-agents-terminal-choice-f1f46570 = no agent terminal
 
-repo-workflows-agents-tip-1c0ba476 =
-    Shown in this tab: its changes are in Uncommitted changes
+repo-workflows-agents-tip-1c0ba476 = { "\u000A" }Shown in this tab: its changes are in Uncommitted changes
 
-repo-workflows-agents-tip-5c1b8dd5 =
-    Click to open it and review its changes
+repo-workflows-agents-tip-5c1b8dd5 = { "\u000A" }Click to open it and review its changes
 
-repo-workflows-agents-tip-7d8e5553 =
-    Task: { $row-task-prompt-1 }
+repo-workflows-agents-tip-7d8e5553 = { "\u000A" }Task: { $row-task-prompt-1 }
 
-repo-workflows-agents-tip-95d5fbf7 =
-    Agent: { $row-task-agent-1 }
+repo-workflows-agents-tip-95d5fbf7 = { "\u000A" }Agent: { $row-task-agent-1 }
 
 repo-workflows-agents-tray-act-78e896bb = the notes
 
@@ -984,11 +980,9 @@ repo-workflows-collision_view-cannot-check-8bcfe01d = Tick the branches to check
 
 repo-workflows-collision_view-cannot-check-c1d9426d = At most { $MOST } branches at a time
 
-repo-workflows-collision_view-cell-tip-81bf5184 =
-      and { $n-listed-1 } more
+repo-workflows-collision_view-cell-tip-81bf5184 = { "\u000A  " }and { $n-listed-1 } more
 
-repo-workflows-collision_view-cell-tip-9b99b61c =
-    Click to compare them
+repo-workflows-collision_view-cell-tip-9b99b61c = { "\u000A" }Click to compare them
 
 repo-workflows-collision_view-cell-tip-b3f28cca = { $a } and { $b } merge cleanly
 
@@ -1947,7 +1941,7 @@ repo-workflows-email-parse-ff511962 = Mail has no Subject header
 
 repo-workflows-email-parse-ff6e2278 = Incomplete mbox envelope
 
-repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 } attachment: { $raw-len-2 } decoded bytes]
+repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 } attachment: { $raw-len-2 } decoded bytes]{ "\u000A" }
 
 repo-workflows-email-parts-93b357ba = Mail MIME nesting exceeds 24 levels
 
@@ -2037,7 +2031,7 @@ repo-workflows-fence_view-fence-gate-2b8e4f3b = Checking against the agent fence
 
 repo-workflows-fence_view-fence-gate-6b730ef5 = Checking against the agent fence
 
-repo-workflows-fence_view-list-violations-a6d5a69b =   and { $found-len-listed-1 } more
+repo-workflows-fence_view-list-violations-a6d5a69b = { "  " }and { $found-len-listed-1 } more
 
 repo-workflows-fence_view-save-7bfa9a3b = Saved, but not everywhere:
     { $errors-join-n-1 }
@@ -2581,7 +2575,7 @@ repo-workflows-history_activity-activity-view-04b6c8fb = Apply period
 
 repo-workflows-history_activity-activity-view-0e407d89 = Contributor statistics
 
-repo-workflows-history_activity-activity-view-101c65f2 =  · shallow clone (earlier history unavailable)
+repo-workflows-history_activity-activity-view-101c65f2 = { " " }· shallow clone (earlier history unavailable)
 
 repo-workflows-history_activity-activity-view-126236b2 = All scanned dates
 
@@ -2729,7 +2723,7 @@ repo-workflows-hotfix-contents-c2cdf43f = git tag -s, with your signing key; oth
 
 repo-workflows-hotfix-contents-c5ecd20d = Push (this repository has no remote)
 
-repo-workflows-hotfix-contents-dd94532f =  since { $t }
+repo-workflows-hotfix-contents-dd94532f = { " " }since { $t }
 
 repo-workflows-hotfix-contents-f3077f1d = { $plan-hotfix-name-1 } · { $plan-changes-len-2 } change{ $if-plan-changes-len-1-else-s-3 }{ $plan-base-tag-as-deref-map-t-for-4 }
 
@@ -2737,7 +2731,7 @@ repo-workflows-hotfix-contents-f5346a60 = Merged into { $plan-main-name-1 }
 
 repo-workflows-hotfix-hotfix-act-06b55025 = { $tag } isn't a version to start a hotfix from
 
-repo-workflows-hotfix-hotfix-op-done-5b11af18 =  — Ctrl+Z puts back what it did
+repo-workflows-hotfix-hotfix-op-done-5b11af18 = { " " }— Ctrl+Z puts back what it did
 
 repo-workflows-hotfix-hotfix-op-done-fbdef87e = { $run-label-1 } (stopped part-way)
 
@@ -2759,7 +2753,7 @@ repo-workflows-hotfix-preview-7df6bedd = Then pushes { $names-join-and-1 } and t
 
 repo-workflows-hotfix-preview-ab279563 = Merges { $h-name-1 } ({ $crate-repo-short-h-head-2 }) into { $t-name-3 } (git merge --no-ff)
 
-repo-workflows-hotfix-preview-e3ee915a =  and 
+repo-workflows-hotfix-preview-e3ee915a = { " " }and{ " " }
 
 repo-workflows-hotfix-problem-0225cdbc = Merging it into { $into } would stop on conflicts in { $files-join-1 }: merge it by hand{ $or }
 
@@ -2903,15 +2897,355 @@ repo-workflows-issue_work-what-68e64f0f = the acceptance criteria
 
 repo-workflows-issue_work-what-734b09bc = the description
 
+repo-workflows-lfs_locks-caught-ff2cd16f = Internal error: { $said }
+
+repo-workflows-lfs_locks-filters-53518a4c = Filter by path or owner
+
+repo-workflows-lfs_locks-filters-5da4f78e = Only mine
+
+repo-workflows-lfs_locks-header-2e532790 = Read the locks again
+
+repo-workflows-lfs_locks-header-961b2a04 = Close (Esc)
+
+repo-workflows-lfs_locks-header-b815cb09 = LFS locks
+
+repo-workflows-lfs_locks-list-04f767bd = { $a } and { $b }
+
+repo-workflows-lfs_locks-list-e6b59dc4 = { $a }, { $b } and { $rest-len-1 } more
+
+repo-workflows-lfs_locks-lock-banners-03d23d29 = LFS locks…
+
+repo-workflows-lfs_locks-lock-banners-11ae36a8 = { $if-one-owner-is-empty-someone-el-1 } holds the lock on { $one-path-2 }: your push of it will be refused until the lock is given back.
+
+repo-workflows-lfs_locks-lock-banners-2737026b = Locked by someone else: { $list-names-1 }. Your push of them will be refused until the locks are given back.
+
+repo-workflows-lfs_locks-lock-banners-3233cb04 = Someone else
+
+repo-workflows-lfs_locks-lock-banners-379e383e = Unlock all
+
+repo-workflows-lfs_locks-lock-banners-4ac709aa = Unlock
+
+repo-workflows-lfs_locks-lock-banners-4caac7c4 = You pushed { $many-len-1 } files and still hold their locks: give them back so others can change them?
+
+repo-workflows-lfs_locks-lock-banners-4fa40890 = You pushed { $one-path-1 } and still hold its lock: give it back so others can change it?
+
+repo-workflows-lfs_locks-lock-banners-6df5e70f = Keep them locked
+
+repo-workflows-lfs_locks-lock-banners-82b7be09 = { $one } can be locked and nobody holds it. Lock it so nobody else pushes changes to it while you work.
+
+repo-workflows-lfs_locks-lock-banners-942087cc = Retry
+
+repo-workflows-lfs_locks-lock-banners-96ed4625 = { $many-len-1 } changed files can be locked and nobody holds them. Lock them so nobody else pushes changes to them while you work.
+
+repo-workflows-lfs_locks-lock-banners-ac5bb7e1 = Lock all
+
+repo-workflows-lfs_locks-lock-banners-bb83044b = Keep it locked
+
+repo-workflows-lfs_locks-lock-banners-db44b8db = Lock
+
+repo-workflows-lfs_locks-lock-banners-f8368582 = Couldn't read the LFS locks, so who holds your changed files isn't known.
+
+repo-workflows-lfs_locks-lock-job-35b33376 = { $label }: done. Commit .gitattributes to share it.
+
+repo-workflows-lfs_locks-lock-job-36f5baee = { $label }: done
+
+repo-workflows-lfs_locks-lock-job-8336fbfe = { $label } failed: { $e }
+
+repo-workflows-lfs_locks-lock-label-398e9b81 = Locked by { $who } { $git-relative-time-at-now-1 }
+
+repo-workflows-lfs_locks-lock-label-6329feb6 = Locked by { $who }
+
+repo-workflows-lfs_locks-lock-list-1a9f2707 = None of the locks is yours.
+
+repo-workflows-lfs_locks-lock-list-3ef08b56 = No lock matches the filter.
+
+repo-workflows-lfs_locks-lock-list-5619b99f = Nobody holds a lock.
+
+repo-workflows-lfs_locks-lock-list-e1890cf8 = Reading the locks…
+
+repo-workflows-lfs_locks-lock-menu-items-03d23d29 = LFS locks…
+
+repo-workflows-lfs_locks-lock-menu-items-052a679c = Give the LFS lock back so others can push changes to the file
+
+repo-workflows-lfs_locks-lock-menu-items-0c28d273 = The server can't say whose lock this is: unlocking fails if it isn't yours
+
+repo-workflows-lfs_locks-lock-menu-items-3f09bd22 = Take the file's LFS lock: nobody else can push changes to it
+
+repo-workflows-lfs_locks-lock-menu-items-4ac709aa = Unlock
+
+repo-workflows-lfs_locks-lock-menu-items-6526301c = git-lfs won't give back the lock of a file with changes: commit them first
+
+repo-workflows-lfs_locks-lock-menu-items-b8fc75d5 = An LFS lock operation is running
+
+repo-workflows-lfs_locks-lock-menu-items-bafa9d65 = Someone else holds this file’s lock
+
+repo-workflows-lfs_locks-lock-menu-items-bea7de48 = Commit the file’s changes before unlocking it
+
+repo-workflows-lfs_locks-lock-menu-items-db44b8db = Lock
+
+repo-workflows-lfs_locks-locks-read-05347473 = Could not read the LFS locks: { $e }
+
+repo-workflows-lfs_locks-patterns-119fe07d = git lfs track --lockable: keeps them in LFS, written to .gitattributes
+
+repo-workflows-lfs_locks-patterns-6105d5e3 = Make lockable
+
+repo-workflows-lfs_locks-patterns-abf43528 = Lockable files
+
+repo-workflows-lfs_locks-patterns-ddfb1d6f = Files matching these patterns can be locked; git-lfs keeps them read-only until you do. Commit .gitattributes to share a new pattern.
+
+repo-workflows-lfs_locks-patterns-ed7c75cc = No pattern in the root .gitattributes is lockable.
+
 repo-workflows-lfs_locks-unlock-buttons-19766ed6 = Cancel
+
+repo-workflows-lfs_locks-unlock-buttons-24110cc4 = Unlock { $n }
+
+repo-workflows-lfs_locks-unlock-buttons-2978e628 = its owner loses the lock
+
+repo-workflows-lfs_locks-unlock-buttons-4ac709aa = Unlock
+
+repo-workflows-lfs_locks-unlock-buttons-6021bccb = Force unlock { $n }…
+
+repo-workflows-lfs_locks-unlock-buttons-62509394 = the owners lose their locks
+
+repo-workflows-lfs_locks-unlock-buttons-97edf7d6 = its owner
+
+repo-workflows-lfs_locks-unlock-buttons-9971cec2 = Take { $n } locks from their owners
+
+repo-workflows-lfs_locks-unlock-buttons-b57b0be8 = Take the lock from { $owner }
+
+repo-workflows-lfs_locks-unlock-buttons-c214395e = Takes the lock from whoever holds it. Only admins may do this; the owner isn't told, and their unpushed changes to the file may clash with someone else's.
+
+repo-workflows-lfs_locks-unlock-buttons-ccf3d9ea = Pick all
+
+repo-workflows-lfs_locks-unlock-buttons-e213bc66 = Click again to force: { $who }.
+
+repo-workflows-lfs_locks-unlock-buttons-e2d5673c = Pick none
+
+repo-workflows-lfs_locks-unlock-buttons-f16646da = Force unlock…
+
+repo-workflows-lfs_storage-caught-ff2cd16f = Internal error: { $said }
+
+repo-workflows-lfs_storage-checkout-1716d186 = Only pointers ({ $missing-len-1 })
+
+repo-workflows-lfs_storage-checkout-4cd9a422 = git lfs pull of each of them, whatever the folders below say
+
+repo-workflows-lfs_storage-checkout-5f0a6ba0 = Download all ({ $paths-len-1 })
+
+repo-workflows-lfs_storage-checkout-683768ab = and { $missing-len-listed-1 } more
+
+repo-workflows-lfs_storage-checkout-87bcf309 = git lfs pull, as far as the folders below allow ({ $e })
+
+repo-workflows-lfs_storage-checkout-a5d7a59b = { $n } files in LFS, all downloaded.
+
+repo-workflows-lfs_storage-checkout-b627e471 = No file of the checkout is kept in LFS.
+
+repo-workflows-lfs_storage-checkout-d6eafe82 = Download
+
+repo-workflows-lfs_storage-checkout-f4b00836 = Listing the LFS files…
+
+repo-workflows-lfs_storage-checkout-f5a54014 = 1 file in LFS, downloaded.
+
+repo-workflows-lfs_storage-download-action-43432746 = “{ $bad }” starts or ends with a space, which git-lfs drops: use LFS: Pull to download it
+
+repo-workflows-lfs_storage-download-action-e9f327fc = { $bad } has a comma in its name, which git-lfs reads as two patterns: use LFS: Pull to download it
+
+repo-workflows-lfs_storage-fetch-only-3f558a4c = LFS now fetches only { $names-join-1 }
+
+repo-workflows-lfs_storage-fetch-only-e3be5d1f = Could not set what LFS fetches: { $e }
+
+repo-workflows-lfs_storage-filters-49e74a0b = Instead of what the repository's .lfsconfig sets: { $names-join-1 }
+
+repo-workflows-lfs_storage-filters-72d4ac36 = Could not read what LFS fetches: { $e }
+
+repo-workflows-lfs_storage-filters-8758c8bb = Only these folders
+
+repo-workflows-lfs_storage-filters-9777b8b2 = git-lfs downloads only the folders included (every one when none is), leaving out those excluded, on fetch, pull and checkout. Set for this repository only.
+
+repo-workflows-lfs_storage-filters-9fd728c6 = Add
+
+repo-workflows-lfs_storage-filters-c621d797 = The repository's .lfsconfig sets: { $names-join-1 }
+
+repo-workflows-lfs_storage-filters-cd8bf912 = Never these folders
+
+repo-workflows-lfs_storage-filters-dc013b99 = Take { $name } out
+
+repo-workflows-lfs_storage-header-59ef044f = LFS storage
+
+repo-workflows-lfs_storage-header-961b2a04 = Close (Esc)
+
+repo-workflows-lfs_storage-header-d8cb92fa = Read again
+
+repo-workflows-lfs_storage-list-lfs-files-8d1bad49 = Could not list the LFS files: { $e }
+
+repo-workflows-lfs_storage-pointer-mark-efdc14b1 = Only its LFS pointer is here (not downloaded). Right-click → LFS: Download.
 
 repo-workflows-lfs_storage-prune-19766ed6 = Cancel
 
+repo-workflows-lfs_storage-prune-30967fda = 1 object
+
+repo-workflows-lfs_storage-prune-407859ca = Click again to delete { $objects }
+
+repo-workflows-lfs_storage-prune-5fc3fdf9 = Delete { $objects } ({ $human-size-plan-bytes-1 })
+
+repo-workflows-lfs_storage-prune-659493e2 = Nothing to prune.
+
+repo-workflows-lfs_storage-prune-8bfaae7c = Pruning deletes local LFS objects that no recent commit, the checkout or unpushed work needs; they can be downloaded again as long as the remote still has them.
+
+repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 } objects
+
+repo-workflows-lfs_storage-prune-ebe86463 = Check what pruning frees
+
+repo-workflows-lfs_storage-prune-f0bcc399 = Working out what pruning frees…
+
+repo-workflows-lfs_storage-set-filter-b41c110a = Could not save it: { $e }
+
+repo-workflows-lfs_storage-storage-menu-items-1b8b17ee = git lfs track: writes the pattern to .gitattributes. Files already committed stay ordinary git files until changed and staged again; commit .gitattributes to share it.
+
+repo-workflows-lfs_storage-storage-menu-items-1de3e10c = LFS: Download
+
+repo-workflows-lfs_storage-storage-menu-items-31a0cb12 = Track { $pattern } in LFS
+
+repo-workflows-lfs_storage-storage-menu-items-4f441605 = Track { $path } in LFS
+
+repo-workflows-lfs_storage-storage-menu-items-5ed965af = LFS: Fetch only { $dir }
+
+repo-workflows-lfs_storage-storage-menu-items-e2cb4df2 = Download this file's LFS object and check it out
+
+repo-workflows-lfs_storage-storage-menu-items-ea226348 = From now on git-lfs downloads only this folder (and any others set in LFS: Storage…) on fetch, pull and checkout; other files stay pointers. Set in this repository's config.
+
+repo-workflows-lfs_storage-storage-panel-6ce01b6d = Old objects
+
+repo-workflows-lfs_storage-storage-panel-a99e2b3d = This checkout
+
+repo-workflows-lfs_storage-storage-panel-b05f298a = What LFS fetches
+
+repo-workflows-lfs_storage-usage-18b3c0d1 = No LFS objects on disk yet
+
+repo-workflows-lfs_storage-usage-9aea26d2 = { $human-size-u-bytes-1 } in 1 LFS object on disk
+
+repo-workflows-lfs_storage-usage-a5b8a0cd = { $human-size-u-bytes-1 } in { $n } LFS objects on disk
+
+repo-workflows-lfs_storage-usage-aca1a392 = Measuring the LFS objects…
+
+repo-workflows-lfs_storage-usage-bc295532 = Could not measure the LFS objects: { $e }
+
 repo-workflows-line_dossier-line-dossier-view-82a9c46f = Commit
+
+repo-workflows-owners-contents-3203b0df = Couldn't list the repository's files: { $e }
+
+repo-workflows-owners-contents-343bb384 = 1 rule
+
+repo-workflows-owners-contents-4adeeb91 = Sections: { $sections-join-1 }
+
+repo-workflows-owners-contents-4b99390e = In your editor
+
+repo-workflows-owners-contents-4d726f4a = { $n } rules
+
+repo-workflows-owners-contents-64feb239 = LINES THE FORGE READS DIFFERENTLY ({ $file-problems-len-1 })
 
 repo-workflows-owners-contents-7d9eb7ac = Close
 
+repo-workflows-owners-contents-8f8353f4 = line { $p-line-1 }: { $p-text-2 }
+
+repo-workflows-owners-contents-96978c8c = { $file-path-1 } at HEAD, read as { $file-flavor-name-2 } reads it · { $rules }
+
+repo-workflows-owners-contents-bd5f6b1d = Open the file
+
+repo-workflows-owners-contents-bd73a6b1 = None: the forge reads every line as written.
+
+repo-workflows-owners-contents-c72a165d = Couldn't read it again lately ({ $e }): this is the one read before.
+
+repo-workflows-owners-contents-e1e62224 = Check CODEOWNERS
+
+repo-workflows-owners-owners-act-9cd4150e = This repository has no CODEOWNERS file
+
+repo-workflows-owners-owners-act-b11dc59d = checking it failed
+
+repo-workflows-owners-owners-summary-db29b096 = From { $path } at HEAD ({ $rules-count-1 })
+
+repo-workflows-owners-read-owners-cf60f83c = reading it failed
+
+repo-workflows-owners-results-26e406d1 = None: every file has an owner.
+
+repo-workflows-owners-results-683768ab = and { $lint-unowned-len-listed-1 } more
+
+repo-workflows-owners-results-85d177f5 = PATTERNS THAT MATCH NO FILE ({ $lint-unmatched-len-1 })
+
+repo-workflows-owners-results-9c0433a9 = None: every pattern matches a file.
+
+repo-workflows-owners-results-a6551c12 = line { $n }: { $pattern }
+
+repo-workflows-owners-results-a92df9d7 = FILES WITHOUT AN OWNER ({ $lint-unowned-len-1 } of { $lint-files-2 })
+
+repo-workflows-owners-reviewers-for-d68c1cfb = { $base } isn't a branch here
+
+repo-workflows-owners-reviewers-ui-796e0df8 = Ask for reviews (from CODEOWNERS) once it isn't a draft
+
+repo-workflows-owners-reviewers-ui-7a8a3ca3 = A team: the forge asks its members
+
+repo-workflows-owners-reviewers-ui-d8e1731e = An account
+
+repo-workflows-owners-reviewers-ui-da35c68e = Ask for reviews (from CODEOWNERS)
+
+repo-workflows-owners-rules-343bb384 = 1 rule
+
+repo-workflows-owners-rules-4d726f4a = { $n } rules
+
+repo-workflows-owners-summary-text-3ff108bf = { $unowned } files without an owner
+
+repo-workflows-owners-summary-text-4339bb43 = No owner
+
+repo-workflows-owners-summary-text-6a5cbe9f = 1 file without an owner
+
+repo-workflows-owners-summary-text-9655d0de = No file here has an owner
+
+repo-workflows-owners-summary-text-a198627d = Needs { $codeowners-and-list-short-names--1 }
+
+repo-workflows-package-buttons-0e916101 = Refresh
+
 repo-workflows-package-buttons-7d9eb7ac = Close
+
+repo-workflows-package-buttons-8a24ec7c = Lists the packages and their files again, after a change to them
+
+repo-workflows-package-contents-59de121d = Package
+
+repo-workflows-package-contents-89bee303 = Couldn't list the package: { $e }
+
+repo-workflows-package-contents-8ed27415 = Nothing here is published: package.json is private, or every crate has publish = false.
+
+repo-workflows-package-contents-a2e9d64e = From { $pkg-ecosystem-tool-1 }, run in { $if-pkg-dir-is-empty-the-reposito-2 }
+
+repo-workflows-package-contents-b32a9827 = Asking { $pkg-ecosystem-tool-1 }…
+
+repo-workflows-package-contents-b60559a9 = What a package will publish
+
+repo-workflows-package-contents-d5728cc3 = the repository's root
+
+repo-workflows-package-contents-e237505e = Couldn't find the packages: { $e }
+
+repo-workflows-package-more-683768ab = and { $len-shown-1 } more
+
+repo-workflows-package-notes-adea78e6 = None found.
+
+repo-workflows-package-report-ui-47ec594b = In { $p-version-1 }, not in this one
+
+repo-workflows-package-report-ui-6c125757 = New since { $p-version-1 }
+
+repo-workflows-package-report-ui-74f3a93b = Couldn't compare: { $e }
+
+repo-workflows-package-report-ui-b2667be4 = COMPARED WITH { $registry-to-uppercase-1 }
+
+repo-workflows-package-report-ui-b413d4db = Asking { $registry }…
+
+repo-workflows-package-report-ui-b47c6e02 = Never published on { $registry }.
+
+repo-workflows-package-report-ui-d4826304 = FILES ({ $report-files-len-1 })
+
+repo-workflows-package-report-ui-ef333981 = Same files as { $p-version-1 } on { $registry }.
+
+repo-workflows-package-report-ui-fa5b38db = USUALLY SHIPPED, LEFT OUT
+
+repo-workflows-package-report-ui-fefc6039 = LOOKS SHIPPED BY ACCIDENT
 
 repo-workflows-parallel_bisect-hash-link-63633913 = Show this commit
 
@@ -3809,5 +4143,27 @@ repo-workflows-history-calendar-day = { $day }
     { $count ->
         [one] { $count } commit
        *[other] { $count } commits
+    }
+
+repo-workflows-lfs-checkout-summary = { $files ->
+        [0] No file of the checkout is kept in LFS.
+       *[other] { $missing ->
+            [0] { $files ->
+                [one] One file in LFS, downloaded.
+               *[other] { $files } files in LFS, all downloaded.
+            }
+           *[other] { $files ->
+                [one] One file in LFS;
+               *[other] { $files } files in LFS;
+            } { $missing ->
+                [one] one is only a pointer here
+               *[other] { $missing } are only pointers here
+            } ({ $bytes } not downloaded).
+        }
+    }
+
+repo-workflows-lfs-force-unlock-confirmation = { $count ->
+        [one] Click again to force: its owner loses the lock.
+       *[other] Click again to force: the owners lose their { $count } locks.
     }
 

@@ -168,8 +168,20 @@ pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
         _ => lock.owner.as_str(),
     };
     match lock.locked_at {
-        Some(at) => format!("Locked by {who} {}", git::relative_time(at, now)),
-        None => format!("Locked by {who}"),
+        Some(at) => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-398e9b81",
+            &[
+                ("who", (who).clone().into()),
+                (
+                    "git-relative-time-at-now-1",
+                    (git::relative_time(at, now)).clone().into(),
+                ),
+            ],
+        ),
+        None => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-6329feb6",
+            &[("who", (who).clone().into())],
+        ),
     }
 }
 

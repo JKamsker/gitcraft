@@ -324,17 +324,13 @@ repo-workflows-agents-terminal-choice-c22c5ccf = Das Terminal, in das die Notize
 
 repo-workflows-agents-terminal-choice-f1f46570 = kein Agent-Terminal
 
-repo-workflows-agents-tip-1c0ba476 =
-    In diesem Tab geöffnet: Die Änderungen stehen unter „Uncommittete Änderungen“
+repo-workflows-agents-tip-1c0ba476 = { "\u000A" }In diesem Tab geöffnet: Die Änderungen stehen unter „Uncommittete Änderungen“
 
-repo-workflows-agents-tip-5c1b8dd5 =
-    Klicken Sie hier, um die Änderungen zu öffnen und zu prüfen
+repo-workflows-agents-tip-5c1b8dd5 = { "\u000A" }Klicken Sie hier, um die Änderungen zu öffnen und zu prüfen
 
-repo-workflows-agents-tip-7d8e5553 =
-    Aufgabe: { $row-task-prompt-1 }
+repo-workflows-agents-tip-7d8e5553 = { "\u000A" }Aufgabe: { $row-task-prompt-1 }
 
-repo-workflows-agents-tip-95d5fbf7 =
-    Agent: { $row-task-agent-1 }
+repo-workflows-agents-tip-95d5fbf7 = { "\u000A" }Agent: { $row-task-agent-1 }
 
 repo-workflows-agents-tray-act-78e896bb = die Notizen
 
@@ -984,11 +980,9 @@ repo-workflows-collision_view-cannot-check-8bcfe01d = Wählen Sie die zu prüfen
 
 repo-workflows-collision_view-cannot-check-c1d9426d = Höchstens { $MOST } Branches gleichzeitig
 
-repo-workflows-collision_view-cell-tip-81bf5184 =
-      und { $n-listed-1 } weitere
+repo-workflows-collision_view-cell-tip-81bf5184 = { "\u000A  " }und { $n-listed-1 } weitere
 
-repo-workflows-collision_view-cell-tip-9b99b61c =
-    Zum Vergleichen klicken
+repo-workflows-collision_view-cell-tip-9b99b61c = { "\u000A" }Zum Vergleichen klicken
 
 repo-workflows-collision_view-cell-tip-b3f28cca = { $a } und { $b } lassen sich konfliktfrei mergen
 
@@ -1947,7 +1941,7 @@ repo-workflows-email-parse-ff511962 = E-Mail hat keinen Subject-Header
 
 repo-workflows-email-parse-ff6e2278 = Unvollständiger mbox-Umschlag
 
-repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 }-Anhang: { $raw-len-2 } decodierte Bytes]
+repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 }-Anhang: { $raw-len-2 } decodierte Bytes]{ "\u000A" }
 
 repo-workflows-email-parts-93b357ba = MIME-Verschachtelung überschreitet 24 Ebenen
 
@@ -2037,7 +2031,7 @@ repo-workflows-fence_view-fence-gate-2b8e4f3b = Agent-Schutzgrenze wird geprüft
 
 repo-workflows-fence_view-fence-gate-6b730ef5 = Gegen Agent-Schutzgrenze prüfen
 
-repo-workflows-fence_view-list-violations-a6d5a69b =   und { $found-len-listed-1 } weitere
+repo-workflows-fence_view-list-violations-a6d5a69b = { "  " }und { $found-len-listed-1 } weitere
 
 repo-workflows-fence_view-save-7bfa9a3b = Gespeichert, aber nicht überall:
     { $errors-join-n-1 }
@@ -2581,7 +2575,7 @@ repo-workflows-history_activity-activity-view-04b6c8fb = Zeitraum anwenden
 
 repo-workflows-history_activity-activity-view-0e407d89 = Mitwirkendenstatistik
 
-repo-workflows-history_activity-activity-view-101c65f2 =  · flacher Klon (früherer Verlauf nicht verfügbar)
+repo-workflows-history_activity-activity-view-101c65f2 = { " " }· flacher Klon (früherer Verlauf nicht verfügbar)
 
 repo-workflows-history_activity-activity-view-126236b2 = Alle erfassten Daten
 
@@ -2729,15 +2723,15 @@ repo-workflows-hotfix-contents-c2cdf43f = git tag -s mit Ihrem Signaturschlüsse
 
 repo-workflows-hotfix-contents-c5ecd20d = Pushen (dieses Repository hat kein Remote)
 
-repo-workflows-hotfix-contents-dd94532f =  seit { $t }
+repo-workflows-hotfix-contents-dd94532f = { " " }seit { $t }
 
 repo-workflows-hotfix-contents-f3077f1d = { $plan-hotfix-name-1 } · { $plan-changes-len-2 } Änderung{ $if-plan-changes-len-1-else-s-3 }{ $plan-base-tag-as-deref-map-t-for-4 }
 
-repo-workflows-hotfix-contents-f5346a60 = Gemergt nach { $plan-main-name-1 }
+repo-workflows-hotfix-contents-f5346a60 = Nach { $plan-main-name-1 } gemergt
 
 repo-workflows-hotfix-hotfix-act-06b55025 = { $tag } ist keine Version, von der aus ein Hotfix erstellt werden kann
 
-repo-workflows-hotfix-hotfix-op-done-5b11af18 =  — Strg+Z macht die ausgeführten Schritte rückgängig
+repo-workflows-hotfix-hotfix-op-done-5b11af18 = { " " }— Strg+Z macht die ausgeführten Schritte rückgängig
 
 repo-workflows-hotfix-hotfix-op-done-fbdef87e = { $run-label-1 } (teilweise angehalten)
 
@@ -2759,11 +2753,11 @@ repo-workflows-hotfix-preview-7df6bedd = Pusht danach { $names-join-and-1 } und 
 
 repo-workflows-hotfix-preview-ab279563 = Mergt { $h-name-1 } ({ $crate-repo-short-h-head-2 }) nach { $t-name-3 } (git merge --no-ff)
 
-repo-workflows-hotfix-preview-e3ee915a =  und 
+repo-workflows-hotfix-preview-e3ee915a = { " " }und{ " " }
 
 repo-workflows-hotfix-problem-0225cdbc = Beim Mergen nach { $into } würden Konflikte in { $files-join-1 } auftreten. Manuell mergen{ $or }
 
-repo-workflows-hotfix-problem-a56c91b5 =  oder die Auswahl aufheben
+repo-workflows-hotfix-problem-a56c91b5 = { " " }oder die Auswahl aufheben
 
 repo-workflows-issue_work-card-1887e67c = beim ersten Lesen
 
@@ -2903,15 +2897,355 @@ repo-workflows-issue_work-what-68e64f0f = Akzeptanzkriterien
 
 repo-workflows-issue_work-what-734b09bc = Beschreibung
 
+repo-workflows-lfs_locks-caught-ff2cd16f = Interner Fehler: { $said }
+
+repo-workflows-lfs_locks-filters-53518a4c = Nach Pfad oder Inhaber filtern
+
+repo-workflows-lfs_locks-filters-5da4f78e = Nur meine
+
+repo-workflows-lfs_locks-header-2e532790 = Sperren erneut lesen
+
+repo-workflows-lfs_locks-header-961b2a04 = Schließen (Esc)
+
+repo-workflows-lfs_locks-header-b815cb09 = LFS-Sperren
+
+repo-workflows-lfs_locks-list-04f767bd = { $a } und { $b }
+
+repo-workflows-lfs_locks-list-e6b59dc4 = { $a }, { $b } und { $rest-len-1 } weitere
+
+repo-workflows-lfs_locks-lock-banners-03d23d29 = LFS-Sperren …
+
+repo-workflows-lfs_locks-lock-banners-11ae36a8 = { $if-one-owner-is-empty-someone-el-1 } hält die Sperre von { $one-path-2 }. Ihr Push wird verweigert, bis die Sperre freigegeben wurde.
+
+repo-workflows-lfs_locks-lock-banners-2737026b = Von anderen gesperrt: { $list-names-1 }. Ihr Push dieser Dateien wird verweigert, bis die Sperren freigegeben wurden.
+
+repo-workflows-lfs_locks-lock-banners-3233cb04 = Jemand anderes
+
+repo-workflows-lfs_locks-lock-banners-379e383e = Alle entsperren
+
+repo-workflows-lfs_locks-lock-banners-4ac709aa = Entsperren
+
+repo-workflows-lfs_locks-lock-banners-4caac7c4 = Sie haben { $many-len-1 } Dateien gepusht und halten deren Sperren weiterhin. Freigeben, damit andere die Dateien ändern können?
+
+repo-workflows-lfs_locks-lock-banners-4fa40890 = Sie haben { $one-path-1 } gepusht und halten die Sperre weiterhin. Freigeben, damit andere die Datei ändern können?
+
+repo-workflows-lfs_locks-lock-banners-6df5e70f = Gesperrt lassen
+
+repo-workflows-lfs_locks-lock-banners-82b7be09 = { $one } kann gesperrt werden und ist derzeit frei. Sperren Sie die Datei, damit niemand anderes während Ihrer Arbeit Änderungen daran pusht.
+
+repo-workflows-lfs_locks-lock-banners-942087cc = Erneut versuchen
+
+repo-workflows-lfs_locks-lock-banners-96ed4625 = { $many-len-1 } geänderte Dateien können gesperrt werden und sind derzeit frei. Sperren Sie sie, damit niemand anderes während Ihrer Arbeit Änderungen daran pusht.
+
+repo-workflows-lfs_locks-lock-banners-ac5bb7e1 = Alle sperren
+
+repo-workflows-lfs_locks-lock-banners-bb83044b = Gesperrt lassen
+
+repo-workflows-lfs_locks-lock-banners-db44b8db = Sperren
+
+repo-workflows-lfs_locks-lock-banners-f8368582 = Die LFS-Sperren konnten nicht gelesen werden. Daher ist unbekannt, wer Ihre geänderten Dateien gesperrt hat.
+
+repo-workflows-lfs_locks-lock-job-35b33376 = { $label }: abgeschlossen. .gitattributes committen, um die Änderung zu teilen.
+
+repo-workflows-lfs_locks-lock-job-36f5baee = { $label }: abgeschlossen
+
+repo-workflows-lfs_locks-lock-job-8336fbfe = { $label } fehlgeschlagen: { $e }
+
+repo-workflows-lfs_locks-lock-label-398e9b81 = Von { $who } gesperrt { $git-relative-time-at-now-1 }
+
+repo-workflows-lfs_locks-lock-label-6329feb6 = Von { $who } gesperrt
+
+repo-workflows-lfs_locks-lock-list-1a9f2707 = Keine der Sperren gehört Ihnen.
+
+repo-workflows-lfs_locks-lock-list-3ef08b56 = Keine Sperre passt zum Filter.
+
+repo-workflows-lfs_locks-lock-list-5619b99f = Niemand hält eine Sperre.
+
+repo-workflows-lfs_locks-lock-list-e1890cf8 = Sperren werden gelesen …
+
+repo-workflows-lfs_locks-lock-menu-items-03d23d29 = LFS-Sperren …
+
+repo-workflows-lfs_locks-lock-menu-items-052a679c = Die LFS-Sperre freigeben, damit andere Änderungen an dieser Datei pushen können
+
+repo-workflows-lfs_locks-lock-menu-items-0c28d273 = Der Server kann den Sperrinhaber nicht bestimmen. Die Freigabe schlägt fehl, wenn die Sperre nicht Ihnen gehört.
+
+repo-workflows-lfs_locks-lock-menu-items-3f09bd22 = Die LFS-Sperre übernehmen, damit niemand anderes Änderungen an dieser Datei pushen kann
+
+repo-workflows-lfs_locks-lock-menu-items-4ac709aa = Entsperren
+
+repo-workflows-lfs_locks-lock-menu-items-6526301c = git-lfs gibt die Sperre einer geänderten Datei nicht frei. Die Änderungen zuerst committen.
+
+repo-workflows-lfs_locks-lock-menu-items-b8fc75d5 = Ein Vorgang für LFS-Sperren läuft
+
+repo-workflows-lfs_locks-lock-menu-items-bafa9d65 = Jemand anderes hält die Sperre dieser Datei
+
+repo-workflows-lfs_locks-lock-menu-items-bea7de48 = Die Änderungen der Datei vor dem Entsperren committen
+
+repo-workflows-lfs_locks-lock-menu-items-db44b8db = Sperren
+
+repo-workflows-lfs_locks-locks-read-05347473 = Die LFS-Sperren konnten nicht gelesen werden: { $e }
+
+repo-workflows-lfs_locks-patterns-119fe07d = git lfs track --lockable: Speichert die Dateien in LFS und schreibt das Muster in .gitattributes
+
+repo-workflows-lfs_locks-patterns-6105d5e3 = Sperrbar machen
+
+repo-workflows-lfs_locks-patterns-abf43528 = Sperrbare Dateien
+
+repo-workflows-lfs_locks-patterns-ddfb1d6f = Dateien, die diesen Mustern entsprechen, können gesperrt werden. Bis dahin hält git-lfs sie schreibgeschützt. .gitattributes committen, um ein neues Muster zu teilen.
+
+repo-workflows-lfs_locks-patterns-ed7c75cc = Kein Muster in der .gitattributes im Hauptverzeichnis ist sperrbar.
+
 repo-workflows-lfs_locks-unlock-buttons-19766ed6 = Abbrechen
+
+repo-workflows-lfs_locks-unlock-buttons-24110cc4 = { $n } entsperren
+
+repo-workflows-lfs_locks-unlock-buttons-2978e628 = der Inhaber verliert die Sperre
+
+repo-workflows-lfs_locks-unlock-buttons-4ac709aa = Entsperren
+
+repo-workflows-lfs_locks-unlock-buttons-6021bccb = Entsperren von { $n } Dateien erzwingen …
+
+repo-workflows-lfs_locks-unlock-buttons-62509394 = die Inhaber verlieren ihre Sperren
+
+repo-workflows-lfs_locks-unlock-buttons-97edf7d6 = deren Inhaber
+
+repo-workflows-lfs_locks-unlock-buttons-9971cec2 = Den Inhabern { $n } Sperren entziehen
+
+repo-workflows-lfs_locks-unlock-buttons-b57b0be8 = { $owner } die Sperre entziehen
+
+repo-workflows-lfs_locks-unlock-buttons-c214395e = Entzieht dem Inhaber die Sperre. Nur Administratoren dürfen dies. Der Inhaber wird nicht benachrichtigt und seine ungepushten Änderungen können mit den Änderungen anderer kollidieren.
+
+repo-workflows-lfs_locks-unlock-buttons-ccf3d9ea = Alle auswählen
+
+repo-workflows-lfs_locks-unlock-buttons-e213bc66 = Erneut klicken, um die Freigabe zu erzwingen: { $who }.
+
+repo-workflows-lfs_locks-unlock-buttons-e2d5673c = Keine auswählen
+
+repo-workflows-lfs_locks-unlock-buttons-f16646da = Entsperren erzwingen …
+
+repo-workflows-lfs_storage-caught-ff2cd16f = Interner Fehler: { $said }
+
+repo-workflows-lfs_storage-checkout-1716d186 = Nur Zeiger ({ $missing-len-1 })
+
+repo-workflows-lfs_storage-checkout-4cd9a422 = Führt git lfs pull für jede Datei aus, unabhängig von den folgenden Ordnereinstellungen
+
+repo-workflows-lfs_storage-checkout-5f0a6ba0 = Alle herunterladen ({ $paths-len-1 })
+
+repo-workflows-lfs_storage-checkout-683768ab = und { $missing-len-listed-1 } weitere
+
+repo-workflows-lfs_storage-checkout-87bcf309 = git lfs pull, soweit die folgenden Ordnereinstellungen dies zulassen ({ $e })
+
+repo-workflows-lfs_storage-checkout-a5d7a59b = { $n } Dateien in LFS, alle heruntergeladen.
+
+repo-workflows-lfs_storage-checkout-b627e471 = Keine Datei dieses Checkouts wird in LFS gespeichert.
+
+repo-workflows-lfs_storage-checkout-d6eafe82 = Herunterladen
+
+repo-workflows-lfs_storage-checkout-f4b00836 = LFS-Dateien werden aufgelistet …
+
+repo-workflows-lfs_storage-checkout-f5a54014 = Eine Datei in LFS, heruntergeladen.
+
+repo-workflows-lfs_storage-download-action-43432746 = „{ $bad }“ beginnt oder endet mit einem Leerzeichen, das git-lfs entfernt. LFS: Pull verwenden, um die Datei herunterzuladen.
+
+repo-workflows-lfs_storage-download-action-e9f327fc = { $bad } enthält ein Komma, das git-lfs als zwei Muster liest. LFS: Pull verwenden, um die Datei herunterzuladen.
+
+repo-workflows-lfs_storage-fetch-only-3f558a4c = LFS ruft jetzt nur { $names-join-1 } ab
+
+repo-workflows-lfs_storage-fetch-only-e3be5d1f = Die LFS-Abrufauswahl konnte nicht gesetzt werden: { $e }
+
+repo-workflows-lfs_storage-filters-49e74a0b = Abweichend von der .lfsconfig des Repositorys: { $names-join-1 }
+
+repo-workflows-lfs_storage-filters-72d4ac36 = Die LFS-Abrufauswahl konnte nicht gelesen werden: { $e }
+
+repo-workflows-lfs_storage-filters-8758c8bb = Nur diese Ordner
+
+repo-workflows-lfs_storage-filters-9777b8b2 = Bei Fetch, Pull und Checkout lädt git-lfs nur eingeschlossene Ordner (alle, wenn keiner angegeben ist), ohne die ausgeschlossenen Ordner. Die Einstellung gilt nur für dieses Repository.
+
+repo-workflows-lfs_storage-filters-9fd728c6 = Hinzufügen
+
+repo-workflows-lfs_storage-filters-c621d797 = Die .lfsconfig des Repositorys legt fest: { $names-join-1 }
+
+repo-workflows-lfs_storage-filters-cd8bf912 = Nie diese Ordner
+
+repo-workflows-lfs_storage-filters-dc013b99 = { $name } entfernen
+
+repo-workflows-lfs_storage-header-59ef044f = LFS-Speicher
+
+repo-workflows-lfs_storage-header-961b2a04 = Schließen (Esc)
+
+repo-workflows-lfs_storage-header-d8cb92fa = Erneut lesen
+
+repo-workflows-lfs_storage-list-lfs-files-8d1bad49 = Die LFS-Dateien konnten nicht aufgelistet werden: { $e }
+
+repo-workflows-lfs_storage-pointer-mark-efdc14b1 = Hier liegt nur der LFS-Zeiger vor (nicht heruntergeladen). Rechtsklick → LFS: Herunterladen.
 
 repo-workflows-lfs_storage-prune-19766ed6 = Abbrechen
 
+repo-workflows-lfs_storage-prune-30967fda = Ein Objekt
+
+repo-workflows-lfs_storage-prune-407859ca = Erneut klicken, um { $objects } zu löschen
+
+repo-workflows-lfs_storage-prune-5fc3fdf9 = { $objects } löschen ({ $human-size-plan-bytes-1 })
+
+repo-workflows-lfs_storage-prune-659493e2 = Nichts zu bereinigen.
+
+repo-workflows-lfs_storage-prune-8bfaae7c = Die Bereinigung löscht lokale LFS-Objekte, die weder aktuelle Commits noch der Checkout oder ungepushte Arbeit benötigen. Sie können erneut heruntergeladen werden, solange das Remote sie bereithält.
+
+repo-workflows-lfs_storage-prune-8f8978b1 = { $plan-objects-1 } Objekte
+
+repo-workflows-lfs_storage-prune-ebe86463 = Freigebbaren Speicher ermitteln
+
+repo-workflows-lfs_storage-prune-f0bcc399 = Freigebbarer Speicher wird ermittelt …
+
+repo-workflows-lfs_storage-set-filter-b41c110a = Speichern fehlgeschlagen: { $e }
+
+repo-workflows-lfs_storage-storage-menu-items-1b8b17ee = git lfs track: Schreibt das Muster in .gitattributes. Bereits committete Dateien bleiben normale Git-Dateien, bis sie erneut geändert und vorgemerkt werden. .gitattributes committen, um das Muster zu teilen.
+
+repo-workflows-lfs_storage-storage-menu-items-1de3e10c = LFS: Herunterladen
+
+repo-workflows-lfs_storage-storage-menu-items-31a0cb12 = { $pattern } in LFS verfolgen
+
+repo-workflows-lfs_storage-storage-menu-items-4f441605 = { $path } in LFS verfolgen
+
+repo-workflows-lfs_storage-storage-menu-items-5ed965af = LFS: Nur { $dir } abrufen
+
+repo-workflows-lfs_storage-storage-menu-items-e2cb4df2 = Das LFS-Objekt dieser Datei herunterladen und auschecken
+
+repo-workflows-lfs_storage-storage-menu-items-ea226348 = git-lfs lädt bei Fetch, Pull und Checkout künftig nur diesen und weitere unter LFS: Speicher … gewählte Ordner herunter. Andere Dateien bleiben Zeiger. Die Einstellung gilt für dieses Repository.
+
+repo-workflows-lfs_storage-storage-panel-6ce01b6d = Alte Objekte
+
+repo-workflows-lfs_storage-storage-panel-a99e2b3d = Dieser Checkout
+
+repo-workflows-lfs_storage-storage-panel-b05f298a = LFS-Abrufauswahl
+
+repo-workflows-lfs_storage-usage-18b3c0d1 = Noch keine LFS-Objekte auf dem Datenträger
+
+repo-workflows-lfs_storage-usage-9aea26d2 = { $human-size-u-bytes-1 } in einem LFS-Objekt auf dem Datenträger
+
+repo-workflows-lfs_storage-usage-a5b8a0cd = { $human-size-u-bytes-1 } in { $n } LFS-Objekten auf dem Datenträger
+
+repo-workflows-lfs_storage-usage-aca1a392 = LFS-Objekte werden vermessen …
+
+repo-workflows-lfs_storage-usage-bc295532 = Die LFS-Objekte konnten nicht vermessen werden: { $e }
+
 repo-workflows-line_dossier-line-dossier-view-82a9c46f = Committen
+
+repo-workflows-owners-contents-3203b0df = Die Dateien des Repositorys konnten nicht aufgelistet werden: { $e }
+
+repo-workflows-owners-contents-343bb384 = Eine Regel
+
+repo-workflows-owners-contents-4adeeb91 = Abschnitte: { $sections-join-1 }
+
+repo-workflows-owners-contents-4b99390e = In Ihrem Editor
+
+repo-workflows-owners-contents-4d726f4a = { $n } Regeln
+
+repo-workflows-owners-contents-64feb239 = VON DER PLATTFORM ANDERS GELESENE ZEILEN ({ $file-problems-len-1 })
 
 repo-workflows-owners-contents-7d9eb7ac = Schließen
 
+repo-workflows-owners-contents-8f8353f4 = Zeile { $p-line-1 }: { $p-text-2 }
+
+repo-workflows-owners-contents-96978c8c = { $file-path-1 } bei HEAD, gelesen wie von { $file-flavor-name-2 } · { $rules }
+
+repo-workflows-owners-contents-bd5f6b1d = Datei öffnen
+
+repo-workflows-owners-contents-bd73a6b1 = Keine. Die Plattform liest jede Zeile wie geschrieben.
+
+repo-workflows-owners-contents-c72a165d = Zuletzt nicht erneut lesbar ({ $e }). Angezeigt wird der zuvor gelesene Stand.
+
+repo-workflows-owners-contents-e1e62224 = CODEOWNERS prüfen
+
+repo-workflows-owners-owners-act-9cd4150e = Dieses Repository hat keine CODEOWNERS-Datei
+
+repo-workflows-owners-owners-act-b11dc59d = Prüfung fehlgeschlagen
+
+repo-workflows-owners-owners-summary-db29b096 = Aus { $path } bei HEAD ({ $rules-count-1 })
+
+repo-workflows-owners-read-owners-cf60f83c = Lesen fehlgeschlagen
+
+repo-workflows-owners-results-26e406d1 = Keine. Jede Datei hat einen Verantwortlichen.
+
+repo-workflows-owners-results-683768ab = und { $lint-unowned-len-listed-1 } weitere
+
+repo-workflows-owners-results-85d177f5 = MUSTER OHNE PASSENDE DATEI ({ $lint-unmatched-len-1 })
+
+repo-workflows-owners-results-9c0433a9 = Keine. Jedes Muster passt zu einer Datei.
+
+repo-workflows-owners-results-a6551c12 = Zeile { $n }: { $pattern }
+
+repo-workflows-owners-results-a92df9d7 = DATEIEN OHNE VERANTWORTLICHE ({ $lint-unowned-len-1 } von { $lint-files-2 })
+
+repo-workflows-owners-reviewers-for-d68c1cfb = { $base } ist hier kein Branch
+
+repo-workflows-owners-reviewers-ui-796e0df8 = Reviews anhand von CODEOWNERS anfordern, sobald es kein Entwurf mehr ist
+
+repo-workflows-owners-reviewers-ui-7a8a3ca3 = Ein Team. Die Plattform fragt seine Mitglieder an.
+
+repo-workflows-owners-reviewers-ui-d8e1731e = Ein Konto
+
+repo-workflows-owners-reviewers-ui-da35c68e = Reviews anhand von CODEOWNERS anfordern
+
+repo-workflows-owners-rules-343bb384 = Eine Regel
+
+repo-workflows-owners-rules-4d726f4a = { $n } Regeln
+
+repo-workflows-owners-summary-text-3ff108bf = { $unowned } Dateien ohne Verantwortlichen
+
+repo-workflows-owners-summary-text-4339bb43 = Kein Verantwortlicher
+
+repo-workflows-owners-summary-text-6a5cbe9f = Eine Datei ohne Verantwortlichen
+
+repo-workflows-owners-summary-text-9655d0de = Hier hat keine Datei einen Verantwortlichen
+
+repo-workflows-owners-summary-text-a198627d = Benötigt { $codeowners-and-list-short-names--1 }
+
+repo-workflows-package-buttons-0e916101 = Aktualisieren
+
 repo-workflows-package-buttons-7d9eb7ac = Schließen
+
+repo-workflows-package-buttons-8a24ec7c = Listet die Pakete und ihre Dateien nach einer Änderung erneut auf
+
+repo-workflows-package-contents-59de121d = Paket
+
+repo-workflows-package-contents-89bee303 = Die Dateien des Pakets konnten nicht aufgelistet werden: { $e }
+
+repo-workflows-package-contents-8ed27415 = Hier wird nichts veröffentlicht: package.json ist privat oder alle Crates haben publish = false.
+
+repo-workflows-package-contents-a2e9d64e = Aus { $pkg-ecosystem-tool-1 }, ausgeführt in { $if-pkg-dir-is-empty-the-reposito-2 }
+
+repo-workflows-package-contents-b32a9827 = Anfrage an { $pkg-ecosystem-tool-1 } …
+
+repo-workflows-package-contents-b60559a9 = Was ein Paket veröffentlicht
+
+repo-workflows-package-contents-d5728cc3 = dem Hauptverzeichnis des Repositorys
+
+repo-workflows-package-contents-e237505e = Die Pakete konnten nicht gefunden werden: { $e }
+
+repo-workflows-package-more-683768ab = und { $len-shown-1 } weitere
+
+repo-workflows-package-notes-adea78e6 = Nichts gefunden.
+
+repo-workflows-package-report-ui-47ec594b = In { $p-version-1 }, fehlt hier
+
+repo-workflows-package-report-ui-6c125757 = Neu seit { $p-version-1 }
+
+repo-workflows-package-report-ui-74f3a93b = Vergleich fehlgeschlagen: { $e }
+
+repo-workflows-package-report-ui-b2667be4 = VERGLICHEN MIT { $registry-to-uppercase-1 }
+
+repo-workflows-package-report-ui-b413d4db = Anfrage an { $registry } …
+
+repo-workflows-package-report-ui-b47c6e02 = Noch nie auf { $registry } veröffentlicht.
+
+repo-workflows-package-report-ui-d4826304 = DATEIEN ({ $report-files-len-1 })
+
+repo-workflows-package-report-ui-ef333981 = Dieselben Dateien wie { $p-version-1 } auf { $registry }.
+
+repo-workflows-package-report-ui-fa5b38db = ÜBLICHERWEISE ENTHALTEN, FEHLT HIER
+
+repo-workflows-package-report-ui-fefc6039 = MÖGLICHERWEISE VERSEHENTLICH ENTHALTEN
 
 repo-workflows-parallel_bisect-hash-link-63633913 = Diesen Commit anzeigen
 
@@ -3809,5 +4143,27 @@ repo-workflows-history-calendar-day = { $day }
     { $count ->
         [one] { $count } Commit
        *[other] { $count } Commits
+    }
+
+repo-workflows-lfs-checkout-summary = { $files ->
+        [0] Keine Datei dieses Checkouts wird in LFS gespeichert.
+       *[other] { $missing ->
+            [0] { $files ->
+                [one] Eine Datei in LFS, heruntergeladen.
+               *[other] { $files } Dateien in LFS, alle heruntergeladen.
+            }
+           *[other] { $files ->
+                [one] Eine Datei in LFS;
+               *[other] { $files } Dateien in LFS;
+            } { $missing ->
+                [one] eine liegt hier nur als Zeiger vor
+               *[other] { $missing } liegen hier nur als Zeiger vor
+            } ({ $bytes } nicht heruntergeladen).
+        }
+    }
+
+repo-workflows-lfs-force-unlock-confirmation = { $count ->
+        [one] Erneut klicken, um die Freigabe zu erzwingen. Der Inhaber verliert die Sperre.
+       *[other] Erneut klicken, um die Freigabe zu erzwingen. Die Inhaber verlieren ihre { $count } Sperren.
     }
 

@@ -55,16 +55,34 @@ fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) ->
     let mut close = false;
     ui.horizontal(|ui| {
         icons::inline(ui, "lock", 16.0, t.icon);
-        ui.label(RichText::new("LFS locks").font(theme::semibold(16.0)));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-lfs_locks-header-b815cb09",
+            ))
+            .font(theme::semibold(16.0)),
+        );
         if state.reading.is_some() {
             ui.add(crate::spinner::Spinner::new());
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            if icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("repo-workflows-lfs_locks-header-961b2a04"),
+            )
+            .clicked()
+            {
                 close = true;
             }
             let reading = state.reading.is_some();
-            if !reading && icons::small_button(ui, "refresh-cw", "Read the locks again").clicked() {
+            if !reading
+                && icons::small_button(
+                    ui,
+                    "refresh-cw",
+                    crate::i18n::text("repo-workflows-lfs_locks-header-2e532790"),
+                )
+                .clicked()
+            {
                 acts.push(Action::LfsLocks(LockAct::Refresh));
             }
         });
@@ -82,10 +100,15 @@ fn filters(ui: &mut Ui, panel: &mut Panel) {
     ui.horizontal(|ui| {
         let typed = ui.add(
             egui::TextEdit::singleline(&mut panel.filter)
-                .hint_text("Filter by path or owner")
+                .hint_text(crate::i18n::text(
+                    "repo-workflows-lfs_locks-filters-53518a4c",
+                ))
                 .desired_width(320.0),
         );
-        let mine = ui.checkbox(&mut panel.only_mine, "Only mine");
+        let mine = ui.checkbox(
+            &mut panel.only_mine,
+            crate::i18n::text("repo-workflows-lfs_locks-filters-5da4f78e"),
+        );
         if typed.changed() || mine.changed() {
             panel.confirm_force = None;
         }
@@ -101,16 +124,24 @@ fn lock_list(ui: &mut Ui, t: &Tokens, state: &LockState, shown: &[&LfsLock], pan
             if shown.is_empty() {
                 let note = if state.locks.is_empty() {
                     if state.reading.is_some() {
-                        Some("Reading the locks…")
+                        Some(crate::i18n::text(
+                            "repo-workflows-lfs_locks-lock-list-e1890cf8",
+                        ))
                     } else if state.error.is_some() {
                         None
                     } else {
-                        Some("Nobody holds a lock.")
+                        Some(crate::i18n::text(
+                            "repo-workflows-lfs_locks-lock-list-5619b99f",
+                        ))
                     }
                 } else if panel.only_mine && panel.filter.trim().is_empty() {
-                    Some("None of the locks is yours.")
+                    Some(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-list-1a9f2707",
+                    ))
                 } else {
-                    Some("No lock matches the filter.")
+                    Some(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-list-3ef08b56",
+                    ))
                 };
                 if let Some(note) = note {
                     ui.label(RichText::new(note).color(t.text_dim));
@@ -172,7 +203,11 @@ fn unlock_buttons(
     let idle = state.busy.is_none();
     ui.horizontal(|ui| {
         let all = !shown.is_empty() && chosen.len() == shown.len();
-        let pick = if all { "Pick none" } else { "Pick all" };
+        let pick = if all {
+            crate::i18n::text("repo-workflows-lfs_locks-unlock-buttons-e2d5673c")
+        } else {
+            crate::i18n::text("repo-workflows-lfs_locks-unlock-buttons-ccf3d9ea")
+        };
         if ui
             .add_enabled(!shown.is_empty(), egui::Button::new(pick))
             .clicked()
@@ -193,20 +228,32 @@ fn unlock_buttons(
                             .find(|l| &l.id == id)
                             .map(|l| l.owner.as_str())
                             .filter(|o| !o.is_empty())
-                            .unwrap_or("its owner");
-                        format!("Take the lock from {owner}")
+                            .unwrap_or(crate::i18n::text(
+                                "repo-workflows-lfs_locks-unlock-buttons-97edf7d6",
+                            ));
+                        crate::i18n::message(
+                            "repo-workflows-lfs_locks-unlock-buttons-b57b0be8",
+                            &[("owner", (owner).clone().into())],
+                        )
                     }
-                    (Some(_), _) => format!("Take {n} locks from their owners"),
-                    (None, _) if n == 0 => "Force unlock…".to_owned(),
-                    (None, _) => format!("Force unlock {n}…"),
+                    (Some(_), _) => crate::i18n::message(
+                        "repo-workflows-lfs_locks-unlock-buttons-9971cec2",
+                        &[("n", (n).clone().into())],
+                    ),
+                    (None, _) if n == 0 => {
+                        crate::i18n::text("repo-workflows-lfs_locks-unlock-buttons-f16646da")
+                            .to_owned()
+                    }
+                    (None, _) => crate::i18n::message(
+                        "repo-workflows-lfs_locks-unlock-buttons-6021bccb",
+                        &[("n", (n).clone().into())],
+                    ),
                 };
                 let force = ui
                     .add_enabled(idle && n > 0, egui::Button::new(label))
-                    .on_hover_text(
-                        "Takes the lock from whoever holds it. Only admins may do this; the \
-                         owner isn't told, and their unpushed changes to the file may clash \
-                         with someone else's.",
-                    );
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-lfs_locks-unlock-buttons-c214395e",
+                    ));
                 if force.clicked() {
                     if panel.confirm_force.is_some() {
                         acts.push(Action::LfsLocks(LockAct::Unlock {
@@ -219,8 +266,13 @@ fn unlock_buttons(
                 }
             }
             let label = match mine.len() {
-                0 => "Unlock".to_owned(),
-                n => format!("Unlock {n}"),
+                0 => {
+                    crate::i18n::text("repo-workflows-lfs_locks-unlock-buttons-4ac709aa").to_owned()
+                }
+                n => crate::i18n::message(
+                    "repo-workflows-lfs_locks-unlock-buttons-24110cc4",
+                    &[("n", (n).clone().into())],
+                ),
             };
             if ui
                 .add_enabled(idle && !mine.is_empty(), egui::Button::new(label))
@@ -235,15 +287,13 @@ fn unlock_buttons(
     });
     if panel.confirm_force.is_some() {
         ui.horizontal(|ui| {
-            let who = if forceable.len() == 1 {
-                "its owner loses the lock"
-            } else {
-                "the owners lose their locks"
-            };
             ui.label(
-                RichText::new(format!("Click again to force: {who}."))
-                    .color(t.warning)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-lfs-force-unlock-confirmation",
+                    &[("count", (forceable.len()).into())],
+                ))
+                .color(t.warning)
+                .small(),
             );
             if ui
                 .small_button(crate::i18n::text(
@@ -260,18 +310,25 @@ fn unlock_buttons(
 
 /// The lockable patterns of `.gitattributes`, and a field to add one.
 fn patterns(ui: &mut Ui, t: &Tokens, state: &LockState, panel: &mut Panel, acts: &mut Vec<Action>) {
-    ui.label(RichText::new("Lockable files").font(theme::semibold(13.0)));
     ui.label(
-        RichText::new(
-            "Files matching these patterns can be locked; git-lfs keeps them read-only until \
-             you do. Commit .gitattributes to share a new pattern.",
-        )
+        RichText::new(crate::i18n::text(
+            "repo-workflows-lfs_locks-patterns-abf43528",
+        ))
+        .font(theme::semibold(13.0)),
+    );
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-lfs_locks-patterns-ddfb1d6f",
+        ))
         .color(t.text_dim)
         .small(),
     );
     if state.patterns.is_empty() {
         ui.label(
-            RichText::new("No pattern in the root .gitattributes is lockable.").color(t.text_faint),
+            RichText::new(crate::i18n::text(
+                "repo-workflows-lfs_locks-patterns-ed7c75cc",
+            ))
+            .color(t.text_faint),
         );
     } else {
         ui.horizontal_wrapped(|ui| {
@@ -289,10 +346,15 @@ fn patterns(ui: &mut Ui, t: &Tokens, state: &LockState, panel: &mut Panel, acts:
         let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         let ok = !panel.new_pattern.trim().is_empty() && state.busy.is_none();
         let add = ui
-            .add_enabled(ok, egui::Button::new("Make lockable"))
-            .on_hover_text(
-                "git lfs track --lockable: keeps them in LFS, written to .gitattributes",
-            );
+            .add_enabled(
+                ok,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-lfs_locks-patterns-6105d5e3",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-lfs_locks-patterns-119fe07d",
+            ));
         if ok && (add.clicked() || enter) {
             acts.push(Action::LfsLocks(LockAct::TrackLockable(
                 panel.new_pattern.trim().to_owned(),

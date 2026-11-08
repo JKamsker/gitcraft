@@ -120,7 +120,9 @@ impl RepoTab {
                 std::panic::catch_unwind(|| {
                     codeowners::read(&repo, "HEAD", forge, known.as_deref())
                 })
-                .unwrap_or_else(|_| Err("reading it failed".to_owned()))
+                .unwrap_or_else(|_| {
+                    Err(crate::i18n::text("repo-workflows-owners-read-owners-cf60f83c").to_owned())
+                })
             },
             move |tab, result, _| {
                 tab.owners.reading = false;
