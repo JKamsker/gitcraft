@@ -14,6 +14,8 @@ mod keep_detached;
 mod linked_machines;
 mod parallel_bisect;
 mod preview;
+#[cfg(test)]
+mod rebase_test_support;
 mod rehearse;
 mod remote;
 mod stash;

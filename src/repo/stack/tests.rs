@@ -314,11 +314,44 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
     let before = (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?);
     let ctx = egui::Context::default();
     let mut tab = open(&repo, &ctx)?;
-    let commits = crate::git::rebase_commits(repo.path(), "main")?;
-    let mut editor = crate::repo::rebase::RebaseEditor::new("main".into(), "main".into(), commits);
+    let onto = repo.tip("main")?;
+    tab.apply(
+        Action::InteractiveRebase {
+            onto: "refs/heads/main".into(),
+            label: "main".into(),
+        },
+        &ctx,
+    );
+    settle(&mut tab, &ctx, |t| t.rebase.is_some())?;
+    let editor = tab.rebase.as_mut().ok_or("no rebase editor")?;
     editor.update_refs = true;
-    tab.rebase = Some(editor);
+    assert_eq!(editor.onto, onto);
+    assert_eq!(editor.head, before.2);
+    let id = editor.id;
+    let mut described = vec![format!("git rebase -i --autostash --update-refs {onto}")];
+    described.extend(
+        editor
+            .entries
+            .iter()
+            .map(|e| format!("todo: Pick {} {}", e.commit.hash, e.message)),
+    );
     tab.apply(Action::RunRebase, &ctx);
+    tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
+    let Some(crate::repo::Dialog::Confirm { preview, .. }) = &tab.dialog else {
+        return Err("no interactive confirmation".into());
+    };
+    let instead = preview
+        .instead
+        .as_ref()
+        .ok_or("no confirmed rebase action")?;
+    assert!(matches!(instead.action, Action::ConfirmedRebase(approved) if approved == id));
+    assert_eq!(instead.described, described);
+    assert_eq!(
+        (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?),
+        before
+    );
+    let accepted = tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
+    tab.apply(accepted, &ctx);
     settle(&mut tab, &ctx, |t| t.rebase.is_none() && t.status.is_some())?;
     assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "main", "api"));
     let tips = || -> Result<(String, String, String), String> {

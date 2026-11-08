@@ -406,7 +406,7 @@ Resolved 'a.rs' using previous resolution.";
 }
 
 #[test]
-fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
+fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() -> Result<(), String> {
     use super::actions::{
         Action, BranchRef, fast_forward_action, merge_action, merge_message, rebase_action,
     };
@@ -428,11 +428,10 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
     }
     let branch_tip = rev("refs/heads/x");
     let start = rev("HEAD");
-    let steps = |action: Action| match action {
-        Action::UndoableOps { ops, .. } => ops,
-        _ => Vec::new(),
+    let go = |action: Action| match action {
+        Action::UndoableOps { ops, .. } => run_steps(&dir, &ops, OpKind::plain(), None).0,
+        _ => Err("expected undoable branch operation".to_owned()),
     };
-    let go = |action: Action| run_steps(&dir, &steps(action), OpKind::plain(), None).0;
     let ff = go(fast_forward_action(BranchRef::local("x"), "work"));
     let ff_head = rev("HEAD");
     let back = run(&["reset", "-q", "--hard", "HEAD@{1}"]);
@@ -441,8 +440,37 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
     let merged_from = rev("HEAD^2");
     let message = run(&["log", "-1", "--format=%s"]);
     assert!(run(&["reset", "-q", "--hard", "HEAD~1"]).is_ok());
-    let rebased = go(rebase_action(BranchRef::remote("origin/x"), "work"));
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new(dir.clone(), &ctx);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !tab.settled() || tab.history_gen == 0 {
+        tab.poll(&ctx);
+        assert!(
+            std::time::Instant::now() < until,
+            "branch tab did not settle"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let before_rebase = rev("HEAD")?;
+    let action = rebase_action(BranchRef::remote("origin/x"), "work");
+    assert!(matches!(&action, Action::AskRebase { onto, .. } if onto == "refs/remotes/origin/x"));
+    tab.apply(action, &ctx);
+    let accepted =
+        tab.accept_rebase_for_test(&ctx, "work", &before_rebase, &branch_tip.clone()?)?;
+    tab.apply(accepted, &ctx);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !tab.settled() || tab.status.is_none() {
+        tab.poll(&ctx);
+        assert!(
+            std::time::Instant::now() < until,
+            "rebase did not settle: {:?}",
+            tab.status
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let rebased = tab.status.clone().ok_or("no rebase result")?;
     let rebased_onto = rev("HEAD~1");
+    drop(tab);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(ff.is_ok(), "{ff:?}");
     assert_eq!(ff_head, branch_tip);
@@ -454,7 +482,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
         message.map(|m| m.trim().to_owned()).as_deref(),
         Ok("Merge branch 'x' into work")
     );
-    assert!(rebased.is_ok(), "{rebased:?}");
+    assert!(!rebased.1, "{rebased:?}");
     assert_eq!(rebased_onto, branch_tip);
     assert_eq!(
         merge_message(BranchRef::local("x"), "main"),
@@ -464,6 +492,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
         merge_message(BranchRef::remote("origin/x"), "feat"),
         "Merge remote-tracking branch 'origin/x' into feat"
     );
+    Ok(())
 }
 
 #[test]

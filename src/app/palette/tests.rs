@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use egui::{Event, Key};
+use egui_kittest::kittest::Queryable;
 
 use super::Palette;
 use crate::app::{App, Saved, Tab};
@@ -142,8 +143,10 @@ fn enter(harness: &mut H<'_>) {
 }
 
 #[test]
-fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
+fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() -> Result<(), String> {
     let dir = repo("rebase");
+    let before = git_ok(&dir, &["rev-parse", "refs/heads/main"]);
+    let onto = git_ok(&dir, &["rev-parse", "refs/heads/side"]);
     let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "reb");
@@ -161,6 +164,17 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     enter(&mut harness);
     assert!(harness.state().palette.is_none());
     settle(&mut harness);
+    {
+        let state = harness.state_mut();
+        let active = state.active;
+        let Some(Tab::Repo(tab)) = state.tabs.get_mut(active) else {
+            return Err("no repository tab".into());
+        };
+        tab.review_rebase_for_test(&egui::Context::default(), "main", &before, &onto)?;
+    }
+    harness.step();
+    harness.get_by_label("Rebase").click();
+    settle(&mut harness);
     let log = git_ok(&dir, &["log", "--format=%s", "main"]);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(
@@ -171,6 +185,7 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     let recent = &harness.state().palette_recent;
     assert_eq!(recent.rank("rebase:side"), Some(0));
     assert_eq!(recent.rank("pick:rebase"), Some(1));
+    Ok(())
 }
 
 /// A letter typed and Enter pressed in the same frame run the best match for the whole query.

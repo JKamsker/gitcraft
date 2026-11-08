@@ -175,18 +175,26 @@ fn dropping_a_branch_on_the_checked_out_one_merges_it_and_undo_takes_it_back() {
 }
 
 #[test]
-fn dropping_a_branch_on_the_checked_out_one_rebases_it() {
+fn dropping_a_branch_on_the_checked_out_one_rebases_it() -> Result<(), String> {
     let dir = diverged("rebase");
     let (ctx, mut tab) = open(&dir);
     let feature = tip(&dir, "feature");
     let target = DropTarget::Branch(branch(&dir, "main"));
     let offers = offered(&tab, DragItem::Branch(branch(&dir, "feature")), &target);
-    choose(&mut tab, &ctx, &offers, "Rebase main onto feature");
+    let before = tip(&dir, "main");
+    let offer = offers
+        .iter()
+        .find(|o| o.label() == "Rebase main onto feature")
+        .ok_or("no rebase offer")?;
+    tab.apply(offer.action(), &ctx);
+    let accepted = tab.accept_rebase_for_test(&ctx, "main", &before, &feature)?;
+    run(&mut tab, &ctx, accepted);
     let rebased = subjects(&dir);
     let parent = git_ok(&dir, &["rev-parse", "main^"]);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(rebased, ["on main", "on feature", "base"]);
     assert_eq!(parent.trim(), feature);
+    Ok(())
 }
 
 #[test]
