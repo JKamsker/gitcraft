@@ -295,6 +295,10 @@ impl RepoTab {
             self.status = Some((why.why().to_owned(), true));
             return;
         }
+        let origin = match &self.dialog {
+            Some(Dialog::RepositoryTools(state)) => Some(state.id),
+            _ => None,
+        };
         let ops = super::ops(&[&[if network { "push" } else { "refs" }]]);
         let control = self.follow_op(&ops, false, ctx);
         self.busy_op = Some(label.into());
@@ -325,9 +329,7 @@ impl RepoTab {
                     ctx,
                 );
                 // Drop snapshots after a mutation. A subsequent action must reread all guards.
-                if matches!(tab.dialog, Some(Dialog::RepositoryTools(_))) {
-                    tab.dialog = None;
-                }
+                retire_origin_dialog(&mut tab.dialog, origin);
             },
         );
     }
@@ -403,33 +405,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         ui.label("Filter refs:");
         ui.text_edit_singleline(&mut state.filter);
     });
-    egui::ScrollArea::vertical()
-        .id_salt("all_refs")
-        .max_height(270.0)
-        .show(ui, |ui| {
-            for r in browser
-                .refs
-                .iter()
-                .filter(|r| r.name.contains(&state.filter))
-            {
-                ui.horizontal(|ui| {
-                    if ui.selectable_label(false, &r.name).clicked() {
-                        acts.push(Action::RepositoryTools(Act::AllRefs(r.name.clone())));
-                    }
-                    ui.monospace(&r.oid);
-                    ui.label(&r.kind);
-                    if !r.symbolic.is_empty() && ui.link(format!("→ {}", r.symbolic)).clicked() {
-                        acts.push(Action::RepositoryTools(Act::AllRefs(r.symbolic.clone())));
-                    }
-                    if ui.small_button("Inspect object").clicked() {
-                        acts.push(Action::RepositoryTools(Act::Object(r.oid.clone())));
-                    }
-                    if ui.small_button("Copy object").clicked() {
-                        ui.ctx().copy_text(r.oid.clone());
-                    }
-                });
-            }
-        });
+    refs_list(ui, &browser.refs, &state.filter, acts);
     ui.separator();
     ui.label("History (up to 200 commits)");
     egui::ScrollArea::both()
@@ -796,5 +772,96 @@ impl RepoTab {
                 }
             },
         );
+    }
+}
+
+fn retire_origin_dialog(dialog: &mut Option<Dialog>, origin: Option<u64>) {
+    if let Some(Dialog::RepositoryTools(state)) = dialog
+        && Some(state.id) == origin
+    {
+        *dialog = None;
+    }
+}
+fn refs_list(
+    ui: &mut egui::Ui,
+    refs: &[all_refs::Reference],
+    filter: &str,
+    acts: &mut Vec<Action>,
+) -> usize {
+    let filtered: Vec<_> = refs.iter().filter(|r| r.name.contains(filter)).collect();
+    let mut rendered = 0;
+    let height = ui
+        .text_style_height(&egui::TextStyle::Body)
+        .max(ui.spacing().interact_size.y);
+    egui::ScrollArea::vertical()
+        .id_salt("all_refs")
+        .max_height(270.0)
+        .show_rows(ui, height, filtered.len(), |ui, rows| {
+            for index in rows {
+                rendered += 1;
+                let r = filtered[index];
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(false, &r.name).clicked() {
+                        acts.push(Action::RepositoryTools(Act::AllRefs(r.name.clone())));
+                    }
+                    ui.monospace(&r.oid);
+                    ui.label(&r.kind);
+                    if !r.symbolic.is_empty() && ui.link(format!("→ {}", r.symbolic)).clicked() {
+                        acts.push(Action::RepositoryTools(Act::AllRefs(r.symbolic.clone())));
+                    }
+                    if ui.small_button("Inspect object").clicked() {
+                        acts.push(Action::RepositoryTools(Act::Object(r.oid.clone())));
+                    }
+                    if ui.small_button("Copy object").clicked() {
+                        ui.ctx().copy_text(r.oid.clone());
+                    }
+                });
+            }
+        });
+    rendered
+}
+#[cfg(test)]
+mod ui_completion_pure {
+    use super::*;
+    fn dialog(id: u64) -> Option<Dialog> {
+        Some(Dialog::RepositoryTools(Box::new(State {
+            id,
+            query: String::new(),
+            result: None,
+            filter: String::new(),
+            tool: Tool::Refs,
+            acknowledged: false,
+            compatible: false,
+            parent: String::new(),
+            effective: true,
+        })))
+    }
+    #[test]
+    fn completion_does_not_close_a_newer_tools_dialog() {
+        let mut newer = dialog(2);
+        retire_origin_dialog(&mut newer, Some(1));
+        assert!(matches!(newer, Some(Dialog::RepositoryTools(ref s)) if s.id == 2));
+        retire_origin_dialog(&mut newer, None);
+        assert!(newer.is_some());
+        retire_origin_dialog(&mut newer, Some(2));
+        assert!(newer.is_none());
+    }
+    #[test]
+    fn all_refs_renders_only_visible_rows() {
+        let refs: Vec<_> = (0..10000)
+            .map(|i| all_refs::Reference {
+                name: format!("refs/gitcraft/{i}"),
+                oid: "a".repeat(40),
+                kind: "commit".into(),
+                symbolic: String::new(),
+            })
+            .collect();
+        let context = egui::Context::default();
+        let mut rendered = 0;
+        let mut output = context.run_ui(egui::RawInput::default(), |ui| {
+            rendered = refs_list(ui, &refs, "", &mut Vec::new());
+        });
+        output.textures_delta.clear();
+        assert!(rendered > 0 && rendered < 40, "rendered {rendered} rows");
     }
 }

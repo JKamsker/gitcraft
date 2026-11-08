@@ -1,4 +1,4 @@
-use super::guard::{Runner, Snapshot, text};
+use super::guard::{Runner, Snapshot};
 use std::path::{Path, PathBuf};
 #[derive(Clone, Debug)]
 pub(crate) struct Candidate {
