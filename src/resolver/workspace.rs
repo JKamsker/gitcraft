@@ -317,12 +317,12 @@ fn replace_with_temp(file: &Path, temp: &Path, bytes: &[u8]) -> std::io::Result<
         // Only Unix has more to them than read-only (which would keep it from being replaced).
         #[cfg(unix)]
         if let Ok(meta) = std::fs::symlink_metadata(file) {
-            std::fs::set_permissions(&temp, meta.permissions())?;
+            std::fs::set_permissions(temp, meta.permissions())?;
         }
-        std::fs::rename(&temp, file)
+        std::fs::rename(temp, file)
     })();
     if written.is_err() {
-        let _ = std::fs::remove_file(&temp);
+        let _ = std::fs::remove_file(temp);
     }
     written
 }
