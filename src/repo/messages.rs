@@ -386,6 +386,8 @@ impl RepoTab {
             self.handle(msg, ctx);
         }
         self.agent_step(ctx);
+        // An agent resolving conflicts that ended is seen to here, the tab shown or not.
+        self.resolver_poll(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
         if !shown || self.sleeping() {
             return;

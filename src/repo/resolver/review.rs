@@ -179,7 +179,8 @@ fn resolved(seg: (&str, Option<&String>, &str), result: String, line: usize) -> 
 
 /// Lines the conflicts up with `after` when the agent left the rest of the file as it was:
 /// the file's common parts, found in order, and between them what it wrote for each conflict.
-/// `None` when a common part isn't there as it was.
+/// `None` when a common part isn't there as it was, or two conflicts touch (nothing tells
+/// which wrote what: see [`align_by_lines`]).
 fn align(segments: &[Segment], after: &str) -> Option<(Vec<Resolved>, bool)> {
     let mut at = 0usize;
     let mut out = Vec::new();
@@ -192,10 +193,9 @@ fn align(segments: &[Segment], after: &str) -> Option<(Vec<Resolved>, bool)> {
                     // Before any conflict, or right after another common part: here.
                     None => after[at..].starts_with(common.as_str()).then_some(at)?,
                     // The last part ends the file; one between conflicts is the next match.
-                    Some(_) if i == last => {
-                        let start = after.len().checked_sub(common.len())?;
-                        (start >= at && after[start..] == **common).then_some(start)?
-                    }
+                    Some(_) if i == last => after[at..]
+                        .ends_with(common.as_str())
+                        .then(|| after.len() - common.len())?,
                     Some(_) => at + after[at..].find(common.as_str())?,
                 };
                 if let Some(seg) = open.take() {
@@ -205,10 +205,8 @@ fn align(segments: &[Segment], after: &str) -> Option<(Vec<Resolved>, bool)> {
                 at = start + common.len();
             }
             Segment::Conflict { ours, base, theirs } => {
-                if let Some(seg) = open.take() {
-                    // Two conflicts with nothing between them: the first got nothing.
-                    let line = after[..at].matches('\n').count() + 1;
-                    out.push(resolved(seg, String::new(), line));
+                if open.is_some() {
+                    return None;
                 }
                 open = Some((ours, base.as_ref(), theirs));
             }

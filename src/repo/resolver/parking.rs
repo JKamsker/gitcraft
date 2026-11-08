@@ -169,6 +169,7 @@ fn kept_run(repo: &Path, parked: &Parked) -> Option<Run> {
         results,
         picked,
         applied: 0,
+        unstaged: false,
         error: record.error,
         last_words: record.last_words,
         cost_usd: record.cost_usd,
@@ -177,8 +178,9 @@ fn kept_run(repo: &Path, parked: &Parked) -> Option<Run> {
     })
 }
 
-/// What the tab says it is doing while a merge is brought back.
+/// What the tab says it is doing while a merge is brought back, or dropped.
 const BRINGING_BACK: &str = "Bring the merge back";
+const DROPPING: &str = "Drop the merge put aside";
 
 /// Drops `ws` away from the UI thread: dropping a scratch worktree runs git.
 fn let_go(ws: Option<Arc<Workspace>>) {
@@ -194,7 +196,12 @@ fn let_go(ws: Option<Arc<Workspace>>) {
 impl RepoTab {
     /// Reads the merges put aside from this worktree (with the rest of the tab, on a reload).
     pub(in crate::repo) fn read_parked(&mut self, ctx: &egui::Context) {
-        if crate::remote::is_remote(&self.path) || self.resolver.reading_parked {
+        if crate::remote::is_remote(&self.path) {
+            return;
+        }
+        // One at a time: the one under way is read again once it is in.
+        if self.resolver.reading_parked {
+            self.resolver.read_parked_again = true;
             return;
         }
         self.resolver.reading_parked = true;
@@ -208,6 +215,11 @@ impl RepoTab {
 
     fn parked_read(&mut self, parked: Vec<Parked>, ctx: &egui::Context) {
         self.resolver.reading_parked = false;
+        // Read before a change made here (or asked for since): read again, this one dropped.
+        if std::mem::take(&mut self.resolver.read_parked_again) {
+            self.read_parked(ctx);
+            return;
+        }
         if parked != self.resolver.parked {
             self.resolver.parked = parked;
             self.rebuild(ctx);
@@ -226,13 +238,22 @@ impl RepoTab {
             ctx,
             // The first of them whose agent's work was kept.
             move || parked.iter().find_map(|p| kept_run(&repo, p)),
-            |tab, run, _| {
-                if tab.resolver.run.is_none() {
-                    tab.resolver.run = run;
-                    tab.resolver.folded = true;
-                }
-            },
+            |tab, run, _| tab.kept_run_read(run),
         );
+    }
+
+    /// The run of a parked merge, read back from what was kept: the tab's, unless another run
+    /// came meanwhile or the merge isn't parked any more (brought back, which reads its run
+    /// itself, or dropped).
+    fn kept_run_read(&mut self, run: Option<Run>) {
+        let Some(run) = run else {
+            return;
+        };
+        let parked = self.resolver.parked.iter().any(|p| p.id == run.id);
+        if self.resolver.run.is_none() && parked {
+            self.resolver.run = Some(run);
+            self.resolver.folded = true;
+        }
     }
 
     /// Unfolds the agent's card (a parked merge's row clicked).
@@ -339,22 +360,41 @@ impl RepoTab {
             }
         };
         self.resolver.parked.retain(|p| p.id != parked.id);
+        self.resolver.parked_changed();
         self.status = Some((format!("The {} is back, as it was", parked.what()), false));
         // Its changes shown, as they were: conflicted and staged files.
         self.resolver.reveal = Some((super::Reveal::Changes, Instant::now()));
         self.reload(ctx);
-        let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == parked.id) else {
+        if self.resolver.run.is_none() {
+            // Its run not here (gitcraft was closed meanwhile, and it wasn't read back yet):
+            // read from what was kept with it. Another run here stays.
+            let repo = self.path.clone();
+            self.then(
+                ctx,
+                move || kept_run(&repo, &parked),
+                |tab, run, ctx| {
+                    if tab.resolver.run.is_none() && run.is_some() {
+                        tab.resolver.run = run;
+                        tab.show_brought_back(ctx);
+                    }
+                },
+            );
+            return;
+        }
+        if self.resolver_owns(&parked.id) {
+            self.show_brought_back(ctx);
+        }
+    }
+
+    /// The run of the merge just brought back: its card in sight, as for a run in place, and
+    /// once it is done what it did, to review and apply now that the merge is here.
+    fn show_brought_back(&mut self, ctx: &egui::Context) {
+        let Some(run) = self.resolver.run.as_mut() else {
             return;
         };
         run.parked = None;
-        // Still at work: its card stays in sight, as for a run in place.
         self.resolver.folded = false;
-        let Some(run) = self.resolver.run.as_ref() else {
-            return;
-        };
         if run.phase == Phase::Ready && !run.results.is_empty() {
-            // What it did, to review and apply now that the merge is here.
-            self.resolver.folded = false;
             self.resolver_act(super::ResolverAct::Review(0), ctx);
         }
     }
@@ -364,6 +404,11 @@ impl RepoTab {
     /// Drops the merge put aside as `id` without bringing it back: its files go on a branch of
     /// their own, so nothing of it is lost; its run (and the agent's work) goes.
     pub(super) fn drop_parked(&mut self, id: &str, ctx: &egui::Context) {
+        // Never while it is brought back (or anything else runs on the worktree).
+        if self.busy_op.is_some() {
+            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            return;
+        }
         let Some(parked) = self.resolver.parked.iter().find(|p| p.id == id).cloned() else {
             return;
         };
@@ -375,36 +420,96 @@ impl RepoTab {
             return;
         }
         let repo = self.path.clone();
+        self.busy_op = Some(DROPPING.to_owned());
         self.then(
             ctx,
             move || park::drop_to_branch(&repo, &parked).map(|b| (parked, b)),
-            |tab, dropped, ctx| match dropped {
-                Ok((parked, branch)) => {
-                    tab.resolver.parked.retain(|p| p.id != parked.id);
-                    if let Some(run) = tab.resolver.run.as_mut().filter(|r| r.id == parked.id) {
-                        run.parked = None;
-                    }
-                    if tab.resolver_owns(&parked.id) {
-                        tab.resolver_act(super::ResolverAct::Dismiss, ctx);
-                    }
-                    tab.status = Some((
-                        format!(
-                            "The {} was dropped: its files are on {branch}",
-                            parked.what()
-                        ),
-                        false,
-                    ));
-                    tab.reload(ctx);
-                }
-                Err(e) => tab.status = Some((format!("Not dropped: {e}"), true)),
-            },
+            |tab, dropped, ctx| tab.parked_dropped(dropped, ctx),
         );
+    }
+
+    fn parked_dropped(&mut self, dropped: Result<(Parked, String), String>, ctx: &egui::Context) {
+        if self.busy_op.as_deref() == Some(DROPPING) {
+            self.busy_op = None;
+        }
+        let (parked, branch) = match dropped {
+            Ok(dropped) => dropped,
+            Err(e) => {
+                self.status = Some((format!("Not dropped: {e}"), true));
+                return;
+            }
+        };
+        self.resolver.parked.retain(|p| p.id != parked.id);
+        self.resolver.parked_changed();
+        if let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == parked.id) {
+            run.parked = None;
+        }
+        if self.resolver_owns(&parked.id) {
+            self.resolver_act(super::ResolverAct::Dismiss, ctx);
+        }
+        self.status = Some((
+            format!(
+                "The {} was dropped: its files are on {branch}",
+                parked.what()
+            ),
+            false,
+        ));
+        self.reload(ctx);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_read_of_the_parked_list_from_before_a_change_here_is_dropped() {
+        let ctx = egui::Context::default();
+        let dir = std::env::temp_dir().join("gitcraft-parked-stale-read");
+        let mut tab = RepoTab::new_deferred(dir, &ctx);
+        let parked = Parked {
+            id: "p1".into(),
+            ..Parked::default()
+        };
+        // Put aside while the list was being read: that read doesn't have it.
+        tab.resolver.reading_parked = true;
+        tab.resolver.parked.push(parked.clone());
+        tab.resolver.parked_changed();
+        tab.parked_read(Vec::new(), &ctx);
+        assert_eq!(tab.resolver.parked, vec![parked]);
+        assert!(tab.resolver.reading_parked, "read again");
+        assert!(!tab.resolver.read_parked_again);
+    }
+
+    #[test]
+    fn a_run_read_back_for_a_merge_no_longer_parked_is_left_out() {
+        let ctx = egui::Context::default();
+        let dir = std::env::temp_dir().join("gitcraft-parked-gone-run");
+        let mut tab = RepoTab::new_deferred(dir, &ctx);
+        let mut run = super::super::look_tests::run(Phase::Ready, Instant::now());
+        run.parked = Some(Parked {
+            id: run.id.clone(),
+            ..Parked::default()
+        });
+        // Brought back (or dropped) while its run was read.
+        tab.kept_run_read(Some(run));
+        assert!(tab.resolver.run.is_none());
+    }
+
+    #[test]
+    fn a_run_in_a_worktree_parked_behind_the_one_shown_is_found() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(std::env::temp_dir().join("gitcraft-owner-a"), &ctx);
+        let mut behind = RepoTab::new_deferred(std::env::temp_dir().join("gitcraft-owner-b"), &ctx);
+        behind.resolver.run = Some(super::super::look_tests::run(Phase::Ready, Instant::now()));
+        tab.parked.push(Box::new(behind));
+        assert!(!tab.resolver_owns("look"));
+        assert!(
+            tab.resolver_owner("look")
+                .is_some_and(|t| t.path.ends_with("gitcraft-owner-b"))
+        );
+        assert!(tab.resolver_owner("other").is_none());
+    }
 
     #[test]
     fn a_run_record_gives_its_progress_back() -> Result<(), String> {

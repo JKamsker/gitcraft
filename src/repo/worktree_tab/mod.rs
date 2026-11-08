@@ -166,14 +166,14 @@ pub(super) fn picker_entries<'a>(
 impl RepoTab {
     fn work(&mut self) -> Unfinished {
         Unfinished {
-            operation: self.busy_op.is_some(),
+            operation: self.busy_op.is_some() || self.resolver.running(),
             terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()
                 || self.reword.is_some()
                 || self.note_being_written(),
             editor: self.rebase.is_some() || self.conflict.is_some(),
-            review: self.has_pr_draft(),
+            review: self.has_pr_draft() || self.resolver.waiting(),
         }
     }
 

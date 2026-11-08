@@ -398,6 +398,11 @@ impl ConflictEditor {
         changed_on_disk(repo, &self.path, &self.opened) != Some(false)
     }
 
+    /// Whether choices or edits were made here that aren't saved.
+    pub fn has_draft(&self) -> bool {
+        self.result != self.opened
+    }
+
     /// The file as it was opened (for [`changed_on_disk`] in the background).
     pub fn opened(&self) -> &str {
         &self.opened

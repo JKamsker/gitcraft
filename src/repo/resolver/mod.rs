@@ -3,6 +3,7 @@
 //! plan, each step and what it is doing on a card of its own ([`panel`]). Once it is done the
 //! user applies what it resolved: those files are written here and marked resolved.
 
+mod apply;
 mod detail;
 mod graph;
 mod panel;
@@ -13,16 +14,16 @@ mod review_view;
 pub(in crate::repo) use graph::parked_rows;
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::repo::{OpKind, Refresh, RepoTab};
+use crate::repo::RepoTab;
 use crate::resolver::agent::{self, Activity, Engine};
 use crate::resolver::park::{self, Parked};
 use crate::resolver::process::Running;
 use crate::resolver::report::{Progress, Report};
-use crate::resolver::workspace::{Applied, FileResult, Workspace};
+use crate::resolver::workspace::{FileResult, Workspace};
 
 /// What the card and the buttons that start a run ask for.
 #[derive(Clone, Debug)]
@@ -93,6 +94,8 @@ struct Run {
     results: Vec<(String, FileResult)>,
     picked: BTreeSet<String>,
     applied: usize,
+    /// The files applied were written, but marking them resolved failed.
+    unstaged: bool,
     error: Option<String>,
     /// What the agent said last, and what it cost (Claude Code says).
     last_words: Option<String>,
@@ -112,6 +115,8 @@ pub(crate) struct ResolverState {
     /// The merges put aside from this worktree (see `parking`).
     pub(in crate::repo) parked: Vec<Parked>,
     reading_parked: bool,
+    /// The list changed (or was asked for) while it was read: that read is stale.
+    read_parked_again: bool,
     /// The row to select and scroll to once the graph has it: the merge just put aside, or
     /// the changes of the one just brought back. Given up on after [`REVEAL_WITHIN`].
     reveal: Option<(Reveal, Instant)>,
@@ -136,6 +141,31 @@ impl ResolverState {
     /// Whether the agent's work is shown for review in the big area.
     pub(crate) fn reviewing(&self) -> bool {
         self.run.as_ref().is_some_and(|r| r.review.is_some())
+    }
+
+    /// Whether the run goes on by itself: the agent works, or its files are being written.
+    pub(crate) fn running(&self) -> bool {
+        self.run.as_ref().is_some_and(|r| {
+            matches!(
+                r.phase,
+                Phase::Preparing | Phase::Working | Phase::Checking | Phase::Applying
+            )
+        })
+    }
+
+    /// The parked list was changed here: a read of it under way is stale.
+    fn parked_changed(&mut self) {
+        if self.reading_parked {
+            self.read_parked_again = true;
+        }
+    }
+
+    /// Whether the agent's work waits to be applied, and would go with the tab (a merge put
+    /// aside keeps its own).
+    pub(crate) fn waiting(&self) -> bool {
+        self.run
+            .as_ref()
+            .is_some_and(|r| r.phase == Phase::Ready && r.parked.is_none())
     }
 }
 
@@ -197,20 +227,50 @@ struct Prepared {
     parked: Option<Parked>,
     /// Why it wasn't put aside, when it was asked to be.
     not_parked: Option<String>,
+    /// The conflicted files behind the agent fence, left to the user.
+    fenced: Vec<String>,
+}
+
+/// `files` split into those the agent may have and those behind the agent fence of `repo`
+/// (see [`crate::fence`]).
+fn split_by_fence(repo: &Path, files: &[String]) -> Result<(Vec<String>, Vec<String>), String> {
+    let patterns = crate::fence::parse_list(&crate::fence::read(repo)?);
+    Ok(files
+        .iter()
+        .cloned()
+        .partition(|f| !patterns.iter().any(|p| p.matches(f))))
+}
+
+/// Why fenced files can't go to the agent.
+fn behind_fence(fenced: &[String]) -> String {
+    let (are, them) = if fenced.len() == 1 {
+        ("is", "it")
+    } else {
+        ("are", "them")
+    };
+    format!(
+        "{} {are} behind the agent fence (see Agent fence…): resolve {them} yourself",
+        fenced.join(", ")
+    )
 }
 
 /// Makes the agent's worktree and command for resolving `files`; then, when `put_aside`, puts
 /// the merge aside (see `park`), the worktree free meanwhile. A merge that can't be (a rebase)
-/// is resolved in place, and says why.
+/// is resolved in place, and says why. Files behind the agent fence never reach the agent:
+/// all of them are left to the user (the merge still put aside), and one asked for is refused.
 fn prepare(
-    repo: &std::path::Path,
+    repo: &Path,
     files: &[String],
     engine: Engine,
     id: &str,
     put_aside: bool,
 ) -> Result<Prepared, String> {
+    let (open, fenced) = split_by_fence(repo, files)?;
+    if !fenced.is_empty() && (!put_aside || open.is_empty()) {
+        return Err(behind_fence(&fenced));
+    }
     let exe = std::env::current_exe().map_err(|e| format!("gitcraft can't find itself: {e}"))?;
-    let workspace = Workspace::prepare(repo, files)?;
+    let workspace = Workspace::prepare(repo, &open)?;
     let mcp_file = std::env::temp_dir().join(format!("gitcraft-resolve-{id}.json"));
     // The worktree goes with `workspace` on failure (dropping it removes it); the file here.
     let command = agent::command(engine, &exe, workspace.dir(), id, &mcp_file)?;
@@ -240,6 +300,7 @@ fn prepare(
         prompt,
         parked,
         not_parked,
+        fenced,
     })
 }
 
@@ -428,6 +489,17 @@ impl RepoTab {
         self.resolver.run.as_ref().is_some_and(|r| r.id == id)
     }
 
+    /// The view whose run `id` is: this one, or a worktree parked behind it.
+    pub(crate) fn resolver_owner(&mut self, id: &str) -> Option<&mut RepoTab> {
+        if self.resolver_owns(id) {
+            return Some(self);
+        }
+        self.parked
+            .iter_mut()
+            .find(|p| p.resolver_owns(id))
+            .map(|p| &mut **p)
+    }
+
     /// A report of the agent's.
     pub(crate) fn resolver_report(&mut self, report: Report, ctx: &egui::Context) {
         if let Some(run) = &mut self.resolver.run {
@@ -477,6 +549,7 @@ impl RepoTab {
             results: Vec::new(),
             picked: BTreeSet::new(),
             applied: 0,
+            unstaged: false,
             error: None,
             last_words: None,
             cost_usd: None,
@@ -508,8 +581,13 @@ impl RepoTab {
         // The merge put aside: the worktree changed under the tab, and the graph has its row.
         let parked = prepared.as_ref().ok().and_then(|p| p.parked.clone());
         let not_parked = prepared.as_ref().ok().and_then(|p| p.not_parked.clone());
+        let fenced = prepared
+            .as_ref()
+            .map(|p| p.fenced.clone())
+            .unwrap_or_default();
         if let Some(parked) = &parked {
             self.resolver.parked.push(parked.clone());
+            self.resolver.parked_changed();
             self.status = Some((
                 format!(
                     "The {} is put aside while the agent resolves it: the worktree is free",
@@ -522,6 +600,14 @@ impl RepoTab {
         } else if let Some(why) = not_parked {
             self.status = Some((format!("Resolving in place: {why}"), false));
         }
+        if !fenced.is_empty() {
+            let said = self
+                .status
+                .as_ref()
+                .map(|(s, _)| format!("{s}. "))
+                .unwrap_or_default();
+            self.status = Some((format!("{said}{}", behind_fence(&fenced)), false));
+        }
         let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == id) else {
             // Dismissed meanwhile: what was made goes (a merge put aside stays, in the graph).
             if let Ok(p) = prepared {
@@ -533,6 +619,7 @@ impl RepoTab {
             return;
         };
         run.parked = parked;
+        run.files.retain(|f| !fenced.contains(f));
         let p = match prepared {
             Ok(p) if run.stopping => {
                 // Stopped while it was being made: the agent isn't started.
@@ -576,19 +663,31 @@ impl RepoTab {
         }
     }
 
-    /// Every frame: an agent that ended has its files looked at; while one works, the card's
-    /// clock moves.
+    /// Every frame the tab is shown: the row waited for is revealed; while an agent works, the
+    /// card's clock moves.
     pub(super) fn resolver_frame(&mut self, ctx: &egui::Context) {
         self.resolver_reveal(ctx);
-        let Some(run) = &mut self.resolver.run else {
-            return;
-        };
-        if matches!(run.phase, Phase::Preparing | Phase::Working) {
+        if self
+            .resolver
+            .run
+            .as_ref()
+            .is_some_and(|r| matches!(r.phase, Phase::Preparing | Phase::Working))
+        {
             ctx.request_repaint_after(CLOCK);
         }
-        if run.phase != Phase::Working {
+    }
+
+    /// With the tab's other work, shown or not (another tab's, a worktree parked behind): an
+    /// agent that ended has its files looked at.
+    pub(in crate::repo) fn resolver_poll(&mut self, ctx: &egui::Context) {
+        let Some(run) = self
+            .resolver
+            .run
+            .as_mut()
+            .filter(|r| r.phase == Phase::Working)
+        else {
             return;
-        }
+        };
         let Some(exit) = run
             .agent
             .as_ref()
@@ -646,91 +745,6 @@ impl RepoTab {
                     Phase::Failed
                 };
             },
-        );
-    }
-
-    fn apply_resolved(&mut self, ctx: &egui::Context) {
-        if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
-            return;
-        }
-        let Some(run) = self
-            .resolver
-            .run
-            .as_mut()
-            .filter(|r| r.phase == Phase::Ready)
-        else {
-            return;
-        };
-        let Some(ws) = run.workspace.clone() else {
-            return;
-        };
-        let picked: Vec<String> = run.picked.iter().cloned().collect();
-        if picked.is_empty() {
-            return;
-        }
-        run.phase = Phase::Applying;
-        let (repo, id) = (self.path.clone(), run.id.clone());
-        let done = done_files(&run.progress);
-        self.then(
-            ctx,
-            move || ws.apply(&repo, &picked, &done),
-            move |tab, applied, ctx| tab.resolved_applied(&id, applied, ctx),
-        );
-    }
-
-    /// The files are written: those that were are marked resolved, whatever became of the
-    /// others.
-    fn resolved_applied(&mut self, id: &str, applied: Applied, ctx: &egui::Context) {
-        let busy = self.busy_op.clone();
-        let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == id) else {
-            return;
-        };
-        let Applied { written, failed } = applied;
-        run.applied = written.len();
-        run.phase = Phase::Applied;
-        run.review = None;
-        let mut said = Vec::new();
-        if !failed.is_empty() {
-            let each: Vec<String> = failed.iter().map(|(p, e)| format!("{p}: {e}")).collect();
-            said.push(format!("Not applied: {}", each.join("; ")));
-        }
-        if let Some(busy) = busy.as_ref().filter(|_| !written.is_empty()) {
-            said.push(format!(
-                "Written, but not marked resolved while {busy} runs: mark them resolved under \
-                 CONFLICTED"
-            ));
-        }
-        run.error = (!said.is_empty()).then(|| said.join(". "));
-        clean_up(run);
-        if written.is_empty() {
-            if failed.is_empty() {
-                self.status = Some((
-                    "Nothing was applied: the files changed here since the agent started"
-                        .to_owned(),
-                    true,
-                ));
-            }
-            return;
-        }
-        // The conflict editor shows the file as it was: it is closed over the new one.
-        if self
-            .conflict
-            .as_ref()
-            .is_some_and(|ed| written.contains(&ed.path))
-        {
-            self.queued.push(crate::repo::Action::CloseDiff);
-        }
-        let mut add = ["--literal-pathspecs", "add", "-A", "--"]
-            .map(str::to_owned)
-            .to_vec();
-        add.extend(written);
-        self.run_ops(
-            "Mark resolved (agent)",
-            vec![add],
-            Refresh::Status,
-            OpKind::plain(),
-            ctx,
         );
     }
 }

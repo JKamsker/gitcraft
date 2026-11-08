@@ -262,6 +262,10 @@ impl RepoTab {
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
             if esc && self.close_drop_menu() {
+            } else if esc && self.resolver.reviewing() {
+                // Drawn over everything else of the big area (a conflict editor too): it
+                // closes first, and the editor under it stays as it is.
+                acts.push(Action::Resolver(super::resolver::ResolverAct::CloseReview));
             } else if esc && diff_keys && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,

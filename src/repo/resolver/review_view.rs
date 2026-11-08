@@ -129,12 +129,12 @@ fn file_bar(
             ui.horizontal_wrapped(|ui| {
                 let mut on = run.picked.contains(path);
                 let usable = result.is_some_and(|r| r.applies()) && run.phase == Phase::Ready;
-                if ui
-                    .add_enabled(usable, egui::Checkbox::new(&mut on, ""))
+                let pick = ui
+                    .add_enabled(usable, egui::Checkbox::without_text(&mut on))
                     .on_hover_text("Apply this file")
-                    .on_disabled_hover_text("Nothing of it can be applied")
-                    .changed()
-                {
+                    .on_disabled_hover_text("Nothing of it can be applied");
+                super::panel::name_pick(&pick, path, on);
+                if pick.changed() {
                     acts.push(Action::Resolver(ResolverAct::Pick(path.to_owned(), on)));
                 }
                 ui.label(RichText::new(path).font(theme::mono(13.0)));

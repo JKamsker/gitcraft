@@ -137,3 +137,34 @@ fn a_conflict_at_the_end_of_the_file_is_lined_up_too() {
     assert!(!outside);
     assert_eq!(resolved[0].took, Took::Both);
 }
+
+#[test]
+fn a_last_part_after_text_of_several_bytes_is_found_without_a_panic() {
+    // The last common part is one byte; the agent's text ends in a two-byte character.
+    let before = "<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> b\n!";
+    let shown = review(Some(before), Some("xé"));
+    let (resolved, outside) = conflicts(&shown);
+    assert!(outside, "the last line went");
+    assert_eq!(resolved.first().map(|r| r.result.as_str()), Some("xé"));
+    let shown = review(Some(before), Some("é\n!"));
+    let (resolved, _) = conflicts(&shown);
+    assert_eq!(resolved.first().map(|r| r.result.as_str()), Some("é\n"));
+}
+
+#[test]
+fn touching_conflicts_are_told_apart_by_their_lines_or_shown_as_a_diff() {
+    let before =
+        "a\n<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> b\n<<<<<<< HEAD\nu\n=======\nv\n>>>>>>> b\nz\n";
+    // Each took its own side: the lines tell which is which.
+    let shown = review(Some(before), Some("a\nx\nv\nz\n"));
+    let (resolved, outside) = conflicts(&shown);
+    assert!(!outside);
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(
+        (resolved[0].took, resolved[1].took),
+        (Took::Ours, Took::Theirs)
+    );
+    // Text of its own between them: nothing tells which conflict wrote it.
+    let review = review(Some(before), Some("a\nnew\nz\n"));
+    assert!(matches!(review, FileReview::Diff(_)), "{review:?}");
+}

@@ -24,8 +24,10 @@ const TURN: std::time::Duration = std::time::Duration::from_millis(60);
 pub(in crate::repo) enum Standing {
     /// It works: how many steps are over, of how many.
     Working(usize, usize),
-    /// Done: what it did is there to review.
+    /// Done, every file resolved: what it did is there to review.
     Ready,
+    /// Done, but only so many of its files resolved, of how many: there to review too.
+    Partly(usize, usize),
     /// No agent works on it (stopped, or gitcraft was closed meanwhile).
     Waiting,
 }
@@ -43,7 +45,13 @@ impl RepoTab {
                 Phase::Preparing | Phase::Working | Phase::Checking => {
                     Standing::Working(run.progress.counts().0, run.progress.counts().1)
                 }
-                Phase::Ready if !run.results.is_empty() => Standing::Ready,
+                Phase::Ready if !run.results.is_empty() => {
+                    let total = run.results.len();
+                    match run.results.iter().filter(|(_, r)| r.applies()).count() {
+                        ready if ready == total => Standing::Ready,
+                        ready => Standing::Partly(ready, total),
+                    }
+                }
                 _ => Standing::Waiting,
             },
             None => Standing::Waiting,
@@ -62,6 +70,7 @@ impl RepoTab {
         let standing = self.parked_standing(parked);
         let color = match standing {
             Standing::Ready => t.success,
+            Standing::Partly(..) => t.warning,
             Standing::Working(..) => t.accent,
             Standing::Waiting => t.text_dim,
         };
@@ -80,7 +89,11 @@ impl RepoTab {
             2.5,
             2.0,
         ));
-        crate::icons::paint(ui, r, "bot", 10.0, color);
+        // Images ignore the clip; a squeezed graph column leaves the robot out (as a stash's
+        // box does its icon).
+        if r.right() <= gp.clip_rect().right() {
+            crate::icons::paint(ui, r, "bot", 10.0, color);
+        }
         match standing {
             Standing::Working(..) => {
                 // A quarter of a ring around the box, a turn a second: drawn again at the
@@ -96,8 +109,8 @@ impl RepoTab {
                 gp.add(egui::Shape::line(points, Stroke::new(2.0, t.accent)));
                 ui.ctx().request_repaint_after(TURN);
             }
-            Standing::Ready => {
-                gp.circle_filled(r.right_top(), 3.5, t.success);
+            Standing::Ready | Standing::Partly(..) => {
+                gp.circle_filled(r.right_top(), 3.5, color);
             }
             Standing::Waiting => {}
         }
@@ -132,6 +145,10 @@ impl RepoTab {
             }
             Standing::Working(..) => ("agent resolving…".to_owned(), t.accent),
             Standing::Ready => ("resolved · bring it back".to_owned(), t.success),
+            Standing::Partly(ready, total) => (
+                format!("{ready}/{total} resolved · bring it back"),
+                t.warning,
+            ),
             Standing::Waiting => ("waiting for you · bring it back".to_owned(), t.warning),
         };
         crate::repo::graph_view::pill(
@@ -151,6 +168,9 @@ impl RepoTab {
                 format!("an agent is resolving it, {over} of {total} steps done")
             }
             Standing::Ready => "the agent resolved it: bring it back to review".to_owned(),
+            Standing::Partly(ready, total) => format!(
+                "the agent is done, {ready} of {total} files resolved: bring it back to review"
+            ),
             Standing::Waiting => "waiting to be brought back".to_owned(),
         };
         format!("{} put aside, {standing}", parked.what())

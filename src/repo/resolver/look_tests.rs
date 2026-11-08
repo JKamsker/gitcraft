@@ -81,7 +81,7 @@ fn step(id: &str, status: StepStatus, note: Option<&str>) -> Report {
     }
 }
 
-fn run(phase: Phase, now: Instant) -> Run {
+pub(super) fn run(phase: Phase, now: Instant) -> Run {
     let done = match phase {
         Phase::Working => 2,
         _ => 4,
@@ -141,6 +141,7 @@ fn run(phase: Phase, now: Instant) -> Run {
         results,
         picked,
         applied: 0,
+        unstaged: false,
         error: None,
         last_words: None,
         cost_usd: (!working).then_some(0.42),

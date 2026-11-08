@@ -65,10 +65,11 @@ impl App {
 /// (`writes` off) or no tab has it open; then it is answered here.
 fn route(writes: bool, tabs: &mut [Tab], incoming: Incoming, ctx: &egui::Context) {
     // A report changes nothing: it goes to the tab whose background run it is about, which
-    // the user started (the agent works in a worktree of its own, no tab's).
+    // the user started (the agent works in a worktree of its own, no tab's), the worktree it
+    // was started from shown or parked behind another.
     if let crate::mcp::wire::WriteOp::Report { run, report } = &incoming.op {
         let tab = tabs.iter_mut().find_map(|tab| match tab {
-            Tab::Repo(r) if r.resolver_owns(run) => Some(r),
+            Tab::Repo(r) => r.resolver_owner(run),
             _ => None,
         });
         let reply = match tab {

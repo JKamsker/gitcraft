@@ -274,7 +274,22 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
         .and_then(|t| t.resolver.run.as_ref())
         .map(|r| r.id.clone())
         .ok_or("no run")?;
-    repo.git(&["checkout", "-q", "other"])?;
+    // The user checks out another branch meanwhile, as gitcraft does it, the agent at work.
+    if let Some(tab) = h.state_mut().as_mut() {
+        tab.queued.push(Action::Checkout("other".into()));
+    }
+    assert!(
+        wait(&mut h, |t| t.busy_op.is_none()
+            && repo
+                .git(&["symbolic-ref", "--short", "HEAD"])
+                .is_ok_and(|b| b.trim() == "other")),
+        "checked out"
+    );
+    assert_eq!(
+        h.state().as_ref().and_then(phase),
+        Some(Phase::Working),
+        "while the agent works"
+    );
 
     act(&mut h, ResolverAct::BringBack(id));
     assert!(
@@ -298,6 +313,68 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
     let tab = h.state().as_ref().ok_or("no tab")?;
     let run = tab.resolver.run.as_ref().ok_or("no run")?;
     assert!(run.results[0].1.applies(), "{:?}", run.results);
+    if let Ok(mut s) = STAND_IN.lock() {
+        *s = None;
+    }
+    Ok(())
+}
+
+/// A conflicted file behind the agent fence never reaches the agent: asked for alone it is
+/// refused, the merge left as it is; _Resolve all_ leaves it to the user and resolves the rest.
+#[test]
+fn a_file_behind_the_agent_fence_is_left_to_the_user() -> Result<(), String> {
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let repo = Repo::new("resolver fence")?;
+    repo.commit(
+        "base",
+        &[("a.txt", Some("a base\n")), ("b.lock", Some("b base\n"))],
+    )?;
+    repo.git(&["checkout", "-q", "-b", "side"])?;
+    repo.commit(
+        "side",
+        &[("a.txt", Some("a side\n")), ("b.lock", Some("b side\n"))],
+    )?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit(
+        "main",
+        &[("a.txt", Some("a main\n")), ("b.lock", Some("b main\n"))],
+    )?;
+    assert!(repo.git(&["merge", "-q", "side"]).is_err());
+    repo.git(&["config", "--local", "--add", "gitcraft.fence", "*.lock"])?;
+    if let Ok(mut s) = STAND_IN.lock() {
+        *s = Some(stand_in());
+    }
+    let dir = repo.path().to_path_buf();
+    let mut h = harness(dir.clone());
+    assert!(wait(&mut h, |t| !t.opening() && t.work.conflicted.len() == 2));
+
+    act(&mut h, ResolverAct::Start(Some(vec!["b.lock".into()])));
+    assert!(wait(&mut h, |t| phase(t) == Some(Phase::Failed)), "refused");
+    let error = h
+        .state()
+        .as_ref()
+        .and_then(|t| t.resolver.run.as_ref())
+        .and_then(|r| r.error.clone())
+        .unwrap_or_default();
+    assert!(error.contains("agent fence"), "{error}");
+    assert!(merging(&dir));
+    act(&mut h, ResolverAct::Dismiss);
+    assert!(wait(&mut h, |t| t.resolver.run.is_none()));
+
+    act(&mut h, ResolverAct::Start(None));
+    assert!(
+        wait(&mut h, |t| phase(t) == Some(Phase::Ready)),
+        "the rest resolved"
+    );
+    let tab = h.state().as_ref().ok_or("no tab")?;
+    let run = tab.resolver.run.as_ref().ok_or("no run")?;
+    assert_eq!(run.files, ["a.txt"]);
+    let results: Vec<&str> = run.results.iter().map(|(p, _)| p.as_str()).collect();
+    assert_eq!(results, ["a.txt"]);
+    // The merge was put aside whole, the fenced file with it.
+    assert!(run.parked.as_ref().is_some_and(|p| p.files.len() == 2));
     if let Ok(mut s) = STAND_IN.lock() {
         *s = None;
     }

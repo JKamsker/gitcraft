@@ -71,6 +71,13 @@ impl RepoTab {
                 t.success,
                 "The agent is done: bring it back to review".to_owned(),
             ),
+            Standing::Partly(ready, total) => (
+                t.warning,
+                format!(
+                    "The agent is done, {ready} of {total} files resolved: bring it back to \
+                     review"
+                ),
+            ),
             Standing::Waiting => (t.warning, "Waiting for you to bring it back".to_owned()),
         };
         egui::Frame::new()
@@ -95,8 +102,8 @@ impl RepoTab {
                 ui.label(RichText::new(words).color(color).small());
                 ui.label(
                     RichText::new(
-                        "Your conflicts and staged files are kept as they were; the worktree is \
-                         free meanwhile.",
+                        "Your conflicts and staged files are kept as they were; the worktree was \
+                         reset to its branch, free meanwhile.",
                     )
                     .color(t.text_dim)
                     .small(),

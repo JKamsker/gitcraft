@@ -58,9 +58,16 @@ impl RepoTab {
                         .inner_margin(egui::Margin::symmetric(12, 7))
                         .show(ui, |ui| pill(ui, &t, run, acts));
                 } else {
+                    // No taller than the big area: what doesn't fit scrolls.
+                    let tallest = (area.height() - 2.0 * MARGIN - 28.0).max(120.0);
                     frame.inner_margin(egui::Margin::same(14)).show(ui, |ui| {
                         ui.set_width(WIDTH);
-                        card(ui, &t, run, acts);
+                        egui::ScrollArea::vertical()
+                            .id_salt("resolver-card")
+                            .max_height(tallest)
+                            // An area's room is its last size: up to this, whatever it was.
+                            .min_scrolled_height(tallest)
+                            .show(ui, |ui| card(ui, &t, run, acts));
                     });
                 }
             });
@@ -90,10 +97,12 @@ impl RepoTab {
             .add_enabled(local, egui::Button::new("Resolve all with agent"))
             .on_hover_text(format!(
                 "{} resolves the {n} conflicted file{} in the background, in a private copy of \
-                 this checkout. The merge is put aside meanwhile, like a stash (conflicts and \
-                 staged files kept as they are): check out and work on anything. When the \
-                 agent is done, bring it back from the graph and review what it did. (The \
-                 agent is picked in Settings → AI.)",
+                 this checkout. gitcraft then tries to put the merge aside, like a stash \
+                 (conflicts and staged files kept as they are, the worktree reset to its \
+                 branch): check out and work on anything. When the agent is done, bring it back \
+                 from the graph and review what it did. One that can't be put aside (a rebase) \
+                 stays in place: resolve it there rather than switch branches. (The agent is \
+                 picked in Settings → AI.)",
                 engine.label(),
                 if n == 1 { "" } else { "s" },
             ))
@@ -120,14 +129,26 @@ fn title(run: &Run) -> String {
         Phase::Preparing => format!("Getting ready to resolve {files}"),
         Phase::Working if run.stopping => "Stopping…".to_owned(),
         Phase::Working | Phase::Checking => format!("Resolving {files}"),
-        Phase::Ready | Phase::Applying => match &run.progress.finished {
-            Some(f) if !f.ok => format!("Partly resolved {files}"),
-            _ if run.stopping => "Stopped".to_owned(),
-            _ => format!("Resolved {files}"),
-        },
+        Phase::Ready | Phase::Applying => {
+            let ready = ready(run);
+            let partly =
+                ready < run.results.len() || run.progress.finished.as_ref().is_some_and(|f| !f.ok);
+            match () {
+                _ if ready == 0 && run.stopping => "Stopped".to_owned(),
+                _ if ready == 0 => format!("Didn't resolve {files}"),
+                _ if partly => format!("Partly resolved {files}"),
+                _ if run.stopping => "Stopped".to_owned(),
+                _ => format!("Resolved {files}"),
+            }
+        }
         Phase::Applied => "Applied".to_owned(),
         Phase::Failed => "Couldn't resolve".to_owned(),
     }
+}
+
+/// How many of its files came back resolved (or deleted, as one side did).
+fn ready(run: &Run) -> usize {
+    run.results.iter().filter(|(_, r)| r.applies()).count()
 }
 
 fn running(run: &Run) -> bool {
@@ -172,7 +193,9 @@ fn status_mark(ui: &mut Ui, t: &Tokens, run: &Run) {
         ui.add(crate::spinner::Spinner::new().size(14.0).color(t.accent));
         return;
     }
-    let ok = run.error.is_none() && run.progress.finished.as_ref().is_none_or(|f| f.ok);
+    // Done with all of its files, as they were checked: not merely an agent that exited well.
+    let all = run.phase != Phase::Ready || (ready(run) > 0 && ready(run) == run.results.len());
+    let ok = all && run.error.is_none() && run.progress.finished.as_ref().is_none_or(|f| f.ok);
     match run.phase {
         Phase::Failed => icons::inline(ui, "circle-alert", 15.0, t.danger),
         _ if ok => icons::inline(ui, "check", 15.0, t.success),
@@ -447,10 +470,9 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
         ui.horizontal(|ui| {
             let mut on = run.picked.contains(path);
             let usable = result.applies() && run.phase == Phase::Ready;
-            if ui
-                .add_enabled(usable, egui::Checkbox::without_text(&mut on))
-                .changed()
-            {
+            let pick = ui.add_enabled(usable, egui::Checkbox::without_text(&mut on));
+            name_pick(&pick, path, on);
+            if pick.changed() {
                 acts.push(Action::Resolver(ResolverAct::Pick(path.clone(), on)));
             }
             icons::inline(ui, icon, 13.0, color);
@@ -516,6 +538,19 @@ fn outcome(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
     });
 }
 
+/// Names a file's _apply it_ checkbox by its file, for screen readers.
+pub(super) fn name_pick(resp: &egui::Response, path: &str, on: bool) {
+    let enabled = resp.enabled();
+    resp.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::Checkbox,
+            enabled,
+            on,
+            crate::a11y::labels::name(&format!("Apply {path}")),
+        )
+    });
+}
+
 /// _Bring it back_: the merge put aside, back in the worktree as it was, to apply the agent's
 /// work to.
 pub(super) fn bring_back_button(
@@ -550,7 +585,9 @@ fn applied(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
     ui.add_space(8.0);
     let text = match run.applied {
         0 => "Nothing was applied.".to_owned(),
+        1 if run.unstaged => "Wrote 1 file.".to_owned(),
         1 => "Applied 1 file and marked it resolved.".to_owned(),
+        n if run.unstaged => format!("Wrote {n} files."),
         n => format!("Applied {n} files and marked them resolved."),
     };
     ui.label(RichText::new(text).color(t.text));
@@ -592,4 +629,27 @@ fn failed(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {
             acts.push(Action::Resolver(ResolverAct::Dismiss));
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_run_is_said_resolved_only_when_its_files_came_back_resolved() {
+        let mut run = super::super::look_tests::run(Phase::Ready, Instant::now());
+        // One of the four changed meanwhile.
+        assert_eq!(title(&run), "Partly resolved 4 files");
+        for (_, r) in &mut run.results {
+            *r = FileResult::Resolved;
+        }
+        assert_eq!(title(&run), "Resolved 4 files");
+        // The agent exited well, having resolved nothing.
+        for (_, r) in &mut run.results {
+            *r = FileResult::Untouched;
+        }
+        assert_eq!(title(&run), "Didn't resolve 4 files");
+        run.stopping = true;
+        assert_eq!(title(&run), "Stopped");
+    }
 }
