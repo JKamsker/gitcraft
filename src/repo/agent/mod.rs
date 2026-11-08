@@ -121,6 +121,7 @@ impl CardView {
     /// Resolve the retained note witnesses only for the current frame's card snapshot.
     fn for_display(mut self) -> Self {
         self.preview = self.preview.as_ref().map(preview::Preview::for_display);
+        self.ask = self.ask.for_display();
         self
     }
 }
@@ -217,12 +218,9 @@ impl RepoTab {
         };
         // What can't be undone always asks, whatever the plan made of it.
         if job.op.needs_approval() && plan.ask.is_none() {
-            plan.ask = Some(Ask {
-                title: plan.label.clone(),
-                body: plan.label.clone(),
-                undo_note: crate::i18n::text("repo-workflows-agent-agent-planned-14b0fc42")
-                    .to_owned(),
-            });
+            plan.ask = Some(Ask::from_presentation(plan::AskPresentation::Fallback {
+                label: plan.label.clone(),
+            }));
         }
         if self.busy_op.is_some() || self.loading {
             // Something started meanwhile: planned again when it is done, its wait counted
@@ -244,8 +242,7 @@ impl RepoTab {
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect::<String>();
-            ask.body
-                .push_str(&format!("\nExact source guards: {digest}\n{guards:?}"));
+            ask.append_source_suffix(&format!("\nExact source guards: {digest}\n{guards:?}"));
         }
         match plan.ask.take() {
             // What the user approved is still what it would do.
@@ -359,7 +356,7 @@ impl RepoTab {
     pub(crate) fn agent_card(&self) -> Option<CardView> {
         let waiting = self.agent_calls.card.as_ref()?;
         let plan = &waiting.ready.plan;
-        let ask = plan.ask.as_ref()?;
+        let ask = plan.ask.as_ref()?.for_display();
         Some(
             CardView {
                 agent: visible(&waiting.ready.job.agent),
@@ -368,6 +365,7 @@ impl RepoTab {
                     title: visible(&ask.title),
                     body: visible(&ask.body),
                     undo_note: visible(&ask.undo_note),
+                    presentation: None,
                 },
                 commands: plan
                     .ops

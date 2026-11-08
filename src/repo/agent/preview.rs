@@ -283,6 +283,7 @@ mod fluent_approval_note_tests {
                 title: "Stable supplied title".into(),
                 body: "Stable supplied body".into(),
                 undo_note: "Stable supplied undo note".into(),
+                presentation: None,
             },
             commands: vec!["git --literal-pathspecs reset --hard -- 'refs/heads/raw/ß'".into()],
             undoable: false,

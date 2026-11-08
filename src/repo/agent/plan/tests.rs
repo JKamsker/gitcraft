@@ -583,6 +583,7 @@ fn a_force_push_is_leased_to_what_the_card_showed() {
         title: String::new(),
         body: String::new(),
         undo_note: String::new(),
+        presentation: None,
     });
     assert_eq!(ask.title, "Force push main to origin/main");
     assert!(ask.body.contains("has no commits that main lacks"));
