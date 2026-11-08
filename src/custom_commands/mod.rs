@@ -43,10 +43,10 @@ impl Placement {
 
     pub fn label(self) -> &'static str {
         match self {
-            Placement::Commit => "Commit menu",
-            Placement::Branch => "Branch menu",
-            Placement::File => "File menu",
-            Placement::Palette => "Command palette",
+            Placement::Commit => crate::i18n::text("interaction-preferences-commit-menu"),
+            Placement::Branch => crate::i18n::text("interaction-preferences-branch-menu"),
+            Placement::File => crate::i18n::text("interaction-preferences-file-menu"),
+            Placement::Palette => crate::i18n::text("interaction-preferences-palette"),
         }
     }
 }
@@ -67,8 +67,8 @@ impl OutputTo {
 
     pub fn label(self) -> &'static str {
         match self {
-            OutputTo::Toast => "Toast",
-            OutputTo::Terminal => "Terminal",
+            OutputTo::Toast => crate::i18n::text("interaction-preferences-toast"),
+            OutputTo::Terminal => crate::i18n::text("interaction-preferences-terminal"),
         }
     }
 }
@@ -89,8 +89,8 @@ impl PromptKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            PromptKind::Text => "Text",
-            PromptKind::Branch => "Branch",
+            PromptKind::Text => crate::i18n::text("interaction-preferences-text"),
+            PromptKind::Branch => crate::i18n::text("interaction-preferences-branch"),
         }
     }
 }
@@ -158,6 +158,70 @@ pub const BUILT_IN: [(&str, &str); 6] = [
     ),
     ("REPO", "the repository's folder, on its machine"),
 ];
+
+/// The built-in variable's prose, resolved at paint time. The variable itself stays literal.
+pub fn variable_description<'a>(name: &str, original: &'a str) -> &'a str {
+    match name {
+        "SHA" => crate::i18n::text("interaction-preferences-variable-sha"),
+        "SHORT_SHA" => crate::i18n::text("interaction-preferences-variable-short_sha"),
+        "BRANCH" => crate::i18n::text("interaction-preferences-variable-branch"),
+        "REMOTE" => crate::i18n::text("interaction-preferences-variable-remote"),
+        "FILE" => crate::i18n::text("interaction-preferences-variable-file"),
+        "REPO" => crate::i18n::text("interaction-preferences-variable-repo"),
+        _ => original,
+    }
+}
+
+/// Localize only our finite validation messages. Raw validation/error identities stay unchanged.
+pub fn display_problem(raw: &str) -> String {
+    if raw == "It has no name" {
+        return crate::i18n::text("interaction-preferences-missing-name").to_owned();
+    }
+    if raw == "Its command line is empty" {
+        return crate::i18n::text("interaction-preferences-empty-line").to_owned();
+    }
+    if raw == "It contains a NUL character" {
+        return crate::i18n::text("interaction-preferences-nul").to_owned();
+    }
+    if let Some(variable) = raw.strip_prefix('“').and_then(|s| {
+        s.strip_suffix(
+            "” isn't a variable name: capital letters, digits and _, starting with a letter",
+        )
+    }) {
+        return crate::i18n::message(
+            "interaction-preferences-bad-variable",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is already set by gitcraft"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-built-in",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is used by the shell or git; pick another name"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-reserved",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is asked for twice"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-twice",
+            &[("variable", variable.into())],
+        );
+    }
+    raw.to_owned()
+}
 
 /// Variables a prompt can't be given: those the shell, git or gitcraft rely on (`PATH`,
 /// `IFS`, `HOME`…), which an answer would change for the whole command.

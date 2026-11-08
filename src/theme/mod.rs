@@ -94,10 +94,10 @@ impl Group {
     pub fn label(self) -> &'static str {
         match self {
             Group::Gitcraft => "gitcraft",
-            Group::Dark => "Dark",
-            Group::Light => "Light",
-            Group::Yours => "Your themes",
-            Group::Editor => "Your editor",
+            Group::Dark => crate::i18n::text("interaction-preferences-group-dark"),
+            Group::Light => crate::i18n::text("interaction-preferences-group-light"),
+            Group::Yours => crate::i18n::text("interaction-preferences-group-yours"),
+            Group::Editor => crate::i18n::text("interaction-preferences-group-editor"),
         }
     }
 }
