@@ -198,17 +198,32 @@ pub fn files(
     if !has(&details.head_oid) || !has(&details.base_oid) {
         let remote = remote_for(remotes, &details.url)
             .ok_or("no remote of this repository is the one the pull request belongs to")?;
-        // No refs and no FETCH_HEAD: nothing here changes but the objects being available.
-        let base = format!("refs/heads/{}", details.base_branch);
-        let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
-        if is_branch_ref(&details.head_ref) {
-            args.push(&details.head_ref);
+        if details.forge == Some(Forge::Bitbucket) {
+            for (args, use_destination_credentials) in bitbucket_fetches(details, remote)? {
+                let args = args.iter().map(String::as_str).collect::<Vec<_>>();
+                git::run_with(
+                    Some(repo),
+                    &args,
+                    if use_destination_credentials {
+                        credentials
+                    } else {
+                        None
+                    },
+                )?;
+            }
+        } else {
+            // No refs and no FETCH_HEAD: nothing here changes but the objects being available.
+            let base = format!("refs/heads/{}", details.base_branch);
+            let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head", remote];
+            if is_branch_ref(&details.head_ref) {
+                args.push(&details.head_ref);
+            }
+            args.push(&base);
+            // The branches may have moved on since the details were read (a force push even leaves
+            // the old commits out), so the very commits are asked for too.
+            args.extend([details.head_oid.as_str(), details.base_oid.as_str()]);
+            git::run_with(Some(repo), &args, credentials)?;
         }
-        args.push(&base);
-        // The branches may have moved on since the details were read (a force push even leaves
-        // the old commits out), so the very commits are asked for too.
-        args.extend([details.head_oid.as_str(), details.base_oid.as_str()]);
-        git::run_with(Some(repo), &args, credentials)?;
     }
     let from = git::merge_base(repo, &details.base_oid, &details.head_oid)?;
     let files = git::diff_files(repo, &from, Some(&details.head_oid))?;
@@ -217,6 +232,56 @@ pub fn files(
         to: details.head_oid.clone(),
         files,
     })
+}
+
+/// Cloud PRs have no documented Server-style pull-request ref. Fetch each native
+/// repository's branch and displayed commit without creating refs or rebinding credentials.
+fn bitbucket_fetches(d: &PrDetails, remote: &str) -> Result<Vec<(Vec<String>, bool)>, String> {
+    let (host, destination) = repo_of_url(&d.url).ok_or("Invalid Bitbucket PR URL")?;
+    if host != "bitbucket.org" || !d.url.starts_with("https://bitbucket.org/") {
+        return Err("Bitbucket source belongs to a different service".into());
+    }
+    let source = d
+        .extras
+        .head_repo
+        .as_deref()
+        .ok_or("Bitbucket PR has no source repository")?;
+    let parts = source.split('/').collect::<Vec<_>>();
+    if parts.len() != 2
+        || parts.iter().any(|p| {
+            p.is_empty()
+                || p.starts_with(['-', '.'])
+                || !p
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        })
+        || !is_branch_name(&d.head_branch)
+        || !is_branch_name(&d.base_branch)
+        || !is_oid(&d.head_oid)
+        || !is_oid(&d.base_oid)
+    {
+        return Err("Invalid Bitbucket source repository or revision".into());
+    }
+    let same = source.eq_ignore_ascii_case(&destination);
+    let source_url = if same {
+        remote.into()
+    } else {
+        format!("https://bitbucket.org/{source}.git")
+    };
+    let fetch = |url: &str, branch: &str, oid: &str| {
+        vec![
+            "fetch".into(),
+            "--no-tags".into(),
+            "--no-write-fetch-head".into(),
+            url.into(),
+            format!("refs/heads/{branch}"),
+            oid.into(),
+        ]
+    };
+    Ok(vec![
+        (fetch(remote, &d.base_branch, &d.base_oid), true),
+        (fetch(&source_url, &d.head_branch, &d.head_oid), same),
+    ])
 }
 
 /// Whether `oid` is a whole commit id (SHA-1 or SHA-256), nothing else.
@@ -471,5 +536,48 @@ mod tests {
         assert!(!is_web_url("javascript:alert(1)"));
         assert!(!is_web_url("ms-settings:"));
         assert!(!is_web_url(""));
+    }
+}
+
+#[cfg(test)]
+mod bitbucket_fetch_tests {
+    use super::*;
+    #[test]
+    fn fork_objects_use_source_branch_without_destination_credential_rebinding()
+    -> Result<(), String> {
+        let mut d = PrDetails {
+            forge: Some(Forge::Bitbucket),
+            url: "https://bitbucket.org/team/repo/pull-requests/7".into(),
+            base_branch: "main".into(),
+            head_branch: "topic".into(),
+            base_oid: "a".repeat(40),
+            head_oid: "b".repeat(40),
+            extras: PrExtras {
+                head_repo: Some("contributor/fork".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let plan = bitbucket_fetches(&d, "origin")?;
+        assert_eq!(plan[0].0[3], "origin");
+        assert!(plan[0].1);
+        assert_eq!(plan[1].0[3], "https://bitbucket.org/contributor/fork.git");
+        assert_eq!(plan[1].0[4], "refs/heads/topic");
+        assert!(!plan[1].1);
+        assert!(plan.iter().all(|(args, _)| {
+            !args
+                .iter()
+                .any(|a| a.contains("refs/pull-requests/") || a.contains(":refs/"))
+        }));
+        d.extras.head_repo = Some("team/repo".into());
+        let own = bitbucket_fetches(&d, "selected-push-remote")?;
+        assert_eq!(own[1].0[3], "selected-push-remote");
+        assert!(own[1].1);
+        d.extras.head_repo = Some("../../foreign".into());
+        assert!(bitbucket_fetches(&d, "origin").is_err());
+        d.extras.head_repo = Some("team/repo".into());
+        d.url = "https://bitbucket.org.evil/team/repo/pull-requests/7".into();
+        assert!(bitbucket_fetches(&d, "origin").is_err());
+        Ok(())
     }
 }

@@ -125,7 +125,7 @@ pub(crate) fn prepare(
                 target: Target::Gitea(Box::new(api)),
             })
         }
-        Forge::GitLab | Forge::Azure => {
+        Forge::GitLab | Forge::Azure | Forge::Bitbucket => {
             Err("This SSH helper registers keys on GitHub, Forgejo and Gitea.".into())
         }
     }

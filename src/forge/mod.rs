@@ -8,6 +8,7 @@
 //!   credential helper) already has for the host. See [`gitea`].
 
 mod azure;
+mod bitbucket;
 mod cli;
 pub(crate) mod cloud;
 pub(crate) use cli::tool_location;
@@ -40,15 +41,17 @@ pub enum Forge {
     Forgejo,
     Gitea,
     Azure,
+    Bitbucket,
 }
 
 impl Forge {
-    pub const ALL: [Forge; 5] = [
+    pub const ALL: [Forge; 6] = [
         Forge::GitHub,
         Forge::GitLab,
         Forge::Forgejo,
         Forge::Gitea,
         Forge::Azure,
+        Forge::Bitbucket,
     ];
 
     /// The module that does the work.
@@ -59,6 +62,7 @@ impl Forge {
             Forge::Forgejo => &gitea::FORGEJO,
             Forge::Gitea => &gitea::GITEA,
             Forge::Azure => &azure::Azure,
+            Forge::Bitbucket => &bitbucket::Bitbucket,
         }
     }
 
@@ -93,6 +97,7 @@ impl Forge {
             Forge::Forgejo => "forgejo",
             Forge::Gitea => "gitea",
             Forge::Azure => "azure",
+            Forge::Bitbucket => "bitbucket",
         }
     }
 
@@ -597,7 +602,7 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
     let tool = match forge {
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => {
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
             return Err(format!("gitcraft has no tool for {}", forge.name()));
         }
     };

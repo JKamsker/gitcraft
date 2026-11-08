@@ -312,7 +312,13 @@ impl Api {
         };
         #[cfg(test)]
         if let Some(record) = &self.record {
-            return record(method, &path, body).map(|v| serde_json::to_vec(&v).unwrap_or_default());
+            return record(method, &path, body).map(|v| {
+                if accept == "text/plain" {
+                    v.as_str().unwrap_or_default().as_bytes().to_vec()
+                } else {
+                    serde_json::to_vec(&v).unwrap_or_default()
+                }
+            });
         }
         if crate::tasks::cancellation().is_cancelled() {
             return Err("Provider request cancelled".into());

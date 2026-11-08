@@ -148,7 +148,7 @@ pub fn statuses(
     match project.forge {
         Forge::GitHub => github::statuses(repo, project, &shas),
         Forge::GitLab => gitlab::statuses(repo, project, &shas),
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => Ok(HashMap::new()),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => Ok(HashMap::new()),
     }
 }
 
@@ -160,7 +160,9 @@ pub fn runs(repo: &Path, project: &Project, sha: &str) -> Result<Vec<Run>, Strin
     match project.forge {
         Forge::GitHub => github::runs(repo, project, sha),
         Forge::GitLab => gitlab::runs(repo, project, sha),
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => Err(no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -169,7 +171,9 @@ pub fn jobs(repo: &Path, project: &Project, run: u64) -> Result<Vec<Job>, String
     match project.forge {
         Forge::GitHub => github::jobs(repo, project, run),
         Forge::GitLab => gitlab::jobs(repo, project, run),
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => Err(no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -178,7 +182,9 @@ pub fn rerun_failed(repo: &Path, project: &Project, run: u64) -> Result<(), Stri
     match project.forge {
         Forge::GitHub => github::rerun_failed(repo, project, run),
         Forge::GitLab => gitlab::retry(repo, project, run),
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => Err(no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -187,7 +193,9 @@ pub fn cancel(repo: &Path, project: &Project, run: u64) -> Result<(), String> {
     match project.forge {
         Forge::GitHub => github::cancel(repo, project, run),
         Forge::GitLab => gitlab::cancel(repo, project, run),
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => Err(no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -201,7 +209,9 @@ pub fn failed_log(
     let log = match project.forge {
         Forge::GitHub => github::failed_log(repo, project, run)?,
         Forge::GitLab => gitlab::failed_log(repo, project, jobs)?,
-        Forge::Forgejo | Forge::Gitea | Forge::Azure => return Err(no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            return Err(no_builds(project.forge));
+        }
     };
     Ok(plain_text(&log))
 }

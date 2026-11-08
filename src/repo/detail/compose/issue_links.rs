@@ -44,7 +44,7 @@ pub fn forge_rule(hosting: &Hosting) -> IssueRule {
     }
     let issues = match hosting.forge {
         Forge::GitLab => "-/issues",
-        Forge::GitHub | Forge::Forgejo | Forge::Gitea | Forge::Azure => "issues",
+        Forge::GitHub | Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => "issues",
     };
     IssueRule {
         pattern: r"\B#(\d+)\b".to_owned(),

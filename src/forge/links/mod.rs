@@ -85,6 +85,19 @@ pub fn url(hosting: &Hosting, place: &Place) -> String {
         hosting.web.trim_end_matches('/'),
         encode_path(hosting.path.trim_matches('/'))
     );
+    if hosting.forge == Forge::Bitbucket {
+        return match place {
+            Place::Commit(sha) => format!("{repo}/commits/{sha}"),
+            Place::Branch(name) => format!("{repo}/src/{}", encode_segment(name)),
+            Place::File { sha, path, lines } => {
+                let mut out = format!("{repo}/src/{sha}/{}", encode_path(path));
+                if let Some(l) = lines {
+                    out.push_str(&format!("#lines-{}:{}", l.first, l.last));
+                }
+                out
+            }
+        };
+    }
     if hosting.forge == Forge::Azure {
         return match place {
             Place::Commit(sha) => format!("{repo}/commit/{sha}"),
@@ -111,14 +124,14 @@ pub fn url(hosting: &Hosting, place: &Place) -> String {
         Place::Commit(sha) => format!("{repo}{dash}/commit/{sha}"),
         Place::Branch(name) => {
             let tree = match hosting.forge {
-                Forge::GitHub | Forge::GitLab | Forge::Azure => "tree",
+                Forge::GitHub | Forge::GitLab | Forge::Azure | Forge::Bitbucket => "tree",
                 Forge::Forgejo | Forge::Gitea => "src/branch",
             };
             format!("{repo}{dash}/{tree}/{}", encode_path(name))
         }
         Place::File { sha, path, lines } => {
             let blob = match hosting.forge {
-                Forge::GitHub | Forge::GitLab | Forge::Azure => "blob",
+                Forge::GitHub | Forge::GitLab | Forge::Azure | Forge::Bitbucket => "blob",
                 Forge::Forgejo | Forge::Gitea => "src/commit",
             };
             let mut out = format!("{repo}{dash}/{blob}/{sha}/{}", encode_path(path));
@@ -126,7 +139,7 @@ pub fn url(hosting: &Hosting, place: &Place) -> String {
                 // A Markdown file (or a notebook, CSV, SVG…) shows rendered, where a line's
                 // anchor goes nowhere: ask for its source.
                 out.push_str(match hosting.forge {
-                    Forge::GitHub | Forge::GitLab | Forge::Azure => "?plain=1",
+                    Forge::GitHub | Forge::GitLab | Forge::Azure | Forge::Bitbucket => "?plain=1",
                     Forge::Forgejo | Forge::Gitea => "?display=source",
                 });
                 out.push_str(&anchor(hosting.forge, *lines));
