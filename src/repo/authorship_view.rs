@@ -119,22 +119,31 @@ impl RepoTab {
         }
         self.authorship.loading = true;
         let read_for = self.authorship.read_for.clone();
+        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
+        let requested_excluded = excluded.clone();
         let repo = self.path.clone();
         self.then(
             ctx,
             move || {
                 // Every ref and note, as a fingerprint: unchanged, nothing to read again.
-                let refs = crate::git::run(
+                let mut refs = crate::git::run(
                     Some(&repo),
                     &["for-each-ref", "--format=%(objectname) %(refname)"],
                 )?;
+                refs.push_str(&format!("\nnamespace filters: {excluded:?}"));
                 if read_for.as_deref() == Some(refs.as_str()) {
                     return Ok(None);
                 }
-                authorship::load::all(&repo).map(|map| Some((refs, map)))
+                authorship::load::all_scoped(&repo, &excluded).map(|map| Some((refs, map)))
             },
-            |tab, result, ctx| {
+            move |tab, result, ctx| {
                 tab.authorship.loading = false;
+                if super::history_filter::rules(ctx, tab.repo_key()).excludes()
+                    != requested_excluded
+                {
+                    tab.load_authorship(ctx);
+                    return;
+                }
                 match result {
                     Ok(Some((refs, map))) => {
                         tab.authorship.read_for = Some(refs);

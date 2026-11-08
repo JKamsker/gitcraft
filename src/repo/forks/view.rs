@@ -96,7 +96,7 @@ fn allow_edits(forge: Option<Forge>) -> &'static str {
 impl RepoTab {
     /// The local branch set up to push to `info`'s fork (found by its URL), if any.
     fn pushing_to_fork(&self, info: &ForkInfo) -> Option<&BranchSetup> {
-        let remote = fork_remote(info, &self.remotes)?;
+        let remote = fork_remote(info, &self.remotes, self.hosting.as_ref())?;
         self.forks.setup.pushing_to(&remote, &info.branch)
     }
 
@@ -192,7 +192,10 @@ impl RepoTab {
                 )
             };
             if item(ui, idle && info.maintainers_can_edit, &text, &tip) {
-                acts.push(Action::Fork(ForkAct::Checkout(number)));
+                acts.push(Action::Fork(ForkAct::Checkout(
+                    number,
+                    self.forge_generation,
+                )));
             }
             let here = set_up.is_some_and(|b| self.refs.current.as_deref() == Some(&b.name));
             let tip = if !info.maintainers_can_edit {
@@ -220,7 +223,7 @@ impl RepoTab {
                 ],
             );
             if item(ui, idle && here && info.maintainers_can_edit, &text, &tip) {
-                acts.push(Action::Fork(ForkAct::Rebase(number)));
+                acts.push(Action::Fork(ForkAct::Rebase(number, self.forge_generation)));
             }
         }
         let waiting = self.forks.waiting(&info.sha).len();
@@ -235,7 +238,10 @@ impl RepoTab {
                 ),
                 tip,
             ) {
-                acts.push(Action::Fork(ForkAct::Approve(number)));
+                acts.push(Action::Fork(ForkAct::Approve(
+                    number,
+                    self.forge_generation,
+                )));
             }
         }
     }

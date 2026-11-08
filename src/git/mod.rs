@@ -39,6 +39,7 @@ pub(crate) mod file_comparison;
 mod files;
 mod fold;
 pub(crate) mod growth;
+pub mod history_scope;
 mod hooks;
 mod interaction;
 pub(crate) mod investigations;

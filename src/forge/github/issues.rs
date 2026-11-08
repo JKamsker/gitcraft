@@ -13,14 +13,15 @@ use crate::pull_request::{at, items};
 const FIELDS: &str = "number,title,body,url,labels";
 
 /// `gh`, for issues: what it says when it isn't installed is about them.
-fn gh(repo: &Path, args: &[&str]) -> Result<String, String> {
-    cli::run(TOOL, "issue", repo, args)
+fn gh(repo: &Path, hosting: &super::Hosting, args: &[&str]) -> Result<String, String> {
+    cli::run(TOOL, "issue", repo, hosting, args)
 }
 
 /// The open issues assigned to `@me`: the account `gh` is signed in to for this host.
-pub(super) fn assigned(repo: &Path) -> Result<Vec<Issue>, String> {
+pub(super) fn assigned(repo: &Path, hosting: &super::Hosting) -> Result<Vec<Issue>, String> {
     let out = gh(
         repo,
+        hosting,
         &[
             "issue",
             "list",
@@ -38,9 +39,10 @@ pub(super) fn assigned(repo: &Path) -> Result<Vec<Issue>, String> {
 }
 
 /// Issue `number` as it is now.
-pub(super) fn one(repo: &Path, number: u64) -> Result<Issue, String> {
+pub(super) fn one(repo: &Path, hosting: &super::Hosting, number: u64) -> Result<Issue, String> {
     let out = gh(
         repo,
+        hosting,
         &["issue", "view", &number.to_string(), "--json", FIELDS],
     )?;
     let value: Value = serde_json::from_str(&out).map_err(|e| {

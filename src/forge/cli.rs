@@ -5,11 +5,17 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-use super::Forge;
+use super::{Forge, Hosting};
 
 /// Runs `tool` in `repo`; `noun` says what it's for when it isn't installed.
-pub(super) fn run(tool: &str, noun: &str, repo: &Path, args: &[&str]) -> Result<String, String> {
-    run_with_input(tool, noun, repo, args, None)
+pub(super) fn run(
+    tool: &str,
+    noun: &str,
+    repo: &Path,
+    hosting: &Hosting,
+    args: &[&str],
+) -> Result<String, String> {
+    run_with_input(tool, noun, repo, hosting, args, None)
 }
 
 /// [`run`], with `input` on its stdin.
@@ -17,6 +23,7 @@ pub(super) fn run_with_input(
     tool: &str,
     noun: &str,
     repo: &Path,
+    hosting: &Hosting,
     args: &[&str],
     input: Option<&str>,
 ) -> Result<String, String> {
@@ -29,7 +36,11 @@ pub(super) fn run_with_input(
             ],
         ));
     }
-    let (cmd, start_error) = prepared(tool, noun, repo, args)?;
+    let (cmd, start_error) = prepared(tool, noun, repo, hosting, args)?;
+    #[cfg(test)]
+    if let Some(answer) = recording::answer(&cmd, input) {
+        return answer;
+    }
     let options = bounded_options(TOOL_TIMEOUT, input);
     finish_run(
         tool,
@@ -43,10 +54,24 @@ pub(super) fn run_within(
     tool: &str,
     noun: &str,
     repo: &Path,
+    hosting: &Hosting,
     args: &[&str],
     within: Duration,
 ) -> Result<String, String> {
-    let (cmd, start_error) = prepared(tool, noun, repo, args)?;
+    let (cmd, start_error) = prepared(tool, noun, repo, hosting, args)?;
+    within_command(tool, cmd, start_error, within)
+}
+
+fn within_command(
+    tool: &str,
+    cmd: Command,
+    start_error: impl FnOnce(String) -> String,
+    within: Duration,
+) -> Result<String, String> {
+    #[cfg(test)]
+    if let Some(answer) = recording::answer(&cmd, None) {
+        return answer;
+    }
     finish_run(
         tool,
         within,
@@ -132,57 +157,78 @@ fn prepared(
     tool: &str,
     noun: &str,
     repo: &Path,
+    hosting: &Hosting,
     args: &[&str],
 ) -> Result<(Command, impl Fn(String) -> String), String> {
     let mut cmd = tool_command(tool);
+    let forge = forge_of(tool)?;
+    if forge != hosting.forge || !plain_path(&hosting.path) || !plain_host(&hosting.host) {
+        return Err(crate::i18n::message(
+            "integration-forge-needs-selected",
+            &[("tool", tool.into())],
+        ));
+    }
+    let authority = match forge {
+        Forge::GitLab => super::gitlab::api_authority(hosting),
+        _ => hosting.host.clone(),
+    };
+    if !plain_host(&authority) || !same_host(&authority, &hosting.host) {
+        return Err(crate::i18n::text("integration-forge-invalid-web-host").to_owned());
+    }
     let remote = crate::remote::parse(repo).is_some();
     let context = crate::connections::current();
     if let Some(error) = &context.error {
         return Err(error.clone());
     }
-    let selected = if tool == "gh" {
-        context.choices.github.selected()
-    } else {
-        context.choices.gitlab.selected()
-    };
-    if remote || selected {
-        // The tool runs here, where the user signed in to it, about the repository there:
-        // named rather than found from the folder, which it can't read.
-        let forge = forge_of(tool)?;
-        let (host, path) = remote_location(repo, forge)?;
-        crate::connections::configure_cli(&mut cmd, tool, &host)?;
-        // The hosts the arguments name (`--hostname`, `-R host/owner/repo`) were read when the
-        // tab loaded: only the one just checked, so a changed `origin` can't send the tool, and
-        // a token, to the one before.
-        if let Some(other) = named_hosts(args)
-            .into_iter()
-            .find(|named| !same_host(named, &host))
-        {
-            return Err(crate::i18n::message(
-                "backend-tool-was-to-go-to-other-but-the-repository-s-remote-is-now-on-hos-7e3c60",
-                &[
-                    ("tool", (tool).to_string().into()),
-                    ("other", (other).to_string().into()),
-                    ("host", (host).to_string().into()),
-                ],
-            ));
+    crate::connections::configure_cli(&mut cmd, tool, &authority)?;
+    if remote {
+        let remotes = remote_catalog(repo)?;
+        validate_remote_target(&remotes, hosting)?;
+        // A named target bypasses the CLI's usual known-host filtering. Only an explicitly
+        // configured login (never an inherited global token) may authorize an SSH-tab host.
+        if !trusted_host(forge, tool, &authority)? {
+            return Err(not_signed_in(tool, &authority));
         }
-        cmd.current_dir(std::env::temp_dir()).args(args);
-        match forge {
-            Forge::GitLab => {
-                cmd.env("GITLAB_HOST", &host);
-                // `glab api` takes no `--repo` (it would fail on it): its calls name the host
-                // and the project themselves.
-                if gitlab_takes_repo(args) {
-                    cmd.args(["--repo", &path]);
-                }
-            }
-            _ => {
-                cmd.env("GH_REPO", format!("{host}/{path}"));
-            }
+    }
+    if named_hosts(args)
+        .iter()
+        .any(|host| !host.eq_ignore_ascii_case(&authority))
+    {
+        return Err(crate::i18n::text("integration-forge-different-host").to_owned());
+    }
+    let mut args = args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    let api = args.first().is_some_and(|s| s == "api");
+    // These switches are command-family specific. Neither tool's `api` accepts --repo.
+    // Insert before `--`, which release uploads use to protect asset filenames.
+    let at = args.iter().position(|s| s == "--").unwrap_or(args.len());
+    if api {
+        if !args.iter().any(|s| s == "--hostname") {
+            args.splice(at..at, ["--hostname".to_owned(), authority.clone()]);
         }
     } else {
-        cmd.current_dir(repo).args(args);
+        let target = match forge {
+            Forge::GitLab => format!("{}/{}", hosting.web.trim_end_matches('/'), hosting.path),
+            _ => format!("{}/{}", hosting.host, hosting.path),
+        };
+        if args.iter().any(|s| matches!(s.as_str(), "--repo" | "-R")) {
+            return Err(crate::i18n::text("integration-forge-no-repository-override").to_owned());
+        }
+        args.splice(at..at, ["--repo".to_owned(), target]);
+    }
+    cmd.current_dir(if remote {
+        std::env::temp_dir()
+    } else {
+        repo.to_owned()
+    })
+    .args(args);
+    match forge {
+        Forge::GitLab => {
+            cmd.env("GITLAB_HOST", &authority)
+                .env("GITLAB_API_HOST", &authority);
+        }
+        _ => {
+            cmd.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+        }
     }
     let here = remote || repo.is_dir();
     let (tool, noun, shown) = (tool.to_owned(), noun.to_owned(), repo.display().to_string());
@@ -230,37 +276,33 @@ fn gitlab_takes_repo(args: &[&str]) -> bool {
     args.first().is_some_and(|sub| *sub != "api")
 }
 
-/// The web host and `owner/repo` of the remote the forge is found from (see
-/// [`super::detect`]), for a repository on another machine. Asked there each time (one round
-/// trip in a shell kept open), so a changed `origin` is followed at once. For an `http(s)`
-/// remote on a port of its own, GitLab's host keeps that port: its web pages and API are on it.
-fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String> {
-    let remotes = crate::git::remotes(repo)?;
-    let url = remotes
-        .iter()
-        .find(|r| r.name == "origin")
-        .or_else(|| remotes.first())
-        .map(|r| r.url.as_str())
-        .unwrap_or_default();
-    let tool = match forge {
-        Forge::GitLab => "glab",
-        _ => "gh",
-    };
-    let (host, path) = tool_location(forge, url)
-        .filter(|(_, path)| plain_path(path))
-        .ok_or_else(|| {
-            crate::i18n::message(
-                "backend-tool-needs-a-remote-with-an-owner-repo-url-3e1de1",
-                &[("tool", (tool).to_string().into())],
-            )
-        })?;
-    // Named to the tool, a host is used whether or not the user signed in to it (in a folder,
-    // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
-    // to, so a repository can't send the tool, and a token, to a host of its choosing.
-    if !trusted_host(forge, tool, &host)? {
-        return Err(not_signed_in(tool, &host));
+/// Re-read the SSH repository's catalog before each command; selection is a host AND path,
+/// rather than an implicit origin. A changed/removed URL requires refreshing the tab.
+fn remote_catalog(repo: &Path) -> Result<Vec<crate::git::Remote>, String> {
+    #[cfg(test)]
+    if let Some(remotes) = recording::remotes() {
+        return Ok(remotes);
     }
-    Ok((host, path))
+    crate::git::remotes(repo)
+}
+
+fn validate_remote_target(remotes: &[crate::git::Remote], hosting: &Hosting) -> Result<(), String> {
+    if remotes
+        .iter()
+        .any(|remote| hosting.matches_git_remote(&remote.url))
+    {
+        Ok(())
+    } else {
+        Err(crate::i18n::text("integration-forge-remote-changed").to_owned())
+    }
+}
+
+fn plain_host(host: &str) -> bool {
+    !host.is_empty()
+        && !host.starts_with(['-', '.', ':'])
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
 }
 
 // The inbox's retry policy consumes this protocol identity; translate at display_error.
@@ -274,7 +316,8 @@ fn plain_path(path: &str) -> bool {
     path.contains('/')
         && path.split('/').all(|part| {
             !part.is_empty()
-                && !part.starts_with(['-', '.'])
+                && !part.starts_with('-')
+                && !matches!(part, "." | "..")
                 && part
                     .chars()
                     .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
@@ -387,8 +430,24 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
 /// error, so cancellation, timeout or uncertain cleanup cannot be cached as signed out.
 fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
     let mut cmd = tool_command(tool);
+    for key in [
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GITLAB_TOKEN",
+        "GITLAB_ACCESS_TOKEN",
+        "OAUTH_TOKEN",
+        "CI_JOB_TOKEN",
+    ] {
+        cmd.env_remove(key);
+    }
     cmd.args(["auth", "status", "--hostname", host])
         .current_dir(std::env::temp_dir());
+    #[cfg(test)]
+    if let Some(answer) = recording::answer(&cmd, None) {
+        return Ok(answer.is_ok());
+    }
     let options = auth_options(AUTH_CHECK_FOR, false)?;
     // No auth output reaches an error message, including partial output on failure.
     finish_auth(crate::processes::run_checked(cmd, options)).map_err(|error| {
@@ -465,7 +524,8 @@ fn tool_command(tool: &str) -> Command {
         .env_remove("GITLAB_REPO")
         .env_remove("GITLAB_URI")
         .env_remove("GL_HOST")
-        .env_remove("GITLAB_HEAD_REPO");
+        .env_remove("GITLAB_HEAD_REPO")
+        .env_remove("GITLAB_API_HOST");
     crate::shell_path::apply(&mut cmd);
     #[cfg(windows)]
     {
@@ -636,6 +696,37 @@ pub(super) fn history_api(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn review13_ssh_catalog_check_keeps_web_authority_prefix_and_forge_case() {
+        for forge in [Forge::GitHub, Forge::GitLab] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "Team/Repo".into(),
+                web: "https://forge.example:4000/reviews".into(),
+            };
+            for (url, expected) in [
+                ("https://forge.example:3000/reviews/Team/Repo.git", false),
+                ("https://forge.example:4000/Team/Repo.git", false),
+                ("https://forge.example:4000/REVIEWS/Team/Repo.git", false),
+                ("https://FORGE.example:4000/reviews/Team/Repo.git", true),
+                ("git@forge.example:Team/Repo.git", true),
+                ("ssh://git@forge.example:2222/Team/Repo.git", true),
+                ("git@forge.example:team/repo.git", forge != Forge::GitLab),
+            ] {
+                let remotes = [crate::git::Remote {
+                    name: "origin".into(),
+                    url: url.into(),
+                }];
+                assert_eq!(
+                    validate_remote_target(&remotes, &h).is_ok(),
+                    expected,
+                    "{forge:?} {url}"
+                );
+            }
+        }
+    }
+
     use super::*;
 
     /// A self-hosted GitLab on a port of its own is reached on it; an SSH port isn't a web one.
@@ -704,6 +795,11 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_tool_given_a_time_is_stopped_at_it() {
+        let run_within = |tool: &str, _: &str, here: &Path, args: &[&str], within| {
+            let mut cmd = tool_command(tool);
+            cmd.current_dir(here).args(args);
+            within_command(tool, cmd, |e| e, within)
+        };
         let here = std::env::temp_dir();
         let started = Instant::now();
         let hung = run_within("sleep", "x", &here, &["20"], Duration::from_millis(300));
@@ -928,6 +1024,12 @@ mod tests {
                 "/recorded/gh",
                 "review",
                 Path::new("/recorded/repo"),
+                &Hosting {
+                    forge: Forge::GitHub,
+                    host: "github.com".into(),
+                    path: "o/r".into(),
+                    web: "https://github.com".into()
+                },
                 &[],
                 Some(&input)
             ),
@@ -965,5 +1067,97 @@ mod backend_fluent_identity_tests {
             }
         }
         crate::i18n::set_language("en-US");
+    }
+}
+/// Recording happens after command preparation, at the process boundary. No forge tool runs.
+#[cfg(test)]
+pub(super) mod recording {
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::process::Command;
+
+    #[derive(Debug)]
+    pub struct Call {
+        pub tool: String,
+        pub args: Vec<String>,
+        pub env: Vec<(String, Option<String>)>,
+        pub input: Option<String>,
+    }
+    #[derive(Default)]
+    struct Recording {
+        calls: Vec<Call>,
+        answers: VecDeque<Result<String, String>>,
+        remotes: Option<Vec<crate::git::Remote>>,
+    }
+    thread_local! {
+        static ACTIVE: RefCell<Option<Recording>> = const { RefCell::new(None) };
+    }
+    pub fn run(
+        answers: Vec<Result<String, String>>,
+        work: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Vec<Call>, String> {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                ACTIVE.with(|a| *a.borrow_mut() = None);
+            }
+        }
+        ACTIVE.with(|a| {
+            assert!(a.borrow().is_none());
+            *a.borrow_mut() = Some(Recording {
+                answers: answers.into(),
+                ..Default::default()
+            });
+        });
+        let _reset = Reset;
+        work()?;
+        ACTIVE.with(|a| {
+            let mut a = a.borrow_mut();
+            let recording = a.take().ok_or("missing active recorder")?;
+            assert!(recording.answers.is_empty(), "unconsumed CLI responses");
+            Ok(recording.calls)
+        })
+    }
+    pub fn set_remotes(remotes: Vec<crate::git::Remote>) {
+        ACTIVE.with(|a| {
+            let mut a = a.borrow_mut();
+            assert!(a.is_some(), "missing recorder");
+            if let Some(r) = a.as_mut() {
+                r.remotes = Some(remotes);
+            }
+        });
+    }
+    pub(super) fn remotes() -> Option<Vec<crate::git::Remote>> {
+        ACTIVE.with(|a| a.borrow().as_ref().and_then(|r| r.remotes.clone()))
+    }
+    pub(super) fn answer(cmd: &Command, input: Option<&str>) -> Option<Result<String, String>> {
+        ACTIVE.with(|a| {
+            let mut a = a.borrow_mut();
+            let recording = a.as_mut()?;
+            recording.calls.push(Call {
+                tool: cmd.get_program().to_string_lossy().into_owned(),
+                args: cmd
+                    .get_args()
+                    .map(|a| a.to_string_lossy().into_owned())
+                    .collect(),
+                env: cmd
+                    .get_envs()
+                    .map(|(k, v)| {
+                        (
+                            k.to_string_lossy().into_owned(),
+                            v.map(|v| v.to_string_lossy().into_owned()),
+                        )
+                    })
+                    .collect(),
+                input: input.map(str::to_owned),
+            });
+            assert!(!recording.answers.is_empty(), "unexpected forge invocation");
+            Some(
+                recording
+                    .answers
+                    .pop_front()
+                    .unwrap_or_else(|| Err("unexpected forge invocation".into())),
+            )
+        })
     }
 }

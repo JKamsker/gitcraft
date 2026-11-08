@@ -25,22 +25,23 @@ pub(super) struct GitHub;
 const TOOL: &str = "gh";
 const NOUN: &str = "pull request";
 
-fn gh(repo: &Path, args: &[&str]) -> Result<String, String> {
-    cli::run(TOOL, NOUN, repo, args)
+fn gh(repo: &Path, hosting: &Hosting, args: &[&str]) -> Result<String, String> {
+    cli::run(TOOL, NOUN, repo, hosting, args)
 }
 
 /// `gh api …` about the repository's host (GitHub Enterprise named with `--hostname`).
 fn api(repo: &Path, hosting: &Hosting, args: &[&str]) -> Result<String, String> {
-    let mut args = args.to_vec();
-    if hosting.host != "github.com" {
-        args.extend(["--hostname", &hosting.host]);
-    }
-    gh(repo, &args)
+    gh(repo, hosting, args)
 }
 
 /// [`gh`], with `input` on its stdin.
-fn gh_with_input(repo: &Path, args: &[&str], input: Option<&str>) -> Result<String, String> {
-    cli::run_with_input(TOOL, NOUN, repo, args, input)
+fn gh_with_input(
+    repo: &Path,
+    hosting: &Hosting,
+    args: &[&str],
+    input: Option<&str>,
+) -> Result<String, String> {
+    cli::run_with_input(TOOL, NOUN, repo, hosting, args, input)
 }
 
 /// The account at `pointer`: a deleted one has none, and GitHub calls those "ghost".
@@ -62,9 +63,10 @@ impl Provider for GitHub {
         host.contains("github") && !host.contains("gitlab")
     }
 
-    fn list(&self, repo: &Path, _: &Hosting) -> Result<Vec<PullRequest>, String> {
+    fn list(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<PullRequest>, String> {
         let out = gh(
             repo,
+            hosting,
             &[
                 "pr",
                 "list",
@@ -79,7 +81,7 @@ impl Provider for GitHub {
         parse_list(&out)
     }
 
-    fn merged(&self, repo: &Path, _: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
+    fn merged(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<MergedPullRequest>, String> {
         let args = [
             "pr",
             "list",
@@ -91,10 +93,15 @@ impl Provider for GitHub {
             "number,headRefName,headRefOid,baseRefName",
         ];
         let pointers = ["/number", "/headRefName", "/headRefOid", "/baseRefName"];
-        super::parse_merged(&gh(repo, &args)?, pointers, TOOL)
+        super::parse_merged(&gh(repo, hosting, &args)?, pointers, TOOL)
     }
 
-    fn create(&self, repo: &Path, _: &Hosting, new: &NewPullRequest) -> Result<String, String> {
+    fn create(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        new: &NewPullRequest,
+    ) -> Result<String, String> {
         let mut args = vec![
             "pr", "create", "--head", new.branch, "--base", new.base, "--title", new.title,
             "--body", new.body,
@@ -102,19 +109,26 @@ impl Provider for GitHub {
         if new.draft {
             args.push("--draft");
         }
-        let url = gh(repo, &args)?.trim().to_owned();
-        // Asked after opening it: gh refuses the whole of `--reviewer` for one name it can't ask.
+        let url = gh(repo, hosting, &args)?.trim().to_owned();
+        // A URL argument to `gh pr edit` overrides --repo. Validate the answer and edit by
+        // number so reviewer requests remain bound to the selected repository as well.
+        let number = super::created_pr_number(hosting, &url)?;
         super::ask_reviewers(url.clone(), new.reviewers, |who| {
-            gh(repo, &["pr", "edit", &url, "--add-reviewer", who]).map(|_| ())
+            gh(
+                repo,
+                hosting,
+                &["pr", "edit", &number, "--add-reviewer", who],
+            )
+            .map(|_| ())
         })
     }
 
-    fn assigned_issues(&self, repo: &Path, _: &Hosting) -> Result<Vec<Issue>, String> {
-        issues::assigned(repo)
+    fn assigned_issues(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<Issue>, String> {
+        issues::assigned(repo, hosting)
     }
 
-    fn issue(&self, repo: &Path, _: &Hosting, number: u64) -> Result<Issue, String> {
-        issues::one(repo, number)
+    fn issue(&self, repo: &Path, hosting: &Hosting, number: u64) -> Result<Issue, String> {
+        issues::one(repo, hosting, number)
     }
 
     fn forks(&self, repo: &Path, hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
@@ -122,6 +136,7 @@ impl Provider for GitHub {
                       headRepository,headRefName,headRefOid,baseRefName";
         let out = gh(
             repo,
+            hosting,
             &[
                 "pr", "list", "--state", "open", "--limit", "100", "--json", fields,
             ],
@@ -152,14 +167,21 @@ impl Provider for GitHub {
         api(repo, hosting, &["api", "-X", "POST", &endpoint]).map(|_| ())
     }
 
-    fn retarget(&self, repo: &Path, _: &Hosting, number: u64, base: &str) -> Result<(), String> {
+    fn retarget(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+        base: &str,
+    ) -> Result<(), String> {
         let number = number.to_string();
-        gh(repo, &["pr", "edit", &number, "--base", base]).map(drop)
+        gh(repo, hosting, &["pr", "edit", &number, "--base", base]).map(drop)
     }
 
-    fn find(&self, repo: &Path, _: &Hosting, branch: &str) -> Result<Option<Found>, String> {
+    fn find(&self, repo: &Path, hosting: &Hosting, branch: &str) -> Result<Option<Found>, String> {
         let out = gh(
             repo,
+            hosting,
             &[
                 "pr",
                 "list",
@@ -197,7 +219,7 @@ impl Provider for GitHub {
     fn create_release(
         &self,
         repo: &Path,
-        _: &Hosting,
+        hosting: &Hosting,
         new: &super::NewRelease,
     ) -> Result<String, String> {
         let mut args = vec![
@@ -217,25 +239,26 @@ impl Provider for GitHub {
         // tag's): that one.
         if let Ok(url) = gh(
             repo,
+            hosting,
             &["release", "view", new.tag, "--json", "url", "-q", ".url"],
         ) && !url.trim().is_empty()
         {
             return Ok(url.trim().to_owned());
         }
-        gh_with_input(repo, &args, Some(new.notes)).map(|out| out.trim().to_owned())
+        gh_with_input(repo, hosting, &args, Some(new.notes)).map(|out| out.trim().to_owned())
     }
 
     fn upload_assets(
         &self,
         repo: &Path,
-        _: &Hosting,
+        hosting: &Hosting,
         tag: &str,
         files: &[std::path::PathBuf],
     ) -> Result<(), String> {
         let paths = super::path_args(files);
         let mut args = vec!["release", "upload", tag, "--clobber", "--"];
         args.extend(paths.iter().map(String::as_str));
-        gh(repo, &args).map(|_| ())
+        gh(repo, hosting, &args).map(|_| ())
     }
 
     /// The authors' GitHub accounts, from the repository's latest commits (the API ties each
@@ -248,7 +271,7 @@ impl Provider for GitHub {
         if host != "github.com" {
             args.extend(["--hostname", host]);
         }
-        let json = gh(repo, &args).or_else(|e| {
+        let json = gh(repo, hosting, &args).or_else(|e| {
             if host != "github.com" {
                 return Err(e);
             }
@@ -271,7 +294,7 @@ impl Provider for GitHub {
 
     /// Two lists: those whose review is asked of you (or a team of yours), and yours with
     /// their checks, comments and reviews.
-    fn inbox(&self, repo: &Path, _: &Hosting) -> Result<inbox::Answer, String> {
+    fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
         const FIELDS: &str = "number,title,url,author,isDraft,updatedAt";
         const MAX: usize = 50;
         let list = |filter: &[&str], fields: &str| {
@@ -279,7 +302,7 @@ impl Provider for GitHub {
             let mut args = vec!["pr", "list", "--state", "open", "--limit", &max];
             args.extend(filter);
             args.extend(["--json", fields]);
-            cli::run_within(TOOL, NOUN, repo, &args, inbox::TOOL_FOR)
+            cli::run_within(TOOL, NOUN, repo, hosting, &args, inbox::TOOL_FOR)
         };
         let asked =
             inbox::parse_github(&list(&["--search", "review-requested:@me"], FIELDS)?, true)?;
@@ -309,13 +332,18 @@ impl Provider for GitHub {
 }
 
 impl Pages for GitHub {
-    /// `gh` finds the repository from the remotes itself, as `gh pr view` in a terminal would.
-    fn details(&self, repo: &Path, _: &Hosting, number: u64) -> Result<PrDetails, String> {
-        details::details(repo, number)
+    /// Read from the selected forge repository, even when origin points elsewhere.
+    fn details(&self, repo: &Path, hosting: &Hosting, number: u64) -> Result<PrDetails, String> {
+        details::details(repo, hosting, number)
     }
 
-    fn target(&self, repo: &Path, _: &Hosting, details: &PrDetails) -> Option<Box<dyn Target>> {
-        post::GitHubTarget::of(repo, details).map(|t| Box::new(t) as Box<dyn Target>)
+    fn target(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        details: &PrDetails,
+    ) -> Option<Box<dyn Target>> {
+        post::GitHubTarget::of(repo, hosting, details).map(|t| Box::new(t) as Box<dyn Target>)
     }
 }
 
@@ -388,5 +416,34 @@ mod tests {
         assert_eq!(prs[0].sha, "c0ffee");
         assert_eq!(prs[0].base, "main");
         assert!(parse_list("oops").is_err());
+    }
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+    #[test]
+    fn provider_boundary_selected_fork_is_explicit_for_github_lists() -> Result<(), String> {
+        let dir = std::env::temp_dir();
+        let hosting = Hosting {
+            forge: super::super::Forge::GitHub,
+            host: "github.com".into(),
+            path: "fork/project".into(),
+            web: "https://github.com".into(),
+        };
+        let calls = cli::recording::run(vec![Ok("[]".into())], || {
+            assert!(GitHub.list(&dir, &hosting)?.is_empty());
+            Ok(())
+        })?;
+        assert_eq!(calls.len(), 1);
+        assert!(
+            calls[0]
+                .args
+                .windows(2)
+                .any(|p| p == ["--repo", "github.com/fork/project"]),
+            "selected fork absent from prepared command: {:?}",
+            calls[0]
+        );
+        Ok(())
     }
 }

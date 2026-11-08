@@ -414,3 +414,39 @@ fn a_stash_has_no_links() -> Result<(), String> {
         },
     )
 }
+
+#[test]
+fn primary_forge_defaults_commit_links_but_explicit_remote_branch_links_keep_their_remote()
+-> Result<(), String> {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    with(
+        repo(
+            "primary-menus",
+            &[
+                ("origin", "https://github.com/Vancete/gitcraft"),
+                ("fork", "https://github.com/JKamsker/gitcraft"),
+            ],
+        )?,
+        |dir| {
+            fetched(dir, "origin", "main", "HEAD")?;
+            git(dir, &["branch", "--set-upstream-to=origin/main", "main"])?;
+            let ctx = egui::Context::default();
+            let mut tab = tab_on(dir, &ctx)?;
+            tab.forge_remotes = crate::forge::detect_remotes(dir, &tab.remotes);
+            tab.take_forge_selection(false, &ctx);
+            tab.set_primary_forge(Some("fork".into()), &ctx);
+            assert_eq!(remotes_of(tab.link_menu(None)), ["fork"]);
+            assert_eq!(
+                tab.branch_link_menu("origin/main")
+                    .map(|(menu, _)| remotes_of(Some(menu))),
+                Some(vec!["origin".into()])
+            );
+            assert_eq!(
+                tab.branch_link_menu("main")
+                    .map(|(menu, _)| remotes_of(Some(menu))),
+                Some(vec!["origin".into()])
+            );
+            Ok(())
+        },
+    )
+}

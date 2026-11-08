@@ -7,7 +7,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::{Job, Project, Run, Status, Step, time};
-use crate::forge::{self, Forge};
+use crate::forge;
 use crate::pull_request::{CheckState, at, check, items};
 
 /// What the rollup of a commit (or a commit status of the older kind) says, in GraphQL's
@@ -68,7 +68,7 @@ pub(super) fn statuses(
         if project.host != "github.com" {
             args.extend(["--hostname", project.host.as_str()]);
         }
-        let json = forge::tool(Forge::GitHub, repo, &args)?;
+        let json = forge::tool(&project.hosting(), repo, &args)?;
         out.extend(parse_statuses(&json)?);
     }
     Ok(out)
@@ -118,33 +118,15 @@ fn parse_statuses(json: &str) -> Result<HashMap<String, Status>, String> {
         .collect())
 }
 
-/// `owner/repo`, with the host in front when it isn't github.com.
-fn repo_arg(project: &Project) -> String {
-    if project.host == "github.com" {
-        project.path.clone()
-    } else {
-        format!("{}/{}", project.host, project.path)
-    }
-}
-
 const RUN_FIELDS: &str = "databaseId,name,workflowName,displayTitle,event,status,conclusion,\
     headBranch,headSha,number,attempt,startedAt,updatedAt,url";
 
 pub(super) fn runs(repo: &Path, project: &Project, sha: &str) -> Result<Vec<Run>, String> {
     let json = forge::tool(
-        Forge::GitHub,
+        &project.hosting(),
         repo,
         &[
-            "run",
-            "list",
-            "-R",
-            &repo_arg(project),
-            "--commit",
-            sha,
-            "--limit",
-            "50",
-            "--json",
-            RUN_FIELDS,
+            "run", "list", "--commit", sha, "--limit", "50", "--json", RUN_FIELDS,
         ],
     )?;
     parse_runs(&json)
@@ -232,10 +214,10 @@ fn run_command(
     run: u64,
     more: &[&str],
 ) -> Result<String, String> {
-    let (run, repo_arg) = (run.to_string(), repo_arg(project));
-    let mut args = vec!["run", command, run.as_str(), "-R", repo_arg.as_str()];
+    let run = run.to_string();
+    let mut args = vec!["run", command, run.as_str()];
     args.extend(more);
-    forge::tool(Forge::GitHub, repo, &args)
+    forge::tool(&project.hosting(), repo, &args)
 }
 
 pub(super) fn rerun_failed(repo: &Path, project: &Project, run: u64) -> Result<(), String> {

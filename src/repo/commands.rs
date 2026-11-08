@@ -289,8 +289,9 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        // The remote the forge was found by.
-        let Some(remote) = self.default_remote() else {
+        // Explicitly publishing a PR uses its hosting remote; ordinary Push/Fetch still
+        // use their existing Git transport routing. Selecting the forge runs no Git writes.
+        let Some(remote) = self.primary_forge_remote().map(str::to_owned) else {
             return;
         };
         let label = format!("Create {}", hosting.forge.noun());
@@ -312,7 +313,7 @@ impl RepoTab {
                 stopped: 0,
             }
         };
-        spawn_or(&self.tx, ctx, failed, move || {
+        spawn_or(&self.forge_operation_sender(), ctx, failed, move || {
             // Publish the branch first, so the forge can see it.
             // No `:dst`, which would bypass `remote.<name>.push`.
             let refspec = format!("refs/heads/{branch}");

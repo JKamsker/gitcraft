@@ -20,7 +20,6 @@ impl RepoTab {
     pub(in crate::repo) fn rebuild_graph_labels(&mut self) {
         self.graph_labels.clear();
         self.graph_badge_index = BadgeIndex::new(&self.refs);
-        let index = &self.graph_badge_index;
         for (i, commit) in self.commits.iter().enumerate() {
             if commit.refs.is_empty() {
                 continue;
@@ -28,8 +27,8 @@ impl RepoTab {
             let Some(row) = self.graph.rows.get(i) else {
                 continue;
             };
-            if let Some(badge) = index
-                .badges(&commit.refs)
+            if let Some(badge) = self
+                .graph_badges(commit)
                 .into_iter()
                 .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
             {

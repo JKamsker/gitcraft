@@ -111,10 +111,20 @@ impl RepoTab {
         self.measure_drift(true, ctx);
     }
 
+    pub(super) fn clear_forge_drift(&mut self) {
+        if let Some(view) = &mut self.drift {
+            view.issue = None;
+            view.report = None;
+            view.second_opinion = None;
+            view.asking = false;
+            view.busy = false;
+        }
+    }
+
     /// Measures the worktree's changes in the background; `first` reads its task and linked
     /// issue as well.
     fn measure_drift(&mut self, first: bool, ctx: &egui::Context) {
-        let forge = self.hosting.as_ref().map(|h| h.forge);
+        let hosting = self.hosting.clone();
         let Some(view) = &mut self.drift else {
             return;
         };
@@ -125,7 +135,7 @@ impl RepoTab {
         let base = view.base.clone();
         let edited = view.task_text();
         let repo = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || -> Measured {
                 let task = if first {
@@ -134,8 +144,8 @@ impl RepoTab {
                     edited.clone()
                 };
                 let issue = drift::task::issue_number(&branch, &task).map(|n| {
-                    let text = match forge {
-                        Some(forge) => drift::task::issue_text(forge, &repo, n),
+                    let text = match &hosting {
+                        Some(hosting) => drift::task::issue_text(hosting, &repo, n),
                         None => Err(crate::i18n::text(
                             "repo-workflows-drift_view-measure-drift-27f1506d",
                         )
@@ -218,7 +228,7 @@ impl RepoTab {
         let asked = view.worktree.path.clone();
         view.asking = true;
         view.second_opinion = None;
-        self.then(
+        self.forge_then(
             ctx,
             move || drift::llm::ask(&question),
             move |tab, answer, _| {

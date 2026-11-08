@@ -24,7 +24,10 @@ pub(crate) struct PublishPreview {
 impl RepoTab {
     /// Previews publishing the pull requests of the stack `branch` is in (or at the bottom of).
     pub(super) fn open_publish(&mut self, branch: &str, ctx: &egui::Context) {
-        let (Some(hosting), Some(_)) = (self.hosting.clone(), self.default_remote()) else {
+        let (Some(hosting), Some(_)) = (
+            self.hosting.clone(),
+            self.primary_forge_remote().map(str::to_owned),
+        ) else {
             self.status = Some(crate::repo::Notice::plain((
                 "This repository isn't on a forge gitcraft knows: there is nowhere to publish to."
                     .to_owned(),
@@ -65,7 +68,7 @@ impl RepoTab {
             id,
         });
         let path = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 // Each branch's pull request asked of the forge now, whatever its state.
@@ -83,7 +86,10 @@ impl RepoTab {
 
     /// Publishes as previewed.
     pub(super) fn start_publish(&mut self, ctx: &egui::Context) {
-        let (Some(hosting), Some(remote)) = (self.hosting.clone(), self.default_remote()) else {
+        let (Some(hosting), Some(remote)) = (
+            self.hosting.clone(),
+            self.primary_forge_remote().map(str::to_owned),
+        ) else {
             return;
         };
         let Some(PublishPreview {
@@ -120,7 +126,7 @@ impl RepoTab {
                 stopped: 0,
             }
         };
-        spawn_or(&self.tx, ctx, failed, move || {
+        spawn_or(&self.forge_operation_sender(), ctx, failed, move || {
             let report = stack::publish(
                 &path,
                 &plans,

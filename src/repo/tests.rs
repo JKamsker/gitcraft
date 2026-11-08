@@ -338,6 +338,8 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         ..Default::default()
     };
     let _ = tab.tx.send(Msg::Loaded(Ok(Box::new(super::load::Loaded {
+        history_namespaces: git::history_scope::default_hidden_namespaces(),
+        excluded_namespace_count: Some(0),
         refs: Default::default(),
         history: Vec::new(),
         work: git::WorkStatus::default(),
@@ -345,7 +347,8 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         worktree_root: String::new(),
         stashes: Vec::new(),
         remotes: Vec::new(),
-        hosting: None,
+        forge_remotes: Vec::new(),
+        forge_generation: 0,
         gerrit: None,
         submodules: Vec::new(),
         lfs: false,

@@ -19,7 +19,7 @@ pub(super) struct PickerState {
 }
 
 impl RepoTab {
-    pub(super) fn picker_button(&mut self, ui: &mut Ui) {
+    pub(super) fn picker_button(&mut self, ui: &mut Ui, enabled: bool) {
         let style = Store::style(ui.ctx());
         if style == PrefixStyle::Off {
             return;
@@ -28,16 +28,23 @@ impl RepoTab {
             PrefixStyle::Gitmoji => "Gitmoji",
             _ => crate::i18n::text("repo-core-0981"),
         };
-        let b = icons::small_button(ui, "tag", tip);
+        let b = ui
+            .add_enabled(enabled, |ui: &mut Ui| icons::small_button(ui, "tag", tip))
+            .on_disabled_hover_text(crate::i18n::text("dev-baseline-replay-message"));
         let used_scopes = self.compose.used.as_ref().map(|(_, s)| s.clone());
         let summary = &mut self.commit_summary;
         let state = &mut self.compose.picker;
         egui::Popup::menu(&b)
             .width(300.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-            .show(|ui| match style {
-                PrefixStyle::Gitmoji => gitmoji(ui, summary),
-                _ => conventional(ui, summary, state, used_scopes.as_deref().unwrap_or(&[])),
+            .show(|ui| {
+                if !enabled {
+                    ui.disable();
+                }
+                match style {
+                    PrefixStyle::Gitmoji => gitmoji(ui, summary),
+                    _ => conventional(ui, summary, state, used_scopes.as_deref().unwrap_or(&[])),
+                }
             });
     }
 }

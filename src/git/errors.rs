@@ -269,6 +269,56 @@ pub fn display_error(error: &str) -> String {
         );
     }
     let id = match error {
+        "The operation on the previous primary forge finished; refresh that repository to check its result" => {
+            "dev-baseline-guard-21"
+        }
+        "The primary remote changed or was removed; plan the fork action again" => {
+            "dev-baseline-guard-0"
+        }
+        "The effective primary fetch URL changed; plan the fork action again" => {
+            "dev-baseline-guard-1"
+        }
+        "The contributor's fork remote was removed; plan the action again" => {
+            "dev-baseline-guard-2"
+        }
+        "The contributor's fork remote changed; plan the action again" => "dev-baseline-guard-3",
+        "The primary forge changed; plan this fork action again. Any completed local rewrite remains undoable." => {
+            "dev-baseline-guard-4"
+        }
+        "Unknown saved checkout forge" => "dev-baseline-guard-5",
+        "This saved fork checkout has no captured destination; check out the pull request again" => {
+            "dev-baseline-guard-6"
+        }
+        "The saved fork checkout has no initial effective destination; check out the pull request again" => {
+            "dev-baseline-guard-7"
+        }
+        "The saved fork remote is missing; check out the pull request again" => {
+            "dev-baseline-guard-8"
+        }
+        "The saved fork destination changed; check out the pull request again" => {
+            "dev-baseline-guard-9"
+        }
+        "Missing fork push destination" => "dev-baseline-guard-10",
+        "Fork push requires an explicit expected commit" => "dev-baseline-guard-11",
+        "Fork push has no recorded expected commit; plan the action again" => {
+            "dev-baseline-guard-12"
+        }
+        "The rebased branch changed before its push; plan the action again" => {
+            "dev-baseline-guard-13"
+        }
+        "Missing fork push refspec" => "dev-baseline-guard-14",
+        "This issue belongs to another primary forge; choose it again" => "dev-baseline-guard-15",
+        "This issue belongs to another forge repository; open its saved URL to view it" => {
+            "dev-baseline-guard-16"
+        }
+        "No primary forge is selected" => "dev-baseline-guard-17",
+        "The primary forge remote is unavailable; refresh before opening this pull request" => {
+            "dev-baseline-guard-18"
+        }
+        "Publication needs the release's push destination" => "dev-baseline-guard-19",
+        "The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge." => {
+            "dev-baseline-guard-20"
+        }
         "Account action cancelled." => "backend-account-action-cancelled-13efa7",
         "Account check cancelled." => "backend-account-check-cancelled-34de37",
         "Analysis cancelled" => "backend-analysis-cancelled-d5fe01",

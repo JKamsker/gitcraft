@@ -33,13 +33,13 @@ const QUERY: &str = "query($owner: String!, $name: String!, $number: Int!, $afte
 }";
 
 /// Reads all of it for the pull request `number` of `owner/name`.
-pub fn fetch(repo: &Path, host: &str, path: &str, number: u64) -> Result<PrExtras, String> {
-    let (owner, name) = path.split_once('/').ok_or(crate::i18n::text(
+pub fn fetch(repo: &Path, hosting: &super::Hosting, number: u64) -> Result<PrExtras, String> {
+    let (owner, name) = hosting.path.split_once('/').ok_or(crate::i18n::text(
         "backend-unexpected-repository-name-cf7267",
     ))?;
     // A push between two pages would put threads of two commits together: it's read again.
     for _ in 0..2 {
-        if let Some(extras) = fetch_pages(repo, host, owner, name, number)? {
+        if let Some(extras) = fetch_pages(repo, hosting, owner, name, number)? {
             return Ok(extras);
         }
     }
@@ -52,7 +52,7 @@ pub fn fetch(repo: &Path, host: &str, path: &str, number: u64) -> Result<PrExtra
 /// All pages of it, or `None` if they weren't all of the same commit.
 fn fetch_pages(
     repo: &Path,
-    host: &str,
+    hosting: &super::Hosting,
     owner: &str,
     name: &str,
     number: u64,
@@ -64,11 +64,8 @@ fn fetch_pages(
             "query": QUERY,
             "variables": { "owner": owner, "name": name, "number": number, "after": after },
         });
-        let mut args = vec!["api", "graphql", "--input", "-"];
-        if host != "github.com" {
-            args.extend(["--hostname", host]);
-        }
-        let out = gh_with_input(repo, &args, Some(&payload.to_string()))?;
+        let args = vec!["api", "graphql", "--input", "-"];
+        let out = gh_with_input(repo, hosting, &args, Some(&payload.to_string()))?;
         let (page, next_page) = parse(&out)?;
         after = next_page;
         extras = match extras {

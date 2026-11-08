@@ -17,7 +17,8 @@ impl RepoTab {
         let mut amend_started = false;
         // Taken out while the row is drawn, which reads the whole tab too (the fold picker).
         let mut amending = self.amend;
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
             ui.label(
                 RichText::new(match continuing {
                     Some(s) => crate::i18n::message(
@@ -29,23 +30,51 @@ impl RepoTab {
                 .font(theme::semibold(10.5))
                 .color(t.text_faint),
             );
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let amend = ui
-                    .add_enabled(
-                        !rebasing && !self.refs.head.is_empty(),
-                        egui::Checkbox::new(&mut amending, crate::i18n::text("repo-core-0894")),
+            let amend = ui
+                .add_enabled(
+                    idle && !rebasing && !self.refs.head.is_empty(),
+                    |ui: &mut Ui| {
+                        icons::toggle_button(
+                            ui,
+                            "history",
+                            crate::i18n::text("repo-core-0894"),
+                            amending,
+                        )
+                    },
+                )
+                .on_hover_text(crate::i18n::text("repo-core-0895"))
+                .on_disabled_hover_text(if !idle {
+                    crate::i18n::text("repo-core-1125")
+                } else if rebasing {
+                    crate::i18n::text("repo-workflows-dco-toggle-9ba5d60e")
+                } else {
+                    crate::i18n::text("dev-integration-ui-no-commits")
+                });
+            if amend.clicked() {
+                amending = !amending;
+                amend_started =
+                    amending && (self.commit_summary.trim().is_empty() || self.unedited_prefill());
+            }
+            self.dco.toggle(ui, !rebasing, acts);
+            self.fold_picker(ui, amending, acts);
+            self.ai_message_button(ui, !rebasing);
+            if ui
+                .add_enabled(!rebasing, |ui: &mut Ui| {
+                    icons::toggle_button(
+                        ui,
+                        "wrench",
+                        crate::i18n::text("repo-core-0899"),
+                        self.skip_hooks.commit,
                     )
-                    .on_hover_text(crate::i18n::text("repo-core-0895"));
-                // Over an empty box, or what the template and hook put there.
-                amend_started = amend.changed()
-                    && amending
-                    && (self.commit_summary.trim().is_empty() || self.unedited_prefill());
-                if !rebasing {
-                    self.fold_picker(ui, amending, acts);
-                }
-                self.ai_message_button(ui, !rebasing);
-                self.dco.toggle(ui, !rebasing, acts);
-            });
+                })
+                .on_hover_text(crate::i18n::text("dev-integration-ui-skip-hooks"))
+                .on_disabled_hover_text(crate::i18n::text("dev-integration-ui-continue-hooks"))
+                .clicked()
+                && !rebasing
+            {
+                self.skip_hooks.commit = !self.skip_hooks.commit;
+            }
+            self.compose_toolbar(ui, !rebasing);
         });
         self.amend = amending;
         if amend_started {
@@ -79,7 +108,6 @@ impl RepoTab {
             }
         }
         self.compose_prefill(ui.ctx());
-        self.compose_toolbar(ui, !rebasing);
         ui.add_space(2.0);
         // `--continue` commits with the message git kept: edits here would be lost.
         let (summary, body) = self.message_fields(ui, !rebasing);
@@ -116,12 +144,6 @@ impl RepoTab {
         if rebasing {
             // `--continue` takes no `--no-verify`: nothing ticked waits for the next commit.
             self.skip_hooks.commit = false;
-        } else {
-            ui.checkbox(
-                &mut self.skip_hooks.commit,
-                crate::i18n::text("repo-core-0899"),
-            )
-            .on_hover_text(crate::i18n::text("repo-core-0900"));
         }
         ui.add_space(4.0);
         let staged = self.work.staged.len();
@@ -218,15 +240,6 @@ impl RepoTab {
                     ],
                 )
             };
-            let resp =
-                ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
-            if id.local || id.local_email {
-                resp.on_hover_text(if elsewhere.is_some() {
-                    crate::i18n::text("repo-core-0913")
-                } else {
-                    crate::i18n::text("repo-core-0914")
-                });
-            }
             // The saved identities, then the authors of the profiles, each once.
             let mut choices: Vec<(String, String, String)> = settings
                 .identities
@@ -287,6 +300,21 @@ impl RepoTab {
                             }
                         }
                     });
+                ui.add(
+                    egui::Label::new(RichText::new(&who).color(t.text_faint).small()).truncate(),
+                )
+                .on_hover_text(if id.local || id.local_email {
+                    format!(
+                        "{who}\n{}",
+                        if elsewhere.is_some() {
+                            crate::i18n::text("repo-core-0913")
+                        } else {
+                            crate::i18n::text("repo-core-0914")
+                        }
+                    )
+                } else {
+                    who.clone()
+                });
             });
         });
     }

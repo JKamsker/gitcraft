@@ -10,6 +10,24 @@ use crate::theme::{self, Tokens};
 impl Settings {
     pub(super) fn agents_ui(&mut self, ui: &mut Ui, f: &Filter) {
         let t = Tokens::get(ui.ctx());
+        section(
+            ui,
+            f,
+            "Sidebar",
+            Some(crate::i18n::text("dev-baseline-agents-tip")),
+            |card| {
+                card.row(
+                    "Show Agents section",
+                    "sidebar feature flag tasks visibility robot",
+                    |ui| {
+                        ui.checkbox(
+                            &mut self.show_agents,
+                            crate::i18n::text("dev-baseline-agents-show"),
+                        );
+                    },
+                );
+            },
+        );
         let program = crate::mcp::program();
         section(
             ui,

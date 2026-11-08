@@ -1,6 +1,6 @@
 //! The strip above the graph: the names of its columns, and its menu.
 
-use egui::{Align2, Rect, Response, Stroke, Ui, pos2};
+use egui::{Rect, Response, Stroke, Ui, pos2};
 
 use crate::repo::columns::Cols;
 use crate::settings::{self, Settings};
@@ -16,45 +16,40 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
     );
     let y = header.center().y;
     let font = theme::semibold(10.5);
-    let right = header.right();
+    use crate::repo::columns::Bar;
     let mut labels = vec![
-        (header.left() + 10.0, crate::i18n::text("repo-core-2612")),
-        (header.left() + cols.refs + 10.0, graph),
         (
-            header.left() + cols.refs + cols.graph + 6.0,
+            cols.cell(header, Bar::Refs),
+            crate::i18n::text("repo-core-2612"),
+        ),
+        (cols.cell(header, Bar::Graph), graph),
+        (
+            cols.description(header),
             crate::i18n::text("repo-core-2613"),
         ),
     ];
-    if cols.hash > 0.0 {
-        labels.push((right - cols.trailing(), crate::i18n::text("repo-core-0893")));
+    for (bar, label) in [
+        (Bar::Hash, crate::i18n::text("repo-core-0893")),
+        (Bar::Author, crate::i18n::text("repo-core-2614")),
+        (Bar::When, crate::i18n::text("repo-core-2615")),
+        (Bar::Date, crate::i18n::text("repo-core-2616")),
+    ] {
+        if cols.width(bar) > 0.0 {
+            labels.push((cols.cell(header, bar), label));
+        }
     }
-    if cols.author > 0.0 {
-        labels.push((
-            right - cols.author - cols.when - cols.date,
-            crate::i18n::text("repo-core-2614"),
-        ));
-    }
-    if cols.when > 0.0 {
-        labels.push((
-            right - cols.when - cols.date,
-            crate::i18n::text("repo-core-2615"),
-        ));
-    }
-    if cols.date > 0.0 {
-        labels.push((right - cols.date, crate::i18n::text("repo-core-2616")));
-    }
-    // Each label is clipped where the next column starts, so a narrow window
-    // cuts DESCRIPTION short instead of running into AUTHOR.
-    for (i, (x, label)) in labels.iter().enumerate() {
-        let limit = labels
-            .get(i + 1)
-            .map_or(header.right(), |(next, _)| next - 8.0);
-        let clip = Rect::from_min_max(pos2(*x, header.top()), pos2(limit.max(*x), header.bottom()));
-        p.with_clip_rect(clip).text(
-            pos2(*x, y),
-            Align2::LEFT_CENTER,
-            label,
-            font.clone(),
+    for (cell, label) in labels {
+        let clip = Cols::padded(cell).intersect(ui.clip_rect());
+        let mut job =
+            egui::text::LayoutJob::simple_singleline(label.to_owned(), font.clone(), t.text_faint);
+        job.wrap = egui::text::TextWrapping::truncate_at_width(clip.width().max(0.0));
+        let galley = ui.fonts_mut(|f| f.layout_job(job));
+        p.with_clip_rect(clip).galley(
+            pos2(
+                cell.left() + crate::repo::columns::CELL_PAD,
+                y - galley.size().y / 2.0,
+            ),
+            galley,
             t.text_faint,
         );
     }

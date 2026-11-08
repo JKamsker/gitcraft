@@ -287,6 +287,21 @@ impl Dialog {
         self
     }
 
+    /// Confirm through a guarded action while still showing this dialog's Git commands.
+    pub(crate) fn instead_ops(mut self, action: Action) -> Self {
+        if let Dialog::Confirm { preview, ops, .. } = &mut self {
+            preview.instead = Some(Instead {
+                action,
+                described: ops
+                    .iter()
+                    .filter(|op| !super::operations::is_expectation(op))
+                    .map(|op| preview::command_line(op))
+                    .collect(),
+            });
+        }
+        self
+    }
+
     /// A confirmation of something that loses nothing: its button is not the danger colour.
     pub fn safe(mut self) -> Self {
         if let Dialog::Confirm { safe, .. } = &mut self {

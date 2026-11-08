@@ -494,6 +494,8 @@ mod fluent_release_tests {
                 steps: vec![(release::Step::Tag, Status::Failed(original_failure.into()))],
                 done: release::Done::default(),
                 recorded: false,
+                hosting: None,
+                forge_repository_generation: 0,
             });
             h.run();
             h.get_by_label(if language == "de" {

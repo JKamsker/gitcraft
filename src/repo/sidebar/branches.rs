@@ -198,6 +198,12 @@ impl RepoTab {
         b: &Branch,
         idle: bool,
     ) {
+        crate::menu_item::bounded_menu(ui, ("branch-menu", &b.name), |ui| {
+            self.branch_menu_contents(ui, acts, b, idle);
+        });
+    }
+
+    fn branch_menu_contents(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
         self.checkout_items(ui, acts, b, idle);
         if b.is_head
             && b.name.starts_with(&self.hotfix_prefix())
@@ -214,7 +220,12 @@ impl RepoTab {
             && !b.is_head
         {
             ui.separator();
-            self.integrate_items(ui, acts, b, current, idle);
+            crate::menu_item::group_named(
+                ui,
+                "Integrate / Compare",
+                crate::i18n::text("dev-integration-ui-integrate-compare"),
+                |ui| self.integrate_items(ui, acts, b, current, idle),
+            );
         }
         // The checked-out branch against the one pull requests usually go to.
         if b.is_head
@@ -241,67 +252,102 @@ impl RepoTab {
                 ));
             }
         }
-        self.review_item(ui, acts, b);
-        self.versions_items(ui, acts, b);
+        crate::menu_item::group_named(
+            ui,
+            "Review / Versions",
+            crate::i18n::text("dev-integration-ui-review-versions"),
+            |ui| {
+                self.review_item(ui, acts, b);
+                self.versions_items(ui, acts, b);
+            },
+        );
         ui.separator();
-        self.publish_items(ui, acts, b, idle);
-        self.stack_menu_items(ui, acts, b, idle);
+        crate::menu_item::group_named(
+            ui,
+            "Publish / Stack",
+            crate::i18n::text("dev-integration-ui-publish-stack"),
+            |ui| {
+                self.publish_items(ui, acts, b, idle);
+                self.stack_menu_items(ui, acts, b, idle);
+            },
+        );
         ui.separator();
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2641"))
-            .icon("git-branch-plus")
-            .show(ui)
-            .clicked()
-        {
-            acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
-        }
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2642"))
-            .icon("tag")
-            .show(ui)
-            .clicked()
-        {
-            acts.push(Action::Dialog(Dialog::tag(
-                &b.target,
-                &b.name,
-                self.default_remote(),
-            )));
-        }
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3389"))
-            .icon("wrench")
-            .enabled(idle)
-            .show(ui)
-            .clicked()
-        {
-            acts.push(Action::Dialog(Dialog::rename_branch(&b.name)));
-        }
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
-            .icon("copy")
-            .show(ui)
-            .clicked()
-        {
-            ui.ctx().copy_text(b.name.clone());
-        }
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3391"))
-            .icon("history")
-            .show(ui)
-            .on_hover_text(crate::i18n::text("repo-core-3392"))
-            .clicked()
-        {
-            acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
-        }
-        if let Some((menu, target)) = self.branch_link_menu(&b.name) {
-            menu.items(ui, "branch", &target, acts);
-        }
-        self.pin_item(ui, &b.name);
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3393"))
-            .icon("bot")
-            .show(ui)
-            .on_hover_text(crate::i18n::text("repo-core-3394"))
-            .clicked()
-        {
-            acts.push(Action::BranchAuthorship(b.name.clone()));
-        }
-        ui.separator();
-        self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
+        crate::menu_item::group_named(
+            ui,
+            "Branch actions",
+            crate::i18n::text("dev-integration-ui-branch-actions"),
+            |ui| {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2641"))
+                    .icon("git-branch-plus")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2642"))
+                    .icon("tag")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::tag(
+                        &b.target,
+                        &b.name,
+                        self.default_remote(),
+                    )));
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3389"))
+                    .icon("wrench")
+                    .enabled(idle)
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::rename_branch(&b.name)));
+                }
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Links / Copy / History",
+            crate::i18n::text("dev-integration-ui-links-copy-history"),
+            |ui| {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
+                    .icon("copy")
+                    .show(ui)
+                    .clicked()
+                {
+                    ui.ctx().copy_text(b.name.clone());
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3391"))
+                    .icon("history")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("repo-core-3392"))
+                    .clicked()
+                {
+                    acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
+                }
+                if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+                    menu.items(ui, "branch", &target, acts);
+                }
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Visibility / Agents",
+            crate::i18n::text("dev-integration-ui-visibility-agents"),
+            |ui| {
+                self.pin_item(ui, &b.name);
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3393"))
+                    .icon("bot")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("repo-core-3394"))
+                    .clicked()
+                {
+                    acts.push(Action::BranchAuthorship(b.name.clone()));
+                }
+                ui.separator();
+                self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
+            },
+        );
         ui.separator();
         self.delete_items(ui, acts, b, idle);
         crate::repo::custom_commands::menu_items(
@@ -502,7 +548,7 @@ impl RepoTab {
                             (
                                 summary.map(|c| c.summary.clone()).unwrap_or_default(),
                                 String::new(),
-                                self.default_base(),
+                                self.issue_base().name,
                             )
                         });
                     acts.push(Action::Dialog(Dialog::create_pr(
@@ -663,8 +709,17 @@ impl RepoTab {
         }
         ui.separator();
         graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
-        crate::repo::interaction::interaction_item(ui, acts, &b.name);
-        crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
+        if Settings::get(ui.ctx()).context_menus.rehearsal {
+            crate::menu_item::group_named(
+                ui,
+                "Advanced",
+                crate::i18n::text("dev-integration-ui-advanced"),
+                |ui| {
+                    crate::repo::interaction::interaction_item(ui, acts, &b.name);
+                    crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
+                },
+            );
+        }
     }
 }
 

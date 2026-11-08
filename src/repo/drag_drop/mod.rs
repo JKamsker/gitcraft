@@ -83,7 +83,12 @@ impl RepoTab {
             DragItem::Branch(b) => b.tip.clone(),
             DragItem::Commit(c) => c.hash.clone(),
         };
-        let reach = Reach::new(&self.commits, &self.index, &[&tip, &self.refs.head]);
+        let reach = Reach::new(
+            &self.history,
+            &self.history_index,
+            &[&tip, &self.refs.head],
+            self.log_order.first_parent,
+        );
         let line = match &item {
             DragItem::Commit(_) if self.refs.current.is_some() => Line::new(self.head_line()),
             _ => Line::default(),
@@ -106,8 +111,8 @@ impl RepoTab {
         let mut line = Vec::new();
         let mut next = Some(self.refs.head.as_str());
         while let Some(c) = next
-            .and_then(|h| self.index.get(h))
-            .and_then(|&i| self.commits.get(i))
+            .and_then(|h| self.history_index.get(h))
+            .and_then(|&i| self.history.get(i))
         {
             line.push(Arc::clone(c));
             next = c.parents.first().map(String::as_str);
@@ -156,7 +161,7 @@ impl RepoTab {
             .filter(|w| !w.current)
             .filter_map(|w| w.branch.clone())
             .collect();
-        let ancestry = payload.reach.ancestry(&self.commits, &self.index);
+        let ancestry = payload.reach.ancestry(&self.history, &self.history_index);
         let scene = Scene {
             current: self.refs.current.as_deref(),
             head: &self.refs.head,

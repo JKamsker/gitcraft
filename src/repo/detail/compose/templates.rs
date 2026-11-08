@@ -26,8 +26,12 @@ enum Pick {
 }
 
 impl RepoTab {
-    pub(super) fn templates_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "list", crate::i18n::text("repo-core-1049"));
+    pub(super) fn templates_button(&mut self, ui: &mut Ui, enabled: bool) {
+        let b = ui
+            .add_enabled(enabled, |ui: &mut Ui| {
+                icons::small_button(ui, "list", crate::i18n::text("repo-core-1049"))
+            })
+            .on_disabled_hover_text(crate::i18n::text("repo-workflows-dco-toggle-9ba5d60e"));
         let t = Tokens::get(ui.ctx());
         let ctx = ui.ctx().clone();
         // Read only while the menu shows, not on every frame.
@@ -41,6 +45,9 @@ impl RepoTab {
             .width(280.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
+                if !enabled {
+                    ui.disable();
+                }
                 ui.label(
                     RichText::new(crate::i18n::text("repo-core-1050"))
                         .color(t.text_faint)

@@ -1,0 +1,5 @@
+isolated_marker_child_waited: unclean=true; parent_drop_while_child_holds_fd: unclean=false; after_waited_child_exit: unclean=true; remaining=0; child_pid=42489
+
+thread 'main' (11033694) panicked at /tmp/gitcraft-drafts-a4981112/owned-inheritance.rs:86:9:
+original second.unclean assertion deterministically fails after all owned children have been reaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -82,7 +82,7 @@ impl RepoTab {
                 )],
             ));
         }
-        let line = quick_edit::first_parents(&self.commits, &self.index, &self.refs.head);
+        let line = quick_edit::first_parents(&self.history, &self.history_index, &self.refs.head);
         quick_edit::refusal(Edit::Drop, &line, hash).map(str::to_owned)
     }
 

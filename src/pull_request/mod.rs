@@ -173,6 +173,7 @@ pub struct PrFiles {
 /// Finds the changes of `details`, fetching its commits first if they aren't here yet.
 pub fn files(
     repo: &Path,
+    hosting: &forge::Hosting,
     details: &PrDetails,
     remotes: &[Remote],
     credentials: Option<&Credentials>,
@@ -196,7 +197,7 @@ pub fn files(
         .is_ok()
     };
     if !has(&details.head_oid) || !has(&details.base_oid) {
-        let remote = remote_for(remotes, &details.url)
+        let remote = remote_for(remotes, &details.url, hosting)
             .ok_or("no remote of this repository is the one the pull request belongs to")?;
         if details.forge == Some(Forge::Bitbucket) {
             for (args, use_destination_credentials) in bitbucket_fetches(details, remote)? {
@@ -323,8 +324,13 @@ pub fn tally(checks: &[Check]) -> (usize, usize, usize, usize) {
 /// The host and `owner/repo` of a pull request's URL: `…/pull/12` on GitHub, `…/pulls/12` on
 /// Forgejo and Gitea, `…/-/merge_requests/12` on GitLab.
 pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
+    forge::location(repository_url(url)?)
+}
+
+/// The repository URL of a PR, retaining the authority and proxy prefix for identity checks.
+pub(crate) fn repository_url(url: &str) -> Option<&str> {
     // The marker nearest the end: a repository may well be called `pull` or `pulls`.
-    let repo = [
+    [
         "/-/merge_requests/",
         "/pulls/",
         "/pull/",
@@ -335,24 +341,25 @@ pub(crate) fn repo_of_url(url: &str) -> Option<(String, String)> {
     .filter_map(|marker| url.rsplit_once(marker))
     .filter(|(_, number)| number.split(['/', '#', '?']).next().is_some_and(is_number))
     .map(|(repo, _)| repo)
-    .max_by_key(|repo| repo.len())?;
-    forge::location(repo)
+    .max_by_key(|repo| repo.len())
 }
 
 fn is_number(text: &str) -> bool {
     !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())
 }
 
-/// The remote of the repository a pull request's URL belongs to. Forges don't mind the case of
-/// owner and name, so a clone of `Owner/Repo` may well be from `owner/repo`.
-pub(crate) fn remote_for<'a>(remotes: &'a [Remote], url: &str) -> Option<&'a str> {
-    let (host, path) = repo_of_url(url)?;
+/// The remote of the captured PR repository, including its web instance and forge path rules.
+pub(crate) fn remote_for<'a>(
+    remotes: &'a [Remote],
+    url: &str,
+    hosting: &forge::Hosting,
+) -> Option<&'a str> {
+    if !hosting.matches_pull_request(url) {
+        return None;
+    }
     remotes
         .iter()
-        .find(|remote| {
-            forge::location(&remote.url)
-                .is_some_and(|(h, p)| h == host && p.eq_ignore_ascii_case(&path))
-        })
+        .find(|remote| hosting.matches_git_remote(&remote.url))
         .map(|remote| remote.name.as_str())
 }
 
@@ -410,18 +417,62 @@ mod tests {
 
     #[test]
     fn finds_the_remote_of_a_pull_request_whatever_its_url_looks_like() {
+        let h = forge::Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://github.com".into(),
+        };
         let remotes = [
             remote("fork", "https://github.com/me/r.git"),
             remote("up", "git@github.com:o/r.git"),
         ];
         assert_eq!(
-            remote_for(&remotes, "https://github.com/o/r/pull/1"),
+            remote_for(&remotes, "https://github.com/o/r/pull/1", &h),
             Some("up")
         );
-        assert_eq!(remote_for(&remotes, "https://github.com/x/y/pull/1"), None);
         assert_eq!(
-            remote_for(&remotes, "https://github.com/O/R/pull/1"),
+            remote_for(&remotes, "https://github.com/x/y/pull/1", &h),
+            None
+        );
+        assert_eq!(
+            remote_for(&remotes, "https://github.com/O/R/pull/1", &h),
             Some("up")
+        );
+    }
+
+    #[test]
+    fn review13_remote_lookup_keeps_authority_and_gitlab_path_case() {
+        let h = forge::Hosting {
+            forge: Forge::Forgejo,
+            host: "forge.example".into(),
+            path: "Team/Repo".into(),
+            web: "https://forge.example:4000".into(),
+        };
+        let remotes = [
+            remote("wrong", "https://forge.example:3000/Team/Repo.git"),
+            remote("selected", "https://forge.example:4000/Team/Repo.git"),
+        ];
+        assert_eq!(
+            remote_for(&remotes, "https://forge.example:4000/Team/Repo/pulls/7", &h),
+            Some("selected")
+        );
+        let remotes = [
+            remote("wrong", "https://gitlab.example/Group/project.git"),
+            remote("selected", "git@gitlab.example:Group/Project.git"),
+        ];
+        assert_eq!(
+            remote_for(
+                &remotes,
+                "https://gitlab.example/Group/Project/-/merge_requests/7",
+                &forge::Hosting {
+                    forge: Forge::GitLab,
+                    host: "gitlab.example".into(),
+                    path: "Group/Project".into(),
+                    web: "https://gitlab.example".into()
+                }
+            ),
+            Some("selected")
         );
     }
 
@@ -509,13 +560,19 @@ mod tests {
 
     #[test]
     fn a_forge_naming_anything_but_commits_gets_nothing_fetched() {
+        let h = forge::Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://github.com".into(),
+        };
         let details = PrDetails {
             head_oid: "+refs/pull/1/head:refs/heads/main".to_owned(),
             base_oid: "--update-head-ok".to_owned(),
             base_branch: "main".to_owned(),
             ..PrDetails::default()
         };
-        let refused = files(Path::new("."), &details, &[], None);
+        let refused = files(Path::new("."), &h, &details, &[], None);
         assert!(refused.is_err_and(|e| e.contains("aren't commit ids")));
         let details = PrDetails {
             head_oid: "a".repeat(40),
@@ -524,7 +581,7 @@ mod tests {
             ..PrDetails::default()
         };
         assert!(
-            files(Path::new("."), &details, &[], None).is_err_and(|e| e.contains("can't take"))
+            files(Path::new("."), &h, &details, &[], None).is_err_and(|e| e.contains("can't take"))
         );
     }
 

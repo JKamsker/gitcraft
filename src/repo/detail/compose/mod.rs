@@ -392,18 +392,13 @@ impl RepoTab {
     /// The row of helpers above the message: templates, the type / scope picker, co-authors
     /// and their options.
     pub(in crate::repo) fn compose_toolbar(&mut self, ui: &mut Ui, enabled: bool) {
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 2.0;
-            ui.add_enabled_ui(enabled, |ui| {
-                self.templates_button(ui);
-                self.picker_button(ui);
-                self.coauthor_button(ui);
-            });
-            self.options_button(ui);
-            if self.compose.prefilling || self.compose.adding_coauthor {
-                ui.add(crate::spinner::Spinner::new());
-            }
-        });
+        self.templates_button(ui, enabled);
+        self.picker_button(ui, enabled);
+        self.coauthor_button(ui, enabled);
+        self.options_button(ui);
+        if self.compose.prefilling || self.compose.adding_coauthor {
+            ui.add(crate::spinner::Spinner::new().size(12.0));
+        }
     }
 
     /// What went wrong with the template or the hook, under the message, until dismissed.

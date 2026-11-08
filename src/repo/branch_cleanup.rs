@@ -32,9 +32,13 @@ impl Candidate {
 impl RepoTab {
     /// The default branch and the refs of it that exist here: on the default remote, and local.
     fn health_bases(&self) -> Bases {
-        let name = self.default_base();
+        let name = self.issue_base().name;
         let mut refs = Vec::new();
-        if let Some(remote) = self.default_remote() {
+        if let Some(remote) = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote())
+        {
             let short = format!("{remote}/{name}");
             if let Some(b) = self.remote_branches(&remote).find(|b| b.name == short) {
                 refs.push((format!("refs/remotes/{short}"), b.target.clone()));
@@ -57,7 +61,7 @@ impl RepoTab {
         let inputs = Inputs::new(&self.refs.local, bases, &self.branch_health.merged_prs);
         let path = self.path.clone();
         let mut cache = self.branch_health.cache.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 // A read that panics is answered all the same: the next one waits for it.
@@ -97,18 +101,19 @@ impl RepoTab {
         };
         let path = self.path.clone();
         let context = crate::connections::current();
-        self.then(
+        let asked = self.prs_loaded;
+        self.forge_then(
             ctx,
             move || {
                 let merged = hosting.forge.provider().merged(&path, &hosting);
                 (hosting, merged, context)
             },
-            |tab, (hosting, merged, context), ctx| {
+            move |tab, (hosting, merged, context), ctx| {
                 if crate::connections::current() != context {
                     return;
                 }
                 let same = super::load::same_repository(Some(&hosting), tab.hosting.as_ref());
-                if let (true, Ok(prs)) = (same, merged)
+                if let (true, Ok(prs)) = (same && tab.prs_loaded == asked, merged)
                     && prs != tab.branch_health.merged_prs
                 {
                     tab.branch_health.merged_prs = prs;

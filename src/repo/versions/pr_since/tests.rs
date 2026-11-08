@@ -3,6 +3,68 @@
 
 use super::*;
 
+#[test]
+fn review13_reviewed_repository_key_keeps_web_instance_and_gitlab_case() -> Result<(), String> {
+    use crate::forge::Hosting;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/reviewed-instance".into(), &ctx);
+    let first = Hosting {
+        forge: Forge::GitLab,
+        host: "gitlab.example".into(),
+        path: "Group/Project".into(),
+        web: "https://gitlab.example:3000".into(),
+    };
+    tab.hosting = Some(first.clone());
+    let key = tab.pr_repo_key().ok_or("missing reviewed key")?;
+    let storage = scratch("identity-key")?;
+    init(&storage.0)?;
+    git(
+        &storage.0,
+        &["commit", "-q", "--allow-empty", "-m", "reviewed"],
+    )?;
+    let tip = git::head(&storage.0);
+    let seen = Series::new(&tip, &tip);
+    git::mark_reviewed(&storage.0, &key, 7, &seen)?;
+    for changed in [
+        Hosting {
+            web: "https://gitlab.example:4000".into(),
+            ..first.clone()
+        },
+        Hosting {
+            path: "Group/project".into(),
+            ..first.clone()
+        },
+        Hosting {
+            web: "https://gitlab.example:3000/reviews".into(),
+            ..first.clone()
+        },
+    ] {
+        tab.hosting = Some(changed);
+        let changed_key = tab.pr_repo_key().ok_or("missing changed key")?;
+        assert_ne!(changed_key, key);
+        assert!(git::reviewed(&storage.0, &changed_key, 7)?.is_none());
+    }
+    tab.hosting = Some(Hosting {
+        web: "HTTPS://GITLAB.example:3000/".into(),
+        ..first
+    });
+    let canonical_key = tab.pr_repo_key().ok_or("missing canonical key")?;
+    assert_eq!(canonical_key, key);
+    assert_eq!(git::reviewed(&storage.0, &canonical_key, 7)?, Some(seen));
+    let mut h = tab.hosting.clone().ok_or("missing hosting")?;
+    h.web = "https://gitlab.example:3000/reviews:prod".into();
+    tab.hosting = Some(h.clone());
+    let colon_key = tab.pr_repo_key().ok_or("missing colon key")?;
+    h.web = "https://gitlab.example:3000/reviews_prod".into();
+    tab.hosting = Some(h);
+    let underscore_key = tab.pr_repo_key().ok_or("missing underscore key")?;
+    assert_ne!(
+        git::reviewed_prefix(&colon_key, 7),
+        git::reviewed_prefix(&underscore_key, 7)
+    );
+    Ok(())
+}
+
 /// A folder removed when dropped.
 struct Scratch(std::path::PathBuf);
 

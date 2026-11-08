@@ -140,7 +140,7 @@ impl RepoTab {
         view.storyboard.invalidate();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             let details = match hosting
                 .as_ref()
                 .and_then(|h| Some((h, h.forge.provider().pages()?)))
@@ -160,6 +160,7 @@ impl RepoTab {
         result: Result<PrDetails, String>,
         ctx: &egui::Context,
     ) {
+        let sender = self.forge_sender();
         let Some(view) = self.pr_view.as_mut().filter(|v| v.request == request) else {
             return;
         };
@@ -193,13 +194,17 @@ impl RepoTab {
         if let Ok(details) = &result {
             view.prepare_texts(details);
             let details = details.clone();
-            let (path, remotes, credentials) = (
+            let (path, remotes, credentials, hosting) = (
                 self.path.clone(),
                 self.remotes.clone(),
                 self.credentials.clone(),
+                self.hosting.clone(),
             );
-            spawn(&self.tx, ctx, move || {
-                let files = pr::files(&path, &details, &remotes, credentials.as_ref());
+            spawn(&sender, ctx, move || {
+                let files = hosting
+                    .as_ref()
+                    .ok_or_else(|| "No primary forge is selected".to_owned())
+                    .and_then(|h| pr::files(&path, h, &details, &remotes, credentials.as_ref()));
                 Msg::PrFiles(request, files)
             });
         }
@@ -379,6 +384,54 @@ mod tests {
             to: Some(to.to_owned()),
             path: path.to_owned(),
         }
+    }
+
+    #[test]
+    fn changing_primary_forge_closes_the_old_pr_file_diff() {
+        let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-source".into(), &ctx);
+        tab.remotes = vec![crate::git::Remote {
+            name: "origin".into(),
+            url: "https://github.com/up/repo".into(),
+        }];
+        tab.forge_remotes = vec![(
+            "origin".into(),
+            crate::forge::Hosting {
+                forge: crate::forge::Forge::GitHub,
+                host: "github.com".into(),
+                path: "up/repo".into(),
+                web: "https://github.com".into(),
+            },
+        )];
+        tab.take_forge_selection(false, &ctx);
+        tab.pr_view = Some(PrView {
+            number: 7,
+            storyboard: Default::default(),
+            freshness: Default::default(),
+            relocated: Default::default(),
+            files_request: 0,
+            request: 1,
+            loading: false,
+            details: None,
+            seen_head: None,
+            body: Vec::new(),
+            entries: Vec::new(),
+            thread_bodies: HashMap::new(),
+            suggestions: HashMap::new(),
+            files: None,
+            markdown: CommonMarkCache::default(),
+        });
+        tab.diff = Some(crate::repo::DiffView::new(range(
+            "base",
+            "old-pr-head",
+            "file.rs",
+        )));
+        tab.remotes[0].url = "https://github.com/other/repo".into();
+        tab.forge_remotes[0].1.path = "other/repo".into();
+        tab.take_forge_selection(true, &ctx);
+        assert!(tab.pr_view.is_none());
+        assert!(tab.diff.is_none());
     }
 
     #[test]

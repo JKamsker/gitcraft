@@ -2,11 +2,11 @@
 
 use egui::{Response, Ui};
 
-use super::badge::{BadgeKind, badges};
+use super::badge::BadgeKind;
 use super::compare_items;
 use crate::forge::links::Target;
 use crate::git;
-use crate::menu_item::MenuItem;
+use crate::menu_item::{MenuItem, bounded_menu};
 use crate::repo::actions::{BranchRef, cherry_pick_action, interactive_rebase_action};
 use crate::repo::commit_actions::revert_action;
 use crate::repo::conflict_check::Op;
@@ -38,7 +38,7 @@ fn apply_patch_item(ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
 impl RepoTab {
     pub(super) fn copy_branch(&self, i: usize) -> Option<String> {
         let commit = self.commits.get(i)?;
-        badges(&commit.refs, &self.refs)
+        self.graph_badges(commit)
             .into_iter()
             .find(|b| b.kind == BadgeKind::Branch)
             .map(|b| b.git_ref())
@@ -78,41 +78,81 @@ impl RepoTab {
         let Some(commit) = self.commits.get(i) else {
             return;
         };
+        bounded_menu(ui, ("commit-menu", &commit.hash), |ui| {
+            self.commit_menu_contents(ui, i, pill, idle, acts)
+        });
+    }
+
+    fn commit_menu_contents(
+        &self,
+        ui: &mut Ui,
+        i: usize,
+        pill: Option<String>,
+        idle: bool,
+        acts: &mut Vec<Action>,
+    ) {
+        let Some(commit) = self.commits.get(i) else {
+            return;
+        };
         let hash = commit.hash.clone();
         let short = hash.get(..8).unwrap_or(&hash).to_owned();
         let summary = commit.summary.clone();
         let is_head = hash == self.refs.head;
         // The right-clicked branch, else the commit's first branch, for copying.
         let first_branch = self.copy_branch(i);
-        let branch_name = pill.clone().or_else(|| first_branch.clone());
+        let branch_name = pill.clone().or_else(|| {
+            self.graph_badges(commit)
+                .into_iter()
+                .find(|b| b.kind == BadgeKind::Branch)
+                .map(|b| b.git_ref())
+        });
         let target = self
             .refs
             .current
             .clone()
             .unwrap_or_else(|| "HEAD".to_owned());
-        if let Some(branch) = &pill
-            && self.refs.current.as_deref() != Some(branch.as_str())
-        {
-            self.pill_items(ui, branch, &hash, idle, acts);
+        let options = crate::settings::Settings::get(ui.ctx()).context_menus;
+        if let Some(branch) = &pill {
+            crate::menu_item::group_named(
+                ui,
+                &format!("Branch {branch}"),
+                &crate::i18n::message(
+                    "dev-integration-ui-branch-group",
+                    &[("branch", branch.to_string().into())],
+                ),
+                |ui| {
+                    ui.label(crate::i18n::message(
+                        "dev-integration-ui-branch-heading",
+                        &[("branch", branch.to_string().into())],
+                    ));
+                    if self.refs.current.as_deref() != Some(branch.as_str()) {
+                        self.pill_items(ui, branch, &hash, idle, acts);
+                    } else if let Some(b) = self.refs.local.iter().find(|b| b.name == *branch) {
+                        self.branch_menu_items(ui, acts, b, idle);
+                    }
+                },
+            );
             ui.separator();
         }
-        self.branch_here_items(ui, &hash, &short, idle, is_head, acts);
-        ui.separator();
-        self.compare_with_items(ui, i, &hash, &short, acts);
-        ui.separator();
-        self.quick_edit_items(ui, &hash, idle, acts);
-        self.fold_item(ui, &hash, idle, acts);
-        ui.separator();
+        crate::menu_item::group_named(
+            ui,
+            "Branches / Checkout",
+            crate::i18n::text("dev-integration-ui-branches-checkout"),
+            |ui| {
+                self.branch_here_items(ui, &hash, &short, idle, is_head, acts);
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Compare",
+            crate::i18n::text("dev-integration-ui-compare"),
+            |ui| self.compare_with_items(ui, i, &hash, &short, acts),
+        );
         let upstream = self
             .refs
             .current
             .as_deref()
             .and_then(|b| self.upstream_ref(b));
-        self.bisect_menu_items(ui, &hash, idle, acts);
-        self.parallel_menu_items(ui, &hash, acts);
-        self.surgery_items(ui, &hash, idle, acts);
-        self.test_menu_items(ui, &hash, acts);
-        ui.separator();
         let rewrite = Rewrite {
             tab: self,
             merge: commit.parents.len() > 1,
@@ -123,35 +163,88 @@ impl RepoTab {
             head: &self.refs.head,
             upstream: upstream.as_deref(),
         };
-        rewrite_items(ui, &rewrite, idle, is_head, acts);
-        ui.separator();
-        let merge = commit.parents.len() > 1;
-        if MenuItem::new(crate::i18n::text("repo-core-2627"))
-            .icon("file-diff")
-            .refused(merge.then_some(crate::i18n::text("repo-core-2628")))
-            .show(ui)
-            .on_hover_text(crate::i18n::text("repo-core-2629"))
-            .clicked()
-        {
-            acts.push(Action::SavePatch {
-                hash: hash.clone(),
-                summary: summary.clone(),
-            });
-        }
-        if is_head {
-            apply_patch_item(ui, idle, acts);
-        }
-        ui.separator();
-        self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
-        self.gerrit_menu(ui, commit, acts);
-        copy_items(
+        crate::menu_item::group_named(
             ui,
-            &hash,
-            &summary,
-            branch_name.as_deref(),
-            self.selected == Some(i),
-            branch_name == first_branch,
+            "Rewrite",
+            crate::i18n::text("dev-integration-ui-rewrite"),
+            |ui| {
+                if !idle {
+                    ui.label(crate::i18n::text("dev-integration-ui-busy-menu"));
+                }
+                crate::menu_item::group_named(
+                    ui,
+                    "Edit / Drop / Reorder",
+                    crate::i18n::text("dev-integration-ui-edit-drop-reorder"),
+                    |ui| self.quick_edit_items(ui, &hash, idle, acts),
+                );
+                self.fold_item(ui, &hash, idle, acts);
+                rewrite_items(ui, &rewrite, idle, is_head, acts);
+                if options.surgery {
+                    crate::menu_item::group_named(
+                        ui,
+                        "Split / Move changes",
+                        crate::i18n::text("dev-integration-ui-split-move"),
+                        |ui| self.surgery_items(ui, &hash, idle, acts),
+                    );
+                }
+            },
         );
+        if options.diagnostics || self.bisect.shows() {
+            crate::menu_item::group_named(
+                ui,
+                "History / Diagnostics",
+                crate::i18n::text("dev-integration-ui-history-diagnostics"),
+                |ui| {
+                    self.bisect_menu_items(ui, &hash, idle, acts);
+                    if options.diagnostics {
+                        self.parallel_menu_items(ui, &hash, acts);
+                        self.test_menu_items(ui, &hash, acts);
+                    }
+                },
+            );
+        }
+        crate::menu_item::group_named(
+            ui,
+            "Patches",
+            crate::i18n::text("dev-integration-ui-patches"),
+            |ui| {
+                if MenuItem::new(crate::i18n::text("repo-core-2627"))
+                    .icon("file-diff")
+                    .refused(
+                        (commit.parents.len() > 1).then_some(crate::i18n::text("repo-core-2628")),
+                    )
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("repo-core-2629"))
+                    .clicked()
+                {
+                    acts.push(Action::SavePatch {
+                        hash: hash.clone(),
+                        summary: summary.clone(),
+                    });
+                }
+                if is_head {
+                    apply_patch_item(ui, idle, acts);
+                }
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Links / Copy",
+            crate::i18n::text("dev-integration-ui-links-copy"),
+            |ui| {
+                self.link_items(ui, &hash, pill.as_deref(), branch_name.as_deref(), acts);
+                self.gerrit_menu(ui, commit, acts);
+                copy_items(
+                    ui,
+                    &hash,
+                    &summary,
+                    branch_name.as_deref(),
+                    self.selected == Some(i),
+                    branch_name == first_branch,
+                );
+            },
+        );
+        // Custom commands retain the clicked commit/branch identity, even in a submenu.
         let scope = self.commit_scope(&hash, branch_name.as_deref());
         crate::repo::custom_commands::menu_items(
             ui,
@@ -290,9 +383,21 @@ impl RepoTab {
         {
             acts.push(interactive_rebase_action(git_ref));
         }
-        crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
-        if branch != current {
-            crate::repo::interaction::interaction_item(ui, acts, branch);
+        if crate::settings::Settings::get(ui.ctx())
+            .context_menus
+            .rehearsal
+        {
+            crate::menu_item::group_named(
+                ui,
+                "Advanced",
+                crate::i18n::text("dev-integration-ui-advanced"),
+                |ui| {
+                    crate::repo::rehearse::rehearse_item(ui, acts, git_ref);
+                    if branch != current {
+                        crate::repo::interaction::interaction_item(ui, acts, branch);
+                    }
+                },
+            );
         }
         ui.separator();
         compare_items(ui, acts, git_ref, current);
@@ -317,13 +422,16 @@ impl RepoTab {
             .filter(|b| b.target == hash)
             .collect();
         for b in &here {
-            crate::menu_item::MenuItem::new(crate::i18n::message(
-                "repo-core-2639",
-                &[("name", b.name.to_string().into())],
-            ))
-            .icon("git-branch-plus")
-            .submenu(ui, |ui| {
-                self.branch_menu_items(ui, acts, b, idle);
+            let id = ui.make_persistent_id(("branch-actions", &b.name));
+            ui.scope_builder(egui::UiBuilder::new().id(id), |ui| {
+                crate::menu_item::MenuItem::new(crate::i18n::message(
+                    "repo-core-2639",
+                    &[("name", b.name.to_string().into())],
+                ))
+                .icon("git-branch-plus")
+                .submenu(ui, |ui| {
+                    self.branch_menu_items(ui, acts, b, idle);
+                });
             });
         }
         if !here.is_empty() {
@@ -348,12 +456,15 @@ impl RepoTab {
                 self.default_remote(),
             )));
         }
-        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0139"))
-            .icon("package")
-            .enabled(idle)
-            .show(ui)
-            .on_hover_text(crate::i18n::text("repo-core-2643"))
-            .clicked()
+        if crate::settings::Settings::get(ui.ctx())
+            .context_menus
+            .release
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0139"))
+                .icon("package")
+                .enabled(idle)
+                .show(ui)
+                .on_hover_text(crate::i18n::text("repo-core-2643"))
+                .clicked()
         {
             acts.push(Action::Release(super::super::release::ReleaseAct::Open(
                 hash.to_owned(),
@@ -389,7 +500,7 @@ impl RepoTab {
     ) {
         if let Some(compare) = self
             .selected
-            .filter(|&s| s != i)
+            .filter(|&s| s != i && self.commits.get(s).is_some_and(|c| c.hash != WIP_HASH))
             .and_then(|s| self.compare_rows(s, i))
         {
             let other = self
@@ -673,6 +784,200 @@ mod tests {
     use crate::repo::OpKind;
     use crate::repo::commit_actions::reset_steps;
     use crate::repo::operations::run_steps;
+    use egui_kittest::kittest::Queryable;
+
+    fn area_d_tab() -> crate::repo::RepoTab {
+        use std::sync::Arc;
+        let ctx = egui::Context::default();
+        let mut tab = crate::repo::RepoTab::new_deferred("/nonexistent/area-d".into(), &ctx);
+        tab.refs.head = "b".repeat(40);
+        tab.refs.current = Some("main".to_owned());
+        tab.commits = vec![
+            Arc::new(git::Commit {
+                hash: crate::repo::WIP_HASH.into(),
+                ..Default::default()
+            }),
+            Arc::new(git::Commit {
+                hash: "a".repeat(40),
+                summary: "A selected commit".into(),
+                ..Default::default()
+            }),
+        ];
+        tab.selected = Some(0);
+        tab
+    }
+
+    #[test]
+    fn area_d_working_tree_comparison_is_unique_and_preserves_scope() {
+        let mut h = egui_kittest::Harness::builder().build_ui_state(
+            |ui, (tab, acts): &mut (crate::repo::RepoTab, Vec<crate::repo::Action>)| {
+                tab.compare_with_items(ui, 1, &"a".repeat(40), "aaaaaaaa", acts);
+            },
+            (area_d_tab(), Vec::new()),
+        );
+        h.run();
+        assert_eq!(
+            h.query_all_by_label("Compare with the working tree")
+                .count(),
+            1
+        );
+        h.get_by_label("Compare with the working tree").click();
+        h.run();
+        assert!(
+            matches!(h.state().1.first(), Some(crate::repo::Action::Compare { base, target: None, .. }) if base == &"a".repeat(40))
+        );
+        h.state_mut().0.selected = Some(1);
+        h.run();
+        assert_eq!(
+            h.query_all_by_label("Compare with the working tree")
+                .count(),
+            1
+        );
+    }
+
+    /// Both root and submenu flip into the screen at the lower right. Their actions retain
+    /// the clicked row while the selected row is WIP (the S14 duplication trigger).
+    #[test]
+    fn area_d_menu_matrix_repositions_and_keeps_submenus_reachable() -> Result<(), String> {
+        for width in [640.0, 1100.0, 1600.0] {
+            for scale in [1.0, 1.25, 1.5] {
+                let mut h = egui_kittest::Harness::builder()
+                    .with_size([width / scale, 760.0 / scale])
+                    .with_pixels_per_point(scale)
+                    .build_ui_state(
+                        |ui,
+                         (tab, acts, fonts): &mut (
+                            crate::repo::RepoTab,
+                            Vec<crate::repo::Action>,
+                            bool,
+                        )| {
+                            if !*fonts {
+                                crate::theme::install_fonts(ui.ctx());
+                                *fonts = true;
+                                return;
+                            }
+                            ui.with_layout(egui::Layout::bottom_up(egui::Align::Max), |ui| {
+                                let row = ui.button("Commit row");
+                                ui.data_mut(|d| {
+                                    d.insert_temp(
+                                        super::pill_menu_id(&"a".repeat(40)),
+                                        Some("fork/a-long-feature-branch".to_owned()),
+                                    )
+                                });
+                                tab.commit_menu(&row, 1, true, acts);
+                            });
+                        },
+                        (area_d_tab(), Vec::new(), false),
+                    );
+                h.run();
+                h.get_by_label("Commit row").click_secondary();
+                h.run();
+                h.event(egui::Event::PointerMoved(egui::pos2(2.0, 2.0)));
+                h.run_steps(12);
+                let root = h.get_by_label_contains("Links / Copy").rect();
+                assert!(
+                    h.ctx.content_rect().contains_rect(root),
+                    "root outside viewport {width}/{scale}: {root:?}"
+                );
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                    h.render()?
+                        .save(format!("{dir}/menu-{width:.0}-{scale:.2}.png"))
+                        .map_err(|e| e.to_string())?;
+                }
+                h.get_by_label("Compare ⏵").hover();
+                h.run_steps(12);
+                let compare = h.get_by_label("Compare with the working tree").rect();
+                let sibling = h.get_by_label_contains("Rewrite").rect();
+                assert!(
+                    !compare.intersects(sibling),
+                    "submenu covers sibling hover target {width}/{scale}: {compare:?} / {sibling:?}"
+                );
+                assert!(
+                    h.ctx.content_rect().contains_rect(compare),
+                    "submenu outside viewport {width}/{scale}: {compare:?}"
+                );
+                if let Ok(dir) = std::env::var("GITCRAFT_AREA_D_SCREENSHOTS") {
+                    h.render()?
+                        .save(format!("{dir}/compare-{width:.0}-{scale:.2}.png"))
+                        .map_err(|e| e.to_string())?;
+                }
+                h.get_by_label("Compare with the working tree").click();
+                h.run();
+                assert!(
+                    matches!(h.state().1.first(), Some(crate::repo::Action::Compare { base, target: None, .. }) if base == &"a".repeat(40))
+                );
+                assert!(!egui::Popup::is_any_open(&h.ctx));
+                h.get_by_label("Commit row").click_secondary();
+                h.run();
+                h.get_by_label("Compare ⏵").focus();
+                h.key_press(egui::Key::Enter);
+                h.run();
+                h.get_by_label("Compare with the working tree");
+                h.key_press(egui::Key::Escape);
+                h.run();
+                assert!(!egui::Popup::is_any_open(&h.ctx));
+            }
+        }
+        Ok(())
+    }
+
+    /// Ref reloads may insert/reorder siblings while the pointer rests on an action in
+    /// an open submenu. Its button identity must belong to the branch, not its row index.
+    #[test]
+    fn area_d_followup_branch_submenu_keeps_its_target_across_ref_reordering() {
+        let branch = |name: &str| git::Branch {
+            name: name.to_owned(),
+            target: "a".repeat(40),
+            is_head: false,
+            upstream: String::new(),
+            track: String::new(),
+        };
+        for updated in [
+            vec!["alpha", "bravo", "charlie"],
+            vec!["charlie", "bravo"],
+            vec!["bravo"],
+        ] {
+            let mut tab = area_d_tab();
+            tab.refs.local = vec![branch("bravo"), branch("charlie")];
+            let mut h = egui_kittest::Harness::builder()
+                .with_size([1000.0, 800.0])
+                .build_ui_state(
+                    |ui, (tab, acts): &mut (crate::repo::RepoTab, Vec<crate::repo::Action>)| {
+                        let r = ui.button("Commit row");
+                        tab.commit_menu(&r, 1, true, acts);
+                    },
+                    (tab, Vec::new()),
+                );
+            h.run();
+            h.get_by_label("Commit row").click_secondary();
+            h.run();
+            h.get_by_label("Branches / Checkout ⏵").hover();
+            h.run_steps(12);
+            h.get_by_label("Branch bravo ⏵").hover();
+            h.run_steps(12);
+            h.get_by_label("Check out").hover();
+            h.run_steps(12);
+            h.state_mut().0.refs.local = updated.iter().map(|name| branch(name)).collect();
+            h.run_steps(12);
+            h.get_by_label("Check out").click();
+            h.run();
+            let targets: Vec<_> = h
+                .state()
+                .1
+                .iter()
+                .filter_map(|action| match action {
+                    crate::repo::Action::Checkout(name) => Some(name.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(
+                targets,
+                ["bravo"],
+                "open submenu changed scope after refs became {updated:?}"
+            );
+        }
+    }
 
     /// A hard reset asked for on `main` does nothing once another branch is checked out (in the
     /// terminal, while the dialog was open): it would throw away that one's uncommitted work.

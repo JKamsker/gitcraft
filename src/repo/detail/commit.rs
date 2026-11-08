@@ -2,7 +2,8 @@
 
 use egui::{Key, RichText, Sense, Ui, vec2};
 
-use super::files_header;
+use super::files_header_with;
+use crate::a11y::Named;
 use crate::ci::Status;
 use crate::git::{CommitDetail, Stash};
 use crate::icons;
@@ -139,12 +140,11 @@ impl RepoTab {
                 if !resolved {
                     let note =
                         (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
-                    files_header(ui, &detail.files, note);
+                    files_header_with(ui, &detail.files, note, |ui| {
+                        self.all_files_toggle(ui, acts)
+                    });
                 }
                 self.remerge_toggle(ui, acts, &remerge);
-                if !resolved {
-                    self.all_files_toggle(ui, acts);
-                }
                 ui.spacing_mut().item_spacing.y = 0.0;
                 if resolved {
                     self.remerge_files(ui, acts, detail);
@@ -338,27 +338,32 @@ fn author_line(ui: &mut Ui, detail: &CommitDetail) {
         widgets::avatar(ui, rect.center(), 16.0, &detail.author, &detail.email);
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 2.0;
-            ui.label(RichText::new(&detail.author).font(theme::medium(12.5)))
-                .on_hover_text(&detail.email);
-            ui.label(
-                RichText::new(&detail.author_date)
-                    .color(t.text_faint)
-                    .font(theme::mono(11.0)),
-            );
+            ui.add(
+                egui::Label::new(RichText::new(&detail.author).font(theme::medium(12.5)))
+                    .truncate(),
+            )
+            .on_hover_text(format!("{} <{}>", detail.author, detail.email));
+            ui.add(
+                egui::Label::new(
+                    RichText::new(&detail.author_date)
+                        .color(t.text_faint)
+                        .font(theme::mono(11.0)),
+                )
+                .truncate(),
+            )
+            .on_hover_text(&detail.author_date);
         });
     });
     if detail.committer != detail.author {
-        ui.label(
-            RichText::new(crate::i18n::message(
-                "repo-core-0877",
-                &[
-                    ("committer", detail.committer.to_string().into()),
-                    ("commit-date", detail.commit_date.to_string().into()),
-                ],
-            ))
-            .color(t.text_faint)
-            .small(),
+        let text = crate::i18n::message(
+            "repo-core-0877",
+            &[
+                ("committer", detail.committer.to_string().into()),
+                ("commit-date", detail.commit_date.to_string().into()),
+            ],
         );
+        ui.add(egui::Label::new(RichText::new(&text).color(t.text_faint).small()).truncate())
+            .on_hover_text(text);
     }
 }
 
@@ -371,65 +376,71 @@ fn meta_grid(
     builds: Option<Option<&Status>>,
 ) {
     let t = Tokens::get(ui.ctx());
-    egui::Grid::new("commit_meta")
-        .num_columns(2)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
-            ui.label(RichText::new(crate::i18n::text("repo-core-0056")).color(t.text_faint));
-            ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new(detail.hash.get(..12).unwrap_or(&detail.hash))
-                        .font(theme::mono(12.0)),
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(6.0, 3.0);
+        // Each hash is one compact action; parents remain individually navigable.
+        if ui
+            .small_button(
+                RichText::new(detail.hash.get(..12).unwrap_or(&detail.hash))
+                    .font(theme::mono(11.0)),
+            )
+            .named(crate::i18n::text("repo-core-0880"))
+            .on_hover_text(crate::i18n::message(
+                "dev-integration-ui-copy-hash",
+                &[("hash", detail.hash.clone().into())],
+            ))
+            .clicked()
+        {
+            ui.ctx().copy_text(detail.hash.clone());
+        }
+        for parent in &detail.parents {
+            if ui
+                .link(
+                    RichText::new(format!("← {}", parent.get(..8).unwrap_or(parent)))
+                        .font(theme::mono(11.0)),
                 )
-                .on_hover_text(&detail.hash);
-                if icons::small_button(ui, "copy", crate::i18n::text("repo-core-0880")).clicked() {
-                    ui.ctx().copy_text(detail.hash.clone());
-                }
-            });
-            ui.end_row();
-            if !detail.parents.is_empty() {
-                ui.label(
-                    RichText::new(if detail.parents.len() > 1 {
-                        crate::i18n::text("repo-core-0881")
+                .on_hover_text(crate::i18n::message(
+                    "dev-integration-ui-select-parent",
+                    &[("parent", parent.to_string().into())],
+                ))
+                .clicked()
+            {
+                acts.push(Action::SelectHash(parent.clone()));
+            }
+        }
+        if let Some(status) = builds {
+            let tally = status
+                .map(|s| {
+                    let label = crate::ci::tally_label(&s.checks);
+                    if label.is_empty() {
+                        ci_status::state_word(s.state).to_owned()
                     } else {
-                        crate::i18n::text("repo-core-0882")
-                    })
-                    .color(t.text_faint),
+                        label
+                    }
+                })
+                .unwrap_or_else(|| crate::i18n::text("repo-core-0883").to_owned());
+            let b = icons::small_button(
+                ui,
+                "flask-conical",
+                &crate::i18n::message("dev-integration-ui-show-builds", &[("tally", tally.into())]),
+            );
+            if let Some(status) = status {
+                ci_status::paint_dot(
+                    ui.painter(),
+                    &t,
+                    b.rect.right_top() + vec2(-2.0, 3.0),
+                    2.5,
+                    status.state,
                 );
-                ui.horizontal_wrapped(|ui| {
-                    for p in &detail.parents {
-                        if ui
-                            .link(RichText::new(p.get(..8).unwrap_or(p)).font(theme::mono(12.0)))
-                            .clicked()
-                        {
-                            acts.push(Action::SelectHash(p.clone()));
-                        }
-                    }
-                });
-                ui.end_row();
             }
-            if let Some(status) = builds {
-                ui.label(RichText::new(crate::i18n::text("repo-core-0883")).color(t.text_faint));
-                ui.horizontal(|ui| {
-                    if let Some(status) = status {
-                        let (dot, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
-                        ci_status::paint_dot(ui.painter(), &t, dot.center(), 3.5, status.state);
-                        let tally = match crate::ci::tally_label(&status.checks) {
-                            tally if tally.is_empty() => ci_status::state_word(status.state).into(),
-                            tally => tally,
-                        };
-                        ui.label(RichText::new(tally).color(t.text_dim));
-                    }
-                    if ui.link(crate::i18n::text("repo-core-0884")).clicked() {
-                        acts.push(Action::OpenCi {
-                            sha: detail.hash.clone(),
-                            run: None,
-                        });
-                    }
+            if b.clicked() {
+                acts.push(Action::OpenCi {
+                    sha: detail.hash.clone(),
+                    run: None,
                 });
-                ui.end_row();
             }
-        });
+        }
+    });
 }
 
 impl Reword {
@@ -489,7 +500,7 @@ fn reword_editor(ui: &mut Ui, reword: &mut Reword) -> Option<bool> {
         )
     });
     let mut out = None;
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if widgets::primary_button(ui, crate::i18n::text("repo-core-0888"), can_save, 110.0)
             .clicked()
         {

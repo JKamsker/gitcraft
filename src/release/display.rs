@@ -150,6 +150,10 @@ pub(crate) fn display_problem(raw: &str, tag: &str, taken: &[String]) -> String 
 /// Known release metadata/worker errors for paint. Raw producers and execution stay unchanged.
 pub(crate) fn display_error(raw: &str) -> String {
     let id = match raw {
+        "The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge." => {
+            Some("dev-baseline-guard-20")
+        }
+        "Publication needs the release's push destination" => Some("dev-baseline-guard-19"),
         "Only the tip of the branch checked out can move the version in its files" => {
             Some("interaction-release-note-tip")
         }

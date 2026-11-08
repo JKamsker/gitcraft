@@ -124,7 +124,48 @@ pub(super) struct Plan {
 }
 
 impl RepoTab {
+    /// Independent tracker accounts use their Context/request checks; Git forge reads also
+    /// carry the selected forge generation through the existing sender.
+    fn issue_then<T: Send + 'static>(
+        &self,
+        independent: bool,
+        ctx: &egui::Context,
+        work: impl FnOnce() -> T + Send + 'static,
+        then: impl FnOnce(&mut RepoTab, T, &egui::Context) + Send + 'static,
+    ) {
+        let sender = if independent {
+            self.tx.clone()
+        } else {
+            self.forge_sender()
+        };
+        super::spawn(&sender, ctx, move || {
+            let result = work();
+            super::Msg::Then(Box::new(move |tab, ctx| then(tab, result, ctx)))
+        });
+    }
+    pub(super) fn forge_issues_changed(&mut self) {
+        self.issue_work.requests += 1;
+        self.issue_work.picker = None;
+        self.issue_work.refreshing = None;
+    }
+
+    fn issue_matches_forge(&self, link: &IssueLink) -> bool {
+        if link.tracker.is_some() {
+            return true;
+        }
+        let Some(hosting) = &self.hosting else {
+            return true;
+        };
+        let place = link
+            .url
+            .rsplit_once("/-/issues/")
+            .or_else(|| link.url.rsplit_once("/issues/"))
+            .map(|(repo, _)| repo);
+        place.is_some_and(|repo| hosting.matches_http_repository(repo))
+    }
+
     pub(super) fn issue_act(&mut self, act: IssueAct, ctx: &egui::Context) {
+        self.sync_forge_selection(ctx);
         match act {
             IssueAct::OpenPicker => self.open_issue_picker(None, ctx),
             IssueAct::OpenSource(source) => self.open_issue_picker(source, ctx),
@@ -142,6 +183,9 @@ impl RepoTab {
     /// into, when it was made for an issue.
     pub(super) fn issue_pull_request(&self, branch: &str) -> Option<(String, String, String)> {
         let link = self.issue_work.links.get(branch)?;
+        if !self.issue_matches_forge(link) {
+            return None;
+        }
         let (title, body) = link.pull_request_text();
         Some((title, body, self.issue_base().name))
     }
@@ -187,7 +231,8 @@ impl RepoTab {
         self.issue_work.picker = Some(picker);
         let path = self.path.clone();
         let connection = crate::connections::current();
-        self.then(
+        self.issue_then(
+            source.is_some(),
             ctx,
             move || match source {
                 Some(kind) => crate::trackers::assigned(kind),
@@ -225,6 +270,13 @@ impl RepoTab {
         if let Some(busy) = &self.busy_op {
             self.status = Some(crate::repo::Notice::plain((
                 format!("Start work on {}: wait for {busy}", issue.key()),
+                true,
+            )));
+            return;
+        }
+        if issue.tracker.is_none() && !self.issue_matches_forge(&IssueLink::of(issue)) {
+            self.status = Some(crate::repo::Notice::plain((
+                "This issue belongs to another primary forge; choose it again".into(),
                 true,
             )));
             return;
@@ -383,23 +435,32 @@ impl RepoTab {
         }
     }
 
-    /// The remote-tracking branch (`origin/42-x`) of the name `branch`: on the default remote,
-    /// else another one. The work on the issue was pushed from elsewhere.
+    /// Prefer the primary repository's tracking branch. A branch of the same name on
+    /// another forge is not evidence that this issue's work was pushed from elsewhere.
     fn remote_branch_named(&self, branch: &str) -> Option<String> {
-        let default = self.default_remote();
+        let primary = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let mut found = self
             .refs
             .remotes
             .iter()
             .filter(|(remote, list)| {
-                let name = format!("{remote}/{branch}");
-                list.iter().any(|b| b.name == name)
+                let eligible = self.hosting.as_ref().is_none_or(|h| {
+                    self.remotes
+                        .iter()
+                        .any(|r| &r.name == remote && h.matches_git_remote(&r.url))
+                });
+                eligible && list.iter().any(|b| b.name == format!("{remote}/{branch}"))
             })
             .map(|(remote, _)| remote.as_str());
         let first = found.next()?;
         let remote = std::iter::once(first)
             .chain(found)
-            .find(|r| Some(*r) == default.as_deref())
+            .find(|r| Some(*r) == primary.as_deref())
             .unwrap_or(first);
         Some(format!("{remote}/{branch}"))
     }
@@ -428,7 +489,12 @@ impl RepoTab {
     /// The branch pull requests of the work on an issue go into: the remote's default branch
     /// (where its `HEAD` points), else the usual guess (main, master or develop).
     pub(super) fn issue_base(&self) -> Base {
-        let remote = self.default_remote();
+        let remote = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let known = remote
             .as_ref()
             .and_then(|r| self.issue_work.remote_heads.get(r))
@@ -440,7 +506,16 @@ impl RepoTab {
                 known: true,
             },
             None => Base {
-                name: self.default_base(),
+                name: remote
+                    .as_deref()
+                    .and_then(|remote| {
+                        ["main", "master", "develop"].into_iter().find(|name| {
+                            self.remote_branches(remote)
+                                .any(|b| b.name == format!("{remote}/{name}"))
+                        })
+                    })
+                    .unwrap_or("main")
+                    .to_owned(),
                 remote,
                 known: false,
             },
@@ -507,6 +582,15 @@ impl RepoTab {
         let Some(link) = self.issue_work.links.get(&branch).cloned() else {
             return;
         };
+        if link.tracker.is_none() && !self.issue_matches_forge(&link) {
+            self.status = Some(crate::repo::Notice::plain((
+                "This issue belongs to another forge repository; open its saved URL to view it"
+                    .into(),
+                true,
+            )));
+            return;
+        }
+        let independent = link.tracker.is_some();
         let previous = link.clone();
         let connection = crate::connections::current();
         if self.issue_work.refreshing.is_some() {
@@ -514,15 +598,27 @@ impl RepoTab {
         }
         self.issue_work.refreshing = Some(branch.clone());
         let path = self.path.clone();
-        self.then(
+        #[cfg(test)]
+        let recorded = hosting
+            .as_ref()
+            .filter(|_| !independent)
+            .and_then(|hosting| tests::record_refresh(hosting, link.number));
+        self.issue_then(
+            independent,
             ctx,
             move || match &link.tracker {
                 Some(identity) => crate::trackers::one(identity),
-                None => hosting
-                    .ok_or_else(|| {
-                        crate::i18n::text("repo-workflows-issue_work-refresh-issue-0c6fd7a6").into()
-                    })
-                    .and_then(|h| h.forge.provider().issue(&path, &h, link.number)),
+                None => {
+                    let hosting = hosting.ok_or_else(|| {
+                        crate::i18n::text("repo-workflows-issue_work-refresh-issue-0c6fd7a6")
+                            .to_owned()
+                    })?;
+                    #[cfg(test)]
+                    if let Some(issue) = recorded {
+                        return Ok(issue);
+                    }
+                    hosting.forge.provider().issue(&path, &hosting, link.number)
+                }
             },
             move |tab, result, ctx| {
                 tab.issue_work.refreshing = None;

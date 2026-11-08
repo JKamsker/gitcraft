@@ -35,11 +35,6 @@ pub(in crate::repo) fn line_panel(
         DiffSide::Right => "",
     };
     ui.horizontal(|ui| {
-        ui.label(
-            RichText::new(format!("{}:{}{which}", target.path, target.line))
-                .font(theme::mono(11.5))
-                .color(t.text_dim),
-        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if icons::small_button(
                 ui,
@@ -50,6 +45,16 @@ pub(in crate::repo) fn line_panel(
             {
                 pr_acts(acts, PrAct::CloseLine);
             }
+            let title = format!("{}:{}{which}", target.path, target.line);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(&title)
+                        .font(theme::mono(11.5))
+                        .color(t.text_dim),
+                )
+                .truncate(),
+            )
+            .on_hover_text(title);
         });
     });
     let threads = threads(ui, view, draft, &target, acts);
@@ -71,7 +76,7 @@ pub(in crate::repo) fn line_panel(
         field.request_focus();
     }
     error_label(ui, draft.error_at(Place::Line));
-    ui.horizontal(|ui| line_buttons(ui, draft, &threads, current, acts));
+    ui.horizontal_wrapped(|ui| line_buttons(ui, draft, &threads, current, acts));
 }
 
 /// What the comment being written on a line can do: go to its thread, or start one.

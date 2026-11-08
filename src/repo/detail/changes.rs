@@ -22,27 +22,47 @@ impl RepoTab {
             branch_tree::files_toggle,
         );
 
-        if ui
-            .button(crate::i18n::text("repo-core-0812"))
-            .on_hover_text(crate::i18n::text("repo-core-0813"))
-            .clicked()
-        {
-            acts.push(Action::EarlierVersions);
-        }
-        self.review_all_button(
-            ui,
-            crate::repo::review_workflow::ReviewSource::Working,
-            acts,
-        );
-        // The commit box stays at the bottom.
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .button(crate::i18n::text("repo-core-0812"))
+                .on_hover_text(crate::i18n::text("repo-core-0813"))
+                .clicked()
+            {
+                acts.push(Action::EarlierVersions);
+            }
+            self.review_all_button(
+                ui,
+                crate::repo::review_workflow::ReviewSource::Working,
+                acts,
+            );
+        });
+        // Keep both staging and composition reachable after reopening in a short window.
+        // Always use the same scroll container, so resizing preserves editor/scroll state.
+        let frame = egui::Frame::new()
+            .fill(t.card)
+            .inner_margin(egui::Margin::symmetric(12, 10))
+            .stroke(egui::Stroke::new(1.0, t.separator));
+        let content_id = ui.id().with("commit_box_content_height");
+        let maximum_height = (ui.available_height() * 0.65).max(1.0);
+        // A ScrollArea doesn't grow its parent panel intrinsically. Give the panel the
+        // measured content height, bounded by the space left for staging. exact_size also
+        // overrides a small persisted panel size after shrinking and expanding the window.
+        let margins = frame.total_margin().sum().y + 1.0; // Panel separator
+        let natural_height = ui
+            .data(|d| d.get_temp::<f32>(content_id))
+            .map_or(maximum_height, |height| height + margins);
+        let composer_height = natural_height.min(maximum_height);
         egui::Panel::bottom("commit_box")
-            .frame(
-                egui::Frame::new()
-                    .fill(t.card)
-                    .inner_margin(egui::Margin::symmetric(12, 10))
-                    .stroke(egui::Stroke::new(1.0, t.separator)),
-            )
-            .show(ui, |ui| self.commit_box(ui, acts));
+            .exact_size(composer_height)
+            .frame(frame)
+            .show(ui, |ui| {
+                let scroll = egui::ScrollArea::vertical()
+                    .id_salt("commit_box_scroll")
+                    .max_height((composer_height - margins).max(1.0))
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| self.commit_box(ui, acts));
+                ui.data_mut(|d| d.insert_temp(content_id, scroll.content_size.y));
+            });
 
         self.keyboard_work_files(ui, acts);
         egui::ScrollArea::vertical()
@@ -231,11 +251,38 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let head = &self.refs.head;
         let staged = &self.work.staged;
-        if list_header(
+        if list_header_with(
             ui,
             crate::i18n::text("repo-core-0839"),
             staged.len(),
             (!staged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0840")),
+            |ui| {
+                let reason = if !idle {
+                    Some(crate::i18n::text("repo-core-1125"))
+                } else if staged.is_empty() {
+                    Some(crate::i18n::text("dev-integration-ui-stage-first"))
+                } else if self.work.in_progress.is_some() {
+                    Some(crate::i18n::text("dev-integration-ui-finish-operation"))
+                } else if self.refs.current.is_none() {
+                    Some(crate::i18n::text("repo-core-0842"))
+                } else {
+                    None
+                };
+                let r = ui
+                    .add_enabled_ui(reason.is_none(), |ui| {
+                        icons::small_button(
+                            ui,
+                            "git-branch-plus",
+                            crate::i18n::text("repo-core-0049"),
+                        )
+                    })
+                    .inner
+                    .on_hover_text(crate::i18n::text("repo-core-0841"))
+                    .on_disabled_hover_text(reason.unwrap_or_default());
+                if r.clicked() {
+                    acts.push(Action::OpenAbsorb);
+                }
+            },
         ) {
             acts.push(stage_action(
                 crate::i18n::text("repo-core-0840"),
@@ -244,24 +291,6 @@ impl RepoTab {
         }
         let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
-        if !staged.is_empty() && self.work.in_progress.is_none() {
-            let attached = self.refs.current.is_some();
-            let clicked = ui
-                .horizontal(|ui| {
-                    ui.add_space(8.0);
-                    ui.add_enabled(
-                        idle && attached,
-                        egui::Button::new(crate::i18n::text("repo-core-0049")).small(),
-                    )
-                    .on_hover_text(crate::i18n::text("repo-core-0841"))
-                    .on_disabled_hover_text(crate::i18n::text("repo-core-0842"))
-                    .clicked()
-                })
-                .inner;
-            if clicked {
-                acts.push(Action::OpenAbsorb);
-            }
-        }
         let buttons = [("minus", crate::i18n::text("repo-core-0844"))];
         self.work_list(
             ui,
@@ -317,26 +346,29 @@ impl RepoTab {
             }
         };
         // Rows are known by their path within the list: a file can be both staged and unstaged.
-        ui.push_id(("work-list", tree), |ui| {
-            branch_tree::files(
-                ui,
-                (id, true),
-                &group.shown,
-                |f| &f.path,
-                &selected,
-                &mut |ui, indent, f| row(ui, indent, f, acts),
-            );
-            let holds_open = group.folded.iter().any(|f| selected(&f));
-            if group.header(ui, id.with("folded-open"), None, holds_open) {
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        super::horizontal_files(ui, ("work-files-scroll", tree), &paths, |ui| {
+            ui.push_id(("work-list", tree), |ui| {
                 branch_tree::files(
                     ui,
-                    (id.with("folded"), true),
-                    &group.folded,
+                    (id, true),
+                    &group.shown,
                     |f| &f.path,
                     &selected,
                     &mut |ui, indent, f| row(ui, indent, f, acts),
                 );
-            }
+                let holds_open = group.folded.iter().any(|f| selected(&f));
+                if group.header(ui, id.with("folded-open"), None, holds_open) {
+                    branch_tree::files(
+                        ui,
+                        (id.with("folded"), true),
+                        &group.folded,
+                        |f| &f.path,
+                        &selected,
+                        &mut |ui, indent, f| row(ui, indent, f, acts),
+                    );
+                }
+            });
         });
         if let Some(first) = files.first() {
             let area = super::super::weakened_marks::area_of(first.area);
@@ -510,44 +542,45 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
 
 /// A list title with a count and an optional text button on the right. Returns the click.
 fn list_header(ui: &mut Ui, title: &str, count: usize, button: Option<&str>) -> bool {
+    list_header_with(ui, title, count, button, |_| {})
+}
+
+fn list_header_with(
+    ui: &mut Ui,
+    title: &str,
+    count: usize,
+    button: Option<&str>,
+    controls: impl FnOnce(&mut Ui),
+) -> bool {
     let t = Tokens::get(ui.ctx());
-    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
-    let p = ui.painter();
-    p.rect_filled(rect, 0.0, t.tab_strip);
-    let y = rect.center().y;
-    let r = p.text(
-        pos2(rect.left() + 12.0, y),
-        Align2::LEFT_CENTER,
-        title,
-        theme::semibold(11.0),
-        t.text_dim,
-    );
-    p.text(
-        pos2(r.right() + 8.0, y),
-        Align2::LEFT_CENTER,
-        count.to_string(),
-        theme::medium(11.0),
-        t.text_faint,
-    );
-    let Some(label) = button else { return false };
-    let galley = p.layout_no_wrap(label.to_owned(), theme::medium(11.5), t.accent_fg);
-    let b = egui::Rect::from_center_size(
-        pos2(rect.right() - 12.0 - galley.size().x / 2.0 - 6.0, y),
-        vec2(galley.size().x + 12.0, 22.0),
-    );
-    let resp = ui.interact(b, ui.id().with(("list_btn", title)), Sense::click());
-    crate::repo::widgets::a11y(&resp, egui::WidgetType::Button, || {
-        crate::a11y::labels::join([label, title])
-    });
-    if resp.hovered() {
-        ui.painter().rect_filled(b, t.radius_sm, t.hover);
-    }
-    ui.painter().galley(
-        pos2(b.left() + 6.0, y - galley.size().y / 2.0),
-        galley,
-        t.accent_fg,
-    );
-    resp.clicked()
+    let mut clicked = false;
+    egui::Frame::new()
+        .fill(t.tab_strip)
+        .inner_margin(egui::Margin::symmetric(10, 5))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    controls(ui);
+                    if let Some(label) = button {
+                        clicked = ui
+                            .small_button(label)
+                            .on_hover_text(format!("{label} · {title}"))
+                            .clicked();
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!("{title}  {count}"))
+                                    .font(theme::semibold(11.0))
+                                    .color(t.text_dim),
+                            )
+                            .truncate(),
+                        );
+                    });
+                });
+            });
+        });
+    clicked
 }
 
 fn empty_hint(ui: &mut Ui, text: &str) {

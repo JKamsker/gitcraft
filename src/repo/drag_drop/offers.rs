@@ -363,7 +363,7 @@ fn commit_offers(src: &DragCommit, target: &DropTarget, scene: &Scene<'_>) -> Ve
     let mut offers = Vec::new();
     let onto_head = is_checked_out(target, scene);
     let in_head = scene.ancestry.is_ancestor(&src.hash, scene.head);
-    if onto_head && !src.merge && src.hash != scene.head && in_head != Some(true) {
+    if onto_head && !src.merge && src.hash != scene.head && in_head == Some(false) {
         offers.push(Offer::CherryPick {
             hash: src.hash.clone(),
             onto: scene.current.unwrap_or("HEAD").to_owned(),

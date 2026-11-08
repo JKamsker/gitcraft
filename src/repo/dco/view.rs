@@ -12,7 +12,7 @@ use crate::theme::Tokens;
 impl Dco {
     /// The commit box's _Sign off_ toggle.
     pub(crate) fn toggle(&self, ui: &mut Ui, enabled: bool, acts: &mut Vec<Action>) {
-        let mut on = self.signs_off();
+        let on = self.signs_off();
         let tip = match (self.rules.choice, self.reason()) {
             (Some(true), Some(why)) => crate::i18n::message(
                 "repo-workflows-dco-toggle-0",
@@ -31,17 +31,18 @@ impl Dco {
             (None, None) => crate::i18n::message("repo-workflows-dco-toggle-5", &[]),
         };
         let r = ui
-            .add_enabled(
-                enabled,
-                egui::Checkbox::new(
-                    &mut on,
+            .add_enabled(enabled, |ui: &mut Ui| {
+                crate::icons::toggle_button(
+                    ui,
+                    "check",
                     crate::i18n::text("repo-workflows-dco-toggle-6ce6ab1f"),
-                ),
-            )
+                    on,
+                )
+            })
             .on_hover_text(tip)
             .on_disabled_hover_text(crate::i18n::text("repo-workflows-dco-toggle-9ba5d60e"));
-        if r.changed() {
-            acts.push(Action::Dco(DcoAct::SetSignOff(on)));
+        if r.clicked() {
+            acts.push(Action::Dco(DcoAct::SetSignOff(!on)));
         }
     }
 

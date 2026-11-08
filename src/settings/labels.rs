@@ -2,6 +2,15 @@
 //! search identities; user-supplied names pass through unchanged.
 pub(super) fn display(raw: &str) -> &str {
     match raw {
+        "History filters" => crate::i18n::text("dev-integration-ui-history-filters"),
+        "Global history filters" => crate::i18n::text("dev-integration-ui-global-history-filters"),
+        "Context menus" => crate::i18n::text("dev-integration-ui-context-menus"),
+        "Optional tools" => crate::i18n::text("dev-baseline-settings-label-0"),
+        "History / diagnostics" => crate::i18n::text("dev-baseline-settings-label-1"),
+        "Commit surgery" => crate::i18n::text("dev-baseline-settings-label-2"),
+        "Branch rehearsal" => crate::i18n::text("dev-baseline-settings-label-3"),
+        "Sidebar" => crate::i18n::text("dev-baseline-settings-label-4"),
+        "Show Agents section" => crate::i18n::text("dev-baseline-settings-label-5"),
         "Files (GNOME)" => crate::i18n::text("interaction-shell-prose-files"),
         "AI" => crate::i18n::text("interaction-settings-label-ai"),
         "Accent colour" => crate::i18n::text("interaction-settings-label-accent-colour"),

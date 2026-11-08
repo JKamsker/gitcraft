@@ -19,8 +19,11 @@ mod gitea;
 mod github;
 mod gitlab;
 pub(crate) mod http;
+mod identity;
 pub mod inbox;
 pub mod links;
+#[cfg(test)]
+mod routing_tests;
 pub(crate) mod ssh_keys;
 pub mod stack;
 #[cfg(test)]
@@ -456,13 +459,18 @@ pub trait Pages: Sync {
     ) -> Option<Box<dyn Target>>;
 }
 
-/// The forge hosting `origin` (or the first remote). git's config can say which it is, for a
+/// The forge hosting usable `origin` (or the first usable remote). git's config can say which it is, for a
 /// server whose name doesn't tell: `gitcraft.forge` for one repository, `gitcraft.<host>.forge`
 /// for every repository on that host (`git config --global gitcraft.git.example.org.forge
 /// forgejo`). Otherwise the host's name decides, then the servers `tea` is logged in to, then
 /// the remote's whole URL.
 pub fn detect(repo: &Path, remotes: &[Remote]) -> Option<Hosting> {
-    detect_with(remotes, &gitcraft_config(repo), &gitea::tea_servers())
+    let hosts = detect_remotes(repo, remotes);
+    hosts
+        .iter()
+        .find(|(name, _)| name == "origin")
+        .or_else(|| hosts.first())
+        .map(|(_, hosting)| hosting.clone())
 }
 
 /// [`detect`], given git's config and the servers `tea` knows as `(host, web address)`.
@@ -471,10 +479,29 @@ fn detect_with(
     config: &HashMap<String, String>,
     tea: &[(String, String)],
 ) -> Option<Hosting> {
-    let remote = remotes
+    remotes
         .iter()
         .find(|r| r.name == "origin")
-        .or_else(|| remotes.first())?;
+        .and_then(|r| detect_remote(r, config, tea))
+        .or_else(|| remotes.iter().find_map(|r| detect_remote(r, config, tea)))
+}
+
+/// All usable forge remotes, detected locally even while offline. A local/unrecognized
+/// `origin` must not prevent another usable remote from being selected.
+pub(crate) fn detect_remotes(repo: &Path, remotes: &[Remote]) -> Vec<(String, Hosting)> {
+    let config = gitcraft_config(repo);
+    let tea = gitea::tea_servers();
+    remotes
+        .iter()
+        .filter_map(|remote| Some((remote.name.clone(), detect_remote(remote, &config, &tea)?)))
+        .collect()
+}
+
+fn detect_remote(
+    remote: &Remote,
+    config: &HashMap<String, String>,
+    tea: &[(String, String)],
+) -> Option<Hosting> {
     let tea_web = |host: &str| {
         tea.iter()
             .find(|(h, _)| h == host)
@@ -483,6 +510,15 @@ fn detect_with(
     // A local path has no host, and `C:/…` only a drive's: neither is on any forge, whatever
     // folder names it goes through.
     let (host, path) = location(&remote.url).filter(|(host, _)| host.len() > 1)?;
+    // Gerrit has its own change-based review flow. An explicit Gerrit override
+    // must not fall through to GitHub/GitLab host guessing for this remote.
+    if config
+        .get("gitcraft.forge")
+        .or_else(|| config.get(&format!("gitcraft.{host}.forge")))
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("gerrit"))
+    {
+        return None;
+    }
     let forge = choose(&host, config)
         .or_else(|| tea_web(&host).map(|_| Forge::Gitea))
         // GitLab can also live under a path of another host (`https://example.org/gitlab/…`) or
@@ -626,7 +662,8 @@ pub fn web_url(url: &str) -> Option<String> {
 
 /// Runs the command-line tool of `forge` (`gh`, `glab`) in `repo`, for what goes past pull
 /// requests (builds). Forgejo and Gitea have none gitcraft uses.
-pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<String, String> {
+    let forge = hosting.forge;
     let tool = match forge {
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
@@ -637,7 +674,22 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
             ));
         }
     };
-    cli::run(tool, forge.noun(), repo, args)
+    cli::run(tool, forge.noun(), repo, hosting, args)
+}
+
+/// Never let a CLI answer's URL override the repository captured for follow-up mutations.
+fn created_pr_number(hosting: &Hosting, url: &str) -> Result<String, String> {
+    let expected = hosting.matches_pull_request(url);
+    let number = url
+        .rsplit('/')
+        .next()
+        .filter(|n| n.parse::<u64>().is_ok_and(|n| n > 0));
+    if expected && let Some(number) = number {
+        return Ok(number.to_owned());
+    }
+    Err(format!(
+        "The forge returned a pull request outside the selected repository; reviewers were not requested. Check the created pull request: {url}"
+    ))
 }
 
 /// Asks each of `reviewers` for a review of the pull request just opened at `url`, one at a
@@ -878,6 +930,26 @@ mod tests {
     }
 
     #[test]
+    fn unusable_origin_falls_back_to_first_usable_forge_remote() {
+        let remotes = [
+            Remote {
+                name: "disk".into(),
+                url: "/srv/repo".into(),
+            },
+            Remote {
+                name: "origin".into(),
+                url: "https://unknown.example/owner/repo".into(),
+            },
+            Remote {
+                name: "fork".into(),
+                url: "https://github.com/JKamsker/gitcraft".into(),
+            },
+        ];
+        let hosting = detect_with(&remotes, &HashMap::new(), &[]);
+        assert_eq!(hosting.map(|h| h.path), Some("JKamsker/gitcraft".into()));
+    }
+
+    #[test]
     fn only_the_host_tells_the_forge() {
         let r = |url: &str| Remote {
             name: "origin".into(),
@@ -961,6 +1033,28 @@ mod tests {
             hosting.map(|h| (h.forge, h.web)),
             Some((Forge::Gitea, "http://gitea.lan:3000".to_owned()))
         );
+    }
+
+    #[test]
+    fn gerrit_override_excludes_only_its_remote_from_primary_forge_candidates() {
+        let remotes = [
+            Remote {
+                name: "origin".into(),
+                url: "https://github.com/team/review.git".into(),
+            },
+            Remote {
+                name: "fork".into(),
+                url: "https://gitlab.com/team/review.git".into(),
+            },
+        ];
+        let config = parse_config("gitcraft.github.com.forge Gerrit\n");
+        assert!(detect_remote(&remotes[0], &config, &[]).is_none());
+        assert_eq!(
+            detect_with(&remotes, &config, &[]).map(|h| h.forge),
+            Some(Forge::GitLab)
+        );
+        let all_gerrit = parse_config("gitcraft.forge gerrit\n");
+        assert!(detect_with(&remotes, &all_gerrit, &[]).is_none());
     }
 
     #[test]

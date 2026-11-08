@@ -42,11 +42,9 @@ impl RepoTab {
         } else {
             crate::i18n::text("repo-workflows-ai-ai-message-button-a1323968").to_owned()
         };
-        let resp = ui
-            .add_enabled_ui(editable && !busy, |ui| {
-                icons::small_button(ui, "sparkles", &tip)
-            })
-            .inner;
+        let resp = ui.add_enabled(editable && !busy, |ui: &mut Ui| {
+            icons::small_button(ui, "sparkles", &tip)
+        });
         if resp.clicked() && settings.enabled() {
             self.start_message(ui.ctx());
         }

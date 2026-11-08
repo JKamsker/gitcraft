@@ -122,9 +122,16 @@ impl RepoTab {
             self.pending_goto = Some(hash.to_owned());
             return;
         }
+        if !self.index.contains_key(hash) && self.history.iter().any(|c| c.hash == hash) {
+            self.history_filter.revealed.insert(hash.to_owned());
+            let previous = self.selected_hash();
+            self.rebuild_rows();
+            self.selected = previous.and_then(|h| self.index.get(&h).copied());
+        }
         if self.index.contains_key(hash) {
             self.pending_goto = None;
             self.select_hash(hash, ctx);
+            self.history_filter.revealed.remove(hash);
         } else if self.has_more && self.history.len() < MAX_HISTORY {
             self.pending_goto = Some(hash.to_owned());
             self.load_more(ctx);
@@ -531,14 +538,19 @@ impl RepoTab {
         // In the branches the graph shows.
         let from = self.log_from.clone();
         let order = self.log_order;
+        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
         // Answered all the same if it panics: the search runs until it is.
         let failed = {
             let query = query.clone();
-            move |e| Msg::Search(query, code, Err(e))
+            let excluded = excluded.clone();
+            move |e| Msg::Search(excluded, query, code, Err(e))
         };
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            let result = git::search_query::run_with_order(&path, from.as_deref(), order, &plan);
-            Msg::Search(query, code, result)
+            let result = (|| {
+                let roots = git::history_scope::search_roots(&path, from.as_deref(), &excluded)?;
+                git::search_query::run_with_order(&path, Some(&roots), order, &plan)
+            })();
+            Msg::Search(excluded, query, code, result)
         });
     }
 

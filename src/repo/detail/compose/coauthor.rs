@@ -30,8 +30,12 @@ pub fn filtered<'a>(authors: &'a [Author], filter: &str, me: &str) -> Vec<&'a Au
 }
 
 impl RepoTab {
-    pub(super) fn coauthor_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "circle-user-round", crate::i18n::text("repo-core-0942"));
+    pub(super) fn coauthor_button(&mut self, ui: &mut Ui, enabled: bool) {
+        let b = ui
+            .add_enabled(enabled, |ui: &mut Ui| {
+                icons::small_button(ui, "circle-user-round", crate::i18n::text("repo-core-0942"))
+            })
+            .on_disabled_hover_text(crate::i18n::text("repo-workflows-dco-toggle-9ba5d60e"));
         if b.clicked() && !self.compose.authors_asked {
             self.load_authors(ui.ctx());
         }
@@ -45,6 +49,9 @@ impl RepoTab {
             .width(300.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
+                if !enabled {
+                    ui.disable();
+                }
                 let field = ui.add(
                     egui::TextEdit::singleline(filter)
                         .hint_text(crate::i18n::text("repo-core-0943"))

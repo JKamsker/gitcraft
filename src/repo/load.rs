@@ -19,13 +19,16 @@ const RECOUNT_EVERY: Duration = Duration::from_secs(30);
 pub(super) struct Loaded {
     pub(super) refs: Refs,
     pub(super) history: Vec<Arc<Commit>>,
+    pub(super) history_namespaces: Vec<String>,
+    pub(super) excluded_namespace_count: Option<usize>,
     pub(super) work: WorkStatus,
     pub(super) worktrees: Vec<Worktree>,
     pub(super) worktree_root: String,
     pub(super) stashes: Vec<Stash>,
     pub(super) remotes: Vec<Remote>,
-    /// The forge `origin` is on, if gitcraft knows it.
-    pub(super) hosting: Option<Hosting>,
+    /// Usable forge remotes; the latest UI preference chooses among these on arrival.
+    pub(super) forge_remotes: Vec<(String, Hosting)>,
+    pub(super) forge_generation: u64,
     pub(super) gerrit: Option<crate::gerrit::Server>,
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
@@ -44,14 +47,12 @@ pub(super) struct Loaded {
     pub(super) issues: super::issue_work::Read,
 }
 
-/// Whether two hostings are the same repository on the same forge, however it's reached (HTTPS
-/// or SSH): the first load, with nothing before it, moves nothing anywhere.
+/// Whether two hostings name the same web instance and repository, however Git reaches it
+/// (HTTPS or SSH): the first load, with nothing before it, moves nothing anywhere.
 pub(super) fn same_repository(before: Option<&Hosting>, now: Option<&Hosting>) -> bool {
     match (before, now) {
         (None, _) => true,
-        (Some(a), Some(b)) => {
-            a.forge == b.forge && a.host == b.host && a.path.eq_ignore_ascii_case(&b.path)
-        }
+        (Some(a), Some(b)) => a.same_repository(b),
         (Some(_), None) => false,
     }
 }
@@ -81,11 +82,13 @@ impl RepoTab {
         self.loading = true;
         self.load_started = Some(Instant::now());
         let read = self.next_read();
+        let forge_generation = self.forge_generation;
         let path = self.path.clone();
         // Keep the pages already loaded.
         let count = self.history.len().clamp(git::LOG_PAGE, MAX_HISTORY);
         let mut visibility = Visibility::load(ctx, self.repo_key());
         let order = super::graph_order::load(ctx, self.repo_key());
+        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
         // Answered all the same if it panics: the tab reloads only once it is.
         let failed = |e| Msg::Loaded(Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
@@ -96,8 +99,10 @@ impl RepoTab {
                 // Leaf reads share one fixed pool across every tab. The parent waits in
                 // the job pool; no reload creates its own scoped OS threads.
                 let history = {
-                    let (path, from) = (path.clone(), log_from.clone());
-                    crate::tasks::read(move || git::log(&path, from.as_deref(), order, 0, count))?
+                    let (path, from, excluded) = (path.clone(), log_from.clone(), excluded.clone());
+                    crate::tasks::read(move || {
+                        git::log_scoped(&path, from.as_deref(), order, 0, count, &excluded)
+                    })?
                 };
                 let work_trees = {
                     let path = path.clone();
@@ -119,7 +124,7 @@ impl RepoTab {
                 };
                 let remotes = {
                     let path = path.clone();
-                    crate::tasks::read(move || git::remotes(&path).unwrap_or_default())?
+                    crate::tasks::read(move || git::remotes(&path))?
                 };
                 let submodules = {
                     let path = path.clone();
@@ -133,6 +138,12 @@ impl RepoTab {
                     let path = path.clone();
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
+                let excluded_namespace_count = git::history_scope::excluded_namespace_count(
+                    &path,
+                    log_from.as_deref(),
+                    &excluded,
+                )
+                .ok();
                 let identity = git::identity(&path);
                 let worktree_root = git::read_worktree_root(&path).map_err(|e| {
                     crate::i18n::message("repo-core-2893", &[("e", e.to_string().into())])
@@ -141,27 +152,26 @@ impl RepoTab {
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
                     stashes.join()?,
-                    remotes.join()?,
+                    remotes.join()??,
                     submodules.join()?,
                     lfs.join()?,
                     issues.join()?,
                 );
                 let path = path.as_path();
                 let gerrit = crate::gerrit::detect(path, &remotes);
-                let hosting = if gerrit.is_none() {
-                    forge::detect(path, &remotes)
-                } else {
-                    None
-                };
+                let forge_remotes = forge::detect_remotes(path, &remotes);
                 Ok(Box::new(Loaded {
                     refs,
                     history,
+                    history_namespaces: excluded,
+                    excluded_namespace_count,
                     work,
                     worktrees,
                     worktree_root,
                     stashes,
                     remotes,
-                    hosting,
+                    forge_remotes,
+                    forge_generation,
                     gerrit,
                     submodules,
                     lfs,
@@ -372,9 +382,15 @@ impl RepoTab {
         let generation = self.history_gen;
         let from = self.log_from.clone();
         let order = self.log_order;
+        let excluded = self
+            .history_filter
+            .read_namespaces
+            .clone()
+            .unwrap_or_else(git::history_scope::default_hidden_namespaces);
         let stream = Arc::clone(&self.log_stream);
         // Answered all the same if it panics: no more is read until it is.
-        let failed = move |e| Msg::More(generation, Err(e));
+        let failed_excluded = excluded.clone();
+        let failed = move |e| Msg::More(generation, failed_excluded, Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
             let page = (|| {
                 let mut slot = stream
@@ -389,7 +405,13 @@ impl RepoTab {
                     *slot = None;
                     *slot = Some((
                         generation,
-                        git::LogStream::start(&path, from.as_deref(), order, skip)?,
+                        git::LogStream::start_scoped(
+                            &path,
+                            from.as_deref(),
+                            order,
+                            skip,
+                            &excluded,
+                        )?,
                     ));
                 }
                 let page = match slot.as_mut() {
@@ -402,7 +424,7 @@ impl RepoTab {
                 }
                 page
             })();
-            Msg::More(generation, page)
+            Msg::More(generation, excluded, page)
         });
     }
 
@@ -413,7 +435,7 @@ impl RepoTab {
         let asked = Instant::now();
         self.prs_loaded = Some(asked);
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             Msg::Prs(asked, hosting.forge.provider().list(&path, &hosting))
         });
         self.load_merged_prs(ctx);
@@ -469,7 +491,42 @@ impl RepoTab {
         self.refs = loaded.refs;
         self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.has_more = loaded.history.len() >= loaded.requested;
+        let namespace_changed = self
+            .history_filter
+            .read_namespaces
+            .as_ref()
+            .is_some_and(|old| *old != loaded.history_namespaces);
+        let selected = self.selected.and_then(|i| self.commits.get(i));
+        let pinned = selected
+            .filter(|c| {
+                c.hash != WIP_HASH
+                    && (namespace_changed
+                        || self
+                            .history_filter
+                            .pinned
+                            .as_ref()
+                            .is_some_and(|p| p.hash == c.hash))
+                    && !loaded.history.iter().any(|h| h.hash == c.hash)
+            })
+            .cloned();
+        self.history_filter.pinned_layout = pinned.as_ref().map(|commit| {
+            let source = self
+                .history_filter
+                .pinned_layout
+                .as_ref()
+                .filter(|p| p.hash == commit.hash)
+                .unwrap_or(commit);
+            super::history_filter::pinned_projection(source, &self.history, &loaded.history)
+        });
+        self.history_filter.pinned = pinned;
         self.history = loaded.history;
+        self.history_filter.read_namespaces = Some(loaded.history_namespaces);
+        self.history_filter.excluded_total = loaded.excluded_namespace_count;
+        let filters = super::history_filter::rules(ctx, self.repo_key());
+        if self.history_filter.read_namespaces.as_ref() != Some(&filters.excludes()) {
+            self.reload_again = true;
+        }
+        self.history_filter.applied = Some(filters);
         // A status read since this reload started is newer.
         let state = loaded.work.in_progress;
         if Self::newer(loaded.read, &mut self.work_read) {
@@ -534,30 +591,14 @@ impl RepoTab {
         self.practice = loaded.practice;
         self.practice_result = None;
         self.take_issue_read(loaded.issues);
-        // Another project (origin pointed elsewhere): its pull requests are other ones, under
-        // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
         if remotes_changed {
             self.invalidate_https_challenge();
         }
         self.remotes = loaded.remotes;
+        self.forge_remotes = loaded.forge_remotes;
+        self.take_forge_catalog(remotes_changed, loaded.forge_generation, ctx);
         self.gerrit = loaded.gerrit;
-        if loaded.hosting != self.hosting || remotes_changed {
-            let moved = !same_repository(self.hosting.as_ref(), loaded.hosting.as_ref());
-            self.hosting = loaded.hosting;
-            self.prs.clear();
-            self.pr_error = None;
-            self.prs_loaded = None;
-            self.forget_merged_prs();
-            if moved {
-                // The page and what was written for it are another repository's now: sent, they
-                // would go to this one, under that number.
-                self.close_pr();
-                self.ci_view = None;
-                self.pr_drafts.clear();
-                self.avatars_hinted = false;
-            }
-        }
         // The forge is asked by itself only while gitcraft may go on the network by itself.
         let paused = !crate::network::background_may_run();
         if !paused
@@ -637,6 +678,29 @@ impl RepoTab {
     /// as the graph.
     pub(super) fn rebuild_rows(&mut self) {
         self.saved_views.dirty = true;
+        self.history_index = self
+            .history
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.hash.clone(), i))
+            .collect();
+        let selected_hash = self.selected_hash();
+        let mut protected = self.history_filter.revealed.clone();
+        protected.extend(self.selected_hash());
+        protected.extend(self.pending_goto.clone());
+        protected.extend(self.search.matches.iter().cloned());
+        protected.insert(self.refs.head.clone());
+        protected.extend(self.stashes.iter().map(|s| s.base.clone()));
+        let rules = self.history_filter.applied.clone().unwrap_or_default();
+        let (visible, graph_history, hidden, kept) = super::history_filter::compact(
+            &self.history,
+            &rules,
+            &protected,
+            self.log_order.first_parent,
+            self.has_more,
+        );
+        self.history_filter.hidden_loaded = hidden;
+        self.history_filter.kept_loaded = kept;
         let old_rows = std::mem::take(&mut self.commits);
         if !self.work.is_clean() {
             self.commits.push(Arc::new(Commit {
@@ -660,7 +724,7 @@ impl RepoTab {
         }
         self.commits
             .reserve(self.history.len() + self.stashes.len());
-        for commit in &self.history {
+        for commit in &visible {
             for stash in stashes_on.get(commit.hash.as_str()).into_iter().flatten() {
                 self.commits.push(Arc::new(Commit {
                     hash: stash.hash.clone(),
@@ -676,8 +740,34 @@ impl RepoTab {
             // Shared with `history`, not copied: tens of thousands of commits may be loaded.
             self.commits.push(Arc::clone(commit));
         }
+        if let Some(pinned) = &self.history_filter.pinned
+            && selected_hash.as_ref() == Some(&pinned.hash)
+            && !self.commits.iter().any(|c| c.hash == pinned.hash)
+        {
+            let at = usize::from(self.commits.first().is_some_and(|c| c.hash == WIP_HASH));
+            self.commits.insert(at, Arc::clone(pinned));
+        }
         self.insert_pr_graph_head();
-        let graph = graph::layout_with(&self.commits, self.log_order.first_parent);
+        let pinned_layout = self
+            .history_filter
+            .pinned_layout
+            .as_ref()
+            .map(|p| super::history_filter::pinned_projection(p, &self.history, &visible));
+        let layout_by_hash: HashMap<&str, &Arc<Commit>> =
+            graph_history.iter().map(|c| (c.hash.as_str(), c)).collect();
+        let layout_rows: Vec<Arc<Commit>> = self
+            .commits
+            .iter()
+            .map(|c| {
+                if let Some(pinned) = pinned_layout.as_ref().filter(|p| p.hash == c.hash) {
+                    return Arc::clone(pinned);
+                }
+                layout_by_hash
+                    .get(c.hash.as_str())
+                    .map_or_else(|| Arc::clone(c), |c| Arc::clone(c))
+            })
+            .collect();
+        let graph = graph::layout_with(&layout_rows, self.log_order.first_parent);
         let index = self
             .commits
             .iter()
@@ -829,13 +919,16 @@ impl RepoTab {
         let mut emails: Vec<String> = self.history.iter().map(|c| c.email.clone()).collect();
         emails.sort();
         emails.dedup();
-        let ctx = ctx.clone();
-        crate::connections::spawn(move || {
-            for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
-                crate::avatars::hint(&email, hint);
-            }
-            ctx.request_repaint();
-        });
+        self.forge_then(
+            ctx,
+            move || hosting.forge.provider().avatars(&repo, &hosting, &emails),
+            |_, hints, ctx| {
+                for (email, hint) in hints {
+                    crate::avatars::hint(&email, hint);
+                }
+                ctx.request_repaint();
+            },
+        );
     }
 }
 

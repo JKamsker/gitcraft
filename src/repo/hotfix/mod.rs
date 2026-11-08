@@ -87,7 +87,7 @@ impl RepoTab {
                 let repo = self.path.clone();
                 let remote = self.default_remote();
                 let hosting = self.hosting.clone();
-                self.then(
+                self.forge_then(
                     ctx,
                     move || plan::plan(&repo, remote),
                     move |tab, plan, _| {

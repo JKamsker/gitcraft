@@ -192,6 +192,7 @@ pub(crate) enum Action {
     OpenBranches(Option<&'static str>),
     /// Hide, show or solo branches in the graph.
     BranchVisibility(branch_visibility::Change),
+    PrimaryForge(Option<String>),
     /// Read the graph's history in this order (and first parent only, or not).
     GraphOrder(git::LogOrder),
     /// Collapse or bring back the detail panel.

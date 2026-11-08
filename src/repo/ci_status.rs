@@ -107,10 +107,14 @@ impl CiStatuses {
 }
 
 impl RepoTab {
-    /// The repository's main project on its forge (that of `origin`): whether builds can be
+    /// The selected primary forge project: whether builds can be
     /// shown at all, and where those of a commit no remote has are asked.
     pub(super) fn ci_project(&self) -> Option<Project> {
-        Project::of(self.forge()?, &self.remotes)
+        let remote = self
+            .remotes
+            .iter()
+            .find(|r| Some(r.name.as_str()) == self.primary_forge_remote())?;
+        Project::of(self.forge()?, std::slice::from_ref(remote))
     }
 
     /// Every candidate for a commit's builds, preferring its last status source.
@@ -190,7 +194,7 @@ impl RepoTab {
         let first = plan[0].0.clone();
         // Answered all the same if it panics: no statuses are read again until it is.
         let failed = move |e| Msg::CiStatuses(fresh, vec![(first, Err(e))]);
-        super::messages::spawn_or(&self.tx, ctx, failed, move || {
+        super::messages::spawn_or(&self.forge_sender(), ctx, failed, move || {
             let answers = plan
                 .into_iter()
                 .map(|(project, shas)| {

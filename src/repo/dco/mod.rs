@@ -117,6 +117,11 @@ impl Dco {
 }
 
 impl RepoTab {
+    pub(super) fn clear_forge_dco(&mut self) {
+        self.dco.pr = None;
+        self.dco.failing_check = None;
+    }
+
     /// Each frame: reads the rules again after a reload, notices a failing DCO check on the pull
     /// request shown and, where sign-offs are asked for, reads those of its commits once they
     /// are here.
@@ -155,7 +160,7 @@ impl RepoTab {
             base,
             commits: None,
         });
-        self.then(
+        self.forge_then(
             ctx,
             move || signoff::commits(&repo, &range),
             move |tab, commits, _| {

@@ -284,8 +284,18 @@ exit 34"#,
             },
             ..Default::default()
         };
-        let answer =
-            context.run(|| crate::forge::tool(crate::forge::Forge::GitHub, &repo, &["pr", "list"]));
+        let answer = context.run(|| {
+            crate::forge::tool(
+                &crate::forge::Hosting {
+                    forge: crate::forge::Forge::GitHub,
+                    host: "github.com".into(),
+                    path: "team/app".into(),
+                    web: "https://github.com".into(),
+                },
+                &repo,
+                &["pr", "list"],
+            )
+        });
         assert_eq!(answer, Ok("[{\"number\":1}]\n".into()));
         Ok(())
     }

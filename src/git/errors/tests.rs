@@ -458,13 +458,14 @@ fn locks_of_a_linked_worktree() -> Result<(), String> {
 
 #[test]
 fn git_processes_of_ps() {
-    let ps = "    1     0 /sbin/init\n  200     1 /usr/bin/git commit -m wip\n  201   200 vim .git/COMMIT_EDITMSG\n  300    42 /usr/lib/git-core/git-remote-https origin https://x\n  400   999 git status\n  401   400 git-lfs filter-process\n  500     1 gitcraft\n  501     1 gitk --all\n";
+    let ps = "    1     0 /sbin/init\n  200     1 /usr/bin/git commit -m wip\n  201   200 vim .git/COMMIT_EDITMSG\n  300    42 /usr/lib/git-core/git-remote-https origin https://x\n  400   999 git status\n  401   400 git-lfs filter-process\n  500     1 gitcraft\n  501     1 gitk --all\n  502     1 git ls-remote https://github.com/JKamsker/gitcraft\n";
     // 999 is this app: its git and what that git started are its own.
     assert_eq!(
         lock::git_lines(ps, Some(999)),
         [
             "/usr/bin/git commit -m wip",
             "/usr/lib/git-core/git-remote-https origin https://x",
+            "git ls-remote https://github.com/JKamsker/gitcraft",
         ]
     );
     assert!(lock::git_lines("", None).is_empty());

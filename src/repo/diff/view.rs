@@ -507,59 +507,10 @@ impl RepoTab {
             .inner_margin(egui::Margin::symmetric(10, 6))
             .stroke(Stroke::new(1.0, t.separator))
             .show(ui, |ui| {
+                // Reserve fixed actions first. Neither the path nor a changing selection can
+                // move the Diff / File pair away from the right edge.
                 ui.horizontal(|ui| {
-                    icons::inline(ui, "file-diff", 16.0, t.icon);
-                    let title = ui.add(
-                        egui::Label::new(egui::RichText::new(path).font(theme::medium(13.0)))
-                            .sense(Sense::click()),
-                    );
-                    let (rev, ignorable) = match &view.key {
-                        DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } => {
-                            (Some(hash.as_str()), false)
-                        }
-                        DiffKey::Range { to: Some(to), .. } => (Some(to.as_str()), false),
-                        DiffKey::Range { to: None, .. } => (None, false),
-                        DiffKey::Work(_) => (None, true),
-                    };
-                    // Linked as it is in the last commit: a new or renamed file isn't there by
-                    // this name. Compared with the working tree, the file shown is in no commit.
-                    let links = || {
-                        self.link_menu(None).filter(|_| match &view.key {
-                            DiffKey::Work(f) => {
-                                !matches!(f.code, 'A' | '?') && f.old_path.is_none()
-                            }
-                            DiffKey::Range { to: None, .. } => false,
-                            DiffKey::Commit { .. }
-                            | DiffKey::Range { .. }
-                            | DiffKey::Remerge { .. } => true,
-                        })
-                    };
-                    widgets::file_menu_with(
-                        &title,
-                        path,
-                        rev,
-                        ignorable,
-                        (!view.structural.enabled).then_some(&view.key),
-                        &links,
-                        false,
-                        acts,
-                        |ui, acts| {
-                            self.lock_menu_items(ui, path, rev, acts);
-                            self.storage_menu_items(ui, path, rev, acts);
-                        },
-                    );
-                    widgets::chip(ui, origin, t.text_dim);
-                    if let Some(ranges) = &view.lines {
-                        widgets::chip(ui, &lines_chip(ranges), t.accent);
-                    }
-                    let before = if markdown == Some(true) {
-                        matches!(&view.rendered, Some(Ok(md)) if md.before)
-                    } else {
-                        matches!(&view.file, Some(Ok(f)) if f.before)
-                    };
-                    if as_file && before {
-                        widgets::chip(ui, crate::i18n::text("repo-core-2360"), t.warning);
-                    }
+                    ui.spacing_mut().item_spacing.x = 4.0;
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
                             .clicked()
@@ -567,6 +518,98 @@ impl RepoTab {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
+                        if icons::toggle_button(
+                            ui,
+                            "book-open",
+                            crate::i18n::text("repo-core-2368"),
+                            as_file,
+                        )
+                        .clicked()
+                        {
+                            acts.push(Action::DiffAsFile(true));
+                        }
+                        if icons::toggle_button(
+                            ui,
+                            "file-diff",
+                            crate::i18n::text("repo-core-2367"),
+                            !as_file,
+                        )
+                        .clicked()
+                        {
+                            acts.push(Action::DiffAsFile(false));
+                        }
+                        ui.vertical(|ui| {
+                            ui.set_width(ui.available_width().max(0.0));
+                            let title = ui
+                                .add(
+                                    egui::Label::new(
+                                        egui::RichText::new(path).font(theme::medium(13.0)),
+                                    )
+                                    .truncate()
+                                    .sense(Sense::click()),
+                                )
+                                .on_hover_text(path);
+                            let (rev, ignorable) = match &view.key {
+                                DiffKey::Commit { hash, .. } | DiffKey::Remerge { hash, .. } => {
+                                    (Some(hash.as_str()), false)
+                                }
+                                DiffKey::Range { to: Some(to), .. } => (Some(to.as_str()), false),
+                                DiffKey::Range { to: None, .. } => (None, false),
+                                DiffKey::Work(_) => (None, true),
+                            };
+                            // Linked as it is in the last commit: a new or renamed file isn't there by
+                            // this name. Compared with the working tree, the file shown is in no commit.
+                            let links = || {
+                                self.link_menu(None).filter(|_| match &view.key {
+                                    DiffKey::Work(f) => {
+                                        !matches!(f.code, 'A' | '?') && f.old_path.is_none()
+                                    }
+                                    DiffKey::Range { to: None, .. } => false,
+                                    DiffKey::Commit { .. }
+                                    | DiffKey::Range { .. }
+                                    | DiffKey::Remerge { .. } => true,
+                                })
+                            };
+                            widgets::file_menu_with(
+                                &title,
+                                path,
+                                rev,
+                                ignorable,
+                                (!view.structural.enabled).then_some(&view.key),
+                                &links,
+                                false,
+                                acts,
+                                |ui, acts| {
+                                    self.lock_menu_items(ui, path, rev, acts);
+                                    self.storage_menu_items(ui, path, rev, acts);
+                                },
+                            );
+                            let mut source = origin.to_owned();
+                            if let Some(ranges) = &view.lines {
+                                source.push_str(&format!(" · {}", lines_chip(ranges)));
+                            }
+                            let before = if markdown == Some(true) {
+                                matches!(&view.rendered, Some(Ok(md)) if md.before)
+                            } else {
+                                matches!(&view.file, Some(Ok(f)) if f.before)
+                            };
+                            if as_file && before {
+                                source.push_str(" · ");
+                                source.push_str(crate::i18n::text("repo-core-2360"));
+                            }
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(&source).small().color(t.text_dim),
+                                )
+                                .truncate(),
+                            )
+                            .on_hover_text(source);
+                        });
+                    });
+                });
+                let mut controls = |ui: &mut Ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
                             && !view.encrypted.enabled
@@ -649,19 +692,22 @@ impl RepoTab {
                             }
                             ui.add_space(4.0);
                         }
-                        let on = usize::from(as_file);
-                        if let Some(i) = widgets::switch(
-                            ui,
-                            &[
-                                crate::i18n::text("repo-core-2367"),
-                                crate::i18n::text("repo-core-2368"),
-                            ],
-                            on,
-                        ) {
-                            acts.push(Action::DiffAsFile(i == 1));
-                        }
                     });
-                });
+                };
+                if ui.available_width() < 620.0 {
+                    let button = icons::small_button(
+                        ui,
+                        "settings",
+                        crate::i18n::text("dev-integration-ui-diff-options"),
+                    );
+                    egui::Popup::menu(&button)
+                        .style(theme::menu_style)
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .width(280.0)
+                        .show(|ui| controls(ui));
+                } else {
+                    controls(ui);
+                }
             });
         clear
     }
@@ -750,17 +796,21 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let chosen = view.chosen.len();
         let revertable = matches!(&view.data, Some(Ok(d)) if d.revertable);
-        // Laid out right to left. The lines' buttons take the place of the file's, which stays
-        // in the file's menu, so the header keeps room for the rest.
+        // Selected lines take the place of the file action. Whole-file revert remains
+        // available in the file name's menu while the selection is active.
         if lines && revertable && chosen > 0 {
             let b = ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(crate::i18n::message(
-                        "repo-core-2378",
-                        &[("chosen", (chosen).into())],
-                    )),
-                )
+                .add_enabled(idle, |ui: &mut Ui| {
+                    icons::small_button(
+                        ui,
+                        "undo-2",
+                        &crate::i18n::message(
+                            "dev-integration-ui-revert-selected",
+                            &[("count", chosen.into())],
+                        ),
+                    )
+                })
+                .on_disabled_hover_text(crate::i18n::text("repo-core-1125"))
                 .on_hover_text(crate::i18n::text("repo-core-2379"));
             if b.clicked() {
                 acts.push(Action::PickLines {
@@ -774,7 +824,10 @@ impl RepoTab {
                 .clicked();
         }
         let b = ui
-            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-2380")))
+            .add_enabled(idle, |ui: &mut Ui| {
+                icons::small_button(ui, "undo-2", crate::i18n::text("repo-core-2380"))
+            })
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1125"))
             .on_hover_text(crate::i18n::text("repo-core-2381"));
         if b.clicked() {
             acts.push(Action::RevertFile {
@@ -1145,3 +1198,7 @@ fn line_comment_panel(
             pr_view::only_web_links(ui.ctx());
         });
 }
+
+#[cfg(test)]
+#[path = "header_tests.rs"]
+mod header_tests;
