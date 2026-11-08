@@ -243,3 +243,48 @@ fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() 
     lists.lists[1].shelf = Some(shelf);
     assert!(require_restore_ownership(&lists, &a).is_ok());
 }
+
+#[test]
+fn pure_state_selected_index_records_do_not_reconstitute_unselected_entries() {
+    let selected = [
+        (
+            "chosen".into(),
+            Some(Entry {
+                mode: "100755".into(),
+                oid: "a".repeat(40),
+            }),
+        ),
+        ("deleted".into(), None),
+    ]
+    .into();
+    let records = selected_index_records(&selected, 40);
+    let rows = records
+        .split(|b| *b == 0)
+        .filter(|r| !r.is_empty())
+        .collect::<Vec<_>>();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        rows[0],
+        format!("100755 {}\tchosen", "a".repeat(40)).as_bytes()
+    );
+    assert_eq!(rows[1], format!("0 {}\tdeleted", "0".repeat(40)).as_bytes());
+    assert!(!records.windows(6).any(|w| w == b"intent"));
+    assert_eq!(selected_index_records(&BTreeMap::new(), 64), b"");
+}
+
+// Owned Git regression: compiled while runtime fixtures are globally held.
+#[test]
+fn changelist_commit_preserves_unselected_intent_to_add_flag() -> Result<(), String> {
+    let f = Fixture::new()?;
+    f.write("intent", b"not staged\n")?;
+    f.git(&["add", "-N", "intent"])?;
+    let before = f.git(&["ls-files", "--debug", "intent"])?;
+    f.write("a", b"chosen change\n")?;
+    let id = f.create("chosen", &["a"])?;
+    commit(f.path(), &f.read()?, &id, &|| true)?;
+    let after = f.git(&["ls-files", "--debug", "intent"])?;
+    assert_eq!(after, before);
+    assert_eq!(f.git(&["diff", "--cached", "--name-only"])?, "");
+    assert_eq!(f.git(&["diff", "--name-only"])?, "intent");
+    Ok(())
+}

@@ -447,60 +447,50 @@ pub(super) fn raw_entries(
         })
         .collect()
 }
+fn selected_index_records(selected: &BTreeMap<String, Option<Entry>>, oid_len: usize) -> Vec<u8> {
+    selected
+        .iter()
+        .flat_map(|(path, entry)| match entry {
+            Some(entry) => format!("{} {}\t{path}\0", entry.mode, entry.oid).into_bytes(),
+            None => format!("0 {}\t{path}\0", "0".repeat(oid_len)).into_bytes(),
+        })
+        .collect()
+}
 fn final_index(
     ctx: &Context,
     source: &Source,
     selected: &BTreeMap<String, Option<Entry>>,
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
-    let mut next = source.index.clone();
-    for (p, e) in selected {
-        match e {
-            Some(e) => {
-                next.insert(p.clone(), e.clone());
-            }
-            None => {
-                next.remove(p);
-            }
-        }
+    // Start with the entire captured cache, including intent-to-add and unrelated
+    // entry flags. Tree reconstruction cannot represent those semantics.
+    private_index_file(ctx, "index", &ctx.index_file, &source.cache, active)?;
+    if let Some((name, bytes)) = &source.shared {
+        private_index_file(ctx, name, &ctx.shared_file, bytes, active)?;
     }
-    tree(ctx, &next, active)?;
-    for (flag, paths) in [
-        (
-            "--skip-worktree",
-            source.skip.iter().cloned().collect::<Vec<_>>(),
-        ),
-        (
-            "--assume-unchanged",
-            source
-                .raw
-                .split(|b| *b == 0)
-                .filter(|r| r.first().is_some_and(u8::is_ascii_lowercase))
-                .filter_map(|r| {
-                    std::str::from_utf8(r)
-                        .ok()?
-                        .split_once('\t')
-                        .map(|(_, p)| p.to_owned())
-                })
-                .collect(),
-        ),
-    ] {
-        let input = paths
-            .into_iter()
-            .filter(|p| !selected.contains_key(p) && next.contains_key(p))
-            .flat_map(|p| p.into_bytes().into_iter().chain([0]))
-            .collect::<Vec<_>>();
-        if !input.is_empty() {
-            ctx.run(
-                &["update-index", flag, "-z", "--stdin"],
-                input,
-                &[0],
-                active,
-            )?;
-        }
+    if ctx.run(&["ls-files", "-v", "--stage", "-z"], vec![], &[0], active)? != source.raw {
+        return Err("Captured index could not be reproduced; no public index was changed".into());
+    }
+    // Materialize split entries in the private cache; transient daemon caches must
+    // not be published. Git rejects index formats/extensions it cannot interpret.
+    ctx.run(
+        &[
+            "update-index",
+            "--no-fsmonitor",
+            "--no-untracked-cache",
+            "--no-split-index",
+        ],
+        vec![],
+        &[0],
+        active,
+    )?;
+    let input = selected_index_records(selected, source.head.as_ref().ok_or("No HEAD")?.len());
+    if !input.is_empty() {
+        ctx.run(&["update-index", "-z", "--index-info"], input, &[0], active)?;
     }
     std::fs::read(ctx.path.join("index")).map_err(|e| e.to_string())
 }
+
 pub fn commit(
     repo: &Path,
     view: &View,
