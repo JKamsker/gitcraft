@@ -11,6 +11,7 @@ pub mod churn;
 pub mod ci_path;
 pub mod conflict_radar;
 pub mod constellation;
+pub mod coupling;
 pub mod deploy;
 pub mod evolution;
 pub mod history;
