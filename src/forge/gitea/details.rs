@@ -158,6 +158,7 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
         head_oid: head_oid.clone(),
         can_bypass_rules: false,
         threads,
+        ..Default::default()
     };
 
     let mut timeline: Vec<Entry> = answers

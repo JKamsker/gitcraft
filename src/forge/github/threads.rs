@@ -139,6 +139,7 @@ pub(crate) fn parse(json: &str) -> Result<(PrExtras, Option<String>), String> {
             .iter()
             .map(thread)
             .collect(),
+        ..Default::default()
     };
     Ok((extras, next_page))
 }

@@ -7,10 +7,16 @@ use serde_json::Value;
 
 use super::inbox;
 use super::{
-    ForkInfo, Found, Hosting, Issue, MergedPullRequest, NewPullRequest, PrState, Provider,
+    ForkInfo, Found, Hosting, Issue, MergedPullRequest, NewPullRequest, Pages, PrState, Provider,
     PullRequest, cli,
 };
 use crate::avatars::Hint;
+
+mod api;
+mod details;
+#[cfg(test)]
+mod native_tests;
+mod post;
 
 pub(super) struct GitLab;
 
@@ -23,6 +29,10 @@ impl GitLab {
 }
 
 impl Provider for GitLab {
+    fn pages(&self) -> Option<&dyn Pages> {
+        Some(self)
+    }
+
     fn name(&self) -> &'static str {
         "GitLab"
     }
@@ -461,5 +471,27 @@ mod tests {
             at("ssh://git@gitlab.example.com:2222/g/p.git"),
             "gitlab.example.com"
         );
+    }
+}
+
+impl Pages for GitLab {
+    fn details(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        number: u64,
+    ) -> Result<crate::pull_request::PrDetails, String> {
+        details::read(&api::Api::new(repo, hosting)?, number)
+    }
+    fn target(
+        &self,
+        repo: &Path,
+        hosting: &Hosting,
+        details: &crate::pull_request::PrDetails,
+    ) -> Option<Box<dyn crate::pr_post::Target>> {
+        Some(Box::new(post::GitLabTarget::new(
+            api::Api::new(repo, hosting).ok()?,
+            details,
+        )?))
     }
 }
