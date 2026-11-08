@@ -785,6 +785,10 @@ mod runtime_held_tests {
     #[test]
     fn actual_filter_repo_rewrites_only_the_owned_fresh_clone_and_reports_refs()
     -> Result<(), String> {
+        if crate::git::run(None, &["filter-repo", "--version"]).is_err() {
+            eprintln!("skipped: git-filter-repo is not installed here");
+            return Ok(());
+        }
         struct Owned(PathBuf);
         impl Drop for Owned {
             fn drop(&mut self) {
