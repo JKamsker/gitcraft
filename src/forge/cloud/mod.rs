@@ -463,7 +463,7 @@ fn parse_azure_token(v: &Value, now: u64) -> Result<(String, Option<u64>), Strin
 mod tests {
     use super::*;
     #[test]
-    fn selected_authority_and_secure_reference_are_metadata_only() {
+    fn selected_authority_and_secure_reference_are_metadata_only() -> Result<(), String> {
         let a = Account {
             server: "https://dev.azure.com/team".into(),
             user: "viewer-id".into(),
@@ -486,18 +486,22 @@ mod tests {
                 .is_err()
         );
         assert_eq!(
-            Service::Azure
-                .server("https://dev.azure.com/TEAM/")
-                .unwrap(),
+            Service::Azure.server("https://dev.azure.com/TEAM/")?,
             "https://dev.azure.com/team"
         );
         let mut other = a.clone();
         other.user = "another-viewer".into();
         assert_ne!(a.key(Service::Azure), other.key(Service::Azure));
-        assert!(serde_json::to_value(&a).unwrap().get("token").is_none());
+        assert!(
+            serde_json::to_value(&a)
+                .map_err(|e| e.to_string())?
+                .get("token")
+                .is_none()
+        );
+        Ok(())
     }
     #[test]
-    fn azure_command_and_expiry_are_recorded_without_process_execution() {
+    fn azure_command_and_expiry_are_recorded_without_process_execution() -> Result<(), String> {
         let a = Account {
             config_dir: "/recorded/azure-profile".into(),
             ..Default::default()
@@ -524,8 +528,7 @@ mod tests {
             parse_azure_token(
                 &json!({"accessToken":"recorded-only","expires_on":200}),
                 100
-            )
-            .unwrap()
+            )?
             .1,
             Some(200)
         );
@@ -537,9 +540,10 @@ mod tests {
             .is_err()
         );
         assert!(parse_azure_token(&json!({"accessToken":"recorded-only"}), 100).is_err());
+        Ok(())
     }
     #[test]
-    fn native_viewer_context_and_endpoints_are_bound() {
+    fn native_viewer_context_and_endpoints_are_bound() -> Result<(), String> {
         let h = Hosting {
             forge: super::super::Forge::GitHub,
             host: "dev.azure.com".into(),
@@ -562,5 +566,6 @@ mod tests {
         let mut changed = connections::current();
         changed.error = Some("changed".into());
         changed.run(|| assert!(api.guard_context().is_err()));
+        Ok(())
     }
 }

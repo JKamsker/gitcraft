@@ -1,6 +1,6 @@
 use super::*;
 #[test]
-fn hosted_and_legacy_remote_locations_are_canonical() {
+fn hosted_and_legacy_remote_locations_are_canonical() -> Result<(), String> {
     for u in [
         "https://dev.azure.com/team/My%20Project/_git/repo",
         "git@ssh.dev.azure.com:v3/team/My%20Project/repo",
@@ -13,6 +13,7 @@ fn hosted_and_legacy_remote_locations_are_canonical() {
     }
     assert!(location("http://dev.azure.com/team/project/_git/repo").is_none());
     assert!(location("https://dev.azure.com.evil/team/project/_git/repo").is_none());
+    Ok(())
 }
 
 use crate::pr_post::{LineComment, Target, Verdict};
@@ -52,9 +53,9 @@ fn recording() -> (Api, Arc<Mutex<Model>>) {
         hosting(),
         "viewer-id",
         Arc::new(move |method, path, body| {
-            let mut m = state.lock().unwrap();
+            let mut m = state.lock().map_err(|e| e.to_string())?;
             m.calls.push((method.into(), path.into(), body.cloned()));
-            let p = path.split('?').next().unwrap();
+            let p = path.split('?').next().ok_or("missing recording path")?;
             if method != "GET" {
                 return Ok(m.pr.clone());
             }
@@ -128,7 +129,7 @@ fn native_page_reads_account_iteration_reviews_policies_and_outdated_threads() -
 fn native_writes_bind_changes_to_common_base_iteration_and_account() -> Result<(), String> {
     let (api, state) = recording();
     let d = details::read(&api, 7)?;
-    let t = post::AzureTarget::new(api, &d).unwrap();
+    let t = post::AzureTarget::new(api, &d).ok_or("missing Azure target")?;
     t.comment("Conversation")?;
     t.review(Verdict::Approve, "")?;
     t.review(Verdict::RequestChanges, "")?;
@@ -147,7 +148,7 @@ fn native_writes_bind_changes_to_common_base_iteration_and_account() -> Result<(
     t.reply("2", "Reply to original discussion")?;
     t.set_resolved("2", true)?;
     t.set_resolved("2", false)?;
-    let m = state.lock().unwrap();
+    let m = state.lock().map_err(|e| e.to_string())?;
     let w = writes(&m);
     assert_eq!(w.len(), 8);
     let positioned = w
@@ -171,7 +172,8 @@ fn native_writes_bind_changes_to_common_base_iteration_and_account() -> Result<(
             .iter()
             .any(|(_, p, _)| p.contains("path=%2Fold.rs") && p.contains(&"c".repeat(40)))
     );
-    assert!(w.iter().any(|(_,p,b)|p.contains("reviewers/viewer-id")&&b.as_ref().unwrap()["vote"]==10));
+    assert!(w.iter().any(|(_, p, b)| p.contains("reviewers/viewer-id")
+        && b.as_ref().is_some_and(|v| v["vote"] == 10)));
     Ok(())
 }
 #[test]
@@ -179,9 +181,9 @@ fn stale_head_target_iteration_and_account_refuse_native_writes() -> Result<(), 
     for field in ["source", "target", "iteration", "repository"] {
         let (api, state) = recording();
         let d = details::read(&api, 7)?;
-        let t = post::AzureTarget::new(api, &d).unwrap();
+        let t = post::AzureTarget::new(api, &d).ok_or("missing Azure target")?;
         {
-            let mut m = state.lock().unwrap();
+            let mut m = state.lock().map_err(|e| e.to_string())?;
             match field {
                 "source" => {
                     m.pr["lastMergeSourceCommit"]["commitId"] = json!("e".repeat(40));
@@ -196,31 +198,31 @@ fn stale_head_target_iteration_and_account_refuse_native_writes() -> Result<(), 
             }
         }
         assert!(t.comment("Must refuse").is_err(), "{field}");
-        assert!(writes(&state.lock().unwrap()).is_empty());
+        assert!(writes(&*state.lock().map_err(|e| e.to_string())?).is_empty());
     }
     let (api, state) = recording();
     let d = details::read(&api, 7)?;
-    let t = post::AzureTarget::new(api, &d).unwrap();
+    let t = post::AzureTarget::new(api, &d).ok_or("missing Azure target")?;
     let mut changed = crate::connections::current();
     changed.error = Some("another profile".into());
     changed.run(|| assert!(t.reply("2", "No").is_err()));
     assert!(t.reply("999", "Not displayed").is_err());
-    assert!(writes(&state.lock().unwrap()).is_empty());
+    assert!(writes(&*state.lock().map_err(|e| e.to_string())?).is_empty());
     Ok(())
 }
 #[test]
 fn source_read_drift_retries_and_partial_discussions_remain_explicit() -> Result<(), String> {
     let (api, state) = recording();
-    state.lock().unwrap().drift = true;
+    state.lock().map_err(|e| e.to_string())?.drift = true;
     let d = details::read(&api, 7)?;
     assert_eq!(d.head_oid, "d".repeat(40));
     let (api, state) = recording();
-    state.lock().unwrap().thread_error = true;
+    state.lock().map_err(|e| e.to_string())?.thread_error = true;
     let d = details::read(&api, 7)?;
     assert!(
         d.inline_error
             .as_deref()
-            .unwrap()
+            .ok_or("missing inline error")?
             .contains("discussion failure")
     );
     assert!(d.extras.threads.is_empty());
@@ -242,7 +244,7 @@ fn native_list_create_and_link_routes_are_reachable_without_external_writes() ->
         reviewers: &["reviewer-id".into()],
     };
     assert_eq!(create(&api, &n)?, pr_url(&hosting(), 7));
-    let m = state.lock().unwrap();
+    let m = state.lock().map_err(|e| e.to_string())?;
     let w = writes(&m);
     assert_eq!(w.len(), 1);
     assert!(
@@ -250,11 +252,11 @@ fn native_list_create_and_link_routes_are_reachable_without_external_writes() ->
             .contains("project-id/_apis/git/repositories/repo-id/pullrequests?api-version=7.1")
     );
     assert_eq!(
-        w[0].2.as_ref().unwrap()["sourceRefName"],
+        w[0].2.as_ref().ok_or("missing create body")?["sourceRefName"],
         "refs/heads/topic"
     );
     assert_eq!(
-        w[0].2.as_ref().unwrap()["reviewers"][0]["id"],
+        w[0].2.as_ref().ok_or("missing create body")?["reviewers"][0]["id"],
         "reviewer-id"
     );
     assert_eq!(

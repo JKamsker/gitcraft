@@ -143,7 +143,7 @@ mod tests {
         draft: &mut PrDraft,
         extras: &PrExtras,
         label: &str,
-    ) -> Vec<Action> {
+    ) -> Result<Vec<Action>, String> {
         let (out, _) = render(ctx, draft, extras, vec![]);
         let p = out
             .shapes
@@ -155,7 +155,7 @@ mod tests {
                     None
                 }
             })
-            .expect("required native discussion button");
+            .ok_or("required native discussion button")?;
         out.drop_without_applying_deltas();
         let event = |pressed| egui::Event::PointerButton {
             pos: p,
@@ -173,10 +173,11 @@ mod tests {
         .drop_without_applying_deltas();
         let (out, acts) = render(ctx, draft, extras, vec![event(false)]);
         out.drop_without_applying_deltas();
-        acts
+        Ok(acts)
     }
     #[test]
-    fn outdated_file_discussion_controls_are_visible_and_route_original_thread() {
+    fn outdated_file_discussion_controls_are_visible_and_route_original_thread()
+    -> Result<(), String> {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         ctx.all_styles_mut(|s| s.animation_time = 0.0);
@@ -194,19 +195,20 @@ mod tests {
         assert!(shown.contains("Reply to discussion"));
         out.drop_without_applying_deltas();
         assert!(
-            click(&ctx, &mut draft, &extras, "Resolve discussion")
+            click(&ctx, &mut draft, &extras, "Resolve discussion")?
                 .iter()
                 .any(|a| matches!(a,Action::Pr(PrAct::SetResolved(id,true)) if id=="old-thread"))
         );
         assert!(
-            click(&ctx, &mut draft, &extras, "Reply to discussion")
+            click(&ctx, &mut draft, &extras, "Reply to discussion")?
                 .iter()
                 .any(|a| matches!(a,Action::Pr(PrAct::ReplyConversation(id)) if id=="old-thread"))
         );
         assert!(
-            click(&ctx, &mut draft, &fixture(true), "Reopen discussion")
+            click(&ctx, &mut draft, &fixture(true), "Reopen discussion")?
                 .iter()
                 .any(|a| matches!(a,Action::Pr(PrAct::SetResolved(id,false)) if id=="old-thread"))
         );
+        Ok(())
     }
 }

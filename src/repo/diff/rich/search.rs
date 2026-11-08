@@ -201,7 +201,6 @@ mod revision_tests {
                 new: 1,
                 words,
             }],
-            ..Default::default()
         };
         let doc = document(
             &RichDiff::Prose(prose),

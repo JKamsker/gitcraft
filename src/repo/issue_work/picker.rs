@@ -447,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn the_filter_goes_by_number_title_and_label() {
+    fn the_filter_goes_by_number_title_and_label() -> Result<(), String> {
         let i = issue(42, "Fix Login crash", &["Bug"]);
         assert!(matches(&i, ""));
         assert!(matches(&i, "#42"));
@@ -456,10 +456,11 @@ mod tests {
         assert!(matches(&i, "bug"));
         assert!(!matches(&i, "#7"));
         assert!(!matches(&i, "feature"));
+        Ok(())
     }
 
     #[test]
-    fn picking_an_issue_suggests_its_branch() {
+    fn picking_an_issue_suggests_its_branch() -> Result<(), String> {
         let mut picker = Picker::new("GitHub", String::new());
         assert!(picker.chosen_issue().is_none());
         let list = vec![issue(42, "Fix login crash", &[]), issue(7, "Other", &[])];
@@ -473,10 +474,11 @@ mod tests {
         // A list asked again without it: nothing is picked any more.
         picker.listed(Ok(Vec::new()));
         assert!(picker.chosen_issue().is_none());
+        Ok(())
     }
 
     #[test]
-    fn tracker_keys_choose_distinct_rows_without_forge_numbers() {
+    fn tracker_keys_choose_distinct_rows_without_forge_numbers() -> Result<(), String> {
         let make = |key: &str, id: &str| Issue {
             tracker: Some(crate::trackers::Identity {
                 kind: crate::trackers::Kind::Linear,
@@ -491,10 +493,14 @@ mod tests {
         let mut picker = Picker::new("Linear", String::new());
         picker.listed(Ok(vec![make("ENG-9", "uuid-a"), make("OPS-9", "uuid-b")]));
         picker.choose(1);
-        assert_eq!(picker.chosen_issue().unwrap().key(), "OPS-9");
+        assert_eq!(
+            picker.chosen_issue().ok_or("missing selected issue")?.key(),
+            "OPS-9"
+        );
         assert_eq!(picker.name, "ops-9-work");
         picker.filter = "eng-9".into();
         assert_eq!(picker.shown(), [0]);
+        Ok(())
     }
 
     fn tracker(key: &str, id: &str) -> Issue {
@@ -526,20 +532,30 @@ mod tests {
         )
     }
     #[test]
-    fn tracker_row_ids_are_stable_and_source_qualified() {
+    fn tracker_row_ids_are_stable_and_source_qualified() -> Result<(), String> {
         let a = tracker("ENG-7", "uuid-a");
         let b = tracker("OPS-7", "uuid-b");
         assert_ne!(a.identity(), b.identity());
         let mut renamed = a.clone();
-        renamed.tracker.as_mut().unwrap().key = "NEW-9".into();
+        renamed
+            .tracker
+            .as_mut()
+            .ok_or("missing tracker identity")?
+            .key = "NEW-9".into();
         renamed.title = "Renamed".into();
         assert_eq!(a.identity(), renamed.identity());
         let mut other = a.clone();
-        other.tracker.as_mut().unwrap().origin = "https://different.invalid".into();
+        other
+            .tracker
+            .as_mut()
+            .ok_or("missing tracker identity")?
+            .origin = "https://different.invalid".into();
         assert_ne!(a.identity(), other.identity());
+        Ok(())
     }
     #[test]
-    fn multiple_tracker_rows_support_distinct_pointer_and_keyboard_selection() {
+    fn multiple_tracker_rows_support_distinct_pointer_and_keyboard_selection() -> Result<(), String>
+    {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         let mut picker = Picker::new("Linear", String::new());
@@ -559,7 +575,7 @@ mod tests {
                         None
                     }
                 })
-                .expect("tracker row");
+                .ok_or("missing tracker row")?;
             out.drop_without_applying_deltas();
             let event = |pressed| egui::Event::PointerButton {
                 pos: p,
@@ -575,7 +591,10 @@ mod tests {
             .drop_without_applying_deltas();
             render_rows(&ctx, &mut picker, vec![event(false)]).drop_without_applying_deltas();
             assert_eq!(picker.chosen, Some(index));
-            assert_eq!(picker.chosen_issue().unwrap().key(), key);
+            assert_eq!(
+                picker.chosen_issue().ok_or("missing selected issue")?.key(),
+                key
+            );
             assert_eq!(picker.name, format!("{}-work", key.to_lowercase()));
         }
         picker.focus = Some(Field::Filter);
@@ -592,10 +611,11 @@ mod tests {
             render_rows(&ctx, &mut picker, vec![event(false)]).drop_without_applying_deltas();
             assert_eq!(picker.chosen, Some(index));
         }
+        Ok(())
     }
 
     #[test]
-    fn the_filter_stays_when_asked_again() {
+    fn the_filter_stays_when_asked_again() -> Result<(), String> {
         let mut picker = Picker::new("Forgejo", "crash".into());
         picker.listed(Ok(vec![
             issue(1, "Login crash", &[]),
@@ -605,5 +625,6 @@ mod tests {
         assert_eq!(picker.shown(), [0, 2]);
         picker.filter = "#2".into();
         assert_eq!(picker.shown(), [1]);
+        Ok(())
     }
 }

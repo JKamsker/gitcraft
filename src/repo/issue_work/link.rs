@@ -266,7 +266,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_the_links_of_every_branch() {
+    fn reads_the_links_of_every_branch() -> Result<(), String> {
         let out = "branch.42-fix.gitcraft-issue\n42\0branch.42-fix.gitcraft-issue-title\nFix it\0\
                    branch.42-fix.gitcraft-issue-criteria\n- [ ] a\n- [x] b\0\
                    branch.42-fix.gitcraft-issue-kept\ntasks\0\
@@ -293,10 +293,11 @@ mod tests {
         // Written before gitcraft kept which part, and when.
         assert_eq!((release.kept, release.read.as_str()), (Kept::Criteria, ""));
         assert!(parse("").is_empty());
+        Ok(())
     }
 
     #[test]
-    fn tracker_link_roundtrips_and_never_closes_a_forge_number() {
+    fn tracker_link_roundtrips_and_never_closes_a_forge_number() -> Result<(), String> {
         let identity = crate::trackers::Identity {
             kind: crate::trackers::Kind::Jira,
             origin: "https://site.atlassian.net".into(),
@@ -329,17 +330,18 @@ mod tests {
                 }
             )
             .last()
-            .unwrap()[2],
+            .ok_or("missing branch operation")?[2],
             ""
         );
         assert!(
             parse("branch.bad.gitcraft-issue\n0\0branch.bad.gitcraft-issue-source\ninvalid\0")
                 .is_empty()
         );
+        Ok(())
     }
 
     #[test]
-    fn closes_the_issue_from_the_pull_request() {
+    fn closes_the_issue_from_the_pull_request() -> Result<(), String> {
         let link = IssueLink {
             number: 42,
             title: "Fix login crash".into(),
@@ -349,19 +351,21 @@ mod tests {
             link.pull_request_text(),
             ("Fix login crash".to_owned(), "Closes #42".to_owned())
         );
+        Ok(())
     }
 
     #[test]
-    fn days_are_dates() {
+    fn days_are_dates() -> Result<(), String> {
         assert_eq!(civil_date(0), (1970, 1, 1));
         assert_eq!(civil_date(59), (1970, 3, 1));
         assert_eq!(civil_date(11_016), (2000, 2, 29));
         assert_eq!(civil_date(20_763), (2026, 11, 6));
         assert_eq!(today().len(), 10);
+        Ok(())
     }
 
     #[test]
-    fn the_steps_of_each_place() {
+    fn the_steps_of_each_place() -> Result<(), String> {
         let link = IssueLink {
             number: 1,
             ..Default::default()
@@ -410,5 +414,6 @@ mod tests {
         let ops = start_ops(&fetched, &link);
         assert_eq!(ops[0][2..], ["fetch", "origin", "dev"]);
         assert_eq!(ops[1][..3], ["checkout", "-b", "1-x"]);
+        Ok(())
     }
 }
