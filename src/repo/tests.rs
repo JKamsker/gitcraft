@@ -342,12 +342,14 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         history: Vec::new(),
         work: git::WorkStatus::default(),
         worktrees: vec![here(0)],
+        worktree_root: String::new(),
         stashes: Vec::new(),
         remotes: Vec::new(),
         hosting: None,
         gerrit: None,
         submodules: Vec::new(),
         lfs: false,
+        practice: None,
         identity: Default::default(),
         requested: git::LOG_PAGE,
         log_from: None,
@@ -521,17 +523,20 @@ fn finish(tab: &mut super::RepoTab, ctx: &egui::Context) {
     }
 }
 
-/// An operation whose later step needed signing in runs again from that step: the ones before
-/// it are done, and running them again (the tag made again) would fail before the step that
-/// needed signing in.
+/// Hook/alias text alone cannot authorize credentials. Completed steps remain
+/// completed and the failed step stays available for an explicit manual rerun.
 #[test]
-fn signing_in_runs_again_only_the_steps_that_had_not_run() {
+fn alias_authentication_text_cannot_authorize_retry_of_remaining_steps() -> Result<(), String> {
     use super::{Action, Refresh, RepoTab};
     let dir = repo("sign-in-retry");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-    // A push git answers like one that needs signing in.
-    let push = ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]);
+    // A non-transport alias imitates an authentication failure.
+    let push = ops(&[&[
+        "-c",
+        "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+        "gitcraft-test-auth",
+    ]]);
     let steps: Vec<Vec<String>> = ops(&[&["tag", "v1"]])
         .into_iter()
         .chain(push.clone())
@@ -547,19 +552,21 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     finish(&mut tab, &ctx);
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     let kept = tab.last_op.as_ref().map(|op| op.ops.clone());
-    let creds = git::Credentials {
-        scope: None,
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     finish(&mut tab, &ctx);
     let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(kept, Some(push));
-    // The push ran again (and needs signing in again), not the tag.
-    assert!(status.contains("sign-in needed"), "{status}");
+    assert!(tab.credentials.is_none());
+    assert!(tab.busy_op.is_none() && !tab.https_checking);
+    assert!(
+        status.contains("destination or account context changed"),
+        "{status}"
+    );
+    Ok(())
 }
 
 /// Aborting a merge or rebase throws away the conflicts resolved so far, with no undo: it asks
@@ -574,10 +581,10 @@ fn aborting_asks_first() {
     assert_eq!(asks, Some(ops(&[&["merge", "--abort"]])));
 }
 
-/// An undo that needed signing in stays undoable when the sign-in is cancelled, and signing in
-/// runs it again without moving the timeline until it goes through.
+/// An undo whose alias prints authentication text remains undoable, but that
+/// text cannot authorize a credential-bearing retry or move the timeline.
 #[test]
-fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
+fn unverified_alias_authentication_keeps_undo_without_authorizing_retry() -> Result<(), String> {
     use super::timeline::{Entry, Origin, RefState};
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
@@ -595,7 +602,11 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let entry = UndoEntry {
         id: 0,
         label: "Push".to_owned(),
-        undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
+        undo: ops(&[&[
+            "-c",
+            "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+            "gitcraft-test-auth",
+        ]]),
         redo: Vec::new(),
         heads: None,
         agent: None,
@@ -621,11 +632,8 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     // Cancelled.
     tab.dialog = None;
     let after_cancel = tab.timeline.current;
-    let creds = git::Credentials {
-        scope: None,
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     let retrying = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
@@ -633,12 +641,14 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let entries = tab.timeline.entries.len();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(running);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(after_cancel, Some(id));
-    assert!(retrying);
-    // Refused again: still there, still only once.
+    assert!(!retrying);
+    assert!(tab.credentials.is_none());
+    // No authorized retry: still there, still only once.
     assert_eq!(after_retry, Some(id));
     assert_eq!(entries, 1);
+    Ok(())
 }
 
 /// Work that panics (a bug in a dependency) still ends: the tab isn't left busy for good.

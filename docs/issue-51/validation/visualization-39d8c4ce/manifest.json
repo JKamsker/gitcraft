@@ -1,0 +1,74 @@
+{
+  "source_tip": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+  "application_candidate": "0b5718ce575d3ba6332ca0ae6ea96f90d6493073",
+  "status": "writer-reported focused validation, independent review pending; not accepted combined candidate",
+  "files": [
+    {
+      "source": "/tmp/gitcraft-51-final-gates.py",
+      "archive": "gitcraft-51-final-gates.py.gz",
+      "sha256": "0c090cd64c3c9d23ec00191a8586b6a76b0741d4475896114bd0158f22b2ec08",
+      "bytes": 1791
+    },
+    {
+      "source": "/tmp/gitcraft-51-run-visual-tests.py",
+      "archive": "gitcraft-51-run-visual-tests.py.gz",
+      "sha256": "43667ba358e16eaeaff72d39c298a2c2b5d0b32eea93d86aceb3faabbdb6bb90",
+      "bytes": 1003
+    },
+    {
+      "source": "/tmp/gitcraft-51-fmt.log",
+      "archive": "gitcraft-51-fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/tmp/gitcraft-51-clippy-local.log",
+      "archive": "gitcraft-51-clippy-local.log.gz",
+      "sha256": "6c25cc08c68325119e3b90a4e525061297a75f360144caf2802a39ebeb63bde0",
+      "bytes": 152
+    },
+    {
+      "source": "/tmp/gitcraft-51-clippy-strict-final.log",
+      "archive": "gitcraft-51-clippy-strict-final.log.gz",
+      "sha256": "06b32616477908c21191dc6aa434ddc9944c281eaa87288515503bca86461c25",
+      "bytes": 1876
+    },
+    {
+      "source": "/tmp/gitcraft-51-final-build.log",
+      "archive": "gitcraft-51-final-build.log.gz",
+      "sha256": "b73b24a7617d72e74aab86edcd9f826ce393ef3ef65db9a84bfd9d41b5bcca02",
+      "bytes": 73
+    },
+    {
+      "source": "/tmp/gitcraft-51-focused-summary.log",
+      "archive": "gitcraft-51-focused-summary.log.gz",
+      "sha256": "b04a314bb400a0e140b6374de5d1134bbae3798f4409949b48aa746e0a010ff3",
+      "bytes": 348
+    },
+    {
+      "source": "/tmp/gitcraft-51-focused-results.log",
+      "archive": "gitcraft-51-focused-results.log.gz",
+      "sha256": "c10d0442eb75364df08a2647143371c14e5cd12911db242c1103946a1eaa9d30",
+      "bytes": 7687
+    },
+    {
+      "source": "/tmp/gitcraft-51-final-bin-build.log",
+      "archive": "gitcraft-51-final-bin-build.log.gz",
+      "sha256": "b1a23122be57df3b295ef94ab6395ff3648a3b149a355058faca85dbb0c5f1b3",
+      "bytes": 1303
+    },
+    {
+      "source": "/tmp/gitcraft-51-graph-regressions.log",
+      "archive": "gitcraft-51-graph-regressions.log.gz",
+      "sha256": "21d5a1c62118201b475e27b524a9b3c9acd3d952a123442237ed1cead374ddce",
+      "bytes": 6798
+    },
+    {
+      "source": "/tmp/gitcraft-51-final-artifacts.jsonl",
+      "archive": "gitcraft-51-final-artifacts.jsonl.gz",
+      "sha256": "4223cf11e5723988edde89a838d0178891e602370aeb5237505e841e245eb9fd",
+      "bytes": 423859
+    }
+  ],
+  "test_binary_sha256": "02e15078252d750200ce93150155aee8f5fe2e65d9887652662e681d2eaadda2"
+}

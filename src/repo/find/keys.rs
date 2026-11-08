@@ -4,9 +4,8 @@
 use egui::{Key, Modifiers};
 
 use super::bar::FIELD_ID;
-use crate::repo::diff::rendered;
+use crate::repo::RepoTab;
 use crate::repo::file_view::FileTab;
-use crate::repo::{DiffKey, RepoTab};
 
 /// What the central pane shows that the find bar can search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,23 +35,12 @@ impl RepoTab {
             return None;
         }
         // A diff shows whenever there is one: on its own, or beside its file's history.
-        if let Some(diff) = &self.diff {
-            if !diff.structural.shows_patch() {
-                return None;
-            }
-            let path = match &diff.key {
-                DiffKey::Commit { path, .. }
-                | DiffKey::Range { path, .. }
-                | DiffKey::Remerge { path, .. } => path,
-                DiffKey::Work(file) => &file.path,
-            };
-            return if rendered::is_markdown(path) && self.diff_rendered {
-                None
-            } else if self.diff_as_file {
-                Some(FindIn::File)
+        if self.diff.is_some() {
+            return Some(if self.diff_as_file {
+                FindIn::File
             } else {
-                Some(FindIn::Diff)
-            };
+                FindIn::Diff
+            });
         }
         match self.file_view.as_ref()?.tab {
             FileTab::Blame => Some(FindIn::Blame),

@@ -141,6 +141,7 @@ impl RepoTab {
         lines: Option<Vec<git::LineRange>>,
         ctx: &egui::Context,
     ) {
+        self.tour = None;
         if self
             .diff
             .as_ref()
@@ -280,6 +281,7 @@ impl RepoTab {
 
     /// Shows Markdown files rendered in diffs, or as text.
     pub(super) fn show_diff_rendered(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.diff_rendered = on;
         if on {
             self.diff_rich = None;
@@ -308,6 +310,7 @@ impl RepoTab {
 
     /// Shows diffs as the whole file, or as the changes.
     pub(super) fn show_diff_as_file(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         self.diff_as_file = on;
         if on && let Some(view) = &mut self.diff {
             view.structural.enabled = false;
@@ -343,6 +346,7 @@ impl RepoTab {
 
     /// Starts comparing two points of history (replacing the comparison shown).
     pub(super) fn compare(&mut self, compare: Compare, ctx: &egui::Context) {
+        self.tour = None;
         self.pr_selection_request = None;
         self.close_pr();
         self.close_range_diff();
@@ -425,6 +429,7 @@ impl RepoTab {
         tab: file_view::FileTab,
         ctx: &egui::Context,
     ) {
+        self.tour = None;
         self.diff = None;
         self.conflict = None;
         let view = match self.file_view.take() {
@@ -492,8 +497,9 @@ impl RepoTab {
         let Some(plan) = plan else {
             // One still being read answers a query that is gone (or can't be searched).
             self.search.running = false;
+            self.history_minimap.dirty = true;
             self.search.results.clear();
-            self.search.matches.clear();
+            self.search.matches = Default::default();
             self.search.searched.clear();
             return;
         };
@@ -527,11 +533,16 @@ impl RepoTab {
             return;
         }
         self.search.running = false;
+        self.history_minimap.dirty = true;
         self.search.searched = query;
         match result {
             Ok(hashes) => {
                 self.search.problem = None;
-                self.search.matches = hashes.iter().cloned().collect();
+                self.search.matches = hashes
+                    .iter()
+                    .cloned()
+                    .collect::<std::collections::HashSet<_>>()
+                    .into();
                 self.search.results = hashes;
                 self.search.current = 0;
                 if let Some(first) = self.search.results.first().cloned() {
@@ -540,7 +551,7 @@ impl RepoTab {
             }
             Err(e) => {
                 self.search.results.clear();
-                self.search.matches.clear();
+                self.search.matches = Default::default();
                 self.search.problem = Some(e);
             }
         }
@@ -559,14 +570,16 @@ impl RepoTab {
     }
 
     pub(super) fn toggle_search(&mut self) {
+        self.history_minimap.dirty = true;
         self.search.open = !self.search.open;
         self.search.focus = self.search.open;
         if !self.search.open {
             self.authorship.filter = false;
             self.search.running = false;
+            self.history_minimap.dirty = true;
             // Nor does a query typed just before closing start a search once it's closed.
             self.search.edited = None;
-            self.search.matches.clear();
+            self.search.matches = Default::default();
             self.search.results.clear();
             self.search.searched.clear();
             self.search.problem = None;
@@ -623,7 +636,7 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = tab();
         tab.search.results = vec!["a".to_owned()];
-        tab.search.matches.insert("a".to_owned());
+        std::sync::Arc::make_mut(&mut tab.search.matches).insert("a".to_owned());
         tab.search.query = "fix author:".to_owned();
         tab.run_search(&ctx);
         assert!(!tab.search.running);
@@ -643,7 +656,7 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = tab();
         tab.search.results = vec!["a".to_owned()];
-        tab.search.matches.insert("a".to_owned());
+        std::sync::Arc::make_mut(&mut tab.search.matches).insert("a".to_owned());
         tab.search.query = "regex:[".to_owned();
         tab.search.running = true;
         let e = "git could not search: invalid regex".to_owned();

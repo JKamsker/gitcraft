@@ -175,7 +175,7 @@ impl App {
         let repaint = ctx.clone();
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(git::clone(&url, &dest2, creds.as_ref(), &following));
             ctx2.request_repaint();
         });

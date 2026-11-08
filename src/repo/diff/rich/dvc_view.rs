@@ -22,6 +22,15 @@ pub(super) fn show(ui: &mut Ui, diff: &DvcDiff, acts: &mut Vec<Action>) {
                             .font(theme::medium(13.0))
                             .color(t.text),
                     );
+                    if ui
+                        .button("DVC: Pull")
+                        .on_hover_text(
+                            "Download data for the current checkout from its configured DVC remote",
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::DvcPull);
+                    }
                     ui.add_space(8.0);
                     for (k, (old, new)) in diff.pairs.iter().enumerate() {
                         ui.push_id(k, |ui| pair(ui, &t, old.as_ref(), new.as_ref(), acts));

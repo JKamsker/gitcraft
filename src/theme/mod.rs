@@ -756,3 +756,7 @@ pub fn set_tokens(ctx: &egui::Context, t: Tokens) {
     ctx.set_style_of(egui::Theme::Light, Arc::clone(&style));
     ctx.set_style_of(egui::Theme::Dark, style);
 }
+
+pub(crate) fn portable_theme(id: &ThemeId) -> bool {
+    catalog::BUILTIN.iter().any(|t| t.id == id.0)
+}

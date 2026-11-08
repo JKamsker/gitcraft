@@ -231,7 +231,7 @@ impl MyWork {
             }
             *running += 1;
             let (tx, ctx) = (tx.clone(), ctx.clone());
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let result = my_work::push_branch(&key.0, &key.1, has_upstream);
                 let _ = tx.send((key, machine, result));
                 ctx.request_repaint();
@@ -272,7 +272,7 @@ impl MyWork {
         self.searches.insert(machine.clone(), None);
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let result = discover::find_repos(&machine);
             let _ = tx.send((machine, result));
             ctx.request_repaint();
@@ -287,7 +287,7 @@ impl MyWork {
         }
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(discover::machines());
             ctx.request_repaint();
         });

@@ -1,0 +1,1149 @@
+use super::model::{Format, inspect};
+use super::*;
+
+fn json(recipient: &str, content: &str) -> String {
+    serde_json::json!({"secret":format!("ENC[{content}]"),"sops":{"age":[{"recipient":recipient,"enc":"wrapped"}],"mac":"ENC[mac]","version":"3.9.0"}}).to_string()
+}
+fn plaintext_compare(old: &str, new: &str, a: &str, b: &str) -> Result<Comparison, String> {
+    let mut n = 0;
+    compare("secret.json", old, new, &|| true, |_, _| {
+        n += 1;
+        Ok(if n == 1 { a.into() } else { b.into() })
+    })
+}
+#[test]
+fn content_changes_are_distinct_from_recipients_and_reencryption() -> Result<(), String> {
+    let old = json("age1old", "cipher1");
+    let recipient = json("age1new", "cipher1");
+    let view = plaintext_compare(
+        &old,
+        &recipient,
+        "password: fixture\n",
+        "password: fixture\n",
+    )?;
+    assert!(!view.content_changed && view.recipients_changed && view.metadata_changed);
+    let reencryption = json("age1old", "cipher2");
+    let view = plaintext_compare(
+        &old,
+        &reencryption,
+        "password: fixture\n",
+        "password: fixture\n",
+    )?;
+    assert!(!view.content_changed && !view.recipients_changed && !view.metadata_changed);
+    let view = plaintext_compare(&old, &reencryption, "password: old\n", "password: new\n")?;
+    assert!(view.content_changed && !view.recipients_changed);
+    assert!(
+        view.rows
+            .iter()
+            .any(|row| row.kind == crate::repo::diff::line_diff::Edit::Del
+                && row.text == "password: old")
+    );
+    assert!(
+        view.rows
+            .iter()
+            .any(|row| row.kind == crate::repo::diff::line_diff::Edit::Add
+                && row.text == "password: new")
+    );
+    Ok(())
+}
+#[test]
+fn formats_recognize_sops_metadata_without_invoking_a_tool() -> Result<(), String> {
+    let examples=[
+        ("secret.json",json("age1fixture","cipher"),Format::Json),
+        ("secret.yaml","secret: ENC[cipher]\nsops:\n  age:\n    - recipient: age1fixture\n      enc: wrapped\n  mac: ENC[mac]\n  version: 3.9.0\n".into(),Format::Yaml),
+        (".env","SECRET=ENC[cipher]\nsops_age__list_0__map_recipient=age1fixture\nsops_mac=ENC[mac]\nsops_version=3.9.0\n".into(),Format::Dotenv),
+        ("secret.ini","[app]\nsecret=ENC[cipher]\n[sops]\nage__list_0__map_recipient=age1fixture\nmac=ENC[mac]\nversion=3.9.0\n".into(),Format::Ini),
+    ];
+    for (path, text, format) in examples {
+        assert_eq!(inspect(path, &text)?.map(|e| e.format), Some(format));
+    }
+    assert_eq!(
+        inspect(
+            "secret.yaml",
+            "{secret: 'ENC[cipher]', sops: {version: '3.10.0', mac: 'ENC[mac]'}}"
+        )?
+        .map(|e| e.format),
+        Some(Format::Yaml)
+    );
+    assert_eq!(
+        inspect(
+            "opaque.bin",
+            r#"{"data":"ENC[cipher]","sops":{"version":"3.10.0","mac":"ENC[mac]"}}"#
+        )?
+        .map(|e| e.format),
+        Some(Format::Json)
+    );
+    assert!(inspect("ordinary.json", r#"{"secret":"ENC[looks similar]"}"#)?.is_none());
+    assert!(inspect("ordinary.yaml", "normal: value\n")?.is_none());
+    assert!(
+        inspect(
+            "ordinary.json",
+            r#"{"nested":{"sops":{"version":"3.9.0","mac":"ENC[mac]"}}}"#
+        )?
+        .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn data_envelopes_require_explicit_format_independent_of_filename() -> Result<(), String> {
+    let envelope = r#"{"data":"ENC[cipher]","sops":{"version":"3.10.0","mac":"ENC[mac]"}}"#;
+    for path in ["config", "config.yaml", "config.json", "config.bin"] {
+        assert!(inspect(path, envelope)?.is_some_and(|e| e.ambiguous_json));
+        let mut calls = 0;
+        let refused = compare(path, envelope, envelope, &|| true, |_, _| {
+            calls += 1;
+            Err("Ambiguous detection must not invoke SOPS".to_owned())
+        });
+        assert_eq!(calls, 0);
+        assert!(refused.is_err_and(|e| e.contains("Choose JSON document or Binary envelope")));
+        for (encoding, format, plaintext) in [
+            (JsonEncoding::Document, Format::Json, r#"{"data":42}"#),
+            (JsonEncoding::Binary, Format::Binary, "actual text\n"),
+        ] {
+            let result = compare_with_encoding(
+                path,
+                envelope,
+                envelope,
+                encoding,
+                &|| true,
+                |selected, _| {
+                    assert_eq!(selected, format);
+                    Ok(plaintext.to_owned())
+                },
+            )?;
+            assert!(!result.content_changed);
+            assert!(result.rows.iter().any(|r| r.text.contains(
+                if encoding == JsonEncoding::Binary {
+                    "actual text"
+                } else {
+                    "42"
+                }
+            )));
+        }
+        assert!(
+            compare_with_encoding(
+                path,
+                envelope,
+                envelope,
+                JsonEncoding::Document,
+                &|| true,
+                |_, _| Ok(r#"{"data":"binary\u0000content"}"#.to_owned())
+            )
+            .is_err()
+        );
+    }
+    Ok(())
+}
+#[test]
+fn malformed_and_oversized_documents_fail_without_leaking_their_contents() {
+    for text in [
+        "{\"sops\": fixture-sensitive-malformed",
+        "sops: [",
+        "sops:\n  mac: ENC[mac]\n",
+        "root: &a [*a]\nsops: {}\n",
+    ] {
+        let error = inspect("secret.yaml", text).err().unwrap_or_default();
+        assert!(!error.is_empty());
+        assert!(!error.contains("fixture-sensitive"));
+    }
+    assert!(inspect("secret.json", &"a".repeat(model::MAX_BYTES + 1)).is_err());
+    for bytes in [
+        vec![0],
+        vec![0xff],
+        vec![b'a'; model::MAX_BYTES + 1],
+        "line\n".repeat(model::MAX_LINES + 1).into_bytes(),
+        vec![b'a'; 8193],
+    ] {
+        assert!(tool::plaintext(bytes).is_err());
+    }
+}
+#[test]
+fn creation_deletion_and_plaintext_to_encrypted_transitions_use_the_correct_sides()
+-> Result<(), String> {
+    let encrypted = json("age1fixture", "cipher");
+    let mut calls = 0;
+    let view = compare("secret.json", "", &encrypted, &|| true, |_, input| {
+        calls += 1;
+        assert_eq!(input, encrypted);
+        Ok("fixture plaintext\n".into())
+    })?;
+    assert_eq!(calls, 1);
+    assert!(view.content_changed && view.recipients_changed);
+    let view = compare("secret.json", &encrypted, "", &|| true, |_, _| {
+        Ok("fixture plaintext\n".into())
+    })?;
+    assert!(
+        view.rows
+            .iter()
+            .any(|r| r.kind == crate::repo::diff::line_diff::Edit::Del)
+    );
+    let view = compare(
+        "secret.json",
+        r#"{"secret":"fixture"}"#,
+        &encrypted,
+        &|| true,
+        |_, _| Ok(r#"{"secret":"fixture"}"#.into()),
+    )?;
+    assert!(!view.content_changed && view.recipients_changed);
+    Ok(())
+}
+#[test]
+fn close_reload_drop_and_late_answers_discard_private_results() -> Result<(), String> {
+    let mut state = State::default();
+    let (send, active) = state.begin();
+    let result = plaintext_compare(
+        &json("a", "one"),
+        &json("b", "one"),
+        "fixture plaintext",
+        "fixture plaintext",
+    )?;
+    assert!(send.send(Ok(result)).is_ok());
+    state.poll();
+    assert!(state.result.is_some());
+    state.close();
+    assert!(!state.enabled && state.result.is_none() && state.receiver.is_none());
+    assert!(!active.load(Ordering::Acquire));
+    let (late, old_active) = state.begin();
+    let (_current, current_active) = state.begin();
+    assert!(!old_active.load(Ordering::Acquire));
+    assert!(late.send(Err("late result".into())).is_err());
+    assert!(current_active.load(Ordering::Acquire));
+    drop(state);
+    assert!(!current_active.load(Ordering::Acquire));
+    let key = DiffKey::Work(crate::git::StatusFile {
+        path: "secret.json".into(),
+        old_path: None,
+        area: crate::git::Area::Untracked,
+        code: '?',
+    });
+    let mut view = crate::repo::DiffView::new(key);
+    let (_, active) = view.encrypted.begin();
+    view.next_request();
+    assert!(!active.load(Ordering::Acquire));
+    assert!(!view.encrypted.enabled);
+    Ok(())
+}
+#[test]
+fn cancellation_between_sides_never_returns_or_decrypts_a_second_plaintext() {
+    let active = AtomicBool::new(true);
+    let mut calls = 0;
+    let result = compare(
+        "secret.json",
+        &json("a", "one"),
+        &json("a", "two"),
+        &|| active.load(Ordering::Acquire),
+        |_, _| {
+            calls += 1;
+            active.store(false, Ordering::Release);
+            Ok("fixture plaintext".into())
+        },
+    );
+    assert!(result.is_err());
+    assert_eq!(calls, 1);
+}
+
+#[test]
+fn private_text_layout_does_not_enter_eguis_shared_galley_cache() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut counts = None;
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
+            let before = ui.fonts_mut(|fonts| fonts.num_galleys_in_cache());
+            let galley = super::view::private_galley(
+                ui,
+                "fixture-private-text-that-must-not-be-cached".into(),
+                egui::Color32::WHITE,
+            );
+            let wrapped = super::view::private_wrapped_galley(
+                ui,
+                "fixture-private-text-that-must-not-be-cached".repeat(10),
+                egui::Color32::WHITE,
+                Some(100.),
+            );
+            assert!(wrapped.rows.len() > 3);
+            let after = ui.fonts_mut(|fonts| fonts.num_galleys_in_cache());
+            counts = Some((before, after));
+            ui.painter()
+                .galley(egui::pos2(5.0, 5.0), galley, egui::Color32::WHITE);
+        });
+    });
+    assert!(matches!(counts,Some((before,after)) if before==after));
+    assert!(output.shapes.iter().any(|shape|matches!(&shape.shape,egui::Shape::Text(text) if text.galley.text().contains("fixture-private-text"))));
+    output.shapes.clear();
+    output.textures_delta.clear();
+}
+
+#[cfg(unix)]
+mod fixture {
+    use super::*;
+    use crate::git::{self, Area, StatusFile};
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+    use std::sync::atomic::AtomicU64;
+    struct Repo(PathBuf);
+    impl Repo {
+        fn new() -> Result<Self, String> {
+            static SEQ: AtomicU64 = AtomicU64::new(0);
+            let root = std::env::temp_dir().join(format!(
+                "gitcraft-sops ü 'fixture'-{}-{}",
+                std::process::id(),
+                SEQ.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+            let repo = Self(root);
+            for args in [
+                vec!["init", "-q"],
+                vec!["config", "user.name", "Fixture"],
+                vec!["config", "user.email", "fixture@example.invalid"],
+                vec!["config", "commit.gpgSign", "false"],
+            ] {
+                repo.git(&args)?;
+            }
+            Ok(repo)
+        }
+        fn git(&self, args: &[&str]) -> Result<String, String> {
+            git::run(Some(&self.0), args)
+        }
+        fn write(&self, path: &str, text: &str) -> Result<(), String> {
+            std::fs::write(self.0.join(path), text).map_err(|e| e.to_string())
+        }
+        fn commit(&self) -> Result<String, String> {
+            self.git(&["add", "-A"])?;
+            self.git(&["commit", "-qm", "fixture"])?;
+            self.git(&["rev-parse", "HEAD"])
+                .map(|s| s.trim().to_owned())
+        }
+    }
+    impl Drop for Repo {
+        fn drop(&mut self) {
+            tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = None);
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    fn work(path: &str, area: Area, code: char) -> DiffKey {
+        DiffKey::Work(StatusFile {
+            path: path.into(),
+            old_path: None,
+            area,
+            code,
+        })
+    }
+    fn program(repo: &Repo, body: &str) -> Result<PathBuf, String> {
+        let tool = repo.0.join("sops fixture 'tool'");
+        std::fs::write(&tool, format!("#!/bin/sh\n{body}\n")).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = Some(tool.clone()));
+        Ok(tool)
+    }
+
+    #[test]
+    fn decrypt_action_is_asynchronous_and_close_cancels_its_private_worker() -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        repo.write(path, &json("age1fixture", "cipher1"))?;
+        repo.commit()?;
+        repo.write(path, &json("age1fixture", "cipher2"))?;
+        let started = repo.0.join("started");
+        let late = repo.0.join("late");
+        program(
+            &repo,
+            &format!(
+                "cat >/dev/null; printf started > {}; sleep 0.6; printf 'fixture-private-output'; printf late > {}",
+                crate::remote::sh_quote(&started.to_string_lossy()),
+                crate::remote::sh_quote(&late.to_string_lossy())
+            ),
+        )?;
+        let ctx = egui::Context::default();
+        let mut tab = crate::repo::RepoTab::new_deferred(repo.0.clone(), &ctx);
+        let mut view = crate::repo::DiffView::new(work(path, Area::Unstaged, 'M'));
+        let request = view.next_request();
+        view.arrived(
+            request,
+            crate::repo::diff::load(&repo.0, &view.key, git::DiffOptions::default(), true),
+        );
+        tab.diff = Some(view);
+        let start = std::time::Instant::now();
+        tab.apply(crate::repo::Action::DiffDecrypted(true), &ctx);
+        assert!(start.elapsed() < Duration::from_millis(200));
+        let active = tab
+            .diff
+            .as_ref()
+            .and_then(|v| v.encrypted.active.clone())
+            .ok_or("Private job not started")?;
+        let until = std::time::Instant::now() + Duration::from_secs(2);
+        while !started.exists() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(started.exists());
+        tab.apply(crate::repo::Action::CloseDiff, &ctx);
+        assert!(!active.load(Ordering::Acquire));
+        std::thread::sleep(Duration::from_millis(700));
+        assert!(!late.exists());
+        assert!(tab.diff.is_none());
+        assert!(tab.status.is_none() && tab.finished.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn private_mode_and_stale_generation_refuse_queued_raw_hunk_writes() -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        repo.write(path, &json("age1fixture", "cipher1"))?;
+        repo.commit()?;
+        repo.write(path, &json("age1fixture", "cipher2"))?;
+        let ctx = egui::Context::default();
+        let mut tab = crate::repo::RepoTab::new_deferred(repo.0.clone(), &ctx);
+        let mut view = crate::repo::DiffView::new(work(path, Area::Unstaged, 'M'));
+        let request = view.next_request();
+        view.arrived(
+            request,
+            crate::repo::diff::load(&repo.0, &view.key, git::DiffOptions::default(), true),
+        );
+        let data = view
+            .data
+            .as_ref()
+            .and_then(|r| r.as_ref().ok())
+            .ok_or("No fixture patch")?;
+        let hunk = data
+            .lines
+            .iter()
+            .position(|l| l.kind == crate::repo::diff::Kind::Hunk)
+            .ok_or("No fixture hunk")?;
+        let lines = crate::repo::diff::hunk_changes(&data.lines, hunk);
+        view.encrypted.begin();
+        tab.diff = Some(view);
+        tab.apply(
+            crate::repo::Action::PickLines {
+                pick: crate::repo::diff::Pick::Stage,
+                lines: lines.clone(),
+            },
+            &ctx,
+        );
+        if let Some(view) = &mut tab.diff {
+            view.encrypted.close();
+            view.next_request();
+        }
+        tab.apply(
+            crate::repo::Action::PickLines {
+                pick: crate::repo::diff::Pick::Stage,
+                lines: lines.clone(),
+            },
+            &ctx,
+        );
+        assert_eq!(
+            repo.git(&["show", &format!(":{path}")])?.trim(),
+            json("age1fixture", "cipher1")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sops_command_is_local_and_has_only_fixed_format_arguments() {
+        // Pure command construction. There is no repository/host parameter to route it.
+        let command = tool::command(Format::Json);
+        assert_eq!(command.get_program(), std::ffi::OsStr::new("sops"));
+        assert_eq!(
+            command.get_current_dir(),
+            Some(std::env::temp_dir().as_path())
+        );
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            tool::args(Format::Json).map(std::ffi::OsStr::new)
+        );
+    }
+
+    /// Opt-in real-tool validation. All keys, HOME/config and plaintext are generated
+    /// fixtures; no user credential environment or default keyring is inherited.
+    #[test]
+    fn real_sops_and_generated_age_compare_formats_and_key_rotation_offline() -> Result<(), String>
+    {
+        use std::process::Command;
+        let Some(sops) = std::env::var_os("GITCRAFT_TEST_SOPS").map(PathBuf::from) else {
+            eprintln!(
+                "Real SOPS fixture not run: set explicit GITCRAFT_TEST_SOPS and GITCRAFT_TEST_AGE_KEYGEN paths"
+            );
+            return Ok(());
+        };
+        let age = std::env::var_os("GITCRAFT_TEST_AGE_KEYGEN")
+            .map(PathBuf::from)
+            .ok_or("Set the explicit fixture age-keygen path")?;
+        if !sops.is_absolute() || !age.is_absolute() || !sops.is_file() || !age.is_file() {
+            return Err("Real-tool fixture paths must be absolute installed executables".into());
+        }
+        let repo = Repo::new()?;
+        let home = repo.0.join("isolated-home");
+        std::fs::create_dir_all(&home).map_err(|e| e.to_string())?;
+        let isolate = |command: &mut Command| {
+            command
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("HOME", &home)
+                .env("XDG_CONFIG_HOME", home.join("config"))
+                .env("XDG_CACHE_HOME", home.join("cache"))
+                .env("SOPS_DECRYPTION_ORDER", "age")
+                .current_dir(&home);
+        };
+        let execute = |command: Command, input: Option<Vec<u8>>| -> Result<Vec<u8>, String> {
+            let output = crate::processes::run_while(
+                command,
+                crate::processes::Options {
+                    input,
+                    timeout: Some(Duration::from_secs(5)),
+                    output_limit: model::MAX_BYTES,
+                    stderr_limit: Some(32768),
+                    ..Default::default()
+                },
+                &|| true,
+            )?
+            .complete()?;
+            if !output.status.success() {
+                return Err("Offline generated-key SOPS/age fixture command failed (private diagnostics suppressed)".into());
+            }
+            Ok(output.stdout)
+        };
+        let mut keys = Vec::new();
+        for label in ["first", "second"] {
+            let key = home.join(format!("fixture-{label}-age-key.txt"));
+            let mut create = Command::new(&age);
+            isolate(&mut create);
+            create.arg("-o").arg(&key);
+            execute(create, None)?;
+            let mut public = Command::new(&age);
+            isolate(&mut public);
+            public.arg("-y").arg(&key);
+            let recipient = String::from_utf8(execute(public, None)?)
+                .map_err(|_| "Invalid fixture recipient")?;
+            if !recipient.trim().starts_with("age1") {
+                return Err("Expected a generated age fixture recipient".into());
+            }
+            keys.push((key, recipient.trim().to_owned()));
+        }
+        tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = Some(sops.clone()));
+        let encrypt = |format: Format, input: &[u8], recipient: &str| -> Result<String, String> {
+            let mut command = Command::new(&sops);
+            isolate(&mut command);
+            command.args([
+                "encrypt",
+                "--input-type",
+                format.name(),
+                "--output-type",
+                format.name(),
+                "--age",
+                recipient,
+                "--filename-override",
+                format.hint(),
+            ]);
+            String::from_utf8(execute(command, Some(input.to_vec()))?)
+                .map_err(|_| "Encrypted fixture must be UTF-8".into())
+        };
+        let decrypt =
+            |format: Format, input: &str, key: &std::path::Path| -> Result<String, String> {
+                let mut command = tool::command(format);
+                isolate(&mut command);
+                command.env("SOPS_AGE_KEY_FILE", key);
+                tool::plaintext(execute(command, Some(input.as_bytes().to_vec()))?)
+            };
+        for (format, path, old, new) in [
+            (
+                Format::Json,
+                "fixture.json",
+                "{\"secret\":\"fixture-old\"}\n",
+                "{\"secret\":\"fixture-new\"}\n",
+            ),
+            (
+                Format::Yaml,
+                "fixture.yaml",
+                "secret: fixture-old\n",
+                "secret: fixture-new\n",
+            ),
+            (
+                Format::Dotenv,
+                "fixture.env",
+                "SECRET=fixture-old\n",
+                "SECRET=fixture-new\n",
+            ),
+            (
+                Format::Ini,
+                "fixture.ini",
+                "[app]\nsecret=fixture-old\n",
+                "[app]\nsecret=fixture-new\n",
+            ),
+            (
+                Format::Binary,
+                "fixture.bin",
+                "fixture-old\n",
+                "fixture-new\n",
+            ),
+        ] {
+            let first = encrypt(format, old.as_bytes(), &keys[0].1)?;
+            let edited = encrypt(format, new.as_bytes(), &keys[0].1)?;
+            let rotated = encrypt(format, old.as_bytes(), &keys[1].1)?;
+            let encoding = if format == Format::Binary {
+                JsonEncoding::Binary
+            } else {
+                JsonEncoding::Ask
+            };
+            assert_eq!(
+                inspect(path, &first)?.map(|e| e.format),
+                Some(if format == Format::Binary {
+                    Format::Json
+                } else {
+                    format
+                })
+            );
+            let changed =
+                compare_with_encoding(path, &first, &edited, encoding, &|| true, |kind, bytes| {
+                    decrypt(kind, bytes, &keys[0].0)
+                })?;
+            assert!(changed.content_changed);
+            assert!(
+                changed
+                    .rows
+                    .iter()
+                    .any(|row| row.text.contains("fixture-old"))
+            );
+            assert!(
+                changed
+                    .rows
+                    .iter()
+                    .any(|row| row.text.contains("fixture-new"))
+            );
+            let rotation = compare_with_encoding(
+                path,
+                &first,
+                &rotated,
+                encoding,
+                &|| true,
+                |kind, bytes| {
+                    decrypt(
+                        kind,
+                        bytes,
+                        if bytes == rotated {
+                            &keys[1].0
+                        } else {
+                            &keys[0].0
+                        },
+                    )
+                },
+            )?;
+            assert!(
+                !rotation.content_changed
+                    && rotation.recipients_changed
+                    && rotation.metadata_changed
+            );
+        }
+        let binary = encrypt(Format::Binary, b"fixture\0binary", &keys[0].1)?;
+        assert!(decrypt(Format::Binary, &binary, &keys[0].0).is_err());
+        // JSON with just `data` is valid under every filename, including across a rename.
+        let data_old = encrypt(Format::Json, br#"{"data":42}"#, &keys[0].1)?;
+        let data_new = encrypt(Format::Json, br#"{"data":43}"#, &keys[0].1)?;
+        for path in ["encrypted-config", "fixture.yaml", "fixture.enc.json"] {
+            let result = compare_with_encoding(
+                path,
+                &data_old,
+                &data_new,
+                JsonEncoding::Document,
+                &|| true,
+                |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+            )?;
+            assert!(result.content_changed && result.rows.iter().any(|r| r.text.contains("43")));
+        }
+        let renamed = Repo::new()?;
+        renamed.write("before.json", &data_old)?;
+        renamed.commit()?;
+        renamed.git(&["mv", "--", "before.json", "after.yaml"])?;
+        let key = DiffKey::Work(git::StatusFile {
+            path: "after.yaml".into(),
+            old_path: Some("before.json".into()),
+            area: Area::Staged,
+            code: 'R',
+        });
+        let (before, after) = read_sides(&renamed.0, &key)?;
+        let result = compare_with_encoding(
+            "after.yaml",
+            &before,
+            &after,
+            JsonEncoding::Document,
+            &|| true,
+            |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+        )?;
+        assert!(!result.content_changed);
+        // Binary envelopes with .json names must use actual bytes, not JSON-escaped data.
+        let text_binary = encrypt(Format::Binary, b"actual binary text\n", &keys[0].1)?;
+        let result = compare_with_encoding(
+            "binary.enc.json",
+            "",
+            &text_binary,
+            JsonEncoding::Binary,
+            &|| true,
+            |kind, bytes| decrypt(kind, bytes, &keys[0].0),
+        )?;
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].text, "actual binary text");
+        for bytes in [
+            b"fixture\0binary".as_slice(),
+            b"fixture\xffbinary".as_slice(),
+        ] {
+            let input = encrypt(Format::Binary, bytes, &keys[0].1)?;
+            assert!(
+                compare_with_encoding(
+                    "binary.enc.json",
+                    "",
+                    &input,
+                    JsonEncoding::Binary,
+                    &|| true,
+                    |kind, bytes| decrypt(kind, bytes, &keys[0].0)
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            compare_with_encoding(
+                "binary.enc.json",
+                "",
+                &binary,
+                JsonEncoding::Document,
+                &|| true,
+                |kind, bytes| decrypt(kind, bytes, &keys[0].0)
+            )
+            .is_err()
+        );
+        eprintln!(
+            "Real local SOPS generated-age fixture completed: JSON/YAML/dotenv/INI/binary UTF-8, recipient rotation, explicit ambiguous formats, cross-extension rename, binary NUL/non-UTF8 refusal; isolated HOME and explicit fixture keys only"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_cli_uses_only_ciphertext_stdin_and_fixed_safe_format_argv() -> Result<(), String> {
+        let repo = Repo::new()?;
+        program(
+            &repo,
+            r#"
+ test "$#" = 7 || exit 11
+ test "$1 $2 $3 $4 $5 $6 $7" = 'decrypt --input-type json --output-type json --filename-override gitcraft.json' || exit 12
+ input=$(cat)
+ case "$input" in *'ENC[cipher1]'*) printf 'fixture-old-private\n';; *'ENC[cipher2]'*) printf 'fixture-new-private\n';; *) exit 13;; esac
+"#,
+        )?;
+        let path = "secret '$(touch INJECTED)' ü.json";
+        let old = json("age1fixture", "cipher1");
+        let new = json("age1fixture", "cipher2");
+        repo.write(path, &old)?;
+        repo.commit()?;
+        repo.write(path, &new)?;
+        let key = work(path, Area::Unstaged, 'M');
+        let result = load(&repo.0, &key, JsonEncoding::Ask, &|| true)?;
+        assert!(result.content_changed && !result.recipients_changed);
+        assert_eq!(
+            std::fs::read_to_string(repo.0.join(path)).map_err(|e| e.to_string())?,
+            new
+        );
+        assert_eq!(repo.git(&["show", &format!(":{path}")])?.trim(), old);
+        assert!(!repo.0.join("INJECTED").exists());
+        let data = crate::repo::diff::load(&repo.0, &key, git::DiffOptions::default(), true)?;
+        assert!(data.sops && data.partial);
+        let hunk = data
+            .lines
+            .iter()
+            .position(|l| l.kind == crate::repo::diff::Kind::Hunk)
+            .ok_or("No encrypted hunk")?;
+        let patch = crate::repo::diff::partial_patch(
+            &data.header,
+            &data.lines,
+            &crate::repo::diff::hunk_changes(&data.lines, hunk),
+            crate::repo::diff::Pick::Stage,
+        )
+        .ok_or("No encrypted patch")?;
+        assert!(patch.contains("ENC[cipher2]"));
+        assert!(!patch.contains("fixture-new-private"));
+        assert!(
+            data.lines
+                .iter()
+                .all(|line| !line.text.contains("fixture-new-private"))
+        );
+        assert!(repo.0.read_dir().map_err(|e| e.to_string())?.all(|entry| {
+            entry.is_ok_and(|e| e.file_name() != "before" && e.file_name() != "after")
+        }));
+        Ok(())
+    }
+
+    #[test]
+    fn plaintext_tool_diagnostics_missing_tools_binary_and_oversized_output_are_redacted()
+    -> Result<(), String> {
+        let repo = Repo::new()?;
+        let input = json("age1fixture", "cipher1");
+        program(
+            &repo,
+            "cat >/dev/null; printf 'fixture-private-stdout'; printf 'fixture-private-stderr' >&2; exit 1",
+        )?;
+        let error = tool::decrypt(Format::Json, &input, &|| true)
+            .err()
+            .ok_or("Expected tool failure")?;
+        assert!(!error.contains("fixture-private"));
+        assert!(error.contains("keys/permissions"));
+        tool::TEST_PROGRAM.with(|p| *p.borrow_mut() = Some(repo.0.join("not-installed")));
+        assert!(
+            tool::decrypt(Format::Json, &input, &|| true)
+                .is_err_and(|e| e.contains("Install SOPS"))
+        );
+        program(&repo, "cat >/dev/null; printf '\\377'")?;
+        assert!(tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("UTF-8")));
+        program(&repo, "cat >/dev/null; head -c 2097153 /dev/zero")?;
+        assert!(
+            tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("size limit"))
+        );
+        program(&repo, "cat >/dev/null; head -c 32769 /dev/zero >&2")?;
+        assert!(
+            tool::decrypt(Format::Json, &input, &|| true).is_err_and(|e| e.contains("size limit"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cancellation_kills_local_decryption_and_late_descendants_without_disk_output()
+    -> Result<(), String> {
+        let repo = Repo::new()?;
+        let marker = repo.0.join("descendant-reached");
+        program(
+            &repo,
+            &format!(
+                "cat >/dev/null; (sleep 0.5; printf leaked > {}) & wait",
+                crate::remote::sh_quote(&marker.to_string_lossy())
+            ),
+        )?;
+        let start = std::time::Instant::now();
+        assert!(
+            tool::decrypt(Format::Json, &json("age1fixture", "cipher"), &|| start
+                .elapsed()
+                < Duration::from_millis(100))
+            .is_err_and(|e| e.contains("cancelled"))
+        );
+        assert!(start.elapsed() < Duration::from_secs(2));
+        std::thread::sleep(Duration::from_millis(600));
+        assert!(!marker.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn changed_encrypted_sides_discard_plaintext_before_returning_a_result() -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        repo.write(path, &json("age1fixture", "cipher1"))?;
+        repo.commit()?;
+        repo.write(path, &json("age1fixture", "cipher2"))?;
+        // Modifying the fixture input simulates an edit while the decrypt subprocess runs.
+        program(
+            &repo,
+            &format!(
+                "cat >/dev/null; printf '%s' {} > {}; printf 'fixture-private-output'",
+                crate::remote::sh_quote(&json("age1fixture", "cipher3")),
+                crate::remote::sh_quote(&repo.0.join(path).to_string_lossy())
+            ),
+        )?;
+        let result = load(
+            &repo.0,
+            &work(path, Area::Unstaged, 'M'),
+            JsonEncoding::Ask,
+            &|| true,
+        );
+        assert!(result.is_err_and(
+            |e| e.contains("changed while decrypting") && !e.contains("fixture-private")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn commit_index_worktree_and_extensionless_sops_are_recognized_without_decrypting()
+    -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "encrypted-config";
+        let old = json("age1first", "cipher1");
+        let indexed = json("age1second", "cipher2");
+        let working = json("age1third", "cipher3");
+        repo.write(path, &old)?;
+        let root = repo.commit()?;
+        repo.write(path, &indexed)?;
+        repo.git(&["add", "--", path])?;
+        repo.write(path, &working)?;
+        assert_eq!(
+            read_sides(&repo.0, &work(path, Area::Staged, 'M'))?,
+            (old.clone(), indexed)
+        );
+        assert_eq!(
+            read_sides(
+                &repo.0,
+                &DiffKey::Commit {
+                    hash: root,
+                    path: path.into()
+                }
+            )?,
+            (String::new(), old)
+        );
+        assert!(probe(&repo.0, &work(path, Area::Unstaged, 'M')));
+        assert!(
+            crate::repo::diff::load(
+                &repo.0,
+                &work(path, Area::Unstaged, 'M'),
+                git::DiffOptions::default(),
+                true
+            )?
+            .sops
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn git_textconv_cannot_decrypt_ordinary_patches_or_run_before_opt_in() -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        let driver = repo.0.join("decrypting-textconv");
+        let marker = repo.0.join("textconv-ran");
+        std::fs::write(
+            &driver,
+            format!(
+                "#!/bin/sh\nprintf ran > {}; printf 'fixture-private-conversion'\n",
+                crate::remote::sh_quote(&marker.to_string_lossy())
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        repo.write(".gitattributes", "secret.json diff=sops-fixture\n")?;
+        repo.git(&[
+            "config",
+            "diff.sops-fixture.textconv",
+            &driver.to_string_lossy(),
+        ])?;
+        repo.write(path, &json("age1fixture", "cipher1"))?;
+        let first = repo.commit()?;
+        // Untracked sources have their own Git --no-index path: exercise actual load/UI.
+        let untracked = "untracked-secret.json";
+        repo.write(".gitattributes", "*.json diff=sops-fixture\n")?;
+        repo.write(untracked, &json("age1fixture", "cipher1"))?;
+        let key = work(untracked, Area::Untracked, '?');
+        let data = crate::repo::diff::load(&repo.0, &key, git::DiffOptions::default(), true)?;
+        assert!(data.sops);
+        assert!(!marker.exists());
+        assert!(
+            data.lines
+                .iter()
+                .all(|l| !l.text.contains("fixture-private-conversion"))
+        );
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = crate::repo::RepoTab::new_deferred(repo.0.clone(), &ctx);
+        let mut view = crate::repo::DiffView::new(key);
+        view.next_request();
+        view.data = Some(Ok(data));
+        tab.diff = Some(view);
+        let mut actions = Vec::new();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            egui::CentralPanel::default().show(ui, |ui| tab.diff_view(ui, &mut actions));
+        });
+        let text = out
+            .shapes
+            .iter()
+            .filter_map(|s| match &s.shape {
+                egui::Shape::Text(t) => Some(t.galley.text()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        out.shapes.clear();
+        out.textures_delta.clear();
+        assert!(text.contains("Show decrypted"));
+        assert!(!text.contains("fixture-private-conversion"));
+        // Both the initial log-L query and selected patch must use ciphertext lines.
+        let history = git::line_history(&repo.0, &git::LinesAt::Rev(first.clone()), path, (1, 1))?;
+        assert!(!history.is_empty());
+        assert!(!marker.exists());
+        let selected = crate::repo::diff::load_lines(
+            &repo.0,
+            &DiffKey::Commit {
+                hash: first.clone(),
+                path: path.into(),
+            },
+            Some(&[(1, 1)]),
+            git::DiffOptions::default(),
+            true,
+        )?;
+        assert!(selected.sops);
+        assert!(
+            selected
+                .lines
+                .iter()
+                .all(|l| !l.text.contains("fixture-private-conversion"))
+        );
+        assert!(!marker.exists());
+        // WorkTree mapping into HEAD must also avoid conversion.
+        git::line_history(&repo.0, &git::LinesAt::WorkTree, path, (1, 1))?;
+        assert!(!marker.exists());
+        repo.write(path, &json("age1fixture", "cipher2"))?;
+        for key in [
+            work(path, Area::Unstaged, 'M'),
+            DiffKey::Range {
+                from: first,
+                to: None,
+                path: path.into(),
+            },
+        ] {
+            let data = crate::repo::diff::load(&repo.0, &key, git::DiffOptions::default(), true)?;
+            assert!(data.sops);
+            assert!(!marker.exists());
+            assert!(
+                data.lines
+                    .iter()
+                    .all(|l| !l.text.contains("fixture-private-conversion"))
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn unreadable_oversize_and_nonregular_sources_fail_closed_before_textconv() -> Result<(), String>
+    {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        let driver = repo.0.join("converter");
+        let marker = repo.0.join("converter-ran");
+        std::fs::write(
+            &driver,
+            format!(
+                "#!/bin/sh\nprintf ran > {}; printf converted\n",
+                crate::remote::sh_quote(&marker.to_string_lossy())
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&driver, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        repo.write(".gitattributes", "*.json diff=sops-fixture\n")?;
+        repo.git(&[
+            "config",
+            "diff.sops-fixture.textconv",
+            &driver.to_string_lossy(),
+        ])?;
+        for before in [json("age1fixture", "old"), "ordinary before\n".into()] {
+            repo.write(path, &before)?;
+            repo.git(&["add", "."])?;
+            let oversized = format!(
+                "{}{}",
+                json("age1fixture", "new"),
+                " ".repeat(2 * 1024 * 1024)
+            );
+            repo.write(path, &oversized)?;
+            let key = work(path, Area::Unstaged, 'M');
+            assert!(reader::read_sides(&repo.0, &key).is_err_and(|e| e.contains("2 MiB")));
+            assert_eq!(probe_checked(&repo.0, &key), None);
+            let data = crate::repo::diff::load(&repo.0, &key, git::DiffOptions::default(), true)?;
+            assert!(!marker.exists());
+            assert!(data.lines.iter().all(|l| !l.text.contains("converted")));
+        }
+        // An actual missing working file is still an empty side, unlike an unavailable read.
+        std::fs::remove_file(repo.0.join(path)).map_err(|e| e.to_string())?;
+        let sides = reader::read_sides(&repo.0, &work(path, Area::Unstaged, 'M'))?;
+        assert!(sides.1.is_empty());
+        std::fs::create_dir(repo.0.join(path)).map_err(|e| e.to_string())?;
+        assert!(reader::read_sides(&repo.0, &work(path, Area::Unstaged, 'M')).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn decrypted_ui_is_read_only_and_mode_close_reload_or_park_disposes_it() -> Result<(), String> {
+        let repo = Repo::new()?;
+        let path = "secret.json";
+        repo.write(path, &json("age1fixture", "cipher1"))?;
+        repo.commit()?;
+        repo.write(path, &json("age1fixture", "cipher2"))?;
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut tab = crate::repo::RepoTab::new_deferred(repo.0.clone(), &ctx);
+        let make_view = || -> Result<crate::repo::DiffView, String> {
+            let mut view = crate::repo::DiffView::new(work(path, Area::Unstaged, 'M'));
+            view.next_request();
+            view.data = Some(crate::repo::diff::load(
+                &repo.0,
+                &view.key,
+                git::DiffOptions::default(),
+                true,
+            ));
+            let (send, _) = view.encrypted.begin();
+            send.send(plaintext_compare(
+                &json("a", "x"),
+                &json("b", "y"),
+                "fixture-private-old",
+                "fixture-private-new",
+            ))
+            .map_err(|_| "No private receiver")?;
+            view.encrypted.poll();
+            Ok(view)
+        };
+        tab.diff = Some(make_view()?);
+        let mut actions = Vec::new();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            egui::CentralPanel::default().show(ui, |ui| tab.diff_view(ui, &mut actions));
+        });
+        let text = out
+            .shapes
+            .iter()
+            .filter_map(|s| match &s.shape {
+                egui::Shape::Text(t) => Some(t.galley.text()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        out.shapes.clear();
+        out.textures_delta.clear();
+        assert!(text.contains("fixture-private-new"));
+        assert_eq!(text.lines().filter(|s| *s == "Wrap").count(), 1);
+        assert!(!text.contains("Algorithm"));
+        assert!(
+            !text.contains("Stage file")
+                && !text.contains("Stage hunk")
+                && !text.contains("Stage 1 line")
+        );
+        assert!(actions.is_empty());
+        out.shapes.clear();
+        out.textures_delta.clear();
+        for action in [
+            crate::repo::Action::DiffAsFile(false),
+            crate::repo::Action::DiffRendered(false),
+            crate::repo::Action::DiffStructural(false),
+            crate::repo::Action::DiffDecryptedEncoding(JsonEncoding::Binary),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Migration),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Lens),
+            crate::repo::Action::OpenFileComparison(crate::repo::file_comparison::Page::Matrix),
+            crate::repo::Action::CloseDiff,
+        ] {
+            tab.diff = Some(make_view()?);
+            let active = tab
+                .diff
+                .as_ref()
+                .and_then(|v| v.encrypted.active.clone())
+                .ok_or("No active token")?;
+            tab.apply(action, &ctx);
+            assert!(!active.load(Ordering::Acquire));
+        }
+        tab.diff = Some(make_view()?);
+        tab.poll_parked_view(&ctx);
+        assert!(tab.diff.as_ref().is_some_and(|v| !v.encrypted.enabled));
+        Ok(())
+    }
+}
+
+#[test]
+fn cancelled_slow_ciphertext_reads_do_not_hold_the_plaintext_owner_waiting() {
+    let start = std::time::Instant::now();
+    let result = await_ciphertext(
+        || {
+            std::thread::sleep(Duration::from_millis(200));
+            Ok(("ciphertext-only".into(), "ciphertext-only".into()))
+        },
+        &|| start.elapsed() < Duration::from_millis(30),
+    );
+    assert!(result.is_err_and(|e| e.contains("cancelled")));
+    assert!(start.elapsed() < Duration::from_millis(150));
+}

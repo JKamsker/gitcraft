@@ -1,0 +1,50 @@
+{
+  "baseline": "a850de26b0a0778ea96fe34cd1498e6e78928492",
+  "documentation_commit": "97b90815a6b4d31f6c1e529fe0fec89711cb56fa",
+  "platform": "macOS arm64",
+  "rust": "1.95.0",
+  "tests_executed": false,
+  "checks": [
+    {
+      "name": "build",
+      "command": "cargo +1.95.0 test --locked --all-targets --no-run",
+      "exit_code": 0,
+      "log": "baseline-build.log.gz",
+      "uncompressed_sha256": "0575583f7a1ad476abad56ce55ab5bb288074fdc8bc0307c4bcfd54ea9ce7bba",
+      "compressed_sha256": "f96f624a8458926c50fcad75563084354cb45cb290b446a9d9bd7b1b6d323afa"
+    },
+    {
+      "name": "fmt",
+      "command": "cargo +1.95.0 fmt --all -- --check",
+      "exit_code": 0,
+      "log": "baseline-fmt.log.gz",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressed_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "name": "clippy",
+      "command": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code",
+      "exit_code": 0,
+      "log": "baseline-clippy.log.gz",
+      "uncompressed_sha256": "958c77ec6cdc5fbaa55637733b8f575c45bcd4f439de3f07e4b1920c36468181",
+      "compressed_sha256": "44315a1abce214cfb858985fcb069b9ce88e0591d1ecf58b706ab708145c93d0"
+    }
+  ],
+  "limitations": [
+    "No runtime tests executed.",
+    "Clippy uses -A dead_code for six pre-existing macOS-only library warnings. This is not a strict macOS Clippy pass.",
+    "No CI invoked.",
+    "Inherited process-cleanup paths need owned-process containment before full runtime suite."
+  ],
+  "source_unchanged_at_documentation_commit": {
+    "verified": true,
+    "paths": [
+      "src",
+      "crates",
+      "Cargo.toml",
+      "Cargo.lock",
+      "tests",
+      ".github/workflows"
+    ]
+  }
+}

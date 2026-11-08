@@ -2,6 +2,8 @@
 //! Git as the compatibility backend (config, credentials, hooks and remote machines).
 
 mod absorb;
+pub(crate) mod activity;
+pub(crate) mod atlas;
 mod attributes;
 pub mod backend;
 mod backlinks;
@@ -22,10 +24,13 @@ mod diff;
 mod diff_algorithm;
 pub mod doctor;
 pub mod dry_run;
+pub(crate) mod dvc;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
+pub(crate) mod growth;
 mod hooks;
 mod interaction;
 pub(crate) mod investigations;
@@ -42,6 +47,7 @@ mod log_order;
 mod notebook_filter;
 mod notes;
 mod overview;
+pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
@@ -66,9 +72,12 @@ mod timed;
 mod trees;
 mod unity;
 #[cfg(test)]
+mod visualization_tests;
+#[cfg(test)]
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
+mod worktree_location;
 
 pub use self::absorb::*;
 pub use self::attributes::*;
@@ -119,6 +128,7 @@ pub use self::timed::*;
 pub use self::trees::*;
 pub use self::unity::*;
 pub use self::worktree::*;
+pub use self::worktree_location::*;
 
 // Explicit names for types and helpers independently added by feature stacks.
 pub use self::commit_msg::Author;
@@ -383,4 +393,5 @@ pub fn clone_with(
 pub(crate) mod drafts;
 
 mod push_hooks;
+pub(crate) use bundles::bundle_git_path;
 pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};

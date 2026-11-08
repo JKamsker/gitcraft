@@ -8,6 +8,7 @@ mod header;
 mod lanes;
 mod menu;
 pub(super) mod message_tooltip;
+pub(super) mod minimap;
 mod order;
 mod pills;
 mod readability;
@@ -125,6 +126,19 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.graph_motion.expire();
+        self.graph_motion.schedule_expiry(ui.ctx());
+        self.celebration_ui(ui);
+        self.graph_walk_header(ui);
+        let map_area = ui.available_rect_before_wrap();
+        let map_rect = egui::Rect::from_min_max(
+            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            map_area.right_bottom(),
+        );
+        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        if show_map {
+            ui.set_width((map_area.width() - 84.0).max(1.0));
+        }
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -202,15 +216,33 @@ impl RepoTab {
             _ => {}
         }
         if let Some(row) = self.take_graph_scroll_row() {
+            let follow_head = self.graph_motion.take_head_scroll();
             let view_h = ui.available_height();
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                let target = (top - view_h / 2.0).max(0.0);
+                let offset = if follow_head {
+                    self.graph_motion.start_scroll(offset, target, ui.ctx())
+                } else {
+                    self.graph_motion.cancel_scroll();
+                    target
+                };
+                scroll = scroll.vertical_scroll_offset(offset);
             }
         }
 
+        if ui.input(|i| i.smooth_scroll_delta.y != 0.0 || i.pointer.any_pressed()) {
+            self.graph_motion.cancel_scroll();
+        }
+        if let Some(offset) = self.graph_motion.scroll_offset(ui.ctx()) {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
+        if let Some(offset) = self.history_minimap.offset.take() {
+            self.graph_motion.cancel_scroll();
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
@@ -357,6 +389,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if show_map && !ghost {
+            self.history_minimap(ui, map_rect, out.state.offset.y, out.inner_rect.height());
+        }
         if let Some(steps) = first_steps {
             self.first_steps_view(ui, steps, acts);
         }
@@ -438,6 +473,32 @@ impl RepoTab {
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
+        if Settings::get(ui.ctx()).graph_lane_walk {
+            let direction = ui.input(|i| {
+                if !i.modifiers.is_none() {
+                    return None;
+                }
+                use crate::repo::graph_walk::Direction;
+                if i.key_pressed(Key::ArrowDown) {
+                    Some(Direction::Parent)
+                } else if i.key_pressed(Key::ArrowUp) {
+                    Some(Direction::Child)
+                } else if i.key_pressed(Key::ArrowRight) {
+                    Some(Direction::Merge)
+                } else if i.key_pressed(Key::ArrowLeft) {
+                    Some(Direction::Tip)
+                } else {
+                    None
+                }
+            });
+            if let Some(direction) = direction
+                && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
+            {
+                acts.push(Action::Select(next));
+                self.scroll_to = Some(next);
+            }
+            return;
+        }
         // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
         let below = self.diff_beside_graph(ui.ctx());
         let (up, down) = ui.input(|i| {

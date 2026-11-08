@@ -3,11 +3,13 @@
 mod agents;
 mod ai_page;
 mod branch_names;
+mod connection_page;
 mod custom_commands;
 mod diffs;
 mod external_tools;
 mod file_menus;
 mod layout;
+pub(crate) mod network_page;
 mod page;
 mod portable_page;
 mod preview;
@@ -57,6 +59,11 @@ pub struct Settings {
     pub graph_width: f32,
     /// The graph's lanes closer together, for a narrower graph column.
     pub compact_graph: bool,
+    pub graph_motion: bool,
+    pub graph_lane_walk: bool,
+    pub graph_sounds: bool,
+    pub celebration_motion: bool,
+    pub celebration_sound: bool,
     /// Widths of the author, when, date and hash columns (dragged in the graph header).
     pub author_width: f32,
     pub when_width: f32,
@@ -88,6 +95,7 @@ pub struct Settings {
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
+    pub diff_wrap: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
@@ -182,6 +190,11 @@ impl Default for Settings {
             branch_names_keep_end: true,
             graph_width: 0.0,
             compact_graph: false,
+            graph_motion: true,
+            graph_lane_walk: false,
+            graph_sounds: false,
+            celebration_motion: false,
+            celebration_sound: false,
             author_width: 150.0,
             when_width: 100.0,
             date_width: 118.0,
@@ -200,6 +213,7 @@ impl Default for Settings {
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
+            diff_wrap: false,
             diff_whole_file: false,
             diff_beside_graph: false,
             diff_algorithms: Default::default(),
@@ -455,7 +469,12 @@ impl Settings {
         let t = Tokens::get(ui.ctx());
         match page {
             Page::Profile => self.profile_ui(ui, f, view),
+            Page::Network => self.network_ui(ui, f, false),
+            Page::HttpsSignins => self.network_ui(ui, f, true),
             Page::General => {
+                section(ui, f, "Quiet celebrations", None, |card| {
+                    card.row("After success", "first commit release tag merge sound motion", |ui| { ui.checkbox(&mut self.celebration_motion,"Short visual flourish"); ui.checkbox(&mut self.celebration_sound,"Soft celebration sound"); ui.small("Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference."); if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } } });
+                });
                 section(ui, f, "Behaviour", None, |card| {
                     card.row("Worktrees", "open same tab switch", |ui| {
                         ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
@@ -709,7 +728,24 @@ impl Settings {
                 });
             }
             Page::Graph => {
+                section(ui, f, "Graph feedback", None, |card| {
+                    card.row("Explanatory motion", "fetch incoming refs scroll reduced motion", |ui| { ui.checkbox(&mut self.graph_motion,"Short ref transitions and smooth navigation"); ui.small("Respects system reduced motion. Incoming markers remain readable without animation."); });
+                });
                 section(ui, f, "Commit graph", None, |card| {
+                    card.row(
+                        "Topology navigation",
+                        "accessibility audio lanes graph parent child",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.graph_lane_walk,
+                                "Walk graph topology with arrow keys",
+                            );
+                            ui.checkbox(
+                                &mut self.graph_sounds,
+                                "Soft sounds for merges and lane crossings",
+                            );
+                        },
+                    );
                     card.preview(Preview::GraphRefs);
                     card.row("Branch column width", "refs tags pills", |ui| {
                         ui.spacing_mut().slider_width = layout::fit(ui, SLIDER_WIDTH + 70.0) - 70.0;
@@ -900,6 +936,19 @@ impl Settings {
                     "Mergiraf",
                     Some("Solves merge conflicts from the syntax of the code."),
                     |card| self.mergiraf_ui(card),
+                );
+                section(
+                    ui,
+                    f,
+                    "Git file tools",
+                    Some("Use gitcraft as Git's difftool and mergetool."),
+                    |card| {
+                        card.row(
+                            "Register gitcraft",
+                            "difftool mergetool compare files standalone global config",
+                            crate::standalone::registration::settings_ui,
+                        );
+                    },
                 );
                 section(
                     ui,
@@ -1138,6 +1187,8 @@ pub(crate) enum Page {
     Graph,
     Git,
     Signing,
+    Network,
+    HttpsSignins,
     Terminal,
     Identities,
     Ai,
@@ -1147,13 +1198,15 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 14] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
         Page::Graph,
         Page::Git,
         Page::Signing,
+        Page::Network,
+        Page::HttpsSignins,
         Page::Terminal,
         Page::Identities,
         Page::Ai,
@@ -1170,6 +1223,8 @@ impl Page {
             Page::Graph => "Commit graph",
             Page::Git => "Git",
             Page::Signing => "Commit signing",
+            Page::Network => "Network",
+            Page::HttpsSignins => "HTTPS sign-ins",
             Page::Terminal => "Terminal",
             Page::Identities => "Identities",
             Page::Ai => "AI",
@@ -1187,6 +1242,8 @@ impl Page {
             Page::Graph => "git-branch",
             Page::Git => "git-merge",
             Page::Signing => "key-round",
+            Page::Network => "network",
+            Page::HttpsSignins => "key-round",
             Page::Terminal => "square-terminal",
             Page::Identities => "user-round",
             Page::Ai => "sparkles",

@@ -37,6 +37,9 @@ egui_commonmark = { version = "0.25", default-features = false, features = ["pul
 egui_extras = { version = "0.36", default-features = false, features = ["svg", "image"] }
 # Sign-ins kept with "Remember connection": Credential Manager, Keychain, Secret Service.
 keyring = "4.2"
+# Bounded SVG rendering with explicitly disabled external resolvers; already transitive.
+resvg = { version = "=0.45.1", default-features = false, features = ["raster-images"] }
+roxmltree = "=0.20.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 md5 = "0.7"
 # Inflating the members of .docx / .odt / .zip files and PDF streams, for their text in diffs.
@@ -53,6 +56,9 @@ ron = "0.12"
 # The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).
 raw-window-handle = "0.6"
 rfd = "0.17"
+# Quiet synthesized native earcons; no codec or media-file support. Device opens only on opt-in.
+rodio = { version = "0.21", default-features = false, features = ["playback"] }
+same-file = "=1.0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
@@ -77,9 +83,11 @@ yaml-rust2 = "0.13.0"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs"] }
+rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Read native ACLs through a safe API before replacing merge output.
+exacl = { version = "=0.13.0", default-features = false }
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }

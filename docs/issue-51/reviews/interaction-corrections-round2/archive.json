@@ -1,0 +1,144 @@
+{
+  "report_sha256": "d520554730f96838d7bed765a7b78a7ac5206249321cf4ec8e174d153c131134",
+  "manifest_sha256": "697fc2960847d4c7847874bdaef92b14d2a7b778432d8c96a19ac6eb0ee2a5b7",
+  "artifacts": [
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/editor-probe",
+      "sha256": "0fa405891e0d868a6d950a7af3ffbcc008c7d611e9b930b16c37e79472a88c97",
+      "bytes": 6997200,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/editor-probe-initial.log",
+      "sha256": "7198719528e53a5056d904d23b995a9b9f88ed9894d2b74aa4d5e8c02cc5e44e",
+      "bytes": 480,
+      "archive": "evidence-001-editor-probe-initial.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/editor-probe-initial.rs",
+      "sha256": "ea541c5be43e8af1a50b2e225a02ed77586463e8390dae675065dbcb1d57e84c",
+      "bytes": 5099,
+      "archive": "evidence-002-editor-probe-initial.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/editor-probe.log",
+      "sha256": "6830080fc83ba8fb853cd263525888e8516adc90009de2b7d72e2a8dce7f148f",
+      "bytes": 470,
+      "archive": "evidence-003-editor-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/editor-probe.rs",
+      "sha256": "544cb70f2b3037a57b5019d7dd2c06031de7df44e7f1207dcb6f8e806b4e1ba6",
+      "bytes": 5184,
+      "archive": "evidence-004-editor-probe.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/keymap/config.rs",
+      "sha256": "7360cb2ea531670e50823a691491aa1f55e8d3c32bcfc1c558b99fa1bce7fcc6",
+      "bytes": 5268,
+      "archive": "evidence-005-config.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/keymap/editor.rs",
+      "sha256": "f98a1149c5fcaed87fa019244e8d456323f7347f4ce963d8d70b3379f7e28675",
+      "bytes": 13886,
+      "archive": "evidence-006-editor.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/keymap/mod.rs",
+      "sha256": "b1e7e5836d62efca8cb637b9a3eaaca8f977b2085a18bf5ce6c2b389d521f361",
+      "bytes": 13476,
+      "archive": "evidence-007-mod.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/keymap/resolver.rs",
+      "sha256": "63c2fd98999b5736524e5e67f245188eb2c5d712a5d1a3632495433a39c16864",
+      "bytes": 20424,
+      "archive": "evidence-008-resolver.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/panel-probe",
+      "sha256": "4fff2cfa1a0ebc91a275c2453045d5749d41ee7e5cc2fe1ad59a22d27f7f4ef5",
+      "bytes": 7372776,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/panel-probe-initial.rs",
+      "sha256": "6bc4dd1457d75686d1c99d1428a4cf981565e587db8ec8cdb463c1f63518fe5d",
+      "bytes": 3851,
+      "archive": "evidence-010-panel-probe-initial.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/panel-probe.log",
+      "sha256": "dcec21e55f4d102f017ad689bb77f3086443aaac6e932ab74338d20b26d2ae26",
+      "bytes": 215,
+      "archive": "evidence-011-panel-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-interaction-r2-evidence/panel-probe.rs",
+      "sha256": "6bde6fcbd94e5d80c80ab8317bcec19b96bfbcac25fa7df002d3155f9df42660",
+      "bytes": 4007,
+      "archive": "evidence-012-panel-probe.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-checkpoint-review-r1-manifest.json",
+      "sha256": "94528f3cf8269056a9c0ea250cd29722e8b8e3fe91a3162c611f9a68cb6f6eb1",
+      "bytes": 11442,
+      "archive": "evidence-013-gitcraft-51-interaction-checkpoint-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-checkpoint-review-r1.md",
+      "sha256": "bcfda86a92acf0f7103cebb0b84967ddd82f62a47837d998438de6df23f8ae72",
+      "bytes": 13871,
+      "archive": "evidence-014-gitcraft-51-interaction-checkpoint-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-corrections-review-r2.md",
+      "sha256": "d520554730f96838d7bed765a7b78a7ac5206249321cf4ec8e174d153c131134",
+      "bytes": 10109,
+      "archive": "evidence-015-gitcraft-51-interaction-corrections-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r1.md",
+      "sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355",
+      "bytes": 16498,
+      "archive": "evidence-016-gitcraft-51-tearoff-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-08b5bded-editor-0.log",
+      "sha256": "9a26cf62ef4a273b2d165173b1fbdf82c59b39c78eacd323408261f24e6ec8da",
+      "bytes": 3148,
+      "archive": "evidence-017-gitcraft-interaction-08b5bded-editor-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-08b5bded-editor-1.log",
+      "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36",
+      "bytes": 72,
+      "archive": "evidence-018-gitcraft-interaction-08b5bded-editor-1.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-586d0894-panel-focus-0.log",
+      "sha256": "93e5f6bec13554732c54145809e1db5511f3c96f634afa5573e96eee4e45642d",
+      "bytes": 1327,
+      "archive": "evidence-019-gitcraft-interaction-586d0894-panel-focus-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-586d0894-panel-focus-1.log",
+      "sha256": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
+      "bytes": 72,
+      "archive": "evidence-020-gitcraft-interaction-586d0894-panel-focus-1.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-editor-validation.json",
+      "sha256": "76da12d39a118c278145098401a4da6d0c05eb304f76045e1b23134c6fae5291",
+      "bytes": 1145,
+      "archive": "evidence-021-gitcraft-interaction-editor-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-panel-focus-validation.json",
+      "sha256": "6c36b6bfa5a323e21124db8f4fed3ce3f5ea7ce6f75ae37dacfeb0d61137298c",
+      "bytes": 1144,
+      "archive": "evidence-022-gitcraft-interaction-panel-focus-validation.json.gz"
+    }
+  ]
+}

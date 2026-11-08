@@ -1,0 +1,157 @@
+{
+  "candidate": "bf6089b684597d878d3c2f256b7c69d64c6785a0",
+  "verdict": "FAIL",
+  "groups": {
+    "content": 4,
+    "ui": 5,
+    "core": 6
+  },
+  "correction_status": "queued awaiting coding slot",
+  "artifacts": [
+    {
+      "source": "/tmp/gitcraft-workflow-content-r1.rs",
+      "archive": "00-gitcraft-workflow-content-r1.rs.gz",
+      "sha256": "f8e9a1539acca16823e2c6352e0b1466133bbbb5a21d30a0b1433de4ab692b7e"
+    },
+    {
+      "source": "/tmp/gitcraft-workflow-content-r1-fixture.json",
+      "archive": "01-gitcraft-workflow-content-r1-fixture.json.gz",
+      "sha256": "6f46d2bd5199b1b80162f8abfb57aaa722e677c835d2049a6e4fd4cc6e2c4db4"
+    },
+    {
+      "source": "/tmp/gitcraft-workflow-content-r1.log",
+      "archive": "02-gitcraft-workflow-content-r1.log.gz",
+      "sha256": "c7b20aa8d8fdef1b46e41734227f2bd7964b1e01e2f0579e76fc1da7e6878dea"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-bf6089b6-tests.log",
+      "archive": "03-gitcraft-workflows-ui-bf6089b6-tests.log.gz",
+      "sha256": "4f90f086912d11ea4e2581d27fe13451cf8ab80d39fa35ee878b6894d2a4efbb"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-default.patch",
+      "archive": "04-gitcraft-workflows-ui-default.patch.gz",
+      "sha256": "32941b391d694bbebd5ab45c5715fbe3699fe250ce44787fe43fbd3fdeb81601"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-bf6089b6-adversarial-fixtures.json",
+      "archive": "05-gitcraft-workflows-ui-bf6089b6-adversarial-fixtures.json.gz",
+      "sha256": "5454e8478c8669082e29007b8db76e96b2aa9bd3f0229f6a089f52635fafdde4"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-story-index-probe.rs",
+      "archive": "06-gitcraft-workflows-ui-story-index-probe.rs.gz",
+      "sha256": "3fdae7ce989283205ba857587d583a6863a917028efd823be3338c3f0c9a46a0"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-story-index-probe.log",
+      "archive": "07-gitcraft-workflows-ui-story-index-probe.log.gz",
+      "sha256": "a5a4912831d81b38c0f8b92bbfc97267a4fd7612c1ec888c98b673aff85bc071"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-radar-status-probe.rs",
+      "archive": "08-gitcraft-workflows-ui-radar-status-probe.rs.gz",
+      "sha256": "02a0adea060fde28eb6eb2f85453d0abb7dc0d2ea75936e2ed549724d7fcceb8"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-radar-status-probe.log",
+      "archive": "09-gitcraft-workflows-ui-radar-status-probe.log.gz",
+      "sha256": "b9bb00de4b6c5414233b9c690240c5b4b162f9923d9ac5f45a7c9269203c3135"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-bf6089b6-tests.json",
+      "archive": "10-gitcraft-workflows-ui-bf6089b6-tests.json.gz",
+      "sha256": "e35614e990054c2add433cf3d1916ac34739d343c05caf08e9915049214d13a8"
+    },
+    {
+      "source": "/tmp/gitcraft-workflows-ui-whole.patch",
+      "archive": "11-gitcraft-workflows-ui-whole.patch.gz",
+      "sha256": "37d4a7dd606812e47beea74e5b63e3c11e8efeaeca5ad0ea71f9d045f6131a78"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/host-checkout-marker.txt",
+      "archive": "12-host-checkout-marker.txt.gz",
+      "sha256": "cbf52b9c241eb73e9240930d36f67959a2c2a5973ce7f927dcc99d6beff5b4d2"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/checkout-hooks.jsonl",
+      "archive": "13-checkout-hooks.jsonl.gz",
+      "sha256": "9815601093a4abb827034b5a138c3fada0b7aae210709425838fb2e1079991dc"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/contracts-baseline.log",
+      "archive": "14-contracts-baseline.log.gz",
+      "sha256": "2a7b5fbd347fcb331f24476c244c897d636c5ec98ff907745e1209ecfc58639d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/intent-shadow-test.log",
+      "archive": "15-intent-shadow-test.log.gz",
+      "sha256": "4d13432cf414f4b01c711898bc95bf33e8197d701d35213144705032c8af815d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/host-checkout-marker-test.log",
+      "archive": "16-host-checkout-marker-test.log.gz",
+      "sha256": "c56bb8bd03906df48720a6d9d85e50b27e7867fce9ac5d864aaf1d46a54062cb"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/sharing-baseline.log",
+      "archive": "17-sharing-baseline.log.gz",
+      "sha256": "17b7f2a0fb5b7abc4ff9c98679a8080d551feeff4cd3a1d34b74af565278caab"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/route_window_probe.py",
+      "archive": "18-route_window_probe.py.gz",
+      "sha256": "42eb1349566f51c7a2c7ebf010fa6c1f22a65b9c172e123054b73093718318f8"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/cleanup-probe-result.json",
+      "archive": "19-cleanup-probe-result.json.gz",
+      "sha256": "867e591ba97af41c17979f4056ec8234f9db10921941c63c11502673a542c547"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/reproducer-baseline.log",
+      "archive": "20-reproducer-baseline.log.gz",
+      "sha256": "65b4a6d86f17fcda62777830930e99cf7597068234c05d03493d59b72fc991dc"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/intents-baseline.log",
+      "archive": "21-intents-baseline.log.gz",
+      "sha256": "08a255484df57d59c803d131e77700363088dae4ee6973cac63fd505d446f7b1"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/git_reachability_probe.py",
+      "archive": "22-git_reachability_probe.py.gz",
+      "sha256": "bd6a7e8eb7dd4ce3dcd1a2db0207836a887ba871df66c947a2556a667a577df4"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/route-window.json",
+      "archive": "23-route-window.json.gz",
+      "sha256": "27bc7d82b59f3a1038964bc8a3097cfa43512ac6e63647278f7cf1e3e32cc7f0"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/recording_cleanup_probe.py",
+      "archive": "24-recording_cleanup_probe.py.gz",
+      "sha256": "3e8d941e578e9c9abe34c8ad069ad7a1e732b96353541bdac5db6bae9a4a3b0e"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/backport-evidence-reachability.json",
+      "archive": "25-backport-evidence-reachability.json.gz",
+      "sha256": "d3fb195a94cfa1e670da32a8e3a52969425b10a216926bdf674987edf87b4df1"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/cleanup-recording.jsonl",
+      "archive": "26-cleanup-recording.jsonl.gz",
+      "sha256": "777780fc354bc454ddd6cec8e93241a13dca48c5cabed9f3e38cf7d6795fd646"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/intent-shadow.jsonl",
+      "archive": "27-intent-shadow.jsonl.gz",
+      "sha256": "db8f3aaf78a6a86faf3582db3c6241bc37b7611eb25bdeaffc3d2070597a9f9d"
+    },
+    {
+      "source": "/private/tmp/gitcraft-workflows-review-core-r1/bin/git",
+      "archive": "28-git.gz",
+      "sha256": "ee388fe81a59c3bd428dcc527f2fb6e7059259317cc41ccea971dad1a122e3e8"
+    }
+  ]
+}

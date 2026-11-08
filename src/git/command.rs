@@ -6,25 +6,9 @@ pub(super) mod bounded;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::RwLock;
-
-/// The config file the active gitcraft profile has git read as its global config (see
-/// `settings::profiles`), if it sets anything.
-static PROFILE_CONFIG: RwLock<Option<PathBuf>> = RwLock::new(None);
-
-/// Has every git command from now on read `path` as its global config, or the user's own again
-/// with `None`. It is still the global scope, so what a repository sets itself (`--local`,
-/// `--worktree`) wins over it.
-pub fn set_profile_config(path: Option<PathBuf>) {
-    if let Ok(mut current) = PROFILE_CONFIG.write() {
-        *current = path;
-    }
-}
-
-/// The active profile's config file, when git reads it as the global config (see
-/// [`set_profile_config`]).
+/// The initiating task's immutable profile config (including queued and nested reads).
 pub fn profile_config() -> Option<PathBuf> {
-    PROFILE_CONFIG.read().ok().and_then(|p| p.clone())
+    crate::connections::current().git_config
 }
 
 /// Whether `args` reads or writes the user's own global config: `git config --global …`
@@ -56,7 +40,17 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
     if user_global_config(args) {
         return;
     }
-    let path = PROFILE_CONFIG.read().ok().and_then(|p| p.clone());
+    let context = crate::connections::current();
+    if context.error.is_some() {
+        cmd.arg("-c").arg("=invalid-profile");
+        return;
+    }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    let path = context.git_config;
     if let Some(path) = path {
         cmd.env("GIT_CONFIG_GLOBAL", path);
     }
@@ -64,9 +58,14 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod connection;
 mod credential_policy;
+mod endpoints;
 pub(crate) use credential_policy::*;
-
+pub(crate) use endpoints::*;
+mod setup;
+pub(crate) use connection::*;
+pub(crate) use setup::{setup_clone, setup_fetch, setup_run};
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
@@ -155,12 +154,13 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    /// Normalize before installing intentional command-owned environment.
     normalize_repository: bool,
-    owned_pre: Vec<String>,
     unset: Vec<&'static str>,
     output_limit: Option<usize>,
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
+    owned_pre: Vec<String>,
     env: Vec<(&'static str, String)>,
     /// What git reads on its input; nothing when `None`.
     stdin: Option<Vec<u8>>,
@@ -231,29 +231,23 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
-    apply_command_extras(cmd, dir, extra, args)
+    apply_command_extras(repository_command(dir, args), dir, extra, args)
 }
-
-/// Apply production argv and environment to an already selected executable.
-/// Recording callers use a fixed command without executable discovery.
+/// Apply the actual production argv/environment policy to an already selected command.
+/// Recording callers can provide a fixed executable without PATH discovery.
 pub(super) fn apply_command_extras(
     mut cmd: Command,
-    _dir: Option<&Path>,
+    dir: Option<&Path>,
     extra: &Extra,
     args: &[&str],
 ) -> Command {
     for name in &extra.unset {
         cmd.env_remove(name);
     }
-    cmd.args(&extra.pre).args(&extra.owned_pre);
-    if extra.normalize_repository {
+    if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
         normalize_connection_command(&mut cmd, args);
     }
+    cmd.args(&extra.pre).args(&extra.owned_pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
@@ -386,6 +380,7 @@ pub fn goes_over_network(args: &[&str]) -> bool {
                 | "lfs"
                 | SHELL_ALIAS
                 | USER_COMMAND_ALIAS
+                | super::dvc::PULL_ALIAS
         )
     )
 }
@@ -699,9 +694,8 @@ pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Chi
             &remote_request(&target, &Extra::default(), args),
         );
     }
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -799,7 +793,12 @@ pub struct Credentials {
     pub scope: Option<super::CredentialScope>,
 }
 
-/// Transient credentials are installed only through the shared command policy.
+/// A designated HTTP transport helper; explicit transient accounts replace ambient
+/// helpers and are never automatically stored. Secret values stay out of argv.
+/// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
+/// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
+const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
+
 /// [`run`], answering a credential request with `creds` when given.
 pub fn run_with(
     dir: Option<&Path>,
@@ -1079,6 +1078,7 @@ impl Recorded {
         creds: Option<&Credentials>,
         started: std::time::Instant,
     ) -> Self {
+        crate::diagnostics::crash::operation(args, code, started.elapsed());
         let password = creds.map(|c| c.password.as_str());
         Self {
             args: args.iter().map(|a| super::redact(a, password)).collect(),
@@ -1168,6 +1168,73 @@ fn syntax_read_error(error: String) -> String {
     } else {
         error
     }
+}
+
+/// Bounded raw snapshots: no implicit network fetches, filters or detached workers.
+pub(super) fn comparison_output(
+    repo: &Path,
+    args: &[&str],
+    env: &[(&'static str, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    let guarded: Vec<_> = std::iter::once("--no-lazy-fetch")
+        .chain(args.iter().copied())
+        .collect();
+    let out = if let Some(target) = remote::parse(repo) {
+        let mut request = bounded::request(&target, &guarded, Vec::new(), 8 * 1024 * 1024);
+        request
+            .env
+            .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
+        comparison_remote(&target.host, request, active)?
+    } else {
+        let extra = Extra {
+            env: env.to_vec(),
+            ..Default::default()
+        };
+        let cmd = local_command(Some(repo), &extra, &guarded);
+        let out = crate::processes::run_while(
+            cmd,
+            crate::processes::Options {
+                timeout: Some(std::time::Duration::from_secs(20)),
+                output_limit: 8 * 1024 * 1024,
+                stderr_limit: Some(64 * 1024),
+                ..Default::default()
+            },
+            active,
+        )?
+        .complete()?;
+        remote::Output {
+            code: out.status.code().unwrap_or(-1),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        }
+    };
+    if out.stdout.len() > 8 * 1024 * 1024 || out.stderr.len() > 64 * 1024 {
+        return Err("Comparison output exceeds the size limit; choose fewer files".into());
+    }
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    Ok(out)
+}
+pub(super) fn comparison_remote(
+    host: &remote::Host,
+    mut request: remote::Request,
+    active: &dyn Fn() -> bool,
+) -> Result<remote::Output, String> {
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    request.timeout = Some(std::time::Duration::from_secs(20));
+    request.long = true;
+    let out = remote::exec(host, &request)?;
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -1423,6 +1490,7 @@ mod tests {
     }
 
     /// Credentials typed into the tab still answer a quiet operation.
+    #[cfg(unix)]
     #[test]
     fn quiet_transient_credentials_use_the_shared_transport_policy() -> Result<(), String> {
         let credentials = Credentials::for_url(
@@ -2179,7 +2247,14 @@ mod reviewed_push_tests {
     #[test]
     fn explicit_repository_context_clears_redirects_and_retains_private_index_overrides() {
         let private = Extra {
-            env: vec![("GIT_INDEX_FILE", "private.index".into())],
+            normalize_repository: true,
+            unset: vec!["GIT_INDEX_FILE", "GIT_CONFIG_COUNT", "GIT_SHALLOW_FILE"],
+            env: vec![
+                ("GIT_INDEX_FILE", "private.index".into()),
+                ("GIT_CONFIG_COUNT", "1".into()),
+                ("GIT_CONFIG_KEY_0", "remote.private.url".into()),
+                ("GIT_CONFIG_VALUE_0", "https://push.invalid/repo".into()),
+            ],
             ..Default::default()
         };
         let mut command = Command::new("/recorded/git");
@@ -2189,7 +2264,7 @@ mod reviewed_push_tests {
             apply_command_extras(command, Some(Path::new("chosen")), &private, &["status"]);
         let env: std::collections::BTreeMap<_, _> = command.get_envs().collect();
         for key in REPOSITORY_ENV_REMOVED {
-            if *key != "GIT_INDEX_FILE" {
+            if !["GIT_INDEX_FILE", "GIT_CONFIG_COUNT"].contains(key) {
                 assert_eq!(env.get(std::ffi::OsStr::new(key)), Some(&None), "{key}");
             }
         }
@@ -2197,6 +2272,12 @@ mod reviewed_push_tests {
             env.get(std::ffi::OsStr::new("GIT_INDEX_FILE")),
             Some(&Some(std::ffi::OsStr::new("private.index")))
         );
+        for (key, value) in &private.env {
+            assert_eq!(
+                env.get(std::ffi::OsStr::new(key)),
+                Some(&Some(std::ffi::OsStr::new(value)))
+            );
+        }
         let target = remote::Target {
             host: remote::Host::Ssh("fixture.invalid".into()),
             path: "/chosen".into(),
@@ -2264,4 +2345,113 @@ mod reviewed_push_tests {
         assert!(safe.contains("[remote rejected]"));
         assert!(reviewed_refusal(good.as_bytes(), &source, "refs/heads/other").is_none());
     }
+}
+
+/// Bounded, read-only repository tour requests. Callers supply only fixed Git operations.
+pub(crate) fn tour_read(
+    repo: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    bounded::run(repo, args, input.unwrap_or_default().to_vec(), 64 << 20)
+}
+
+/// All local execution routes, including streaming and watched operations, use this builder.
+pub(super) fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
+    if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
+        return practice_command(dir);
+    }
+    let mut cmd = git_cmd();
+    with_profile(&mut cmd, args);
+    if let Some(dir) = dir {
+        cmd.arg("-C").arg(dir);
+    }
+    cmd
+}
+fn practice_command(dir: &Path) -> Command {
+    let mut cmd = git_cmd();
+    for name in crate::practice::ISOLATED_ENV_REMOVE {
+        cmd.env_remove(name);
+    }
+    for (name, value) in crate::practice::ISOLATED_ENV_SET {
+        cmd.env(name, value);
+    }
+    cmd.arg("--no-replace-objects").arg("-C").arg(dir);
+    cmd
+}
+pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
+    if remote::is_remote(dir) {
+        return Err("Practice repositories are local".into());
+    }
+    let mut cmd = practice_command(dir);
+    cmd.args(args);
+    let out = crate::processes::run(
+        cmd,
+        crate::processes::Options {
+            timeout: Some(std::time::Duration::from_secs(30)),
+            ..Default::default()
+        },
+    )?
+    .complete()?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}
+
+#[cfg(test)]
+mod practice_environment_tests {
+    use super::*;
+    #[test]
+    fn synthetic_practice_command_removes_every_inherited_route() {
+        let cmd = practice_command(Path::new("sandbox"));
+        let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+        for name in crate::practice::ISOLATED_ENV_REMOVE {
+            assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+        }
+        for (name, value) in crate::practice::ISOLATED_ENV_SET {
+            assert_eq!(
+                env.get(std::ffi::OsStr::new(name)).copied().flatten(),
+                Some(std::ffi::OsStr::new(value)),
+                "{name}"
+            );
+        }
+        assert!(cmd.get_args().any(|a| a == "--no-replace-objects"));
+    }
+}
+
+pub(crate) fn onboarding_local_config(
+    repo: &Path,
+    key: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<String>, String> {
+    if !["user.name", "user.email"].contains(&key) {
+        return Err("Unsupported setup configuration key".into());
+    }
+    if !active() {
+        return Err("Export cancelled".into());
+    }
+    let bytes = execute(
+        Some(repo),
+        &Extra {
+            timeout: Some(std::time::Duration::from_secs(20)),
+            output_limit: Some(65536),
+            ..Default::default()
+        },
+        &["config", "--local", "--null", "--get", key],
+    )?;
+    if bytes.code == Some(1) {
+        return Ok(None);
+    }
+    if bytes.code != Some(0) {
+        return Err("Could not inspect local setup configuration".into());
+    }
+    let value = bytes
+        .stdout
+        .strip_suffix(&[0])
+        .ok_or("Invalid configuration response")?;
+    String::from_utf8(value.to_vec())
+        .map(Some)
+        .map_err(|_| "Local configuration is not UTF-8".into())
 }

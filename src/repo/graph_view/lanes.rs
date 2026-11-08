@@ -43,29 +43,65 @@ impl RepoTab {
             if lane < lanes {
                 let ends = [pos2(x(lane), top), pos2(x(lane), bottom)];
                 if ghost_lane(|g| &g.through, lane) {
-                    dashed(&gp, &ends, t.lane(lane), width);
+                    dashed(
+                        &gp,
+                        &ends,
+                        t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane)),
+                        width,
+                    );
                 } else if going(|g| &g.going_through, lane) {
-                    gp.line_segment(ends, Stroke::new(width, t.lane(lane).gamma_multiply(GOING)));
+                    gp.line_segment(
+                        ends,
+                        Stroke::new(
+                            width,
+                            t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane))
+                                .gamma_multiply(GOING),
+                        ),
+                    );
                 } else {
-                    gp.line_segment(ends, Stroke::new(width, t.lane(lane)));
+                    gp.line_segment(
+                        ends,
+                        Stroke::new(
+                            width,
+                            t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane)),
+                        ),
+                    );
                 }
             }
         }
         for &lane in graph_row.incoming.iter() {
             let end = pos2(x(lane), top);
             if ghost_lane(|g| &g.incoming, lane) {
-                dashed(&gp, &edge_points(node, end), t.lane(lane), width);
+                dashed(
+                    &gp,
+                    &edge_points(node, end),
+                    t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane)),
+                    width,
+                );
             } else if going(|g| &g.going_incoming, lane) {
-                edge(&gp, node, end, t.lane(lane).gamma_multiply(GOING), width);
+                edge(
+                    &gp,
+                    node,
+                    end,
+                    t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane))
+                        .gamma_multiply(GOING),
+                    width,
+                );
             } else {
-                edge(&gp, node, end, t.lane(lane), width);
+                edge(
+                    &gp,
+                    node,
+                    end,
+                    t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane)),
+                    width,
+                );
             }
         }
         for &lane in graph_row.outgoing.iter() {
             let color = if is_wip || stash.is_some() {
                 t.text_faint
             } else {
-                t.lane(lane)
+                t.lane(graph_row.colours.get(&lane).copied().unwrap_or(lane))
             };
             let end = pos2(x(lane), bottom);
             if new {

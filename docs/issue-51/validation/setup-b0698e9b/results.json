@@ -1,0 +1,473 @@
+{
+  "sha": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "path_prefix": "/tmp/gitcraft-integration-tools",
+  "results": [
+    {
+      "filter": "tour::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "tour::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.42,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-tour.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3251 filtered out; finished in 0.18s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "practice::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "practice::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 1.49,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-practice.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 3243 filtered out; finished in 1.17s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "glossary::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "glossary::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.25,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-glossary.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3251 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "settings::profiles::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "settings::profiles::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.7,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-settings-profiles.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 3246 filtered out; finished in 0.46s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "repo::ssh_setup::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "repo::ssh_setup::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.65,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-repo-ssh_setup.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 3239 filtered out; finished in 0.41s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "forge::ssh_keys::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "forge::ssh_keys::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.69,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-forge-ssh_keys.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3250 filtered out; finished in 0.45s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "diagnostics::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diagnostics::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.45,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-diagnostics.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3248 filtered out; finished in 0.21s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "connection_doctor::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "connection_doctor::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.51,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-connection_doctor.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3248 filtered out; finished in 0.26s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "git::command::connection::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::command::connection::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.4,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-git-command-connection.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3251 filtered out; finished in 0.15s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "settings::network_page::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "settings::network_page::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-settings-network_page.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3253 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "portability::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "portability::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 1.62,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-portability.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3240 filtered out; finished in 1.39s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "app::setup::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "app::setup::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.72,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-app-setup.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3248 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "git::command::setup::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::command::setup::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.73,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-git-command-setup.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3251 filtered out; finished in 0.48s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "connections::tests::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "connections::tests::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 1.6,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-connections-tests.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s",
+        "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 3229 filtered out; finished in 1.35s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "repo::load::",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "repo::load::",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 0.27,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-repo-load.log",
+      "results": [
+        "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3252 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "filter": "build",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--bin",
+        "gitcraft"
+      ],
+      "exit": 0,
+      "seconds": 21.14,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-build.log",
+      "results": [
+        "\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.10s"
+      ]
+    },
+    {
+      "filter": "clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "exit": 0,
+      "seconds": 12.13,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-clippy.log",
+      "results": [
+        "\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.06s"
+      ]
+    },
+    {
+      "filter": "format",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 1.84,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-format.log",
+      "results": []
+    },
+    {
+      "filter": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.01,
+      "log": "/tmp/gitcraft-51-t3-5b9a0fe3-final-diff-check.log",
+      "results": []
+    }
+  ],
+  "archived_logs": [
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-tour.log",
+      "archive": "00-tour--.log.gz",
+      "sha256": "094d90b1034f7471293eb26259405ecf325195fba90d3fc96476f3bd02f6aee8"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-practice.log",
+      "archive": "01-practice--.log.gz",
+      "sha256": "ecc3e0726bef633cca5c898d96699b7c57e271032e764d656f00ed6cd0303a54"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-glossary.log",
+      "archive": "02-glossary--.log.gz",
+      "sha256": "5b4f945aa3600395b024afe040687e3b9d6d24be544a3ba059c6d55753b297c2"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-settings-profiles.log",
+      "archive": "03-settings--profiles--.log.gz",
+      "sha256": "eb35c80b62c3fb3d45ad9b441c091004703e7ed2588092492e810bf80da4235b"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-repo-ssh_setup.log",
+      "archive": "04-repo--ssh_setup--.log.gz",
+      "sha256": "6e7d35d62149d7f581673ee63485ab6be614790c5e5979c23a496ad86589f995"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-forge-ssh_keys.log",
+      "archive": "05-forge--ssh_keys--.log.gz",
+      "sha256": "f3b1d085fa01d1bb7cc0ae5c100e8cf1235f22f16b5a138408547ba331b1c3c1"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-diagnostics.log",
+      "archive": "06-diagnostics--.log.gz",
+      "sha256": "b50d2a54ca07aacb12446d23d6e79be8014d61bd01c45b14a255f1d60f946930"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-connection_doctor.log",
+      "archive": "07-connection_doctor--.log.gz",
+      "sha256": "27aafc4b20ac88ddca0a29854b699a5633774266a3aeaaf464643b5b7ce853f9"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-git-command-connection.log",
+      "archive": "08-git--command--connection--.log.gz",
+      "sha256": "5eec9a766aedf29a605c308f0d6fa212426b5cf9528b4ee9573d7d282dbfa583"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-settings-network_page.log",
+      "archive": "09-settings--network_page--.log.gz",
+      "sha256": "19754695b21338989983dac406d78c5af35bbe7fc0a7100c1e83370d9e08bdda"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-portability.log",
+      "archive": "10-portability--.log.gz",
+      "sha256": "b3c2b3f96b563bc84dd569fd0e7824ab5a33aea5e9331e002afeb8accb063b71"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-app-setup.log",
+      "archive": "11-app--setup--.log.gz",
+      "sha256": "b14078d35d0c1c1c002715542a1fc760a3a94999ab29c657fe6c22bcc95e9f7a"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-git-command-setup.log",
+      "archive": "12-git--command--setup--.log.gz",
+      "sha256": "d210663038c724e656886ba8c6e37f689aa6be35d2e6faa8602a311e59aa549f"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-connections-tests.log",
+      "archive": "13-connections--tests--.log.gz",
+      "sha256": "23da34da0e7f6e7aa0b0afc95ff102b0952c8efc8d4715b5576d30c8b4958bef"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-repo-load.log",
+      "archive": "14-repo--load--.log.gz",
+      "sha256": "de361450891af33f54da6121e17a92ea6f3b70f4d91915ebf5707b9fceee1d00"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-build.log",
+      "archive": "15-build.log.gz",
+      "sha256": "1c4a0a9671aec92efb924d238d5335352b73212cdbe3b5bbe96eae71fdf49211"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-clippy.log",
+      "archive": "16-clippy.log.gz",
+      "sha256": "82f835997f77e01b696a27d8a81cd34ef67654838c8cb9331dae49bebb1531b8"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-format.log",
+      "archive": "17-format.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "/tmp/gitcraft-51-t3-5b9a0fe3-final-diff-check.log",
+      "archive": "18-diff-check.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "independent_review": "in progress",
+  "remote_sha_verified_by_parent": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+  "lint_scope": "Qualified clippy: -D warnings -A dead_code; macOS baseline warning allowance, not strict"
+}

@@ -39,7 +39,7 @@ impl<T> Loading<T> {
     {
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(work());
             ctx.request_repaint();
         });
@@ -113,7 +113,7 @@ impl TeleportForm {
         let info = Loading::start(ctx, move || teleport::inspect(&path));
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(remote::wsl_distros());
             ctx2.request_repaint();
         });
@@ -357,7 +357,7 @@ impl TeleportForm {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         let worker = Arc::clone(&job);
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let landed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 teleport::run(&plan, &worker)
             }))

@@ -264,7 +264,7 @@ pub fn work_diff(repo: &Path, file: &StatusFile, opts: DiffOptions) -> Result<St
     if file.area == Area::Untracked {
         // An untracked file has no history: show it as all added.
         let mut args = vec!["diff"];
-        args.extend(PATCH_ARGS);
+        opts.push_args(&mut args);
         args.extend(["--no-index", "--", "/dev/null", path]);
         return run_ok_codes(Some(repo), &args, &[0, 1]);
     }

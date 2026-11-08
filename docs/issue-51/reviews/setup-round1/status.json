@@ -1,0 +1,110 @@
+{
+  "candidate": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+  "verdict": "FAIL",
+  "findings": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6"
+  ],
+  "correction_status": "queued awaiting coding slot",
+  "artifacts": [
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/config-source.rs",
+      "archive": "00-config-source.rs.gz",
+      "sha256": "7eae92105a76cbaf0d04f7e1294f914576571a8bd3e050e479e94c6de41a839a"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/push-endpoint-build.log",
+      "archive": "01-push-endpoint-build.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/mux-repro.json",
+      "archive": "02-mux-repro.json.gz",
+      "sha256": "2abd01056f347e5d005f103c0941c1641574cdd55e57dc51dc1050a62ffb72b4"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/source-repros-build.log",
+      "archive": "03-source-repros-build.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/stale-switch.log",
+      "archive": "04-stale-switch.log.gz",
+      "sha256": "0a8de83ef240833695d770ed35c6ede3825418d7048cd3960237d47bed5b66ee"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/SHA256SUMS.json",
+      "archive": "05-SHA256SUMS.json.gz",
+      "sha256": "5cb20baf01ead32be3ca3f3052d73601391f73a7a686a5f0c2d180ae0deb72e2"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/mux_repro.py",
+      "archive": "06-mux_repro.py.gz",
+      "sha256": "b0a66ffd73753ee1ddfeb777a3482fb207607f4970f9569885be6e802a8741be"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/stale-switch-build.log",
+      "archive": "07-stale-switch-build.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/source-repros.log",
+      "archive": "08-source-repros.log.gz",
+      "sha256": "51dd70b09d7c1b517a964047d876bdceb7cb1b1ea7db1707ecec1585e1c6df4d"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/source-function-hashes.json",
+      "archive": "09-source-function-hashes.json.gz",
+      "sha256": "ea073843545e4a38ef639c9e34e396e6fcfb8e56f50bcf543855550b4fe3d092"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/stale_switch_repro.py",
+      "archive": "10-stale_switch_repro.py.gz",
+      "sha256": "e2ffc1fdad1d22176e9737f379af7a14475f5279af4e2c62d74e6fc0d664bd0b"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/source_repros.py",
+      "archive": "11-source_repros.py.gz",
+      "sha256": "f61f8b380f9e27530e02052477976fedc937d233691853b3ba747311ead254a1"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/gitcraft-51-t3-5b9a0fe3-validation.json",
+      "archive": "12-gitcraft-51-t3-5b9a0fe3-validation.json.gz",
+      "sha256": "1fd6b4b9c2ab6fba6c89818b51fe18483bbe8dac687975746eadfba9a544b1fe"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/verification.json",
+      "archive": "13-verification.json.gz",
+      "sha256": "9d3a8af0993077767425e1c02dfdc408af50cc594dd28f21bc369970e608ee6b"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/gitcraft-issue51-issues.json",
+      "archive": "14-gitcraft-issue51-issues.json.gz",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/stale-switch-repro.rs",
+      "archive": "15-stale-switch-repro.rs.gz",
+      "sha256": "08d3837bfa42803c9ce4795f1ce17f892adf94d83a84d2f2319e7ec7616cd186"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/push-endpoint.log",
+      "archive": "16-push-endpoint.log.gz",
+      "sha256": "59d849142c82b0874aa01fbf812af3e2d39e93c91d61261495f527d8c82018de"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/push-endpoint-repro.rs",
+      "archive": "17-push-endpoint-repro.rs.gz",
+      "sha256": "d615c16d38091d9836f5c2c335e13f697e054446a1c1a41f6aa6a0cc4691f8dd"
+    },
+    {
+      "source": "/tmp/gitcraft-51-setup-review-r1-evidence/source-repros.rs",
+      "archive": "18-source-repros.rs.gz",
+      "sha256": "f6d6240f63667a8ca7244254ba4e168dea81b45a93f03797ba95a9842e9f8eb5"
+    }
+  ]
+}

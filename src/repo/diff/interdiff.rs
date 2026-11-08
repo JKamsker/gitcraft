@@ -107,6 +107,7 @@ pub(in crate::repo) fn interdiff_rows(
                     false,
                     None,
                     None,
+                    None,
                 );
             }
         });

@@ -51,7 +51,28 @@ pub(crate) enum Action {
     /// Turn offline mode on or off.
     SetOffline(bool),
     Select(usize),
+    DvcPull,
+    OpenFileComparison(super::file_comparison::Page),
+    RefreshFileComparison,
+    CloseFileComparison,
+    ComparisonMove {
+        request: u64,
+        index: usize,
+    },
+    ComparisonCell {
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+    },
+    ComparisonPick {
+        request: u64,
+        boundary: usize,
+        lines: std::collections::BTreeSet<usize>,
+        whole: bool,
+    },
+    ComparisonNormalPatch,
     SelectHash(String),
+    ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),
     SelectStash(usize),
@@ -77,6 +98,7 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    LocalCi(super::local_ci::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
@@ -85,6 +107,8 @@ pub(crate) enum Action {
     /// Show the repository doctor in the big area, at a section.
     OpenDoctor(doctor::Section),
     CloseDoctor,
+    OpenTour,
+    OpenSshSetup,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
     /// Agent tasks and the worktree setup recipe.
@@ -219,6 +243,10 @@ pub(crate) enum Action {
     },
     /// Read syntax changes through Difftastic; staging stays in the patch.
     DiffStructural(bool),
+    DiffDecrypted(bool),
+    DiffSvgSource(bool),
+    DiffWrap(bool),
+    DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// Show the two places of a moved block of the diff together (by its index), or stop.
@@ -361,6 +389,8 @@ pub(crate) enum Action {
     Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Forget the effective HTTPS helper login, then reopen the tab sign-in dialog.
+    SwitchHttps(String),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
     /// at is known (read in the background for a repository on another machine).
     DeleteTag {
@@ -560,6 +590,31 @@ impl RepoTab {
     /// What the command palette offers for this repository.
     pub(crate) fn additional_palette_items(&self) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "DVC: Pull".into(),
+                "data download remote".into(),
+                Action::DvcPull,
+            ),
+            (
+                "Code moved across files".into(),
+                "refactor moved block".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::CodeMoves),
+            ),
+            (
+                "File migration map".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Migration),
+            ),
+            (
+                "Three-state staging lens".into(),
+                "staging".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Lens),
+            ),
+            (
+                "File versions across branches".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
             ("Fetch".into(), label(Command::Fetch), Action::Fetch),
             ("Pull".into(), label(Command::Pull), Action::Pull),
             (

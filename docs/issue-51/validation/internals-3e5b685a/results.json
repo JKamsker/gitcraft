@@ -1,0 +1,265 @@
+{
+  "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "PATH": "/tmp/gitcraft-integration-tools:/opt/homebrew/opt/python@3.14/libexec/bin:/Users/jonas/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Wireshark.app/Contents/MacOS:/usr/local/share/dotnet:~/.dotnet/tools:/Users/jonas/.codex/packages/standalone/releases/0.164.0-aarch64-apple-darwin/codex-path:/Users/jonas/.codex/tmp/arg0-macos/codex-arg08iQWXM:/opt/homebrew/opt/python@3.14/libexec/bin:/Users/jonas/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/jonas/.cargo/bin",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "results": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 1.7,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 24.78,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-clippy.log",
+      "log_sha256": "80fb44102ee94e5068555425d811b2c32f40b2b47a47d68f1e995c57b6df78a2"
+    },
+    {
+      "name": "repository-tools",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "repository_tools",
+        "--lib",
+        "--",
+        "--test-threads=2"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 3.86,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-repository-tools.log",
+      "log_sha256": "e0fbd9a1401ef8ebdc10ea597ef4e23f25bd59ac97c64f4e80e95c1f12bee6bf"
+    },
+    {
+      "name": "push",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "repo::push::tests",
+        "--lib",
+        "--",
+        "--test-threads=2"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 3.39,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-push.log",
+      "log_sha256": "86096ae6e9e04620a86c5f5b699128e940a196376bc36ae50f1bf2ce3a65b84b"
+    },
+    {
+      "name": "operations",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "repo::operations::tests",
+        "--lib",
+        "--",
+        "--test-threads=2"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 0.63,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-operations.log",
+      "log_sha256": "bb4a447a3c6658124cf6ef8a949ef797f435ba85b8426a776c1de70a948d7b3d"
+    },
+    {
+      "name": "my-work",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "across::my_work::tests",
+        "--lib",
+        "--",
+        "--test-threads=2"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 1.63,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-my-work.log",
+      "log_sha256": "c04d6c6f69fa9a81afd4d6ada68b65b2e99e31a51d233af9e5d550fbbc4c83b2"
+    },
+    {
+      "name": "build",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--bin",
+        "gitcraft"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 55.52,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-build.log",
+      "log_sha256": "f9f14861baf0f32fd5493cd6d088994072c5b79b1d0de60c28b89bb9b5ea902e"
+    },
+    {
+      "name": "windows-owned-module",
+      "command": [
+        "rustc",
+        "+1.95.0",
+        "--crate-name",
+        "gitcraft_held_windows_check",
+        "--crate-type",
+        "lib",
+        "--edition=2024",
+        "--target",
+        "x86_64-pc-windows-gnu",
+        "--emit=metadata",
+        "-L",
+        "dependency=target/x86_64-pc-windows-gnu/debug/deps",
+        "--extern",
+        "windows_sys=target/x86_64-pc-windows-gnu/debug/deps/libwindows_sys-bfe4dbd8e43860ff.rmeta",
+        "--extern",
+        "winapi_util=target/x86_64-pc-windows-gnu/debug/deps/libwinapi_util-f0000a99546bfc15.rmeta",
+        "/tmp/gitcraft-advanced-held-windows-check.rs",
+        "-o",
+        "/tmp/gitcraft-advanced-held-windows-check.rmeta"
+      ],
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "exit_code": 0,
+      "seconds": 0.16,
+      "log": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-windows-owned-module.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "remote_branch": "refs/heads/t3/advanced-git-repository-tools",
+  "remote_sha_verified": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+  "commits": [
+    {
+      "sha": "012674d400dad02ae0d06e2d3fe96cdbe9735ca2",
+      "subject": "Browse all refs, symbolic targets and namespace history"
+    },
+    {
+      "sha": "d254ec2b8b34b4ec23ab964c60c5ca05bcfdca51",
+      "subject": "Inspect stored objects, file versions, packs and delta bases"
+    },
+    {
+      "sha": "daef5fb429eea4a0d5f5e161477431c4da7cbd29",
+      "subject": "Guide ref storage migration with stale-state and worktree guards"
+    },
+    {
+      "sha": "a7a86745858c06f7f62eea544422a2fdcc04779c",
+      "subject": "Explore original and effective histories with removable graft joins"
+    },
+    {
+      "sha": "7842ee77c0e56cdab4a6e073a8439739db79e731",
+      "subject": "Edit remote URLs and refspecs with mapping and prune previews"
+    },
+    {
+      "sha": "39781f857570cbb10d070102ab67fe2cc5435241",
+      "subject": "Publish named host groups with pinned commits and failed-only retry"
+    },
+    {
+      "sha": "1e9b6008e94615961cebaa7d2d7a80792ef841d1",
+      "subject": "Show independent branch pull and push routes with guarded destination pickers"
+    },
+    {
+      "sha": "e589c7bdbc0a1f4dd44da0ab4c79afda0fd1ebe4",
+      "subject": "Resolve submodule conflicts through base ours theirs graphs"
+    },
+    {
+      "sha": "024cfef18324c371c96cfe135718d3eba4ba6758",
+      "subject": "Publish submodule dependencies on checked hosts before the parent"
+    },
+    {
+      "sha": "06b69cb6ddc2e9b90be1770f3ab2d789f2997040",
+      "subject": "Inspect borrowed object topology and safely make local clones independent"
+    },
+    {
+      "sha": "4c78b9aa35b6df3840c3e2d49d0a6718745cb099",
+      "subject": "Refuse inherited remote edits before writing and parse native mirror booleans"
+    },
+    {
+      "sha": "a65781fdf588acbbe98d273ba9526205abe37882",
+      "subject": "Verify effective routes and guard every publication endpoint and force push"
+    },
+    {
+      "sha": "7b6926b0d2442c4b6a75e536ae78970ec6684146",
+      "subject": "Follow immediate symbolic targets through root refs such as HEAD"
+    },
+    {
+      "sha": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "subject": "Use Git boolean semantics for promisor topology and independence guards"
+    }
+  ],
+  "report": "/tmp/gitcraft-advanced-repository-tools-report.md",
+  "report_sha256": "06b657b290269ade279ae77228fd08c0e19340a20bfdf38494855b7f6674faae",
+  "archived_logs": [
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-fmt.log",
+      "archive": "00-fmt.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-clippy.log",
+      "archive": "01-clippy.log.gz",
+      "sha256": "80fb44102ee94e5068555425d811b2c32f40b2b47a47d68f1e995c57b6df78a2"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-repository-tools.log",
+      "archive": "02-repository-tools.log.gz",
+      "sha256": "e0fbd9a1401ef8ebdc10ea597ef4e23f25bd59ac97c64f4e80e95c1f12bee6bf"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-push.log",
+      "archive": "03-push.log.gz",
+      "sha256": "86096ae6e9e04620a86c5f5b699128e940a196376bc36ae50f1bf2ce3a65b84b"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-operations.log",
+      "archive": "04-operations.log.gz",
+      "sha256": "bb4a447a3c6658124cf6ef8a949ef797f435ba85b8426a776c1de70a948d7b3d"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-my-work.log",
+      "archive": "05-my-work.log.gz",
+      "sha256": "c04d6c6f69fa9a81afd4d6ada68b65b2e99e31a51d233af9e5d550fbbc4c83b2"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-build.log",
+      "archive": "06-build.log.gz",
+      "sha256": "f9f14861baf0f32fd5493cd6d088994072c5b79b1d0de60c28b89bb9b5ea902e"
+    },
+    {
+      "original": "/tmp/gitcraft-advanced-validation/3e5b685a17d9351ae59dd89cd4c148358c9644bd-windows-owned-module.log",
+      "archive": "07-windows-owned-module.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "independent_review": "pending",
+  "remote_sha_verified_by_parent": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+  "lint_scope": "Qualified clippy: -D warnings -A dead_code; macOS baseline warning allowance, not strict"
+}

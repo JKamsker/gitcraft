@@ -1,0 +1,71 @@
+# Issue #51: visualization and graph audio implementation evidence
+
+This is the isolated visualization batch, based on `a850de26b0a0778ea96fe34cd1498e6e78928492`. It covers all eight #46 ideas, #39's graph-hearing idea, and #38.14 explanatory motion. Status: **implemented and locally validated; independent adversarial review and combined validation remain with the parent task**. No PR or CI run was created.
+
+The tested application commit is `0b5718ce575d3ba6332ca0ae6ea96f90d6493073` on `t3/history-visualization-audio`, pushed to `https://github.com/JKamsker/gitcraft`. Local and remote SHAs matched. Every implementation unit and subsequent correction was committed and pushed before continuing. All commits use `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`.
+
+## Requirement coverage and feature provenance
+
+Feature SHAs below identify the initial preserved units. The tested application commit includes their subsequent corrections; cherry-picking only the initial units omits those fixes.
+
+| Idea | Initial feature commit | Implemented behavior and source evidence |
+| --- | --- | --- |
+| #46.1 Branching-model lanes | `86768bad4608b7159b96c01dbf77199a6fea8077` | Graph tools offers Compact, Trunk and GitFlow presets plus individual full-ref band pins. Repository-scoped preferences persist; actual branch tips reserve stable bands/colors before first-parent inheritance. Existing compact layout, merge edges and ghost previews remain. [Preferences, classification and UI](../src/repo/branch_bands.rs), [banded layout](../src/graph.rs), [lane painting](../src/repo/graph_view/lanes.rs). |
+| #46.2 History minimap | `0a5e5f1a2f1bc569290a61844ca84ec7fbc30301` | Loaded graph shape, viewport rectangle, HEAD, tags, search hits and unloaded-history boundary. Click/drag and focused keyboard movement scroll the graph. Model builds off-thread and is invalidated on graph/search changes. [Model, painting, interactions and UI test](../src/repo/graph_view/minimap.rs). |
+| #46.3 Activity calendar | `fd0805820d0be43f389fa097898b9ead99b74d4a` | Graph tools opens a dedicated commit calendar, separate from the operation log. Day/month browsing, click-day commit lists, drag-date ranges, editable dates and author/committer clocks. Unique pinned local/remote/tag/HEAD roots are walked once; stash/application refs are excluded. [Calendar UI](../src/repo/history_activity/view.rs), [history reader and summaries](../src/git/activity.rs), [integration/UI tests](../src/repo/history_activity/tests.rs). |
+| #46.4 Churn/contributor atlas | `ea5a1e83a4b6b94179946f7f451c5cbcbfc0e1a0` | Graph tools opens a zoomable folder treemap; byte/change-frequency sizing, churn/contributor coloring, date window and clock. Current unchanged files and historical deleted paths are represented. Folder hotspots zoom; file hotspots open history pinned to the analyzed HEAD. Labels say “Most frequent contributor.” [Backend](../src/git/atlas.rs), [UI, partition tests and actual hotspot test](../src/repo/atlas/mod.rs). |
+| #46.5 Repository growth playback | `e689eaa5e2ceb6f3f000316cd3500c39a06b7125` | Graph tools opens a real file-tree replay with play/pause, speed, scrubber and previous/next controls. A full pinned baseline and first-parent changes show file appearance, modification and deletion, highlighting the current contributor's paths. Pause opens the displayed commit. Reduced motion permits static stepping/scrubbing. Reads and tree reconstruction run off-thread. [Pinned reader and replay test](../src/git/growth.rs), [hierarchical UI and interaction tests](../src/repo/growth.rs). |
+| #46.6 Contributor statistics | `fd0805820d0be43f389fa097898b9ead99b74d4a` | Graph tools opens author statistics for the selected date period: commits, distinct files, active days and first/last activity. Selecting an author lists commits. Git resolves the effective worktree/configured/blob mailmap once after paging so aliases share one identity. [Statistics UI](../src/repo/history_activity/view.rs), [aggregation](../src/git/activity.rs), [Git mailmap handling](../src/git/activity/mailmap.rs), [real Git tests](../src/git/activity/tests.rs). Calendar and statistics intentionally share this feature unit. |
+| #46.7 Quiet celebrations | `aac96f21e2aa3535665fe81e9167f39113c5b387` | Settings → General has separate default-off flourish/sound switches. Accepted first-commit, explicitly designated release-tag and merge operations arm candidates; only success plus a confirming later repository read triggers the short flourish/soft cue. Failed/no-op/unconfirmed actions do not celebrate. No counts/line thresholds. System reduced motion suppresses the flourish independently of sound. [Confirmation and recording tests](../src/repo/celebration.rs), [operation hooks](../src/repo/operations.rs), [release designation](../src/repo/dialogs/branch.rs), [settings](../src/settings/mod.rs). |
+| #46.8 History postcards | `3b0b0bc7d7999e66e10d8472e64cb68ceafb1085` | Graph tools opens immutable range/tag/branch selection, release name/date, optional names/messages and anonymization. Disclosure lists enumerate exported text; preview uses the exact composed PNG. Anonymization removes raw author/message data from renderer input. Local export creates a new PNG without overwriting existing destinations or following replaced parents. Profile changes/closing cancel stale workers and discard disclosure data. [UI and PNG/privacy tests](../src/repo/postcards/mod.rs), [composition](../src/repo/postcards/render.rs), [safe export](../src/repo/postcards/export.rs), [range reader](../src/git/postcards.rs). |
+| #39 Graph you can hear | `6bc0e42842351865279d6ecb3e1c2ab4063d3fc0` | Graph tools and Settings → Graph enable topology walking. Arrow keys follow first parent, child, next descendant merge and branch tip; a chooser exposes other parents/children. AccessKit rows gain shape/loaded-boundary descriptions in this mode. Selected narration reports ahead/behind against main/master/trunk (or current branch), shared-ancestor date and observed introduction merges into release branches, with explicit loaded-history coverage. Optional short merge/lane-crossing cues use rodio. Default labels/navigation remain compatible. [Topology/narration/UI tests](../src/repo/graph_walk.rs), [arrow integration](../src/repo/navigate.rs), [row labels](../src/repo/graph_view/row.rs), [audio](../src/audio.rs). |
+| #38.14 Explanatory motion | `43f4d91c72067c3ebb7218914cf3ff4d4d1dadf3` | Successful fetches mark newly observed commits with a short highlight and readable “new” badge. Confirmed merge/reset/rebase/pull changes interpolate moved ref pills; operation feedback follows HEAD smoothly. Ordinary navigation keeps its prior scrolling behavior. System/style reduced motion and the graph-motion switch finish transitions immediately while retaining static incoming markers. [Snapshots, transitions and tests](../src/repo/graph_motion.rs), [badges/highlight](../src/repo/graph_view/row.rs), [pill animation](../src/repo/graph_view/pills.rs), [scroll integration](../src/repo/graph_view/mod.rs). |
+
+Selective preserved-source adaptation used `origin/codex/graph-features`, `origin/codex/history-activity` and `origin/codex/motion-audio`; it did not merge those branches wholesale. Atlas and growth received new production implementations. The final application commit includes all followups through `0b5718ce575d3ba6332ca0ae6ea96f90d6493073`, including graph-hitbox/default-navigation compatibility, profile guards, bounded expanded trees, and actual AccessKit topology-mode coverage.
+
+## Ownership, remote reads and dependency
+
+[The latest-only reader](../src/repo/history_reader.rs) uses the existing shared task pool, child cancellation tokens and completion messages. It holds the current slot until the worker returns and retains at most one pending replacement; tests block a worker and supersede it repeatedly. Closing/dropping a view cancels its owned reader. Profile guards reject results from a previous profile.
+
+[Git analysis commands](../src/git/activity/process.rs) use existing local command/process infrastructure or the encoded remote bounded-command transport. Reads disable replacements, lazy object fetching, hooks and signature display; output/deadline limits and task cancellation remain in shared infrastructure. No new process-tree discovery or signal implementation was introduced. Read failures, including Git `error:`/`fatal:` diagnostics on exit zero, surface in the view. Tests cover dirty-worktree/index/ref preservation, missing promised objects, shallow history, mailmap precedence, merge paths, and encoded remote requests.
+
+`rodio 0.21.1` was added because #39 explicitly requires native optional sound. Default features are disabled and only playback is enabled; cues are synthesized, short, quiet, lazily open the device and have bounded queues. Missing devices degrade to visible status/retry. Existing Linux workflow install lists gain `libasound2-dev`; no workflow was invoked.
+
+## Validation bound to the tested application commit
+
+All commands used cargo `+1.95.0`, the worktree's own APFS-cloned `target`, and `CARGO_BUILD_JOBS=2`. Test normalization was `TMPDIR=/private/tmp`, `PATH=/tmp/gitcraft-integration-tools:$PATH`, `SHELL=/tmp/gitcraft-integration-tools/validation-shell`.
+
+- `cargo +1.95.0 fmt --check`: passed.
+- `cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code`: passed. The separate strict result and preexisting warning exception are described below.
+- `cargo +1.95.0 clippy --locked --all-targets -- -D warnings`: failed only on six preexisting macOS dead-code findings: `desktop_entry::{OURS, PACKAGE_ENTRY, set_actions, desktop_id, package_entry}` and `diagnostics::pretty_name`. Both source files are unchanged from the base commit (verified with `git diff a850de26..0b5718ce -- src/desktop_entry.rs src/diagnostics.rs`). Raw output is `/tmp/gitcraft-51-clippy-strict-final.log`. The passing qualified lint gate suppresses only that lint category; this is not a strict-lint pass.
+- `cargo +1.95.0 test --locked --lib --no-run --message-format=json`: passed.
+- `cargo +1.95.0 build --locked`: passed, including production audio compilation/linking.
+- The built main test executable, `target/debug/deps/gitcraft-31c2c4e1786728f8`, ran each following filter with `--nocapture`: **52 passed, zero failed, two explicitly ignored process-control tests** across 16 focused groups.
+
+```text
+repo::branch_bands::            repo::graph_view::minimap::
+git::activity::                 repo::history_activity::
+git::atlas::                    repo::atlas::
+git::growth::                   repo::growth::
+repo::postcards::               git::postcards::
+git::visualization_tests::      repo::graph_walk::
+repo::celebration::             repo::graph_motion::
+repo::history_reader::          audio::tests::
+```
+
+The same executable also ran `graph::tests::` (8 passed), `repo::graph_view::` (54 passed), `repo::navigate::tests::` (4 passed) and `a11y::tests::repo_view::` (1 passed): **67 passing regression executions**, including two minimap tests already counted above. These include real graph drag/drop, pill hitboxes, width/virtualization behavior, full-message hover, and keyboard/screen-reader navigation.
+
+Exact command orchestration and raw logs remain in shared `/tmp/gitcraft-51-final-gates.py`, `/tmp/gitcraft-51-run-visual-tests.py`, `/tmp/gitcraft-51-{fmt,clippy-local,final-build,focused-summary,focused-results,final-bin-build,graph-regressions}.log`, and `/tmp/gitcraft-51-final-artifacts.jsonl`. Earlier failing logs are superseded by these final candidate gates.
+
+This evidence file is a documentation-only followup. Application files were verified unchanged from the tested commit before committing it; no fresh application-test execution is claimed for that documentation followup.
+
+## Genuine limits and parent integration gates
+
+- The minimap describes loaded history (512 bins, the graph's first 24 display lanes) and is omitted in narrow/short graph panes. Parent saved-view projection changes must be integrated with its raw-row mapping; this batch does not implement saved filtering/views.
+- Calendar/statistics/atlas begin with 5,000 commits and offer scan-more up to 100,000, with shallow/partial coverage displayed. History reads have a 64 MiB cumulative stream budget, 16 MiB per-command output budget and at most 10,000 unique ref tips. Atlas limits are 100,000 tree files, 200,000 expanded nodes and 128 path components; flat hotspots are paginated. Non-UTF-8 paths remain distinct in analytics but the existing string-based file-history navigation cannot open them; the UI reports that limitation.
+- Growth intentionally replays one coherent HEAD first-parent history, with at most the latest 1,000 commits, a complete starting tree and explicit partial/shallow labels. It does not interleave mutually incompatible branch trees. Files/tree expansion are bounded at 100,000/200,000 entries; contributor colors identify the displayed commit's touched paths.
+- Postcards require a range of at most 200 commits; they report limits instead of silently truncating. Names/messages are sanitized and previewed; user-entered release name/date/range identifiers are intentionally still visible when anonymizing identities. Export is local and create-only.
+- Narration counts actual loaded topology and labels incomplete ancestry. Git has no reliable branch-creation timestamp; the UI says “shared ancestor” and its author date rather than inventing a branch age. Release narration observes up to 20 local `release/` branches.
+- Audio dispatch/samples were tested with recording-only hooks; actual speaker output was not exercised. macOS compilation/build and headless interactions passed; Windows/Linux native builds were not run here.
+- No full suite, parallel-bisect real timeout/cancel test, or host-wide process inspection/signal was run. The two imported activity process timeout/cancellation tests remain explicitly ignored pending the parent's shared containment review. The ordinary real-Git analysis fixtures ran successfully.
+- Independent adversarial review and the final combined suite remain required on the parent's assembled candidate. This evidence does not claim either gate or CI success.
