@@ -494,20 +494,21 @@ mod merge_regressions {
         tab.history_minimap.dirty = false;
         tab.history_minimap.bins = model.bins;
         tab.history_minimap.rows = model.rows;
-        let mut h = egui_kittest::Harness::builder()
-            .with_size([900.0, 500.0])
-            .build_ui_state(
-                |ui, tab: &mut RepoTab| {
-                    crate::theme::install_fonts(ui.ctx());
-                    egui_extras::install_image_loaders(ui.ctx());
-                    tab.graph_rows_view(ui, &mut vec![]);
-                },
-                tab,
-            );
-        h.run();
+        egui_extras::install_image_loaders(&ctx);
+        let output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(900.0, 500.0),
+                )),
+                ..Default::default()
+            },
+            |ui| {
+                tab.graph_rows_view(ui, &mut vec![]);
+            },
+        );
         let label = crate::i18n::text("repo-core-2497");
-        let text = h
-            .output()
+        let text = output
             .shapes
             .iter()
             .find_map(|s| match &s.shape {
@@ -527,7 +528,8 @@ mod merge_regressions {
             bounds.left() > 780.0,
             "not the reserved right-hand strip: {bounds:?}"
         );
-        assert_eq!(h.state().commits.len(), 100);
+        assert_eq!(tab.commits.len(), 100);
+        output.drop_without_applying_deltas();
         Ok(())
     }
 }
