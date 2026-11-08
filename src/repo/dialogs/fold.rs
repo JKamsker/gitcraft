@@ -48,8 +48,8 @@ pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
         let line = crate::i18n::message(
             "repo-core-1312",
             &[
-                ("summary", format!("{}", plan.target.summary).into()),
-                ("branch", format!("{}", plan.branch).into()),
+                ("summary", plan.target.summary.to_string().into()),
+                ("branch", plan.branch.to_string().into()),
             ],
         );
         ui.add(egui::Label::new(RichText::new(line).color(t.text_dim)).wrap());
@@ -89,13 +89,13 @@ fn rewritten(ui: &mut Ui, plan: &Plan, t: &Tokens) {
         0 => crate::i18n::text("repo-core-1316").to_owned(),
         1 => crate::i18n::message(
             "repo-core-1317",
-            &[("branch", format!("{}", plan.branch).into())],
+            &[("branch", plan.branch.to_string().into())],
         ),
         n => crate::i18n::message(
             "repo-core-1318",
             &[
                 ("n", (n).into()),
-                ("branch", format!("{}", plan.branch).into()),
+                ("branch", plan.branch.to_string().into()),
             ],
         ),
     };
@@ -126,7 +126,7 @@ fn pushed_warning(plan: &Plan) -> String {
     } else {
         crate::i18n::message("repo-core-1322", &[("n", n.into())])
     };
-    crate::i18n::message("repo-core-1325", &[("what", format!("{}", what).into())])
+    crate::i18n::message("repo-core-1325", &[("what", what.to_string().into())])
 }
 
 /// A commit's short hash and summary, marked when a remote already has it.

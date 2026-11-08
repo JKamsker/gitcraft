@@ -87,7 +87,7 @@ impl RepoTab {
             crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {
                 crate::i18n::message(
                     "repo-core-2609",
-                    &[("bar", format!("{}", bar_name(bar)).into())],
+                    &[("bar", bar_name(bar).to_string().into())],
                 )
             });
             let active = resp.hovered() || resp.dragged();

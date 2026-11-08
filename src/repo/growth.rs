@@ -194,26 +194,22 @@ impl RepoTab {
                         ("count", (data.frames.len()).into()),
                         (
                             "history",
-                            format!(
-                                "{}",
-                                if data.more {
-                                    crate::i18n::text("repo-core-2778")
-                                } else {
-                                    crate::i18n::text("repo-core-2779")
-                                }
-                            )
+                            (if data.more {
+                                crate::i18n::text("repo-core-2778")
+                            } else {
+                                crate::i18n::text("repo-core-2779")
+                            })
+                            .to_string()
                             .into(),
                         ),
                         (
                             "else",
-                            format!(
-                                "{}",
-                                if data.shallow {
-                                    crate::i18n::text("repo-core-2780")
-                                } else {
-                                    ""
-                                }
-                            )
+                            (if data.shallow {
+                                crate::i18n::text("repo-core-2780")
+                            } else {
+                                ""
+                            })
+                            .to_string()
                             .into(),
                         ),
                     ],
@@ -370,7 +366,7 @@ impl RepoTab {
                                     if row.changed {
                                         crate::i18n::message(
                                             "repo-core-2793",
-                                            &[("name", format!("{}", frame.name).into())],
+                                            &[("name", frame.name.to_string().into())],
                                         )
                                     } else {
                                         String::new()

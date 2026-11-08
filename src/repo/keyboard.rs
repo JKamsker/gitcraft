@@ -269,7 +269,7 @@ impl RepoTab {
                 || {
                     crate::i18n::message(
                         "repo-core-2850",
-                        &[("path", format!("{}", key.path()).into())],
+                        &[("path", key.path().to_string().into())],
                     )
                 },
                 true,

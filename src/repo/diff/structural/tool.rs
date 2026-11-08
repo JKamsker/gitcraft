@@ -112,7 +112,7 @@ fn output(code: i32, stdout: Vec<u8>, stderr: Vec<u8>) -> Result<Vec<u8>, String
         let error = String::from_utf8_lossy(&stderr);
         return Err(crate::i18n::message(
             "repo-core-4072",
-            &[("trim", format!("{}", error.trim()).into())],
+            &[("trim", error.trim().to_string().into())],
         ));
     }
     Ok(stdout)
@@ -221,7 +221,7 @@ pub(super) fn run(command: Command, timeout: Duration) -> Result<remote::Output,
             ..Default::default()
         },
     )
-    .map_err(|e| crate::i18n::message("repo-core-4075", &[("e", format!("{}", e).into())]))?
+    .map_err(|e| crate::i18n::message("repo-core-4075", &[("e", e.to_string().into())]))?
     .complete()?;
     Ok(remote::Output {
         code: out.status.code().unwrap_or(-1),

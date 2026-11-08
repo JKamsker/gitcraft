@@ -26,7 +26,7 @@ pub(super) fn create_branch(
         crate::i18n::text("repo-core-0140"),
         &crate::i18n::message(
             "repo-core-1213",
-            &[("at-label", format!("{}", at_label).into())],
+            &[("at-label", at_label.to_string().into())],
         ),
         &t,
     );
@@ -113,7 +113,7 @@ pub(super) fn tag(
         crate::i18n::text("repo-core-0141"),
         &crate::i18n::message(
             "repo-core-1220",
-            &[("at-label", format!("{}", at_label).into())],
+            &[("at-label", at_label.to_string().into())],
         ),
         &t,
     );
@@ -131,10 +131,7 @@ pub(super) fn tag(
         ui.add_space(4.0);
         ui.checkbox(
             push,
-            crate::i18n::message(
-                "repo-core-1223",
-                &[("remote", format!("{}", remote).into())],
-            ),
+            crate::i18n::message("repo-core-1223", &[("remote", remote.to_string().into())]),
         );
     }
     ui.add_space(8.0);
@@ -190,7 +187,7 @@ pub(super) fn rename_branch(
     title(
         ui,
         crate::i18n::text("repo-core-1229"),
-        &crate::i18n::message("repo-core-1230", &[("old", format!("{}", old).into())]),
+        &crate::i18n::message("repo-core-1230", &[("old", old.to_string().into())]),
         &t,
     );
     field(ui, new, "new-name", focus);

@@ -34,7 +34,7 @@ impl Reader<'_> {
             "repo-core-2183",
             &[
                 ("line", format!("{}", self.line).into()),
-                ("what", format!("{}", what).into()),
+                ("what", what.to_string().into()),
             ],
         )
     }
@@ -152,7 +152,7 @@ impl Reader<'_> {
         if !strict || text.parse::<f64>().is_err() {
             return Err(self.error(&crate::i18n::message(
                 "repo-core-2191",
-                &[("text", format!("{}", text).into())],
+                &[("text", text.to_string().into())],
             )));
         }
         Ok(Node::Scalar {

@@ -123,7 +123,7 @@ fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Optio
             .add(egui::Button::new(&template.name).truncate())
             .on_hover_text(crate::i18n::message(
                 "repo-core-1058",
-                &[("text", format!("{}", template.text).into())],
+                &[("text", template.text.to_string().into())],
             ))
             .clicked()
         {
@@ -132,7 +132,7 @@ fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Optio
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let delete = crate::i18n::message(
                 "repo-core-1059",
-                &[("name", format!("{}", template.name).into())],
+                &[("name", template.name.to_string().into())],
             );
             if icons::small_button(ui, "x", &delete).clicked() {
                 *pick = Some(Pick::Delete(scope, template.name.clone()));

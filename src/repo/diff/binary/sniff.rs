@@ -114,7 +114,7 @@ fn image_facts(b: &[u8]) -> Option<(String, Vec<Fact>)> {
             "repo-core-1658",
             &[
                 ("b", format!("{}", b[24]).into()),
-                ("color", format!("{}", color).into()),
+                ("color", color.to_string().into()),
             ],
         );
         return Some((

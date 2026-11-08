@@ -84,7 +84,7 @@ impl RepoTab {
             }),
             Err(e) => {
                 self.status = Some((
-                    crate::i18n::message("repo-core-3322", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-3322", &[("e", e.to_string().into())]),
                     true,
                 ))
             }
@@ -120,7 +120,11 @@ impl RepoTab {
                         "repo-core-3323",
                         &[(
                             "self",
-                            format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                            self.busy_op
+                                .as_deref()
+                                .unwrap_or_default()
+                                .to_string()
+                                .into(),
                         )],
                     ),
                     true,
@@ -136,7 +140,7 @@ impl RepoTab {
             ),
             Err(e) => {
                 self.status = Some((
-                    crate::i18n::message("repo-core-3322", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-3322", &[("e", e.to_string().into())]),
                     true,
                 ))
             }
@@ -212,7 +216,7 @@ impl RepoTab {
             }
             Err(e) => {
                 self.status = Some((
-                    crate::i18n::message("repo-core-3325", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-3325", &[("e", e.to_string().into())]),
                     true,
                 ))
             }
@@ -261,10 +265,7 @@ impl RepoTab {
                     Ok(p) => p,
                     Err(e) => {
                         tab.status = Some((
-                            crate::i18n::message(
-                                "repo-core-3329",
-                                &[("e", format!("{}", e).into())],
-                            ),
+                            crate::i18n::message("repo-core-3329", &[("e", e.to_string().into())]),
                             true,
                         ));
                         return;
@@ -293,7 +294,7 @@ impl RepoTab {
                         ask,
                         crate::i18n::message(
                             "repo-core-3332",
-                            &[("branch", format!("{}", branch).into())],
+                            &[("branch", branch.to_string().into())],
                         ),
                     ),
                     ctx,
@@ -361,10 +362,7 @@ impl RepoTab {
             .undo(Undo::HeadMove { mode: "--keep" })
             .preview(
                 ask,
-                crate::i18n::message(
-                    "repo-core-3339",
-                    &[("branch", format!("{}", branch).into())],
-                ),
+                crate::i18n::message("repo-core-3339", &[("branch", branch.to_string().into())]),
             ),
             ctx,
         );
@@ -463,7 +461,7 @@ impl RepoTab {
                         "repo-core-3345",
                         &[(
                             "label",
-                            crate::repo::messages::display_operation(&label).into(),
+                            crate::repo::messages::display_operation(label).into(),
                         )],
                     ),
                     true,

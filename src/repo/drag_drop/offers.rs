@@ -154,36 +154,36 @@ impl Offer {
             Offer::Merge { from, into } => crate::i18n::message(
                 "repo-core-2422",
                 &[
-                    ("hash", format!("{}", from.label()).into()),
-                    ("into", format!("{}", into).into()),
+                    ("hash", from.label().to_string().into()),
+                    ("into", into.to_string().into()),
                 ],
             ),
             Offer::Rebase { branch, onto } => crate::i18n::message(
                 "repo-core-2423",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("hash", format!("{}", onto.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("hash", onto.label().to_string().into()),
                 ],
             ),
             Offer::InteractiveRebase { branch, onto } => crate::i18n::message(
                 "repo-core-2424",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", onto.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("label", onto.label().to_string().into()),
                 ],
             ),
             Offer::FastForward { branch, to, .. } => crate::i18n::message(
                 "repo-core-2425",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", to.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
                 ],
             ),
             Offer::CherryPick { hash, onto } => crate::i18n::message(
                 "repo-core-2426",
                 &[
-                    ("hash", format!("{}", short(hash)).into()),
-                    ("onto", format!("{}", onto).into()),
+                    ("hash", short(hash).to_string().into()),
+                    ("onto", onto.to_string().into()),
                 ],
             ),
             Offer::Rewrite(drop) => drop.label(),
@@ -196,21 +196,20 @@ impl Offer {
             Offer::Merge { from, into } => crate::i18n::message(
                 "repo-core-2427",
                 &[
-                    ("into", format!("{}", into).into()),
-                    ("label", format!("{}", from.label()).into()),
+                    ("into", into.to_string().into()),
+                    ("label", from.label().to_string().into()),
                 ],
             ),
             Offer::Rebase { branch, onto } => crate::i18n::message(
                 "repo-core-2428",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", onto.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("label", onto.label().to_string().into()),
                 ],
             ),
-            Offer::InteractiveRebase { branch, .. } => crate::i18n::message(
-                "repo-core-2429",
-                &[("branch", format!("{}", branch).into())],
-            ),
+            Offer::InteractiveRebase { branch, .. } => {
+                crate::i18n::message("repo-core-2429", &[("branch", branch.to_string().into())])
+            }
             Offer::FastForward {
                 branch,
                 to,
@@ -219,19 +218,19 @@ impl Offer {
             } => crate::i18n::message(
                 "repo-core-2430",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", to.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
                 ],
             ),
             Offer::FastForward { branch, to, .. } => crate::i18n::message(
                 "repo-core-2431",
                 &[
-                    ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", to.label()).into()),
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
                 ],
             ),
             Offer::CherryPick { onto, .. } => {
-                crate::i18n::message("repo-core-2432", &[("onto", format!("{}", onto).into())])
+                crate::i18n::message("repo-core-2432", &[("onto", onto.to_string().into())])
             }
             Offer::Rewrite(drop) => drop.place.explain().to_owned(),
         }

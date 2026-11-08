@@ -57,10 +57,7 @@ impl RepoTab {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch",
-                    crate::i18n::message(
-                        "repo-core-3362",
-                        &[("name", format!("{}", b.name).into())],
-                    ),
+                    crate::i18n::message("repo-core-3362", &[("name", b.name.to_string().into())]),
                     crate::i18n::text("repo-core-1115"),
                     guarded(ops(&[&["branch", "-d", "--", &b.name]])),
                     Some((
@@ -80,7 +77,7 @@ impl RepoTab {
         };
         let both = MenuItem::new(crate::i18n::message(
             "repo-core-3364",
-            &[("remote", format!("{}", remote).into())],
+            &[("remote", remote.to_string().into())],
         ))
         .icon("minus")
         .enabled(idle)
@@ -89,8 +86,8 @@ impl RepoTab {
         .on_hover_text(crate::i18n::message(
             "repo-core-3365",
             &[
-                ("upstream", format!("{}", b.upstream).into()),
-                ("remote", format!("{}", remote).into()),
+                ("upstream", b.upstream.to_string().into()),
+                ("remote", remote.to_string().into()),
             ],
         ));
         offer(&both, || GhostOp::DeleteBranch {
@@ -114,9 +111,9 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-3368",
                         &[
-                            ("name", format!("{}", b.name).into()),
-                            ("name2", format!("{}", name).into()),
-                            ("remote", format!("{}", remote).into()),
+                            ("name", b.name.to_string().into()),
+                            ("name2", name.to_string().into()),
+                            ("remote", remote.to_string().into()),
                         ],
                     ),
                     crate::i18n::text("repo-core-3369"),

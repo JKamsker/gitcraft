@@ -232,8 +232,8 @@ impl RebaseEditor {
                 return Some(crate::i18n::message(
                     "repo-core-3212",
                     &[
-                        ("label", format!("{}", e.step.label()).into()),
-                        ("hash", format!("{}", short(&e.commit.hash)).into()),
+                        ("label", e.step.label().to_string().into()),
+                        ("hash", short(&e.commit.hash).to_string().into()),
                     ],
                 ));
             }
@@ -298,9 +298,8 @@ impl RebaseEditor {
     /// there.
     fn command_there(&self, repo: &Path, target: &crate::remote::Target) -> Result<Moving, String> {
         let write = |name: &str, text: &str| {
-            crate::remote::host_temp_file(target, name, text.as_bytes()).map_err(|e| {
-                crate::i18n::message("repo-core-3214", &[("e", format!("{}", e).into())])
-            })
+            crate::remote::host_temp_file(target, name, text.as_bytes())
+                .map_err(|e| crate::i18n::message("repo-core-3214", &[("e", e.to_string().into())]))
         };
         let mut files = Vec::new();
         for (i, e) in self.entries.iter().enumerate() {
@@ -478,21 +477,25 @@ fn keys_hint(ctx: &egui::Context) -> String {
         &[
             (
                 "RebaseMoveUp",
-                format!("{}", keymap::label(ctx, Command::RebaseMoveUp)).into(),
+                keymap::label(ctx, Command::RebaseMoveUp).to_string().into(),
             ),
             (
                 "RebaseMoveDown",
-                format!("{}", keymap::label(ctx, Command::RebaseMoveDown)).into(),
+                keymap::label(ctx, Command::RebaseMoveDown)
+                    .to_string()
+                    .into(),
             ),
             (
                 "RebasePrevious",
-                format!("{}", keymap::label(ctx, Command::RebasePrevious)).into(),
+                keymap::label(ctx, Command::RebasePrevious)
+                    .to_string()
+                    .into(),
             ),
             (
                 "RebaseNext",
-                format!("{}", keymap::label(ctx, Command::RebaseNext)).into(),
+                keymap::label(ctx, Command::RebaseNext).to_string().into(),
             ),
-            ("steps", format!("{}", steps).into()),
+            ("steps", steps.to_string().into()),
         ],
     )
 }
@@ -529,8 +532,8 @@ impl RepoTab {
                         egui::RichText::new(crate::i18n::message(
                             "repo-core-3236",
                             &[
-                                ("branch", format!("{}", branch).into()),
-                                ("onto-label", format!("{}", editor.onto_label).into()),
+                                ("branch", branch.to_string().into()),
+                                ("onto-label", editor.onto_label.to_string().into()),
                             ],
                         ))
                         .font(theme::medium(13.0)),
@@ -602,13 +605,11 @@ impl RepoTab {
                                         ("n", (n).into()),
                                         (
                                             "Undo",
-                                            format!(
-                                                "{}",
-                                                crate::keymap::label(
-                                                    ui.ctx(),
-                                                    crate::keymap::Command::Undo
-                                                )
+                                            crate::keymap::label(
+                                                ui.ctx(),
+                                                crate::keymap::Command::Undo,
                                             )
+                                            .to_string()
                                             .into(),
                                         ),
                                     ],

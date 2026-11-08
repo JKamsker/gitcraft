@@ -75,7 +75,7 @@ impl RepoTab {
                 Err(e) => {
                     state.error = Some(crate::i18n::message(
                         "repo-core-0293",
-                        &[("e", format!("{}", e).into())],
+                        &[("e", e.to_string().into())],
                     ))
                 }
             }
@@ -100,7 +100,7 @@ impl RepoTab {
                         if let Some(version) = &state.version {
                             ui.label(crate::i18n::message(
                                 "repo-core-0298",
-                                &[("version", format!("{}", version).into())],
+                                &[("version", version.to_string().into())],
                             ));
                         }
                         if let Some(report) = &state.report {

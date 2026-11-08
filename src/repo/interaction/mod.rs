@@ -121,8 +121,8 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-4151",
                         &[
-                            ("current", format!("{}", current).into()),
-                            ("name", format!("{}", b.name).into()),
+                            ("current", current.to_string().into()),
+                            ("name", b.name.to_string().into()),
                         ],
                     ),
                     "interaction combination breaks ddmin delta debugging".to_owned(),
@@ -189,9 +189,9 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-4155",
                     &[
-                        ("name", format!("{}", name).into()),
-                        ("a", format!("{}", search.spec.a).into()),
-                        ("b", format!("{}", search.spec.b).into()),
+                        ("name", name.to_string().into()),
+                        ("a", search.spec.a.to_string().into()),
+                        ("b", search.spec.b.to_string().into()),
                     ],
                 ),
                 failed,

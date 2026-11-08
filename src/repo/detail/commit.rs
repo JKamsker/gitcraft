@@ -352,8 +352,8 @@ fn author_line(ui: &mut Ui, detail: &CommitDetail) {
             RichText::new(crate::i18n::message(
                 "repo-core-0877",
                 &[
-                    ("committer", format!("{}", detail.committer).into()),
-                    ("commit-date", format!("{}", detail.commit_date).into()),
+                    ("committer", detail.committer.to_string().into()),
+                    ("commit-date", detail.commit_date.to_string().into()),
                 ],
             ))
             .color(t.text_faint)

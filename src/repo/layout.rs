@@ -217,7 +217,7 @@ impl RepoTab {
             ui.label(
                 egui::RichText::new(crate::i18n::message(
                     "repo-core-2878",
-                    &[("name", format!("{}", self.name).into())],
+                    &[("name", self.name.to_string().into())],
                 ))
                 .font(crate::theme::semibold(18.0))
                 .color(t.text),
@@ -439,9 +439,9 @@ impl RepoTab {
 /// The footer button folding a side panel down to its strip, or opening it back up.
 fn panel_toggle(ui: &mut Ui, icon: &str, name: &str, open: bool) -> bool {
     let tip = if open {
-        crate::i18n::message("repo-core-2891", &[("name", format!("{}", name).into())])
+        crate::i18n::message("repo-core-2891", &[("name", name.to_string().into())])
     } else {
-        crate::i18n::message("repo-core-2892", &[("name", format!("{}", name).into())])
+        crate::i18n::message("repo-core-2892", &[("name", name.to_string().into())])
     };
     icons::tool_button(ui, icon, "", true)
         .named(&tip)

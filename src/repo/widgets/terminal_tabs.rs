@@ -83,7 +83,7 @@ fn terminal_tab(
         || {
             crate::i18n::message(
                 "repo-core-3776",
-                &[("text", format!("{}", galley.text()).into())],
+                &[("text", galley.text().to_string().into())],
             )
         },
         selected,

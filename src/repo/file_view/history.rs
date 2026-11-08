@@ -125,8 +125,8 @@ impl RepoTab {
                         summary = crate::i18n::message(
                             "repo-core-2485",
                             &[
-                                ("summary", format!("{}", summary).into()),
-                                ("path", format!("{}", c.path).into()),
+                                ("summary", summary.to_string().into()),
+                                ("path", c.path.to_string().into()),
                             ],
                         );
                     }

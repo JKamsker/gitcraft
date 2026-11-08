@@ -24,7 +24,7 @@ pub(super) fn section(
         Some(Ok(None)) => Summary::Text(
             crate::i18n::message(
                 "repo-core-1103",
-                &[("namespace", format!("{}", namespace).into())],
+                &[("namespace", namespace.to_string().into())],
             ),
             t.text_faint,
         ),
@@ -91,7 +91,7 @@ fn namespace_choices(ui: &mut Ui, notes: &mut Notes, current: &str, cmds: &mut V
             .response
             .on_hover_text(crate::i18n::message(
                 "repo-core-1108",
-                &[("current", format!("{}", current).into())],
+                &[("current", current.to_string().into())],
             ));
         let field = ui.add(
             egui::TextEdit::singleline(&mut notes.new_namespace)
@@ -232,7 +232,7 @@ fn editor(
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-core-1120",
-                    &[("command", format!("{}", crate::manual::command()).into())],
+                    &[("command", crate::manual::command().to_string().into())],
                 ))
                 .small()
                 .color(t.text_faint),
@@ -278,8 +278,8 @@ fn share(
             .on_hover_text(crate::i18n::message(
                 "repo-core-1124",
                 &[
-                    ("namespace", format!("{}", namespace).into()),
-                    ("remote", format!("{}", remote).into()),
+                    ("namespace", namespace.to_string().into()),
+                    ("remote", remote.to_string().into()),
                 ],
             ))
             .on_disabled_hover_text(crate::i18n::text("repo-core-1125"));
@@ -295,8 +295,8 @@ fn share(
             .on_hover_text(crate::i18n::message(
                 "repo-core-1127",
                 &[
-                    ("namespace", format!("{}", namespace).into()),
-                    ("remote", format!("{}", remote).into()),
+                    ("namespace", namespace.to_string().into()),
+                    ("remote", remote.to_string().into()),
                 ],
             ))
             .on_disabled_hover_text(if has_notes {
@@ -304,7 +304,7 @@ fn share(
             } else {
                 crate::i18n::message(
                     "repo-core-1128",
-                    &[("namespace", format!("{}", namespace).into())],
+                    &[("namespace", namespace.to_string().into())],
                 )
             });
         if push.clicked() {

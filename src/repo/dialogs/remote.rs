@@ -81,7 +81,7 @@ pub(super) fn credentials(
     let host = host_of(url);
     title(
         ui,
-        &crate::i18n::message("repo-core-1469", &[("host", format!("{}", host).into())]),
+        &crate::i18n::message("repo-core-1469", &[("host", host.to_string().into())]),
         crate::i18n::text("repo-core-1470"),
         &t,
     );
@@ -101,7 +101,7 @@ pub(super) fn credentials(
     } else {
         ui.label(crate::i18n::message(
             "repo-core-1474",
-            &[("url", format!("{}", url).into())],
+            &[("url", url.to_string().into())],
         ));
     }
     if refused {
@@ -167,12 +167,12 @@ pub(super) fn create_pr(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        &crate::i18n::message("repo-core-1482", &[("noun", format!("{}", noun).into())]),
+        &crate::i18n::message("repo-core-1482", &[("noun", noun.to_string().into())]),
         &crate::i18n::message(
             "repo-core-1483",
             &[
-                ("branch", format!("{}", branch).into()),
-                ("base", format!("{}", base).into()),
+                ("branch", branch.to_string().into()),
+                ("base", base.to_string().into()),
             ],
         ),
         &t,

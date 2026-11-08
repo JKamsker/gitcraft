@@ -31,7 +31,7 @@ impl RepoTab {
                 verb(
                     crate::i18n::message(
                         "repo-core-2972",
-                        &[("current", format!("{}", current).into())],
+                        &[("current", current.to_string().into())],
                     ),
                     "merge",
                     Pick::Merge,
@@ -39,7 +39,7 @@ impl RepoTab {
                 verb(
                     crate::i18n::message(
                         "repo-core-2973",
-                        &[("current", format!("{}", current).into())],
+                        &[("current", current.to_string().into())],
                     ),
                     "rebase",
                     Pick::Rebase,
@@ -47,7 +47,7 @@ impl RepoTab {
                 verb(
                     crate::i18n::message(
                         "repo-core-2974",
-                        &[("current", format!("{}", current).into())],
+                        &[("current", current.to_string().into())],
                     ),
                     "rebase",
                     Pick::InteractiveRebase,
@@ -55,7 +55,7 @@ impl RepoTab {
                 verb(
                     crate::i18n::message(
                         "repo-core-2975",
-                        &[("current", format!("{}", current).into())],
+                        &[("current", current.to_string().into())],
                     ),
                     "compare",
                     Pick::ChangesAdded,
@@ -63,7 +63,7 @@ impl RepoTab {
                 verb(
                     crate::i18n::message(
                         "repo-core-2976",
-                        &[("current", format!("{}", current).into())],
+                        &[("current", current.to_string().into())],
                     ),
                     "compare",
                     Pick::Compare,
@@ -75,10 +75,7 @@ impl RepoTab {
             && self.refs.local.iter().any(|b| b.name != *current)
         {
             items.push(verb(
-                crate::i18n::message(
-                    "repo-core-2977",
-                    &[("current", format!("{}", current).into())],
-                ),
+                crate::i18n::message("repo-core-2977", &[("current", current.to_string().into())]),
                 "interaction",
                 Pick::Interaction,
             ));
@@ -117,10 +114,7 @@ impl RepoTab {
                 .map(|(b, to, push)| {
                     PaletteItem::action(
                         &b.name,
-                        &crate::i18n::message(
-                            "repo-core-2981",
-                            &[("to", format!("{}", to).into())],
-                        ),
+                        &crate::i18n::message("repo-core-2981", &[("to", to.to_string().into())]),
                         push,
                     )
                     .key(key(&b.name))

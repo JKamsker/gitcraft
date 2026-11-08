@@ -107,7 +107,7 @@ impl RepoTab {
                 self.status = Some((
                     crate::i18n::message(
                         "repo-core-2900",
-                        &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+                        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
                     ),
                     true,
                 ));

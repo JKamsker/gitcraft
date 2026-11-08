@@ -162,7 +162,7 @@ fn slides(members: &[Member], reader: &mut Reader<'_>, gaps: &mut Vec<String>) -
         let text = xml_text(&String::from_utf8_lossy(&xml), &Rules::SLIDE);
         out.push_str(&crate::i18n::message(
             "repo-core-3834",
-            &[("n", (n).into()), ("text", format!("{}", text).into())],
+            &[("n", (n).into()), ("text", text.to_string().into())],
         ));
         if out.len() > MAX_TEXT {
             break;

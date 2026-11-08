@@ -67,7 +67,7 @@ fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-core-1903",
-                &[("name", format!("{}", name).into())],
+                &[("name", name.to_string().into())],
             ))
             .color(t.text_dim)
             .small(),
@@ -85,7 +85,7 @@ fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>
         .checkbox(&mut on, crate::i18n::text("repo-core-1907"))
         .on_hover_text(crate::i18n::message(
             "repo-core-1908",
-            &[("tool", format!("{}", tool).into())],
+            &[("tool", tool.to_string().into())],
         ));
     if r.changed() {
         acts.push(Action::StripNotebookOutputs(on));
@@ -172,7 +172,7 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
                         RichText::new(crate::i18n::message(
                             "repo-core-1919",
                             &[
-                                ("label", format!("{}", cell.kind.display_label()).into()),
+                                ("label", cell.kind.display_label().to_string().into()),
                                 ("number", format!("{}", c.number).into()),
                             ],
                         ))
@@ -222,7 +222,7 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
                     RichText::new(crate::i18n::message(
                         "repo-core-1921",
                         &[
-                            ("kind", format!("{}", kind).into()),
+                            ("kind", kind.to_string().into()),
                             ("number", format!("{}", c.number).into()),
                         ],
                     ))
@@ -392,7 +392,7 @@ fn output(ui: &mut Ui, t: &Tokens, id: (&str, usize, usize), o: &Output) {
             } else {
                 crate::i18n::message(
                     "repo-core-1937",
-                    &[("kinds", format!("{}", kinds.join(", ")).into())],
+                    &[("kinds", kinds.join(", ").to_string().into())],
                 )
             };
             ui.label(RichText::new(text).color(t.text_faint).small());

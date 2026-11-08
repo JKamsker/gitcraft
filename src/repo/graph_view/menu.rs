@@ -184,7 +184,7 @@ impl RepoTab {
         {
             menu.items(
                 ui,
-                &crate::i18n::message("repo-core-2631", &[("name", format!("{}", name).into())]),
+                &crate::i18n::message("repo-core-2631", &[("name", name.to_string().into())]),
                 &target,
                 acts,
             );
@@ -218,7 +218,7 @@ impl RepoTab {
         };
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2632",
-            &[("branch", format!("{}", branch).into())],
+            &[("branch", branch.to_string().into())],
         ))
         .icon("log-in")
         .enabled(idle)
@@ -237,8 +237,8 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2634",
             &[
-                ("current", format!("{}", current).into()),
-                ("branch", format!("{}", branch).into()),
+                ("current", current.to_string().into()),
+                ("branch", branch.to_string().into()),
             ],
         ))
         .icon("arrow-right")
@@ -251,8 +251,8 @@ impl RepoTab {
         let merge = crate::i18n::message(
             "repo-core-2636",
             &[
-                ("branch", format!("{}", branch).into()),
-                ("current", format!("{}", current).into()),
+                ("branch", branch.to_string().into()),
+                ("current", current.to_string().into()),
             ],
         );
         if self
@@ -264,8 +264,8 @@ impl RepoTab {
         let rebase = crate::i18n::message(
             "repo-core-2637",
             &[
-                ("current", format!("{}", current).into()),
-                ("branch", format!("{}", branch).into()),
+                ("current", current.to_string().into()),
+                ("branch", branch.to_string().into()),
             ],
         );
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, hash);
@@ -279,8 +279,8 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2638",
             &[
-                ("current", format!("{}", current).into()),
-                ("branch", format!("{}", branch).into()),
+                ("current", current.to_string().into()),
+                ("branch", branch.to_string().into()),
             ],
         ))
         .icon("git-merge")
@@ -319,7 +319,7 @@ impl RepoTab {
         for b in &here {
             crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-2639",
-                &[("name", format!("{}", b.name).into())],
+                &[("name", b.name.to_string().into())],
             ))
             .icon("git-branch-plus")
             .submenu(ui, |ui| {
@@ -405,7 +405,7 @@ impl RepoTab {
                 .unwrap_or_default();
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-2648",
-                &[("other", format!("{}", other).into())],
+                &[("other", other.to_string().into())],
             ))
             .icon("file-diff")
             .show(ui)
@@ -459,7 +459,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     } = *r;
     if crate::menu_item::MenuItem::new(crate::i18n::message(
         "repo-core-2652",
-        &[("target", format!("{}", target).into())],
+        &[("target", target.to_string().into())],
     ))
     .icon("git-merge")
     .enabled(idle)
@@ -498,7 +498,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     {
         crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2656",
-            &[("target", format!("{}", target).into())],
+            &[("target", target.to_string().into())],
         ))
         .icon("undo-2")
         .enabled(idle)
@@ -565,15 +565,15 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
                     crate::i18n::message(
                         "repo-core-2660",
                         &[
-                            ("target", format!("{}", target).into()),
-                            ("short", format!("{}", short).into()),
-                            ("summary", format!("{}", summary).into()),
-                            ("explain", format!("{}", explain).into()),
+                            ("target", target.to_string().into()),
+                            ("short", short.to_string().into()),
+                            ("summary", summary.to_string().into()),
+                            ("explain", explain.to_string().into()),
                         ],
                     ),
                     &crate::i18n::message(
                         "repo-core-0389",
-                        &[("to-lowercase", format!("{}", label.to_lowercase()).into())],
+                        &[("to-lowercase", label.to_lowercase().to_string().into())],
                     ),
                     reset_steps(mode, hash, target, head),
                     None,
@@ -590,12 +590,12 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
                     if mode == "--hard" {
                         crate::i18n::message(
                             "repo-core-2661",
-                            &[("target", format!("{}", target).into())],
+                            &[("target", target.to_string().into())],
                         )
                     } else {
                         crate::i18n::message(
                             "repo-core-2662",
-                            &[("target", format!("{}", target).into())],
+                            &[("target", target.to_string().into())],
                         )
                     },
                 ),
@@ -652,7 +652,7 @@ fn copy_items(
     if let Some(name) = branch
         && crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-2665",
-            &[("name", format!("{}", name).into())],
+            &[("name", name.to_string().into())],
         ))
         .icon("copy")
         .keys_when(

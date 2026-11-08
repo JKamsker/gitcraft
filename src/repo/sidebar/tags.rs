@@ -71,7 +71,7 @@ impl RepoTab {
         if crate::release::version::Version::parse(&tag.name).is_some()
             && crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3538",
-                &[("name", format!("{}", tag.name).into())],
+                &[("name", tag.name.to_string().into())],
             ))
             .icon("tag")
             .enabled(idle)
@@ -87,7 +87,7 @@ impl RepoTab {
         if let Some(remote) = self.default_remote() {
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3540",
-                &[("remote", format!("{}", remote).into())],
+                &[("remote", remote.to_string().into())],
             ))
             .icon("arrow-up-from-line")
             .enabled(idle)
@@ -102,7 +102,7 @@ impl RepoTab {
             }
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3542",
-                &[("remote", format!("{}", remote).into())],
+                &[("remote", remote.to_string().into())],
             ))
             .icon("minus")
             .enabled(idle)
@@ -114,8 +114,8 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-3544",
                         &[
-                            ("name", format!("{}", tag.name).into()),
-                            ("remote", format!("{}", remote).into()),
+                            ("name", tag.name.to_string().into()),
+                            ("remote", remote.to_string().into()),
                         ],
                     ),
                     crate::i18n::text("repo-core-1115"),
@@ -159,7 +159,7 @@ impl RepoTab {
                         "Delete tag",
                         crate::i18n::message(
                             "repo-core-3547",
-                            &[("name", format!("{}", name).into())],
+                            &[("name", name.to_string().into())],
                         ),
                         crate::i18n::text("repo-core-1115"),
                         delete_tag(&name, object.as_deref()),

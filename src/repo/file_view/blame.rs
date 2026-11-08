@@ -151,7 +151,7 @@ impl RepoTab {
                             "repo-core-2477",
                             &[
                                 ("i", format!("{}", i + 1).into()),
-                                ("short", format!("{}", short).into()),
+                                ("short", short.to_string().into()),
                             ],
                         )
                     });
@@ -202,12 +202,9 @@ impl RepoTab {
                     let gutter_resp = gutter_resp.on_hover_text(crate::i18n::message(
                         "repo-core-2479",
                         &[
-                            ("author", format!("{}", line.author).into()),
-                            (
-                                "now",
-                                format!("{}", git::relative_time(line.time, now)).into(),
-                            ),
-                            ("summary", format!("{}", line.summary).into()),
+                            ("author", line.author.to_string().into()),
+                            ("now", git::relative_time(line.time, now).to_string().into()),
+                            ("summary", line.summary.to_string().into()),
                         ],
                     ));
                     if gutter_resp.clicked() {

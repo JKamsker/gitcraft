@@ -168,9 +168,9 @@ impl RepoTab {
         match file.area {
             Area::Unstaged | Area::Untracked => {
                 let discard = if file.area == Area::Untracked {
-                    crate::i18n::message("repo-core-3005", &[("path", format!("{}", path).into())])
+                    crate::i18n::message("repo-core-3005", &[("path", path.to_string().into())])
                 } else {
-                    crate::i18n::message("repo-core-3006", &[("path", format!("{}", path).into())])
+                    crate::i18n::message("repo-core-3006", &[("path", path.to_string().into())])
                 };
                 vec![
                     PaletteItem::action(

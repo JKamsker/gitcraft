@@ -708,8 +708,8 @@ pub(super) fn compare_items(
     if crate::menu_item::MenuItem::new(crate::i18n::message(
         "repo-core-4144",
         &[
-            ("name", format!("{}", name).into()),
-            ("current", format!("{}", current).into()),
+            ("name", name.to_string().into()),
+            ("current", current.to_string().into()),
         ],
     ))
     .icon("command")
@@ -722,8 +722,8 @@ pub(super) fn compare_items(
     if crate::menu_item::MenuItem::new(crate::i18n::message(
         "repo-core-4145",
         &[
-            ("current", format!("{}", current).into()),
-            ("name", format!("{}", name).into()),
+            ("current", current.to_string().into()),
+            ("name", name.to_string().into()),
         ],
     ))
     .icon("file-diff")

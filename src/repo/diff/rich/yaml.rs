@@ -54,7 +54,7 @@ pub fn parse(text: &str) -> Result<Node, String> {
             "repo-core-2281",
             &[
                 ("line", format!("{}", e.marker().line()).into()),
-                ("info", format!("{}", e.info()).into()),
+                ("info", e.info().to_string().into()),
             ],
         )
     })?;

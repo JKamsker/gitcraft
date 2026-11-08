@@ -410,7 +410,7 @@ pub(super) fn refuse_option_like(name: &str, status: &mut Option<(String, bool)>
     let bad = name.is_empty() || name.starts_with('-');
     if bad {
         *status = Some((
-            crate::i18n::message("repo-core-0369", &[("name", format!("{}", name).into())]),
+            crate::i18n::message("repo-core-0369", &[("name", name.to_string().into())]),
             true,
         ));
     }

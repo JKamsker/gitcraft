@@ -145,7 +145,7 @@ pub(in crate::repo) fn search_document(
                             "repo-core-4048",
                             &[
                                 ("number", format!("{}", old.number).into()),
-                                ("text", format!("{}", old.text).into()),
+                                ("text", old.text.to_string().into()),
                             ],
                         ),
                         t.danger,
@@ -157,7 +157,7 @@ pub(in crate::repo) fn search_document(
                             "repo-core-4049",
                             &[
                                 ("number", format!("{}", new.number).into()),
-                                ("text", format!("{}", new.text).into()),
+                                ("text", new.text.to_string().into()),
                             ],
                         ),
                         t.success,

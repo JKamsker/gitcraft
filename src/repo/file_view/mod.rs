@@ -91,7 +91,7 @@ impl RepoTab {
                             ui,
                             &crate::i18n::message(
                                 "repo-core-2494",
-                                &[("rev", format!("{}", rev.get(..8).unwrap_or(rev)).into())],
+                                &[("rev", rev.get(..8).unwrap_or(rev).to_string().into())],
                             ),
                             t.text_dim,
                         );

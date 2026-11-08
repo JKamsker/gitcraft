@@ -107,12 +107,11 @@ fn where_label(at: &LinesAt) -> String {
         LinesAt::Rev(rev) => match rev.strip_suffix('^') {
             Some(commit) => crate::i18n::message(
                 "repo-core-2493",
-                &[("commit", format!("{}", short(commit)).into())],
+                &[("commit", short(commit).to_string().into())],
             ),
-            None => crate::i18n::message(
-                "repo-core-2494",
-                &[("rev", format!("{}", short(rev)).into())],
-            ),
+            None => {
+                crate::i18n::message("repo-core-2494", &[("rev", short(rev).to_string().into())])
+            }
         },
         LinesAt::Index => crate::i18n::text("repo-core-2495").to_owned(),
         LinesAt::WorkTree => crate::i18n::text("repo-core-2496").to_owned(),

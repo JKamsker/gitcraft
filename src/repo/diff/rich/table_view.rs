@@ -74,7 +74,7 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-2246",
-                        &[("format", format!("{}", diff.format).into())],
+                        &[("format", diff.format.to_string().into())],
                     ))
                     .font(theme::medium(12.5))
                     .color(t.text),

@@ -134,22 +134,22 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                     (a, 0) => crate::i18n::message(
                         "repo-core-0934",
                         &[
-                            ("other", format!("{}", other).into()),
-                            ("a", format!("{}", commits(a)).into()),
+                            ("other", other.to_string().into()),
+                            ("a", commits(a).to_string().into()),
                         ],
                     ),
                     (0, b) => crate::i18n::message(
                         "repo-core-0935",
                         &[
-                            ("other", format!("{}", other).into()),
-                            ("b", format!("{}", commits(b)).into()),
+                            ("other", other.to_string().into()),
+                            ("b", commits(b).to_string().into()),
                         ],
                     ),
                     (a, b) => crate::i18n::message(
                         "repo-core-0936",
                         &[
-                            ("other", format!("{}", other).into()),
-                            ("a", format!("{}", commits(a)).into()),
+                            ("other", other.to_string().into()),
+                            ("a", commits(a).to_string().into()),
                             ("b", format!("{}", b).into()),
                         ],
                     ),
@@ -160,7 +160,7 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                 let mut since = c.since_fork;
                 let label = crate::i18n::message(
                     "repo-core-0937",
-                    &[("target-name", format!("{}", target_name).into())],
+                    &[("target-name", target_name.to_string().into())],
                 );
                 if ui
                     .checkbox(&mut since, label)

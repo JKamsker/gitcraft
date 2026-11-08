@@ -595,7 +595,7 @@ pub(super) fn abort_action(state: InProgress) -> Action {
     let what = state.label().to_lowercase();
     Action::Dialog(Dialog::confirm(
         &format!("Abort {what}"),
-        crate::i18n::message("repo-core-0017", &[("what", format!("{}", what).into())]),
+        crate::i18n::message("repo-core-0017", &[("what", what.to_string().into())]),
         crate::i18n::text("repo-core-0018"),
         ops(&[&[state.command(), "--abort"]]),
         None,

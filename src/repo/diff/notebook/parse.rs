@@ -200,7 +200,7 @@ fn cut(text: String) -> String {
             crate::i18n::message(
                 "repo-core-1884",
                 &[
-                    ("at", format!("{}", &text[..at]).into()),
+                    ("at", text[..at].to_string().into()),
                     ("more", format!("{}", more).into()),
                 ],
             )

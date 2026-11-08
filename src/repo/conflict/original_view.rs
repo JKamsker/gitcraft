@@ -113,7 +113,7 @@ fn body(
         (Original::Unknown(why), _) => note(
             ui,
             t,
-            &crate::i18n::message("repo-core-0627", &[("why", format!("{}", why).into())]),
+            &crate::i18n::message("repo-core-0627", &[("why", why.to_string().into())]),
         ),
         (Original::Text(base), Some((ours, theirs))) => {
             if base.is_empty() {
@@ -149,11 +149,8 @@ fn side_changes(ui: &mut Ui, t: &Tokens, (k, ours): (usize, bool), name: &str, l
                 RichText::new(crate::i18n::message(
                     "repo-core-0629",
                     &[
-                        ("name", format!("{}", name).into()),
-                        (
-                            "lines",
-                            format!("{}", super::original::summary(lines)).into(),
-                        ),
+                        ("name", name.to_string().into()),
+                        ("lines", super::original::summary(lines).to_string().into()),
                     ],
                 ))
                 .color(t.text_faint)

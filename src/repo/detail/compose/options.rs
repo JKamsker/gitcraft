@@ -70,7 +70,7 @@ fn rules_ui(
     let forge_note = match forge {
         Some(f) => crate::i18n::message(
             "repo-core-0971",
-            &[("replace", format!("{}", f.url.replace("$1", "12")).into())],
+            &[("replace", f.url.replace("$1", "12").to_string().into())],
         ),
         None => crate::i18n::text("repo-core-0972").to_owned(),
     };

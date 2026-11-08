@@ -678,8 +678,8 @@ impl RepoTab {
                         &crate::i18n::message(
                             "repo-core-0156",
                             &[
-                                ("pattern", format!("{}", pattern).into()),
-                                ("path", format!("{}", path).into()),
+                                ("pattern", pattern.to_string().into()),
+                                ("path", path.to_string().into()),
                             ],
                         ),
                         ops(&[&[
@@ -699,12 +699,12 @@ impl RepoTab {
                     let msg = if added {
                         crate::i18n::message(
                             "repo-core-0162",
-                            &[("pattern", format!("{}", pattern).into())],
+                            &[("pattern", pattern.to_string().into())],
                         )
                     } else {
                         crate::i18n::message(
                             "repo-core-0163",
-                            &[("pattern", format!("{}", pattern).into())],
+                            &[("pattern", pattern.to_string().into())],
                         )
                     };
                     self.status = Some((msg, false));
@@ -849,7 +849,7 @@ impl RepoTab {
                 "repo-core-0169",
                 &[(
                     "label",
-                    crate::repo::messages::display_operation(&label).into(),
+                    crate::repo::messages::display_operation(label).into(),
                 )],
             ),
             ops(&[&args]),
@@ -879,7 +879,7 @@ impl RepoTab {
                         (
                             crate::i18n::message(
                                 "repo-core-0172",
-                                &[("tool", format!("{}", tool).into())],
+                                &[("tool", tool.to_string().into())],
                             ),
                             false,
                         )
@@ -888,14 +888,14 @@ impl RepoTab {
                         git::StripState::Other(name) => (
                             crate::i18n::message(
                                 "repo-core-0173",
-                                &[("name", format!("{}", name).into())],
+                                &[("name", name.to_string().into())],
                             ),
                             false,
                         ),
                         _ => (crate::i18n::text("repo-core-0174").to_owned(), false),
                     },
                     Err(e) => (
-                        crate::i18n::message("repo-core-0175", &[("e", format!("{}", e).into())]),
+                        crate::i18n::message("repo-core-0175", &[("e", e.to_string().into())]),
                         true,
                     ),
                 });
@@ -930,20 +930,18 @@ impl RepoTab {
                 let left = ed.take_solved(text);
                 let solved = before.saturating_sub(left);
                 let message = match (solved, left) {
-                    (0, _) => crate::i18n::message(
-                        "repo-core-0176",
-                        &[("path", format!("{}", path).into())],
-                    ),
-                    (_, 0) => crate::i18n::message(
-                        "repo-core-0177",
-                        &[("path", format!("{}", path).into())],
-                    ),
+                    (0, _) => {
+                        crate::i18n::message("repo-core-0176", &[("path", path.to_string().into())])
+                    }
+                    (_, 0) => {
+                        crate::i18n::message("repo-core-0177", &[("path", path.to_string().into())])
+                    }
                     _ => crate::i18n::message(
                         "repo-core-0178",
                         &[
                             ("solved", (solved).into()),
                             ("before", (before).into()),
-                            ("path", format!("{}", path).into()),
+                            ("path", path.to_string().into()),
                             ("left", (left).into()),
                         ],
                     ),
@@ -1002,10 +1000,7 @@ impl RepoTab {
             Ok(()) => {
                 self.run_prepared(
                     "Mark resolved",
-                    &crate::i18n::message(
-                        "repo-core-0180",
-                        &[("file", format!("{}", file).into())],
-                    ),
+                    &crate::i18n::message("repo-core-0180", &[("file", file.to_string().into())]),
                     ops(&[&["--literal-pathspecs", "add", "--", &file]]),
                     Refresh::Status,
                     OpKind::plain(),
@@ -1042,7 +1037,7 @@ impl RepoTab {
                         ("left", (left).into()),
                         (
                             "busy",
-                            crate::repo::messages::display_operation(&busy).into(),
+                            crate::repo::messages::display_operation(busy).into(),
                         ),
                     ],
                 ),
@@ -1105,7 +1100,7 @@ pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
         crate::i18n::message(
             "repo-core-0191",
             &[
-                ("editor", format!("{}", editor).into()),
+                ("editor", editor.to_string().into()),
                 ("e", format!("{}", e).into()),
             ],
         )

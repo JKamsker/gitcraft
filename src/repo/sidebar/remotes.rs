@@ -75,7 +75,7 @@ impl RepoTab {
                 labels::section(
                     &crate::i18n::message(
                         "repo-core-3484",
-                        &[("name", format!("{}", remote.name).into())],
+                        &[("name", remote.name.to_string().into())],
                     ),
                     &count,
                     expanded,
@@ -133,7 +133,7 @@ impl RepoTab {
         acts.extend(visibility::eye(ui, &r, &full, shown));
         let r = r.on_hover_text(crate::i18n::message(
             "repo-core-3485",
-            &[("name", format!("{}", b.name).into())],
+            &[("name", b.name.to_string().into())],
         ));
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
@@ -165,7 +165,7 @@ impl RepoTab {
         if let Some(current) = self.refs.current.as_deref() {
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3487",
-                &[("current", format!("{}", current).into())],
+                &[("current", current.to_string().into())],
             ))
             .icon("arrow-right")
             .enabled(idle)
@@ -174,20 +174,16 @@ impl RepoTab {
             {
                 acts.push(fast_forward_action(BranchRef::remote(&b.name), current));
             }
-            let merge = crate::i18n::message(
-                "repo-core-3488",
-                &[("current", format!("{}", current).into())],
-            );
+            let merge =
+                crate::i18n::message("repo-core-3488", &[("current", current.to_string().into())]);
             if self
                 .conflict_button(ui, merge, idle, Op::Merge, &b.target)
                 .clicked()
             {
                 acts.push(merge_action(BranchRef::remote(&b.name), current));
             }
-            let rebase = crate::i18n::message(
-                "repo-core-3489",
-                &[("current", format!("{}", current).into())],
-            );
+            let rebase =
+                crate::i18n::message("repo-core-3489", &[("current", current.to_string().into())]);
             let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
             offer(&rebase, || GhostOp::Rebase {
                 onto: BranchRef::remote(&b.name).full(),
@@ -234,8 +230,8 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-3492",
                         &[
-                            ("short", format!("{}", short).into()),
-                            ("remote", format!("{}", remote).into()),
+                            ("short", short.to_string().into()),
+                            ("remote", remote.to_string().into()),
                         ],
                     ),
                     crate::i18n::text("repo-core-1115"),
@@ -333,7 +329,7 @@ fn paint_remote_header(
 fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle: bool) {
     if crate::menu_item::MenuItem::new(crate::i18n::message(
         "repo-core-3495",
-        &[("name", format!("{}", remote.name).into())],
+        &[("name", remote.name.to_string().into())],
     ))
     .icon("cloud-download")
     .enabled(idle)
@@ -384,8 +380,8 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
             crate::i18n::message(
                 "repo-core-3501",
                 &[
-                    ("name", format!("{}", remote.name).into()),
-                    ("url", format!("{}", remote.url).into()),
+                    ("name", remote.name.to_string().into()),
+                    ("url", remote.url.to_string().into()),
                 ],
             ),
             crate::i18n::text("repo-core-0305"),
@@ -404,7 +400,7 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
     widgets::a11y(&resp, egui::WidgetType::Button, || {
         let name = crate::i18n::message(
             "repo-core-2595",
-            &[("git-ref", format!("{}", labels::ref_name(full)).into())],
+            &[("git-ref", labels::ref_name(full).to_string().into())],
         );
         let notes = [
             (has_pr, crate::i18n::text("repo-core-3418")),

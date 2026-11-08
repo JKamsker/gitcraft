@@ -223,7 +223,7 @@ impl RepoTab {
                 if link
                     .on_hover_text(crate::i18n::message(
                         "repo-core-2704",
-                        &[("id", format!("{}", id).into())],
+                        &[("id", id.to_string().into())],
                     ))
                     .clicked()
                 {
@@ -364,7 +364,7 @@ impl RepoTab {
                 };
                 (
                     crate::repo::bisect::mark_color(t, mark),
-                    crate::i18n::message("repo-core-2711", &[("word", format!("{}", word).into())]),
+                    crate::i18n::message("repo-core-2711", &[("word", word.to_string().into())]),
                 )
             }
             (false, None) => return None,

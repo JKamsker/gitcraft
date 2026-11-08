@@ -13,7 +13,7 @@ pub fn parse(text: &str) -> Result<Node, String> {
             "repo-core-2267",
             &[
                 ("line", (line).into()),
-                ("trim", format!("{}", e.message().trim()).into()),
+                ("trim", e.message().trim().to_string().into()),
             ],
         )
     })?;

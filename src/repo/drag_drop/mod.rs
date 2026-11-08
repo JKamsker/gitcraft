@@ -130,16 +130,13 @@ impl RepoTab {
         if let Some(op) = &self.busy_op {
             return Some(crate::i18n::message(
                 "repo-core-4084",
-                &[("op", crate::repo::messages::display_operation(&op).into())],
+                &[("op", crate::repo::messages::display_operation(op).into())],
             ));
         }
         self.work.in_progress.map(|s| {
             crate::i18n::message(
                 "repo-core-4085",
-                &[(
-                    "to-lowercase",
-                    format!("{}", s.label().to_lowercase()).into(),
-                )],
+                &[("to-lowercase", s.label().to_lowercase().to_string().into())],
             )
         })
     }
@@ -338,8 +335,8 @@ impl Offer {
                         crate::i18n::message(
                             "repo-core-2422",
                             &[
-                                ("hash", format!("{}", short(hash)).into()),
-                                ("into", format!("{}", into).into()),
+                                ("hash", short(hash).to_string().into()),
+                                ("into", into.to_string().into()),
                             ],
                         ),
                         &["merge", "--no-edit", hash],
@@ -356,8 +353,8 @@ impl Offer {
                         crate::i18n::message(
                             "repo-core-2423",
                             &[
-                                ("branch", format!("{}", branch).into()),
-                                ("hash", format!("{}", short(hash)).into()),
+                                ("branch", branch.to_string().into()),
+                                ("hash", short(hash).to_string().into()),
                             ],
                         ),
                         &["rebase", hash],
@@ -389,8 +386,8 @@ impl Offer {
                         crate::i18n::message(
                             "repo-core-2425",
                             &[
-                                ("branch", format!("{}", branch).into()),
-                                ("label", format!("{}", short(hash)).into()),
+                                ("branch", branch.to_string().into()),
+                                ("label", short(hash).to_string().into()),
                             ],
                         ),
                         &["merge", "--ff-only", to_tip],

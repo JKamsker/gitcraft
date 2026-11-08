@@ -62,10 +62,7 @@ pub fn run_test(repo: &std::path::Path, command: &str) -> Result<TestRun, String
 fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) {
     match run {
         Ok(r) if r.passed => (
-            crate::i18n::message(
-                "repo-core-0479",
-                &[("command", format!("{}", command).into())],
-            ),
+            crate::i18n::message("repo-core-0479", &[("command", command.to_string().into())]),
             false,
         ),
         Ok(r) => {
@@ -79,8 +76,8 @@ fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) 
                 crate::i18n::message(
                     "repo-core-0481",
                     &[
-                        ("command", format!("{}", command).into()),
-                        ("last", format!("{}", last).into()),
+                        ("command", command.to_string().into()),
+                        ("last", last.to_string().into()),
                     ],
                 ),
                 true,
@@ -90,8 +87,8 @@ fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) 
             crate::i18n::message(
                 "repo-core-0482",
                 &[
-                    ("command", format!("{}", command).into()),
-                    ("e", format!("{}", e).into()),
+                    ("command", command.to_string().into()),
+                    ("e", e.to_string().into()),
                 ],
             ),
             true,
@@ -178,17 +175,15 @@ impl RepoTab {
                         &[
                             (
                                 "Fetching",
-                                format!(
-                                    "{}",
-                                    if send {
-                                        crate::i18n::text("repo-core-0487")
-                                    } else {
-                                        crate::i18n::text("repo-core-0488")
-                                    }
-                                )
+                                (if send {
+                                    crate::i18n::text("repo-core-0487")
+                                } else {
+                                    crate::i18n::text("repo-core-0488")
+                                })
+                                .to_string()
                                 .into(),
                             ),
-                            ("remote", format!("{}", remote).into()),
+                            ("remote", remote.to_string().into()),
                         ],
                     ),
                     false,
@@ -336,18 +331,12 @@ impl RepoTab {
         };
         vec![
             (
-                crate::i18n::message(
-                    "repo-core-0492",
-                    &[("remote", format!("{}", remote).into())],
-                ),
+                crate::i18n::message("repo-core-0492", &[("remote", remote.to_string().into())]),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote.clone(), true)),
             ),
             (
-                crate::i18n::message(
-                    "repo-core-0493",
-                    &[("remote", format!("{}", remote).into())],
-                ),
+                crate::i18n::message("repo-core-0493", &[("remote", remote.to_string().into())]),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote, false)),
             ),

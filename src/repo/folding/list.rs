@@ -235,6 +235,6 @@ pub(super) fn group_title(reasons: &[FoldReason]) -> String {
     };
     crate::i18n::message(
         "repo-core-1911",
-        &[("n", (n).into()), ("what", format!("{}", what).into())],
+        &[("n", (n).into()), ("what", what.to_string().into())],
     )
 }

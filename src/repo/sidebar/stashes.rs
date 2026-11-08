@@ -170,7 +170,7 @@ fn menu(
     {
         acts.push(Action::Dialog(Dialog::confirm(
             "Drop stash",
-            crate::i18n::message("repo-core-3515", &[("name", format!("{}", name).into())]),
+            crate::i18n::message("repo-core-3515", &[("name", name.to_string().into())]),
             crate::i18n::text("repo-core-3197"),
             steps(StashOp::Drop),
             None,

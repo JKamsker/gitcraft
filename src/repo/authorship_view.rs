@@ -219,17 +219,14 @@ impl RepoTab {
         let repo = self.path.clone();
         let name = branch.to_owned();
         self.status = Some((
-            crate::i18n::message(
-                "repo-core-0197",
-                &[("branch", format!("{}", branch).into())],
-            ),
+            crate::i18n::message("repo-core-0197", &[("branch", branch.to_string().into())]),
             false,
         ));
         self.then(
             ctx,
             move || {
                 let base = default_branch(&repo, &full).or(main).ok_or_else(|| {
-                    crate::i18n::message("repo-core-0198", &[("name", format!("{}", name).into())])
+                    crate::i18n::message("repo-core-0198", &[("name", name.to_string().into())])
                 })?;
                 authorship::branch::figures(&repo, &full, &base, &known, complete)
                     .map(|f| f.headline(&name))

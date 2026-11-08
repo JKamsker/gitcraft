@@ -206,7 +206,7 @@ impl Form {
                         t.danger,
                         crate::i18n::message(
                             "repo-core-1247",
-                            &[("error", format!("{}", error).into())],
+                            &[("error", error.to_string().into())],
                         ),
                     );
                 }
@@ -334,7 +334,7 @@ impl Form {
                                     "repo-core-1266",
                                     &[
                                         ("count", (self.selected.len()).into()),
-                                        ("prefix", format!("{}", self.prefix).into()),
+                                        ("prefix", self.prefix.to_string().into()),
                                     ],
                                 ),
                             );

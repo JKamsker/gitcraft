@@ -155,9 +155,9 @@ impl RepoTab {
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
         let r = r.on_hover_text(if has_view {
-            crate::i18n::message("repo-core-3451", &[("url", format!("{}", pr.url).into())])
+            crate::i18n::message("repo-core-3451", &[("url", pr.url.to_string().into())])
         } else {
-            crate::i18n::message("repo-core-3452", &[("url", format!("{}", pr.url).into())])
+            crate::i18n::message("repo-core-3452", &[("url", pr.url.to_string().into())])
         });
         let r = match badges {
             Some(why) => r.on_hover_text(why),
@@ -200,7 +200,7 @@ impl RepoTab {
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3455",
-                    &[("branch", format!("{}", pr.branch).into())],
+                    &[("branch", pr.branch.to_string().into())],
                 ))
                 .icon("log-in")
                 .enabled(idle)
@@ -286,14 +286,14 @@ impl RepoTab {
                 true,
                 crate::i18n::message(
                     "repo-core-3458",
-                    &[("path", format!("{}", crate::remote::display(path)).into())],
+                    &[("path", crate::remote::display(path).to_string().into())],
                 ),
             ),
             PrWorktree::Create { path, .. } => (
                 idle,
                 crate::i18n::message(
                     "repo-core-3459",
-                    &[("path", format!("{}", crate::remote::display(path)).into())],
+                    &[("path", crate::remote::display(path).to_string().into())],
                 ),
             ),
         };

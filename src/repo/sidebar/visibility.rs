@@ -83,7 +83,7 @@ impl RepoTab {
             )
             .on_hover_text(crate::i18n::message(
                 "repo-core-3560",
-                &[("what", format!("{}", what).into())],
+                &[("what", what.to_string().into())],
             ));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(10.0);

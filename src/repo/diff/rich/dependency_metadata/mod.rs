@@ -272,17 +272,15 @@ impl Metadata {
             terms.push(crate::i18n::message(
                 "repo-core-3991",
                 &[
-                    ("path", format!("{}", path).into()),
+                    ("path", path.to_string().into()),
                     (
                         "else",
-                        format!(
-                            "{}",
-                            if content.is_err() {
-                                crate::i18n::text("repo-core-3992")
-                            } else {
-                                ""
-                            }
-                        )
+                        (if content.is_err() {
+                            crate::i18n::text("repo-core-3992")
+                        } else {
+                            ""
+                        })
+                        .to_string()
                         .into(),
                     ),
                 ],
@@ -317,8 +315,8 @@ impl Metadata {
             &crate::i18n::message(
                 "repo-core-3994",
                 &[
-                    ("side", format!("{}", side).into()),
-                    ("archive-url", format!("{}", self.archive_url).into()),
+                    ("side", side.to_string().into()),
+                    ("archive-url", self.archive_url.to_string().into()),
                 ],
             ),
             t.text_dim,
@@ -327,11 +325,8 @@ impl Metadata {
             &crate::i18n::message(
                 "repo-core-3995",
                 &[
-                    ("side", format!("{}", side).into()),
-                    (
-                        "license-summary",
-                        format!("{}", self.license_summary()).into(),
-                    ),
+                    ("side", side.to_string().into()),
+                    ("license-summary", self.license_summary().to_string().into()),
                 ],
             ),
             t.warning,
@@ -341,8 +336,8 @@ impl Metadata {
                 &crate::i18n::message(
                     "repo-core-3996",
                     &[
-                        ("side", format!("{}", side).into()),
-                        ("path", format!("{}", path).into()),
+                        ("side", side.to_string().into()),
+                        ("path", path.to_string().into()),
                     ],
                 ),
                 t.text,
@@ -354,7 +349,7 @@ impl Metadata {
         }
         if self.changelogs.is_empty() {
             doc.text(
-                &crate::i18n::message("repo-core-3997", &[("side", format!("{}", side).into())]),
+                &crate::i18n::message("repo-core-3997", &[("side", side.to_string().into())]),
                 t.text_dim,
             );
         }
@@ -363,8 +358,8 @@ impl Metadata {
                 &crate::i18n::message(
                     "repo-core-3998",
                     &[
-                        ("side", format!("{}", side).into()),
-                        ("path", format!("{}", path).into()),
+                        ("side", side.to_string().into()),
+                        ("path", path.to_string().into()),
                     ],
                 ),
                 t.text,
@@ -376,9 +371,9 @@ impl Metadata {
                 &crate::i18n::message(
                     "repo-core-3999",
                     &[
-                        ("side", format!("{}", side).into()),
-                        ("path", format!("{}", path).into()),
-                        ("reason", format!("{}", reason).into()),
+                        ("side", side.to_string().into()),
+                        ("path", path.to_string().into()),
+                        ("reason", reason.to_string().into()),
                     ],
                 ),
                 t.warning,
@@ -391,7 +386,7 @@ fn side_summary(side: &Side) -> String {
         Ok(Some(m)) => m.license_summary(),
         Ok(None) => crate::i18n::text("repo-core-4000").into(),
         Err(error) => {
-            crate::i18n::message("repo-core-4001", &[("error", format!("{}", error).into())])
+            crate::i18n::message("repo-core-4001", &[("error", error.to_string().into())])
         }
     }
 }
@@ -538,7 +533,7 @@ impl State {
             return;
         };
         doc.text(
-            &crate::i18n::message("repo-core-4005", &[("name", format!("{}", name).into())]),
+            &crate::i18n::message("repo-core-4005", &[("name", name.to_string().into())]),
             t.text,
         );
         if self.pending.is_some() {
@@ -551,18 +546,16 @@ impl State {
                     &[
                         (
                             "else",
-                            format!(
-                                "{}",
-                                if changed(answer) {
-                                    crate::i18n::text("repo-core-4008")
-                                } else {
-                                    ""
-                                }
-                            )
+                            (if changed(answer) {
+                                crate::i18n::text("repo-core-4008")
+                            } else {
+                                ""
+                            })
+                            .to_string()
                             .into(),
                         ),
-                        ("answer", format!("{}", side_summary(&answer.0)).into()),
-                        ("answer2", format!("{}", side_summary(&answer.1)).into()),
+                        ("answer", side_summary(&answer.0).to_string().into()),
+                        ("answer2", side_summary(&answer.1).to_string().into()),
                     ],
                 ),
                 t.warning,
@@ -576,7 +569,7 @@ impl State {
                     Ok(None) => doc.text(
                         &crate::i18n::message(
                             "repo-core-4009",
-                            &[("side", format!("{}", side).into())],
+                            &[("side", side.to_string().into())],
                         ),
                         t.text_dim,
                     ),
@@ -584,8 +577,8 @@ impl State {
                         &crate::i18n::message(
                             "repo-core-4010",
                             &[
-                                ("side", format!("{}", side).into()),
-                                ("error", format!("{}", error).into()),
+                                ("side", side.to_string().into()),
+                                ("error", error.to_string().into()),
                             ],
                         ),
                         t.warning,
@@ -603,7 +596,7 @@ impl State {
         ui.horizontal(|ui| {
             ui.strong(crate::i18n::message(
                 "repo-core-4005",
-                &[("name", format!("{}", name).into())],
+                &[("name", name.to_string().into())],
             ));
             if ui.button(crate::i18n::text("repo-core-4011")).clicked() {
                 self.close();
@@ -630,18 +623,16 @@ impl State {
                 &[
                     (
                         "else",
-                        format!(
-                            "{}",
-                            if changed(answer) {
-                                crate::i18n::text("repo-core-4008")
-                            } else {
-                                ""
-                            }
-                        )
+                        (if changed(answer) {
+                            crate::i18n::text("repo-core-4008")
+                        } else {
+                            ""
+                        })
+                        .to_string()
                         .into(),
                     ),
-                    ("answer", format!("{}", side_summary(&answer.0)).into()),
-                    ("answer2", format!("{}", side_summary(&answer.1)).into()),
+                    ("answer", side_summary(&answer.0).to_string().into()),
+                    ("answer2", side_summary(&answer.1).to_string().into()),
                 ],
             ));
             egui::ScrollArea::vertical()
@@ -657,7 +648,7 @@ impl State {
                             Ok(None) => {
                                 ui.label(crate::i18n::message(
                                     "repo-core-4009",
-                                    &[("side", format!("{}", side).into())],
+                                    &[("side", side.to_string().into())],
                                 ));
                                 continue;
                             }
@@ -665,8 +656,8 @@ impl State {
                                 ui.label(crate::i18n::message(
                                     "repo-core-4010",
                                     &[
-                                        ("side", format!("{}", side).into()),
-                                        ("error", format!("{}", error).into()),
+                                        ("side", side.to_string().into()),
+                                        ("error", error.to_string().into()),
                                     ],
                                 ));
                                 continue;
@@ -675,7 +666,7 @@ impl State {
                         ui.hyperlink_to(
                             crate::i18n::message(
                                 "repo-core-4015",
-                                &[("side", format!("{}", side).into())],
+                                &[("side", side.to_string().into())],
                             ),
                             &metadata.archive_url,
                         );
@@ -683,8 +674,8 @@ impl State {
                             egui::CollapsingHeader::new(crate::i18n::message(
                                 "repo-core-3996",
                                 &[
-                                    ("side", format!("{}", side).into()),
-                                    ("path", format!("{}", path).into()),
+                                    ("side", side.to_string().into()),
+                                    ("path", path.to_string().into()),
                                 ],
                             ))
                             .id_salt((side, "licence-file"))
@@ -700,16 +691,16 @@ impl State {
                         if metadata.changelogs.is_empty() {
                             ui.label(crate::i18n::message(
                                 "repo-core-4017",
-                                &[("side", format!("{}", side).into())],
+                                &[("side", side.to_string().into())],
                             ));
                         }
                         for (path, reason) in &metadata.skipped {
                             ui.label(crate::i18n::message(
                                 "repo-core-3999",
                                 &[
-                                    ("side", format!("{}", side).into()),
-                                    ("path", format!("{}", path).into()),
-                                    ("reason", format!("{}", reason).into()),
+                                    ("side", side.to_string().into()),
+                                    ("path", path.to_string().into()),
+                                    ("reason", reason.to_string().into()),
                                 ],
                             ));
                         }
@@ -717,8 +708,8 @@ impl State {
                             egui::CollapsingHeader::new(crate::i18n::message(
                                 "repo-core-3998",
                                 &[
-                                    ("side", format!("{}", side).into()),
-                                    ("path", format!("{}", path).into()),
+                                    ("side", side.to_string().into()),
+                                    ("path", path.to_string().into()),
                                 ],
                             ))
                             .id_salt((side, path))

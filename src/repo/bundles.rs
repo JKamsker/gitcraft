@@ -67,7 +67,7 @@ impl RepoTab {
             Err(e) => {
                 self.dialog = None;
                 self.status = Some((
-                    crate::i18n::message("repo-core-0263", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-0263", &[("e", e.to_string().into())]),
                     true,
                 ));
             }
@@ -94,7 +94,7 @@ impl RepoTab {
             Err(e) => {
                 self.dialog = None;
                 self.status = Some((
-                    crate::i18n::message("repo-core-0264", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-0264", &[("e", e.to_string().into())]),
                     true,
                 ));
             }
@@ -172,7 +172,7 @@ impl RepoTab {
                             "label",
                             crate::repo::messages::display_operation(&label).into(),
                         ),
-                        ("e", format!("{}", e).into()),
+                        ("e", e.to_string().into()),
                     ],
                 ),
                 true,

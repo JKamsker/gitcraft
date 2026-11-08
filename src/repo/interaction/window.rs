@@ -19,8 +19,8 @@ impl RepoTab {
         egui::Window::new(crate::i18n::message(
             "repo-core-2832",
             &[
-                ("a", format!("{}", search.spec.a).into()),
-                ("b", format!("{}", search.spec.b).into()),
+                ("a", search.spec.a.to_string().into()),
+                ("b", search.spec.b.to_string().into()),
             ],
         ))
         .id(egui::Id::new(("gitcraft-interaction", self.path.clone())))
@@ -36,7 +36,7 @@ impl RepoTab {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-2836",
-                        &[("e", format!("{}", e).into())],
+                        &[("e", e.to_string().into())],
                     ))
                     .color(t.danger),
                 );
@@ -72,7 +72,7 @@ impl RepoTab {
                             ui.label(
                                 RichText::new(crate::i18n::message(
                                     "repo-core-2838",
-                                    &[("side", format!("{}", side).into())],
+                                    &[("side", side.to_string().into())],
                                 ))
                                 .color(t.text_faint),
                             );
@@ -106,7 +106,7 @@ fn going(ui: &mut egui::Ui, t: &Tokens, search: &Search, acts: &mut Vec<Action>)
         RichText::new(crate::i18n::message(
             "repo-core-2840",
             &[
-                ("command", format!("{}", search.spec.command).into()),
+                ("command", search.spec.command.to_string().into()),
                 ("reruns", format!("{}", search.spec.reruns).into()),
             ],
         ))

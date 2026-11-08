@@ -37,7 +37,7 @@ pub(crate) fn blocked(
             "repo-core-2520",
             &[(
                 "to-lowercase",
-                format!("{}", state.label().to_lowercase()).into(),
+                state.label().to_lowercase().to_string().into(),
             )],
         ));
     }
@@ -72,19 +72,19 @@ impl Plan {
         if read.root && read.shallow {
             return Err(crate::i18n::message(
                 "repo-core-2525",
-                &[("target", format!("{}", short(&read.target)).into())],
+                &[("target", short(&read.target).to_string().into())],
             ));
         }
         if let Some(file) = &read.ignored_in_way {
             return Err(crate::i18n::message(
                 "repo-core-2526",
-                &[("file", format!("{}", file).into())],
+                &[("file", file.to_string().into())],
             ));
         }
         if !read.ancestor {
             return Err(crate::i18n::message(
                 "repo-core-2527",
-                &[("target", format!("{}", short(&read.target)).into())],
+                &[("target", short(&read.target).to_string().into())],
             ));
         }
         // Merges first: they bring in commits of other branches, listed before the target.
@@ -233,7 +233,7 @@ const VERIFY: [&str; 6] = [
 pub(crate) fn lost_in_rebase(error: &str) -> bool {
     error.starts_with(&crate::i18n::message(
         "repo-core-2534",
-        &[("VERIFY", format!("{}", VERIFY.join(" ")).into())],
+        &[("VERIFY", VERIFY.join(" ").to_string().into())],
     ))
 }
 

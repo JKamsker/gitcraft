@@ -45,14 +45,14 @@ impl Reason {
     pub fn describe(&self) -> String {
         match self {
             Reason::Merged(Merged::Into(base)) => {
-                crate::i18n::message("repo-core-0241", &[("base", format!("{}", base).into())])
+                crate::i18n::message("repo-core-0241", &[("base", base.to_string().into())])
             }
             Reason::Merged(Merged::Rebased(base)) => {
-                crate::i18n::message("repo-core-0242", &[("base", format!("{}", base).into())])
+                crate::i18n::message("repo-core-0242", &[("base", base.to_string().into())])
             }
             Reason::Merged(Merged::Pr(n, base)) => crate::i18n::message(
                 "repo-core-0243",
-                &[("n", (*n).into()), ("base", format!("{}", base).into())],
+                &[("n", (*n).into()), ("base", base.to_string().into())],
             ),
             Reason::UpstreamGone => crate::i18n::text("repo-core-0244").to_owned(),
             Reason::Stale(days) => {
@@ -323,7 +323,7 @@ impl HealthState {
                 self.asked = None;
                 self.error = Some(crate::i18n::message(
                     "repo-core-0246",
-                    &[("e", format!("{}", e).into())],
+                    &[("e", e.to_string().into())],
                 ));
             }
         }

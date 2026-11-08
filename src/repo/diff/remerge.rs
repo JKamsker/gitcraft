@@ -15,7 +15,7 @@ pub(super) const EDITED: &str = "repo-core-1953";
 pub(super) fn origin(hash: &str) -> String {
     crate::i18n::message(
         "repo-core-1954",
-        &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
     )
 }
 

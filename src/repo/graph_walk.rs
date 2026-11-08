@@ -211,7 +211,7 @@ impl RepoTab {
         let mut description = crate::i18n::message(
             "repo-core-2752",
             &[
-                ("shape", format!("{}", shape).into()),
+                ("shape", shape.to_string().into()),
                 ("count", (parents.len()).into()),
                 ("children", (children).into()),
             ],
@@ -222,7 +222,7 @@ impl RepoTab {
         for branch in self.refs.local.iter().filter(|b| b.target == commit.hash) {
             description.push_str(&crate::i18n::message(
                 "repo-core-2754",
-                &[("name", format!("{}", branch.name).into())],
+                &[("name", branch.name.to_string().into())],
             ));
             if !branch.upstream.is_empty() {
                 if branch.upstream_gone() {
@@ -234,7 +234,7 @@ impl RepoTab {
                         &[
                             ("ahead", (ahead).into()),
                             ("behind", (behind).into()),
-                            ("upstream", format!("{}", branch.upstream).into()),
+                            ("upstream", branch.upstream.to_string().into()),
                         ],
                     ));
                 }
@@ -350,7 +350,7 @@ impl RepoTab {
                 &[
                     ("ahead", (ahead).into()),
                     ("behind", (behind).into()),
-                    ("name", format!("{}", name).into()),
+                    ("name", name.to_string().into()),
                     ("count", (commits.len()).into()),
                 ],
             );
@@ -360,9 +360,14 @@ impl RepoTab {
                     &[
                         (
                             "hash",
-                            format!("{}", common.hash.get(..8).unwrap_or(&common.hash)).into(),
+                            common
+                                .hash
+                                .get(..8)
+                                .unwrap_or(&common.hash)
+                                .to_string()
+                                .into(),
                         ),
-                        ("date", format!("{}", common.date).into()),
+                        ("date", common.date.to_string().into()),
                     ],
                 ));
             } else {
@@ -385,7 +390,7 @@ impl RepoTab {
                     "repo-core-2761",
                     &[
                         ("merges", format!("{}", merges).into()),
-                        ("release", format!("{}", release).into()),
+                        ("release", release.to_string().into()),
                     ],
                 ));
                 if !line_complete {
@@ -426,38 +431,27 @@ impl RepoTab {
                     &[
                         (
                             "GraphNext",
-                            format!(
-                                "{}",
-                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphNext)
-                            )
-                            .into(),
+                            crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphNext)
+                                .to_string()
+                                .into(),
                         ),
                         (
                             "GraphPrevious",
-                            format!(
-                                "{}",
-                                crate::keymap::label(
-                                    ui.ctx(),
-                                    crate::keymap::Command::GraphPrevious
-                                )
-                            )
-                            .into(),
+                            crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphPrevious)
+                                .to_string()
+                                .into(),
                         ),
                         (
                             "GraphRight",
-                            format!(
-                                "{}",
-                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphRight)
-                            )
-                            .into(),
+                            crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphRight)
+                                .to_string()
+                                .into(),
                         ),
                         (
                             "GraphLeft",
-                            format!(
-                                "{}",
-                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphLeft)
-                            )
-                            .into(),
+                            crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphLeft)
+                                .to_string()
+                                .into(),
                         ),
                     ],
                 ));
@@ -486,13 +480,16 @@ impl RepoTab {
                                     .button(crate::i18n::message(
                                         "repo-core-2767",
                                         &[
-                                            ("kind", format!("{}", kind).into()),
+                                            ("kind", kind.to_string().into()),
                                             (
                                                 "hash",
-                                                format!("{}", c.hash.get(..8).unwrap_or(&c.hash))
+                                                c.hash
+                                                    .get(..8)
+                                                    .unwrap_or(&c.hash)
+                                                    .to_string()
                                                     .into(),
                                             ),
-                                            ("summary", format!("{}", c.summary).into()),
+                                            ("summary", c.summary.to_string().into()),
                                         ],
                                     ))
                                     .clicked()

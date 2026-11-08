@@ -443,7 +443,7 @@ fn folder_row<T>(
         labels::section(
             &crate::i18n::message(
                 "repo-core-0255",
-                &[("name", format!("{}", folder.name).into())],
+                &[("name", folder.name.to_string().into())],
             ),
             &count,
             open,

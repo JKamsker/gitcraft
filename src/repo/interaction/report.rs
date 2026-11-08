@@ -35,23 +35,17 @@ pub(crate) fn found_line(found: &Found, a: &str, b: &str, budget: usize) -> Stri
         }
         Found::PassTogether => crate::i18n::message(
             "repo-core-2818",
-            &[
-                ("a", format!("{}", a).into()),
-                ("b", format!("{}", b).into()),
-            ],
+            &[("a", a.to_string().into()), ("b", b.to_string().into())],
         ),
         Found::FailsAlone(Side::A) => {
-            crate::i18n::message("repo-core-2819", &[("a", format!("{}", a).into())])
+            crate::i18n::message("repo-core-2819", &[("a", a.to_string().into())])
         }
         Found::FailsAlone(Side::B) => {
-            crate::i18n::message("repo-core-2820", &[("b", format!("{}", b).into())])
+            crate::i18n::message("repo-core-2820", &[("b", b.to_string().into())])
         }
         Found::DontApply => crate::i18n::message(
             "repo-core-2821",
-            &[
-                ("a", format!("{}", a).into()),
-                ("b", format!("{}", b).into()),
-            ],
+            &[("a", a.to_string().into()), ("b", b.to_string().into())],
         ),
         Found::Flaky => crate::i18n::text("repo-core-2822").to_owned(),
     }

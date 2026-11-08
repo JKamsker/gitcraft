@@ -220,10 +220,7 @@ fn side_ui(
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-core-0450",
-            &[
-                ("name", format!("{}", name).into()),
-                ("count", (count).into()),
-            ],
+            &[("name", name.to_string().into()), ("count", (count).into())],
         ))
         .color(t.text_faint)
         .small(),
@@ -290,7 +287,7 @@ fn picked_ui(
             if ui
                 .small_button(crate::i18n::message(
                     "repo-core-0456",
-                    &[("short", format!("{}", step.short).into())],
+                    &[("short", step.short.to_string().into())],
                 ))
                 .on_hover_text(crate::i18n::text("repo-core-0457"))
                 .clicked()
@@ -319,8 +316,8 @@ fn picked_ui(
                             crate::i18n::message(
                                 "repo-core-0460",
                                 &[
-                                    ("short", format!("{}", a.short).into()),
-                                    ("short2", format!("{}", b.short).into()),
+                                    ("short", a.short.to_string().into()),
+                                    ("short2", b.short.to_string().into()),
                                 ],
                             ),
                             t.warning,
@@ -330,8 +327,8 @@ fn picked_ui(
                             crate::i18n::message(
                                 "repo-core-0461",
                                 &[
-                                    ("short", format!("{}", a.short).into()),
-                                    ("short2", format!("{}", b.short).into()),
+                                    ("short", a.short.to_string().into()),
+                                    ("short2", b.short.to_string().into()),
                                 ],
                             ),
                             t.success,
@@ -397,10 +394,10 @@ fn answer_text(found: &Found, timelines: &Timelines, names: (&str, &str)) -> Str
             let mut text = crate::i18n::message(
                 "repo-core-0464",
                 &[
-                    ("a", format!("{}", named(a)).into()),
-                    ("names", format!("{}", names.0).into()),
-                    ("b", format!("{}", named(b)).into()),
-                    ("names2", format!("{}", names.1).into()),
+                    ("a", named(a).to_string().into()),
+                    ("names", names.0.to_string().into()),
+                    ("b", named(b).to_string().into()),
+                    ("names2", names.1.to_string().into()),
                 ],
             );
             text.push_str(if *checked {
@@ -436,7 +433,7 @@ fn change_ui(ui: &mut Ui, t: &Tokens, history: &mut History) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-core-0471",
-                &[("short", format!("{}", short).into())],
+                &[("short", short.to_string().into())],
             ))
             .color(t.text_faint)
             .small(),

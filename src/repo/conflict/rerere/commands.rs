@@ -30,8 +30,8 @@ fn bool_config(repo: &Path, name: &str) -> Result<Option<bool>, String> {
         crate::i18n::message(
             "repo-core-0635",
             &[
-                ("name", format!("{}", name).into()),
-                ("e", format!("{}", e).into()),
+                ("name", name.to_string().into()),
+                ("e", e.to_string().into()),
             ],
         )
     })?;
@@ -276,8 +276,8 @@ pub fn preimage(
         Err(e) => Err(crate::i18n::message(
             "repo-core-0670",
             &[
-                ("path", format!("{}", path).into()),
-                ("e", format!("{}", e).into()),
+                ("path", path.to_string().into()),
+                ("e", e.to_string().into()),
             ],
         )),
     }

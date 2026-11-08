@@ -746,7 +746,7 @@ impl<'a> Rows<'a> {
             crate::i18n::message(
                 "repo-core-2318",
                 &[
-                    ("tip", format!("{}", tip).into()),
+                    ("tip", tip.to_string().into()),
                     ("number", format!("{}", number).into()),
                     ("count", (count.unwrap_or(0)).into()),
                 ],
@@ -818,30 +818,28 @@ fn line_label(line: &super::DiffLine) -> String {
     crate::i18n::message(
         "repo-core-2322",
         &[
-            ("kind", format!("{}", kind).into()),
+            ("kind", kind.to_string().into()),
             (
                 "line",
-                format!(
-                    "{}",
-                    line.old.map_or_else(
+                line.old
+                    .map_or_else(
                         || crate::i18n::text("repo-core-2323").to_owned(),
-                        |n| n.to_string()
+                        |n| n.to_string(),
                     )
-                )
-                .into(),
+                    .to_string()
+                    .into(),
             ),
             (
                 "line2",
-                format!(
-                    "{}",
-                    line.new.map_or_else(
+                line.new
+                    .map_or_else(
                         || crate::i18n::text("repo-core-2323").to_owned(),
-                        |n| n.to_string()
+                        |n| n.to_string(),
                     )
-                )
-                .into(),
+                    .to_string()
+                    .into(),
             ),
-            ("text", format!("{}", line.text).into()),
+            ("text", line.text.to_string().into()),
         ],
     )
 }

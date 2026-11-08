@@ -74,8 +74,8 @@ pub(super) fn keep_detached(
         .on_hover_text(crate::i18n::message(
             "repo-core-1355",
             &[
-                ("trim", format!("{}", d.name.trim()).into()),
-                ("target", format!("{}", target).into()),
+                ("trim", d.name.trim().to_string().into()),
+                ("target", target.to_string().into()),
             ],
         ));
         if keep.clicked() || (enter && valid) {
@@ -92,7 +92,7 @@ pub(super) fn keep_detached(
             )
             .on_hover_text(crate::i18n::message(
                 "repo-core-1357",
-                &[("target", format!("{}", target).into())],
+                &[("target", target.to_string().into())],
             ))
             .clicked()
         {

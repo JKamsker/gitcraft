@@ -40,7 +40,7 @@ impl RepoTab {
                 false,
             ),
             Err(e) => (
-                crate::i18n::message("repo-core-3017", &[("e", format!("{}", e).into())]),
+                crate::i18n::message("repo-core-3017", &[("e", e.to_string().into())]),
                 true,
             ),
         });
@@ -78,10 +78,10 @@ impl RepoTab {
             return Err(crate::i18n::message(
                 "repo-core-3022",
                 &[
-                    ("name", format!("{}", self.name).into()),
+                    ("name", self.name.to_string().into()),
                     (
                         "busy",
-                        crate::repo::messages::display_operation(&busy).into(),
+                        crate::repo::messages::display_operation(busy).into(),
                     ),
                 ],
             ));
@@ -92,7 +92,7 @@ impl RepoTab {
         ) {
             return Err(crate::i18n::message(
                 "repo-core-3023",
-                &[("name", format!("{}", self.name).into())],
+                &[("name", self.name.to_string().into())],
             ));
         }
         self.status = None;
@@ -140,12 +140,12 @@ impl RepoTab {
                 let why = crate::i18n::message(
                     "repo-core-3024",
                     &[
-                        ("file", format!("{}", file_name(&file)).into()),
+                        ("file", file_name(&file).to_string().into()),
                         ("e", format!("{}", e).into()),
                     ],
                 );
                 self.status = Some((
-                    crate::i18n::message("repo-core-3025", &[("why", format!("{}", why).into())]),
+                    crate::i18n::message("repo-core-3025", &[("why", why.to_string().into())]),
                     true,
                 ));
                 if dropped {
@@ -193,7 +193,7 @@ impl RepoTab {
                 "repo-core-3029",
                 &[(
                     "self",
-                    format!("{}", self.busy_op.clone().unwrap_or_default()).into(),
+                    self.busy_op.clone().unwrap_or_default().to_string().into(),
                 )],
             )),
             Ok(file) => {
@@ -213,7 +213,7 @@ impl RepoTab {
                                 "label",
                                 crate::repo::messages::display_operation(&label).into(),
                             ),
-                            ("e", format!("{}", e).into()),
+                            ("e", e.to_string().into()),
                         ],
                     ),
                     true,

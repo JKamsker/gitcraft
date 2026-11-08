@@ -22,10 +22,7 @@ impl RepoTab {
                 RichText::new(match continuing {
                     Some(s) => crate::i18n::message(
                         "repo-core-0892",
-                        &[(
-                            "to-uppercase",
-                            format!("{}", s.label().to_uppercase()).into(),
-                        )],
+                        &[("to-uppercase", s.label().to_uppercase().to_string().into())],
                     ),
                     None => crate::i18n::text("repo-core-0893").to_owned(),
                 })
@@ -135,10 +132,7 @@ impl RepoTab {
         } else if let Some(s) = continuing {
             crate::i18n::message(
                 "repo-core-0352",
-                &[(
-                    "to-lowercase",
-                    format!("{}", s.label().to_lowercase()).into(),
-                )],
+                &[("to-lowercase", s.label().to_lowercase().to_string().into())],
             )
         } else if self.amend {
             crate::i18n::text("repo-core-0894").to_owned()
@@ -191,10 +185,10 @@ impl RepoTab {
                 {
                     crate::i18n::message(
                         "repo-core-0906",
-                        &[("title", format!("{}", profile.display_title()).into())],
+                        &[("title", profile.display_title().to_string().into())],
                     )
                 } else if let Some(host) = &elsewhere {
-                    crate::i18n::message("repo-core-0907", &[("host", format!("{}", host).into())])
+                    crate::i18n::message("repo-core-0907", &[("host", host.to_string().into())])
                 } else {
                     crate::i18n::text("repo-core-0908").to_owned()
                 }
@@ -210,17 +204,17 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-0911",
                         &[
-                            ("name-from", format!("{}", name_from).into()),
-                            ("email-from", format!("{}", email_from).into()),
+                            ("name-from", name_from.to_string().into()),
+                            ("email-from", email_from.to_string().into()),
                         ],
                     )
                 };
                 crate::i18n::message(
                     "repo-core-0912",
                     &[
-                        ("name", format!("{}", id.name).into()),
-                        ("email", format!("{}", id.email).into()),
-                        ("source", format!("{}", source).into()),
+                        ("name", id.name.to_string().into()),
+                        ("email", id.email.to_string().into()),
+                        ("source", source.to_string().into()),
                     ],
                 )
             };
@@ -248,7 +242,7 @@ impl RepoTab {
                     choices.push((
                         crate::i18n::message(
                             "repo-core-0915",
-                            &[("title", format!("{}", p.display_title()).into())],
+                            &[("title", p.display_title().to_string().into())],
                         ),
                         name.to_owned(),
                         email.to_owned(),

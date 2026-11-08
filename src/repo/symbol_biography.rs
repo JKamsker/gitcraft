@@ -223,18 +223,16 @@ impl RepoTab {
                 ui.small(crate::i18n::message(
                     "repo-core-3629",
                     &[
-                        ("tip", format!("{}", super::short(&history.tip)).into()),
+                        ("tip", super::short(&history.tip).to_string().into()),
                         ("count", (history.steps.len()).into()),
                         (
                             "else",
-                            format!(
-                                "{}",
-                                if history.limited {
-                                    crate::i18n::text("repo-core-3630")
-                                } else {
-                                    ""
-                                }
-                            )
+                            (if history.limited {
+                                crate::i18n::text("repo-core-3630")
+                            } else {
+                                ""
+                            })
+                            .to_string()
                             .into(),
                         ),
                     ],
@@ -283,7 +281,7 @@ impl RepoTab {
                     if ui
                         .button(crate::i18n::message(
                             "repo-core-3634",
-                            &[("commit", format!("{}", super::short(&step.commit)).into())],
+                            &[("commit", super::short(&step.commit).to_string().into())],
                         ))
                         .clicked()
                     {
@@ -327,8 +325,8 @@ impl RepoTab {
                             .button(crate::i18n::message(
                                 "repo-core-3637",
                                 &[
-                                    ("qualified", format!("{}", related.qualified).into()),
-                                    ("path", format!("{}", related.path).into()),
+                                    ("qualified", related.qualified.to_string().into()),
+                                    ("path", related.path.to_string().into()),
                                     ("first", format!("{}", related.first).into()),
                                 ],
                             ))
@@ -368,14 +366,12 @@ impl RepoTab {
                                                     "repo-core-3640",
                                                     &[(
                                                         "String",
-                                                        format!(
-                                                            "{}",
-                                                            lines[i]
-                                                                .chars()
-                                                                .take(2000)
-                                                                .collect::<String>()
-                                                        )
-                                                        .into(),
+                                                        lines[i]
+                                                            .chars()
+                                                            .take(2000)
+                                                            .collect::<String>()
+                                                            .to_string()
+                                                            .into(),
                                                     )],
                                                 )
                                             } else {

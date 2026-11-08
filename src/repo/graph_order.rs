@@ -34,7 +34,7 @@ pub(super) fn header_label(order: LogOrder) -> String {
     match order.summary() {
         Some(summary) => crate::i18n::message(
             "repo-core-2585",
-            &[("to-uppercase", format!("{}", summary.to_uppercase()).into())],
+            &[("to-uppercase", summary.to_uppercase().to_string().into())],
         ),
         None => crate::i18n::text("repo-core-2586").to_owned(),
     }

@@ -55,29 +55,29 @@ impl CommitDrop {
             Place::Above => crate::i18n::message(
                 "repo-core-2437",
                 &[
-                    ("hash", format!("{}", short(&self.hash)).into()),
-                    ("target", format!("{}", target).into()),
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
                 ],
             ),
             Place::Below => crate::i18n::message(
                 "repo-core-2438",
                 &[
-                    ("hash", format!("{}", short(&self.hash)).into()),
-                    ("target", format!("{}", target).into()),
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
                 ],
             ),
             Place::Squash => crate::i18n::message(
                 "repo-core-2439",
                 &[
-                    ("hash", format!("{}", short(&self.hash)).into()),
-                    ("target", format!("{}", target).into()),
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
                 ],
             ),
             Place::Fixup => crate::i18n::message(
                 "repo-core-2440",
                 &[
-                    ("hash", format!("{}", short(&self.hash)).into()),
-                    ("target", format!("{}", target).into()),
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
                 ],
             ),
         }
@@ -197,11 +197,15 @@ impl RepoTab {
                         &[
                             (
                                 "label",
-                                crate::repo::messages::display_operation(&label).into(),
+                                crate::repo::messages::display_operation(label).into(),
                             ),
                             (
                                 "self",
-                                format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                                self.busy_op
+                                    .as_deref()
+                                    .unwrap_or_default()
+                                    .to_string()
+                                    .into(),
                             ),
                         ],
                     ),

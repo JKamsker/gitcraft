@@ -24,10 +24,7 @@ pub(super) fn test_commits(
     title(
         ui,
         crate::i18n::text("repo-core-1508"),
-        &crate::i18n::message(
-            "repo-core-1509",
-            &[("machine", format!("{}", machine).into())],
-        ),
+        &crate::i18n::message("repo-core-1509", &[("machine", machine.to_string().into())]),
         &t,
     );
     ui.label(RichText::new(crate::i18n::text("repo-core-1510")).color(t.text_dim));
@@ -65,7 +62,7 @@ pub(super) fn test_commits(
     if let Some(old) = changed {
         ui.checkbox(
             &mut start.forget,
-            crate::i18n::message("repo-core-1518", &[("old", format!("{}", old).into())]),
+            crate::i18n::message("repo-core-1518", &[("old", old.to_string().into())]),
         );
         if !start.forget {
             ui.label(RichText::new(crate::i18n::text("repo-core-1519")).color(t.warning));

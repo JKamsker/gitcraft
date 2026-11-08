@@ -330,7 +330,7 @@ impl Find {
                 &[
                     ("i", format!("{}", i + 1).into()),
                     ("n", (n).into()),
-                    ("more", format!("{}", more).into()),
+                    ("more", more.to_string().into()),
                 ],
             ),
             (_, false, Some(i)) => crate::i18n::message(
@@ -339,7 +339,7 @@ impl Find {
             ),
             (_, true, None) => crate::i18n::message(
                 "repo-core-4108",
-                &[("n", (n).into()), ("more", format!("{}", more).into())],
+                &[("n", (n).into()), ("more", more.to_string().into())],
             ),
             (_, false, None) => crate::i18n::message("repo-core-4109", &[("n", (n).into())]),
         };

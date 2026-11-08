@@ -119,14 +119,12 @@ impl RepoTab {
                     "repo-core-2808",
                     &[(
                         "failed",
-                        format!(
-                            "{}",
-                            if result.is_ok() {
-                                crate::i18n::text("repo-core-2809")
-                            } else {
-                                crate::i18n::text("repo-core-0290")
-                            }
-                        )
+                        (if result.is_ok() {
+                            crate::i18n::text("repo-core-2809")
+                        } else {
+                            crate::i18n::text("repo-core-0290")
+                        })
+                        .to_string()
                         .into(),
                     )],
                 ),
@@ -147,10 +145,7 @@ impl RepoTab {
                 self.status = Some((
                     crate::i18n::message(
                         "repo-core-2811",
-                        &[(
-                            "e",
-                            format!("{}", crate::diagnostics::crash::scrub(&e)).into(),
-                        )],
+                        &[("e", crate::diagnostics::crash::scrub(&e).to_string().into())],
                     ),
                     true,
                 ))

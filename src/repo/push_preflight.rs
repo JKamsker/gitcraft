@@ -124,8 +124,8 @@ impl RepoTab {
             "author" => crate::i18n::message(
                 "repo-core-3111",
                 &[
-                    ("expected-name", format!("{}", plan.expected_name).into()),
-                    ("expected-email", format!("{}", plan.expected_email).into()),
+                    ("expected-name", plan.expected_name.to_string().into()),
+                    ("expected-email", plan.expected_email.to_string().into()),
                 ],
             ),
             "sign" => crate::i18n::text("repo-core-3113").into(),
@@ -140,7 +140,7 @@ impl RepoTab {
         self.dialog = Some(
             Dialog::confirm(
                 "Fix outgoing history",
-                crate::i18n::message("repo-core-3119", &[("text", format!("{}", text).into())]),
+                crate::i18n::message("repo-core-3119", &[("text", text.to_string().into())]),
                 crate::i18n::text("repo-core-3120"),
                 vec![step],
                 None,
@@ -263,10 +263,12 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
             crate::i18n::message(
                 "repo-core-3135",
                 &[
-                    ("destination", format!("{}", plan.destination).into()),
+                    ("destination", plan.destination.to_string().into()),
                     (
                         "super",
-                        format!("{}", super::short(plan.base.as_deref().unwrap_or(""))).into(),
+                        super::short(plan.base.as_deref().unwrap_or(""))
+                            .to_string()
+                            .into(),
                     ),
                 ],
             ),
@@ -278,17 +280,15 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
             &[
                 (
                     "After",
-                    format!(
-                        "{}",
-                        if before {
-                            crate::i18n::text("repo-core-1564")
-                        } else {
-                            crate::i18n::text("repo-core-1565")
-                        }
-                    )
+                    (if before {
+                        crate::i18n::text("repo-core-1564")
+                    } else {
+                        crate::i18n::text("repo-core-1565")
+                    })
+                    .to_string()
                     .into(),
                 ),
-                ("step", format!("{}", step).into()),
+                ("step", step.to_string().into()),
             ],
         ));
     }
@@ -300,9 +300,9 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                 "count2",
                 (plan.commits.iter().filter(|c| c.signed).count()).into(),
             ),
-            ("head", format!("{}", super::short(&plan.head)).into()),
-            ("expected-name", format!("{}", plan.expected_name).into()),
-            ("expected-email", format!("{}", plan.expected_email).into()),
+            ("head", super::short(&plan.head).to_string().into()),
+            ("expected-name", plan.expected_name.to_string().into()),
+            ("expected-email", plan.expected_email.to_string().into()),
         ],
     ));
     if plan.skip_hooks {
@@ -312,8 +312,8 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         ui.label(crate::i18n::message(
             "repo-core-3139",
             &[
-                ("host", format!("{}", host).into()),
-                ("account", format!("{}", account).into()),
+                ("host", host.to_string().into()),
+                ("account", account.to_string().into()),
             ],
         ));
     }
@@ -323,7 +323,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
             "repo-core-3141",
             &[
                 ("count", (plan.lfs_objects.len()).into()),
-                ("plan", format!("{}", plan.lfs_targets().join(", ")).into()),
+                ("plan", plan.lfs_targets().join(", ").to_string().into()),
             ],
         ));
     }

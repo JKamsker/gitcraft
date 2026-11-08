@@ -63,7 +63,7 @@ impl Badge {
             ),
             BadgeKind::Branch if !self.local => crate::i18n::message(
                 "repo-core-2595",
-                &[("git-ref", format!("{}", self.git_ref()).into())],
+                &[("git-ref", self.git_ref().to_string().into())],
             ),
             BadgeKind::Branch => crate::i18n::message(
                 "repo-core-2596",

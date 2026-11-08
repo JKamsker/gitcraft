@@ -30,7 +30,7 @@ pub(super) fn show(
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-2139",
-                        &[("file", format!("{}", diff.file).into())],
+                        &[("file", diff.file.to_string().into())],
                     ))
                     .font(theme::medium(12.5))
                     .color(t.text),
@@ -114,11 +114,11 @@ fn row(
         let text = match (old, new) {
             (Some(o), Some(n)) => crate::i18n::message(
                 "repo-core-2145",
-                &[("o", format!("{}", o).into()), ("n", (n).into())],
+                &[("o", o.to_string().into()), ("n", (n).into())],
             ),
             (None, Some(n)) => crate::i18n::message("repo-core-2146", &[("n", (n).into())]),
             (Some(o), None) => {
-                crate::i18n::message("repo-core-2147", &[("o", format!("{}", o).into())])
+                crate::i18n::message("repo-core-2147", &[("o", o.to_string().into())])
             }
             _ => String::new(),
         };
@@ -140,8 +140,8 @@ fn row(
         crate::i18n::message(
             "repo-core-2150",
             &[
-                ("name", format!("{}", d.name).into()),
-                ("tip", format!("{}", tip).into()),
+                ("name", d.name.to_string().into()),
+                ("tip", tip.to_string().into()),
             ],
         )
     });

@@ -104,7 +104,7 @@ impl RepoTab {
             Ok(drafts) => self.put_back(drafts),
             Err(e) => {
                 self.status = Some((
-                    crate::i18n::message("repo-core-4076", &[("e", format!("{}", e).into())]),
+                    crate::i18n::message("repo-core-4076", &[("e", e.to_string().into())]),
                     true,
                 ));
             }

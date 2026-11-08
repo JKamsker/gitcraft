@@ -40,7 +40,7 @@ fn chip(ui: &mut egui::Ui, t: &Tokens, panel: Panel, acts: &mut Vec<Action>) {
     icons::inline(ui, "picture-in-picture-2", 13.0, t.text_faint);
     let text = crate::i18n::message(
         "repo-core-3041",
-        &[("noun", format!("{}", capitalized(panel.noun())).into())],
+        &[("noun", capitalized(panel.noun()).to_string().into())],
     );
     let label = ui
         .add(
@@ -51,7 +51,7 @@ fn chip(ui: &mut egui::Ui, t: &Tokens, panel: Panel, acts: &mut Vec<Action>) {
     crate::a11y::a11y(&label, egui::WidgetType::Button, || {
         crate::i18n::message(
             "repo-core-3043",
-            &[("noun", format!("{}", panel.noun()).into())],
+            &[("noun", panel.noun().to_string().into())],
         )
     });
     if label.clicked() {

@@ -49,13 +49,15 @@ impl RepoTab {
                     "repo-core-3564",
                     &[(
                         "fenced",
-                        format!("{}", crate::repo::fence_view::list_violations(fenced)).into(),
+                        crate::repo::fence_view::list_violations(fenced)
+                            .to_string()
+                            .into(),
                     )],
                 ));
             } else if let Some(e) = self.fence.error(&wt.path) {
                 tip.push_str(&crate::i18n::message(
                     "repo-core-3565",
-                    &[("e", format!("{}", e).into())],
+                    &[("e", e.to_string().into())],
                 ));
             }
             let r = worktree_row(ui, wt, self.fence.red(&wt.path)).on_hover_text(tip);
@@ -165,7 +167,7 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree, fenced: bool) -> Response {
             "repo-core-3573",
             &[(
                 "head",
-                format!("{}", wt.head.get(..8).unwrap_or(&wt.head)).into(),
+                wt.head.get(..8).unwrap_or(&wt.head).to_string().into(),
             )],
         ),
     };
@@ -188,13 +190,13 @@ fn worktree_tip(wt: &Worktree, same_tab: bool) -> String {
     if let Some(reason) = wt.locked.as_deref().filter(|r| !r.is_empty()) {
         tip.push_str(&crate::i18n::message(
             "repo-core-3575",
-            &[("reason", format!("{}", reason).into())],
+            &[("reason", reason.to_string().into())],
         ));
     }
     if let Some(reason) = &wt.prunable {
         tip.push_str(&crate::i18n::message(
             "repo-core-3576",
-            &[("reason", format!("{}", reason).into())],
+            &[("reason", reason.to_string().into())],
         ));
     }
     if !wt.current {
@@ -332,7 +334,7 @@ fn worktree_menu_items(
         {
             acts.push(Action::Dialog(Dialog::confirm(
                 "Remove worktree",
-                crate::i18n::message("repo-core-3598", &[("path", format!("{}", path).into())]),
+                crate::i18n::message("repo-core-3598", &[("path", path.to_string().into())]),
                 crate::i18n::text("repo-core-0305"),
                 ops(&[&["worktree", "remove", &path]]),
                 Some((

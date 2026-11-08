@@ -137,11 +137,11 @@ impl RepoTab {
             (true, _) => crate::i18n::text("repo-core-3379").to_owned(),
             (false, true) => crate::i18n::message(
                 "repo-core-3380",
-                &[("upstream", format!("{}", b.upstream).into())],
+                &[("upstream", b.upstream.to_string().into())],
             ),
             (false, false) => crate::i18n::message(
                 "repo-core-3381",
-                &[("upstream", format!("{}", b.upstream).into())],
+                &[("upstream", b.upstream.to_string().into())],
             ),
         };
         if let Some(status) = ci {
@@ -149,7 +149,7 @@ impl RepoTab {
                 "repo-core-3382",
                 &[(
                     "state",
-                    format!("{}", ci_status::state_word(status.state)).into(),
+                    ci_status::state_word(status.state).to_string().into(),
                 )],
             ));
         }
@@ -163,16 +163,16 @@ impl RepoTab {
             Some(wt) => r.on_hover_text(crate::i18n::message(
                 "repo-core-3384",
                 &[
-                    ("name", format!("{}", b.name).into()),
-                    ("tip", format!("{}", tip).into()),
+                    ("name", b.name.to_string().into()),
+                    ("tip", tip.to_string().into()),
                     ("wt", format!("{}", wt.path.display()).into()),
                 ],
             )),
             None => r.on_hover_text(crate::i18n::message(
                 "repo-core-3385",
                 &[
-                    ("name", format!("{}", b.name).into()),
-                    ("tip", format!("{}", tip).into()),
+                    ("name", b.name.to_string().into()),
+                    ("tip", tip.to_string().into()),
                 ],
             )),
         };
@@ -225,8 +225,8 @@ impl RepoTab {
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3387",
                 &[
-                    ("name", format!("{}", b.name).into()),
-                    ("name2", format!("{}", base.name).into()),
+                    ("name", b.name.to_string().into()),
+                    ("name2", base.name.to_string().into()),
                 ],
             ))
             .icon("command")
@@ -336,8 +336,8 @@ impl RepoTab {
             crate::i18n::message(
                 "repo-core-3398",
                 &[
-                    ("name", format!("{}", b.name).into()),
-                    ("base", format!("{}", base).into()),
+                    ("name", b.name.to_string().into()),
+                    ("base", base.to_string().into()),
                 ],
             )
         } else {
@@ -420,7 +420,7 @@ impl RepoTab {
         if let Some((to, push)) = self.push_branch(b)
             && crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-3408",
-                &[("to", format!("{}", to).into())],
+                &[("to", to.to_string().into())],
             ))
             .icon("arrow-up-from-line")
             .enabled(idle)
@@ -458,7 +458,7 @@ impl RepoTab {
         if !b.upstream.is_empty()
             && crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-core-0348",
-                &[("upstream", format!("{}", b.upstream).into())],
+                &[("upstream", b.upstream.to_string().into())],
             ))
             .icon("git-branch")
             .enabled(idle)
@@ -473,7 +473,7 @@ impl RepoTab {
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3410",
                     &[
-                        ("noun", format!("{}", forge.noun_label()).into()),
+                        ("noun", forge.noun_label().to_string().into()),
                         ("number", format!("{}", pr.number).into()),
                     ],
                 ))
@@ -487,7 +487,7 @@ impl RepoTab {
             None => {
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3412",
-                    &[("noun", format!("{}", forge.noun_label()).into())],
+                    &[("noun", forge.noun_label().to_string().into())],
                 ))
                 .icon("external-link")
                 .enabled(idle)
@@ -608,8 +608,8 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-0011",
             &[
-                ("current", format!("{}", current).into()),
-                ("name", format!("{}", b.name).into()),
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
             ],
         ))
         .icon("arrow-right")
@@ -622,8 +622,8 @@ impl RepoTab {
         let merge = crate::i18n::message(
             "repo-core-0006",
             &[
-                ("name", format!("{}", b.name).into()),
-                ("current", format!("{}", current).into()),
+                ("name", b.name.to_string().into()),
+                ("current", current.to_string().into()),
             ],
         );
         if self
@@ -635,8 +635,8 @@ impl RepoTab {
         let rebase = crate::i18n::message(
             "repo-core-0013",
             &[
-                ("current", format!("{}", current).into()),
-                ("name", format!("{}", b.name).into()),
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
             ],
         );
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
@@ -650,8 +650,8 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new(crate::i18n::message(
             "repo-core-3415",
             &[
-                ("current", format!("{}", current).into()),
-                ("name", format!("{}", b.name).into()),
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
             ],
         ))
         .icon("git-merge")

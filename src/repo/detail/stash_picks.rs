@@ -108,7 +108,7 @@ pub(super) fn stash_menu_items(
     } else {
         crate::i18n::message(
             "repo-core-1157",
-            &[("command", format!("{}", crate::manual::command()).into())],
+            &[("command", crate::manual::command().to_string().into())],
         )
     };
     if crate::menu_item::MenuItem::new(pick)

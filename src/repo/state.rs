@@ -353,7 +353,7 @@ impl Compare {
         } else if data.from == rev && self.since_fork {
             Some(crate::i18n::message(
                 "repo-core-3619",
-                &[("rev", format!("{}", short(rev)).into())],
+                &[("rev", short(rev).to_string().into())],
             ))
         } else if data.from == rev {
             Some(self.base_label.clone())

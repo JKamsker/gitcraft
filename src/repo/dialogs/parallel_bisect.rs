@@ -323,7 +323,7 @@ fn limits(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
                     "repo-core-1426",
                     &[
                         ("n", (n).into()),
-                        ("label", format!("{}", form.chosen().label()).into()),
+                        ("label", form.chosen().label().to_string().into()),
                     ],
                 ),
                 None,

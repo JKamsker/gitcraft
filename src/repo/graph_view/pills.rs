@@ -154,10 +154,10 @@ impl RepoTab {
             let resp = resp.on_hover_text(crate::i18n::message(
                 "repo-core-2686",
                 &[
-                    ("n", format!("{}", lines.join("\n")).into()),
-                    ("author", format!("{}", row.commit.author).into()),
+                    ("n", lines.join("\n").to_string().into()),
+                    ("author", row.commit.author.to_string().into()),
                     ("date", crate::i18n::date_iso(&row.commit.date).into()),
-                    ("drag", format!("{}", drag).into()),
+                    ("drag", drag.to_string().into()),
                 ],
             ));
             return (resp, hit);

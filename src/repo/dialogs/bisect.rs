@@ -32,12 +32,12 @@ pub(super) fn start_bisect(
     ui.radio_value(
         this_good,
         true,
-        crate::i18n::message("repo-core-1201", &[("at", format!("{}", at).into())]),
+        crate::i18n::message("repo-core-1201", &[("at", at.to_string().into())]),
     );
     ui.radio_value(
         this_good,
         false,
-        crate::i18n::message("repo-core-1202", &[("at", format!("{}", at).into())]),
+        crate::i18n::message("repo-core-1202", &[("at", at.to_string().into())]),
     );
     // The other end's usual answer, unless one was typed.
     if *this_good != was_good {
@@ -97,10 +97,7 @@ pub(super) fn bisect_run(
     title(
         ui,
         crate::i18n::text("repo-core-1208"),
-        &crate::i18n::message(
-            "repo-core-1209",
-            &[("machine", format!("{}", machine).into())],
-        ),
+        &crate::i18n::message("repo-core-1209", &[("machine", machine.to_string().into())]),
         &t,
     );
     field(ui, command, "cargo test, make check, ./test.sh…", focus);
