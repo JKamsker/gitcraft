@@ -118,7 +118,7 @@ fn file_bar(
         .progress
         .steps
         .iter()
-        .find(|s| s.id == path || s.file.as_deref() == Some(path))
+        .find(|s| s.id == path || s.path.as_deref() == Some(path))
         .filter(|s| s.status != StepStatus::Pending);
     egui::Frame::new()
         .fill(t.card)

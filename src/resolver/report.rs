@@ -81,7 +81,11 @@ pub enum Report {
 pub struct Step {
     pub id: String,
     pub title: String,
+    /// The file it is about, cleaned for showing.
     pub file: Option<String>,
+    /// That file exactly as the agent named it, for telling which file it is (a done step
+    /// decides it: see `Workspace::check`).
+    pub path: Option<String>,
     pub status: StepStatus,
     pub note: Option<String>,
     pub started: Option<Instant>,
@@ -159,29 +163,37 @@ impl Progress {
                 continue;
             }
             let title = clean(&planned.title, MAX_TEXT);
-            let file = planned
-                .file
-                .map(|f| clean(&f, MAX_TEXT))
+            let path = planned.file.filter(|f| !f.trim().is_empty());
+            let file = path
+                .as_deref()
+                .map(|f| clean(f, MAX_TEXT))
                 .filter(|f| !f.is_empty());
-            let step = match old.iter().find(|s| s.id == id) {
-                Some(known) => Step {
-                    title: if title.is_empty() {
-                        known.title.clone()
-                    } else {
-                        title
-                    },
-                    file: file.or_else(|| known.file.clone()),
+            let known = old.iter().find(|s| s.id == id);
+            let title = match known {
+                Some(known) if title.is_empty() => known.title.clone(),
+                _ if title.is_empty() => id.clone(),
+                _ => title,
+            };
+            let fresh = Step {
+                id,
+                title,
+                file,
+                path,
+                status: StepStatus::Pending,
+                note: None,
+                started: None,
+                ended: None,
+            };
+            let step = match known {
+                // Known, and still about its file: it keeps how it stands. One now about another
+                // file starts over: how it went for the old one says nothing of this one.
+                Some(known) if fresh.path.is_none() || fresh.path == known.path => Step {
+                    title: fresh.title,
+                    file: fresh.file.or_else(|| known.file.clone()),
+                    path: fresh.path.or_else(|| known.path.clone()),
                     ..known.clone()
                 },
-                None => Step {
-                    title: if title.is_empty() { id.clone() } else { title },
-                    id,
-                    file,
-                    status: StepStatus::Pending,
-                    note: None,
-                    started: None,
-                    ended: None,
-                },
+                _ => fresh,
             };
             self.steps.push(step);
         }
@@ -200,6 +212,7 @@ impl Progress {
                     title: id.clone(),
                     id,
                     file: None,
+                    path: None,
                     status: StepStatus::Pending,
                     note: None,
                     started: None,

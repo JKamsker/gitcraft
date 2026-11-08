@@ -140,6 +140,49 @@ fn a_new_plan_keeps_how_known_steps_stand_and_unplanned_steps_are_added() {
     assert_eq!(p.steps[2].title, "verify");
 }
 
+/// A file is told by its exact name (one with two spaces, or a bidi character, is shown
+/// cleaned but still decided); a step moved to another file starts over.
+#[test]
+fn a_step_keeps_its_exact_file_and_starts_over_on_another() {
+    let t0 = Instant::now();
+    let mut p = Progress::default();
+    let on = |file: &str| PlannedStep {
+        id: "s".into(),
+        title: "Resolve".into(),
+        file: Some(file.into()),
+    };
+    p.apply(
+        Report::Plan {
+            steps: vec![on("my  notes\u{202e}.bin")],
+            estimate_minutes: None,
+        },
+        t0,
+    );
+    p.apply(step("s", StepStatus::Done), t0);
+    assert_eq!(p.steps[0].path.as_deref(), Some("my  notes\u{202e}.bin"));
+    assert_eq!(p.steps[0].file.as_deref(), Some("my notes.bin"));
+    // The same file again: still done.
+    p.apply(
+        Report::Plan {
+            steps: vec![on("my  notes\u{202e}.bin")],
+            estimate_minutes: None,
+        },
+        t0,
+    );
+    assert_eq!(p.steps[0].status, StepStatus::Done);
+    // Another file under the same id: not done with that one yet.
+    p.apply(
+        Report::Plan {
+            steps: vec![on("other.bin")],
+            estimate_minutes: None,
+        },
+        t0,
+    );
+    assert_eq!(p.steps[0].status, StepStatus::Pending);
+    assert_eq!(p.steps[0].ended, None);
+    assert_eq!(p.steps[0].path.as_deref(), Some("other.bin"));
+}
+
 #[test]
 fn what_the_agent_writes_is_cleaned_and_bounded() {
     assert_eq!(clean("a\u{202e}b\n\tc   d\u{200b}", 100), "ab c d");

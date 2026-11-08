@@ -310,7 +310,7 @@ fn done_files(progress: &Progress) -> Vec<String> {
         .steps
         .iter()
         .filter(|s| s.status == crate::resolver::report::StepStatus::Done)
-        .flat_map(|s| [Some(s.id.clone()), s.file.clone()])
+        .flat_map(|s| [Some(s.id.clone()), s.path.clone()])
         .flatten()
         .collect()
 }

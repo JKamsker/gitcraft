@@ -53,7 +53,7 @@ impl RunRecord {
                 .map(|s| PlannedStep {
                     id: s.id.clone(),
                     title: s.title.clone(),
-                    file: s.file.clone(),
+                    file: s.path.clone(),
                 })
                 .collect(),
             steps: run

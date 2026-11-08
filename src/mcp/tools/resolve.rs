@@ -5,7 +5,7 @@
 
 use serde_json::{Value, json};
 
-use super::{Ctx, Kind, ToolDef, boolean, number, object, string};
+use super::{Ctx, Kind, ToolDef, number, object, string};
 use crate::mcp::args::Args;
 use crate::mcp::link;
 use crate::mcp::wire::{Outcome, WriteOp};
@@ -109,7 +109,10 @@ fn plan_report(a: &Args) -> Result<Report, String> {
             Ok(PlannedStep {
                 id: text(&step, "id")?,
                 title: text(&step, "title")?,
-                file: step.opt_str("file")?.map(str::to_owned),
+                file: match step.opt_str("file")? {
+                    Some(_) => Some(text(&step, "file")?),
+                    None => None,
+                },
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -170,7 +173,7 @@ static FINISH: ToolDef = ToolDef {
     schema: || {
         object(
             json!({
-                "ok": boolean("Every conflicted file is resolved.", true),
+                "ok": { "type": "boolean", "description": "Every conflicted file is resolved." },
                 "summary": string("A few short lines for the user."),
             }),
             &["ok", "summary"],
@@ -181,8 +184,12 @@ static FINISH: ToolDef = ToolDef {
 
 fn finish_report(a: &Args) -> Result<Report, String> {
     a.only(&["ok", "summary"])?;
+    // Not taken for success when left out: the agent says it.
+    if a.value("ok").is_none() {
+        return Err("`ok` is required: true when every conflicted file is resolved".to_owned());
+    }
     Ok(Report::Finish {
-        ok: a.bool("ok", true)?,
+        ok: a.bool("ok", false)?,
         summary: text(a, "summary")?,
     })
 }
@@ -261,6 +268,13 @@ mod tests {
         assert!(step_report(&Args::new(&pending)).is_err());
         let long = args(json!({"ok": true, "summary": "x".repeat(MAX_TEXT * 5)}));
         assert!(finish_report(&Args::new(&long)).is_err());
+        for no_ok in [json!({"summary": "s"}), json!({"ok": null, "summary": "s"})] {
+            let e = finish_report(&Args::new(&args(no_ok)));
+            assert!(e.is_err_and(|e| e.contains("`ok` is required")));
+        }
+        let long_file =
+            json!({"steps": [{"id": "a", "title": "t", "file": "f".repeat(MAX_TEXT * 5)}]});
+        assert!(plan_report(&Args::new(&args(long_file))).is_err());
     }
 
     #[test]
