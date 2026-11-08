@@ -209,6 +209,13 @@ pub struct Issue {
 }
 
 impl Issue {
+    /// Source-qualified stable key for UI interactions; tracker display numbers are not IDs.
+    pub(crate) fn identity(&self) -> String {
+        self.tracker.as_ref().map_or_else(
+            || serde_json::json!(["forge", self.url, self.number]).to_string(),
+            |i| serde_json::json!([i.kind, i.origin, i.id]).to_string(),
+        )
+    }
     pub fn key(&self) -> String {
         self.tracker
             .as_ref()

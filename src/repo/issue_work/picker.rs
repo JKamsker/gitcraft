@@ -421,7 +421,7 @@ fn issue_row(ui: &mut Ui, issue: &Issue, chosen: bool) -> bool {
     }
     let response = ui.interact(
         inner.response.rect,
-        ui.id().with(("issue-row", issue.number)),
+        ui.id().with(("issue-row", issue.identity())),
         egui::Sense::click(),
     );
     response
@@ -494,6 +494,103 @@ mod tests {
         assert_eq!(picker.name, "ops-9-work");
         picker.filter = "eng-9".into();
         assert_eq!(picker.shown(), [0]);
+    }
+
+    fn tracker(key: &str, id: &str) -> Issue {
+        Issue {
+            tracker: Some(crate::trackers::Identity {
+                kind: crate::trackers::Kind::Linear,
+                origin: "https://api.linear.app".into(),
+                account: "me@example.org".into(),
+                viewer: "viewer".into(),
+                id: id.into(),
+                key: key.into(),
+            }),
+            ..issue(0, "Work", &[])
+        }
+    }
+    fn render_rows(
+        ctx: &egui::Context,
+        picker: &mut Picker,
+        events: Vec<egui::Event>,
+    ) -> egui::FullOutput {
+        ctx.run_ui(
+            egui::RawInput {
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                choose(ui, picker);
+            },
+        )
+    }
+    #[test]
+    fn tracker_row_ids_are_stable_and_source_qualified() {
+        let a = tracker("ENG-7", "uuid-a");
+        let b = tracker("OPS-7", "uuid-b");
+        assert_ne!(a.identity(), b.identity());
+        let mut renamed = a.clone();
+        renamed.tracker.as_mut().unwrap().key = "NEW-9".into();
+        renamed.title = "Renamed".into();
+        assert_eq!(a.identity(), renamed.identity());
+        let mut other = a.clone();
+        other.tracker.as_mut().unwrap().origin = "https://different.invalid".into();
+        assert_ne!(a.identity(), other.identity());
+    }
+    #[test]
+    fn multiple_tracker_rows_support_distinct_pointer_and_keyboard_selection() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut picker = Picker::new("Linear", String::new());
+        picker.listed(Ok(vec![
+            tracker("ENG-7", "uuid-a"),
+            tracker("OPS-7", "uuid-b"),
+        ]));
+        for (index, key) in [(1, "OPS-7"), (0, "ENG-7"), (1, "OPS-7")] {
+            let out = render_rows(&ctx, &mut picker, vec![]);
+            let p = out
+                .shapes
+                .iter()
+                .find_map(|s| {
+                    if let egui::Shape::Text(t) = &s.shape {
+                        (t.galley.text() == key).then_some(t.pos + t.galley.size() * 0.5)
+                    } else {
+                        None
+                    }
+                })
+                .expect("tracker row");
+            out.drop_without_applying_deltas();
+            let event = |pressed| egui::Event::PointerButton {
+                pos: p,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: Default::default(),
+            };
+            render_rows(
+                &ctx,
+                &mut picker,
+                vec![egui::Event::PointerMoved(p), event(true)],
+            )
+            .drop_without_applying_deltas();
+            render_rows(&ctx, &mut picker, vec![event(false)]).drop_without_applying_deltas();
+            assert_eq!(picker.chosen, Some(index));
+            assert_eq!(picker.chosen_issue().unwrap().key(), key);
+            assert_eq!(picker.name, format!("{}-work", key.to_lowercase()));
+        }
+        picker.focus = Some(Field::Filter);
+        render_rows(&ctx, &mut picker, vec![]).drop_without_applying_deltas();
+        for (key, index) in [(Key::ArrowUp, 0), (Key::ArrowDown, 1)] {
+            let event = |pressed| egui::Event::Key {
+                key,
+                physical_key: None,
+                pressed,
+                repeat: false,
+                modifiers: Default::default(),
+            };
+            render_rows(&ctx, &mut picker, vec![event(true)]).drop_without_applying_deltas();
+            render_rows(&ctx, &mut picker, vec![event(false)]).drop_without_applying_deltas();
+            assert_eq!(picker.chosen, Some(index));
+        }
     }
 
     #[test]
