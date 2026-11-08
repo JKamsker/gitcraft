@@ -524,7 +524,6 @@ impl ConflictEditor {
                 "repo-core-3799",
                 &[
                     ("left", (left).into()),
-                    ("s", format!("{}", if left == 1 { "" } else { "s" }).into()),
                     ("path", format!("{}", self.path).into()),
                 ],
             ));

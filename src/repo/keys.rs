@@ -45,7 +45,7 @@ impl RepoTab {
         {
             return Err(crate::i18n::message(
                 "repo-core-2860",
-                &[("op", format!("{}", op).into())],
+                &[("op", crate::repo::messages::display_operation(&op).into())],
             ));
         }
         let no_remote = || crate::i18n::text("repo-core-2861").to_owned();
@@ -101,7 +101,7 @@ impl RepoTab {
                 return Err(crate::i18n::text("repo-core-0351").into());
             }
             Command::StageAll => Action::Ops {
-                label: crate::i18n::text("repo-core-0832").into(),
+                label: "Stage all".into(),
                 ops: ops(&[&["add", "-A"]]),
                 refresh: Refresh::Status,
             },

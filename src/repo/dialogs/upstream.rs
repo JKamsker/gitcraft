@@ -109,10 +109,7 @@ pub(super) fn set_upstream(
                 branch.to_owned(),
             ];
             Action::UndoableOps {
-                label: crate::i18n::message(
-                    "repo-core-1532",
-                    &[("upstream", format!("{}", upstream).into())],
-                ),
+                label: format!("Track {upstream}"),
                 ops: vec![set.clone()],
                 refresh: Refresh::All,
                 undo: Undo::Custom {
@@ -122,13 +119,7 @@ pub(super) fn set_upstream(
             }
         } else {
             Action::Ops {
-                label: crate::i18n::message(
-                    "repo-core-1533",
-                    &[
-                        ("branch", format!("{}", branch).into()),
-                        ("upstream", format!("{}", upstream).into()),
-                    ],
-                ),
+                label: format!("Push {branch} to {upstream}"),
                 ops: vec![vec![
                     "push".to_owned(),
                     "-u".to_owned(),

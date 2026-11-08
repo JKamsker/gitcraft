@@ -179,9 +179,9 @@ fn offer_box(
             ui.horizontal_wrapped(|ui| {
                 if !applied {
                     let label = if offer.stale {
-                        crate::i18n::text("repo-core-0534")
+                        "Use it anyway"
                     } else {
-                        crate::i18n::text("repo-core-0535")
+                        "Use this decision"
                     };
                     if ui
                         .add_enabled(!manual, egui::Button::new(label))
@@ -241,9 +241,9 @@ fn context_ui(ui: &mut Ui, t: &Tokens, k: usize, offer: &Offer) {
 fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
     if !draft.open {
         let label = if draft.is_empty() {
-            crate::i18n::text("repo-core-0546")
+            "Note why…"
         } else {
-            crate::i18n::text("repo-core-0547")
+            "Edit the note…"
         };
         if ui
             .small_button(label)

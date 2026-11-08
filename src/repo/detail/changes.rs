@@ -86,7 +86,10 @@ impl RepoTab {
                     let what = match self.fold_stopped_here(state) {
                         Some(fold) => crate::i18n::message(
                             "repo-core-0817",
-                            &[("label", format!("{}", fold.label).into())],
+                            &[(
+                                "label",
+                                crate::repo::messages::display_operation(&fold.label).into(),
+                            )],
                         ),
                         None => crate::i18n::message(
                             "repo-core-0818",
@@ -267,7 +270,7 @@ impl RepoTab {
             |acts, f, click| match click {
                 RowClick::Open => acts.push(Action::OpenDiff(DiffKey::Work(f.clone()))),
                 RowClick::Button(_) => acts.push(Action::Ops {
-                    label: crate::i18n::text("repo-core-0844").to_owned(),
+                    label: "Unstage".to_owned(),
                     ops: vec![unstage_args(head, &f.path)],
                     refresh: Refresh::Status,
                 }),
@@ -473,7 +476,7 @@ fn unstage_all_args(head: &str) -> Vec<&'static str> {
 pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     if f.area == Area::Untracked {
         Dialog::confirm(
-            crate::i18n::text("repo-core-0851"),
+            "Delete new file",
             crate::i18n::message("repo-core-0852", &[("path", format!("{}", f.path).into())]),
             crate::i18n::text("repo-core-0853"),
             ops(&[&["--literal-pathspecs", "clean", "-f", "-q", "--", &f.path]]),
@@ -487,7 +490,7 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
         .files_heading(crate::i18n::text("repo-core-0855"))
     } else {
         Dialog::confirm(
-            crate::i18n::text("repo-core-0856"),
+            "Discard changes",
             crate::i18n::message("repo-core-0857", &[("path", format!("{}", f.path).into())]),
             crate::i18n::text("repo-core-0858"),
             // Not `--literal-pathspecs`: restore runs the post-checkout hook, which would get it.

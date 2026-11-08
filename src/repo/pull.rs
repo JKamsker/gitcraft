@@ -21,9 +21,9 @@ impl PullMode {
 
     pub fn label(self) -> &'static str {
         match self {
-            PullMode::Merge => crate::i18n::text("repo-core-3093"),
-            PullMode::FastForwardOnly => crate::i18n::text("repo-core-3094"),
-            PullMode::Rebase => crate::i18n::text("repo-core-3095"),
+            PullMode::Merge => "Pull (fast-forward if possible)",
+            PullMode::FastForwardOnly => "Pull (fast-forward only)",
+            PullMode::Rebase => "Pull (rebase)",
         }
     }
 
@@ -79,7 +79,10 @@ pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     let mut settings = Settings::get(ui.ctx());
     for mode in PullMode::ALL {
         let radio = ui
-            .radio(settings.pull_mode == mode, mode.label())
+            .radio(
+                settings.pull_mode == mode,
+                super::messages::display_operation(mode.label()),
+            )
             .on_hover_text(format!("git {}", mode.args().join(" ")));
         super::ghost::offer(&radio, || super::ghost::GhostOp::Pull(mode));
         if radio.clicked() && settings.pull_mode != mode {

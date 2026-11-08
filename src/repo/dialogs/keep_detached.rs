@@ -35,7 +35,7 @@ pub(super) fn keep_detached(
         } else {
             crate::i18n::message(
                 "repo-core-1099",
-                &[("SHOWN", format!("{}", n - SHOWN).into())],
+                &[("hidden", format!("{}", n - SHOWN).into())],
             )
         };
         ui.label(RichText::new(rest).color(t.text_faint).small());
@@ -110,30 +110,12 @@ pub(super) fn keep_detached(
 /// What checking out would do to the commits, in a sentence or two.
 fn explanation(d: &KeepDialog) -> String {
     let n = d.commits.len().min(crate::git::LOOSE_LISTED);
-    let (count, verb, them) = match n {
-        _ if d.more() => (
-            crate::i18n::message("repo-core-1358", &[("n", (n).into())]),
-            crate::i18n::text("repo-core-1324"),
-            "them",
-        ),
-        1 => (
-            crate::i18n::text("repo-core-1360").to_owned(),
-            crate::i18n::text("repo-core-1323"),
-            "it",
-        ),
-        _ => (
-            crate::i18n::message("repo-core-1362", &[("n", (n).into())]),
-            crate::i18n::text("repo-core-1324"),
-            "them",
-        ),
-    };
     crate::i18n::message(
         "repo-core-1363",
         &[
-            ("count", (count).into()),
-            ("verb", format!("{}", verb).into()),
-            ("target", format!("{}", d.target()).into()),
-            ("them", format!("{}", them).into()),
+            ("count", n.into()),
+            ("more", if d.more() { "yes" } else { "no" }.into()),
+            ("target", d.target().into()),
         ],
     )
 }

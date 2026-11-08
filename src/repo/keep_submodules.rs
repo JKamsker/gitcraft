@@ -11,7 +11,7 @@ const UPDATE: [&str; 4] = ["submodule", "update", "--init", "--recursive"];
 /// Updates all submodules.
 pub(super) fn update_all() -> Action {
     Action::Ops {
-        label: crate::i18n::text("repo-core-0122").into(),
+        label: "Update submodules".into(),
         ops: ops(&[&UPDATE]),
         refresh: Refresh::All,
     }
@@ -22,7 +22,7 @@ pub(super) fn update_one(path: &str) -> Action {
     let mut args = UPDATE.to_vec();
     args.extend(["--", path]);
     Action::Ops {
-        label: crate::i18n::message("repo-core-2844", &[("path", format!("{}", path).into())]),
+        label: format!("Update submodule {path}"),
         ops: ops(&[&args]),
         refresh: Refresh::All,
     }
@@ -45,7 +45,7 @@ impl RepoTab {
             && (crate::remote::is_remote(&self.path) || self.path.join(".gitmodules").is_file())
         {
             self.run_ops(
-                crate::i18n::text("repo-core-0122"),
+                "Update submodules",
                 ops(&[&UPDATE]),
                 Refresh::All,
                 OpKind::plain(),

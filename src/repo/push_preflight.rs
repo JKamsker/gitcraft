@@ -99,7 +99,7 @@ impl RepoTab {
             return;
         }
         let pending = self.preflight_pending.take().unwrap_or(super::PendingOp {
-            label: crate::i18n::text("repo-core-3110").into(),
+            label: "Push reviewed history".into(),
             ops: vec![],
             refresh: Refresh::All,
             kind: super::OpKind::plain(),
@@ -139,7 +139,7 @@ impl RepoTab {
         step.push(kind.into());
         self.dialog = Some(
             Dialog::confirm(
-                crate::i18n::text("repo-core-3118"),
+                "Fix outgoing history",
                 crate::i18n::message("repo-core-3119", &[("text", format!("{}", text).into())]),
                 crate::i18n::text("repo-core-3120"),
                 vec![step],
@@ -277,7 +277,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
             "repo-core-3136",
             &[
                 (
-                    crate::i18n::text("repo-core-1565"),
+                    "After",
                     format!(
                         "{}",
                         if before {

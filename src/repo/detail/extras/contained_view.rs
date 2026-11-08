@@ -41,8 +41,14 @@ pub(super) fn section(
 /// "2 branches · 3 tags · first tag v1.0".
 pub(super) fn headline(c: &Containment) -> String {
     let branches = c.local.total + c.remote.total;
-    let mut parts = vec![count(branches, "branch", "branches")];
-    parts.push(count(c.tags.total, "tag", "tags"));
+    let mut parts = vec![crate::i18n::message(
+        "repo-core-contained-branches",
+        &[("count", branches.into())],
+    )];
+    parts.push(crate::i18n::message(
+        "repo-core-contained-tags",
+        &[("count", c.tags.total.into())],
+    ));
     if let Some(tag) = c.first_tag() {
         parts.push(crate::i18n::message(
             "repo-core-1087",
@@ -50,17 +56,6 @@ pub(super) fn headline(c: &Containment) -> String {
         ));
     }
     parts.join(" · ")
-}
-
-fn count(n: usize, one: &str, many: &str) -> String {
-    match n {
-        0 => crate::i18n::message("repo-core-1088", &[("many", format!("{}", many).into())]),
-        1 => crate::i18n::message("repo-core-1089", &[("one", format!("{}", one).into())]),
-        n => crate::i18n::message(
-            "repo-core-1090",
-            &[("n", (n).into()), ("many", format!("{}", many).into())],
-        ),
-    }
 }
 
 fn body(ui: &mut Ui, c: &Containment) {

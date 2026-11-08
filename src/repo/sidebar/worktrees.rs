@@ -324,13 +324,7 @@ fn worktree_menu_items(
             .clicked()
         {
             acts.push(Action::Ops {
-                label: crate::i18n::message(
-                    "repo-core-3595",
-                    &[
-                        ("label", format!("{}", label).into()),
-                        ("name", format!("{}", wt.name()).into()),
-                    ],
-                ),
+                label: format!("{label} worktree {}", wt.name()),
                 ops: ops(&[&args]),
                 refresh: Refresh::All,
             });
@@ -343,7 +337,7 @@ fn worktree_menu_items(
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::confirm(
-                crate::i18n::text("repo-core-3597"),
+                "Remove worktree",
                 crate::i18n::message("repo-core-3598", &[("path", format!("{}", path).into())]),
                 crate::i18n::text("repo-core-0305"),
                 ops(&[&["worktree", "remove", &path]]),
@@ -363,7 +357,7 @@ fn worktree_menu_items(
             .clicked()
         {
             acts.push(Action::Ops {
-                label: crate::i18n::text("repo-core-3602").into(),
+                label: "Prune worktrees".into(),
                 ops: ops(&[&["worktree", "prune"]]),
                 refresh: Refresh::All,
             });

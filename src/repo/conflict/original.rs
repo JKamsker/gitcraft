@@ -190,28 +190,15 @@ pub(super) fn summary(lines: &Lines) -> String {
         count(Change::Removed),
         count(Change::Same),
     );
-    let n = |k: usize| format!("{k} line{}", if k == 1 { "" } else { "s" });
     match (added, removed) {
         (0, 0) => crate::i18n::text("repo-core-0610").to_owned(),
-        (0, r) if same == 0 => {
-            crate::i18n::message("repo-core-0611", &[("r", format!("{}", n(r)).into())])
+        (0, r) if same == 0 => crate::i18n::message("repo-core-0611", &[("r", (r).into())]),
+        (0, r) => crate::i18n::message("repo-core-0612", &[("r", (r).into())]),
+        (a, 0) => crate::i18n::message("repo-core-0613", &[("a", (a).into())]),
+        (a, r) if same == 0 => {
+            crate::i18n::message("repo-core-0614", &[("r", (r).into()), ("a", (a).into())])
         }
-        (0, r) => crate::i18n::message("repo-core-0612", &[("r", format!("{}", n(r)).into())]),
-        (a, 0) => crate::i18n::message("repo-core-0613", &[("a", format!("{}", n(a)).into())]),
-        (a, r) if same == 0 => crate::i18n::message(
-            "repo-core-0614",
-            &[
-                ("r", format!("{}", n(r)).into()),
-                ("a", format!("{}", n(a)).into()),
-            ],
-        ),
-        (a, r) => crate::i18n::message(
-            "repo-core-0615",
-            &[
-                ("a", format!("{}", n(a)).into()),
-                ("r", format!("{}", n(r)).into()),
-            ],
-        ),
+        (a, r) => crate::i18n::message("repo-core-0615", &[("a", (a).into()), ("r", (r).into())]),
     }
 }
 

@@ -78,10 +78,7 @@ impl RepoTab {
                                     let plural = if a.commits == 1 { "" } else { "s" };
                                     if r.on_hover_text(crate::i18n::message(
                                         "repo-core-0945",
-                                        &[
-                                            ("commits", format!("{}", a.commits).into()),
-                                            ("plural", format!("{}", plural).into()),
-                                        ],
+                                        &[("commits", (a.commits).into())],
                                     ))
                                     .clicked()
                                     {

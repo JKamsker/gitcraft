@@ -56,7 +56,7 @@ impl RepoTab {
         if delete.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
-                    crate::i18n::text("repo-core-3361"),
+                    "Delete branch",
                     crate::i18n::message(
                         "repo-core-3362",
                         &[("name", format!("{}", b.name).into())],
@@ -110,7 +110,7 @@ impl RepoTab {
             );
             acts.push(Action::Dialog(
                 Dialog::confirm(
-                    crate::i18n::text("repo-core-3367"),
+                    "Delete branch locally and on the remote",
                     crate::i18n::message(
                         "repo-core-3368",
                         &[

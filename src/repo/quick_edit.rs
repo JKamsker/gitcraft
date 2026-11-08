@@ -34,6 +34,15 @@ impl Edit {
         }
     }
 
+    fn operation_label(self) -> &'static str {
+        match self {
+            Self::Message => "Edit commit message",
+            Self::Drop => "Drop commit",
+            Self::MoveUp => "Move commit up",
+            Self::MoveDown => "Move commit down",
+        }
+    }
+
     fn explain(self) -> &'static str {
         match self {
             Edit::Message => crate::i18n::text("repo-core-3176"),
@@ -213,7 +222,7 @@ impl RepoTab {
         ];
         Action::Dialog(
             Dialog::confirm(
-                crate::i18n::text("repo-core-3173"),
+                "Drop commit",
                 crate::i18n::message(
                     "repo-core-3196",
                     &[
@@ -292,7 +301,10 @@ impl RepoTab {
                     &[
                         ("label", format!("{}", edit.label()).into()),
                         ("hash", format!("{}", short(&hash)).into()),
-                        ("busy", format!("{}", busy).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
                     ],
                 ),
                 true,
@@ -314,7 +326,7 @@ impl RepoTab {
         result: Result<Vec<RebaseCommit>, String>,
         ctx: &egui::Context,
     ) {
-        let label = format!("{} {}", edit.label(), short(&hash));
+        let label = format!("{} {}", edit.operation_label(), short(&hash));
         match result.and_then(|commits| plan(edit, &hash, commits)) {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.quick_edit_ready(&label, command, ctx);
@@ -337,7 +349,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             (
                                 "self",
                                 format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),

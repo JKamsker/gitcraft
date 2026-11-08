@@ -194,7 +194,10 @@ impl Form {
                 ui.heading(crate::i18n::text("repo-core-1243"));
                 ui.label(crate::i18n::message(
                     "repo-core-1244",
-                    &[("label", format!("{}", self.label).into())],
+                    &[(
+                        "label",
+                        crate::repo::messages::display_operation(&self.label).into(),
+                    )],
                 ));
                 ui.monospace(format!("SHA-256 {}", self.preview.digest));
                 ui.label(crate::i18n::text("repo-core-1246"));

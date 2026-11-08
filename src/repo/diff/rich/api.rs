@@ -403,7 +403,10 @@ impl<'a> Cx<'a, '_> {
                 Some(o) if p.required && !o.required => self.breaking(
                     crate::i18n::message(
                         "repo-core-1999",
-                        &[("label", format!("{}", label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     Some(o.line),
                     Some(p.line),

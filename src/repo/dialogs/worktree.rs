@@ -204,7 +204,7 @@ pub(super) fn add_worktree(
                 ]
             };
             Action::Ops {
-                label: crate::i18n::text("repo-core-1535").to_owned(),
+                label: "Add worktree".to_owned(),
                 ops: vec![
                     vec![
                         "config".into(),

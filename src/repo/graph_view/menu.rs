@@ -551,10 +551,7 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         if button.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
-                    &crate::i18n::message(
-                        "repo-core-2659",
-                        &[("label", format!("{}", label).into())],
-                    ),
+                    &format!("{label} reset"),
                     crate::i18n::message(
                         "repo-core-2660",
                         &[

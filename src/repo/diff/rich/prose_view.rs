@@ -56,7 +56,12 @@ pub(super) fn show(ui: &mut Ui, prose: &ProseDiff, state: &mut RichState, acts: 
     let width = (ui.available_width() - 2.0 * MARGIN).clamp(200.0, CONTENT_W);
     let note = summary(prose);
     // A file all new or all gone needs no caption on each paragraph.
-    let captions = !matches!(note, Some(n) if n.starts_with("The whole") || n.contains("deletes"));
+    let captions = !(!prose.parts.is_empty()
+        && (prose.parts.iter().all(|p| matches!(p, Part::Added { .. }))
+            || prose
+                .parts
+                .iter()
+                .all(|p| matches!(p, Part::Removed { .. }))));
     let items = layout(&prose.parts, &state.opened);
     if state.heights.len() != items.len() || state.width != width {
         state.width = width;

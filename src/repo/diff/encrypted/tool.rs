@@ -66,7 +66,7 @@ pub(super) fn decrypt(
 }
 
 fn safe_failure(error: String) -> String {
-    if error.contains(crate::i18n::text("repo-core-2896")) {
+    if error.contains("cancelled") {
         crate::i18n::text("repo-core-3914").into()
     } else if error.contains("timed out") {
         crate::i18n::text("repo-core-3929").into()

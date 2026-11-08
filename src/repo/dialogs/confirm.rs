@@ -30,7 +30,10 @@ pub(super) fn confirm(
     safe: bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(asked.title).font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::repo::messages::display_operation(asked.title))
+            .font(theme::semibold(15.0)),
+    );
     ui.add_space(6.0);
     ui.add(egui::Label::new(asked.body).wrap());
     preview::show(ui, preview);
@@ -43,7 +46,12 @@ pub(super) fn confirm(
         _ => asked.ops,
     };
     let described = preview.instead.as_ref().map(|i| i.described.as_slice());
-    preview::commands(ui, asked.title, steps, described);
+    preview::commands(
+        ui,
+        &crate::repo::messages::display_operation(asked.title),
+        steps,
+        described,
+    );
     preview::undo_note(ui, asked.undo, preview);
     ui.add_space(14.0);
     let mut outcome = Outcome::Open;

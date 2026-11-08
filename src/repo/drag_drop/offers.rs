@@ -154,7 +154,7 @@ impl Offer {
             Offer::Merge { from, into } => crate::i18n::message(
                 "repo-core-2422",
                 &[
-                    ("label", format!("{}", from.label()).into()),
+                    ("hash", format!("{}", from.label()).into()),
                     ("into", format!("{}", into).into()),
                 ],
             ),
@@ -162,7 +162,7 @@ impl Offer {
                 "repo-core-2423",
                 &[
                     ("branch", format!("{}", branch).into()),
-                    ("label", format!("{}", onto.label()).into()),
+                    ("hash", format!("{}", onto.label()).into()),
                 ],
             ),
             Offer::InteractiveRebase { branch, onto } => crate::i18n::message(

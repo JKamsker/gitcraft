@@ -98,10 +98,7 @@ impl RepoTab {
             move |tab, same, ctx| match same {
                 Ok(()) => tab.apply(
                     Action::Ops {
-                        label: crate::i18n::message(
-                            "repo-core-0590",
-                            &[("path", format!("{}", plan.path).into())],
-                        ),
+                        label: format!("Keep both versions of {}", plan.path),
                         ops: keep_both::stage_steps(&plan),
                         refresh: Refresh::Status,
                     },

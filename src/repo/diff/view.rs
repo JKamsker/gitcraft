@@ -30,6 +30,20 @@ use crate::theme::{self, Tokens};
 
 impl RepoTab {
     pub(in crate::repo) fn diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let locale_changed = self.diff.as_mut().is_some_and(|view| {
+            let generation = crate::i18n::generation();
+            if view.presentation_generation == generation {
+                return false;
+            }
+            view.presentation_generation = generation;
+            view.rich = None;
+            view.rich_state = Default::default();
+            true
+        });
+        if locale_changed {
+            self.refresh_diff(ui.ctx());
+            self.load_diff_rich(ui.ctx());
+        }
         let t = Tokens::get(ui.ctx());
         let settings = Settings::get(ui.ctx());
         if let Some(view) = &mut self.diff {
@@ -698,7 +712,13 @@ impl RepoTab {
             &[Pick::Stage, Pick::Discard]
         };
         for &pick in picks {
-            let b = egui::Button::new(format!("{} {chosen} {lines}", pick.verb()));
+            let b = egui::Button::new(crate::i18n::message(
+                "repo-core-2376",
+                &[
+                    ("verb", format!("{}", pick.verb()).into()),
+                    ("chosen", (chosen).into()),
+                ],
+            ));
             if ui.add(b).clicked() {
                 acts.push(Action::PickLines {
                     pick,
@@ -733,10 +753,7 @@ impl RepoTab {
                     idle,
                     egui::Button::new(crate::i18n::message(
                         "repo-core-2378",
-                        &[
-                            ("chosen", format!("{}", chosen).into()),
-                            ("noun", format!("{}", noun).into()),
-                        ],
+                        &[("chosen", (chosen).into())],
                     )),
                 )
                 .on_hover_text(crate::i18n::text("repo-core-2379"));
@@ -828,12 +845,14 @@ fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
             }
         })
         .collect();
-    let noun = if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
-        crate::i18n::text("repo-core-2384")
-    } else {
-        crate::i18n::text("repo-core-2385")
-    };
-    format!("{noun} {}", parts.join(", "))
+    crate::i18n::message(
+        if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
+            "repo-core-line-range-one"
+        } else {
+            "repo-core-line-range-many"
+        },
+        &[("range", parts.join(", ").into())],
+    )
 }
 
 fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {

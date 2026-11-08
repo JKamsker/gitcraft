@@ -86,31 +86,15 @@ impl CommitDrop {
     /// The label of the operation, for the toolbar and the undo list.
     fn op_label(&self) -> String {
         let (verb, word) = match self.place {
-            Place::Above => (
-                crate::i18n::text("repo-core-2441"),
-                crate::i18n::text("repo-core-2442"),
-            ),
-            Place::Below => (
-                crate::i18n::text("repo-core-2441"),
-                crate::i18n::text("repo-core-2443"),
-            ),
-            Place::Squash => (
-                crate::i18n::text("repo-core-2444"),
-                crate::i18n::text("repo-core-2445"),
-            ),
-            Place::Fixup => (
-                crate::i18n::text("repo-core-2446"),
-                crate::i18n::text("repo-core-2445"),
-            ),
+            Place::Above => ("Move", "above"),
+            Place::Below => ("Move", "below"),
+            Place::Squash => ("Squash", "into"),
+            Place::Fixup => ("Fixup", "into"),
         };
-        crate::i18n::message(
-            "repo-core-2447",
-            &[
-                ("verb", format!("{}", verb).into()),
-                ("hash", format!("{}", short(&self.hash)).into()),
-                ("word", format!("{}", word).into()),
-                ("target", format!("{}", short(&self.target)).into()),
-            ],
+        format!(
+            "{verb} {} {word} {}",
+            short(&self.hash),
+            short(&self.target)
         )
     }
 }
@@ -211,7 +195,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             (
                                 "self",
                                 format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),

@@ -33,7 +33,7 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
             crate::i18n::text("repo-core-0686"),
             crate::i18n::text("repo-core-0687"),
             Action::Dialog(Dialog::confirm(
-                crate::i18n::text("repo-core-0688"),
+                "Forget this resolution?",
                 crate::i18n::message(
                     "repo-core-0689",
                     &[
@@ -50,7 +50,7 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
             crate::i18n::text("repo-core-0691"),
             crate::i18n::text("repo-core-0692"),
             Action::Dialog(Dialog::confirm(
-                crate::i18n::text("repo-core-0693"),
+                "Bring the conflicts back?",
                 crate::i18n::message(
                     "repo-core-0694",
                     &[

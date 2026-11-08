@@ -130,7 +130,7 @@ impl RepoTab {
         if let Some(op) = &self.busy_op {
             return Some(crate::i18n::message(
                 "repo-core-4084",
-                &[("op", format!("{}", op).into())],
+                &[("op", crate::repo::messages::display_operation(&op).into())],
             ));
         }
         self.work.in_progress.map(|s| {
@@ -317,13 +317,7 @@ fn fast_forward_branch(branch: &str, to: &Rev, to_tip: &str, from_tip: &str) -> 
     let full = format!("refs/heads/{branch}");
     let force = |at: &str| ops(&[&["branch", "-f", "--end-of-options", branch, at]]);
     Action::UndoableOps {
-        label: crate::i18n::message(
-            "repo-core-2425",
-            &[
-                ("branch", format!("{}", branch).into()),
-                ("label", format!("{}", to.label()).into()),
-            ],
-        ),
+        label: format!("Fast-forward {branch} to {}", to.label()),
         ops: [vec![expect_ref_at(&full, from_tip)], force(to_tip)].concat(),
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -396,7 +390,7 @@ impl Offer {
                             "repo-core-2425",
                             &[
                                 ("branch", format!("{}", branch).into()),
-                                ("hash", format!("{}", short(hash)).into()),
+                                ("label", format!("{}", short(hash)).into()),
                             ],
                         ),
                         &["merge", "--ff-only", to_tip],

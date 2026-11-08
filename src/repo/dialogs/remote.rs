@@ -33,11 +33,7 @@ pub(super) fn remote(
     );
     ui.add_space(8.0);
     let valid = usable(name) && usable(url);
-    let label = if original.is_some() {
-        crate::i18n::text("repo-core-1062")
-    } else {
-        crate::i18n::text("repo-core-0976")
-    };
+    let label = if original.is_some() { "Save" } else { "Add" };
     buttons(ui, label, valid, enter, || {
         let (name, url) = (name.trim().to_owned(), url.trim().to_owned());
         let steps = match original {
@@ -62,7 +58,7 @@ pub(super) fn remote(
             }
         };
         Action::Ops {
-            label: crate::i18n::message("repo-core-1468", &[("name", format!("{}", name).into())]),
+            label: format!("Remote {name}"),
             ops: steps,
             refresh: Refresh::All,
         }

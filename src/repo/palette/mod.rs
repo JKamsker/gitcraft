@@ -86,8 +86,8 @@ impl PaletteItem {
         let label = label.into();
         Self {
             key: label.clone(),
-            label,
-            hint: hint.to_owned(),
+            label: super::messages::display_operation(&label),
+            hint: super::messages::display_operation(hint),
             shortcut: None,
             selection: false,
             run,
@@ -123,6 +123,7 @@ pub(crate) struct PaletteGeneration {
     selected: Option<usize>,
     file: Option<DiffKey>,
     busy: bool,
+    locale: u64,
 }
 
 impl RepoTab {
@@ -135,6 +136,7 @@ impl RepoTab {
             selected: self.selected,
             file: self.diff.as_ref().map(|d| d.key.clone()),
             busy: self.busy_op.is_some(),
+            locale: crate::i18n::generation(),
         }
     }
 
@@ -199,13 +201,13 @@ impl RepoTab {
     /// The repository's commands, whatever is selected.
     fn command_items(&self, ctx: &egui::Context) -> Vec<PaletteItem> {
         let mut items = vec![
-            PaletteItem::action(crate::i18n::text("repo-core-0029"), "remote", Action::Fetch),
-            PaletteItem::action(crate::i18n::text("repo-core-0030"), "remote", Action::Pull),
+            PaletteItem::action("Fetch", "remote", Action::Fetch),
+            PaletteItem::action("Pull", "remote", Action::Pull),
             PaletteItem::action(
                 if self.gerrit.is_some() {
-                    crate::i18n::text("repo-core-0031")
+                    "Push for review"
                 } else {
-                    crate::i18n::text("repo-core-0032")
+                    "Push"
                 },
                 "remote",
                 Action::Push,
@@ -215,66 +217,45 @@ impl RepoTab {
             PullMode::ALL.map(|m| PaletteItem::action(m.label(), "remote", Action::PullWith(m))),
         );
         items.extend([
-            PaletteItem::action(crate::i18n::text("repo-core-0033"), "remote", Action::Sync),
+            PaletteItem::action("Sync (pull, then push)", "remote", Action::Sync),
             PaletteItem::action(
-                crate::i18n::text("repo-core-0058"),
+                "Reflog",
                 "recovery",
                 Action::Reflog(super::reflog::ReflogAct::Show(super::reflog::Source::head())),
             ),
             PaletteItem::action(
-                crate::i18n::text("repo-core-0060"),
+                "Find lost commits",
                 "recovery",
                 Action::Reflog(super::reflog::ReflogAct::FindLost),
             ),
             PaletteItem::action(
-                crate::i18n::text("repo-core-0055"),
+                "Stage all changes",
                 "changes",
                 Action::Key(crate::keymap::Command::StageAll),
             ),
             PaletteItem::action(
-                crate::i18n::text("repo-core-0056"),
+                "Commit",
                 "changes",
                 Action::Key(crate::keymap::Command::Commit),
             ),
+            PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
+            PaletteItem::action("Undo", "history", Action::Undo),
+            PaletteItem::action("Redo", "history", Action::Redo),
+            PaletteItem::action("Stash changes", "stash", Action::Dialog(Dialog::stash())),
+            PaletteItem::action("Search", "graph or visible lines", Action::FocusSearch),
+            PaletteItem::action("Toggle terminal", "terminal", Action::ToggleTerminal),
             PaletteItem::action(
-                crate::i18n::text("repo-core-2630"),
-                "patch",
-                Action::ApplyPatch,
-            ),
-            PaletteItem::action(crate::i18n::text("repo-core-0051"), "history", Action::Undo),
-            PaletteItem::action(crate::i18n::text("repo-core-0052"), "history", Action::Redo),
-            PaletteItem::action(
-                crate::i18n::text("repo-core-1492"),
-                "stash",
-                Action::Dialog(Dialog::stash()),
-            ),
-            PaletteItem::action(
-                crate::i18n::text("repo-core-4193"),
-                crate::i18n::text("repo-core-4194"),
-                Action::FocusSearch,
-            ),
-            PaletteItem::action(
-                crate::i18n::text("repo-core-0061"),
-                "terminal",
-                Action::ToggleTerminal,
-            ),
-            PaletteItem::action(
-                crate::i18n::text("repo-core-0068"),
+                "New terminal",
                 "terminal",
                 Action::NewTerminal {
                     shell: None,
                     cwd: None,
                 },
             ),
-            PaletteItem::action(
-                crate::i18n::text("repo-core-0070"),
-                "repository",
-                Action::Reload,
-            )
-            .shortcut("F5"),
+            PaletteItem::action("Reload", "repository", Action::Reload).shortcut("F5"),
             PaletteItem::action(reveal_label(), "folder", Action::OpenPath(PathBuf::new())),
             PaletteItem::action(
-                crate::i18n::text("repo-core-0113"),
+                "Open in editor",
                 "folder",
                 Action::OpenInEditor(PathBuf::new()),
             ),
@@ -284,22 +265,22 @@ impl RepoTab {
         }
         if let Some(url) = self.web_page() {
             items.push(PaletteItem::action(
-                crate::i18n::text("repo-core-0115"),
+                "Open in browser",
                 "remote",
                 Action::OpenUrl(url),
             ));
         }
         if !self.submodules.is_empty() {
             items.push(PaletteItem::action(
-                crate::i18n::text("repo-core-0122"),
+                "Update submodules",
                 "submodule",
                 super::keep_submodules::update_all(),
             ));
         }
         if self.lfs {
             for (label, args) in [
-                (crate::i18n::text("repo-core-0126"), ["lfs", "fetch"]),
-                (crate::i18n::text("repo-core-0129"), ["lfs", "pull"]),
+                ("LFS: Fetch", ["lfs", "fetch"]),
+                ("LFS: Pull", ["lfs", "pull"]),
             ] {
                 items.push(PaletteItem::action(
                     label,
@@ -313,23 +294,23 @@ impl RepoTab {
             }
         }
         items.push(PaletteItem::action(
-            crate::i18n::text("repo-core-4197"),
+            "Run Actions locally…",
             "act",
             Action::LocalCi(super::local_ci::Act::Open),
         ));
         items.push(PaletteItem::action(
-            crate::i18n::text("repo-core-4199"),
+            "Email patches…",
             "b4",
             Action::Email(super::email::Act::Open),
         ));
         items.push(PaletteItem::action(
-            crate::i18n::text("repo-core-4201"),
+            "Worktree dev container…",
             "environment",
             Action::Devcontainer(super::devcontainer::Act::Open),
         ));
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push(PaletteItem::action(
-                crate::i18n::text("repo-core-0135"),
+                "Show CI for HEAD",
                 "builds",
                 Action::OpenCi {
                     sha: self.refs.head.clone(),
@@ -339,12 +320,12 @@ impl RepoTab {
         }
         if !self.refs.head.is_empty() {
             items.push(PaletteItem::action(
-                crate::i18n::text("repo-core-4203"),
+                "Create branch…",
                 "branch",
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push(PaletteItem::action(
-                crate::i18n::text("repo-core-4204"),
+                "Create tag…",
                 "tag",
                 Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
             ));

@@ -206,7 +206,7 @@ impl RepoTab {
                 PaletteItem::action(
                     format!(
                         "{} — {}",
-                        crate::i18n::text(mode.label),
+                        super::super::messages::display_operation(mode.label),
                         crate::i18n::text(mode.short)
                     ),
                     "reset",

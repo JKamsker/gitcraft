@@ -600,7 +600,6 @@ impl RepoTab {
                                     "repo-core-3243",
                                     &[
                                         ("n", (n).into()),
-                                        ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
                                         (
                                             "Undo",
                                             format!(

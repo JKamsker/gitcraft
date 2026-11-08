@@ -313,11 +313,7 @@ fn people(
                 "repo-core-2735",
                 &[
                     ("email", format!("{}", p.email).into()),
-                    ("commits", format!("{}", p.commits).into()),
-                    (
-                        "s",
-                        format!("{}", if p.commits == 1 { "" } else { "s" }).into(),
-                    ),
+                    ("commits", (p.commits).into()),
                 ],
             ),
             operator: false,

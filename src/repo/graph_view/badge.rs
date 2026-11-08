@@ -41,16 +41,25 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => crate::i18n::message(
                 "repo-core-2591",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::DetachedHead => crate::i18n::text("repo-core-2592").to_owned(),
             BadgeKind::PullRequest => crate::i18n::message(
                 "repo-core-2593",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::Branch if self.head => crate::i18n::message(
                 "repo-core-2594",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::Branch if !self.local => crate::i18n::message(
                 "repo-core-2595",
@@ -58,7 +67,10 @@ impl Badge {
             ),
             BadgeKind::Branch => crate::i18n::message(
                 "repo-core-2596",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
         }
     }
@@ -87,12 +99,18 @@ impl Badge {
         match self.kind {
             BadgeKind::Tag => crate::i18n::message(
                 "repo-core-2591",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::DetachedHead => crate::i18n::text("repo-core-2598").to_owned(),
             BadgeKind::PullRequest => crate::i18n::message(
                 "repo-core-2599",
-                &[("label", format!("{}", self.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::Branch => {
                 let mut places = Vec::new();

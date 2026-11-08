@@ -4,9 +4,9 @@ use crate::theme::Tokens;
 
 pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document {
     let mut doc = Document::default();
-    for (label, side) in [
-        (crate::i18n::text("repo-core-1564"), &pair.old),
-        (crate::i18n::text("repo-core-1565"), &pair.new),
+    for (before, label, side) in [
+        (true, crate::i18n::text("repo-core-1564"), &pair.old),
+        (false, crate::i18n::text("repo-core-1565"), &pair.new),
     ] {
         let Some(side) = side else { continue };
         doc.text(
@@ -25,14 +25,7 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
             doc.text(&format!("{key}: {value}"), t.text_dim);
         }
         if let Some(text) = &side.text {
-            doc.text(
-                text,
-                if label == crate::i18n::text("repo-core-1564") {
-                    t.danger
-                } else {
-                    t.success
-                },
-            );
+            doc.text(text, if before { t.danger } else { t.success });
         }
         for note in &side.text_gaps {
             doc.text(note, t.warning);

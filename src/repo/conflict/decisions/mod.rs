@@ -136,13 +136,7 @@ fn record_and_test(repo: &std::path::Path, pending: Pending) -> Vec<(String, boo
         if bad && others_conflicted > 0 {
             text.push_str(&crate::i18n::message(
                 "repo-core-0485",
-                &[
-                    ("others-conflicted", format!("{}", others_conflicted).into()),
-                    (
-                        "s",
-                        format!("{}", if others_conflicted == 1 { "" } else { "s" }).into(),
-                    ),
-                ],
+                &[("others-conflicted", (others_conflicted).into())],
             ));
         }
         said.push((text, bad));
@@ -183,7 +177,7 @@ impl RepoTab {
                         "repo-core-0486",
                         &[
                             (
-                                crate::i18n::text("repo-core-0488"),
+                                "Fetching",
                                 format!(
                                     "{}",
                                     if send {

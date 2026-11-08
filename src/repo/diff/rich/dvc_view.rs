@@ -123,10 +123,7 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-2180",
-                        &[
-                            ("files", format!("{}", files).into()),
-                            ("s", format!("{}", s).into()),
-                        ],
+                        &[("files", (files).into())],
                     ))
                     .color(t.text_dim),
                 );

@@ -45,7 +45,13 @@ pub(super) fn order_button(
         .interact(rect, ui.id().with("graph-order"), Sense::click())
         .on_hover_text(crate::i18n::text("repo-core-2680"));
     crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
-        crate::i18n::message("repo-core-2681", &[("label", format!("{}", label).into())])
+        crate::i18n::message(
+            "repo-core-2681",
+            &[(
+                "label",
+                crate::repo::messages::display_operation(&label).into(),
+            )],
+        )
     });
     if resp.hovered() {
         ui.painter()

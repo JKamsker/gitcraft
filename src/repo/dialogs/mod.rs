@@ -881,7 +881,15 @@ fn buttons(
 ) -> Outcome {
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        if widgets::primary_button(ui, label, valid, 90.0).clicked() || (enter && valid) {
+        if widgets::primary_button(
+            ui,
+            &crate::repo::messages::display_operation(label),
+            valid,
+            90.0,
+        )
+        .clicked()
+            || (enter && valid)
+        {
             outcome = Outcome::Done(Box::new(done()));
         }
         if cancel_button(ui) {

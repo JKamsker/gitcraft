@@ -117,6 +117,7 @@ impl DiffKey {
 }
 
 pub(crate) struct DiffView {
+    pub(super) presentation_generation: u64,
     pub(super) key: DiffKey,
     pub(super) data: Option<Result<diff::DiffData, String>>,
     /// Changed lines clicked, to stage, unstage or discard only those.
@@ -190,6 +191,7 @@ static DIFF_REQUESTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU6
 impl DiffView {
     pub(super) fn new(key: DiffKey) -> Self {
         Self {
+            presentation_generation: crate::i18n::generation(),
             key,
             data: None,
             chosen: Default::default(),

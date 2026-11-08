@@ -43,8 +43,14 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2947",
                         &[
-                            ("label", format!("{}", label).into()),
-                            ("busy", format!("{}", busy).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            (
+                                "busy",
+                                crate::repo::messages::display_operation(&busy).into(),
+                            ),
                         ],
                     ),
                     true,
@@ -60,7 +66,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2948",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             ("why", format!("{}", why).into()),
                         ],
                     ),
@@ -82,10 +91,7 @@ impl RepoTab {
                     .any(|s| s.first().is_some_and(|s| s == "tag"))
             {
                 let follow = PendingOp {
-                    label: crate::i18n::message(
-                        "repo-core-2949",
-                        &[("label", format!("{}", label).into())],
-                    ),
+                    label: format!("Push after {label}"),
                     ops: ops[at..].to_vec(),
                     refresh,
                     kind: OpKind::plain(),
@@ -260,7 +266,13 @@ impl RepoTab {
         }
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                crate::i18n::message("repo-core-2950", &[("busy", format!("{}", busy).into())]),
+                crate::i18n::message(
+                    "repo-core-2950",
+                    &[(
+                        "busy",
+                        crate::repo::messages::display_operation(&busy).into(),
+                    )],
+                ),
                 true,
             ));
             return;
@@ -384,8 +396,14 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-2957",
                     &[
-                        ("label", format!("{}", op.label).into()),
-                        ("busy", format!("{}", busy).into()),
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&op.label).into(),
+                        ),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
                     ],
                 ),
                 true,
@@ -441,10 +459,7 @@ impl RepoTab {
         match &result {
             Ok(_) => {
                 self.note_reused(None);
-                if label == crate::i18n::text("repo-core-0056")
-                    || label == crate::i18n::text("repo-core-0358")
-                    || label.starts_with("Continue ")
-                {
+                if label == "Commit" || label == "Amend" || label.starts_with("Continue ") {
                     self.commit_summary.clear();
                     self.commit_body.clear();
                     self.amend = false;
@@ -460,20 +475,17 @@ impl RepoTab {
                         crate::i18n::message(
                             "repo-core-2959",
                             &[
-                                ("label", format!("{}", label).into()),
+                                (
+                                    "label",
+                                    crate::repo::messages::display_operation(&label).into(),
+                                ),
                                 ("note", format!("{}", note).into()),
                             ],
                         ),
                         true,
                     ));
                 } else if refresh == Refresh::All && !quiet {
-                    self.status = Some((
-                        crate::i18n::message(
-                            "repo-core-0269",
-                            &[("label", format!("{}", label).into())],
-                        ),
-                        false,
-                    ));
+                    self.status = Some((format!("{label}: done"), false));
                 }
                 if label.contains("etch") {
                     self.note_fetched();
@@ -498,7 +510,10 @@ impl RepoTab {
                 self.status = Some((
                     crate::i18n::message(
                         "repo-core-2962",
-                        &[("label", format!("{}", label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     true,
                 ));
@@ -522,7 +537,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-0270",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             ("e", format!("{}", e).into()),
                         ],
                     ),
@@ -550,7 +568,10 @@ impl RepoTab {
                         "repo-core-2965",
                         &[
                             ("name", format!("{}", self.name).into()),
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                         ],
                     ),
                     false,
@@ -560,7 +581,10 @@ impl RepoTab {
                         "repo-core-2966",
                         &[
                             ("name", format!("{}", self.name).into()),
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             ("e", format!("{}", headline(e)).into()),
                         ],
                     ),

@@ -80,43 +80,19 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                     .color(t.text),
                 );
                 let parts: Vec<String> = [
-                    (
-                        count(Change::Changed),
-                        crate::i18n::text("repo-core-2247"),
-                        crate::i18n::text("repo-core-1704"),
-                    ),
-                    (
-                        count(Change::Added),
-                        crate::i18n::text("repo-core-2247"),
-                        crate::i18n::text("repo-core-1702"),
-                    ),
-                    (
-                        count(Change::Removed),
-                        crate::i18n::text("repo-core-2247"),
-                        crate::i18n::text("repo-core-1703"),
-                    ),
-                    (
-                        col_count(Change::Added),
-                        crate::i18n::text("repo-core-2248"),
-                        crate::i18n::text("repo-core-1702"),
-                    ),
+                    (count(Change::Changed), "repo-core-table-rows-changed"),
+                    (count(Change::Added), "repo-core-table-rows-added"),
+                    (count(Change::Removed), "repo-core-table-rows-removed"),
+                    (col_count(Change::Added), "repo-core-table-columns-added"),
                     (
                         col_count(Change::Removed),
-                        crate::i18n::text("repo-core-2248"),
-                        crate::i18n::text("repo-core-1703"),
+                        "repo-core-table-columns-removed",
                     ),
-                    (
-                        renamed,
-                        crate::i18n::text("repo-core-2248"),
-                        crate::i18n::text("repo-core-2249"),
-                    ),
+                    (renamed, "repo-core-table-columns-renamed"),
                 ]
                 .iter()
-                .filter(|(n, ..)| *n > 0)
-                .map(|(n, what, how)| {
-                    let s = if *n == 1 { "" } else { "s" };
-                    format!("{n} {what}{s} {how}")
-                })
+                .filter(|(n, _)| *n > 0)
+                .map(|(n, id)| crate::i18n::message(id, &[("count", (*n).into())]))
                 .collect();
                 let summary = if parts.is_empty() {
                     crate::i18n::text("repo-core-2251").to_owned()
@@ -191,7 +167,10 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                             || {
                                 crate::i18n::message(
                                     "repo-core-2258",
-                                    &[("label", format!("{}", label).into())],
+                                    &[(
+                                        "label",
+                                        crate::repo::messages::display_operation(&label).into(),
+                                    )],
                                 )
                             },
                             false,
@@ -382,10 +361,8 @@ fn row(
         .unwrap_or_default();
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let where_ = match (r.change, r.old_line, r.new_line) {
-        (Change::Removed, Some(o), _) => {
-            crate::i18n::message("repo-core-2040", &[("o", format!("{}", o).into())])
-        }
-        (_, _, Some(n)) => crate::i18n::message("repo-core-2039", &[("n", (n).into())]),
+        (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
+        (_, _, Some(n)) => format!("Go to line {n}"),
         _ => String::new(),
     };
     let tip = if tip.is_empty() {

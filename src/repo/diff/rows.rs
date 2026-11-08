@@ -625,7 +625,13 @@ impl<'a> Rows<'a> {
         let label = if block.exact {
             label
         } else {
-            crate::i18n::message("repo-core-2311", &[("label", format!("{}", label).into())])
+            crate::i18n::message(
+                "repo-core-2311",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&label).into(),
+                )],
+            )
         };
         let right = rect.right().min(ui.clip_rect().right()) - 6.0;
         let id = ui.id().with(("moved_btn", i));

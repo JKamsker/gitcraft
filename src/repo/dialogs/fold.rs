@@ -16,41 +16,19 @@ const LISTED: usize = 8;
 
 pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    let one = plan.staged == 1;
-    let files = if one {
-        crate::i18n::text("repo-core-1301").to_owned()
+    let heading = if plan.keep_fixup {
+        crate::i18n::text("repo-core-1303")
     } else {
-        crate::i18n::message(
-            "repo-core-1302",
-            &[("staged", format!("{}", plan.staged).into())],
-        )
-    };
-    let (heading, lead) = match (plan.keep_fixup, one) {
-        (true, true) => (
-            crate::i18n::text("repo-core-1303"),
-            crate::i18n::text("repo-core-1304"),
-        ),
-        (true, false) => (
-            crate::i18n::text("repo-core-1303"),
-            crate::i18n::text("repo-core-1305"),
-        ),
-        (false, true) => (
-            crate::i18n::text("repo-core-1306"),
-            crate::i18n::text("repo-core-1307"),
-        ),
-        (false, false) => (
-            crate::i18n::text("repo-core-1306"),
-            crate::i18n::text("repo-core-1308"),
-        ),
+        crate::i18n::text("repo-core-1306")
     };
     title(
         ui,
         heading,
         &crate::i18n::message(
-            "repo-core-1309",
+            "repo-core-fold-staged",
             &[
-                ("files", format!("{}", files).into()),
-                ("lead", format!("{}", lead).into()),
+                ("count", plan.staged.into()),
+                ("fixup", if plan.keep_fixup { "yes" } else { "no" }.into()),
             ],
         ),
         &t,
@@ -146,24 +124,7 @@ fn pushed_warning(plan: &Plan) -> String {
     } else if n == total {
         crate::i18n::message("repo-core-1321", &[("total", (total).into())])
     } else {
-        crate::i18n::message(
-            "repo-core-1322",
-            &[
-                ("n", (n).into()),
-                (
-                    crate::i18n::text("repo-core-1324"),
-                    format!(
-                        "{}",
-                        if n == 1 {
-                            crate::i18n::text("repo-core-1323")
-                        } else {
-                            crate::i18n::text("repo-core-1324")
-                        }
-                    )
-                    .into(),
-                ),
-            ],
-        )
+        crate::i18n::message("repo-core-1322", &[("n", n.into())])
     };
     crate::i18n::message("repo-core-1325", &[("what", format!("{}", what).into())])
 }

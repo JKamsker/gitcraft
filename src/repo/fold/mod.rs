@@ -156,7 +156,10 @@ impl RepoTab {
                     "repo-core-4121",
                     &[
                         ("label", format!("{}", plan.label()).into()),
-                        ("busy", format!("{}", busy).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
                     ],
                 ),
                 true,
@@ -237,7 +240,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             (
                                 "self",
                                 format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
@@ -275,7 +281,10 @@ impl RepoTab {
                 Ok(_) => (
                     crate::i18n::message(
                         "repo-core-4125",
-                        &[("label", format!("{}", back.label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&back.label).into(),
+                        )],
                     ),
                     true,
                 ),
@@ -283,7 +292,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-4126",
                         &[
-                            ("label", format!("{}", back.label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&back.label).into(),
+                            ),
                             ("e", format!("{}", e).into()),
                         ],
                     ),
@@ -310,7 +322,10 @@ impl RepoTab {
                     self.status = Some((
                         crate::i18n::message(
                             "repo-core-4127",
-                            &[("label", format!("{}", label).into())],
+                            &[(
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            )],
                         ),
                         true,
                     ));
@@ -377,7 +392,10 @@ impl RepoTab {
         let mut undo = stopped.leftover_undo(&head);
         let failed = crate::i18n::message(
             "repo-core-4128",
-            &[("label", format!("{}", stopped.label).into())],
+            &[(
+                "label",
+                crate::repo::messages::display_operation(&stopped.label).into(),
+            )],
         );
         if let Some(entry) = self
             .timeline
@@ -399,7 +417,10 @@ impl RepoTab {
         self.status = Some((
             crate::i18n::message(
                 "repo-core-4129",
-                &[("label", format!("{}", stopped.label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&stopped.label).into(),
+                )],
             ),
             true,
         ));
@@ -492,13 +513,7 @@ fn unfixup_label(stopped: &Stopped) -> String {
         "repo-core-4132",
         &[(
             "fold",
-            format!(
-                "{}",
-                stopped
-                    .label
-                    .replacen(crate::i18n::text("repo-core-1315"), "fold", 1)
-            )
-            .into(),
+            format!("{}", stopped.label.replacen("Fold", "fold", 1)).into(),
         )],
     )
 }
@@ -508,13 +523,7 @@ fn put_back_label(stopped: &Stopped) -> String {
         "repo-core-4133",
         &[(
             "fold",
-            format!(
-                "{}",
-                stopped
-                    .label
-                    .replacen(crate::i18n::text("repo-core-1315"), "fold", 1)
-            )
-            .into(),
+            format!("{}", stopped.label.replacen("Fold", "fold", 1)).into(),
         )],
     )
 }
@@ -524,13 +533,7 @@ fn abort_label(stopped: &Stopped) -> String {
         "repo-core-3686",
         &[(
             "fold",
-            format!(
-                "{}",
-                stopped
-                    .label
-                    .replacen(crate::i18n::text("repo-core-1315"), "fold", 1)
-            )
-            .into(),
+            format!("{}", stopped.label.replacen("Fold", "fold", 1)).into(),
         )],
     )
 }

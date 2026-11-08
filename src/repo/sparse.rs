@@ -114,7 +114,7 @@ impl RepoTab {
         if fetch {
             state.consent = false;
             acts.push(Action::Ops {
-                label: crate::i18n::text("repo-core-3615").into(),
+                label: "Download history objects (consented)".into(),
                 ops: super::ops(&[&["fetch", "--refetch", "--no-filter", "--", "origin"]]),
                 refresh: Refresh::All,
             });

@@ -23,7 +23,10 @@ fn step_tip(what: &str, entry: &super::timeline::Entry, keys: &str) -> String {
             &[
                 ("what", format!("{}", what).into()),
                 ("agent", format!("{}", agent).into()),
-                ("label", format!("{}", entry.label).into()),
+                (
+                    "label",
+                    crate::repo::messages::display_operation(&entry.label).into(),
+                ),
                 ("keys", format!("{}", keys).into()),
             ],
         ),
@@ -31,7 +34,10 @@ fn step_tip(what: &str, entry: &super::timeline::Entry, keys: &str) -> String {
             "repo-core-3646",
             &[
                 ("what", format!("{}", what).into()),
-                ("label", format!("{}", entry.label).into()),
+                (
+                    "label",
+                    crate::repo::messages::display_operation(&entry.label).into(),
+                ),
                 ("keys", format!("{}", keys).into()),
             ],
         ),
@@ -575,10 +581,7 @@ impl RepoTab {
                     idle,
                     egui::Button::new(crate::i18n::message(
                         "repo-core-3686",
-                        &[(
-                            "to-lowercase",
-                            format!("{}", state.label().to_lowercase()).into(),
-                        )],
+                        &[("fold", format!("{}", state.label().to_lowercase()).into())],
                     )),
                 )
                 .clicked()
@@ -597,7 +600,7 @@ impl RepoTab {
             && (self.busy_op.is_none() || *is_err)
         {
             let color = if *is_err { t.danger } else { t.text_dim };
-            let first_line = headline(msg);
+            let first_line = super::messages::display_status(&headline(msg));
             let entry = self.status_entry();
             let mut label =
                 egui::Label::new(egui::RichText::new(first_line).color(color)).truncate();
@@ -605,7 +608,7 @@ impl RepoTab {
                 label = label.sense(egui::Sense::click());
             }
             let shown = ui.add(label).on_hover_ui(|ui| {
-                ui.label(msg.as_str());
+                ui.label(super::messages::display_status(msg));
                 if entry.is_some() {
                     ui.label(
                         egui::RichText::new(crate::i18n::text("repo-core-3687")).color(t.text_dim),
@@ -628,19 +631,27 @@ impl RepoTab {
             && ui
                 .button(crate::i18n::text("repo-core-0443"))
                 .on_hover_text(if self.waiting.is_empty() {
-                    crate::i18n::message("repo-core-3688", &[("op", format!("{}", op).into())])
+                    crate::i18n::message(
+                        "repo-core-3688",
+                        &[("op", crate::repo::messages::display_operation(&op).into())],
+                    )
                 } else {
-                    crate::i18n::message("repo-core-3689", &[("op", format!("{}", op).into())])
+                    crate::i18n::message(
+                        "repo-core-3689",
+                        &[("op", crate::repo::messages::display_operation(&op).into())],
+                    )
                 })
                 .clicked()
         {
             acts.push(Action::CancelOp);
         }
+        let op = super::messages::display_operation(op);
         let progress = self.op_progress();
         let doing = match &progress {
-            _ if self.was_cancelled() => {
-                crate::i18n::message("repo-core-3690", &[("op", format!("{}", op).into())])
-            }
+            _ if self.was_cancelled() => crate::i18n::message(
+                "repo-core-3690",
+                &[("op", crate::repo::messages::display_operation(&op).into())],
+            ),
             Some(p) => format!("{op}… {}", p.label()),
             None => format!("{op}…"),
         };
@@ -652,7 +663,11 @@ impl RepoTab {
         }
         ui.add(crate::spinner::Spinner::new());
         if !self.waiting.is_empty() {
-            let names: Vec<&str> = self.waiting.iter().map(|w| w.label()).collect();
+            let names: Vec<String> = self
+                .waiting
+                .iter()
+                .map(|w| super::messages::display_operation(w.label()))
+                .collect();
             widgets::chip(
                 ui,
                 &crate::i18n::message(
@@ -663,16 +678,19 @@ impl RepoTab {
             )
             .on_hover_text(crate::i18n::message(
                 "repo-core-3694",
-                &[("op", format!("{}", op).into())],
+                &[("op", crate::repo::messages::display_operation(&op).into())],
             ));
         }
     }
 
     /// Why a button that changes the repository waits: the operation running.
     fn waits_text(&self) -> Option<String> {
-        self.busy_op
-            .as_ref()
-            .map(|op| crate::i18n::message("repo-core-3695", &[("op", format!("{}", op).into())]))
+        self.busy_op.as_ref().map(|op| {
+            crate::i18n::message(
+                "repo-core-3695",
+                &[("op", crate::repo::messages::display_operation(&op).into())],
+            )
+        })
     }
 }
 
@@ -688,8 +706,16 @@ pub(crate) fn reveal_label() -> &'static str {
 
 /// Pull or Push as a screen reader says it: "Pull, 2 behind".
 fn behind_ahead(name: &str, n: u32, how: &str) -> String {
-    let count = (n > 0).then(|| format!("{n} {how}"));
-    crate::a11y::labels::join([name, count.as_deref().unwrap_or("")])
+    if n == 0 {
+        return name.to_owned();
+    }
+    crate::i18n::message(
+        match how {
+            "behind" => "repo-core-toolbar-behind",
+            _ => "repo-core-toolbar-ahead",
+        },
+        &[("name", name.into()), ("count", n.into())],
+    )
 }
 
 fn short_duration(d: Duration) -> String {
@@ -713,31 +739,32 @@ pub(super) fn headline(msg: &str) -> String {
             0 => crate::i18n::message(
                 "repo-core-3702",
                 &[
-                    ("label", format!("{}", label).into()),
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
                     ("conflicts", (conflicts).into()),
-                    ("files", format!("{}", files).into()),
                 ],
             ),
             n if n >= conflicts => crate::i18n::message(
                 "repo-core-3703",
                 &[
-                    ("label", format!("{}", label).into()),
-                    ("n", (n).into()),
                     (
-                        "files",
-                        format!("{}", if n == 1 { "file" } else { "files" }).into(),
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
                     ),
-                    ("n2", format!("{}", them(n)).into()),
+                    ("n", (n).into()),
                 ],
             ),
             n => crate::i18n::message(
                 "repo-core-3704",
                 &[
-                    ("label", format!("{}", label).into()),
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
                     ("conflicts", (conflicts).into()),
-                    ("files", format!("{}", files).into()),
                     ("n", (n).into()),
-                    ("n2", format!("{}", them(n)).into()),
                 ],
             ),
         };

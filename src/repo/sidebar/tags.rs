@@ -95,10 +95,7 @@ impl RepoTab {
             .clicked()
             {
                 acts.push(Action::Ops {
-                    label: crate::i18n::message(
-                        "repo-core-3541",
-                        &[("name", format!("{}", tag.name).into())],
-                    ),
+                    label: format!("Push tag {}", tag.name),
                     ops: ops(&[&["push", &remote, &format!("refs/tags/{}", tag.name)]]),
                     refresh: Refresh::All,
                 });
@@ -113,7 +110,7 @@ impl RepoTab {
             .clicked()
             {
                 acts.push(Action::Dialog(Dialog::confirm(
-                    crate::i18n::text("repo-core-3543"),
+                    "Delete remote tag",
                     crate::i18n::message(
                         "repo-core-3544",
                         &[
@@ -159,7 +156,7 @@ impl RepoTab {
             move |tab, (name, object), _| {
                 tab.dialog = Some(
                     Dialog::confirm(
-                        crate::i18n::text("repo-core-3546"),
+                        "Delete tag",
                         crate::i18n::message(
                             "repo-core-3547",
                             &[("name", format!("{}", name).into())],

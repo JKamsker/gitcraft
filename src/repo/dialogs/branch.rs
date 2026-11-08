@@ -49,10 +49,7 @@ pub(super) fn create_branch(
                 vec!["branch".into(), name.clone(), at.to_owned()]
             };
             Action::UndoableOps {
-                label: crate::i18n::message(
-                    "repo-core-1218",
-                    &[("name", format!("{}", name).into())],
-                ),
+                label: format!("Create branch {name}"),
                 ops: vec![args.clone()],
                 refresh: Refresh::All,
                 undo: Undo::Custom {
@@ -165,9 +162,9 @@ pub(super) fn tag(
             }
             Action::UndoableOps {
                 label: if *release {
-                    crate::i18n::message("repo-core-1227", &[("name", format!("{}", name).into())])
+                    format!("Create release tag {name}")
                 } else {
-                    crate::i18n::message("repo-core-1228", &[("name", format!("{}", name).into())])
+                    format!("Create tag {name}")
                 },
                 ops: steps,
                 refresh: Refresh::All,
@@ -214,13 +211,7 @@ pub(super) fn rename_branch(
                 steps
             };
             Action::UndoableOps {
-                label: crate::i18n::message(
-                    "repo-core-1233",
-                    &[
-                        ("old", format!("{}", old).into()),
-                        ("new", format!("{}", new).into()),
-                    ],
-                ),
+                label: format!("Rename {old} to {new}"),
                 ops: rename(&old, &new),
                 refresh: Refresh::All,
                 undo: Undo::Custom {

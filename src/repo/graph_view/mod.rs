@@ -662,7 +662,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 .clicked()
             {
                 acts.push(Action::Ops {
-                    label: crate::i18n::text("repo-core-0832").into(),
+                    label: "Stage all".into(),
                     ops: ops(&[&["add", "-A"]]),
                     refresh: Refresh::Status,
                 });

@@ -36,10 +36,7 @@ impl RepoTab {
                 .chain(steps)
                 .collect();
             self.run_undoable(
-                &crate::i18n::message(
-                    "repo-core-3321",
-                    &[("hash", format!("{}", short(&hash)).into())],
-                ),
+                &format!("Edit the message of {}", short(&hash)),
                 guarded,
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
@@ -131,10 +128,7 @@ impl RepoTab {
             }
             // The todo list replaces the commits read: not one made since.
             Ok((command, head)) => self.run_undoable(
-                &crate::i18n::message(
-                    "repo-core-3321",
-                    &[("hash", format!("{}", short(hash)).into())],
-                ),
+                &format!("Edit the message of {}", short(hash)),
                 vec![self.same_branch(), expect_ref_at("HEAD", &head), command],
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
@@ -200,7 +194,10 @@ impl RepoTab {
                 self.status = Some((
                     crate::i18n::message(
                         "repo-core-3324",
-                        &[("label", format!("{}", label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     true,
                 ));
@@ -354,7 +351,7 @@ impl RepoTab {
         );
         self.open_dialog(
             super::Dialog::confirm(
-                crate::i18n::text("repo-core-3337"),
+                "Interactive rebase",
                 crate::i18n::text("repo-core-3338").into(),
                 crate::i18n::text("repo-core-3242"),
                 Vec::new(),
@@ -411,10 +408,7 @@ impl RepoTab {
             self.status = Some((reason, true));
             return;
         }
-        let label = crate::i18n::message(
-            "repo-core-3342",
-            &[("onto-label", format!("{}", editor.onto_label).into())],
-        );
+        let label = format!("Interactive rebase onto {}", editor.onto_label);
         // Started once: until its files are written (elsewhere, in the background), it can't
         // be started again, and it runs only if this editor is still the one open then.
         editor.starting = true;
@@ -467,7 +461,10 @@ impl RepoTab {
                 self.status = Some((
                     crate::i18n::message(
                         "repo-core-3345",
-                        &[("label", format!("{}", label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     true,
                 ));

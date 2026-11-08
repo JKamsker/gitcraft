@@ -473,7 +473,7 @@ impl RepoTab {
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3410",
                     &[
-                        ("noun", format!("{}", forge.noun()).into()),
+                        ("noun", format!("{}", forge.noun_label()).into()),
                         ("number", format!("{}", pr.number).into()),
                     ],
                 ))
@@ -487,7 +487,7 @@ impl RepoTab {
             None => {
                 if crate::menu_item::MenuItem::new(crate::i18n::message(
                     "repo-core-3412",
-                    &[("noun", format!("{}", forge.noun()).into())],
+                    &[("noun", format!("{}", forge.noun_label()).into())],
                 ))
                 .icon("external-link")
                 .enabled(idle)
@@ -506,7 +506,7 @@ impl RepoTab {
                             )
                         });
                     acts.push(Action::Dialog(Dialog::create_pr(
-                        forge.noun(),
+                        forge.noun_label(),
                         &b.name,
                         &base,
                         &title,

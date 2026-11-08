@@ -206,7 +206,7 @@ impl Form {
                                     ("machine", format!("{}", f.machine).into()),
                                     ("head", format!("{}", f.head).into()),
                                     (
-                                        crate::i18n::text("repo-core-1377"),
+                                        "untested",
                                         format!(
                                             "{}",
                                             f.stored_test

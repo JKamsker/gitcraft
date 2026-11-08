@@ -258,7 +258,7 @@ fn default_branch(repo: &std::path::Path, branch: &str) -> Option<String> {
 }
 
 /// What the search bar shows it searched when the filter is on.
-pub(crate) const AGENT_FILTER: &str = "Agent-written commits";
+pub(crate) const AGENT_FILTER: &str = "agent-written commits";
 
 /// The filter's toggle in the search bar.
 pub(crate) fn filter_toggle(ui: &mut Ui, on: bool, acts: &mut Vec<Action>) {

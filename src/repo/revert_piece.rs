@@ -12,13 +12,7 @@ use crate::git::{self, Reverted};
 impl RepoTab {
     /// Undoes commit `hash`'s changes to `path` in the working tree.
     pub(super) fn revert_file(&mut self, hash: String, path: String, ctx: &egui::Context) {
-        let label = crate::i18n::message(
-            "repo-core-3309",
-            &[
-                ("path", format!("{}", path).into()),
-                ("hash", format!("{}", short(&hash)).into()),
-            ],
-        );
+        let label = format!("Revert {path} as changed in {}", short(&hash));
         let repo = self.path.clone();
         self.start_revert(label, ctx, move || {
             let patch = git::commit_file_patch(&repo, &hash, &path)?;
@@ -60,22 +54,12 @@ impl RepoTab {
             .filter(|&h| data.lines[h].kind == diff::Kind::Hunk)
             .any(|h| diff::hunk_changes(&data.lines, h) == *lines);
         let label = if whole_hunk {
-            crate::i18n::message(
-                "repo-core-3311",
-                &[
-                    ("path", format!("{}", path).into()),
-                    ("hash", format!("{}", short(hash)).into()),
-                ],
-            )
+            format!("Revert a hunk of {path} from {}", short(hash))
         } else {
-            crate::i18n::message(
-                "repo-core-3312",
-                &[
-                    ("n", (n).into()),
-                    ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
-                    ("path", format!("{}", path).into()),
-                    ("hash", format!("{}", short(hash)).into()),
-                ],
+            format!(
+                "Revert {n} line{} of {path} from {}",
+                if n == 1 { "" } else { "s" },
+                short(hash)
             )
         };
         view.chosen.clear();
@@ -127,8 +111,14 @@ impl RepoTab {
             crate::i18n::message(
                 "repo-core-3313",
                 &[
-                    ("label", format!("{}", label).into()),
-                    ("busy", format!("{}", busy).into()),
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
+                    (
+                        "busy",
+                        crate::repo::messages::display_operation(&busy).into(),
+                    ),
                 ],
             ),
             true,
@@ -157,13 +147,22 @@ impl RepoTab {
                 (
                     crate::i18n::message(
                         "repo-core-3316",
-                        &[("label", format!("{}", label).into())],
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        )],
                     ),
                     false,
                 )
             }
             Ok((_, Reverted::Merged)) => (
-                crate::i18n::message("repo-core-3317", &[("label", format!("{}", label).into())]),
+                crate::i18n::message(
+                    "repo-core-3317",
+                    &[(
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    )],
+                ),
                 false,
             ),
             Ok((_, Reverted::Conflicts(files))) => {
@@ -177,7 +176,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-3318",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             ("files", format!("{}", files).into()),
                         ],
                     ),
@@ -188,7 +190,10 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-0270",
                     &[
-                        ("label", format!("{}", label).into()),
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        ),
                         ("e", format!("{}", e).into()),
                     ],
                 ),

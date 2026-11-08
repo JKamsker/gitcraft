@@ -152,7 +152,7 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         }
     });
     ui.add_space(6.0);
-    let mut facts: Vec<String> = vec![crate::i18n::text("repo-core-1693").to_owned()];
+    let mut facts: Vec<String> = vec!["repo-core-1693".to_owned()];
     for s in [&pair.old, &pair.new].into_iter().flatten() {
         for (k, _) in &s.facts {
             if !facts.contains(k) {
@@ -162,7 +162,7 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     }
     let value = |s: &Option<Side>, k: &str| -> Option<String> {
         let s = s.as_ref()?;
-        if k == crate::i18n::text("repo-core-1693") {
+        if k == "repo-core-1693" {
             return Some(size_text(s));
         }
         s.facts.iter().find(|(f, _)| f == k).map(|(_, v)| v.clone())
@@ -187,7 +187,14 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
             for k in &facts {
                 let (a, b) = (value(&pair.old, k), value(&pair.new, k));
                 let changed = both && a != b;
-                ui.label(RichText::new(k).color(t.text_dim));
+                ui.label(
+                    RichText::new(if k == "repo-core-1693" {
+                        crate::i18n::text("repo-core-1693")
+                    } else {
+                        k
+                    })
+                    .color(t.text_dim),
+                );
                 for (v, side, missing, color) in [
                     (&a, &pair.old, crate::i18n::text("repo-core-1695"), t.danger),
                     (

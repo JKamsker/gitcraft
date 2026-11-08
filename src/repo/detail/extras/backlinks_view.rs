@@ -57,22 +57,13 @@ pub(super) fn headline(links: &[Backlink], more: bool) -> String {
     if explicit > 0 {
         parts.push(crate::i18n::message(
             "repo-core-1071",
-            &[
-                ("explicit", format!("{}", explicit).into()),
-                (
-                    "s",
-                    format!("{}", if explicit == 1 { "" } else { "s" }).into(),
-                ),
-            ],
+            &[("explicit", (explicit).into())],
         ));
     }
     if bare > 0 {
         parts.push(crate::i18n::message(
             "repo-core-1072",
-            &[
-                ("bare", format!("{}", bare).into()),
-                ("s", format!("{}", if bare == 1 { "" } else { "s" }).into()),
-            ],
+            &[("bare", (bare).into())],
         ));
     }
     let text = parts.join(" · ");

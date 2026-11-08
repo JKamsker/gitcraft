@@ -104,7 +104,7 @@ impl RepoTab {
             Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::DvcPull => {
                 self.dialog = Some(super::Dialog::confirm(
-                    crate::i18n::text("repo-core-0020"),
+                    "DVC: Pull",
                     crate::i18n::text("repo-core-0143").into(),
                     crate::i18n::text("repo-core-0144"),
                     git::dvc::pull_steps(),
@@ -284,7 +284,7 @@ impl RepoTab {
             Action::Fetch => {
                 self.last_fetch = Instant::now();
                 self.run_ops(
-                    crate::i18n::text("repo-core-0029"),
+                    "Fetch",
                     ops(&[&["fetch", "--all", "--prune"]]),
                     Refresh::All,
                     plain,
@@ -386,7 +386,7 @@ impl RepoTab {
             Action::OpenInDiffTool(key) => self.open_in_diff_tool(key, ctx),
             Action::ResolveInMergeTool(path) => self.resolve_in_merge_tool(path, ctx),
             Action::SetIdentity(name, email) => self.run_ops(
-                crate::i18n::text("repo-core-0148"),
+                "Set identity",
                 ops(&[
                     &["config", "--local", "user.name", &name],
                     &["config", "--local", "user.email", &email],
@@ -405,7 +405,7 @@ impl RepoTab {
                 }
                 if !list.is_empty() {
                     self.run_ops(
-                        crate::i18n::text("repo-core-0154"),
+                        "Use the profile's author",
                         ops(&list),
                         Refresh::All,
                         plain,
@@ -674,10 +674,7 @@ impl RepoTab {
             Ok(added) => {
                 if tracked {
                     self.run_prepared(
-                        &crate::i18n::message(
-                            "repo-core-0155",
-                            &[("pattern", format!("{}", pattern).into())],
-                        ),
+                        &format!("Ignore {pattern}"),
                         &crate::i18n::message(
                             "repo-core-0156",
                             &[
@@ -772,7 +769,10 @@ impl RepoTab {
             pick,
             preparing: crate::i18n::message(
                 "repo-core-0166",
-                &[("label", format!("{}", label).into())],
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&label).into(),
+                )],
             ),
             label,
             started: Instant::now(),
@@ -845,7 +845,13 @@ impl RepoTab {
         };
         self.run_prepared(
             label,
-            &crate::i18n::message("repo-core-0169", &[("label", format!("{}", label).into())]),
+            &crate::i18n::message(
+                "repo-core-0169",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&label).into(),
+                )],
+            ),
             ops(&[&args]),
             Refresh::Status,
             kind,
@@ -995,7 +1001,7 @@ impl RepoTab {
         match saved {
             Ok(()) => {
                 self.run_prepared(
-                    crate::i18n::text("repo-core-0179"),
+                    "Mark resolved",
                     &crate::i18n::message(
                         "repo-core-0180",
                         &[("file", format!("{}", file).into())],
@@ -1034,7 +1040,10 @@ impl RepoTab {
                     "repo-core-0182",
                     &[
                         ("left", (left).into()),
-                        ("busy", format!("{}", busy).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
                     ],
                 ),
                 true,

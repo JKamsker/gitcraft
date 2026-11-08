@@ -126,7 +126,7 @@ impl RepoTab {
                         .any(|c| &c.hash == hash && c.parents.is_empty())
                 }) =>
             {
-                crate::i18n::text("repo-core-0278")
+                "First commit created"
             }
             Event::ReleaseTag { name, target }
                 if self
@@ -135,7 +135,7 @@ impl RepoTab {
                     .iter()
                     .any(|b| b.name == name && b.target == target) =>
             {
-                crate::i18n::text("repo-core-0279")
+                "Release tag created"
             }
             Event::Merge {
                 before,
@@ -149,7 +149,7 @@ impl RepoTab {
                     })
             }) =>
             {
-                crate::i18n::text("repo-core-0280")
+                "Merge completed"
             }
             _ => return,
         };

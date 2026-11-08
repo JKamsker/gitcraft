@@ -52,13 +52,7 @@ impl RepoTab {
 
 /// `3 files picked to stash`.
 fn picked_label(n: usize) -> String {
-    crate::i18n::message(
-        "repo-core-1153",
-        &[
-            ("n", (n).into()),
-            ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
-        ],
-    )
+    crate::i18n::message("repo-core-1153", &[("n", (n).into())])
 }
 
 /// The stash entries of the menu of the working-tree file `path`.

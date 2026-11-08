@@ -118,10 +118,7 @@ impl RepoTab {
             return;
         };
         let repo = self.path.clone();
-        let label = crate::i18n::message(
-            "repo-core-0267",
-            &[("file", format!("{}", file.display()).into())],
-        );
+        let label = format!("Export bundle to {}", file.display());
         self.bundle_job(label, Refresh::Status, ctx, move || {
             let bytes = git::export_bundle(&repo, &refs, Some(&base))?;
             git::save_bundle_file(&file, &bytes)
@@ -166,15 +163,15 @@ impl RepoTab {
         // Untrusted prerequisite descriptions are never interpreted as an authentication
         // request or used to retry a previous operation.
         self.status = Some(match result {
-            Ok(()) => (
-                crate::i18n::message("repo-core-0269", &[("label", format!("{}", label).into())]),
-                false,
-            ),
+            Ok(()) => (format!("{label}: done"), false),
             Err(e) => (
                 crate::i18n::message(
                     "repo-core-0270",
                     &[
-                        ("label", format!("{}", label).into()),
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        ),
                         ("e", format!("{}", e).into()),
                     ],
                 ),

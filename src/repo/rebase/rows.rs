@@ -372,14 +372,12 @@ impl RebaseEditor {
                             .sense(Sense::click()),
                     );
                     let label = || {
-                        crate::i18n::message(
-                            "repo-core-3249",
-                            &[
-                                ("hash", format!("{}", short(&e.commit.hash)).into()),
-                                ("summary", format!("{}", e.commit.summary).into()),
-                                ("author", format!("{}", e.commit.author).into()),
-                                ("label", format!("{}", e.step.label()).into()),
-                            ],
+                        format!(
+                            "Rebase commit {}, {}, {}, {}",
+                            short(&e.commit.hash),
+                            e.commit.summary,
+                            e.commit.author,
+                            e.step.label()
                         )
                     };
                     for response in [&hash, &avatar, &summary] {

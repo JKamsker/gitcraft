@@ -143,7 +143,7 @@ fn menu(
         .clicked()
     {
         acts.push(Action::Ops {
-            label: crate::i18n::message("repo-core-3510", &[("name", format!("{}", name).into())]),
+            label: format!("Apply {name}"),
             ops: steps(StashOp::Apply),
             refresh: Refresh::All,
         });
@@ -156,7 +156,7 @@ fn menu(
         .clicked()
     {
         acts.push(Action::Ops {
-            label: crate::i18n::message("repo-core-3512", &[("name", format!("{}", name).into())]),
+            label: format!("Pop {name}"),
             ops: steps(StashOp::Pop),
             refresh: Refresh::All,
         });
@@ -169,7 +169,7 @@ fn menu(
         .clicked()
     {
         acts.push(Action::Dialog(Dialog::confirm(
-            crate::i18n::text("repo-core-3514"),
+            "Drop stash",
             crate::i18n::message("repo-core-3515", &[("name", format!("{}", name).into())]),
             crate::i18n::text("repo-core-3197"),
             steps(StashOp::Drop),

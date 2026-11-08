@@ -114,14 +114,8 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 &[
                     (
                         "name",
-                        format!(
-                            "{}",
-                            d.forge.map_or(
-                                crate::i18n::text("repo-core-3053"),
-                                crate::forge::Forge::name
-                            )
-                        )
-                        .into(),
+                        format!("{}", d.forge.map_or("The forge", crate::forge::Forge::name))
+                            .into(),
                     ),
                     ("head-branch", format!("{}", d.head_branch).into()),
                 ],

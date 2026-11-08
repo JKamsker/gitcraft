@@ -60,7 +60,7 @@ impl RepoTab {
                 let head = &self.refs.head;
                 acts.push(Action::Dialog(
                     Dialog::confirm(
-                        crate::i18n::text("repo-core-3355"),
+                        "Hard reset",
                         String::new(),
                         crate::i18n::text("repo-core-3356"),
                         Vec::new(),

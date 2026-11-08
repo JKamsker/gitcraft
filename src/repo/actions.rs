@@ -547,13 +547,7 @@ pub(crate) fn merge_message(branch: BranchRef<'_>, current: &str) -> String {
 pub(crate) fn merge_action(branch: BranchRef<'_>, current: &str) -> Action {
     let message = merge_message(branch, current);
     Action::UndoableOps {
-        label: crate::i18n::message(
-            "repo-core-0006",
-            &[
-                ("name", format!("{}", branch.name).into()),
-                ("current", format!("{}", current).into()),
-            ],
-        ),
+        label: format!("Merge {} into {current}", branch.name),
         ops: ops(&[&["merge", "--no-edit", "-m", &message, &branch.full()]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -563,13 +557,7 @@ pub(crate) fn merge_action(branch: BranchRef<'_>, current: &str) -> Action {
 /// Moves the current branch forward to `branch`; fails (and says so) if they have diverged.
 pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message(
-            "repo-core-0011",
-            &[
-                ("current", format!("{}", current).into()),
-                ("name", format!("{}", branch.name).into()),
-            ],
-        ),
+        label: format!("Fast-forward {current} to {}", branch.name),
         ops: ops(&[&["merge", "--ff-only", &branch.full()]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -579,23 +567,14 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
     Action::AskRebase {
         onto: onto.full(),
-        label: crate::i18n::message(
-            "repo-core-0013",
-            &[
-                ("current", format!("{}", current).into()),
-                ("name", format!("{}", onto.name).into()),
-            ],
-        ),
+        label: format!("Rebase {current} onto {}", onto.name),
     }
 }
 
 /// Cherry-picks the commit `hash` onto what is checked out.
 pub(crate) fn cherry_pick_action(hash: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message(
-            "repo-core-0014",
-            &[("hash", format!("{}", super::short(hash)).into())],
-        ),
+        label: format!("Cherry-pick {}", super::short(hash)),
         ops: ops(&[&["cherry-pick", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -615,7 +594,7 @@ pub(crate) fn interactive_rebase_action(onto: BranchRef<'_>) -> Action {
 pub(super) fn abort_action(state: InProgress) -> Action {
     let what = state.label().to_lowercase();
     Action::Dialog(Dialog::confirm(
-        &crate::i18n::message("repo-core-0016", &[("what", format!("{}", what).into())]),
+        &format!("Abort {what}"),
         crate::i18n::message("repo-core-0017", &[("what", format!("{}", what).into())]),
         crate::i18n::text("repo-core-0018"),
         ops(&[&[state.command(), "--abort"]]),
@@ -631,60 +610,52 @@ impl RepoTab {
     ) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
             (
-                crate::i18n::text("repo-core-0020").into(),
+                "DVC: Pull".into(),
                 "data download remote".into(),
                 Action::DvcPull,
             ),
             (
-                crate::i18n::text("repo-core-0022").into(),
+                "Code moved across files".into(),
                 "refactor moved block".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::CodeMoves),
             ),
             (
-                crate::i18n::text("repo-core-0024").into(),
+                "File migration map".into(),
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Migration),
             ),
             (
-                crate::i18n::text("repo-core-0026").into(),
+                "Three-state staging lens".into(),
                 "staging".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Lens),
             ),
             (
-                crate::i18n::text("repo-core-0028").into(),
+                "File versions across branches".into(),
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Matrix),
             ),
-            (
-                crate::i18n::text("repo-core-0029").into(),
-                label(ctx, Command::Fetch),
-                Action::Fetch,
-            ),
-            (
-                crate::i18n::text("repo-core-0030").into(),
-                label(ctx, Command::Pull),
-                Action::Pull,
-            ),
+            ("Fetch".into(), label(ctx, Command::Fetch), Action::Fetch),
+            ("Pull".into(), label(ctx, Command::Pull), Action::Pull),
             (
                 if self.gerrit.is_some() {
-                    crate::i18n::text("repo-core-0031")
+                    "Push for review"
                 } else {
-                    crate::i18n::text("repo-core-0032")
+                    "Push"
                 }
                 .into(),
                 label(ctx, Command::Push),
                 Action::Push,
             ),
             (
-                crate::i18n::text("repo-core-0033").into(),
+                "Sync (pull, then push)".into(),
                 "remote".into(),
                 Action::Sync,
             ),
             (
                 if self.gerrit.is_some() {
-                    crate::i18n::text("repo-core-0035")
+                    "Push for review, skipping hooks"
                 } else {
-                    crate::i18n::text("repo-core-0036")
+                    "Push, skipping hooks"
                 }
                 .into(),
                 "--no-verify".into(),
@@ -699,228 +670,216 @@ impl RepoTab {
         );
         items.extend([
             (
-                crate::i18n::text("repo-core-0038").into(),
+                "Behaviour timeline…".into(),
                 "command output benchmark screenshot".into(),
                 Action::OpenBehaviour,
             ),
             (
-                crate::i18n::text("repo-core-0040").into(),
+                "Linked project copies…".into(),
                 "machines".into(),
                 Action::OpenLinkedMachines,
             ),
             (
-                crate::i18n::text("repo-core-0042").into(),
+                "Export Git bundle…".into(),
                 "offline backup".into(),
                 Action::OpenBundleExport,
             ),
             (
-                crate::i18n::text("repo-core-0044").into(),
+                "Inspect local Git bundle…".into(),
                 "offline exchange".into(),
                 Action::OpenBundleInspect,
             ),
             (
-                crate::i18n::text("repo-core-0046").into(),
+                "Stash only what is staged…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Staged)),
             ),
             (
-                crate::i18n::text("repo-core-0048").into(),
+                "Save snapshot (stash, keep the changes)…".into(),
                 "stash".into(),
                 Action::Dialog(Dialog::stash_as(StashChoice::Snapshot)),
             ),
             (
-                crate::i18n::text("repo-core-0049").into(),
+                "Distribute staged fixes…".into(),
                 "absorb".into(),
                 Action::OpenAbsorb,
             ),
+            ("Undo".into(), label(ctx, Command::Undo), Action::Undo),
+            ("Redo".into(), label(ctx, Command::Redo), Action::Redo),
             (
-                crate::i18n::text("repo-core-0051").into(),
-                label(ctx, Command::Undo),
-                Action::Undo,
-            ),
-            (
-                crate::i18n::text("repo-core-0052").into(),
-                label(ctx, Command::Redo),
-                Action::Redo,
-            ),
-            (
-                crate::i18n::text("repo-core-0053").into(),
+                "Timeline and undo tree".into(),
                 label(ctx, Command::Timeline),
                 Action::ToggleTimeline,
             ),
             (
-                crate::i18n::text("repo-core-0054").into(),
+                "Stash changes…".into(),
                 label(ctx, Command::Stash),
                 Action::Dialog(Dialog::stash()),
             ),
             (
-                crate::i18n::text("repo-core-0055").into(),
+                "Stage all changes".into(),
                 label(ctx, Command::StageAll),
                 Action::Key(Command::StageAll),
             ),
             (
-                crate::i18n::text("repo-core-0056").into(),
+                "Commit".into(),
                 label(ctx, Command::Commit),
                 Action::Key(Command::Commit),
             ),
             (
-                crate::i18n::text("repo-core-0057").into(),
+                "Search commits".into(),
                 label(ctx, Command::Search),
                 Action::ToggleSearch,
             ),
             (
-                crate::i18n::text("repo-core-0058").into(),
+                "Reflog".into(),
                 "recovery".into(),
                 Action::Reflog(reflog::ReflogAct::Show(reflog::Source::head())),
             ),
             (
-                crate::i18n::text("repo-core-0060").into(),
+                "Find lost commits".into(),
                 "recovery".into(),
                 Action::Reflog(reflog::ReflogAct::FindLost),
             ),
             (
-                crate::i18n::text("repo-core-0061").into(),
+                "Toggle terminal".into(),
                 label(ctx, Command::Terminal),
                 Action::ToggleTerminal,
             ),
             if crate::network::refused().is_some() {
                 (
-                    crate::i18n::text("repo-core-0062").into(),
+                    "Go online".into(),
                     "network offline".into(),
                     Action::SetOffline(false),
                 )
             } else {
                 (
-                    crate::i18n::text("repo-core-0064").into(),
+                    "Go offline".into(),
                     "network offline metered".into(),
                     Action::SetOffline(true),
                 )
             },
             (
-                crate::i18n::text("repo-core-0066").into(),
+                "Activity: operations and their output".into(),
                 "log".into(),
                 Action::ToggleActivity,
             ),
             (
-                crate::i18n::text("repo-core-0068").into(),
+                "New terminal".into(),
                 "terminal".into(),
                 Action::NewTerminal {
                     shell: None,
                     cwd: None,
                 },
             ),
+            ("Reload".into(), label(ctx, Command::Reload), Action::Reload),
             (
-                crate::i18n::text("repo-core-0070").into(),
-                label(ctx, Command::Reload),
-                Action::Reload,
-            ),
-            (
-                crate::i18n::text("repo-core-0071").into(),
+                "Select stale or merged branches…".into(),
                 "branch".into(),
                 Action::SelectStaleBranches,
             ),
             (
-                crate::i18n::text("repo-core-0072").into(),
-                crate::i18n::text("repo-core-0073").into(),
+                "Conflicts that can wait: isolated rebase and restack…".into(),
+                "Deferred rewrites".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Deferred),
             ),
             (
-                crate::i18n::text("repo-core-0074").into(),
-                crate::i18n::text("repo-core-0075").into(),
+                "Parallel branches in this folder: hunk ownership…".into(),
+                "Virtual branches".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Virtuals),
             ),
             (
-                crate::i18n::text("repo-core-0076").into(),
-                crate::i18n::text("repo-core-0077").into(),
+                "Inspect state publication receipts…".into(),
+                "Working-state transaction recovery".into(),
                 Action::RepositoryTools(super::repository_tools::Act::StateReceipts),
             ),
             (
-                crate::i18n::text("repo-core-0078").into(),
-                crate::i18n::text("repo-core-0079").into(),
+                "Named changelists: messages, commit and shelve…".into(),
+                "Working changes".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Lists),
             ),
             (
-                crate::i18n::text("repo-core-0080").into(),
-                crate::i18n::text("repo-core-0081").into(),
+                "Push outbox: queue exact commit or send selected entries…".into(),
+                "Offline publication".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Outbox),
             ),
             (
-                crate::i18n::text("repo-core-0082").into(),
-                crate::i18n::text("repo-core-0083").into(),
+                "Subtrees: register, update, inspect and publish vendored folders…".into(),
+                "Vendored source history".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Subtrees(String::new())),
             ),
             (
-                crate::i18n::text("repo-core-0084").into(),
-                crate::i18n::text("repo-core-0085").into(),
+                "Shared and borrowed objects".into(),
+                "Inspect shared Git directories and donors; make a clone independent".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Sharing),
             ),
             (
-                crate::i18n::text("repo-core-0086").into(),
+                "Publish submodule dependencies before parent…".into(),
                 "submodules publish remote".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Dependencies),
             ),
             (
-                crate::i18n::text("repo-core-0088").into(),
+                "Pull and push routes…".into(),
                 "triangular upstream ahead behind".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Routes(String::new())),
             ),
             (
-                crate::i18n::text("repo-core-0090").into(),
+                "Publish to several hosts…".into(),
                 "publication group retry mirrors".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Publication(String::new())),
             ),
             (
-                crate::i18n::text("repo-core-0092").into(),
+                "Remote URLs, refspecs and mirror policy…".into(),
                 "fetch push mapping prune".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Remote(String::new())),
             ),
             (
-                crate::i18n::text("repo-core-0094").into(),
+                "Replace refs and temporary history joins…".into(),
                 "grafts original effective history".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Replacements),
             ),
             (
-                crate::i18n::text("repo-core-0096").into(),
+                "Ref storage and reftable migration…".into(),
                 "refs compatibility".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Reftable),
             ),
             (
-                crate::i18n::text("repo-core-0098").into(),
+                "How an object is stored…".into(),
                 "objects pack delta file version".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Object("HEAD".into())),
             ),
             (
-                crate::i18n::text("repo-core-0101").into(),
+                "All refs and namespace history…".into(),
                 "refs internals".into(),
                 Action::RepositoryTools(super::repository_tools::Act::AllRefs(String::new())),
             ),
             (
-                crate::i18n::text("repo-core-0103").into(),
+                "Repository doctor".into(),
                 "doctor".into(),
                 Action::OpenDoctor(doctor::Section::ALL[0]),
             ),
             (
-                crate::i18n::text("repo-core-0105").into(),
+                "Start agent task…".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::OpenStart),
             ),
             (
-                crate::i18n::text("repo-core-0107").into(),
+                "Bake-off: compare attempts…".into(),
                 "agent".into(),
                 Action::Bake(super::bakeoff::BakeAct::OpenPicker),
             ),
             (
-                crate::i18n::text("repo-core-0108").into(),
+                "Agent turns: save each turn in this worktree".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::InstallHooks),
             ),
             (
-                crate::i18n::text("repo-core-0109").into(),
+                "Worktree setup…".into(),
                 "agent".into(),
                 Action::Agent(super::agents::AgentAct::OpenRecipe),
             ),
             (
-                crate::i18n::text("repo-core-0110").into(),
+                "What a package will publish".into(),
                 "cargo / npm".into(),
                 Action::Package(super::package::PackageAct::Open),
             ),
@@ -930,7 +889,7 @@ impl RepoTab {
                 Action::OpenPath(PathBuf::new()),
             ),
             (
-                crate::i18n::text("repo-core-0113").into(),
+                "Open in editor".into(),
                 "folder".into(),
                 Action::OpenInEditor(PathBuf::new()),
             ),
@@ -938,17 +897,14 @@ impl RepoTab {
         items.extend(super::popout::palette_items());
         for section in doctor::Section::ALL {
             items.push((
-                crate::i18n::message(
-                    "repo-core-0114",
-                    &[("title", format!("{}", section.title()).into())],
-                ),
+                format!("Doctor: {}", section.title()),
                 "doctor".into(),
                 Action::OpenDoctor(section),
             ));
         }
         if let Some(url) = self.web_page() {
             items.push((
-                crate::i18n::text("repo-core-0115").into(),
+                "Open in browser".into(),
                 "remote".into(),
                 Action::OpenUrl(url),
             ));
@@ -956,7 +912,7 @@ impl RepoTab {
         items.extend(self.versions_palette_item());
         if self.owners.file().is_some() {
             items.push((
-                crate::i18n::text("repo-core-0116").into(),
+                "Check CODEOWNERS".into(),
                 "owners".into(),
                 Action::Owners(super::owners::OwnersAct::Check),
             ));
@@ -964,9 +920,9 @@ impl RepoTab {
         if let Some(on) = self.rerere.enabled() {
             items.push((
                 if on {
-                    crate::i18n::text("repo-core-0118")
+                    "Stop remembering conflict resolutions (rerere)"
                 } else {
-                    crate::i18n::text("repo-core-0119")
+                    "Remember conflict resolutions (rerere)"
                 }
                 .into(),
                 "conflicts".into(),
@@ -977,29 +933,29 @@ impl RepoTab {
         let unused = self.forks.unused().len();
         if unused > 0 {
             items.push((
-                crate::i18n::message("repo-core-0121", &[("unused", (unused).into())]),
+                format!("Remove unused fork remotes ({unused})"),
                 "remote".into(),
                 Action::Fork(super::forks::ForkAct::Tidy),
             ));
         }
         if !self.submodules.is_empty() {
             items.push((
-                crate::i18n::text("repo-core-0122").into(),
+                "Update submodules".into(),
                 "submodule".into(),
                 super::keep_submodules::update_all(),
             ));
         }
         if self.unity.project().is_some() {
             items.push((
-                crate::i18n::text("repo-core-0124").into(),
+                "Unity: Set-up…".into(),
                 "settings".into(),
                 Action::Unity(super::unity::UnityAct::OpenPanel),
             ));
         }
         if self.lfs {
             for (label, args) in [
-                (crate::i18n::text("repo-core-0126"), ["lfs", "fetch"]),
-                (crate::i18n::text("repo-core-0129"), ["lfs", "pull"]),
+                ("LFS: Fetch", ["lfs", "fetch"]),
+                ("LFS: Pull", ["lfs", "pull"]),
             ] {
                 items.push((
                     label.into(),
@@ -1012,26 +968,26 @@ impl RepoTab {
                 ));
             }
             items.push((
-                crate::i18n::text("repo-core-0131").into(),
+                "LFS: Locks…".into(),
                 "remote".into(),
                 Action::LfsLocks(super::lfs_locks::LockAct::OpenPanel),
             ));
             items.push((
-                crate::i18n::text("repo-core-0132").into(),
+                "LFS: Storage…".into(),
                 "remote".into(),
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
         {
             items.push((
-                crate::i18n::text("repo-core-0133").into(),
+                "Start work from an issue…".into(),
                 "issue".into(),
                 Action::Issue(issue_work::IssueAct::OpenPicker),
             ));
         }
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push((
-                crate::i18n::text("repo-core-0135").into(),
+                "Show CI for HEAD".into(),
                 "builds".into(),
                 Action::OpenCi {
                     sha: self.refs.head.clone(),
@@ -1046,24 +1002,24 @@ impl RepoTab {
             .is_some_and(|b| b.starts_with(&self.hotfix_prefix()))
         {
             items.push((
-                crate::i18n::text("repo-core-0137").into(),
+                "Finish hotfix…".into(),
                 "release".into(),
                 Action::Hotfix(super::hotfix::HotfixAct::OpenFinish),
             ));
         }
         if !self.refs.head.is_empty() {
             items.push((
-                crate::i18n::text("repo-core-0139").into(),
+                "Cut release…".into(),
                 "release".into(),
                 Action::Release(super::release::ReleaseAct::Open(self.refs.head.clone())),
             ));
             items.push((
-                crate::i18n::text("repo-core-0140").into(),
+                "Create branch".into(),
                 label(ctx, Command::NewBranch),
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push((
-                crate::i18n::text("repo-core-0141").into(),
+                "Create tag".into(),
                 "tag".into(),
                 Action::Dialog(Dialog::tag(&self.refs.head, "HEAD", self.default_remote())),
             ));

@@ -90,12 +90,8 @@ pub(super) fn protocol_args(path: &str, before: &Path, after: &Path) -> [OsStrin
 pub(super) fn prepare(old: &str, new: &str) -> Result<(Temp, PathBuf, PathBuf), String> {
     let temp = Temp::new()?;
     let (before, after) = (
-        temp.0
-            .join(crate::i18n::text("repo-core-2049"))
-            .join("source"),
-        temp.0
-            .join(crate::i18n::text("repo-core-2050"))
-            .join("source"),
+        temp.0.join("before").join("source"),
+        temp.0.join("after").join("source"),
     );
     for (file, text) in [(&before, old), (&after, new)] {
         std::fs::write(file, text).map_err(|e| {
@@ -190,10 +186,7 @@ impl Temp {
             match builder.create(&path) {
                 Ok(()) => {
                     let temp = Self(path);
-                    for side in [
-                        crate::i18n::text("repo-core-2049"),
-                        crate::i18n::text("repo-core-2050"),
-                    ] {
+                    for side in ["before", "after"] {
                         std::fs::create_dir(temp.0.join(side)).map_err(|e| e.to_string())?;
                     }
                     return Ok(temp);

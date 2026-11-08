@@ -27,7 +27,10 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                 &crate::i18n::message(
                     "repo-core-1895",
                     &[
-                        ("label", format!("{}", label).into()),
+                        (
+                            "label",
+                            crate::repo::messages::display_operation(&label).into(),
+                        ),
                         ("label2", format!("{}", cell.kind.label()).into()),
                         (
                             "execution-count",

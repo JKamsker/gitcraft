@@ -79,7 +79,7 @@ pub(super) fn review(
         plan.is_ok(),
         false,
         || Action::Ops {
-            label: crate::i18n::text("repo-core-0031").to_owned(),
+            label: "Push for review".to_owned(),
             ops: plan.unwrap_or_default(),
             refresh: Refresh::All,
         },

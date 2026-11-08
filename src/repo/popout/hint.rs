@@ -47,7 +47,7 @@ fn chip(ui: &mut egui::Ui, t: &Tokens, panel: Panel, acts: &mut Vec<Action>) {
             egui::Label::new(RichText::new(text).size(12.0).color(t.text_dim))
                 .sense(Sense::click()),
         )
-        .on_hover_text(crate::i18n::text("repo-core-3042"));
+        .on_hover_text("Show that window");
     crate::a11y::a11y(&label, egui::WidgetType::Button, || {
         crate::i18n::message(
             "repo-core-3043",

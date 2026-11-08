@@ -120,7 +120,10 @@ impl RepoTab {
                 "repo-core-2459",
                 &[
                     ("file", format!("{}", file).into()),
-                    ("label", format!("{}", label).into()),
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
                     ("refreshes", format!("{}", refreshes).into()),
                     ("path", format!("{}", where_it_runs(&self.path)).into()),
                 ],
@@ -157,7 +160,10 @@ impl RepoTab {
             crate::i18n::message(
                 "repo-core-2461",
                 &[
-                    ("label", format!("{}", label).into()),
+                    (
+                        "label",
+                        crate::repo::messages::display_operation(&label).into(),
+                    ),
                     ("path", format!("{}", path).into()),
                     ("path2", format!("{}", where_it_runs(&self.path)).into()),
                 ],
@@ -196,7 +202,10 @@ impl RepoTab {
                         "repo-core-2462",
                         &[
                             ("path", format!("{}", path).into()),
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                         ],
                     ),
                     false,

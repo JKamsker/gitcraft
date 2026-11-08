@@ -44,7 +44,8 @@ impl RepoTab {
         if !open {
             return;
         }
-        if let Some(err) = &self.pr_error {
+        if let Some(raw_error) = &self.pr_error {
+            let err = crate::forge::inbox::display_error(raw_error);
             let (rect, r) =
                 ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
             ui.painter_at(rect).text(

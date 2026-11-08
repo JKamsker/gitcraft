@@ -194,13 +194,7 @@ impl ConflictEditor {
                 .clicked()
             {
                 acts.push(Action::Ops {
-                    label: crate::i18n::message(
-                        "repo-core-0729",
-                        &[
-                            ("label", format!("{}", label).into()),
-                            ("path", format!("{}", self.path).into()),
-                        ],
-                    ),
+                    label: format!("{label} for {}", self.path),
                     ops: ops(&[
                         // Not `--literal-pathspecs`: checkout runs the post-checkout hook.
                         &["checkout", side, "--", &literal_path(&self.path)],

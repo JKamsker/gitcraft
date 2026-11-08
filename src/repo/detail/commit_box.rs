@@ -143,16 +143,7 @@ impl RepoTab {
         } else if self.amend {
             crate::i18n::text("repo-core-0894").to_owned()
         } else if staged > 0 {
-            crate::i18n::message(
-                "repo-core-0902",
-                &[
-                    ("staged", format!("{}", staged).into()),
-                    (
-                        "s",
-                        format!("{}", if staged == 1 { "" } else { "s" }).into(),
-                    ),
-                ],
-            )
+            crate::i18n::message("repo-core-0902", &[("staged", (staged).into())])
         } else {
             crate::i18n::text("repo-core-0903").to_owned()
         };

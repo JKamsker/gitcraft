@@ -230,7 +230,7 @@ impl RepoTab {
         {
             acts.push(Action::Dialog(
                 Dialog::confirm(
-                    crate::i18n::text("repo-core-3491"),
+                    "Delete remote branch",
                     crate::i18n::message(
                         "repo-core-3492",
                         &[
@@ -341,10 +341,7 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
     .clicked()
     {
         acts.push(Action::Ops {
-            label: crate::i18n::message(
-                "repo-core-3495",
-                &[("name", format!("{}", remote.name).into())],
-            ),
+            label: format!("Fetch {}", remote.name),
             ops: ops(&[&["fetch", "--prune", &remote.name]]),
             refresh: Refresh::All,
         });
@@ -383,7 +380,7 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
         .clicked()
     {
         acts.push(Action::Dialog(Dialog::confirm(
-            crate::i18n::text("repo-core-3500"),
+            "Remove remote",
             crate::i18n::message(
                 "repo-core-3501",
                 &[
@@ -407,7 +404,7 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
     widgets::a11y(&resp, egui::WidgetType::Button, || {
         let name = crate::i18n::message(
             "repo-core-2595",
-            &[("full", format!("{}", labels::ref_name(full)).into())],
+            &[("git-ref", format!("{}", labels::ref_name(full)).into())],
         );
         let notes = [
             (has_pr, crate::i18n::text("repo-core-3418")),

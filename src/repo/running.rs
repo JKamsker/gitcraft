@@ -48,9 +48,9 @@ impl Waiter {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::Fetch => crate::i18n::text("repo-core-0029"),
+            Self::Fetch => "Fetch",
             Self::Pull(mode) => mode.label(),
-            Self::Push => crate::i18n::text("repo-core-0032"),
+            Self::Push => "Push",
         }
     }
 
@@ -135,7 +135,10 @@ impl RepoTab {
                     &[
                         ("label", format!("{}", waiter.label()).into()),
                         ("MAX-WAITING", format!("{}", MAX_WAITING).into()),
-                        ("busy", format!("{}", busy).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
                     ],
                 ),
                 true,

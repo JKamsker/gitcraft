@@ -120,15 +120,7 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                 });
             if let Some(d) = data {
                 let (behind, ahead) = d.apart;
-                let commits = |n: u32| {
-                    crate::i18n::message(
-                        "repo-core-0932",
-                        &[
-                            ("n", (n).into()),
-                            ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
-                        ],
-                    )
-                };
+                let commits = |n: u32| crate::i18n::message("repo-core-0932", &[("n", (n).into())]);
                 let other = if c.target.is_some() {
                     target_name
                 } else {

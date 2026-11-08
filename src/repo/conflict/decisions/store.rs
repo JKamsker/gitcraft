@@ -193,10 +193,6 @@ pub fn sync(repo: &Path, remote: &str, send: bool) -> Result<String, String> {
         &[
             ("got", format!("{}", got).into()),
             ("count", (mine.len()).into()),
-            (
-                "s",
-                format!("{}", if mine.len() == 1 { "" } else { "s" }).into(),
-            ),
             ("remote", format!("{}", remote).into()),
         ],
     ))

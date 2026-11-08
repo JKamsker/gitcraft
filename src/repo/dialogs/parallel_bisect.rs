@@ -259,10 +259,7 @@ fn machine(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
     let home = Machine::of(&form.repo);
     let label = |m: &Machine| {
         if *m == home {
-            crate::i18n::message(
-                "repo-core-1418",
-                &[("label", format!("{}", capital(&m.label())).into())],
-            )
+            format!("{} (where the repository is)", capital(&m.label()))
         } else {
             capital(&m.label())
         }

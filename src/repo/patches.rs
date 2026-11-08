@@ -79,7 +79,10 @@ impl RepoTab {
                 "repo-core-3022",
                 &[
                     ("name", format!("{}", self.name).into()),
-                    ("busy", format!("{}", busy).into()),
+                    (
+                        "busy",
+                        crate::repo::messages::display_operation(&busy).into(),
+                    ),
                 ],
             ));
         }
@@ -151,10 +154,7 @@ impl RepoTab {
                 return;
             }
         };
-        let label = crate::i18n::message(
-            "repo-core-3026",
-            &[("file", format!("{}", file_name(&file)).into())],
-        );
+        let label = format!("Apply {}", file_name(&file));
         let mail = is_mail(&String::from_utf8_lossy(&bytes));
         // For a repository on another machine, git there reads a copy put there (in the
         // background). A panic there still comes back as an error, so that a dropped patch
@@ -209,7 +209,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-core-0270",
                         &[
-                            ("label", format!("{}", label).into()),
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
                             ("e", format!("{}", e).into()),
                         ],
                     ),

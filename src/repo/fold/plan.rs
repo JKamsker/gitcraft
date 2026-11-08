@@ -122,15 +122,9 @@ impl Plan {
     /// What the operation is called, in the status line and the undo history.
     pub(crate) fn label(&self) -> String {
         if self.keep_fixup {
-            crate::i18n::message(
-                "repo-core-2529",
-                &[("hash", format!("{}", short(&self.target.hash)).into())],
-            )
+            format!("Commit fixup! for {}", short(&self.target.hash))
         } else {
-            crate::i18n::message(
-                "repo-core-2530",
-                &[("hash", format!("{}", short(&self.target.hash)).into())],
-            )
+            format!("Fold into {}", short(&self.target.hash))
         }
     }
 
@@ -332,10 +326,7 @@ impl Stopped {
         UndoEntry {
             id: 0,
             agent: None,
-            label: crate::i18n::message(
-                "repo-core-2538",
-                &[("label", format!("{}", self.label).into())],
-            ),
+            label: format!("{} (its fixup! commit)", self.label),
             undo: vec![on_branch.clone(), soft_reset(&self.before)],
             redo: vec![on_branch, soft_reset(fixup)],
             heads: Some((self.before.clone(), fixup.to_owned())),

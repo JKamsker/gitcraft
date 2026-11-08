@@ -17,7 +17,7 @@ pub(crate) struct Rewrite<'a> {
 
 pub(crate) fn cherry_pick_action(hash: &str, short: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message("repo-core-0370", &[("short", format!("{}", short).into())]),
+        label: format!("Cherry-pick {short}"),
         ops: ops(&[&["cherry-pick", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -26,7 +26,7 @@ pub(crate) fn cherry_pick_action(hash: &str, short: &str) -> Action {
 
 pub(crate) fn revert_action(hash: &str, short: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message("repo-core-0371", &[("short", format!("{}", short).into())]),
+        label: format!("Revert {short}"),
         ops: ops(&[&["revert", "--no-edit", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -45,28 +45,28 @@ pub(crate) struct ResetMode {
 
 pub(crate) const RESET_MODES: [ResetMode; 4] = [
     ResetMode {
-        label: "repo-core-0373",
+        label: "Soft",
         short: "repo-core-0374",
         explain: "repo-core-0375",
         mode: "--soft",
         undo_mode: "--soft",
     },
     ResetMode {
-        label: "repo-core-0376",
+        label: "Mixed",
         short: "repo-core-0377",
         explain: "repo-core-0378",
         mode: "--mixed",
         undo_mode: "--mixed",
     },
     ResetMode {
-        label: "repo-core-0380",
+        label: "Keep",
         short: "repo-core-0381",
         explain: "repo-core-0382",
         mode: "--keep",
         undo_mode: "--keep",
     },
     ResetMode {
-        label: "repo-core-0383",
+        label: "Hard",
         short: "repo-core-0384",
         explain: "repo-core-0385",
         mode: "--hard",
@@ -85,10 +85,7 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
     } = *r;
     Action::Dialog(
         Dialog::confirm(
-            &crate::i18n::message(
-                "repo-core-0387",
-                &[("label", format!("{}", crate::i18n::text(mode.label)).into())],
-            ),
+            &format!("{} reset", mode.label),
             crate::i18n::message(
                 "repo-core-0388",
                 &[
@@ -105,7 +102,11 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
                 "repo-core-0389",
                 &[(
                     "to-lowercase",
-                    format!("{}", crate::i18n::text(mode.label).to_lowercase()).into(),
+                    format!(
+                        "{}",
+                        super::messages::display_operation(mode.label).to_lowercase()
+                    )
+                    .into(),
                 )],
             ),
             reset_steps(mode.mode, hash, target, head),
@@ -145,7 +146,7 @@ mod tests {
         assert_eq!(RESET_MODES.len(), 4);
         let keep = RESET_MODES
             .iter()
-            .find(|m| m.label == "repo-core-0380")
+            .find(|m| m.label == "Keep")
             .ok_or("Missing Keep reset")?;
         assert_eq!(keep.mode, "--keep");
         assert_eq!(keep.undo_mode, "--keep");

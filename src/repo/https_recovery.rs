@@ -118,7 +118,7 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-core-2808",
                     &[(
-                        crate::i18n::text("repo-core-0290"),
+                        "failed",
                         format!(
                             "{}",
                             if result.is_ok() {
