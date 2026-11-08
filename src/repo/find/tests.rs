@@ -649,4 +649,28 @@ fn actual_markdown_diff_opens_find_and_marks_rendered_content() {
     });
     output.drop_without_applying_deltas();
     assert_eq!(tab.find.count(), 0);
+    let request = tab.diff.as_ref().map(|v| v.request);
+    if let Some(view) = &mut tab.diff {
+        view.rendered_load += 1;
+        view.rendered = Some(Ok(crate::repo::diff::rendered::RenderedMd {
+            file: "# Replacement visible words".into(),
+            blocks: vec![(
+                crate::repo::diff::rendered::Change::Added,
+                "# Replacement visible words".into(),
+            )],
+            before: false,
+            images: Vec::new(),
+        }));
+    }
+    tab.find.query.text = "Replacement".into();
+    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        tab.diff_view(ui, &mut Vec::new())
+    });
+    output.drop_without_applying_deltas();
+    assert_eq!(request, tab.diff.as_ref().map(|v| v.request));
+    assert_eq!(
+        tab.find.count(),
+        1,
+        "accepted Markdown reread must replace the cached text under the same diff request"
+    );
 }

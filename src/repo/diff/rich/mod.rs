@@ -322,4 +322,10 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
         });
 }
 
-pub(in crate::repo) use search::document as search_document;
+pub(in crate::repo) use search::with_state as search_document;
+impl RichState {
+    pub(in crate::repo) fn search_generation(&mut self, ctx: &egui::Context) -> u64 {
+        self.metadata.poll(ctx);
+        self.metadata.generation()
+    }
+}

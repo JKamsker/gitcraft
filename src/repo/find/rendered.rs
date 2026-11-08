@@ -8,59 +8,100 @@ use egui::{Color32, FontId, Ui};
 #[derive(Default)]
 pub(in crate::repo) struct Document {
     pub rows: Vec<LayoutJob>,
+    segments: Vec<Segment>,
+    bytes: usize,
+    limited: bool,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct Segment {
+    pub line: usize,
+    pub bytes: std::ops::Range<usize>,
+    pub chars: std::ops::Range<usize>,
+}
+impl Segment {
+    fn job(&self, source: &LayoutJob) -> LayoutJob {
+        let mut part = LayoutJob {
+            text: source.text[self.bytes.clone()].to_owned(),
+            ..Default::default()
+        };
+        let first = source
+            .sections
+            .partition_point(|s| s.byte_range.end.0 <= self.bytes.start);
+        for section in source.sections[first..]
+            .iter()
+            .take_while(|s| s.byte_range.start.0 < self.bytes.end)
+        {
+            let (a, b) = (
+                section.byte_range.start.0.max(self.bytes.start),
+                section.byte_range.end.0.min(self.bytes.end),
+            );
+            if a < b {
+                let mut section = section.clone();
+                section.byte_range = egui::text::ByteIndex(a - self.bytes.start)
+                    ..egui::text::ByteIndex(b - self.bytes.start);
+                part.sections.push(section);
+            }
+        }
+        part
+    }
 }
 impl Document {
-    /// Split very long text into complete searchable rows, preserving UTF-8 and inline styles.
+    /// Logical rows remain whole for matching. Only visible display segments are sliced.
     fn bound_rows(&mut self) {
         let limit = crate::repo::highlight::MAX_LINE_CHARS;
-        self.rows = std::mem::take(&mut self.rows)
-            .into_iter()
-            .flat_map(|job| {
-                let mut out = Vec::new();
-                let mut start = 0;
-                while start < job.text.len() {
-                    let end = job.text[start..]
-                        .char_indices()
-                        .nth(limit)
-                        .map_or(job.text.len(), |(n, _)| start + n);
-                    let mut part = LayoutJob {
-                        text: job.text[start..end].to_owned(),
-                        ..Default::default()
-                    };
-                    for section in &job.sections {
-                        let a = section.byte_range.start.0.max(start);
-                        let b = section.byte_range.end.0.min(end);
-                        if a < b {
-                            let mut section = section.clone();
-                            section.byte_range =
-                                egui::text::ByteIndex(a - start)..egui::text::ByteIndex(b - start);
-                            part.sections.push(section);
-                        }
-                    }
-                    out.push(part);
-                    start = end;
+        for (line, job) in self.rows.iter().enumerate() {
+            let (mut byte, mut chars, mut count) = (0, 0, 0);
+            for (end, _) in job.text.char_indices() {
+                if count == limit {
+                    self.segments.push(Segment {
+                        line,
+                        bytes: byte..end,
+                        chars: chars..chars + count,
+                    });
+                    byte = end;
+                    chars += count;
+                    count = 0;
                 }
-                if out.is_empty() {
-                    out.push(job);
-                }
-                out
-            })
-            .collect();
+                count += 1;
+            }
+            self.segments.push(Segment {
+                line,
+                bytes: byte..job.text.len(),
+                chars: chars..chars + count,
+            });
+        }
+    }
+    fn push(&mut self, job: LayoutJob) {
+        // Reject an over-budget reading explicitly rather than allocating millions of
+        // LayoutJobs or presenting a truncated document as complete search results.
+        if self.limited {
+            return;
+        }
+        self.bytes = self.bytes.saturating_add(job.text.len());
+        if self.rows.len() >= 32768 || self.bytes > 20 << 20 {
+            self.limited = true;
+            self.rows.clear();
+            return;
+        }
+        self.rows.push(job);
     }
     pub fn job(&mut self, mut job: LayoutJob) {
         job.text = job.text.replace(['\n', '\r'], " ");
         job.wrap.max_width = f32::INFINITY;
-        self.rows.push(job);
+        self.push(job);
     }
     pub fn text(&mut self, text: &str, color: Color32) {
         for line in text.lines() {
+            if self.limited {
+                break;
+            }
             let mut job = LayoutJob::default();
             job.append(
                 line,
                 0.0,
                 TextFormat::simple(FontId::proportional(14.0), color),
             );
-            self.rows.push(job);
+            self.push(job);
         }
     }
     pub fn markdown(&mut self, markdown: &str, color: Color32) {
@@ -74,12 +115,15 @@ impl Document {
         let mut link = 0usize;
         let flush = |doc: &mut Self, job: &mut LayoutJob| {
             if !job.text.is_empty() {
-                doc.rows.push(std::mem::take(job));
+                doc.push(std::mem::take(job));
             }
         };
         for event in
             pulldown_cmark::Parser::new_ext(markdown, crate::pull_request::markdown_options())
         {
+            if self.limited {
+                break;
+            }
             match event {
                 Event::Start(Tag::Heading { .. }) => {
                     flush(self, &mut job);
@@ -151,6 +195,11 @@ impl Document {
                         job.append(line, 0.0, format);
                     }
                 }
+                Event::FootnoteReference(text) => job.append(
+                    &format!("[{text}]"),
+                    0.0,
+                    TextFormat::simple(FontId::proportional(14.0), color),
+                ),
                 Event::Code(text) => job.append(
                     &text,
                     0.0,
@@ -195,6 +244,18 @@ impl Find {
             .small()
             .color(t.text_dim),
         );
+        if doc.limited {
+            self.drop_results();
+            ui.label("Rendered Find is unavailable: this reading exceeds 32768 logical rows or 20 MiB of rendered text. Close Find to use the original view; no partial result count is shown.");
+            self.rendered_document = Some((key, doc));
+            return;
+        }
+        if let Some(hit) = self.current
+            && let Some(row) = doc.rows.get(hit.line)
+            && ui.small_button("Copy current reading row").clicked()
+        {
+            ui.ctx().copy_text(row.text.clone());
+        }
         let source = SourceKey {
             what: Source::Rendered(key.clone()),
             at: doc.rows.as_ptr() as usize,
@@ -205,20 +266,27 @@ impl Find {
             source,
             doc.rows.len(),
             |i| doc.rows.get(i).map(|j| j.text.as_str()),
-            Layout::Lines,
+            Layout::Rendered(&doc.segments),
         );
         let mut scroll = egui::ScrollArea::both()
             .id_salt(("find-rendered", &key))
             .auto_shrink(false);
         if let Some(hit) = self.take_reveal() {
-            if let Some(row) = doc.rows.get(hit.line) {
-                let galley = ui.fonts_mut(|f| f.layout_job(row.clone()));
+            if let Some(segment) = doc.segments.get(hit.row) {
+                let row = segment.job(&doc.rows[segment.line]);
+                let galley = ui.fonts_mut(|f| f.layout_job(row));
                 let left = galley
-                    .pos_from_cursor(egui::text::CCursor::new(hit.start))
+                    .pos_from_cursor(egui::text::CCursor::new(
+                        hit.start.saturating_sub(segment.chars.start),
+                    ))
                     .left()
                     + 12.0;
                 let right = galley
-                    .pos_from_cursor(egui::text::CCursor::new(hit.end))
+                    .pos_from_cursor(egui::text::CCursor::new(
+                        hit.end
+                            .min(segment.chars.end)
+                            .saturating_sub(segment.chars.start),
+                    ))
                     .right()
                     + 12.0;
                 if left < self.seen.x || right > self.seen.x + ui.available_width() {
@@ -231,9 +299,38 @@ impl Find {
             );
         }
         ui.spacing_mut().item_spacing.y = 0.0;
-        let result = scroll.show_rows(ui, 24.0, doc.rows.len(), |ui, range| {
+        let result = scroll.show_rows(ui, 24.0, doc.segments.len(), |ui, range| {
             for index in range {
-                let galley = ui.fonts_mut(|f| f.layout_job(doc.rows[index].clone()));
+                let segment = &doc.segments[index];
+                let galley = ui.fonts_mut(|f| f.layout_job(segment.job(&doc.rows[segment.line])));
+                let marks = self.marks(segment.line);
+                let ranges: Vec<_> = marks
+                    .iter()
+                    .flat_map(|m| m.ranges)
+                    .filter_map(|r| {
+                        let (a, b) = (
+                            r.start.max(segment.chars.start),
+                            r.end.min(segment.chars.end),
+                        );
+                        (a < b).then(|| a - segment.chars.start..b - segment.chars.start)
+                    })
+                    .collect();
+                let current = self
+                    .current
+                    .filter(|h| h.line == segment.line)
+                    .and_then(|hit| {
+                        let (a, b) = (
+                            hit.start.max(segment.chars.start),
+                            hit.end.min(segment.chars.end),
+                        );
+                        (a < b)
+                            .then(|| {
+                                ranges.iter().position(|r| {
+                                    *r == (a - segment.chars.start..b - segment.chars.start)
+                                })
+                            })
+                            .flatten()
+                    });
                 let (rect, _) = ui.allocate_exact_size(
                     egui::vec2(ui.available_width().max(galley.size().x + 24.0), 24.0),
                     egui::Sense::hover(),
@@ -242,7 +339,10 @@ impl Find {
                     ui.painter(),
                     (rect.left() + 12.0, rect.center().y, 24.0),
                     galley,
-                    self.marks(index),
+                    (!ranges.is_empty()).then_some(super::LineMarks {
+                        ranges: &ranges,
+                        current,
+                    }),
                     &t,
                 );
             }
@@ -343,7 +443,8 @@ mod tests {
         let text = "é".repeat(crate::repo::highlight::MAX_LINE_CHARS + 10);
         doc.text(&text, Color32::WHITE);
         doc.bound_rows();
-        assert_eq!(doc.rows.len(), 2);
+        assert_eq!(doc.rows.len(), 1);
+        assert_eq!(doc.segments.len(), 2);
         assert_eq!(
             doc.rows.iter().map(|j| j.text.as_str()).collect::<String>(),
             text
@@ -357,5 +458,128 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod revision_tests {
+    use super::*;
+    use crate::repo::find::Query;
+    fn search(text: &str, query: Query) -> Find {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut find = Find {
+            open: true,
+            query,
+            ..Default::default()
+        };
+        for _ in 0..2 {
+            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                find.rendered(ui, "logical-source".into(), |t| {
+                    let mut doc = Document::default();
+                    doc.text(text, t.text);
+                    doc
+                })
+            });
+            output.drop_without_applying_deltas();
+        }
+        find
+    }
+    #[test]
+    fn logical_matches_cross_visual_cuts_without_inventing_regex_or_word_boundaries() {
+        let text = format!("{}needlex", "é".repeat(4997));
+        let find = search(
+            &text,
+            Query {
+                text: "needle".into(),
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.count(), 1);
+        assert_eq!(
+            find.current().map(|h| (h.start, h.end, h.row)),
+            Some((4997, 5003, 0))
+        );
+        let find = search(
+            &text,
+            Query {
+                text: "needle".into(),
+                whole_word: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.count(), 0);
+        let text = format!("{}needle", "x".repeat(5000));
+        let find = search(
+            &text,
+            Query {
+                text: "needle".into(),
+                whole_word: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.count(), 0);
+        let find = search(
+            &text,
+            Query {
+                text: "^needle".into(),
+                regex: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.count(), 0);
+        let text = format!("{}needle{}", "x".repeat(4994), "x".repeat(10));
+        let find = search(
+            &text,
+            Query {
+                text: "needle$".into(),
+                regex: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.count(), 0);
+        let find = search(
+            &format!("{} needle", "é".repeat(10005)),
+            Query {
+                text: "needle".into(),
+                ..Default::default()
+            },
+        );
+        assert_eq!(find.current().map(|h| (h.start, h.row)), Some((10006, 2)));
+    }
+    #[test]
+    fn near_limit_many_line_documents_refuse_explicitly_without_retaining_millions_of_jobs() {
+        let source = "x\n".repeat(4 << 20);
+        let mut doc = Document::default();
+        doc.text(&source, Color32::WHITE);
+        assert!(doc.limited);
+        assert!(doc.rows.is_empty());
+        let ctx = egui::Context::default();
+        let mut find = Find {
+            open: true,
+            query: Query {
+                text: "x".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            find.rendered(ui, "bounded".into(), |_| std::mem::take(&mut doc))
+        });
+        let text = output
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let egui::Shape::Text(t) = &s.shape {
+                    Some(t.galley.text())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("no partial result count"), "{text}");
+        assert_eq!(find.count(), 0);
+        output.drop_without_applying_deltas();
     }
 }

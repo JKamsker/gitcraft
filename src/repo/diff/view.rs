@@ -107,7 +107,10 @@ impl RepoTab {
                     if self.find.open {
                         self.find.rendered(
                             ui,
-                            format!("markdown:{:?}:{}:{as_file}", view.key, view.request),
+                            format!(
+                                "markdown:{:?}:{}:{}:{as_file}",
+                                view.key, view.request, view.rendered_load
+                            ),
                             |t| {
                                 let mut doc = find::rendered::Document::default();
                                 if as_file {
@@ -195,11 +198,15 @@ impl RepoTab {
                     return;
                 }
                 Some((_, Ok(rich::Rich::Ready(diff)))) => {
+                    let metadata_generation = view.rich_state.search_generation(ui.ctx());
                     if self.find.open {
                         self.find.rendered(
                             ui,
-                            format!("rich:{:?}:{}:{}", view.key, view.request, view.rich_load),
-                            |t| rich::search_document(diff, t),
+                            format!(
+                                "rich:{:?}:{}:{}:{metadata_generation}",
+                                view.key, view.request, view.rich_load
+                            ),
+                            |t| rich::search_document(diff, &view.rich_state, t),
                         );
                     } else {
                         rich::show(ui, diff, &mut view.rich_state, acts);

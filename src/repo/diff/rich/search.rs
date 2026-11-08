@@ -16,8 +16,8 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                     prose::Part::Removed { text, .. } => {
                         doc.text(&format!("Removed · {text}"), t.danger)
                     }
-                    prose::Part::Changed { .. } => {
-                        doc.job(super::prose_view::part_job(part, t, f32::INFINITY))
+                    prose::Part::Changed { words, .. } => {
+                        doc.job(super::prose_view::search_changed(words, t))
                     }
                 }
             }
@@ -95,6 +95,9 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
             for (old, new) in &d.pairs {
                 for (side, item) in [("Before", old), ("After", new)] {
                     if let Some(item) = item {
+                        if let Some(files) = item.files {
+                            doc.text(&format!("{side}: a folder of {files} files"), t.text);
+                        }
                         doc.text(
                             &format!(
                                 "{side} · {} · {} · {} · {}",
@@ -111,6 +114,18 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                 }
             }
         }
+    }
+    doc
+}
+
+pub(in crate::repo) fn with_state(
+    diff: &RichDiff,
+    state: &super::RichState,
+    t: &Tokens,
+) -> Document {
+    let mut doc = document(diff, t);
+    if matches!(diff, RichDiff::Deps(_)) {
+        state.metadata.append_document(&mut doc, t);
     }
     doc
 }
@@ -169,6 +184,53 @@ mod tests {
             }],
         }));
         assert!(shown.contains("GET /users") && shown.contains("Removed endpoint"));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod revision_tests {
+    use super::*;
+    #[test]
+    fn changed_prose_search_retains_styled_tail_after_normal_display_cutoff() {
+        let mut words = vec![(super::super::words::Change::Kept, "a ".into()); 11000];
+        words.push((super::super::words::Change::Added, "TAIL_NEEDLE".into()));
+        let prose = super::super::prose::ProseDiff {
+            parts: vec![prose::Part::Changed {
+                old: 1,
+                new: 1,
+                words,
+            }],
+            ..Default::default()
+        };
+        let doc = document(
+            &RichDiff::Prose(prose),
+            &Tokens::get(&egui::Context::default()),
+        );
+        assert!(doc.rows.iter().any(|r| r.text.ends_with("TAIL_NEEDLE")));
+        assert!(
+            doc.rows.last().is_some_and(|r| r.sections.len() < 10),
+            "consecutive word styles should coalesce"
+        );
+    }
+    #[test]
+    fn dvc_folder_file_counts_are_part_of_the_reading() -> Result<(), String> {
+        let data = super::super::dvc::diff(&super::super::Sides {
+            old: Some("outs:\n  - path: data\n    nfiles: 1729\n    md5: a.dir\n".into()),
+            new: Some("outs:\n  - path: data\n    nfiles: 1730\n    md5: b.dir\n".into()),
+        })?;
+        let doc = document(
+            &RichDiff::Dvc(data),
+            &Tokens::get(&egui::Context::default()),
+        );
+        let text = doc
+            .rows
+            .iter()
+            .map(|r| r.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Before: a folder of 1729 files"));
+        assert!(text.contains("After: a folder of 1730 files"));
         Ok(())
     }
 }

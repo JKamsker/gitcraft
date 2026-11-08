@@ -97,14 +97,16 @@ impl Scan {
             for i in self.next..end {
                 let Some(text) = line(i) else { continue };
                 // A line cut to be shown has a note on its end, which isn't searched.
-                let text = if text.len() <= MAX_LINE_CHARS {
+                let text = if matches!(self.key.what, Source::Rendered(_))
+                    || text.len() <= MAX_LINE_CHARS
+                {
                     text
                 } else {
                     text.char_indices()
                         .nth(MAX_LINE_CHARS)
                         .map_or(text, |(at, _)| &text[..at])
                 };
-                let mut hits = matcher.find(text);
+                let mut hits = matcher.find_limited(text, MAX_HITS - self.count);
                 if hits.is_empty() {
                     continue;
                 }

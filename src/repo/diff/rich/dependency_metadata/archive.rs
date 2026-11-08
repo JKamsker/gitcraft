@@ -5,7 +5,15 @@ use std::io::Read;
 const MAX_EXPANDED: u64 = 32 << 20;
 const MAX_TEXT: usize = 512 << 10;
 
-pub(super) fn texts(bytes: &[u8]) -> Result<BTreeMap<String, String>, String> {
+#[derive(Default)]
+pub(super) struct Texts {
+    pub files: BTreeMap<String, String>,
+    pub skipped: BTreeMap<String, String>,
+}
+pub(super) fn texts(bytes: &[u8]) -> Result<Texts, String> {
+    texts_with(bytes, None)
+}
+pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, String> {
     let mut tar = Vec::new();
     flate2::read::GzDecoder::new(bytes)
         .take(MAX_EXPANDED + 1)
@@ -14,7 +22,7 @@ pub(super) fn texts(bytes: &[u8]) -> Result<BTreeMap<String, String>, String> {
     if tar.len() as u64 > MAX_EXPANDED {
         return Err("Expanded package exceeds 32 MiB".into());
     }
-    let mut files = BTreeMap::new();
+    let mut result = Texts::default();
     let mut at = 0usize;
     let mut long = None;
     let mut retained = 0usize;
@@ -64,27 +72,56 @@ pub(super) fn texts(bytes: &[u8]) -> Result<BTreeMap<String, String>, String> {
                         .find_map(|l| l.split_once(" path=").map(|(_, v)| v.to_owned()))
                 });
             }
-            b'0' | 0 if size <= MAX_TEXT => {
+            b'0' | 0 => {
                 if let Some((_, path)) = name.split_once('/') {
                     if path.split('/').any(|p| matches!(p, "." | ".." | "")) || path.contains('\\')
                     {
                         return Err("Unsafe package member path".into());
                     }
                     let leaf = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
-                    let wanted = matches!(path, "Cargo.toml" | "package.json")
+                    let wanted = Some(path) == extra
+                        || matches!(path, "Cargo.toml" | "package.json")
                         || leaf.starts_with("changelog")
                         || leaf.starts_with("changes")
                         || leaf.starts_with("history")
                         || leaf.starts_with("release-notes");
                     if wanted {
-                        retained += size;
-                        if retained > 2 << 20 || files.len() >= 16 {
-                            return Err("Too much package metadata".into());
-                        }
-                        let text = std::str::from_utf8(body)
-                            .map_err(|_| "Package metadata is not UTF-8")?;
-                        if files.insert(path.to_owned(), text.to_owned()).is_some() {
+                        if result.files.contains_key(path) || result.skipped.contains_key(path) {
                             return Err("Duplicate package metadata member".into());
+                        }
+                        let manifest = matches!(path, "Cargo.toml" | "package.json");
+                        let reason = if size > MAX_TEXT {
+                            Some(format!(
+                                "included, but exceeds the 512 KiB text limit ({size} bytes)"
+                            ))
+                        } else if !manifest
+                            && (retained + size > 2 << 20 || result.files.len() >= 16)
+                        {
+                            Some(
+                                "included, but exceeds the retained metadata count/byte limit"
+                                    .into(),
+                            )
+                        } else {
+                            None
+                        };
+                        match reason {
+                            Some(reason) => {
+                                if result.skipped.len() < 64 {
+                                    result.skipped.insert(path.to_owned(), reason);
+                                }
+                            }
+                            None => match std::str::from_utf8(body) {
+                                Ok(text) => {
+                                    retained += size;
+                                    result.files.insert(path.to_owned(), text.to_owned());
+                                }
+                                Err(_) => {
+                                    result.skipped.insert(
+                                        path.to_owned(),
+                                        "included, but not UTF-8 text".into(),
+                                    );
+                                }
+                            },
                         }
                     }
                 }
@@ -99,5 +136,5 @@ pub(super) fn texts(bytes: &[u8]) -> Result<BTreeMap<String, String>, String> {
             )
             .ok_or("Archive overflow")?;
     }
-    Ok(files)
+    Ok(result)
 }

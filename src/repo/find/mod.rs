@@ -161,7 +161,7 @@ impl Find {
             self.order_of = Some(of);
         }
         match layout {
-            Layout::Lines => {
+            Layout::Lines | Layout::Rendered(_) => {
                 let new = scan.found.get(self.ordered_lines..).unwrap_or_default();
                 self.order.extend(order::ordered(new, layout));
                 self.ordered_lines = scan.found.len();

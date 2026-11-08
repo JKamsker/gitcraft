@@ -61,7 +61,11 @@ impl Matcher {
     /// Where the query is in `line`, as ranges of characters (not bytes), in order, none
     /// overlapping: after a match the search goes on where it ended, as editors do. Empty
     /// matches (`^`, `x*`) are left out, there would be nothing to show.
+    #[cfg(test)]
     pub(crate) fn find(&self, line: &str) -> Vec<Range<usize>> {
+        self.find_limited(line, usize::MAX)
+    }
+    pub(crate) fn find_limited(&self, line: &str, limit: usize) -> Vec<Range<usize>> {
         let mut out = Vec::new();
         // Bytes to characters, counted on from the previous match rather than from the start.
         let (mut byte, mut chars) = (0usize, 0usize);
@@ -77,6 +81,9 @@ impl Matcher {
             let start = to_char(m.start());
             let end = to_char(m.end());
             out.push(start..end);
+            if out.len() >= limit {
+                break;
+            }
         }
         out
     }
