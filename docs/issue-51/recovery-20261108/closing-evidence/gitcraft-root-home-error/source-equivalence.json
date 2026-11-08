@@ -1,0 +1,14 @@
+{
+  "root": "e4a884ee332e020fe49e9aca713c2f8e907cc318",
+  "owner": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+  "all_eight_exact": [
+    "src/app/clone.rs",
+    "src/app/dropped.rs",
+    "src/app/home.rs",
+    "src/app/mod.rs",
+    "src/app/panels.rs",
+    "src/app/remote_open.rs",
+    "src/app/windows.rs",
+    "src/app/workspaces.rs"
+  ]
+}

@@ -1,0 +1,827 @@
+{
+  "verdict": "FINDINGS",
+  "scope": "Independent bounded read-only source review; no product execution",
+  "base": "c2da523eb77e724a2aeefecdbc34ebea7e5d415c",
+  "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+  "tree": "7b4b406787118021edd9c89319129b5cf87308fa",
+  "canonical_raw_baseline": "771cbd9924fbdda106a36718c551b95305a9a269",
+  "findings": [
+    {
+      "id": "OP-NOTICE-1",
+      "priority": "P2",
+      "title": "Keep unknown operation errors opaque instead of routing them through the push suffix parser",
+      "path": "src/repo/notice/operation.rs",
+      "start_line": 35,
+      "end_line": 36,
+      "supporting_paths": [
+        {
+          "path": "src/push_preflight/display.rs",
+          "start_line": 427,
+          "end_line": 439
+        },
+        {
+          "path": "locales/de/interaction-guards.ftl",
+          "start_line": 252,
+          "end_line": 252
+        }
+      ],
+      "trigger": "Any generic op_done failure with no Gerrit witness whose raw message ends in ` Git blob; consider Git LFS.`, for example `provider opaque Git blob; consider Git LFS.`.",
+      "source_path": "op_done -> Failure::capture(error,None) -> Failure::projected -> canonical_error -> push_preflight::display::diagnostic -> dynamic",
+      "observed_by": "Static source/catalog inspection only; no runtime reproduction.",
+      "effect": "At de paint, the unknown body is rewritten to `Git-Blob mit provider opaque; erw\u00e4ge Git LFS.`. Status, finished and retained activity all use this fallback; raw values remain unchanged, but the required opaque presentation boundary is violated.",
+      "why_new": "Old generic op_done status interpolated its error unchanged, and the old activity fallback did not invoke the push diagnostic parser. New Failure sources are created for every operation error without any typed push provenance.",
+      "requested_change": "Keep fallback diagnostics opaque, or attach and use a finite push-owned presentation captured from the actual producer; do not classify arbitrary generic errors by suffix. Add an inert retained EN-DE-EN lookalike case across status, finished and activity."
+    }
+  ],
+  "independently_verified_source": {
+    "changed_paths_count": 10,
+    "paths": [
+      {
+        "path": "src/gerrit.rs",
+        "base_sha256": "ca3f831f01bec639476e119e2ea862f07f3aaf0b7ca3df1d8e078995c4794fd0",
+        "candidate_sha256": "5fa9424c936d40bb2ac3a009e26c72852e7d93dda031d4f96643f0049e562e47",
+        "unchanged_original_functions": [
+          "change_url",
+          "detect",
+          "detect_with",
+          "valid_web",
+          "remote_location",
+          "change_id",
+          "amended_message",
+          "valid_branch",
+          "valid_topic",
+          "amend_args",
+          "review_ops",
+          "check_stack",
+          "check_stack_with",
+          "encode"
+        ],
+        "changed_original_functions": []
+      },
+      {
+        "path": "src/gerrit/display.rs",
+        "base_sha256": "777b2d54e1e931adb98c1b0e96193d497fab166d2917cc04a9592a57c3c0e86a",
+        "candidate_sha256": "7942e72d9ceb604977c1e3a37fbea4a49683c876e0903cb99b503132ef6f30ae",
+        "unchanged_original_functions": [
+          "error",
+          "display_web_warning",
+          "actual_validation_and_server_warning_render_without_mutating_identity_or_ops",
+          "actual_recording_stack_validation_uses_same_log_context_and_keeps_unknowns_opaque"
+        ],
+        "changed_original_functions": [
+          "stack_error"
+        ]
+      },
+      {
+        "path": "src/git/command/watched.rs",
+        "base_sha256": "0478547c1b5716557bb31e42a87106c134cc92268a984c7dab1607769ffcd7f7",
+        "candidate_sha256": "572a635958be23d68ba035680a4a3de3584defce0eabc657dd116af56d6bb040",
+        "unchanged_original_functions": [
+          "new",
+          "cancel",
+          "is_cancelled",
+          "cancellation",
+          "progress",
+          "record",
+          "authentication_failed",
+          "auth_failure",
+          "take_steps",
+          "step_summaries",
+          "set_progress",
+          "with_progress",
+          "run_watched",
+          "run_watched_recorded",
+          "run_watched_extra_recorded",
+          "reviewed",
+          "follow_command",
+          "scratch",
+          "source",
+          "progress_goes_after_the_subcommand_unless_told_to_be_quiet",
+          "a_clone_reports_its_progress_and_ends",
+          "a_failure_says_why_without_the_progress",
+          "a_cancel_stops_git_and_what_it_started",
+          "nothing_runs_once_cancelled",
+          "run_there_here",
+          "the_script_run_elsewhere_has_an_owner_and_ends_as_git_did",
+          "remote_stream_progress_cancel_and_partial_output_use_the_event_loop"
+        ],
+        "changed_original_functions": [
+          "scoped"
+        ]
+      },
+      {
+        "path": "src/repo/activity/mod.rs",
+        "base_sha256": "0e1d17a8b1f6f66fc46da0c8553cf7c3fc78252949f2a903bd85c6f5d975c213",
+        "candidate_sha256": "df03f120aaf1c89ccb66c84843b10ef970469d833bc5a6cc8db2f53c1bc70a95",
+        "unchanged_original_functions": [
+          "as_text",
+          "entries",
+          "len",
+          "last",
+          "clear",
+          "reveal",
+          "bounded",
+          "floor_char",
+          "ceil_char",
+          "short_command_line",
+          "command_line",
+          "shell_word",
+          "exit_text",
+          "outcome_text",
+          "seconds",
+          "display_workflow_error",
+          "link_status",
+          "status_entry"
+        ],
+        "changed_original_functions": [
+          "push",
+          "log_activity"
+        ]
+      },
+      {
+        "path": "src/repo/activity/tests.rs",
+        "base_sha256": "54b4251efefc78d78179d1cc94080a7e59f9bd864cb1ebaff285be5ea4e061cd",
+        "candidate_sha256": "63d82e33b3ac1a54c29759ebdd8fd19e34fe4c46f8adc3cd0b816acfef62e9ec",
+        "unchanged_original_functions": [
+          "step",
+          "the_log_keeps_the_newest_operations",
+          "a_huge_output_keeps_its_start_and_end",
+          "commands_read_as_typed_in_a_shell",
+          "an_entry_copies_as_text",
+          "repo",
+          "finish",
+          "an_operation_leaves_its_commands_and_output",
+          "a_background_fetch_is_kept_only_when_it_fails",
+          "a_recorded_call_hides_its_secrets",
+          "the_same_background_failure_is_counted_not_repeated",
+          "the_toolbar_message_opens_its_own_operation",
+          "fluent_partition_actual_activity_adapter_formats_numbers_and_preserves_commands",
+          "fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_diagnostics"
+        ],
+        "changed_original_functions": []
+      },
+      {
+        "path": "src/repo/activity/view.rs",
+        "base_sha256": "e78321ec5203f324650515be4cc34a4aa5073808169f45840f0ab26dd181146d",
+        "candidate_sha256": "897616abedf7ce3fb3343f5356648d411923abf1b5e10b1e9daf1a8badc83ebf",
+        "unchanged_original_functions": [
+          "activity_panel",
+          "running_entry",
+          "ago"
+        ],
+        "changed_original_functions": [
+          "entry_ui"
+        ]
+      },
+      {
+        "path": "src/repo/dialogs/gerrit.rs",
+        "base_sha256": "2749bba3dfe96a064f134d023569e3ea7bfcdbc7f957304a39c7ec0f1b5ec2b7",
+        "candidate_sha256": "0ba7b532564ff03377082872957a347da4b11cdba2c3b51eeb665a8a84788dc3",
+        "unchanged_original_functions": [],
+        "changed_original_functions": [
+          "review"
+        ]
+      },
+      {
+        "path": "src/repo/notice.rs",
+        "base_sha256": "75f65e0bcddd4b38e4bf4030080ed087c2812b193872107a16abcc632e3346a6",
+        "candidate_sha256": "90318022d4c59526263a9a29643a7c71fac22055494484bf5e4d70d65f765570",
+        "unchanged_original_functions": [
+          "plain",
+          "authorship",
+          "parallel",
+          "custom_completed",
+          "custom_started",
+          "custom_start_failed",
+          "for_repository",
+          "projected",
+          "raw",
+          "into_raw",
+          "edit_raw",
+          "deref",
+          "eq",
+          "eq",
+          "supplied",
+          "source_notice_moves_through_queues_and_repaints_without_changing_raw",
+          "any_raw_edit_retires_origin_before_noop_or_unwind",
+          "option_refusal_preserves_false_path_and_replaces_origin_on_true",
+          "captured_completion_repaints_bounded_opaque_tail_after_queue_transfer",
+          "custom_launch_sources_keep_original_raw_envelopes_and_opaque_detail"
+        ],
+        "changed_original_functions": [
+          "display"
+        ]
+      },
+      {
+        "path": "src/repo/notice/operation.rs",
+        "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "candidate_sha256": "8e0f55a4d44360a807ed9a48fd115e9f1e02c8c15aed09d8fee5644a114a2679",
+        "unchanged_original_functions": [],
+        "changed_original_functions": []
+      },
+      {
+        "path": "src/repo/operations.rs",
+        "base_sha256": "0cf82a711c217b334b9267bbd7f53519b48664d6fd3d313d13a9e75765ee7199",
+        "candidate_sha256": "d740ab4bd1ae05f2fb49de667675e357960029086d24b4c97d564b13df5f5859",
+        "unchanged_original_functions": [
+          "run_ops",
+          "run_ops_ex",
+          "keep_unfinished",
+          "run_undoable",
+          "forget_https_memory",
+          "switch_https",
+          "sign_in",
+          "accept_scoped_signin",
+          "run_last_op_again",
+          "record_undo",
+          "undo_entry",
+          "run_step",
+          "reviewed_operands",
+          "retain_unfinished",
+          "merge_pure_reviewed_echo_operands_are_strict_and_survive_retry",
+          "run_reviewed_push",
+          "reviewed_auth_failure",
+          "check_https_routes",
+          "cancelled_message",
+          "offline_refusal",
+          "reaches_a_remote",
+          "run_steps",
+          "run_steps_counted",
+          "with_rechecked_preparation",
+          "expect_ref",
+          "expect_ref_at",
+          "expect_symref",
+          "expect_tree",
+          "expected_tree",
+          "expect_symref_in",
+          "expected_ref",
+          "expected_symref",
+          "try_step",
+          "tried_note",
+          "is_expectation",
+          "fill_expected",
+          "stash_push_args",
+          "selected_continuation_recording_retains_actual_route_receipt_and_expect_retry",
+          "recorded_route",
+          "recording_reviewed_route_is_captured_before_dispatch_and_proves_one_shot_receipt",
+          "recording_reviewed_auth_missing_foreign_or_unproven_routes_refuse_without_dispatch",
+          "recording_https_route_proof_is_rechecked_after_draft_and_retained_for_retry",
+          "recording_safety_draft_cannot_authorize_an_operation_after_its_context_moves",
+          "repo",
+          "a_quiet_operation_runs_its_steps_but_not_its_expectations",
+          "entry",
+          "stash",
+          "undoing_a_stash_refuses_once_another_was_pushed",
+          "a_redone_stash_that_saved_nothing_is_not_popped",
+          "an_expected_head_that_moved_stops_the_operation",
+          "undoing_checkout_and_pull_keeps_commits_made_since",
+          "signout_clears_nested_parked_credentials_before_a_view_is_reopened",
+          "core_guard_paint_reviewed_auth_extracts_original_proof_before_display"
+        ],
+        "changed_original_functions": [
+          "op_done",
+          "check_expected"
+        ]
+      }
+    ],
+    "unchanged_original_function_bodies": 153,
+    "modified_original_function_count": 9,
+    "old_assertion_invocations_retained_exact": 204,
+    "old_test_modules_retained_exact_count": 10,
+    "activity_tests_retained_as_exact_original_prefix": true,
+    "raw_headline_771_exact_after_symbol_and_module_adaptation": true,
+    "check_expected_exact_after_callee_adaptation": true,
+    "op_done_control_token_skeleton_unchanged_after_explicit_presentation_and_source_handoff_removal": true,
+    "binary_patch_matches_immutable_git_diff": true,
+    "author_and_committer_match_requested_identity_on_both_unit_commits": true
+  },
+  "independently_verified_evidence": {
+    "handoff": [
+      {
+        "path": "/tmp/gitcraft-op-status/handoff.md",
+        "sha256": "81f0ead283236bcaf8a16d52d3940ce4f2366fbd3cd161129c9bb96aae652440"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/handoff.json",
+        "sha256": "734a94f25bc16365e3a4fa00434421243ed1041339612e26d3ca3b2d6af3fedf"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "/tmp/gitcraft-op-status/operation-status.patch",
+        "sha256": "e73f30451127e53227bb4009b443a6195b6956bd0228d3b76c57202c670b707d"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/source-proof-918889d5bd69.json",
+        "sha256": "5d9c7b317a190735babc07c3ed9a83352584349efa19fdab433b82080992cb8c"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/gates-918889d5bd69.json",
+        "sha256": "94a0e36a743ec4126351d5b9595acdb2c2f5040fba94b498227e264d6603a994"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/918889d5bd69-rustfmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/918889d5bd69-diff-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/source-proof.py",
+        "sha256": "cde761dc4ed832d93007876eaa7b6395c7d2b562700828d15333b0120b89636a"
+      },
+      {
+        "path": "/tmp/gitcraft-op-status/gates.py",
+        "sha256": "64299b73471d7ab4a6268fa0e4855eaaa50b597ef988a7b5b1c0c905d3acd641"
+      }
+    ],
+    "gates": [
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "check",
+          "--locked",
+          "--offline",
+          "--all-targets"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 25.185,
+        "selected_pass": null,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-check.log",
+        "sha256": "7e04d06e68cca45ce54e4049564bdfb5e5292a57535f3ac915f39e02d344e02f",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": false,
+        "dev_profile_completion_verified": true
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::notice::operation::tests::retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 55.186,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-1.log",
+        "sha256": "0a221cc14cdf749921918f9bf0985726c7b5cd128bfe59540f98c431668a99bb",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::notice::operation::tests::retained_finished_uses_original_headline_and_discards_unselected_output",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.393,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-2.log",
+        "sha256": "ee394df68e90b59a5913fd61740a0e5055562cb994eee8bcd49ea471510456fc",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::activity::view::operation_presentation_tests::same_recording_stack_check_repaints_retained_status_finished_and_actual_activity",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.449,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-3.log",
+        "sha256": "c45a5c72aff17d1babb4706e9d0a4a72843843107cd57e3f7cce39855ac54e55",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::activity::view::operation_presentation_tests::provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.338,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-4.log",
+        "sha256": "161938991fbbdbbd91a2ba90f54bfa942c99544298115a44f8e25b8f6d39b12f",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::activity::tests::operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.343,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-5.log",
+        "sha256": "edc893680d61d1a8e977a7e1232babf214163fff1c61ced37ec56920396de551",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "gerrit::display::tests::actual_recording_stack_validation_uses_same_log_context_and_keeps_unknowns_opaque",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.333,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-6.log",
+        "sha256": "16267a56db40fa4b22fac0061a1cc1b699f912a2b447271d7ffb2a17a86b7ffd",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "gerrit::display::tests::actual_validation_and_server_warning_render_without_mutating_identity_or_ops",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.353,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-7.log",
+        "sha256": "2561afbe088dfdac72376a629306fad461cec7a50d0a7088d4a991cf32c8766c",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::notice::tests::source_notice_moves_through_queues_and_repaints_without_changing_raw",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.35,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-8.log",
+        "sha256": "dccd1d95217e986928fb631c641f0f6f7b640e47821d0617f29ee04c86dc510f",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::notice::tests::any_raw_edit_retires_origin_before_noop_or_unwind",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.28,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-9.log",
+        "sha256": "38110d43b078f2bd53d2aba101a9cb478ece6d2c7061c323b04c4870bd864385",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::activity::tests::an_entry_copies_as_text",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.327,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-10.log",
+        "sha256": "cbf75a50333a2173f36cda5d08ef04cb96d90d23a76d05caf5b34e5000752cb8",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::activity::tests::the_same_background_failure_is_counted_not_repeated",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.271,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-11.log",
+        "sha256": "439151966e246937f56527e799f21fe5ad106ceee919e608ff9a6e5d57105be9",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "repo::dialogs::gerrit::warning_presentation_tests::actual_review_warning_paint_repaints_without_changing_raw_server_or_plan",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.356,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-12.log",
+        "sha256": "465a75040be36922dffe6ad8ba845b52a306661325af2283c3e7e723e6cbd956",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      },
+      {
+        "candidate": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "env": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_TARGET_DIR": "/tmp/gitcraft-op-status/target",
+          "RUSTUP_AUTO_INSTALL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_INCREMENTAL": "0"
+        },
+        "exit": 0,
+        "seconds": 0.395,
+        "selected_pass": 1,
+        "log": "/tmp/gitcraft-op-status/918889d5bd69-13.log",
+        "sha256": "ec252915562895b73e110b081db90cd8dfdfe62037715a4926396893b658fd42",
+        "hash_verified": true,
+        "exact_selected_test_name_and_one_pass_verified": true,
+        "dev_profile_completion_verified": false
+      }
+    ],
+    "manifest_and_gate_lists_agree": true,
+    "all_gate_candidates_match": true,
+    "all_recorded_exit_codes_zero": true,
+    "recorded_tests_passed": 13,
+    "recorded_all_target_check_passed": true,
+    "executed_by_this_reviewer": false,
+    "warning_count_in_check_log": 374
+  },
+  "accepted_context_reports": [
+    {
+      "path": "/tmp/gitcraft-51-notice-transport-review.md",
+      "sha256": "9d8a0d29df649a1e9267b54fb50fff048f5a56de79b397ac324daab210b39c46"
+    },
+    {
+      "path": "/tmp/gitcraft-51-notice-transport-review.json",
+      "sha256": "334f5135f3cdb7152ee562d541f28cf7b7012f3fcff4ea15601897cb69de1491"
+    },
+    {
+      "path": "/tmp/gitcraft-51-parallel-notice-review.md",
+      "sha256": "0d57cb01070986a4b35fe3eaded3f56987d493b9e257d8b5bc52467554504c07"
+    },
+    {
+      "path": "/tmp/gitcraft-51-parallel-notice-review.json",
+      "sha256": "9509585d869aa35afdb906e6a55eaa32d01c572617802929cc5c209e43100001"
+    },
+    {
+      "path": "/tmp/gitcraft-51-custom-notice-review.md",
+      "sha256": "98513880e1df4b319ccc9cc5028e51d74a212394cbeebc100fe60053df145b34"
+    },
+    {
+      "path": "/tmp/gitcraft-51-custom-notice-review.json",
+      "sha256": "b2c4ec7b67e518022afbfe52ca22c68a6fa7983c320280e7eb09b3d5b0aab57f"
+    }
+  ],
+  "passed_bounded_source_conclusions": [
+    "Same validator call and same successful log closure produce Gerrit finite source without an extra Git read or provider-suffix provenance; retained source contains only expected error plus finite hash/reason/id fields.",
+    "Complete final error equality is checked before long-finished headline selection, so a matching first line with a changed tail loses the Gerrit witness.",
+    "Ancestor and empty-stack sources are finite; cancellation, failed log reads, mismatches, later successful checks and ordinary plain replacements do not mint or reuse dynamic Gerrit provenance.",
+    "Original op_done guards, flags, auth extraction, callbacks, undo/timeline bookkeeping and order survive presentation-only normalization; APPROVED/FIX/EXPECT/TRY and dispatch functions are unchanged.",
+    "Activity redaction/bounding precede source retention equality checks; repeated plain equal background failures replace source with None; raw Outcome, as_text, ids, repeats, copy and status linkage preserve prior source logic.",
+    "Notice immutable Arc ownership, raw equality, plain/default semantics and edit_raw retirement are unchanged; existing queue/Toast consumers remain unchanged.",
+    "Actual Gerrit dialog warning uses the finite exact Gerrit adapter at paint without changing server identity or review plan."
+  ],
+  "constraints_and_limits": [
+    "No tests, compiler, product runtime, process/Git-under-test, App/RepoTab constructor, discovery, native window, CI, network or subagent was run by this reviewer.",
+    "No repository source, branch, commit or runtime state was changed; only /tmp review artifacts were written.",
+    "Logs and metadata are supplied execution receipts; hashing verifies binding/integrity, not independent attestation of the environment.",
+    "This unit does not establish combined application/full-suite/strict-lint/final-PR acceptance. Existing compile warnings remain.",
+    "Prior Notice, parallel and custom reviews are accepted context, not fresh whole-application audits. Prior workflow six-P2 and interaction INT-FINAL-1 remain OPEN; root-selected nested legacy worker strings remain OPEN.",
+    "Source normalizations and exact body/assertion retention are bounded supporting evidence, not whole-program semantic proof.",
+    "Remote branch SHA is recorded in the handoff; this reviewer did not make a fresh network/ls-remote call."
+  ],
+  "markdown_report": {
+    "path": "/tmp/gitcraft-51-operation-gerrit-notice-review.md",
+    "sha256": "1c98484f44152552664fc67a74ebb4633bc081aa9090dbb9c716492788153084"
+  }
+}

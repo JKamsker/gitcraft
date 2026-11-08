@@ -1,0 +1,594 @@
+[
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-00819036",
+    "head": "d43d666f99c468f181ff9af5404d6fce23587ca8",
+    "branch": "refs/heads/feat/insights-175",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-0e06676d",
+    "head": "e3112905ef7e9647c453b222890eb0b5b3e489dc",
+    "branch": "refs/heads/t3/fluent-review-map",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-0ee27f14",
+    "head": "60ef236876a3fcb8e73603ef33cd7ae04768ae46",
+    "branch": "refs/heads/t3/issue51-graph-activity-tests",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-1074668e",
+    "head": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "branch": "refs/heads/t3/review-final-candidate",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-127dffa7",
+    "head": "a7d446647e066862b933f627295339adf0559888",
+    "branch": "refs/heads/t3/fluent-package-update-display",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-1a34bd60",
+    "head": "4cc6a9f970fd8b13aacb059409b9473cc6a147d6",
+    "branch": "refs/heads/t3/undo-replay-guard-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-1a7321da",
+    "head": "a05d15a192d7e6714e8e512f0dae4f3dbcbd3599",
+    "branch": "refs/heads/t3/native-https-credential-fixture",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-1ebb9ba6",
+    "head": "94994ce472b746c3f22854c5c7fa96f51ef2d412",
+    "branch": "refs/heads/t3/integration-adversarial-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-20ca9719",
+    "head": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "branch": "refs/heads/t3/review-hosting-routing",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-2c39b098",
+    "head": "d3fcf2f66a2de5d34d8794984aa204c3f441c9c2",
+    "branch": "refs/heads/t3/history-layout",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-350204d4",
+    "head": "04f045f4f4ccfb820e69ab103545b612ebb3f8e2",
+    "branch": "refs/heads/t3/normalize-strict-lint",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-39954dc3",
+    "head": "2ae6c3bbd0db67e0f2cdb66149726047fe058989",
+    "branch": "refs/heads/t3/terminal-bisect-fluent",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-3a66e6f0",
+    "head": "071492cfaaf326c673179bf36b626f4bbe2e6f0c",
+    "branch": "refs/heads/t3/advanced-git-repository-tools",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-3cd58a52",
+    "head": "8733bd8be5fe2a23edab0da99efd956aca9befa9",
+    "branch": "refs/heads/t3/mechanical-clippy-cleanup",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-42431fee",
+    "head": "2743133d690874512716c2037b6ab0f9c11e6a5a",
+    "branch": "refs/heads/t3/audit-integrated-fork-recovery",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-42d3ab85",
+    "head": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6",
+    "branch": "refs/heads/t3/forge-identity-release-preflight",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-45db91c9",
+    "head": "c44f7358b30663272007d2aa0a4bdf25cc5f58e7",
+    "branch": "refs/heads/t3/clone-cleanup-backlink",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-4a6c0b9e",
+    "head": "3dfe5cbc8f2b14665a2c08007a1a9236e1f8ed49",
+    "branch": "refs/heads/t3/history-investigation-views",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-53c9c50e",
+    "head": "dbb47a144b6ecb0ff3baa57ecdcf8de6ab3bab27",
+    "branch": "refs/heads/t3/implement-issues-158-163",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a",
+    "head": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+    "branch": "refs/heads/t3/visualization-review-fixes",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-5b9a0fe3",
+    "head": "8aaadb4fb1af291a12368c3ff0160892126885c1",
+    "branch": "refs/heads/t3/practice-connections-diagnostics",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-5de96531",
+    "head": "5d6ebb07feea74388943fa835a62538c00517276",
+    "branch": "refs/heads/t3/fluent-interaction-practice",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-61ff14cf",
+    "head": "b84fbb49794189c251121b779dd6a3fd205fabee",
+    "branch": "refs/heads/t3/working-state-publication-features",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-62542090",
+    "head": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "branch": "refs/heads/t3/composer-height-resize-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-680bf798",
+    "head": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+    "branch": "refs/heads/t3/history-visualization-audio",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-6ab41167",
+    "head": "f02847a3b8c2e393e46622f8622906f78b0187de",
+    "branch": "refs/heads/t3/fix-rebase-confirmation-tests",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-6c795338",
+    "head": "71503f0650d35a8888a5cdf74e674f92dab27a1d",
+    "branch": "refs/heads/t3/interaction-guard-display",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-6d0d75e7",
+    "head": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+    "branch": "refs/heads/refactor/178-terminal-ownership",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-6f9968b6",
+    "head": "3dc515fea42b06c818a43fda93565ebda34a04bd",
+    "branch": "refs/heads/t3/history-layout-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-72cc2dfe",
+    "head": "7fa4cf802cd088992e8f93f2063301055724b856",
+    "branch": "refs/heads/t3/workflow-r2-two-residuals",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-768b22a8",
+    "head": "886b42b54ba23e01e0cdfc477282bbc4afca3de3",
+    "branch": "refs/heads/t3/implement-issue-51-ideas",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-7aef3422",
+    "head": "9c5f5d8504af0a77c51f2d5c6e795c3756ab6112",
+    "branch": "refs/heads/t3/remote-fluent-interaction",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-85ba05c5",
+    "head": "385db583e148be51273516694ce15f4804977c7f",
+    "branch": "refs/heads/t3/issues-167-171-final",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063",
+    "head": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+    "branch": "refs/heads/t3/home-error-presentation",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-8d9a7cf2",
+    "head": "9737efa031d96d6b79f75ee0ef507b4275573b7d",
+    "branch": "refs/heads/t3/guarded-fork-timeline",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-8e9f5137",
+    "head": "d7b3757ac4ed1e6a955c5845a898cb1bfca7ff11",
+    "branch": "refs/heads/t3/merge-prs-single-ci",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-940761ce",
+    "head": "3e43ced28232183108491acb76bca08a2166f15f",
+    "branch": "refs/heads/t3/implement-review-workflow-ideas",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-95ce1af6",
+    "head": "d5481d20f1ad3e1fc94f26a2a2bb59d78a323f15",
+    "branch": "refs/heads/t3/fix-resize-origin-state",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-965c856c",
+    "head": "d374eff2cb99af9280edfcdc3f3656c1afede153",
+    "branch": "refs/heads/t3/url-action-boundaries",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-9781e34c",
+    "head": "771cbd9924fbdda106a36718c551b95305a9a269",
+    "branch": "refs/heads/t3/integrate-interaction-features",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-98fd8367",
+    "head": "84db10d3d76c2b1df4e7b3df9a581b8a95d0b493",
+    "branch": "refs/heads/t3/fluent-paint-wiring",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-9be2a0e8",
+    "head": "1b6dc070bb08704334e03c4c4681a24424a114a9",
+    "branch": "refs/heads/t3/core-lint-normalization",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-a4981112",
+    "head": "913bf4a5b46b0e7ce6117539177cd058c807263f",
+    "branch": "refs/heads/t3/drafts-session-marker-flake",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-a4d53ade",
+    "head": "c24cb1becdc19a9f9cb1a348c0c27548f2bf832e",
+    "branch": "refs/heads/t3/fluent-repo-core",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-a61f0eaa",
+    "head": "4c8146849bcf8a7c93f7cab6f256780508c2cb5f",
+    "branch": "refs/heads/t3/issue51-batch-b",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-a9d9d56c",
+    "head": "ff068f1d5fd9dee20aa380a9b7fca7770d9ab5d8",
+    "branch": "refs/heads/t3/review-issue-171-integration",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-ac352dae",
+    "head": "abfa385952c5b76871541828df51c4805a4c49c4",
+    "branch": "refs/heads/t3/review-gitcraft-167-171",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b20fd748",
+    "head": "655b040da0fff6dcfa79f28549ff3fd30a0a2c08",
+    "branch": "refs/heads/t3/review-forge-identity-release",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b32c1519",
+    "head": "e2a6be9ac6aee1e0ae77b227ea2c4b239da8e20b",
+    "branch": "refs/heads/t3/repo-worktree-root",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1",
+    "head": "44cd6ea8467ef4bbc10fe861fb9f807dfb09a107",
+    "branch": "refs/heads/t3/interaction-desktop-accessibility",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba",
+    "head": "eb1431a4329c1de6805a69644fee255c4d08396e",
+    "branch": "refs/heads/t3/integrate-codex-branches",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-bed189c6",
+    "head": "94994ce472b746c3f22854c5c7fa96f51ef2d412",
+    "branch": "refs/heads/t3/fork-rebase-safety-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-c37549ad",
+    "head": "82ae63be6a1619d0fa699c6dc996665a4992463a",
+    "branch": "refs/heads/t3/review-area-d-ui",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-c524d8ca",
+    "head": "28d71cc44edd5b5c291d782a9ba2364e11039e46",
+    "branch": "refs/heads/t3/restructure-graph-menus-settings",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-c64fe05e",
+    "head": "655b040da0fff6dcfa79f28549ff3fd30a0a2c08",
+    "branch": "refs/heads/t3/review-history-filter-contract",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-c7ab6a59",
+    "head": "6b13ae41666c95cb323843c370e575f54d2fd521",
+    "branch": "refs/heads/t3/fluent-repo-workflows",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-c8ce365a",
+    "head": "35368c0549e41c95269a0513e25e1dbd67d52844",
+    "branch": "refs/heads/t3/implement-issue-160",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-cb58420c",
+    "head": "340c0b86517898eb58b93d34d21be785949c1ce3",
+    "branch": "refs/heads/t3/forge-selection-branch-visibility",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-ce7a5cdd",
+    "head": "34bc20dec72eb178aeeb4841e7bc47c102764cdc",
+    "branch": "refs/heads/t3/responsive-diff-detail-compose",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-cfbc5b5f",
+    "head": "2743133d690874512716c2037b6ab0f9c11e6a5a",
+    "branch": "refs/heads/t3/fork-recovery-review",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-d018a1e1",
+    "head": "6aad5ba689ec889a4fcae3cd377a4ef73c9f23d5",
+    "branch": "refs/heads/t3/history-graph-layout-filters",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-d6277c89",
+    "head": "b37050fcfbfbf83e6055fd4e3e86a5e0da38e5b3",
+    "branch": "refs/heads/t3/standalone-fluent-migration",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-d63cf089",
+    "head": "81c18601cddad1ab0d5d03475e8d99025c6b7973",
+    "branch": "refs/heads/t3/issue51-suite-regressions",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-d6506094",
+    "head": "04d3149208e88c7e256fe35573865b0542d4271a",
+    "branch": "refs/heads/t3/review-issue171-responsive",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-dcbba117",
+    "head": "5242f500186800aeb7ae374f2e283a67ffa1d0ce",
+    "branch": "refs/heads/t3/safe-process-supervision",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-dcc7e54a",
+    "head": "43b8b0e94bf8466ea45dba520e2a501dca969cf2",
+    "branch": "refs/heads/t3/bundle-strict-lint",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-e06bdc42",
+    "head": "9fd9b235051d2f5a3e244aa1cb641630c24ba896",
+    "branch": "refs/heads/t3/diff-staging-views",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-e7913e59",
+    "head": "7a789977fbb32f4f1ae3e9f55147853ad7dccb14",
+    "branch": "refs/heads/t3/issue51-local-fetch-fixtures",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-ee16a204",
+    "head": "c8b1dc1ff6827ce4833a92c27d948354ab2601ef",
+    "branch": "refs/heads/t3/review-workflow-fluent",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-f24b1fe3",
+    "head": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+    "branch": "refs/heads/t3/gerrit-operation-status",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-f46edd7d",
+    "head": "a68c940a879a9552323c13dcc04292315fad46f9",
+    "branch": "refs/heads/t3/babysit-pr-172",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-f4ee93fc",
+    "head": "5d2714e25b83f01dbe4cb7d0361a08e4a4c06238",
+    "branch": "refs/heads/t3/owned-runtime-fixtures",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-f7189c7e",
+    "head": "e9a6812d83280c1cc6b3e5c67e8a754e34cfc9a2",
+    "branch": "refs/heads/t3/review-history-layout-filters",
+    "status": "",
+    "error": "",
+    "exit": 0
+  },
+  {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-fcb97300",
+    "head": "52bb543b46e68f9b6a33876d2749c89c0dca1d5d",
+    "branch": "refs/heads/t3/backend-fluent-localization",
+    "status": "",
+    "error": "",
+    "exit": 0
+  }
+]

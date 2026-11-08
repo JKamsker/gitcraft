@@ -1,0 +1,730 @@
+[
+  {
+    "branch": "dev",
+    "local": "35a26a547820bdf1b1e4f6fcbb3ec5e5346f2e22",
+    "remote": "760c79bb69ffc3af5401612bd9c48dcd254eca54",
+    "exact": false,
+    "reachable_from_github_branch": null,
+    "github_tip": null
+  },
+  {
+    "branch": "feat/insights-175",
+    "local": "d43d666f99c468f181ff9af5404d6fce23587ca8",
+    "remote": "d43d666f99c468f181ff9af5404d6fce23587ca8",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175",
+    "github_tip": "d43d666f99c468f181ff9af5404d6fce23587ca8"
+  },
+  {
+    "branch": "feat/insights-175-analysis",
+    "local": "3ff60df789b6ee6e5c0668162bd129dd4703fa5d",
+    "remote": "3ff60df789b6ee6e5c0668162bd129dd4703fa5d",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-analysis",
+    "github_tip": "3ff60df789b6ee6e5c0668162bd129dd4703fa5d"
+  },
+  {
+    "branch": "feat/insights-175-branches",
+    "local": "062f04115929eb84189f571cb1e936288956a8f6",
+    "remote": "062f04115929eb84189f571cb1e936288956a8f6",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-branches",
+    "github_tip": "062f04115929eb84189f571cb1e936288956a8f6"
+  },
+  {
+    "branch": "feat/insights-175-ci",
+    "local": "54556c0c9a4c6024d8e0d318f09ac9d7949a7b0b",
+    "remote": "54556c0c9a4c6024d8e0d318f09ac9d7949a7b0b",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-ci",
+    "github_tip": "54556c0c9a4c6024d8e0d318f09ac9d7949a7b0b"
+  },
+  {
+    "branch": "feat/insights-175-history",
+    "local": "4f496f6dff4d7584d1a580393c7541d58f55312b",
+    "remote": "4f496f6dff4d7584d1a580393c7541d58f55312b",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-history",
+    "github_tip": "4f496f6dff4d7584d1a580393c7541d58f55312b"
+  },
+  {
+    "branch": "feat/insights-175-patterns",
+    "local": "6406efce789512535a7867f5ac81395033101112",
+    "remote": "6406efce789512535a7867f5ac81395033101112",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-patterns",
+    "github_tip": "6406efce789512535a7867f5ac81395033101112"
+  },
+  {
+    "branch": "feat/insights-175-review",
+    "local": "6e4d4dc11cf4ea9e3c96301f5c75b64d9c9f2617",
+    "remote": "6e4d4dc11cf4ea9e3c96301f5c75b64d9c9f2617",
+    "exact": true,
+    "reachable_from_github_branch": "feat/insights-175-review",
+    "github_tip": "6e4d4dc11cf4ea9e3c96301f5c75b64d9c9f2617"
+  },
+  {
+    "branch": "feat/pr-selection-branch-pills",
+    "local": "af2f4f09b4b4a3efb21980be9a1c81f5ada1a08e",
+    "remote": "af2f4f09b4b4a3efb21980be9a1c81f5ada1a08e",
+    "exact": true,
+    "reachable_from_github_branch": "feat/pr-selection-branch-pills",
+    "github_tip": "af2f4f09b4b4a3efb21980be9a1c81f5ada1a08e"
+  },
+  {
+    "branch": "perf/workflow-cpu-coverage",
+    "local": "52101b6c785dfb67ebae9250b6b73e5d7e827382",
+    "remote": "52101b6c785dfb67ebae9250b6b73e5d7e827382",
+    "exact": true,
+    "reachable_from_github_branch": "perf/workflow-cpu-coverage",
+    "github_tip": "52101b6c785dfb67ebae9250b6b73e5d7e827382"
+  },
+  {
+    "branch": "refactor/178-terminal-ownership",
+    "local": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+    "remote": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+    "exact": true,
+    "reachable_from_github_branch": "refactor/178-terminal-ownership",
+    "github_tip": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1"
+  },
+  {
+    "branch": "t3/179-review-followup",
+    "local": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+    "remote": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1",
+    "exact": true,
+    "reachable_from_github_branch": "refactor/178-terminal-ownership",
+    "github_tip": "58d2ddc5a44397ec954f17df76a7471d5b1c78c1"
+  },
+  {
+    "branch": "t3/advanced-git-repository-tools",
+    "local": "071492cfaaf326c673179bf36b626f4bbe2e6f0c",
+    "remote": "071492cfaaf326c673179bf36b626f4bbe2e6f0c",
+    "exact": true,
+    "reachable_from_github_branch": "t3/advanced-git-repository-tools",
+    "github_tip": "071492cfaaf326c673179bf36b626f4bbe2e6f0c"
+  },
+  {
+    "branch": "t3/audit-integrated-fork-recovery",
+    "local": "2743133d690874512716c2037b6ab0f9c11e6a5a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/babysit-pr-172",
+    "local": "a68c940a879a9552323c13dcc04292315fad46f9",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "fix/ci-status-per-remote",
+    "github_tip": "a68c940a879a9552323c13dcc04292315fad46f9"
+  },
+  {
+    "branch": "t3/backend-fluent-localization",
+    "local": "52bb543b46e68f9b6a33876d2749c89c0dca1d5d",
+    "remote": "52bb543b46e68f9b6a33876d2749c89c0dca1d5d",
+    "exact": true,
+    "reachable_from_github_branch": "t3/backend-fluent-localization",
+    "github_tip": "52bb543b46e68f9b6a33876d2749c89c0dca1d5d"
+  },
+  {
+    "branch": "t3/bundle-strict-lint",
+    "local": "43b8b0e94bf8466ea45dba520e2a501dca969cf2",
+    "remote": "43b8b0e94bf8466ea45dba520e2a501dca969cf2",
+    "exact": true,
+    "reachable_from_github_branch": "t3/bundle-strict-lint",
+    "github_tip": "43b8b0e94bf8466ea45dba520e2a501dca969cf2"
+  },
+  {
+    "branch": "t3/clone-cleanup-backlink",
+    "local": "c44f7358b30663272007d2aa0a4bdf25cc5f58e7",
+    "remote": "c44f7358b30663272007d2aa0a4bdf25cc5f58e7",
+    "exact": true,
+    "reachable_from_github_branch": "t3/clone-cleanup-backlink",
+    "github_tip": "c44f7358b30663272007d2aa0a4bdf25cc5f58e7"
+  },
+  {
+    "branch": "t3/codex-integration-checkpoints-20261107",
+    "local": "0963b41fe1499859e3e17a2a1debeb775c7ab10a",
+    "remote": "0963b41fe1499859e3e17a2a1debeb775c7ab10a",
+    "exact": true,
+    "reachable_from_github_branch": "t3/codex-integration-checkpoints-20261107",
+    "github_tip": "0963b41fe1499859e3e17a2a1debeb775c7ab10a"
+  },
+  {
+    "branch": "t3/composer-height-resize-review",
+    "local": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/core-lint-normalization",
+    "local": "1b6dc070bb08704334e03c4c4681a24424a114a9",
+    "remote": "1b6dc070bb08704334e03c4c4681a24424a114a9",
+    "exact": true,
+    "reachable_from_github_branch": "t3/core-lint-normalization",
+    "github_tip": "1b6dc070bb08704334e03c4c4681a24424a114a9"
+  },
+  {
+    "branch": "t3/diff-staging-views",
+    "local": "9fd9b235051d2f5a3e244aa1cb641630c24ba896",
+    "remote": "9fd9b235051d2f5a3e244aa1cb641630c24ba896",
+    "exact": true,
+    "reachable_from_github_branch": "t3/diff-staging-views",
+    "github_tip": "9fd9b235051d2f5a3e244aa1cb641630c24ba896"
+  },
+  {
+    "branch": "t3/drafts-session-marker-flake",
+    "local": "913bf4a5b46b0e7ce6117539177cd058c807263f",
+    "remote": "913bf4a5b46b0e7ce6117539177cd058c807263f",
+    "exact": true,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/fix-rebase-confirmation-tests",
+    "local": "f02847a3b8c2e393e46622f8622906f78b0187de",
+    "remote": "f02847a3b8c2e393e46622f8622906f78b0187de",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fix-rebase-confirmation-tests",
+    "github_tip": "f02847a3b8c2e393e46622f8622906f78b0187de"
+  },
+  {
+    "branch": "t3/fix-resize-origin-state",
+    "local": "d5481d20f1ad3e1fc94f26a2a2bb59d78a323f15",
+    "remote": "d5481d20f1ad3e1fc94f26a2a2bb59d78a323f15",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fix-resize-origin-state",
+    "github_tip": "d5481d20f1ad3e1fc94f26a2a2bb59d78a323f15"
+  },
+  {
+    "branch": "t3/fluent-interaction-practice",
+    "local": "5d6ebb07feea74388943fa835a62538c00517276",
+    "remote": "5d6ebb07feea74388943fa835a62538c00517276",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-interaction-practice",
+    "github_tip": "5d6ebb07feea74388943fa835a62538c00517276"
+  },
+  {
+    "branch": "t3/fluent-package-update-display",
+    "local": "a7d446647e066862b933f627295339adf0559888",
+    "remote": "a7d446647e066862b933f627295339adf0559888",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-package-update-display",
+    "github_tip": "a7d446647e066862b933f627295339adf0559888"
+  },
+  {
+    "branch": "t3/fluent-paint-wiring",
+    "local": "84db10d3d76c2b1df4e7b3df9a581b8a95d0b493",
+    "remote": "84db10d3d76c2b1df4e7b3df9a581b8a95d0b493",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-paint-wiring",
+    "github_tip": "84db10d3d76c2b1df4e7b3df9a581b8a95d0b493"
+  },
+  {
+    "branch": "t3/fluent-repo-core",
+    "local": "c24cb1becdc19a9f9cb1a348c0c27548f2bf832e",
+    "remote": "c24cb1becdc19a9f9cb1a348c0c27548f2bf832e",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-repo-core",
+    "github_tip": "c24cb1becdc19a9f9cb1a348c0c27548f2bf832e"
+  },
+  {
+    "branch": "t3/fluent-repo-workflows",
+    "local": "6b13ae41666c95cb323843c370e575f54d2fd521",
+    "remote": "6b13ae41666c95cb323843c370e575f54d2fd521",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-repo-workflows",
+    "github_tip": "6b13ae41666c95cb323843c370e575f54d2fd521"
+  },
+  {
+    "branch": "t3/fluent-review-map",
+    "local": "e3112905ef7e9647c453b222890eb0b5b3e489dc",
+    "remote": "e3112905ef7e9647c453b222890eb0b5b3e489dc",
+    "exact": true,
+    "reachable_from_github_branch": "t3/fluent-review-map",
+    "github_tip": "e3112905ef7e9647c453b222890eb0b5b3e489dc"
+  },
+  {
+    "branch": "t3/forge-identity-release-preflight",
+    "local": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6",
+    "remote": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6",
+    "exact": true,
+    "reachable_from_github_branch": "t3/forge-identity-release-preflight",
+    "github_tip": "c1cb74e686b4b47e9b33cceb3aecdfb56ac085d6"
+  },
+  {
+    "branch": "t3/forge-selection-branch-visibility",
+    "local": "340c0b86517898eb58b93d34d21be785949c1ce3",
+    "remote": "340c0b86517898eb58b93d34d21be785949c1ce3",
+    "exact": true,
+    "reachable_from_github_branch": "t3/forge-selection-branch-visibility",
+    "github_tip": "340c0b86517898eb58b93d34d21be785949c1ce3"
+  },
+  {
+    "branch": "t3/fork-rebase-safety-review",
+    "local": "94994ce472b746c3f22854c5c7fa96f51ef2d412",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/fork-recovery-review",
+    "local": "2743133d690874512716c2037b6ab0f9c11e6a5a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/gerrit-operation-status",
+    "local": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+    "remote": "918889d5bd6925efb6cad7791cb0706bc0c4f123",
+    "exact": true,
+    "reachable_from_github_branch": "t3/gerrit-operation-status",
+    "github_tip": "918889d5bd6925efb6cad7791cb0706bc0c4f123"
+  },
+  {
+    "branch": "t3/guarded-fork-timeline",
+    "local": "9737efa031d96d6b79f75ee0ef507b4275573b7d",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/recovery-20261108/guarded-fork-timeline",
+    "github_tip": "9737efa031d96d6b79f75ee0ef507b4275573b7d"
+  },
+  {
+    "branch": "t3/history-graph-layout-filters",
+    "local": "6aad5ba689ec889a4fcae3cd377a4ef73c9f23d5",
+    "remote": "6aad5ba689ec889a4fcae3cd377a4ef73c9f23d5",
+    "exact": true,
+    "reachable_from_github_branch": "t3/history-graph-layout-filters",
+    "github_tip": "6aad5ba689ec889a4fcae3cd377a4ef73c9f23d5"
+  },
+  {
+    "branch": "t3/history-investigation-views",
+    "local": "3dfe5cbc8f2b14665a2c08007a1a9236e1f8ed49",
+    "remote": "3dfe5cbc8f2b14665a2c08007a1a9236e1f8ed49",
+    "exact": true,
+    "reachable_from_github_branch": "t3/history-investigation-views",
+    "github_tip": "3dfe5cbc8f2b14665a2c08007a1a9236e1f8ed49"
+  },
+  {
+    "branch": "t3/history-layout",
+    "local": "d3fcf2f66a2de5d34d8794984aa204c3f441c9c2",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/history-layout-review",
+    "local": "3dc515fea42b06c818a43fda93565ebda34a04bd",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/history-visualization-audio",
+    "local": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+    "remote": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+    "exact": true,
+    "reachable_from_github_branch": "t3/history-visualization-audio",
+    "github_tip": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea"
+  },
+  {
+    "branch": "t3/home-error-presentation",
+    "local": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+    "remote": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+    "exact": true,
+    "reachable_from_github_branch": "t3/home-error-presentation",
+    "github_tip": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5"
+  },
+  {
+    "branch": "t3/implement-issue-160",
+    "local": "35368c0549e41c95269a0513e25e1dbd67d52844",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issue-51-ideas",
+    "github_tip": "886b42b54ba23e01e0cdfc477282bbc4afca3de3"
+  },
+  {
+    "branch": "t3/implement-issue-175",
+    "local": "760c79bb69ffc3af5401612bd9c48dcd254eca54",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "dev",
+    "github_tip": "760c79bb69ffc3af5401612bd9c48dcd254eca54"
+  },
+  {
+    "branch": "t3/implement-issue-51-ideas",
+    "local": "886b42b54ba23e01e0cdfc477282bbc4afca3de3",
+    "remote": "886b42b54ba23e01e0cdfc477282bbc4afca3de3",
+    "exact": true,
+    "reachable_from_github_branch": "t3/implement-issue-51-ideas",
+    "github_tip": "886b42b54ba23e01e0cdfc477282bbc4afca3de3"
+  },
+  {
+    "branch": "t3/implement-issues-158-163",
+    "local": "dbb47a144b6ecb0ff3baa57ecdcf8de6ab3bab27",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/recovery-20261108/implement-issues-158-163",
+    "github_tip": "dbb47a144b6ecb0ff3baa57ecdcf8de6ab3bab27"
+  },
+  {
+    "branch": "t3/implement-issues-167-171",
+    "local": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0",
+    "remote": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0",
+    "exact": true,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/implement-review-workflow-ideas",
+    "local": "3e43ced28232183108491acb76bca08a2166f15f",
+    "remote": "3e43ced28232183108491acb76bca08a2166f15f",
+    "exact": true,
+    "reachable_from_github_branch": "t3/implement-review-workflow-ideas",
+    "github_tip": "3e43ced28232183108491acb76bca08a2166f15f"
+  },
+  {
+    "branch": "t3/improve-code-quality",
+    "local": "0922187c78f6ea86b6825ce379cb4b828f08ff63",
+    "remote": "0922187c78f6ea86b6825ce379cb4b828f08ff63",
+    "exact": true,
+    "reachable_from_github_branch": "t3/improve-code-quality",
+    "github_tip": "0922187c78f6ea86b6825ce379cb4b828f08ff63"
+  },
+  {
+    "branch": "t3/integrate-codex-branches",
+    "local": "eb1431a4329c1de6805a69644fee255c4d08396e",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/pr164-review-validation",
+    "github_tip": "eb1431a4329c1de6805a69644fee255c4d08396e"
+  },
+  {
+    "branch": "t3/integrate-interaction-features",
+    "local": "771cbd9924fbdda106a36718c551b95305a9a269",
+    "remote": "771cbd9924fbdda106a36718c551b95305a9a269",
+    "exact": true,
+    "reachable_from_github_branch": "t3/integrate-interaction-features",
+    "github_tip": "771cbd9924fbdda106a36718c551b95305a9a269"
+  },
+  {
+    "branch": "t3/integration-adversarial-review",
+    "local": "94994ce472b746c3f22854c5c7fa96f51ef2d412",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/interaction-desktop-accessibility",
+    "local": "44cd6ea8467ef4bbc10fe861fb9f807dfb09a107",
+    "remote": "44cd6ea8467ef4bbc10fe861fb9f807dfb09a107",
+    "exact": true,
+    "reachable_from_github_branch": "t3/interaction-desktop-accessibility",
+    "github_tip": "44cd6ea8467ef4bbc10fe861fb9f807dfb09a107"
+  },
+  {
+    "branch": "t3/interaction-guard-display",
+    "local": "71503f0650d35a8888a5cdf74e674f92dab27a1d",
+    "remote": "71503f0650d35a8888a5cdf74e674f92dab27a1d",
+    "exact": true,
+    "reachable_from_github_branch": "t3/interaction-guard-display",
+    "github_tip": "71503f0650d35a8888a5cdf74e674f92dab27a1d"
+  },
+  {
+    "branch": "t3/issue51-batch-b",
+    "local": "4c8146849bcf8a7c93f7cab6f256780508c2cb5f",
+    "remote": "4c8146849bcf8a7c93f7cab6f256780508c2cb5f",
+    "exact": true,
+    "reachable_from_github_branch": "t3/issue51-batch-b",
+    "github_tip": "4c8146849bcf8a7c93f7cab6f256780508c2cb5f"
+  },
+  {
+    "branch": "t3/issue51-graph-activity-tests",
+    "local": "60ef236876a3fcb8e73603ef33cd7ae04768ae46",
+    "remote": "60ef236876a3fcb8e73603ef33cd7ae04768ae46",
+    "exact": true,
+    "reachable_from_github_branch": "t3/issue51-graph-activity-tests",
+    "github_tip": "60ef236876a3fcb8e73603ef33cd7ae04768ae46"
+  },
+  {
+    "branch": "t3/issue51-local-fetch-fixtures",
+    "local": "7a789977fbb32f4f1ae3e9f55147853ad7dccb14",
+    "remote": "7a789977fbb32f4f1ae3e9f55147853ad7dccb14",
+    "exact": true,
+    "reachable_from_github_branch": "t3/issue51-local-fetch-fixtures",
+    "github_tip": "7a789977fbb32f4f1ae3e9f55147853ad7dccb14"
+  },
+  {
+    "branch": "t3/issue51-suite-regressions",
+    "local": "81c18601cddad1ab0d5d03475e8d99025c6b7973",
+    "remote": "81c18601cddad1ab0d5d03475e8d99025c6b7973",
+    "exact": true,
+    "reachable_from_github_branch": "t3/issue51-suite-regressions",
+    "github_tip": "81c18601cddad1ab0d5d03475e8d99025c6b7973"
+  },
+  {
+    "branch": "t3/issues-167-171-final",
+    "local": "385db583e148be51273516694ce15f4804977c7f",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/recovery-20261108/issues-167-171-final",
+    "github_tip": "385db583e148be51273516694ce15f4804977c7f"
+  },
+  {
+    "branch": "t3/manual-features-fluent-migration",
+    "local": "a42ac646d92dbb7f56088334dbe99456384fe654",
+    "remote": "a42ac646d92dbb7f56088334dbe99456384fe654",
+    "exact": true,
+    "reachable_from_github_branch": "t3/manual-features-fluent-migration",
+    "github_tip": "a42ac646d92dbb7f56088334dbe99456384fe654"
+  },
+  {
+    "branch": "t3/mechanical-clippy-cleanup",
+    "local": "8733bd8be5fe2a23edab0da99efd956aca9befa9",
+    "remote": "8733bd8be5fe2a23edab0da99efd956aca9befa9",
+    "exact": true,
+    "reachable_from_github_branch": "t3/mechanical-clippy-cleanup",
+    "github_tip": "8733bd8be5fe2a23edab0da99efd956aca9befa9"
+  },
+  {
+    "branch": "t3/merge-prs-single-ci",
+    "local": "d7b3757ac4ed1e6a955c5845a898cb1bfca7ff11",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issue-51-ideas",
+    "github_tip": "886b42b54ba23e01e0cdfc477282bbc4afca3de3"
+  },
+  {
+    "branch": "t3/native-https-credential-fixture",
+    "local": "a05d15a192d7e6714e8e512f0dae4f3dbcbd3599",
+    "remote": "a05d15a192d7e6714e8e512f0dae4f3dbcbd3599",
+    "exact": true,
+    "reachable_from_github_branch": "t3/native-https-credential-fixture",
+    "github_tip": "a05d15a192d7e6714e8e512f0dae4f3dbcbd3599"
+  },
+  {
+    "branch": "t3/normalize-strict-lint",
+    "local": "04f045f4f4ccfb820e69ab103545b612ebb3f8e2",
+    "remote": "04f045f4f4ccfb820e69ab103545b612ebb3f8e2",
+    "exact": true,
+    "reachable_from_github_branch": "t3/normalize-strict-lint",
+    "github_tip": "04f045f4f4ccfb820e69ab103545b612ebb3f8e2"
+  },
+  {
+    "branch": "t3/owned-runtime-fixtures",
+    "local": "5d2714e25b83f01dbe4cb7d0361a08e4a4c06238",
+    "remote": "5d2714e25b83f01dbe4cb7d0361a08e4a4c06238",
+    "exact": true,
+    "reachable_from_github_branch": "t3/owned-runtime-fixtures",
+    "github_tip": "5d2714e25b83f01dbe4cb7d0361a08e4a4c06238"
+  },
+  {
+    "branch": "t3/practice-connections-diagnostics",
+    "local": "8aaadb4fb1af291a12368c3ff0160892126885c1",
+    "remote": "8aaadb4fb1af291a12368c3ff0160892126885c1",
+    "exact": true,
+    "reachable_from_github_branch": "t3/practice-connections-diagnostics",
+    "github_tip": "8aaadb4fb1af291a12368c3ff0160892126885c1"
+  },
+  {
+    "branch": "t3/remote-fluent-interaction",
+    "local": "9c5f5d8504af0a77c51f2d5c6e795c3756ab6112",
+    "remote": "9c5f5d8504af0a77c51f2d5c6e795c3756ab6112",
+    "exact": true,
+    "reachable_from_github_branch": "t3/remote-fluent-interaction",
+    "github_tip": "9c5f5d8504af0a77c51f2d5c6e795c3756ab6112"
+  },
+  {
+    "branch": "t3/repo-worktree-root",
+    "local": "e2a6be9ac6aee1e0ae77b227ea2c4b239da8e20b",
+    "remote": "08bffcfd448f7b02c275a6da7797adb50b28fee6",
+    "exact": false,
+    "reachable_from_github_branch": "t3/repo-worktree-root",
+    "github_tip": "08bffcfd448f7b02c275a6da7797adb50b28fee6"
+  },
+  {
+    "branch": "t3/responsive-diff-detail-compose",
+    "local": "34bc20dec72eb178aeeb4841e7bc47c102764cdc",
+    "remote": "34bc20dec72eb178aeeb4841e7bc47c102764cdc",
+    "exact": true,
+    "reachable_from_github_branch": "t3/responsive-diff-detail-compose",
+    "github_tip": "34bc20dec72eb178aeeb4841e7bc47c102764cdc"
+  },
+  {
+    "branch": "t3/restructure-graph-menus-settings",
+    "local": "28d71cc44edd5b5c291d782a9ba2364e11039e46",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/recovery-20261108/restructure-graph-menus-settings",
+    "github_tip": "28d71cc44edd5b5c291d782a9ba2364e11039e46"
+  },
+  {
+    "branch": "t3/review-area-d-ui",
+    "local": "82ae63be6a1619d0fa699c6dc996665a4992463a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/review-final-candidate",
+    "local": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/review-forge-identity-release",
+    "local": "655b040da0fff6dcfa79f28549ff3fd30a0a2c08",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/review-gitcraft-167-171",
+    "local": "abfa385952c5b76871541828df51c4805a4c49c4",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/review-history-filter-contract",
+    "local": "655b040da0fff6dcfa79f28549ff3fd30a0a2c08",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/review-history-layout-filters",
+    "local": "e9a6812d83280c1cc6b3e5c67e8a754e34cfc9a2",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/review-hosting-routing",
+    "local": "bc8d0c711415eb402d6bdf96eac170ec2402cd0a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/review-issue-171-integration",
+    "local": "ff068f1d5fd9dee20aa380a9b7fca7770d9ab5d8",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/review-issue171-responsive",
+    "local": "04d3149208e88c7e256fe35573865b0542d4271a",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issues-167-171",
+    "github_tip": "7c3b8ead0c809f8a331f91bf3b66c91de7ef91f0"
+  },
+  {
+    "branch": "t3/review-workflow-fluent",
+    "local": "c8b1dc1ff6827ce4833a92c27d948354ab2601ef",
+    "remote": "c8b1dc1ff6827ce4833a92c27d948354ab2601ef",
+    "exact": true,
+    "reachable_from_github_branch": "t3/review-workflow-fluent",
+    "github_tip": "c8b1dc1ff6827ce4833a92c27d948354ab2601ef"
+  },
+  {
+    "branch": "t3/safe-process-supervision",
+    "local": "5242f500186800aeb7ae374f2e283a67ffa1d0ce",
+    "remote": "5242f500186800aeb7ae374f2e283a67ffa1d0ce",
+    "exact": true,
+    "reachable_from_github_branch": "t3/safe-process-supervision",
+    "github_tip": "5242f500186800aeb7ae374f2e283a67ffa1d0ce"
+  },
+  {
+    "branch": "t3/standalone-fluent-migration",
+    "local": "b37050fcfbfbf83e6055fd4e3e86a5e0da38e5b3",
+    "remote": "b37050fcfbfbf83e6055fd4e3e86a5e0da38e5b3",
+    "exact": true,
+    "reachable_from_github_branch": "t3/standalone-fluent-migration",
+    "github_tip": "b37050fcfbfbf83e6055fd4e3e86a5e0da38e5b3"
+  },
+  {
+    "branch": "t3/terminal-bisect-fluent",
+    "local": "2ae6c3bbd0db67e0f2cdb66149726047fe058989",
+    "remote": "2ae6c3bbd0db67e0f2cdb66149726047fe058989",
+    "exact": true,
+    "reachable_from_github_branch": "t3/terminal-bisect-fluent",
+    "github_tip": "2ae6c3bbd0db67e0f2cdb66149726047fe058989"
+  },
+  {
+    "branch": "t3/undo-replay-guard-review",
+    "local": "4cc6a9f970fd8b13aacb059409b9473cc6a147d6",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/recovery-20261108/undo-replay-guard-review",
+    "github_tip": "4cc6a9f970fd8b13aacb059409b9473cc6a147d6"
+  },
+  {
+    "branch": "t3/url-action-boundaries",
+    "local": "d374eff2cb99af9280edfcdc3f3656c1afede153",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/drafts-session-marker-flake",
+    "github_tip": "913bf4a5b46b0e7ce6117539177cd058c807263f"
+  },
+  {
+    "branch": "t3/visualization-review-fixes",
+    "local": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+    "remote": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+    "exact": true,
+    "reachable_from_github_branch": "t3/visualization-review-fixes",
+    "github_tip": "cfc96d8ff949e35d0de5ea643e76b1551b874769"
+  },
+  {
+    "branch": "t3/workflow-r2-two-residuals",
+    "local": "7fa4cf802cd088992e8f93f2063301055724b856",
+    "remote": "7fa4cf802cd088992e8f93f2063301055724b856",
+    "exact": true,
+    "reachable_from_github_branch": "t3/workflow-r2-two-residuals",
+    "github_tip": "7fa4cf802cd088992e8f93f2063301055724b856"
+  },
+  {
+    "branch": "t3/workflow-residual-fixes",
+    "local": "c2da523eb77e724a2aeefecdbc34ebea7e5d415c",
+    "remote": null,
+    "exact": false,
+    "reachable_from_github_branch": "t3/implement-issue-51-ideas",
+    "github_tip": "886b42b54ba23e01e0cdfc477282bbc4afca3de3"
+  },
+  {
+    "branch": "t3/working-state-publication-features",
+    "local": "b84fbb49794189c251121b779dd6a3fd205fabee",
+    "remote": "b84fbb49794189c251121b779dd6a3fd205fabee",
+    "exact": true,
+    "reachable_from_github_branch": "t3/working-state-publication-features",
+    "github_tip": "b84fbb49794189c251121b779dd6a3fd205fabee"
+  },
+  {
+    "branch": "wip/insights-175-notes",
+    "local": "ad25e342efca2a0c88b16bc10cc9a335f9427867",
+    "remote": "ad25e342efca2a0c88b16bc10cc9a335f9427867",
+    "exact": true,
+    "reachable_from_github_branch": "wip/insights-175-notes",
+    "github_tip": "ad25e342efca2a0c88b16bc10cc9a335f9427867"
+  }
+]

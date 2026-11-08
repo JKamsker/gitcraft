@@ -1,0 +1,4298 @@
+{
+  "base": "e4a884ee332e020fe49e9aca713c2f8e907cc318",
+  "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+  "candidate_tree": "b850f6ca51fc5b1e3c46f040a3b95470550297b7",
+  "owner": "6b13ae41666c95cb323843c370e575f54d2fd521",
+  "assembly": "cbafbbac903456da94b69d5eb2eee51115fe2005",
+  "residual_worker": "7fa4cf802cd088992e8f93f2063301055724b856",
+  "review_execution": "immutable Git reads and inert source/hash/JSON/catalog/token parsing only",
+  "findings": [],
+  "prior_inventory_hash_verification": [
+    {
+      "base": "771cbd9924fbdda106a36718c551b95305a9a269",
+      "candidate": "383a4cb577663c9b11685cf7cc0a32a0f7a78b5b",
+      "verified_rows": 283
+    },
+    {
+      "base": "383a4cb577663c9b11685cf7cc0a32a0f7a78b5b",
+      "candidate": "6b13ae41666c95cb323843c370e575f54d2fd521",
+      "verified_rows": 283
+    }
+  ],
+  "prior_review_artifacts_reverified": 22,
+  "owner_receipt_artifacts_reverified": 17,
+  "owner_patch_exact": {
+    "path_count": 48,
+    "sha256": "c0ce3ef981cca011acf4eb9cc00aa4d35e06283b2e9b3c475e0ef38f71a40def"
+  },
+  "assembled_paths": [
+    {
+      "path": "locales/de/repo-workflows.ftl",
+      "base_sha256": "2ad6a989577824deee1b27c872d6dfa5a6ffd174b275a8ad3acbb05950b993d8",
+      "assembly_sha256": "51f34347d8dbf081240c573620ebd940de12b4c1172c6ddb4943d130b60b5fd4",
+      "candidate_sha256": "51f34347d8dbf081240c573620ebd940de12b4c1172c6ddb4943d130b60b5fd4",
+      "owner_sha256": "51f34347d8dbf081240c573620ebd940de12b4c1172c6ddb4943d130b60b5fd4",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "locales/en-US/repo-workflows.ftl",
+      "base_sha256": "14bf819e3b0c8943e923c034876e3def97e79984dfd23594d3ebeeb9434c7adf",
+      "assembly_sha256": "1ab8fc01522a9a8691987d1155fb9a9a38647e67d7e9b9561484cfdac8227fcb",
+      "candidate_sha256": "1ab8fc01522a9a8691987d1155fb9a9a38647e67d7e9b9561484cfdac8227fcb",
+      "owner_sha256": "1ab8fc01522a9a8691987d1155fb9a9a38647e67d7e9b9561484cfdac8227fcb",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/activity/mod.rs",
+      "base_sha256": "0e1d17a8b1f6f66fc46da0c8553cf7c3fc78252949f2a903bd85c6f5d975c213",
+      "assembly_sha256": "21b3a464764062e5816a3d126da0d4b0eda0726e7faf68820ee1a4159bef5327",
+      "candidate_sha256": "21b3a464764062e5816a3d126da0d4b0eda0726e7faf68820ee1a4159bef5327",
+      "owner_sha256": "8290a722b66516196bef07a9ebc56de698c5079a825c16bb2fd611dd6644503e",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/agents/turns.rs",
+      "base_sha256": "4d9c5425e5c454fc6cd77a3abcce65133ee78d76a6d96114ecfc4222a0d4dec1",
+      "assembly_sha256": "8b3723fc8e8ca6e3df264fe6f75ccec03a2418a221e7076ade326ff3db6d5e77",
+      "candidate_sha256": "8b3723fc8e8ca6e3df264fe6f75ccec03a2418a221e7076ade326ff3db6d5e77",
+      "owner_sha256": "a707190e300c996c276f26deab7d501d679638e9167090dae7398d3394055198",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/ai/message.rs",
+      "base_sha256": "114a08a89637cf20db8cc79a7632e227f8b00c161d3711cda25357948b4cae67",
+      "assembly_sha256": "53f2411d2f93cabec1f0a9268145da5879ceb1af09f1cfed2cc3d147e7a3bae5",
+      "candidate_sha256": "53f2411d2f93cabec1f0a9268145da5879ceb1af09f1cfed2cc3d147e7a3bae5",
+      "owner_sha256": "53f2411d2f93cabec1f0a9268145da5879ceb1af09f1cfed2cc3d147e7a3bae5",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/ai/mod.rs",
+      "base_sha256": "e91225cd676c0bac89d6df97ad223ff91ffc91b7c7973366f0c891fb9a059d1e",
+      "assembly_sha256": "68b49a6dc7eadd03542b03282e6aae5ada0e87060e12e72165fc50d64be522a8",
+      "candidate_sha256": "68b49a6dc7eadd03542b03282e6aae5ada0e87060e12e72165fc50d64be522a8",
+      "owner_sha256": "68b49a6dc7eadd03542b03282e6aae5ada0e87060e12e72165fc50d64be522a8",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/atlas/mod.rs",
+      "base_sha256": "2b67c063e59c9c7b8c6444f620a90afa82fa5c24b8410a924284a25e6c18feb7",
+      "assembly_sha256": "c0fa9e99c16d0455e7fe38ebb39d76ad9d81b17225266bec0f0802e7e01998bb",
+      "candidate_sha256": "c0fa9e99c16d0455e7fe38ebb39d76ad9d81b17225266bec0f0802e7e01998bb",
+      "owner_sha256": "c0fa9e99c16d0455e7fe38ebb39d76ad9d81b17225266bec0f0802e7e01998bb",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/bakeoff/mod.rs",
+      "base_sha256": "3cbac8742be6ba2206137888e88a76b1bb2dfa5b2f5bb3953337ae06b74b79f6",
+      "assembly_sha256": "fc11d246a4878e7cea8a1b21226556c0fe93c9386d0cfecb6a4d1984cc880e1c",
+      "candidate_sha256": "fc11d246a4878e7cea8a1b21226556c0fe93c9386d0cfecb6a4d1984cc880e1c",
+      "owner_sha256": "1ce33fd67292816ed0762b3db66a9af4337b6d99f6cdbe7a18d86b8c2f33bcdf",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/bakeoff/view.rs",
+      "base_sha256": "f7ba2c062fc3e5896d53edc0272f641102f4a625dd78d3be2306912c71b4ae76",
+      "assembly_sha256": "6343b3cf79ae7e1f913deaf7044b0b3a8c7b1ed27501576f2990e8a7c94e2f0a",
+      "candidate_sha256": "6343b3cf79ae7e1f913deaf7044b0b3a8c7b1ed27501576f2990e8a7c94e2f0a",
+      "owner_sha256": "61297b0484f7cb1c211e557f257f48b37ff9cfdca0d8e3210c9f43b43e7bfdd0",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/bisect/banner.rs",
+      "base_sha256": "8359182ad353d088d6ac81bf18c24818417785572fdf6c667996de585298dd90",
+      "assembly_sha256": "3bf7c799e030c9590f4eb40b4f8b9c9fa933d5f313131caece7f46ab0d579cb6",
+      "candidate_sha256": "3bf7c799e030c9590f4eb40b4f8b9c9fa933d5f313131caece7f46ab0d579cb6",
+      "owner_sha256": "3bf7c799e030c9590f4eb40b4f8b9c9fa933d5f313131caece7f46ab0d579cb6",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/devcontainer/mod.rs",
+      "base_sha256": "14bf5783858309f069afd1feed2fa64433c84b4fb7affc4d4cbb929f62e15927",
+      "assembly_sha256": "78311468e341b39f744fca3576ee181310844b30811422fef12b2ca703cf26ca",
+      "candidate_sha256": "b4983b5a92461e681100228dd49a2cf7778b70eea1a0c9dace34675f249d4e46",
+      "owner_sha256": "78311468e341b39f744fca3576ee181310844b30811422fef12b2ca703cf26ca",
+      "exact_owner": false,
+      "changed_by_residual": true
+    },
+    {
+      "path": "src/repo/doctor/config_section.rs",
+      "base_sha256": "144178ac94e8d4203345be45df6e39ff9e591e08bb58167dae092c3877d30701",
+      "assembly_sha256": "8abdd23a1c6583a215f6cb6eed5e91ea60f4da1fff1690bb67a379ef84102b4f",
+      "candidate_sha256": "8abdd23a1c6583a215f6cb6eed5e91ea60f4da1fff1690bb67a379ef84102b4f",
+      "owner_sha256": "8abdd23a1c6583a215f6cb6eed5e91ea60f4da1fff1690bb67a379ef84102b4f",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/doctor/flags_section.rs",
+      "base_sha256": "168e016030e1b980c55015678720916f6017e006ea4036b0fbe022a2eb2f25a7",
+      "assembly_sha256": "99b3ab9122b59bb532cb46ba66ade4de9981a6294ebb75fd970650c6247ba0b8",
+      "candidate_sha256": "99b3ab9122b59bb532cb46ba66ade4de9981a6294ebb75fd970650c6247ba0b8",
+      "owner_sha256": "99b3ab9122b59bb532cb46ba66ade4de9981a6294ebb75fd970650c6247ba0b8",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/doctor/health_section.rs",
+      "base_sha256": "b5f18fcf78744b5f1040424a762a7b212d2daf7c30917453cf24decb38c93b0e",
+      "assembly_sha256": "b744fb0e7d623b08502aec126b1510f624eaa59e664afcad00c0be4a255cd91a",
+      "candidate_sha256": "b744fb0e7d623b08502aec126b1510f624eaa59e664afcad00c0be4a255cd91a",
+      "owner_sha256": "b744fb0e7d623b08502aec126b1510f624eaa59e664afcad00c0be4a255cd91a",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/doctor/mod.rs",
+      "base_sha256": "5f126fe2df98295f074a9cdfe2ec04bd2af431045b27ecef15d6bf1239045edc",
+      "assembly_sha256": "798c4154f2c46d4ccf5f8e508116e1eb8902e15ec38282595c23748b079262b1",
+      "candidate_sha256": "798c4154f2c46d4ccf5f8e508116e1eb8902e15ec38282595c23748b079262b1",
+      "owner_sha256": "c2b2278fb53b04cd22d5df0718595bb661bff859649ef0c29f23311a4e4beb6d",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/doctor/page.rs",
+      "base_sha256": "555a1ddbcf8dee1fdd4a1ccaccd68ffafd5714a94720200bfa770e047ec8516b",
+      "assembly_sha256": "b60a0b4940a0504843e3c4c6a2f9b1becfc5648c87706a31283e34cff10bebad",
+      "candidate_sha256": "b60a0b4940a0504843e3c4c6a2f9b1becfc5648c87706a31283e34cff10bebad",
+      "owner_sha256": "b60a0b4940a0504843e3c4c6a2f9b1becfc5648c87706a31283e34cff10bebad",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/doctor/tests.rs",
+      "base_sha256": "926a9f7b8cee55a4f31b32ea3fc66c8c40d59f078d36fc009d11db10fec64862",
+      "assembly_sha256": "34e25dfcf4d50a65ac316b1f5e69cc18f9ed0beb66b1952675cafbe8cef27486",
+      "candidate_sha256": "34e25dfcf4d50a65ac316b1f5e69cc18f9ed0beb66b1952675cafbe8cef27486",
+      "owner_sha256": "e3f0d10c5c2ff87f240ec4eee8032f1c4726d50dd8423a594cc499fa815a5270",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/email/mod.rs",
+      "base_sha256": "c49dc1206ad9608cf2bf5bd581f5f86419ec86ce1201e6e6bd4d4f6c1e0a6ad9",
+      "assembly_sha256": "82f3a2196d891a2153aed3bd779d82fb2beade97478aa50463646ea86802d877",
+      "candidate_sha256": "82f3a2196d891a2153aed3bd779d82fb2beade97478aa50463646ea86802d877",
+      "owner_sha256": "82f3a2196d891a2153aed3bd779d82fb2beade97478aa50463646ea86802d877",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/file_comparison/mod.rs",
+      "base_sha256": "8de395ad52b1ef5f5dce347cf4a24a8863a2f04172d5a6d9923ffff1284c3a9d",
+      "assembly_sha256": "3c98944874d2c9937a8056527a70a740c793a03884034e26e92e6d0032b39168",
+      "candidate_sha256": "3c98944874d2c9937a8056527a70a740c793a03884034e26e92e6d0032b39168",
+      "owner_sha256": "fb1d0317dc5afe4f44c712e5b3fba1d4e1617b89031706bea53441e5e2a418cf",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/file_comparison/model.rs",
+      "base_sha256": "e67606e4f2ecabadc6699fff69801b0137f8434fd127eb7fe37c10ff1051efab",
+      "assembly_sha256": "d312d10a68ab45fe369998b6c8300fe46dddf8426bd4984bf089ddf3e1e7f858",
+      "candidate_sha256": "d312d10a68ab45fe369998b6c8300fe46dddf8426bd4984bf089ddf3e1e7f858",
+      "owner_sha256": "d312d10a68ab45fe369998b6c8300fe46dddf8426bd4984bf089ddf3e1e7f858",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/file_comparison/view.rs",
+      "base_sha256": "cfd5d1496c1cd8d8f8b374468317e60468e1f70c0288db42a71092f528afa7fd",
+      "assembly_sha256": "922ba200d76e215f70d9e12a1e937b5bfc209e4129a5925ec9f55a4683fe658f",
+      "candidate_sha256": "922ba200d76e215f70d9e12a1e937b5bfc209e4129a5925ec9f55a4683fe658f",
+      "owner_sha256": "922ba200d76e215f70d9e12a1e937b5bfc209e4129a5925ec9f55a4683fe658f",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/forks/plan.rs",
+      "base_sha256": "a51826a6b32b9e3ea1c74bdd4a9c43f5ea8bf6f59d128518d3a4c8051d3dc344",
+      "assembly_sha256": "aaa6032a8c8d8df3e365c872058a29e538b41719205817bd4e4f010e0444805c",
+      "candidate_sha256": "aaa6032a8c8d8df3e365c872058a29e538b41719205817bd4e4f010e0444805c",
+      "owner_sha256": "aaa6032a8c8d8df3e365c872058a29e538b41719205817bd4e4f010e0444805c",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/history_activity/mod.rs",
+      "base_sha256": "6337d65887239cb5dab934dd318590d50c3754e8ae29605d05b6b3919d866c39",
+      "assembly_sha256": "df1ebb8e4d29810be4af8bc06cc8496afedf1b1705d8d679e65ce31d496ad86c",
+      "candidate_sha256": "df1ebb8e4d29810be4af8bc06cc8496afedf1b1705d8d679e65ce31d496ad86c",
+      "owner_sha256": "80736555b5ae5a4b796a47c9a88b2bc45669f1b70071cf5a8c714bd369b21d3a",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/history_activity/view.rs",
+      "base_sha256": "3041f00dffec0dc14096b5d8ac4a9b9cb1f5e1f9fcf0edbdeda8d11914666cca",
+      "assembly_sha256": "02929af81ec1aa70b6369086f4587f3ab474a856c8089b5c8e488fa0181dde6f",
+      "candidate_sha256": "02929af81ec1aa70b6369086f4587f3ab474a856c8089b5c8e488fa0181dde6f",
+      "owner_sha256": "02929af81ec1aa70b6369086f4587f3ab474a856c8089b5c8e488fa0181dde6f",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/lfs_locks/banner.rs",
+      "base_sha256": "72513d37dda4b13a27af698b8aa88eb99e1e175688b3bb20bcc918c354e9fcdb",
+      "assembly_sha256": "64a30d7f7b7d7f38b6784ae774626499738e27410175428cfb15dae4317162ff",
+      "candidate_sha256": "64a30d7f7b7d7f38b6784ae774626499738e27410175428cfb15dae4317162ff",
+      "owner_sha256": "64a30d7f7b7d7f38b6784ae774626499738e27410175428cfb15dae4317162ff",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/lfs_locks/jobs.rs",
+      "base_sha256": "f405c085f61c31db667b534da9f7b0d6e206b015f5c772bd4b40f09a8f17e277",
+      "assembly_sha256": "b73a9ce268d4211cd00a227ae3af16b7be588883fa5921819b0b25facd9f76c6",
+      "candidate_sha256": "b73a9ce268d4211cd00a227ae3af16b7be588883fa5921819b0b25facd9f76c6",
+      "owner_sha256": "5085c00b0c5a39f53c618f0ecb1cc7ffb64b518399b7ab17b9a26b8edbd71559",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/lfs_locks/mod.rs",
+      "base_sha256": "f11396ceb74c9f90d2179449838f8214a517a4b0a29612d6e6b0a8885572f169",
+      "assembly_sha256": "c1666deef6599bbb2d4ef4096ef3d12adbd50b2c847d85d18abd96e3781aef1e",
+      "candidate_sha256": "c1666deef6599bbb2d4ef4096ef3d12adbd50b2c847d85d18abd96e3781aef1e",
+      "owner_sha256": "c1666deef6599bbb2d4ef4096ef3d12adbd50b2c847d85d18abd96e3781aef1e",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/lfs_locks/panel.rs",
+      "base_sha256": "c76c214e24716ff315272916698393e65c8e7a5cd2c18a53bc95c77021eb779c",
+      "assembly_sha256": "7955c9282a09a56f831cd2dde0a8f98a31693867dd477e23d973eaf11170ed99",
+      "candidate_sha256": "7955c9282a09a56f831cd2dde0a8f98a31693867dd477e23d973eaf11170ed99",
+      "owner_sha256": "7955c9282a09a56f831cd2dde0a8f98a31693867dd477e23d973eaf11170ed99",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/line_dossier/mod.rs",
+      "base_sha256": "13d73b74089282105e0a8c38df11dc08ff050b9e7d285fdaf9305b8ddc807db6",
+      "assembly_sha256": "b70538902720037c0fd5547ddfdbef4b569bc983fe78918d8f7089b137ccd39a",
+      "candidate_sha256": "b70538902720037c0fd5547ddfdbef4b569bc983fe78918d8f7089b137ccd39a",
+      "owner_sha256": "741baeeb14739a3c8c088c72ec238d3330e491adfbd80dcd2ddf6006b2477258",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/line_dossier/view.rs",
+      "base_sha256": "10d7b53639cbdd02a3fc6b7d7e09b0f71415f9edd48380f29f8eed49b39e3b35",
+      "assembly_sha256": "c578fd5855232942f3b1899b88f69d854259774672a572d58728b9b13c0dee1e",
+      "candidate_sha256": "c578fd5855232942f3b1899b88f69d854259774672a572d58728b9b13c0dee1e",
+      "owner_sha256": "c578fd5855232942f3b1899b88f69d854259774672a572d58728b9b13c0dee1e",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/local_ci/mod.rs",
+      "base_sha256": "43db0ab0ac0f206ea6ab15955f39b6c7e5ddc5ca57e01ef1f9cd5bcf480d66f1",
+      "assembly_sha256": "b5b6cd6d2060e75f4db46e983bfb5934037be79a5af8b10561e0d2a56f809380",
+      "candidate_sha256": "e9113c6cef55dbd6d14376e868dbe2552c4a0ead41967f18e1cc842d778ccb0a",
+      "owner_sha256": "b5b6cd6d2060e75f4db46e983bfb5934037be79a5af8b10561e0d2a56f809380",
+      "exact_owner": false,
+      "changed_by_residual": true
+    },
+    {
+      "path": "src/repo/local_ci/model.rs",
+      "base_sha256": "cd15cb422e631b5668ff54d0aad2fcdae3c7c2248e84a5fc76fd349bb7a10e69",
+      "assembly_sha256": "9fb1ab6fd7b894306e393aa44c136971a300ca6fbfa28b1fb394ff3954e80efc",
+      "candidate_sha256": "9fb1ab6fd7b894306e393aa44c136971a300ca6fbfa28b1fb394ff3954e80efc",
+      "owner_sha256": "9fb1ab6fd7b894306e393aa44c136971a300ca6fbfa28b1fb394ff3954e80efc",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/local_ci/run.rs",
+      "base_sha256": "370711656a62cc22be8c846c4cc341a9c6594f55870a21b952e460ac4c6bcb7f",
+      "assembly_sha256": "3940f3ba6dd82ce2fa5136aab7fd87dac0a364c8354624edc56680872b81016c",
+      "candidate_sha256": "3940f3ba6dd82ce2fa5136aab7fd87dac0a364c8354624edc56680872b81016c",
+      "owner_sha256": "3940f3ba6dd82ce2fa5136aab7fd87dac0a364c8354624edc56680872b81016c",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/messages/workflow.rs",
+      "base_sha256": "2d5b82d9e04d89fb235161154f485a8a489024997b507b8599388c84a227d9a7",
+      "assembly_sha256": "58c8b798927aa55380977e0bd675c363cfe4befa774556a7ec96720324e996b9",
+      "candidate_sha256": "58c8b798927aa55380977e0bd675c363cfe4befa774556a7ec96720324e996b9",
+      "owner_sha256": null,
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/messages/workflow/tests.rs",
+      "base_sha256": "cdf5cce93abf8ea6af44cade6a41a76c2c64a0f82aaf98ae76d44f746c969089",
+      "assembly_sha256": "7ebd922130eca7b6262066912ef905de3ff5b0f4e80bc4b28c6ea568aebb8722",
+      "candidate_sha256": "7ebd922130eca7b6262066912ef905de3ff5b0f4e80bc4b28c6ea568aebb8722",
+      "owner_sha256": null,
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/parallel_bisect/marks.rs",
+      "base_sha256": "90eeb72c49428c4b4742901b22bf3907e6518d38add47ca46d484dd9176e5fde",
+      "assembly_sha256": "aa803cd825dab213de66281dc8cacb1b6533929185b6412e24d7ab69e7c41060",
+      "candidate_sha256": "aa803cd825dab213de66281dc8cacb1b6533929185b6412e24d7ab69e7c41060",
+      "owner_sha256": "aa803cd825dab213de66281dc8cacb1b6533929185b6412e24d7ab69e7c41060",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/pr_view/timeline.rs",
+      "base_sha256": "60432c1492e5d0f510634c16afba25b087d3ba328115aa43af0c4832961c4f1e",
+      "assembly_sha256": "ed8e9f71323c1a98557e2a92e44b5cc42c1ec253c566efb22d51ab8dba6fbb7a",
+      "candidate_sha256": "ed8e9f71323c1a98557e2a92e44b5cc42c1ec253c566efb22d51ab8dba6fbb7a",
+      "owner_sha256": "ed8e9f71323c1a98557e2a92e44b5cc42c1ec253c566efb22d51ab8dba6fbb7a",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/release/mod.rs",
+      "base_sha256": "b655f5eb92630ea89b59f4056e9c0e9191979905858f421c1390a5d71b66bb5f",
+      "assembly_sha256": "762b0eed4dc267fcdddfb67b581cafbbad5205206cf45499c8ccc9ecba13952d",
+      "candidate_sha256": "762b0eed4dc267fcdddfb67b581cafbbad5205206cf45499c8ccc9ecba13952d",
+      "owner_sha256": "14b7807d1726fc8db4844651114c375578a47616711be864e49b8e4821d609da",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/repository_tools/deferred.rs",
+      "base_sha256": "d93dfcaee800a008b96f404fb5625f92f7a145ab5e6b4b7160220f35cbdb9b84",
+      "assembly_sha256": "d94a4b2b32e43e89a007e321f642d826b35de139e3bfb47b5c65844c0e1fa449",
+      "candidate_sha256": "d94a4b2b32e43e89a007e321f642d826b35de139e3bfb47b5c65844c0e1fa449",
+      "owner_sha256": "c732ed713a714e38ea47d61dff0fecb5cddaf78d4798fb0761e8f05d1bb24cad",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/saved_views/mod.rs",
+      "base_sha256": "d2174232953d859827ca8322478159afe1bce77914141077ea5f050cdbc8b4bb",
+      "assembly_sha256": "93de9a4d81780c8adf730ef8999b4682e9d3fb191c7b6d13163def413f8e721a",
+      "candidate_sha256": "93de9a4d81780c8adf730ef8999b4682e9d3fb191c7b6d13163def413f8e721a",
+      "owner_sha256": "93de9a4d81780c8adf730ef8999b4682e9d3fb191c7b6d13163def413f8e721a",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/saved_views/reader.rs",
+      "base_sha256": "b79547ff82c9dcea55e4a72ea29daf1240d327be3415f4a5679f9edad6af38dc",
+      "assembly_sha256": "bb605e62e20742c8b7404efad797745b88d75f54edefe4681f76e4363a59a7dc",
+      "candidate_sha256": "bb605e62e20742c8b7404efad797745b88d75f54edefe4681f76e4363a59a7dc",
+      "owner_sha256": "bb605e62e20742c8b7404efad797745b88d75f54edefe4681f76e4363a59a7dc",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/saved_views/tests.rs",
+      "base_sha256": "01fdfd93d7921c0881ba6eb8692e11cfde5e907eef70f195876e08fed754636f",
+      "assembly_sha256": "f4ac6ab2aa7cf37c6eb23dd49ecd6798c597904eb66121dc610752dbdeccef12",
+      "candidate_sha256": "f4ac6ab2aa7cf37c6eb23dd49ecd6798c597904eb66121dc610752dbdeccef12",
+      "owner_sha256": "f4ac6ab2aa7cf37c6eb23dd49ecd6798c597904eb66121dc610752dbdeccef12",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/saved_views/view.rs",
+      "base_sha256": "848b7da8703f78e3760f119a95bea0fbf789c627ee84ffa7d68c78d9d879db2a",
+      "assembly_sha256": "2fb088d85bf3073fc9122592f03e0304a5099719570a49c4e202a3d481a17ecd",
+      "candidate_sha256": "2fb088d85bf3073fc9122592f03e0304a5099719570a49c4e202a3d481a17ecd",
+      "owner_sha256": "2fb088d85bf3073fc9122592f03e0304a5099719570a49c4e202a3d481a17ecd",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/ssh_setup/mod.rs",
+      "base_sha256": "37760e142616461cf84860fc797192f2801e15e8c53e923a3733884ee7786bb6",
+      "assembly_sha256": "2450d96122c27ae1c0cdc2e32af39f63648e0859bc3b1cdab1983888c626d82f",
+      "candidate_sha256": "2450d96122c27ae1c0cdc2e32af39f63648e0859bc3b1cdab1983888c626d82f",
+      "owner_sha256": "2726388f9526ebe830731d47ee26c316cc7c2ca172034fe5766341872488dc9a",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/stack/mod.rs",
+      "base_sha256": "3d04030c0450b54195e2bf959ce02f81c17c0a57d9384e7268a9378abea20740",
+      "assembly_sha256": "e1a6eec590f0c3810cc1a070c7d6c7dcb05bfbaefda6f1d2aad7db61ebea3519",
+      "candidate_sha256": "e1a6eec590f0c3810cc1a070c7d6c7dcb05bfbaefda6f1d2aad7db61ebea3519",
+      "owner_sha256": "0e914d2557797e0d8e088f05c432730f4912a17f215cc55bb1aee38ebf0d98b0",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/stack/section.rs",
+      "base_sha256": "c1649d134582893d4a83ae8c964fc544e43a1b27d217f03f8be913d6050dd628",
+      "assembly_sha256": "fb7d76e5dcb3f8a6fd4a6e55a043b8b50a1d609fb97a2907248b1ccb6abd7a30",
+      "candidate_sha256": "fb7d76e5dcb3f8a6fd4a6e55a043b8b50a1d609fb97a2907248b1ccb6abd7a30",
+      "owner_sha256": "fb7d76e5dcb3f8a6fd4a6e55a043b8b50a1d609fb97a2907248b1ccb6abd7a30",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/test_lane/banner.rs",
+      "base_sha256": "59d33b879788f3839e1a24bc1c02b94d3d86149578480443968c3f1e245e9c53",
+      "assembly_sha256": "ee4b8a1daac8bf3db2c3bdef49012f1fe88209848a344f4419d25b4059b82f31",
+      "candidate_sha256": "ee4b8a1daac8bf3db2c3bdef49012f1fe88209848a344f4419d25b4059b82f31",
+      "owner_sha256": "ee4b8a1daac8bf3db2c3bdef49012f1fe88209848a344f4419d25b4059b82f31",
+      "exact_owner": true,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/test_lane/mod.rs",
+      "base_sha256": "2208f3de907e28bcf4298cccb1cb0698eeccbf92d3f4bd6453fe35e48f9f2b35",
+      "assembly_sha256": "f9216fe7dbc062be99b3d94321ed080ad30f5a63350b4adcecb455544d255d21",
+      "candidate_sha256": "f9216fe7dbc062be99b3d94321ed080ad30f5a63350b4adcecb455544d255d21",
+      "owner_sha256": "fba20d104cf37f78a65ff8ea521fc08e5336b3d130a0c9dba667a47ece0b2627",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/timeline/view.rs",
+      "base_sha256": "2a029ca52997a4e4cad7187a9cd3b11361cf8d55c43a67ef8a9ab79f8cc3b735",
+      "assembly_sha256": "1d8edea4f09010cffc9084343b4999f78cffad1ed9fa0ca604586e5dfd9e5b6b",
+      "candidate_sha256": "1d8edea4f09010cffc9084343b4999f78cffad1ed9fa0ca604586e5dfd9e5b6b",
+      "owner_sha256": "c519b467ef0d8d582aaa540f789c6e1248d2b794a6cfd678a1451208fe19768b",
+      "exact_owner": false,
+      "changed_by_residual": false
+    },
+    {
+      "path": "src/repo/versions/view.rs",
+      "base_sha256": "b04df48c50779226540714c68c2e98987475070129a58a5b8524b92e4262bc62",
+      "assembly_sha256": "0f094599d7e8643277923e2f4aff56c77cf9a3459a3f61efb629ad3123d70a77",
+      "candidate_sha256": "0f094599d7e8643277923e2f4aff56c77cf9a3459a3f61efb629ad3123d70a77",
+      "owner_sha256": "0f094599d7e8643277923e2f4aff56c77cf9a3459a3f61efb629ad3123d70a77",
+      "exact_owner": true,
+      "changed_by_residual": false
+    }
+  ],
+  "residual_production_exact_worker": true,
+  "residual_new_test_scaffold_only_difference": "diff --git a/src/repo/local_ci/mod.rs b/src/repo/local_ci/mod.rs\nindex 06f4ecf6..63ed0598 100644\n--- a/src/repo/local_ci/mod.rs\n+++ b/src/repo/local_ci/mod.rs\n@@ -646,7 +646,6 @@ impl State {\n \n #[cfg(test)]\n mod fluent_r2_guard_tests {\n-    #![allow(clippy::unwrap_used)]\n     use super::*;\n     use egui_kittest::{Harness, kittest::Queryable};\n \n@@ -656,23 +655,23 @@ mod fluent_r2_guard_tests {\n             url: \"https://github.com/supplied/opaque-repo.git\".into(),\n         }]\n     }\n-    fn supplied_state() -> State {\n+    fn supplied_state() -> Result<State, String> {\n         let mut state = State::default();\n-        state.workflows = vec![model::parse(\"opaque.yml\".into(), \"on: [push]\\njobs:\\n  opaque-job:\\n    runs-on: ubuntu-latest\\n    steps: [{run: 'opaque command --unchanged'}]\\n\".into()).unwrap()];\n+        state.workflows = vec![model::parse(\"opaque.yml\".into(), \"on: [push]\\njobs:\\n  opaque-job:\\n    runs-on: ubuntu-latest\\n    steps: [{run: 'opaque command --unchanged'}]\\n\".into())?];\n         state.remote = \"fork\".into();\n         state.remote_override = true;\n-        state.displayed_context = Some(context::Context::capture(\"fork\", &remotes()).unwrap());\n+        state.displayed_context = Some(context::Context::capture(\"fork\", &remotes())?);\n         state.payload = \"{\\\"opaque\\\":\\\"Working…\\\"}\".into();\n         state.platforms = \"ubuntu-latest=supplied/image\".into();\n         state.architecture = \"linux/arm64\".into();\n         state.minutes = 17;\n         state.trust = true;\n         state.provenance = Some(\"opaque prior provenance\\nKein Matrixeintrag ausgewählt\".into());\n-        state\n+        Ok(state)\n     }\n-    fn snapshot(state: &State) -> String {\n-        let log = state.log.lock().unwrap();\n-        format!(\n+    fn snapshot(state: &State) -> Result<String, String> {\n+        let log = state.log.lock().map_err(|e| e.to_string())?;\n+        Ok(format!(\n             \"{:?}\",\n             (\n                 (\n@@ -696,10 +695,10 @@ mod fluent_r2_guard_tests {\n                 (state.trust, state.busy(), &state.provenance),\n                 (Arc::as_ptr(&state.log), &log.text, &log.rows, log.truncated),\n             )\n-        )\n+        ))\n     }\n-    fn repaint_same_state(state: State, raw: &str, german: &str) {\n-        let before = snapshot(&state);\n+    fn repaint_same_state(state: State, raw: &str, german: &str) -> Result<(), String> {\n+        let before = snapshot(&state)?;\n         let mut h = Harness::new_ui_state(\n             |ui, state: &mut State| {\n                 let mut actions = Vec::new();\n@@ -714,20 +713,25 @@ mod fluent_r2_guard_tests {\n             h.get_by_label(expected);\n             assert_eq!(h.state().display_result_error(raw), expected);\n             assert_eq!(h.state().result.as_ref(), Some(&Err(raw.to_owned())));\n-            assert_eq!(snapshot(h.state()), before);\n+            assert_eq!(snapshot(h.state())?, before);\n             assert!(h.state().pending.is_none());\n         }\n+        Ok(())\n     }\n \n     #[test]\n-    fn actual_context_guard_retains_raw_error_and_repaints_without_restoring_consent() {\n+    fn actual_context_guard_retains_raw_error_and_repaints_without_restoring_consent()\n+    -> Result<(), String> {\n         for created_in in [\"en-US\", \"de\"] {\n             crate::i18n::set_language(created_in);\n-            let mut state = supplied_state();\n-            let old = snapshot(&state);\n-            let displayed = state.displayed_context.clone().unwrap();\n+            let mut state = supplied_state()?;\n+            let old = snapshot(&state)?;\n+            let displayed = state\n+                .displayed_context\n+                .clone()\n+                .ok_or(\"missing supplied context\")?;\n             assert!(state.run_context_matches(&displayed));\n-            assert_eq!(snapshot(&state), old);\n+            assert_eq!(snapshot(&state)?, old);\n             assert!(state.result.is_none());\n             let changed = context::Context::capture(\n                 \"fork\",\n@@ -735,8 +739,7 @@ mod fluent_r2_guard_tests {\n                     name: \"fork\".into(),\n                     url: \"https://github.com/replacement/repo.git\".into(),\n                 }],\n-            )\n-            .unwrap();\n+            )?;\n             assert!(!state.run_context_matches(&changed));\n             assert!(!state.trust);\n             assert_eq!(state.displayed_context.as_ref(), Some(&displayed));\n@@ -744,20 +747,22 @@ mod fluent_r2_guard_tests {\n                 state,\n                 \"Repository context changed since display; review it before running\",\n                 \"Der Repository-Kontext hat sich seit der Anzeige geändert. Vor dem Start erneut prüfen.\",\n-            );\n+            )?;\n         }\n         crate::i18n::set_language(\"en-US\");\n+        Ok(())\n     }\n \n     #[test]\n-    fn actual_matrix_guard_retains_raw_error_and_selection_eligibility_without_submitting() {\n+    fn actual_matrix_guard_retains_raw_error_and_selection_eligibility_without_submitting()\n+    -> Result<(), String> {\n         for created_in in [\"en-US\", \"de\"] {\n             crate::i18n::set_language(created_in);\n-            let mut state = supplied_state();\n-            let entries = state.workflows[0].matrices(\"opaque-job\").unwrap();\n-            let before = snapshot(&state);\n+            let mut state = supplied_state()?;\n+            let entries = state.workflows[0].matrices(\"opaque-job\")?;\n+            let before = snapshot(&state)?;\n             assert_eq!(state.run_matrix(&entries), Some(entries[0].clone()));\n-            assert_eq!(snapshot(&state), before);\n+            assert_eq!(snapshot(&state)?, before);\n             assert!(state.result.is_none());\n             state.matrix = entries.len();\n             assert!(state.run_matrix(&entries).is_none());\n@@ -767,21 +772,27 @@ mod fluent_r2_guard_tests {\n                 state,\n                 \"No selected matrix entry\",\n                 \"Kein Matrixeintrag ausgewählt\",\n-            );\n+            )?;\n         }\n         crate::i18n::set_language(\"en-US\");\n+        Ok(())\n     }\n \n     #[test]\n-    fn local_guard_receipt_rejects_mismatch_and_leaves_unmarked_provider_details_opaque() {\n-        let mut state = supplied_state();\n+    fn local_guard_receipt_rejects_mismatch_and_leaves_unmarked_provider_details_opaque()\n+    -> Result<(), String> {\n+        let mut state = supplied_state()?;\n         state.remember_failure(ResultFailure::MissingMatrix);\n         state.result = Some(Err(\n             \"provider diagnostic\\nNo selected matrix entry\\nKein Matrixeintrag ausgewählt\".into(),\n         ));\n         for lang in [\"en-US\", \"de\", \"en-US\"] {\n             crate::i18n::set_language(lang);\n-            let raw = state.result.as_ref().unwrap().as_ref().unwrap_err();\n+            let raw = state\n+                .result\n+                .as_ref()\n+                .and_then(|r| r.as_ref().err())\n+                .ok_or(\"missing supplied failure\")?;\n             assert_eq!(state.display_result_error(raw), *raw);\n         }\n         state.result_presentation = None;\n@@ -798,5 +809,6 @@ mod fluent_r2_guard_tests {\n             }\n         }\n         crate::i18n::set_language(\"en-US\");\n+        Ok(())\n     }\n }\n",
+  "canonical_preservation": [
+    {
+      "path": "src/repo/agent/flow_tests.rs",
+      "sha256": "f5173db26bab5f7f6b4fc83f1810ddb490130aa736964cbd8ccd6b37cb60f8cb",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/agent/mod.rs",
+      "sha256": "a31a33017b7f1eeed0cb43dfc357acfd58025f1f2314c702122717b6beefeac3",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/agent/plan.rs",
+      "sha256": "6f08266fda39dee2647546719ccd2b3dcf8a858cc6bde45ec3688861413831d6",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/agent/plan/tests.rs",
+      "sha256": "f9fee3de4c17845cd159bf7afcd8067d52eb556cfc30248c3ebc3221b919b78d",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/agent/preview.rs",
+      "sha256": "0f91bfd9fcf95301c52b1a59b59494e120d9b24407cb04ef7cf1666f6d408f1d",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/dco/mod.rs",
+      "sha256": "c4f40c42a2643f926ef87072d569bfa45f52c6e90cdab31b9acc7b5780ec66a4",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/dco/signoff.rs",
+      "sha256": "3582079e323056cc7a94d8201446eb77bba3778fc3d53b19bcfba78908f3424c",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/dco/tests.rs",
+      "sha256": "985b5918f1a2e678f2e0f1d531e625298142cc6938f9f51f97ac4175f2296c2f",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/dco/view.rs",
+      "sha256": "8c8d3801b73d38299275d52f0b54def3b71ca4b2070cfd6f195768b2418b8494",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/mod.rs",
+      "sha256": "505a5065b5c3c4a699902d1098105b9008e101052ee4193205e43f95b29b54a9",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/op.rs",
+      "sha256": "2d3aaa4147228e0cfd7bb81fcef1e55c67fdcd0138cd1109d7dc7f5a11ab74f0",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/plan.rs",
+      "sha256": "ce4cda68b8df282951403535ba20e3275d13c13d27580c90410a79d6a309c484",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/strip.rs",
+      "sha256": "932e6ede4ef19aeb0a87f38ece4218711ae68a0d075cc164e8e129df7f44ccce",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/tests.rs",
+      "sha256": "aa427057dea186f56f22b6202a8f90d21418b770ef97d797331118aa56b82dfa",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/ghost/view.rs",
+      "sha256": "1c4c265fdd2bf8d18d8e7cd3baecc359f89985fddbbe287391d4488a9bbca899",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/package/mod.rs",
+      "sha256": "3f73f373a11f8cac7b222f3d1e3ba8e5e59cfdf6f42a707dc50e9c41c3a742b3",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/package/tests.rs",
+      "sha256": "04afcee63fcab00472d83259af6163c1f98011f9805cba72274c58bb77c1939e",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/package/view.rs",
+      "sha256": "a673b06c0d73b16f1689ae40324e4ee13d329d58165278d20091d49de2641ed9",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/anchors.rs",
+      "sha256": "511d6cfe1ef05f9cb6fe8a0dff34d1793bdaca3ab506a7151dddb5734d3bf9bd",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/choreography.rs",
+      "sha256": "ae44cb53ca5e2874422bf6fe25d235f336c529ffb4c1f99e8ed8f50906ae5f2d",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/continuous.rs",
+      "sha256": "ef62e0362ebc70d042ec19fb060c8cdae33cffbb213917fa087d2dec94719c41",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/contracts.rs",
+      "sha256": "e34a460c652c1b35a49561544909e8625b9f1545bcf242ffdaf6a55fc2dd3b75",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/echo.rs",
+      "sha256": "dd9074b826be146c340c3ffad22dc3c0d63f4bac0c2ff47eee8b6df5788e0299",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/echo_push.rs",
+      "sha256": "8866c0b9ab81437060cfe7530c7be1790233fef0a83cb83af68f4a80a1c7de7b",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/freshness.rs",
+      "sha256": "b40371d6386a8e419fecbfe887167ec8d8a5c750c89f7a8b1027abe8e7f4bee5",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/intents.rs",
+      "sha256": "ab4848044d9100b0070c09f6f334d9ba7e6cd33543f74d0d2cbd8b6e1497e2ce",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/mod.rs",
+      "sha256": "2b37d05fa09d5214546907d995e9772855dc5874f6259920adcd1d93c3159f2b",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/radar.rs",
+      "sha256": "01d154cfef0b0be69959ca885164ac6dda0cb2ff9b1b698447519ef82475c11d",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer.rs",
+      "sha256": "3fbfbd575408f7815343275af0a68ee179e3bda1f7acaaea321669083f21c545",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_docker.rs",
+      "sha256": "d94d42abfd844fe7a4d541d679f266da48acde5c1784d733df871208193dc6dc",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_source.rs",
+      "sha256": "c72c7526a787aa0cb1fb7b816366fb1a95926ffcd2b91d15ae7441d5c5f360ff",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/rust_dependencies.rs",
+      "sha256": "d3514fef2cb433134d75b64580eb804034fae4adb2aecbdfc2b2d241dc3f46f7",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/sharing.rs",
+      "sha256": "9e4fb422618862dd41c9d634c53816100667039edac96ffc44142dab2f9a645f",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/store.rs",
+      "sha256": "b6ab52731344902f9e472d9d7e48011eb450636452d2c191c062e0f90af24717",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/storyboard.rs",
+      "sha256": "198539efbd4d40ba94b62103d95866af597678df4334708133032af217640767",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/review_workflow/tools.rs",
+      "sha256": "bd17b9c0ea9c95f16782913e2b9057114ccddd545571e585394b91d1badce8e8",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/state.rs",
+      "sha256": "3784cc0fca44936f24ed2e7c876469d6a1a10169c34bf5521cbc244dfb348d02",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "sha256": "53602bcae8ffccf4c1288dc07cd4585b5c2db2a7c4aa961dbb3a3dcd8b743496",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/navigate.rs",
+      "sha256": "5ea17025f3d7cbb50d74cdbb5303b5901aed8030354a2436bfbdcfb0d6d1f116",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "src/repo/detail/compare.rs",
+      "sha256": "4baf50256c28ce44d8ac4cab6abb48199690a96fa1a4f36fa5e846cf42d23b8a",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "locales/en-US/repo-workflows-review.ftl",
+      "sha256": "e53938fb088ddadf693aa824fb0d2e19168f4ae7ff6e940ad3f676d08480312e",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "locales/de/repo-workflows-review.ftl",
+      "sha256": "f58a6a4cf5f7e795985e374f4349832c63318c8b88f486c216592924e881f794",
+      "unchanged_from_base": true
+    }
+  ],
+  "original_283_root_hashes": [
+    {
+      "path": "src/repo/activity/mod.rs",
+      "base_sha256": "0e1d17a8b1f6f66fc46da0c8553cf7c3fc78252949f2a903bd85c6f5d975c213",
+      "candidate_sha256": "21b3a464764062e5816a3d126da0d4b0eda0726e7faf68820ee1a4159bef5327",
+      "changed": true
+    },
+    {
+      "path": "src/repo/activity/tests.rs",
+      "base_sha256": "54b4251efefc78d78179d1cc94080a7e59f9bd864cb1ebaff285be5ea4e061cd",
+      "candidate_sha256": "54b4251efefc78d78179d1cc94080a7e59f9bd864cb1ebaff285be5ea4e061cd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/activity/view.rs",
+      "base_sha256": "e78321ec5203f324650515be4cc34a4aa5073808169f45840f0ab26dd181146d",
+      "candidate_sha256": "e78321ec5203f324650515be4cc34a4aa5073808169f45840f0ab26dd181146d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agent/flow_tests.rs",
+      "base_sha256": "f5173db26bab5f7f6b4fc83f1810ddb490130aa736964cbd8ccd6b37cb60f8cb",
+      "candidate_sha256": "f5173db26bab5f7f6b4fc83f1810ddb490130aa736964cbd8ccd6b37cb60f8cb",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agent/mod.rs",
+      "base_sha256": "a31a33017b7f1eeed0cb43dfc357acfd58025f1f2314c702122717b6beefeac3",
+      "candidate_sha256": "a31a33017b7f1eeed0cb43dfc357acfd58025f1f2314c702122717b6beefeac3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agent/plan.rs",
+      "base_sha256": "6f08266fda39dee2647546719ccd2b3dcf8a858cc6bde45ec3688861413831d6",
+      "candidate_sha256": "6f08266fda39dee2647546719ccd2b3dcf8a858cc6bde45ec3688861413831d6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agent/plan/tests.rs",
+      "base_sha256": "f9fee3de4c17845cd159bf7afcd8067d52eb556cfc30248c3ebc3221b919b78d",
+      "candidate_sha256": "f9fee3de4c17845cd159bf7afcd8067d52eb556cfc30248c3ebc3221b919b78d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agent/preview.rs",
+      "base_sha256": "0f91bfd9fcf95301c52b1a59b59494e120d9b24407cb04ef7cf1666f6d408f1d",
+      "candidate_sha256": "0f91bfd9fcf95301c52b1a59b59494e120d9b24407cb04ef7cf1666f6d408f1d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/handoff.rs",
+      "base_sha256": "4e705e4590e55dce639bca1ee92083ffe6437d1733e4add93af3b63377f47c15",
+      "candidate_sha256": "4e705e4590e55dce639bca1ee92083ffe6437d1733e4add93af3b63377f47c15",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/handoff_tests.rs",
+      "base_sha256": "70852f4574653da8ec6facdf6b0ca9f0a0cab1a7f1fd2e3cbe55ee0d894cf2b8",
+      "candidate_sha256": "70852f4574653da8ec6facdf6b0ca9f0a0cab1a7f1fd2e3cbe55ee0d894cf2b8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/mod.rs",
+      "base_sha256": "cdb4aef3f0975821525b06d2ccdc87fd1a32adf8266d1fab2314a908ac84cd3e",
+      "candidate_sha256": "cdb4aef3f0975821525b06d2ccdc87fd1a32adf8266d1fab2314a908ac84cd3e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/panel.rs",
+      "base_sha256": "4e381d586a094ad66d65b63a3531401aab80f186a86bc1a3b0c27e4163f43da1",
+      "candidate_sha256": "4e381d586a094ad66d65b63a3531401aab80f186a86bc1a3b0c27e4163f43da1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/recipe_editor.rs",
+      "base_sha256": "204917dd8ff3e24678ae7d84decf9d8eedbaa79ed5863ba011bb29b3f383e315",
+      "candidate_sha256": "204917dd8ff3e24678ae7d84decf9d8eedbaa79ed5863ba011bb29b3f383e315",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/start.rs",
+      "base_sha256": "d750a6498f361643b89167727b79174b506598d4de1172d221f828b108194a2e",
+      "candidate_sha256": "d750a6498f361643b89167727b79174b506598d4de1172d221f828b108194a2e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/tests.rs",
+      "base_sha256": "fb912d1ba9d2144d8b5a7e5e341e01cc509ba0c88b3a50c2c468f5c67f94b086",
+      "candidate_sha256": "fb912d1ba9d2144d8b5a7e5e341e01cc509ba0c88b3a50c2c468f5c67f94b086",
+      "changed": false
+    },
+    {
+      "path": "src/repo/agents/turns.rs",
+      "base_sha256": "4d9c5425e5c454fc6cd77a3abcce65133ee78d76a6d96114ecfc4222a0d4dec1",
+      "candidate_sha256": "8b3723fc8e8ca6e3df264fe6f75ccec03a2418a221e7076ade326ff3db6d5e77",
+      "changed": true
+    },
+    {
+      "path": "src/repo/ai/message.rs",
+      "base_sha256": "114a08a89637cf20db8cc79a7632e227f8b00c161d3711cda25357948b4cae67",
+      "candidate_sha256": "53f2411d2f93cabec1f0a9268145da5879ceb1af09f1cfed2cc3d147e7a3bae5",
+      "changed": true
+    },
+    {
+      "path": "src/repo/ai/mod.rs",
+      "base_sha256": "e91225cd676c0bac89d6df97ad223ff91ffc91b7c7973366f0c891fb9a059d1e",
+      "candidate_sha256": "68b49a6dc7eadd03542b03282e6aae5ada0e87060e12e72165fc50d64be522a8",
+      "changed": true
+    },
+    {
+      "path": "src/repo/ai/review.rs",
+      "base_sha256": "4a41e55caa3b1264fb400f0deb146ad8a935facbc9af3bf17221980cde62f2ba",
+      "candidate_sha256": "4a41e55caa3b1264fb400f0deb146ad8a935facbc9af3bf17221980cde62f2ba",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ai/tests.rs",
+      "base_sha256": "2bdb90992f9e0f48174fc431b0a18a1afb48b4f633a18505014f160476fe1e41",
+      "candidate_sha256": "2bdb90992f9e0f48174fc431b0a18a1afb48b4f633a18505014f160476fe1e41",
+      "changed": false
+    },
+    {
+      "path": "src/repo/atlas/byte_history.rs",
+      "base_sha256": "4736e0d0875c3ece0a0eb2b611da5049063c3d544f5f5c74880202ae13218fde",
+      "candidate_sha256": "4736e0d0875c3ece0a0eb2b611da5049063c3d544f5f5c74880202ae13218fde",
+      "changed": false
+    },
+    {
+      "path": "src/repo/atlas/mod.rs",
+      "base_sha256": "2b67c063e59c9c7b8c6444f620a90afa82fa5c24b8410a924284a25e6c18feb7",
+      "candidate_sha256": "c0fa9e99c16d0455e7fe38ebb39d76ad9d81b17225266bec0f0802e7e01998bb",
+      "changed": true
+    },
+    {
+      "path": "src/repo/bakeoff/mod.rs",
+      "base_sha256": "3cbac8742be6ba2206137888e88a76b1bb2dfa5b2f5bb3953337ae06b74b79f6",
+      "candidate_sha256": "fc11d246a4878e7cea8a1b21226556c0fe93c9386d0cfecb6a4d1984cc880e1c",
+      "changed": true
+    },
+    {
+      "path": "src/repo/bakeoff/picker.rs",
+      "base_sha256": "631d35fa15776f362e3633d6b22bec690957965de060be75964f82cbd7aba695",
+      "candidate_sha256": "631d35fa15776f362e3633d6b22bec690957965de060be75964f82cbd7aba695",
+      "changed": false
+    },
+    {
+      "path": "src/repo/bakeoff/tests.rs",
+      "base_sha256": "cf3ef80d29b1f8ab141683ece5ddef64b27bb81cb08bc453ea2f26021c24e3ae",
+      "candidate_sha256": "cf3ef80d29b1f8ab141683ece5ddef64b27bb81cb08bc453ea2f26021c24e3ae",
+      "changed": false
+    },
+    {
+      "path": "src/repo/bakeoff/view.rs",
+      "base_sha256": "f7ba2c062fc3e5896d53edc0272f641102f4a625dd78d3be2306912c71b4ae76",
+      "candidate_sha256": "6343b3cf79ae7e1f913deaf7044b0b3a8c7b1ed27501576f2990e8a7c94e2f0a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/bisect/banner.rs",
+      "base_sha256": "8359182ad353d088d6ac81bf18c24818417785572fdf6c667996de585298dd90",
+      "candidate_sha256": "3bf7c799e030c9590f4eb40b4f8b9c9fa933d5f313131caece7f46ab0d579cb6",
+      "changed": true
+    },
+    {
+      "path": "src/repo/bisect/items.rs",
+      "base_sha256": "741c5baa4767145ce2a3947b78e90966ef8747c08e2a2f544c6754275c224913",
+      "candidate_sha256": "741c5baa4767145ce2a3947b78e90966ef8747c08e2a2f544c6754275c224913",
+      "changed": false
+    },
+    {
+      "path": "src/repo/bisect/mod.rs",
+      "base_sha256": "14b3338ff6c63603886db8b7e29a0309b5dcb1bbb27838d1b061af65aac57b72",
+      "candidate_sha256": "14b3338ff6c63603886db8b7e29a0309b5dcb1bbb27838d1b061af65aac57b72",
+      "changed": false
+    },
+    {
+      "path": "src/repo/bisect/tests.rs",
+      "base_sha256": "283368b68f582b65b04b45792ee57786b3f4a0dce7da63c2463e65cca2f55f8b",
+      "candidate_sha256": "283368b68f582b65b04b45792ee57786b3f4a0dce7da63c2463e65cca2f55f8b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ci_view/graph.rs",
+      "base_sha256": "fa6b8d6c8e0ee642a21677f6ee4fee37dc1c7807e8ea2276882c4f4151db6c36",
+      "candidate_sha256": "fa6b8d6c8e0ee642a21677f6ee4fee37dc1c7807e8ea2276882c4f4151db6c36",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ci_view/mod.rs",
+      "base_sha256": "1623be57b27d2fe115f9f40f318b399fed9e49a2e752bb3118edc4b68192b776",
+      "candidate_sha256": "1623be57b27d2fe115f9f40f318b399fed9e49a2e752bb3118edc4b68192b776",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ci_view/page.rs",
+      "base_sha256": "f7dfd530545328715f6cc5d0e55594955102141b986e2d14e6516f9c6ca50055",
+      "candidate_sha256": "f7dfd530545328715f6cc5d0e55594955102141b986e2d14e6516f9c6ca50055",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ci_view/steps.rs",
+      "base_sha256": "c4b9f7949d0f0ad37a3ad2b2c4c028ac0c1f5141b05910d20002c1cba380d23a",
+      "candidate_sha256": "c4b9f7949d0f0ad37a3ad2b2c4c028ac0c1f5141b05910d20002c1cba380d23a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/collision_view/grid.rs",
+      "base_sha256": "741e6c843922bca56b516e379549b472a5a1f6be8c1db8a59ef26271abf291ba",
+      "candidate_sha256": "741e6c843922bca56b516e379549b472a5a1f6be8c1db8a59ef26271abf291ba",
+      "changed": false
+    },
+    {
+      "path": "src/repo/collision_view/mod.rs",
+      "base_sha256": "89adf8706660d916b68cdebaeb3d6affcc6aafe2bf50f00ae9078b1bb93aaba1",
+      "candidate_sha256": "89adf8706660d916b68cdebaeb3d6affcc6aafe2bf50f00ae9078b1bb93aaba1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/collision_view/tests.rs",
+      "base_sha256": "cad1fb2cda0b3b8109b72d1794d103ee7b9de0ce7584010206cb1dfc0eca6964",
+      "candidate_sha256": "cad1fb2cda0b3b8109b72d1794d103ee7b9de0ce7584010206cb1dfc0eca6964",
+      "changed": false
+    },
+    {
+      "path": "src/repo/content_recovery/mod.rs",
+      "base_sha256": "ae2ddac5df81f172baff9ea9e1bc24ec276a64db47213fdccc54f0ba87b68abe",
+      "candidate_sha256": "ae2ddac5df81f172baff9ea9e1bc24ec276a64db47213fdccc54f0ba87b68abe",
+      "changed": false
+    },
+    {
+      "path": "src/repo/content_recovery/view.rs",
+      "base_sha256": "52a1f87aaef73fcf168d330a078b683819e25655f327faac55931c37f382d174",
+      "candidate_sha256": "52a1f87aaef73fcf168d330a078b683819e25655f327faac55931c37f382d174",
+      "changed": false
+    },
+    {
+      "path": "src/repo/cpu_benchmarks/workflows.rs",
+      "base_sha256": "1415b79a4baa20de849de0e0f2ee310bbdf113b85eec68aee06ae465c2f94948",
+      "candidate_sha256": "1415b79a4baa20de849de0e0f2ee310bbdf113b85eec68aee06ae465c2f94948",
+      "changed": false
+    },
+    {
+      "path": "src/repo/cpu_benchmarks/workflows/data.rs",
+      "base_sha256": "6be04ab13486cbc07069458d8166be164807048ea14d5dad042a9168bb8abfd5",
+      "candidate_sha256": "6be04ab13486cbc07069458d8166be164807048ea14d5dad042a9168bb8abfd5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/cpu_benchmarks/workflows/documents.rs",
+      "base_sha256": "abd610a14650db305e93338c19d5dd4e7d3f866ebb070e80a7991306db565b51",
+      "candidate_sha256": "abd610a14650db305e93338c19d5dd4e7d3f866ebb070e80a7991306db565b51",
+      "changed": false
+    },
+    {
+      "path": "src/repo/cpu_benchmarks/workflows/reads.rs",
+      "base_sha256": "9d8baa5bd24d1abcbe782296195ddab5c75f91a00a4b6f8a168bf4d0437730c6",
+      "candidate_sha256": "9d8baa5bd24d1abcbe782296195ddab5c75f91a00a4b6f8a168bf4d0437730c6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/cpu_benchmarks/workflows/ui.rs",
+      "base_sha256": "6a5a11e6f2dd25f0454195bf2b05428c29de82fe70399d6eaa9658c1142139a2",
+      "candidate_sha256": "6a5a11e6f2dd25f0454195bf2b05428c29de82fe70399d6eaa9658c1142139a2",
+      "changed": false
+    },
+    {
+      "path": "src/repo/custom_commands/mod.rs",
+      "base_sha256": "5d7f46dd29a2ccd355e1d07b60849418070e9a0a795ff734dfa68944d6791295",
+      "candidate_sha256": "5d7f46dd29a2ccd355e1d07b60849418070e9a0a795ff734dfa68944d6791295",
+      "changed": false
+    },
+    {
+      "path": "src/repo/custom_commands/run.rs",
+      "base_sha256": "ad1c5d3b979870de6eda497513fe5d219e0567cea0e4a9f794baa3f56895edc2",
+      "candidate_sha256": "ad1c5d3b979870de6eda497513fe5d219e0567cea0e4a9f794baa3f56895edc2",
+      "changed": false
+    },
+    {
+      "path": "src/repo/custom_commands/tests.rs",
+      "base_sha256": "bfe52f03d07791ea20dc808fab1648e5fc465932120d60d415ba5462c83a89d6",
+      "candidate_sha256": "bfe52f03d07791ea20dc808fab1648e5fc465932120d60d415ba5462c83a89d6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/dco/mod.rs",
+      "base_sha256": "c4f40c42a2643f926ef87072d569bfa45f52c6e90cdab31b9acc7b5780ec66a4",
+      "candidate_sha256": "c4f40c42a2643f926ef87072d569bfa45f52c6e90cdab31b9acc7b5780ec66a4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/dco/signoff.rs",
+      "base_sha256": "3582079e323056cc7a94d8201446eb77bba3778fc3d53b19bcfba78908f3424c",
+      "candidate_sha256": "3582079e323056cc7a94d8201446eb77bba3778fc3d53b19bcfba78908f3424c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/dco/tests.rs",
+      "base_sha256": "985b5918f1a2e678f2e0f1d531e625298142cc6938f9f51f97ac4175f2296c2f",
+      "candidate_sha256": "985b5918f1a2e678f2e0f1d531e625298142cc6938f9f51f97ac4175f2296c2f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/dco/view.rs",
+      "base_sha256": "8c8d3801b73d38299275d52f0b54def3b71ca4b2070cfd6f195768b2418b8494",
+      "candidate_sha256": "8c8d3801b73d38299275d52f0b54def3b71ca4b2070cfd6f195768b2418b8494",
+      "changed": false
+    },
+    {
+      "path": "src/repo/detached/banner.rs",
+      "base_sha256": "25d0a42fd8cd8036aa95f612ecaf6a0fd3419b3afb0a61fccdfbc70d11d392aa",
+      "candidate_sha256": "25d0a42fd8cd8036aa95f612ecaf6a0fd3419b3afb0a61fccdfbc70d11d392aa",
+      "changed": false
+    },
+    {
+      "path": "src/repo/detached/mod.rs",
+      "base_sha256": "469227e9a6635b250679e302e71fd18b4b39d1d0f697f3cfebe7a721b1dee4dd",
+      "candidate_sha256": "469227e9a6635b250679e302e71fd18b4b39d1d0f697f3cfebe7a721b1dee4dd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/detached/tests.rs",
+      "base_sha256": "acbaa39abd4b93d47738711bee530c4187dabd5c5d21658cdc5cb2028b59a7fb",
+      "candidate_sha256": "acbaa39abd4b93d47738711bee530c4187dabd5c5d21658cdc5cb2028b59a7fb",
+      "changed": false
+    },
+    {
+      "path": "src/repo/devcontainer/mod.rs",
+      "base_sha256": "14bf5783858309f069afd1feed2fa64433c84b4fb7affc4d4cbb929f62e15927",
+      "candidate_sha256": "b4983b5a92461e681100228dd49a2cf7778b70eea1a0c9dace34675f249d4e46",
+      "changed": true
+    },
+    {
+      "path": "src/repo/devcontainer/model.rs",
+      "base_sha256": "91a94d61c060d72c6bc5a2f04261a684ddb93ebd9cd0afed16fb8483db464c13",
+      "candidate_sha256": "91a94d61c060d72c6bc5a2f04261a684ddb93ebd9cd0afed16fb8483db464c13",
+      "changed": false
+    },
+    {
+      "path": "src/repo/devcontainer/run.rs",
+      "base_sha256": "cd5ec63ecb00060ba0ca8b4bf22b8124067e9969244ff9ed5d40198a195dce63",
+      "candidate_sha256": "cd5ec63ecb00060ba0ca8b4bf22b8124067e9969244ff9ed5d40198a195dce63",
+      "changed": false
+    },
+    {
+      "path": "src/repo/devcontainer/tests.rs",
+      "base_sha256": "c334ac06cc299f0ab6e1a5ab816f2a591bd9ee90d6240acb66c745339a49dcb7",
+      "candidate_sha256": "c334ac06cc299f0ab6e1a5ab816f2a591bd9ee90d6240acb66c745339a49dcb7",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/config_section.rs",
+      "base_sha256": "144178ac94e8d4203345be45df6e39ff9e591e08bb58167dae092c3877d30701",
+      "candidate_sha256": "8abdd23a1c6583a215f6cb6eed5e91ea60f4da1fff1690bb67a379ef84102b4f",
+      "changed": true
+    },
+    {
+      "path": "src/repo/doctor/flags_section.rs",
+      "base_sha256": "168e016030e1b980c55015678720916f6017e006ea4036b0fbe022a2eb2f25a7",
+      "candidate_sha256": "99b3ab9122b59bb532cb46ba66ade4de9981a6294ebb75fd970650c6247ba0b8",
+      "changed": true
+    },
+    {
+      "path": "src/repo/doctor/health.rs",
+      "base_sha256": "fa9bd3bb8243b9c3c072a651d406657702d796227e3a096122cb044bd68934a9",
+      "candidate_sha256": "fa9bd3bb8243b9c3c072a651d406657702d796227e3a096122cb044bd68934a9",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/health_section.rs",
+      "base_sha256": "b5f18fcf78744b5f1040424a762a7b212d2daf7c30917453cf24decb38c93b0e",
+      "candidate_sha256": "b744fb0e7d623b08502aec126b1510f624eaa59e664afcad00c0be4a255cd91a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/doctor/hooks.rs",
+      "base_sha256": "ecff96b4bd4ea482eccdee86cda1e311c5ae560a88ed16bfee0baa52154b3cf4",
+      "candidate_sha256": "ecff96b4bd4ea482eccdee86cda1e311c5ae560a88ed16bfee0baa52154b3cf4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/hooks_section.rs",
+      "base_sha256": "bb49858bacfdfb0c38545e150a1470db5c34564a3f58f06c621ddd1c78afbb70",
+      "candidate_sha256": "bb49858bacfdfb0c38545e150a1470db5c34564a3f58f06c621ddd1c78afbb70",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/ignore.rs",
+      "base_sha256": "ec1c4b735dec0f691666612ff39a1b703a035aec22841bca0dfab0e432a587be",
+      "candidate_sha256": "ec1c4b735dec0f691666612ff39a1b703a035aec22841bca0dfab0e432a587be",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/ignore_section.rs",
+      "base_sha256": "53b45b65fffebfd8b1076211b908787de21d434f08e96dcd6193f1bf6fcd3c7b",
+      "candidate_sha256": "53b45b65fffebfd8b1076211b908787de21d434f08e96dcd6193f1bf6fcd3c7b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/doctor/mod.rs",
+      "base_sha256": "5f126fe2df98295f074a9cdfe2ec04bd2af431045b27ecef15d6bf1239045edc",
+      "candidate_sha256": "798c4154f2c46d4ccf5f8e508116e1eb8902e15ec38282595c23748b079262b1",
+      "changed": true
+    },
+    {
+      "path": "src/repo/doctor/page.rs",
+      "base_sha256": "555a1ddbcf8dee1fdd4a1ccaccd68ffafd5714a94720200bfa770e047ec8516b",
+      "candidate_sha256": "b60a0b4940a0504843e3c4c6a2f9b1becfc5648c87706a31283e34cff10bebad",
+      "changed": true
+    },
+    {
+      "path": "src/repo/doctor/tests.rs",
+      "base_sha256": "926a9f7b8cee55a4f31b32ea3fc66c8c40d59f078d36fc009d11db10fec64862",
+      "candidate_sha256": "34e25dfcf4d50a65ac316b1f5e69cc18f9ed0beb66b1952675cafbe8cef27486",
+      "changed": true
+    },
+    {
+      "path": "src/repo/drift_view/items.rs",
+      "base_sha256": "ae2cf492559d582b3ebc3cda8cf3f1295bf383fd0e1015dffa74cf03929eeca8",
+      "candidate_sha256": "ae2cf492559d582b3ebc3cda8cf3f1295bf383fd0e1015dffa74cf03929eeca8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/drift_view/mod.rs",
+      "base_sha256": "7f8f0e68d420af3b408e7728d266328a01464731a2c1250ff324502da5f0acc8",
+      "candidate_sha256": "7f8f0e68d420af3b408e7728d266328a01464731a2c1250ff324502da5f0acc8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/drift_view/tests.rs",
+      "base_sha256": "46c5bd531e0b0be1b6b6fc221b1534ac9ecbf577eb767eb21800e72bab741ba6",
+      "candidate_sha256": "46c5bd531e0b0be1b6b6fc221b1534ac9ecbf577eb767eb21800e72bab741ba6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/email/mod.rs",
+      "base_sha256": "c49dc1206ad9608cf2bf5bd581f5f86419ec86ce1201e6e6bd4d4f6c1e0a6ad9",
+      "candidate_sha256": "82f3a2196d891a2153aed3bd779d82fb2beade97478aa50463646ea86802d877",
+      "changed": true
+    },
+    {
+      "path": "src/repo/email/model.rs",
+      "base_sha256": "7136c34457c2411dfa791da0d5c1c3407d58fc166762afc4ab66ef51790d631c",
+      "candidate_sha256": "7136c34457c2411dfa791da0d5c1c3407d58fc166762afc4ab66ef51790d631c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/email/run.rs",
+      "base_sha256": "e2ab1d51718cb9a9c6501be7d43d0c454804645ffdc9626ee1064a6ea17fb40b",
+      "candidate_sha256": "e2ab1d51718cb9a9c6501be7d43d0c454804645ffdc9626ee1064a6ea17fb40b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/email/tests.rs",
+      "base_sha256": "ea3dd8a3822e16211e9f4f5c354094da31028253c1631cc045892bcf00f05b8d",
+      "candidate_sha256": "ea3dd8a3822e16211e9f4f5c354094da31028253c1631cc045892bcf00f05b8d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/fence_view/editor.rs",
+      "base_sha256": "2fbafd98a8c7ad8935ffcc8fb0da278d3517840fad0391ae66ad177af57ec8f5",
+      "candidate_sha256": "2fbafd98a8c7ad8935ffcc8fb0da278d3517840fad0391ae66ad177af57ec8f5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/fence_view/mod.rs",
+      "base_sha256": "a7b44ace7a8a470a4b72efc3ff49a82d27594d649784003b71b7d738e764cc10",
+      "candidate_sha256": "a7b44ace7a8a470a4b72efc3ff49a82d27594d649784003b71b7d738e764cc10",
+      "changed": false
+    },
+    {
+      "path": "src/repo/fence_view/tests.rs",
+      "base_sha256": "8d017244e3b7c48186aa91a21d2a33c603cc4b60b5bb1ae62ccb9719d10656fc",
+      "candidate_sha256": "8d017244e3b7c48186aa91a21d2a33c603cc4b60b5bb1ae62ccb9719d10656fc",
+      "changed": false
+    },
+    {
+      "path": "src/repo/file_comparison/code_moves.rs",
+      "base_sha256": "65dea4de5d514f93f682ac9373e0a6966bdfd2344df1d0a8acb377cb0b6eca0d",
+      "candidate_sha256": "65dea4de5d514f93f682ac9373e0a6966bdfd2344df1d0a8acb377cb0b6eca0d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/file_comparison/mod.rs",
+      "base_sha256": "8de395ad52b1ef5f5dce347cf4a24a8863a2f04172d5a6d9923ffff1284c3a9d",
+      "candidate_sha256": "3c98944874d2c9937a8056527a70a740c793a03884034e26e92e6d0032b39168",
+      "changed": true
+    },
+    {
+      "path": "src/repo/file_comparison/model.rs",
+      "base_sha256": "e67606e4f2ecabadc6699fff69801b0137f8434fd127eb7fe37c10ff1051efab",
+      "candidate_sha256": "d312d10a68ab45fe369998b6c8300fe46dddf8426bd4984bf089ddf3e1e7f858",
+      "changed": true
+    },
+    {
+      "path": "src/repo/file_comparison/tests.rs",
+      "base_sha256": "dc5d66ad9eb31a3b5b20e847e86a39332661a4f8bd3b77ab0c8f2ad8b2936f14",
+      "candidate_sha256": "dc5d66ad9eb31a3b5b20e847e86a39332661a4f8bd3b77ab0c8f2ad8b2936f14",
+      "changed": false
+    },
+    {
+      "path": "src/repo/file_comparison/text.rs",
+      "base_sha256": "bb65ff64ca4a5b4c4844a5c7c6954e5383eeab5b6f22fe72d639fa1246fb3f8b",
+      "candidate_sha256": "bb65ff64ca4a5b4c4844a5c7c6954e5383eeab5b6f22fe72d639fa1246fb3f8b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/file_comparison/view.rs",
+      "base_sha256": "cfd5d1496c1cd8d8f8b374468317e60468e1f70c0288db42a71092f528afa7fd",
+      "candidate_sha256": "922ba200d76e215f70d9e12a1e937b5bfc209e4129a5925ec9f55a4683fe658f",
+      "changed": true
+    },
+    {
+      "path": "src/repo/forge_link/mod.rs",
+      "base_sha256": "ac2fafb617377c692d209266852c710de7cecd7a65ff660be00820223f31fdca",
+      "candidate_sha256": "ac2fafb617377c692d209266852c710de7cecd7a65ff660be00820223f31fdca",
+      "changed": false
+    },
+    {
+      "path": "src/repo/forge_link/tests.rs",
+      "base_sha256": "b8de0633516900b618526ce4f28303328cbe582b14741a3c4e854e2cdea45012",
+      "candidate_sha256": "b8de0633516900b618526ce4f28303328cbe582b14741a3c4e854e2cdea45012",
+      "changed": false
+    },
+    {
+      "path": "src/repo/forks/mod.rs",
+      "base_sha256": "fe24608d9076d266b0ba1e1057557dc51d3dda598c5893196573f59d9dcd810f",
+      "candidate_sha256": "fe24608d9076d266b0ba1e1057557dc51d3dda598c5893196573f59d9dcd810f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/forks/plan.rs",
+      "base_sha256": "a51826a6b32b9e3ea1c74bdd4a9c43f5ea8bf6f59d128518d3a4c8051d3dc344",
+      "candidate_sha256": "aaa6032a8c8d8df3e365c872058a29e538b41719205817bd4e4f010e0444805c",
+      "changed": true
+    },
+    {
+      "path": "src/repo/forks/tests.rs",
+      "base_sha256": "82e1b437678770a78371374c9ce7e1cc8770b35b59d02f1126a7ccf969ec9da5",
+      "candidate_sha256": "82e1b437678770a78371374c9ce7e1cc8770b35b59d02f1126a7ccf969ec9da5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/forks/view.rs",
+      "base_sha256": "9b2e6341fc7e589f28534c21165b7601effd9b52d34c85bf77d8fd9bb9a72355",
+      "candidate_sha256": "9b2e6341fc7e589f28534c21165b7601effd9b52d34c85bf77d8fd9bb9a72355",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/mod.rs",
+      "base_sha256": "505a5065b5c3c4a699902d1098105b9008e101052ee4193205e43f95b29b54a9",
+      "candidate_sha256": "505a5065b5c3c4a699902d1098105b9008e101052ee4193205e43f95b29b54a9",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/op.rs",
+      "base_sha256": "2d3aaa4147228e0cfd7bb81fcef1e55c67fdcd0138cd1109d7dc7f5a11ab74f0",
+      "candidate_sha256": "2d3aaa4147228e0cfd7bb81fcef1e55c67fdcd0138cd1109d7dc7f5a11ab74f0",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/plan.rs",
+      "base_sha256": "ce4cda68b8df282951403535ba20e3275d13c13d27580c90410a79d6a309c484",
+      "candidate_sha256": "ce4cda68b8df282951403535ba20e3275d13c13d27580c90410a79d6a309c484",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/strip.rs",
+      "base_sha256": "932e6ede4ef19aeb0a87f38ece4218711ae68a0d075cc164e8e129df7f44ccce",
+      "candidate_sha256": "932e6ede4ef19aeb0a87f38ece4218711ae68a0d075cc164e8e129df7f44ccce",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/tests.rs",
+      "base_sha256": "aa427057dea186f56f22b6202a8f90d21418b770ef97d797331118aa56b82dfa",
+      "candidate_sha256": "aa427057dea186f56f22b6202a8f90d21418b770ef97d797331118aa56b82dfa",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ghost/view.rs",
+      "base_sha256": "1c4c265fdd2bf8d18d8e7cd3baecc359f89985fddbbe287391d4488a9bbca899",
+      "candidate_sha256": "1c4c265fdd2bf8d18d8e7cd3baecc359f89985fddbbe287391d4488a9bbca899",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/empty_commit.rs",
+      "base_sha256": "a38c559167c3869a3cd90daeac2df756f26e2c243ec40bb50a291ecb472178c0",
+      "candidate_sha256": "a38c559167c3869a3cd90daeac2df756f26e2c243ec40bb50a291ecb472178c0",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/first_steps.rs",
+      "base_sha256": "f9dd4932a13a1948adb7fa6324068d216885bee93c8bca6c20d748b707f0f3f0",
+      "candidate_sha256": "f9dd4932a13a1948adb7fa6324068d216885bee93c8bca6c20d748b707f0f3f0",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/hints.rs",
+      "base_sha256": "471f509416a7515394992b2ab5c72b9234acca7888677857ce78ef4a2ea78996",
+      "candidate_sha256": "471f509416a7515394992b2ab5c72b9234acca7888677857ce78ef4a2ea78996",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/mod.rs",
+      "base_sha256": "f65089d188312f9238bfc2f6c593285de034ed3e317f0ca72dca2070108d1f5e",
+      "candidate_sha256": "f65089d188312f9238bfc2f6c593285de034ed3e317f0ca72dca2070108d1f5e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/tests.rs",
+      "base_sha256": "c4195d88bfc8744735bd64569dbad48cbb52e3df7261effe02474e4d88b339bd",
+      "candidate_sha256": "c4195d88bfc8744735bd64569dbad48cbb52e3df7261effe02474e4d88b339bd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/tip_line.rs",
+      "base_sha256": "1e2e49c294021f17dbd34eed10f9eb79203640bf567ceae8ee53d6f0a13e10b0",
+      "candidate_sha256": "1e2e49c294021f17dbd34eed10f9eb79203640bf567ceae8ee53d6f0a13e10b0",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/tips.rs",
+      "base_sha256": "aba7c180aae726532f8b451a44487e03e23a64ba5a29c55a320b0507c4b94cd8",
+      "candidate_sha256": "aba7c180aae726532f8b451a44487e03e23a64ba5a29c55a320b0507c4b94cd8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/guide/view.rs",
+      "base_sha256": "19fddc34b69467ca0c20ca4c80f8960a51372a68634c604ea7a4fb3207c76137",
+      "candidate_sha256": "19fddc34b69467ca0c20ca4c80f8960a51372a68634c604ea7a4fb3207c76137",
+      "changed": false
+    },
+    {
+      "path": "src/repo/history_activity/mod.rs",
+      "base_sha256": "6337d65887239cb5dab934dd318590d50c3754e8ae29605d05b6b3919d866c39",
+      "candidate_sha256": "df1ebb8e4d29810be4af8bc06cc8496afedf1b1705d8d679e65ce31d496ad86c",
+      "changed": true
+    },
+    {
+      "path": "src/repo/history_activity/tests.rs",
+      "base_sha256": "bf41c7488ef569e829c14dbec7140f5f614b4ceacd0fbc1ff5a939e2cbc74564",
+      "candidate_sha256": "bf41c7488ef569e829c14dbec7140f5f614b4ceacd0fbc1ff5a939e2cbc74564",
+      "changed": false
+    },
+    {
+      "path": "src/repo/history_activity/view.rs",
+      "base_sha256": "3041f00dffec0dc14096b5d8ac4a9b9cb1f5e1f9fcf0edbdeda8d11914666cca",
+      "candidate_sha256": "02929af81ec1aa70b6369086f4587f3ab474a856c8089b5c8e488fa0181dde6f",
+      "changed": true
+    },
+    {
+      "path": "src/repo/hotfix/mod.rs",
+      "base_sha256": "f29adc9435a2dbd4f7bdb34e89ef1931e1b1c21d0cfe08cd3607e78405f48640",
+      "candidate_sha256": "f29adc9435a2dbd4f7bdb34e89ef1931e1b1c21d0cfe08cd3607e78405f48640",
+      "changed": false
+    },
+    {
+      "path": "src/repo/hotfix/plan.rs",
+      "base_sha256": "53a23ded1b2105a3b36d33b9f8f8ad3e7022507a40af7d67942d5df07ddc03b4",
+      "candidate_sha256": "53a23ded1b2105a3b36d33b9f8f8ad3e7022507a40af7d67942d5df07ddc03b4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/hotfix/tests.rs",
+      "base_sha256": "26ab28a8e160c0509fdd14b11c76162007b8c896c5af7d7e98fc584da975ba63",
+      "candidate_sha256": "26ab28a8e160c0509fdd14b11c76162007b8c896c5af7d7e98fc584da975ba63",
+      "changed": false
+    },
+    {
+      "path": "src/repo/hotfix/view.rs",
+      "base_sha256": "8b7b11d7ea11e0e8a0e8128995ac92a13dbbf876e5b73987ac332071d6808981",
+      "candidate_sha256": "8b7b11d7ea11e0e8a0e8128995ac92a13dbbf876e5b73987ac332071d6808981",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/card.rs",
+      "base_sha256": "41f03ccb4664352dc15eb673c6c76762f461bdcdad90c02dd644ddd13b019072",
+      "candidate_sha256": "41f03ccb4664352dc15eb673c6c76762f461bdcdad90c02dd644ddd13b019072",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/criteria.rs",
+      "base_sha256": "6c6bc391e3aa86ec94e0a1e16901633e7820376a84c369aea452e703034efe3b",
+      "candidate_sha256": "6c6bc391e3aa86ec94e0a1e16901633e7820376a84c369aea452e703034efe3b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/link.rs",
+      "base_sha256": "67bfad81936973f6f90c0d28890daa8f36b567f160ebb04f923fb86d57d1440d",
+      "candidate_sha256": "67bfad81936973f6f90c0d28890daa8f36b567f160ebb04f923fb86d57d1440d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/mod.rs",
+      "base_sha256": "5e5b0996409dc1f947f4541693e999a2adc25c734976d0e70c59ea971180ba7e",
+      "candidate_sha256": "5e5b0996409dc1f947f4541693e999a2adc25c734976d0e70c59ea971180ba7e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/naming.rs",
+      "base_sha256": "af7828d039f2e89c667c3cd78a0ba5d03ecabef4891ce3a7d4b0ab563da1842d",
+      "candidate_sha256": "af7828d039f2e89c667c3cd78a0ba5d03ecabef4891ce3a7d4b0ab563da1842d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/picker.rs",
+      "base_sha256": "80fae85fd7f1d304780d9f69cfb9626feee3565e2c54fad2fcbad9a0f7ff223d",
+      "candidate_sha256": "80fae85fd7f1d304780d9f69cfb9626feee3565e2c54fad2fcbad9a0f7ff223d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/issue_work/tests.rs",
+      "base_sha256": "9cb738c5f352222a2d1fd5ce15044bdf9c97a272609a9bb60d4a8ac595b48df8",
+      "candidate_sha256": "9cb738c5f352222a2d1fd5ce15044bdf9c97a272609a9bb60d4a8ac595b48df8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/lfs_locks/banner.rs",
+      "base_sha256": "72513d37dda4b13a27af698b8aa88eb99e1e175688b3bb20bcc918c354e9fcdb",
+      "candidate_sha256": "64a30d7f7b7d7f38b6784ae774626499738e27410175428cfb15dae4317162ff",
+      "changed": true
+    },
+    {
+      "path": "src/repo/lfs_locks/jobs.rs",
+      "base_sha256": "f405c085f61c31db667b534da9f7b0d6e206b015f5c772bd4b40f09a8f17e277",
+      "candidate_sha256": "b73a9ce268d4211cd00a227ae3af16b7be588883fa5921819b0b25facd9f76c6",
+      "changed": true
+    },
+    {
+      "path": "src/repo/lfs_locks/mod.rs",
+      "base_sha256": "f11396ceb74c9f90d2179449838f8214a517a4b0a29612d6e6b0a8885572f169",
+      "candidate_sha256": "c1666deef6599bbb2d4ef4096ef3d12adbd50b2c847d85d18abd96e3781aef1e",
+      "changed": true
+    },
+    {
+      "path": "src/repo/lfs_locks/panel.rs",
+      "base_sha256": "c76c214e24716ff315272916698393e65c8e7a5cd2c18a53bc95c77021eb779c",
+      "candidate_sha256": "7955c9282a09a56f831cd2dde0a8f98a31693867dd477e23d973eaf11170ed99",
+      "changed": true
+    },
+    {
+      "path": "src/repo/lfs_locks/tests.rs",
+      "base_sha256": "f2ae79b98dab20e3a148e1b126145f10adbeac03d4ee8726ebba65defe25d7c4",
+      "candidate_sha256": "f2ae79b98dab20e3a148e1b126145f10adbeac03d4ee8726ebba65defe25d7c4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/lfs_storage/menu.rs",
+      "base_sha256": "9268de14d642bee65013f54107f84eda1abba2132c900e80b303def33044e361",
+      "candidate_sha256": "9268de14d642bee65013f54107f84eda1abba2132c900e80b303def33044e361",
+      "changed": false
+    },
+    {
+      "path": "src/repo/lfs_storage/mod.rs",
+      "base_sha256": "c8e1035c87fee143ce236973888e6b2f0f7b088148136303120c4504d62a7c37",
+      "candidate_sha256": "c8e1035c87fee143ce236973888e6b2f0f7b088148136303120c4504d62a7c37",
+      "changed": false
+    },
+    {
+      "path": "src/repo/lfs_storage/panel.rs",
+      "base_sha256": "5a3ca6092b785dfa32fefd66c278ddba0b9a730ecc5b78574a1c667e8df8b3f8",
+      "candidate_sha256": "5a3ca6092b785dfa32fefd66c278ddba0b9a730ecc5b78574a1c667e8df8b3f8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/lfs_storage/tests.rs",
+      "base_sha256": "04c54d0cdcc4c569ed291ee037ae004ff860302914cec80d95a33bf9e0c46937",
+      "candidate_sha256": "04c54d0cdcc4c569ed291ee037ae004ff860302914cec80d95a33bf9e0c46937",
+      "changed": false
+    },
+    {
+      "path": "src/repo/line_dossier/mod.rs",
+      "base_sha256": "13d73b74089282105e0a8c38df11dc08ff050b9e7d285fdaf9305b8ddc807db6",
+      "candidate_sha256": "b70538902720037c0fd5547ddfdbef4b569bc983fe78918d8f7089b137ccd39a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/line_dossier/summary.rs",
+      "base_sha256": "51fd6d30f63b85ea06689e34fec29048f79834a4c6fbf624623229715bd8cabf",
+      "candidate_sha256": "51fd6d30f63b85ea06689e34fec29048f79834a4c6fbf624623229715bd8cabf",
+      "changed": false
+    },
+    {
+      "path": "src/repo/line_dossier/view.rs",
+      "base_sha256": "10d7b53639cbdd02a3fc6b7d7e09b0f71415f9edd48380f29f8eed49b39e3b35",
+      "candidate_sha256": "c578fd5855232942f3b1899b88f69d854259774672a572d58728b9b13c0dee1e",
+      "changed": true
+    },
+    {
+      "path": "src/repo/local_ci/context.rs",
+      "base_sha256": "eee471e96d12f4a364ef32e5af9b765373dd4374b5cbd7b4a3085afce7257b8a",
+      "candidate_sha256": "eee471e96d12f4a364ef32e5af9b765373dd4374b5cbd7b4a3085afce7257b8a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/local_ci/mod.rs",
+      "base_sha256": "43db0ab0ac0f206ea6ab15955f39b6c7e5ddc5ca57e01ef1f9cd5bcf480d66f1",
+      "candidate_sha256": "e9113c6cef55dbd6d14376e868dbe2552c4a0ead41967f18e1cc842d778ccb0a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/local_ci/model.rs",
+      "base_sha256": "cd15cb422e631b5668ff54d0aad2fcdae3c7c2248e84a5fc76fd349bb7a10e69",
+      "candidate_sha256": "9fb1ab6fd7b894306e393aa44c136971a300ca6fbfa28b1fb394ff3954e80efc",
+      "changed": true
+    },
+    {
+      "path": "src/repo/local_ci/run.rs",
+      "base_sha256": "370711656a62cc22be8c846c4cc341a9c6594f55870a21b952e460ac4c6bcb7f",
+      "candidate_sha256": "3940f3ba6dd82ce2fa5136aab7fd87dac0a364c8354624edc56680872b81016c",
+      "changed": true
+    },
+    {
+      "path": "src/repo/local_ci/tests.rs",
+      "base_sha256": "b9f27978eafe2a0685dd4bdeadca07f462c65ff0cd51ba67a06c0eb92852e230",
+      "candidate_sha256": "b9f27978eafe2a0685dd4bdeadca07f462c65ff0cd51ba67a06c0eb92852e230",
+      "changed": false
+    },
+    {
+      "path": "src/repo/owners/lint.rs",
+      "base_sha256": "d508cd41609a3cb37a0016a930e5a8f6acb5fd59c8b21f13fe352c500067de3f",
+      "candidate_sha256": "d508cd41609a3cb37a0016a930e5a8f6acb5fd59c8b21f13fe352c500067de3f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/owners/mod.rs",
+      "base_sha256": "e96d45088a0d66e78f193617901c24d413c2fb97cfdd63a7796798d842b741d3",
+      "candidate_sha256": "e96d45088a0d66e78f193617901c24d413c2fb97cfdd63a7796798d842b741d3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/owners/suggest.rs",
+      "base_sha256": "e401a780fee9cb3594b3c38ca38c02b75686f919571a674a65d7dfbd0a1ea6ca",
+      "candidate_sha256": "e401a780fee9cb3594b3c38ca38c02b75686f919571a674a65d7dfbd0a1ea6ca",
+      "changed": false
+    },
+    {
+      "path": "src/repo/owners/tests.rs",
+      "base_sha256": "0ac0e5bfc50a349c4b611e9d31789ad70e1eb78fa7630a822262271d630c6790",
+      "candidate_sha256": "0ac0e5bfc50a349c4b611e9d31789ad70e1eb78fa7630a822262271d630c6790",
+      "changed": false
+    },
+    {
+      "path": "src/repo/owners/view.rs",
+      "base_sha256": "736ed6e2475b8a7ae4f180b33934a107383fb407ac4beb433b8e22ad73c87715",
+      "candidate_sha256": "736ed6e2475b8a7ae4f180b33934a107383fb407ac4beb433b8e22ad73c87715",
+      "changed": false
+    },
+    {
+      "path": "src/repo/package/mod.rs",
+      "base_sha256": "3f73f373a11f8cac7b222f3d1e3ba8e5e59cfdf6f42a707dc50e9c41c3a742b3",
+      "candidate_sha256": "3f73f373a11f8cac7b222f3d1e3ba8e5e59cfdf6f42a707dc50e9c41c3a742b3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/package/tests.rs",
+      "base_sha256": "04afcee63fcab00472d83259af6163c1f98011f9805cba72274c58bb77c1939e",
+      "candidate_sha256": "04afcee63fcab00472d83259af6163c1f98011f9805cba72274c58bb77c1939e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/package/view.rs",
+      "base_sha256": "a673b06c0d73b16f1689ae40324e4ee13d329d58165278d20091d49de2641ed9",
+      "candidate_sha256": "a673b06c0d73b16f1689ae40324e4ee13d329d58165278d20091d49de2641ed9",
+      "changed": false
+    },
+    {
+      "path": "src/repo/parallel_bisect/banner.rs",
+      "base_sha256": "687ae7bce420114a9a172ae768c251765fabf4f27b6031907ff289b7b4613dc6",
+      "candidate_sha256": "687ae7bce420114a9a172ae768c251765fabf4f27b6031907ff289b7b4613dc6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/parallel_bisect/items.rs",
+      "base_sha256": "9451fe04ed1266e426ad2df89d6db45cfdbcda7abcfbb0c405a90f5924a4dd20",
+      "candidate_sha256": "9451fe04ed1266e426ad2df89d6db45cfdbcda7abcfbb0c405a90f5924a4dd20",
+      "changed": false
+    },
+    {
+      "path": "src/repo/parallel_bisect/marks.rs",
+      "base_sha256": "90eeb72c49428c4b4742901b22bf3907e6518d38add47ca46d484dd9176e5fde",
+      "candidate_sha256": "aa803cd825dab213de66281dc8cacb1b6533929185b6412e24d7ab69e7c41060",
+      "changed": true
+    },
+    {
+      "path": "src/repo/parallel_bisect/mod.rs",
+      "base_sha256": "5e698f7fc96037f663c1b5933d23fdcf06e877c61d0966dd918e8206a19f2a44",
+      "candidate_sha256": "5e698f7fc96037f663c1b5933d23fdcf06e877c61d0966dd918e8206a19f2a44",
+      "changed": false
+    },
+    {
+      "path": "src/repo/parallel_bisect/tests.rs",
+      "base_sha256": "62969ec125394ad15ac6914bb49a9a16d875e02e9bf6ec8302671baf64d3e1a5",
+      "candidate_sha256": "62969ec125394ad15ac6914bb49a9a16d875e02e9bf6ec8302671baf64d3e1a5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/partial_stash/mod.rs",
+      "base_sha256": "5ef0783fa4dbe390acebd7f6c43e6700f59eb491ea696b70f5306afc87f40c9c",
+      "candidate_sha256": "5ef0783fa4dbe390acebd7f6c43e6700f59eb491ea696b70f5306afc87f40c9c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/partial_stash/tests.rs",
+      "base_sha256": "06d94b5242db9cc337cab3e8e0ab9df31bad82336bb13ece2176b9c1ccd32555",
+      "candidate_sha256": "06d94b5242db9cc337cab3e8e0ab9df31bad82336bb13ece2176b9c1ccd32555",
+      "changed": false
+    },
+    {
+      "path": "src/repo/postcards/export.rs",
+      "base_sha256": "9145b084d79d22eab0059bfcd04591f7120309202c7d8eaa99ff7c6df6174d65",
+      "candidate_sha256": "9145b084d79d22eab0059bfcd04591f7120309202c7d8eaa99ff7c6df6174d65",
+      "changed": false
+    },
+    {
+      "path": "src/repo/postcards/mod.rs",
+      "base_sha256": "adc17c3175d2442e9ab81b0409cee9ffb4293884a1ceadf40073f8590abe6a27",
+      "candidate_sha256": "adc17c3175d2442e9ab81b0409cee9ffb4293884a1ceadf40073f8590abe6a27",
+      "changed": false
+    },
+    {
+      "path": "src/repo/postcards/render.rs",
+      "base_sha256": "00183f12193c9323d2c41630f66084bec42501a2a5f3d84ac18ae7dffff48ae1",
+      "candidate_sha256": "00183f12193c9323d2c41630f66084bec42501a2a5f3d84ac18ae7dffff48ae1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/boxes.rs",
+      "base_sha256": "e74a3a60dda1aa089755d5a2311e70a919ab443f0a251c22a28604e4af623ced",
+      "candidate_sha256": "e74a3a60dda1aa089755d5a2311e70a919ab443f0a251c22a28604e4af623ced",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/line_panel.rs",
+      "base_sha256": "a6443f367735a5a8c627a8bcf13d52c7a1c394d025fea8fbad88a9109e331117",
+      "candidate_sha256": "a6443f367735a5a8c627a8bcf13d52c7a1c394d025fea8fbad88a9109e331117",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/lines.rs",
+      "base_sha256": "a21ccf1e83bc6682a72a5887f5a8029616b582481569fbc6cad096302b6d4c2a",
+      "candidate_sha256": "a21ccf1e83bc6682a72a5887f5a8029616b582481569fbc6cad096302b6d4c2a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/mod.rs",
+      "base_sha256": "12b30a60bf65e7ee80bf5ae2e67225a11b94eb732b9444e2dc73bba1aae45cbd",
+      "candidate_sha256": "12b30a60bf65e7ee80bf5ae2e67225a11b94eb732b9444e2dc73bba1aae45cbd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/native_discussions.rs",
+      "base_sha256": "304c9aa14ffed1a1e69b2e2df6b32afd36ba896882e7f5567bd64b24b24214e1",
+      "candidate_sha256": "304c9aa14ffed1a1e69b2e2df6b32afd36ba896882e7f5567bd64b24b24214e1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_review/send.rs",
+      "base_sha256": "0dc78e6cf5d8ed53b2d49ec89d9d658f287e22837611d69af25bee3e58eee7ef",
+      "candidate_sha256": "0dc78e6cf5d8ed53b2d49ec89d9d658f287e22837611d69af25bee3e58eee7ef",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_view/mod.rs",
+      "base_sha256": "5a3c3a080aaa31e75a7fac2c33ac9d56e7b3a0470f7ee989d2814a493dc0a63a",
+      "candidate_sha256": "5a3c3a080aaa31e75a7fac2c33ac9d56e7b3a0470f7ee989d2814a493dc0a63a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_view/page.rs",
+      "base_sha256": "883c335fb2274e60cc275a0a9746ad2aebebbd5a1a019075ffa9d6c60c8d3acd",
+      "candidate_sha256": "883c335fb2274e60cc275a0a9746ad2aebebbd5a1a019075ffa9d6c60c8d3acd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_view/select.rs",
+      "base_sha256": "d94c4dcffe863020f1f7f225661c14a8585ea9c532648acd04fe73d7378ef625",
+      "candidate_sha256": "d94c4dcffe863020f1f7f225661c14a8585ea9c532648acd04fe73d7378ef625",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_view/text.rs",
+      "base_sha256": "eac83ddc5b4ebe24c36ce712c03c7c50f78c6d318511eb70cb5869a39963ff72",
+      "candidate_sha256": "eac83ddc5b4ebe24c36ce712c03c7c50f78c6d318511eb70cb5869a39963ff72",
+      "changed": false
+    },
+    {
+      "path": "src/repo/pr_view/timeline.rs",
+      "base_sha256": "60432c1492e5d0f510634c16afba25b087d3ba328115aa43af0c4832961c4f1e",
+      "candidate_sha256": "ed8e9f71323c1a98557e2a92e44b5cc42c1ec253c566efb22d51ab8dba6fbb7a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/push/banner.rs",
+      "base_sha256": "40d708738af3d42dc3bbabc68512c12463612234d3ef4e855dde96b061e5e2d6",
+      "candidate_sha256": "40d708738af3d42dc3bbabc68512c12463612234d3ef4e855dde96b061e5e2d6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/push/check.rs",
+      "base_sha256": "2d52f1f1cbe4b71ced3a6de34a837ab16606ec45191738a3a8b80eed1b56edb1",
+      "candidate_sha256": "2d52f1f1cbe4b71ced3a6de34a837ab16606ec45191738a3a8b80eed1b56edb1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/push/mod.rs",
+      "base_sha256": "6bbdada6b398b8f71f8b9c08fe9e19e8818a925bb6b87e27f6cf2796995953de",
+      "candidate_sha256": "6bbdada6b398b8f71f8b9c08fe9e19e8818a925bb6b87e27f6cf2796995953de",
+      "changed": false
+    },
+    {
+      "path": "src/repo/push/porcelain.rs",
+      "base_sha256": "6ffd753873da4452f928499e081b46360ed545f61ffd09e9837db768da8bc2ae",
+      "candidate_sha256": "6ffd753873da4452f928499e081b46360ed545f61ffd09e9837db768da8bc2ae",
+      "changed": false
+    },
+    {
+      "path": "src/repo/push/tests.rs",
+      "base_sha256": "049b7a5c26cc33509982be4862327c409835120bf68a3f06cdf5c6ce728c4667",
+      "candidate_sha256": "049b7a5c26cc33509982be4862327c409835120bf68a3f06cdf5c6ce728c4667",
+      "changed": false
+    },
+    {
+      "path": "src/repo/reflog/menu.rs",
+      "base_sha256": "96484e0a959f3025001661bbce969cc17b2f42ae2af0eeba1ba42de94b85de7f",
+      "candidate_sha256": "96484e0a959f3025001661bbce969cc17b2f42ae2af0eeba1ba42de94b85de7f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/reflog/mod.rs",
+      "base_sha256": "a7fdfd67072c3288ddfd2ac4a524f8ffccace95609bd6939eac891dc44e1fe82",
+      "candidate_sha256": "a7fdfd67072c3288ddfd2ac4a524f8ffccace95609bd6939eac891dc44e1fe82",
+      "changed": false
+    },
+    {
+      "path": "src/repo/reflog/tests.rs",
+      "base_sha256": "67308c0524bbf6316d4a0edb13900e0fe0d9ace83a7cfe10ad6a1103b077b686",
+      "candidate_sha256": "67308c0524bbf6316d4a0edb13900e0fe0d9ace83a7cfe10ad6a1103b077b686",
+      "changed": false
+    },
+    {
+      "path": "src/repo/reflog/view.rs",
+      "base_sha256": "7edebd09bf67644d7388ee6972047c337b71de0374dcbecc7c7d18d16268905e",
+      "candidate_sha256": "7edebd09bf67644d7388ee6972047c337b71de0374dcbecc7c7d18d16268905e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/rehearse/mod.rs",
+      "base_sha256": "c9a5a0b03fc70220cfaa709985abc8117d09feeeacde3e062df9eb4f01e96a33",
+      "candidate_sha256": "c9a5a0b03fc70220cfaa709985abc8117d09feeeacde3e062df9eb4f01e96a33",
+      "changed": false
+    },
+    {
+      "path": "src/repo/rehearse/report.rs",
+      "base_sha256": "91f289886ae03c15c2ace0124848ab74ce4f351d7f742425a2b041e042e410c6",
+      "candidate_sha256": "91f289886ae03c15c2ace0124848ab74ce4f351d7f742425a2b041e042e410c6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/rehearse/tests.rs",
+      "base_sha256": "63a583545428a68c46e7b4b689bc9e49c35919105aed32c64de1de0198333f7d",
+      "candidate_sha256": "63a583545428a68c46e7b4b689bc9e49c35919105aed32c64de1de0198333f7d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/rehearse/window.rs",
+      "base_sha256": "968eba43beb82ca099549b0c7a52f745e685eb7bf9fbd537e70632f37a2f68a4",
+      "candidate_sha256": "968eba43beb82ca099549b0c7a52f745e685eb7bf9fbd537e70632f37a2f68a4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/release/mod.rs",
+      "base_sha256": "b655f5eb92630ea89b59f4056e9c0e9191979905858f421c1390a5d71b66bb5f",
+      "candidate_sha256": "762b0eed4dc267fcdddfb67b581cafbbad5205206cf45499c8ccc9ecba13952d",
+      "changed": true
+    },
+    {
+      "path": "src/repo/release/tests.rs",
+      "base_sha256": "535d857a20d43bcc63937a36e20a919955d090391cb9501f544e1022e2791662",
+      "candidate_sha256": "535d857a20d43bcc63937a36e20a919955d090391cb9501f544e1022e2791662",
+      "changed": false
+    },
+    {
+      "path": "src/repo/release/view.rs",
+      "base_sha256": "b1bc54f4e3d66ad1fb48eb750be43d89a2e744461c894138450d4c2afeb89338",
+      "candidate_sha256": "b1bc54f4e3d66ad1fb48eb750be43d89a2e744461c894138450d4c2afeb89338",
+      "changed": false
+    },
+    {
+      "path": "src/repo/remerge/badge.rs",
+      "base_sha256": "365a95f8ffa35f4e3c96ffe9c80d19ea229cf2d6696bcff8f07b340808edacc9",
+      "candidate_sha256": "365a95f8ffa35f4e3c96ffe9c80d19ea229cf2d6696bcff8f07b340808edacc9",
+      "changed": false
+    },
+    {
+      "path": "src/repo/remerge/mod.rs",
+      "base_sha256": "204f5fe49122d60f0203b55a26b849282daecf1c7c768c55236910d919695c1f",
+      "candidate_sha256": "204f5fe49122d60f0203b55a26b849282daecf1c7c768c55236910d919695c1f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/remerge/panel.rs",
+      "base_sha256": "b4619f961bd72f19ae5d097a9f67f178c061a4e3b7e658f16051fad749b4ecd5",
+      "candidate_sha256": "b4619f961bd72f19ae5d097a9f67f178c061a4e3b7e658f16051fad749b4ecd5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/remerge/tests.rs",
+      "base_sha256": "74a0f5a35267465ec2ad64c90b13afe7092e604867ab4b95b13f56e3d31caa10",
+      "candidate_sha256": "74a0f5a35267465ec2ad64c90b13afe7092e604867ab4b95b13f56e3d31caa10",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/deferred.rs",
+      "base_sha256": "d93dfcaee800a008b96f404fb5625f92f7a145ab5e6b4b7160220f35cbdb9b84",
+      "candidate_sha256": "d94a4b2b32e43e89a007e321f642d826b35de139e3bfb47b5c65844c0e1fa449",
+      "changed": true
+    },
+    {
+      "path": "src/repo/repository_tools/dependencies.rs",
+      "base_sha256": "7bbe273188e15cdc3ed2661b25961dd05e817b7b52e25349fcb3b399b18ac92c",
+      "candidate_sha256": "7bbe273188e15cdc3ed2661b25961dd05e817b7b52e25349fcb3b399b18ac92c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/lists.rs",
+      "base_sha256": "e971b838f1c490bcfb0198a8ecb2fc23f94855c67d76142b1acd6ee74a1e9bac",
+      "candidate_sha256": "e971b838f1c490bcfb0198a8ecb2fc23f94855c67d76142b1acd6ee74a1e9bac",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/mod.rs",
+      "base_sha256": "45f9794e28526be683999efc2479abc71d310f62c225485bfe106e3a65dc36bb",
+      "candidate_sha256": "45f9794e28526be683999efc2479abc71d310f62c225485bfe106e3a65dc36bb",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/outbox.rs",
+      "base_sha256": "df18893f8b0daad8d500f040b6a6bbf0f1e13baa0ebf466914c32de71d6f0b7b",
+      "candidate_sha256": "df18893f8b0daad8d500f040b6a6bbf0f1e13baa0ebf466914c32de71d6f0b7b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/publication.rs",
+      "base_sha256": "050d48796bb498a72c074b4ef779e646d67170c145aab79a6e0b5e1d1b20493a",
+      "candidate_sha256": "050d48796bb498a72c074b4ef779e646d67170c145aab79a6e0b5e1d1b20493a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/push_continuation.rs",
+      "base_sha256": "baebdd575aa00ac76c37708f91f4b85c1fcd9909df16ee43025bb349ec75ca65",
+      "candidate_sha256": "baebdd575aa00ac76c37708f91f4b85c1fcd9909df16ee43025bb349ec75ca65",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/receipts.rs",
+      "base_sha256": "4499685f64dd8b1c6bfa7fcc53b3dc47b4ba136c6861d1f34d8314d86142586a",
+      "candidate_sha256": "4499685f64dd8b1c6bfa7fcc53b3dc47b4ba136c6861d1f34d8314d86142586a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/remotes.rs",
+      "base_sha256": "25f65c245b1c6a3da5567821548ab7087bcd92699a52a245e9e1453f45963081",
+      "candidate_sha256": "25f65c245b1c6a3da5567821548ab7087bcd92699a52a245e9e1453f45963081",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/routes.rs",
+      "base_sha256": "20e0bc34eecf8b6eff8db03eaee1be10f5e571fc683bde3f4a79f397abdec709",
+      "candidate_sha256": "20e0bc34eecf8b6eff8db03eaee1be10f5e571fc683bde3f4a79f397abdec709",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/sharing.rs",
+      "base_sha256": "d37775195f22174c7dc914a91c3fdb9a1a7241268a78e4cf49c17f0a36303aad",
+      "candidate_sha256": "d37775195f22174c7dc914a91c3fdb9a1a7241268a78e4cf49c17f0a36303aad",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/submodule_conflict.rs",
+      "base_sha256": "a33a92cb29238973c75e485fd6287298e69029e9ad01c463c95da45286a6d9fb",
+      "candidate_sha256": "a33a92cb29238973c75e485fd6287298e69029e9ad01c463c95da45286a6d9fb",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/subtrees.rs",
+      "base_sha256": "b5128eabab0c43f24e10ccfd42efb359ca54e70f15b7111f2acac51682399d7f",
+      "candidate_sha256": "b5128eabab0c43f24e10ccfd42efb359ca54e70f15b7111f2acac51682399d7f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/subtrees/tests.rs",
+      "base_sha256": "3ebd714cb09cb2290492014d0f8e3f43223f95653cbdb91067575250fb0b03b1",
+      "candidate_sha256": "3ebd714cb09cb2290492014d0f8e3f43223f95653cbdb91067575250fb0b03b1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/turns.rs",
+      "base_sha256": "d6ededf3d1a8d7d90d9684d802f8bb95a1502945eef03349bea39564efb8b966",
+      "candidate_sha256": "d6ededf3d1a8d7d90d9684d802f8bb95a1502945eef03349bea39564efb8b966",
+      "changed": false
+    },
+    {
+      "path": "src/repo/repository_tools/virtuals.rs",
+      "base_sha256": "e21fa1c54d28f780fbe9c5cfbd00bce1d2d40107cc2eac1cfde6f3ec776c23d8",
+      "candidate_sha256": "e21fa1c54d28f780fbe9c5cfbd00bce1d2d40107cc2eac1cfde6f3ec776c23d8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/anchors.rs",
+      "base_sha256": "511d6cfe1ef05f9cb6fe8a0dff34d1793bdaca3ab506a7151dddb5734d3bf9bd",
+      "candidate_sha256": "511d6cfe1ef05f9cb6fe8a0dff34d1793bdaca3ab506a7151dddb5734d3bf9bd",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/choreography.rs",
+      "base_sha256": "ae44cb53ca5e2874422bf6fe25d235f336c529ffb4c1f99e8ed8f50906ae5f2d",
+      "candidate_sha256": "ae44cb53ca5e2874422bf6fe25d235f336c529ffb4c1f99e8ed8f50906ae5f2d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/continuous.rs",
+      "base_sha256": "ef62e0362ebc70d042ec19fb060c8cdae33cffbb213917fa087d2dec94719c41",
+      "candidate_sha256": "ef62e0362ebc70d042ec19fb060c8cdae33cffbb213917fa087d2dec94719c41",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/contracts.rs",
+      "base_sha256": "e34a460c652c1b35a49561544909e8625b9f1545bcf242ffdaf6a55fc2dd3b75",
+      "candidate_sha256": "e34a460c652c1b35a49561544909e8625b9f1545bcf242ffdaf6a55fc2dd3b75",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/echo.rs",
+      "base_sha256": "dd9074b826be146c340c3ffad22dc3c0d63f4bac0c2ff47eee8b6df5788e0299",
+      "candidate_sha256": "dd9074b826be146c340c3ffad22dc3c0d63f4bac0c2ff47eee8b6df5788e0299",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/echo_push.rs",
+      "base_sha256": "8866c0b9ab81437060cfe7530c7be1790233fef0a83cb83af68f4a80a1c7de7b",
+      "candidate_sha256": "8866c0b9ab81437060cfe7530c7be1790233fef0a83cb83af68f4a80a1c7de7b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/freshness.rs",
+      "base_sha256": "b40371d6386a8e419fecbfe887167ec8d8a5c750c89f7a8b1027abe8e7f4bee5",
+      "candidate_sha256": "b40371d6386a8e419fecbfe887167ec8d8a5c750c89f7a8b1027abe8e7f4bee5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/intents.rs",
+      "base_sha256": "ab4848044d9100b0070c09f6f334d9ba7e6cd33543f74d0d2cbd8b6e1497e2ce",
+      "candidate_sha256": "ab4848044d9100b0070c09f6f334d9ba7e6cd33543f74d0d2cbd8b6e1497e2ce",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/mod.rs",
+      "base_sha256": "2b37d05fa09d5214546907d995e9772855dc5874f6259920adcd1d93c3159f2b",
+      "candidate_sha256": "2b37d05fa09d5214546907d995e9772855dc5874f6259920adcd1d93c3159f2b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/radar.rs",
+      "base_sha256": "01d154cfef0b0be69959ca885164ac6dda0cb2ff9b1b698447519ef82475c11d",
+      "candidate_sha256": "01d154cfef0b0be69959ca885164ac6dda0cb2ff9b1b698447519ef82475c11d",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer.rs",
+      "base_sha256": "3fbfbd575408f7815343275af0a68ee179e3bda1f7acaaea321669083f21c545",
+      "candidate_sha256": "3fbfbd575408f7815343275af0a68ee179e3bda1f7acaaea321669083f21c545",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_docker.rs",
+      "base_sha256": "d94d42abfd844fe7a4d541d679f266da48acde5c1784d733df871208193dc6dc",
+      "candidate_sha256": "d94d42abfd844fe7a4d541d679f266da48acde5c1784d733df871208193dc6dc",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_source.rs",
+      "base_sha256": "c72c7526a787aa0cb1fb7b816366fb1a95926ffcd2b91d15ae7441d5c5f360ff",
+      "candidate_sha256": "c72c7526a787aa0cb1fb7b816366fb1a95926ffcd2b91d15ae7441d5c5f360ff",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/rust_dependencies.rs",
+      "base_sha256": "d3514fef2cb433134d75b64580eb804034fae4adb2aecbdfc2b2d241dc3f46f7",
+      "candidate_sha256": "d3514fef2cb433134d75b64580eb804034fae4adb2aecbdfc2b2d241dc3f46f7",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/sharing.rs",
+      "base_sha256": "9e4fb422618862dd41c9d634c53816100667039edac96ffc44142dab2f9a645f",
+      "candidate_sha256": "9e4fb422618862dd41c9d634c53816100667039edac96ffc44142dab2f9a645f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/store.rs",
+      "base_sha256": "b6ab52731344902f9e472d9d7e48011eb450636452d2c191c062e0f90af24717",
+      "candidate_sha256": "b6ab52731344902f9e472d9d7e48011eb450636452d2c191c062e0f90af24717",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/storyboard.rs",
+      "base_sha256": "198539efbd4d40ba94b62103d95866af597678df4334708133032af217640767",
+      "candidate_sha256": "198539efbd4d40ba94b62103d95866af597678df4334708133032af217640767",
+      "changed": false
+    },
+    {
+      "path": "src/repo/review_workflow/tools.rs",
+      "base_sha256": "bd17b9c0ea9c95f16782913e2b9057114ccddd545571e585394b91d1badce8e8",
+      "candidate_sha256": "bd17b9c0ea9c95f16782913e2b9057114ccddd545571e585394b91d1badce8e8",
+      "changed": false
+    },
+    {
+      "path": "src/repo/saved_views/mod.rs",
+      "base_sha256": "d2174232953d859827ca8322478159afe1bce77914141077ea5f050cdbc8b4bb",
+      "candidate_sha256": "93de9a4d81780c8adf730ef8999b4682e9d3fb191c7b6d13163def413f8e721a",
+      "changed": true
+    },
+    {
+      "path": "src/repo/saved_views/projection.rs",
+      "base_sha256": "46854d140391ce2eb365df6f427160f3565186279dba715f6ff41551ae074440",
+      "candidate_sha256": "46854d140391ce2eb365df6f427160f3565186279dba715f6ff41551ae074440",
+      "changed": false
+    },
+    {
+      "path": "src/repo/saved_views/reader.rs",
+      "base_sha256": "b79547ff82c9dcea55e4a72ea29daf1240d327be3415f4a5679f9edad6af38dc",
+      "candidate_sha256": "bb605e62e20742c8b7404efad797745b88d75f54edefe4681f76e4363a59a7dc",
+      "changed": true
+    },
+    {
+      "path": "src/repo/saved_views/tests.rs",
+      "base_sha256": "01fdfd93d7921c0881ba6eb8692e11cfde5e907eef70f195876e08fed754636f",
+      "candidate_sha256": "f4ac6ab2aa7cf37c6eb23dd49ecd6798c597904eb66121dc610752dbdeccef12",
+      "changed": true
+    },
+    {
+      "path": "src/repo/saved_views/view.rs",
+      "base_sha256": "848b7da8703f78e3760f119a95bea0fbf789c627ee84ffa7d68c78d9d879db2a",
+      "candidate_sha256": "2fb088d85bf3073fc9122592f03e0304a5099719570a49c4e202a3d481a17ecd",
+      "changed": true
+    },
+    {
+      "path": "src/repo/ssh_setup/mod.rs",
+      "base_sha256": "37760e142616461cf84860fc797192f2801e15e8c53e923a3733884ee7786bb6",
+      "candidate_sha256": "2450d96122c27ae1c0cdc2e32af39f63648e0859bc3b1cdab1983888c626d82f",
+      "changed": true
+    },
+    {
+      "path": "src/repo/ssh_setup/plan.rs",
+      "base_sha256": "5d257aa0c75c50178c65f63a825317322d32798224cfdc1e969f8efc526187a7",
+      "candidate_sha256": "5d257aa0c75c50178c65f63a825317322d32798224cfdc1e969f8efc526187a7",
+      "changed": false
+    },
+    {
+      "path": "src/repo/ssh_setup/tests.rs",
+      "base_sha256": "dacc0d056468717ae37aa394bb7d2dd30a4d12f4a787f64170ad53dedee0ba19",
+      "candidate_sha256": "dacc0d056468717ae37aa394bb7d2dd30a4d12f4a787f64170ad53dedee0ba19",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/dialog.rs",
+      "base_sha256": "2df20dbe4689f5086413328dbf9c63b45e9d2be0088a8912aae5f3b855707a2b",
+      "candidate_sha256": "2df20dbe4689f5086413328dbf9c63b45e9d2be0088a8912aae5f3b855707a2b",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/graph.rs",
+      "base_sha256": "3167efc451fb5aa418febea78f302f2009467d8cd573b890d15cce4c9ff07e44",
+      "candidate_sha256": "3167efc451fb5aa418febea78f302f2009467d8cd573b890d15cce4c9ff07e44",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/mod.rs",
+      "base_sha256": "3d04030c0450b54195e2bf959ce02f81c17c0a57d9384e7268a9378abea20740",
+      "candidate_sha256": "e1a6eec590f0c3810cc1a070c7d6c7dcb05bfbaefda6f1d2aad7db61ebea3519",
+      "changed": true
+    },
+    {
+      "path": "src/repo/stack/model.rs",
+      "base_sha256": "b75f4e881bf238541eb85670d3f2495eb1639244af65597a3d11d19974d640e3",
+      "candidate_sha256": "b75f4e881bf238541eb85670d3f2495eb1639244af65597a3d11d19974d640e3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/publish.rs",
+      "base_sha256": "1e059f739f01bfdfef95ebbae92322be0310c980fef9224848de9cff0c037867",
+      "candidate_sha256": "1e059f739f01bfdfef95ebbae92322be0310c980fef9224848de9cff0c037867",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/restack.rs",
+      "base_sha256": "c5a2c8bc284f7b52b1affcbdcd19ff6d51625ebe07ed10d524f846d27cb9d241",
+      "candidate_sha256": "c5a2c8bc284f7b52b1affcbdcd19ff6d51625ebe07ed10d524f846d27cb9d241",
+      "changed": false
+    },
+    {
+      "path": "src/repo/stack/section.rs",
+      "base_sha256": "c1649d134582893d4a83ae8c964fc544e43a1b27d217f03f8be913d6050dd628",
+      "candidate_sha256": "fb7d76e5dcb3f8a6fd4a6e55a043b8b50a1d609fb97a2907248b1ccb6abd7a30",
+      "changed": true
+    },
+    {
+      "path": "src/repo/stack/tests.rs",
+      "base_sha256": "6887b3c097860ec60234a770433e6d565ab66b562daf91d739ebb6cf74b59f7c",
+      "candidate_sha256": "6887b3c097860ec60234a770433e6d565ab66b562daf91d739ebb6cf74b59f7c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/absorb/history.rs",
+      "base_sha256": "286b18e8cf524ce2f441990d9b37dcd09746c54aa2d8c8eb92771eb31a4d1261",
+      "candidate_sha256": "286b18e8cf524ce2f441990d9b37dcd09746c54aa2d8c8eb92771eb31a4d1261",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/absorb/mod.rs",
+      "base_sha256": "f0a6440142f6131d399ec7ee0688ce68cd2ff73d6a519b02c0e22197b7d2952e",
+      "candidate_sha256": "f0a6440142f6131d399ec7ee0688ce68cd2ff73d6a519b02c0e22197b7d2952e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/absorb/view.rs",
+      "base_sha256": "37edddbe35f140caed5736e9a21cffd4eab9eed4f0db61ca02ac49d6e14533fa",
+      "candidate_sha256": "37edddbe35f140caed5736e9a21cffd4eab9eed4f0db61ca02ac49d6e14533fa",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/absorb_tests.rs",
+      "base_sha256": "d877fb7fd90a2cf917e335ff3d90fc42e53a5e6e65432cd54a0714c41e204e7c",
+      "candidate_sha256": "d877fb7fd90a2cf917e335ff3d90fc42e53a5e6e65432cd54a0714c41e204e7c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/mod.rs",
+      "base_sha256": "feb6aece2707fcbcd63cbfa54122c4000c316f767d9b7b76bf29afcf20e2d0f3",
+      "candidate_sha256": "feb6aece2707fcbcd63cbfa54122c4000c316f767d9b7b76bf29afcf20e2d0f3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/move_tests.rs",
+      "base_sha256": "9a4be140f01a149df1a0e3e1467263fbb8167f02fe5a685728be348b8106c04f",
+      "candidate_sha256": "9a4be140f01a149df1a0e3e1467263fbb8167f02fe5a685728be348b8106c04f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/moving.rs",
+      "base_sha256": "ed27f4462704e8247eabcbb0c7ea508b40ebe173141584f061da7d67c642ca5e",
+      "candidate_sha256": "ed27f4462704e8247eabcbb0c7ea508b40ebe173141584f061da7d67c642ca5e",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/patchset.rs",
+      "base_sha256": "492911abc6c333eaf970f0cc9f1b20433a36d3ddf0f01355b8ba305cd1a9e4c6",
+      "candidate_sha256": "492911abc6c333eaf970f0cc9f1b20433a36d3ddf0f01355b8ba305cd1a9e4c6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/replay.rs",
+      "base_sha256": "0485be4f60c4998515d030d30b230b95ba5b983a66c0a2a95e0fd32c6d391f77",
+      "candidate_sha256": "0485be4f60c4998515d030d30b230b95ba5b983a66c0a2a95e0fd32c6d391f77",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/split/mod.rs",
+      "base_sha256": "03868ed845e412e7a59c52f65fc0ae33a8721b380d96e555e615512586ea33c6",
+      "candidate_sha256": "03868ed845e412e7a59c52f65fc0ae33a8721b380d96e555e615512586ea33c6",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/split/preview.rs",
+      "base_sha256": "dbb53d015a1c5918b9206668f89b114cc00ba0e2ff1f61dbd1ef0e92a00c0686",
+      "candidate_sha256": "dbb53d015a1c5918b9206668f89b114cc00ba0e2ff1f61dbd1ef0e92a00c0686",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/split/view.rs",
+      "base_sha256": "dc06d982148e4930ecfac851dd56cfdcf4d03df0f9a8c0e3db030e791d34edc7",
+      "candidate_sha256": "dc06d982148e4930ecfac851dd56cfdcf4d03df0f9a8c0e3db030e791d34edc7",
+      "changed": false
+    },
+    {
+      "path": "src/repo/surgery/tests.rs",
+      "base_sha256": "8ccc7b40365ecca14725d5301aa2e7f8e9ac114e466a31223bc9868f0a1e570c",
+      "candidate_sha256": "8ccc7b40365ecca14725d5301aa2e7f8e9ac114e466a31223bc9868f0a1e570c",
+      "changed": false
+    },
+    {
+      "path": "src/repo/test_lane/banner.rs",
+      "base_sha256": "59d33b879788f3839e1a24bc1c02b94d3d86149578480443968c3f1e245e9c53",
+      "candidate_sha256": "ee4b8a1daac8bf3db2c3bdef49012f1fe88209848a344f4419d25b4059b82f31",
+      "changed": true
+    },
+    {
+      "path": "src/repo/test_lane/dot.rs",
+      "base_sha256": "5115a158578d8dea91a28debe4ce7e075a51a759b08195417da71ce645fcfd15",
+      "candidate_sha256": "5115a158578d8dea91a28debe4ce7e075a51a759b08195417da71ce645fcfd15",
+      "changed": false
+    },
+    {
+      "path": "src/repo/test_lane/mod.rs",
+      "base_sha256": "2208f3de907e28bcf4298cccb1cb0698eeccbf92d3f4bd6453fe35e48f9f2b35",
+      "candidate_sha256": "f9216fe7dbc062be99b3d94321ed080ad30f5a63350b4adcecb455544d255d21",
+      "changed": true
+    },
+    {
+      "path": "src/repo/test_lane/output.rs",
+      "base_sha256": "a7dc01f2d98ee1b5044aa514223fc74ccad3085feadd2317ac514995600c6624",
+      "candidate_sha256": "a7dc01f2d98ee1b5044aa514223fc74ccad3085feadd2317ac514995600c6624",
+      "changed": false
+    },
+    {
+      "path": "src/repo/test_lane/tests.rs",
+      "base_sha256": "ee45b89fbfa674036746821bd4eecd5a14879eea03bc6771edd0fa23d711c371",
+      "candidate_sha256": "ee45b89fbfa674036746821bd4eecd5a14879eea03bc6771edd0fa23d711c371",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/mod.rs",
+      "base_sha256": "cf947c47b436c2761752a29f68ac96d0d3a1fb810c70c7b41b31442e7f707c63",
+      "candidate_sha256": "cf947c47b436c2761752a29f68ac96d0d3a1fb810c70c7b41b31442e7f707c63",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/observe.rs",
+      "base_sha256": "cb6e5572ad4d2cbae00b930e770b24e7b6678026b2926c98f0c3750c80547f6f",
+      "candidate_sha256": "cb6e5572ad4d2cbae00b930e770b24e7b6678026b2926c98f0c3750c80547f6f",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/receipt.rs",
+      "base_sha256": "80b2483ae96b17c2b80b8312207baac9fd65292f57e20fea4f6779029ba10add",
+      "candidate_sha256": "80b2483ae96b17c2b80b8312207baac9fd65292f57e20fea4f6779029ba10add",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/receipt_tests.rs",
+      "base_sha256": "3963bf8a8f0bd727b524d7b3b3139e4ab7ed9f085c9280e85cdc56d76756d7c5",
+      "candidate_sha256": "3963bf8a8f0bd727b524d7b3b3139e4ab7ed9f085c9280e85cdc56d76756d7c5",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/receipt_view.rs",
+      "base_sha256": "9cdea8f8ca4aa8736344eae1c6f0f5b60cc5e4b4ab75088168e08c16dccf5dfa",
+      "candidate_sha256": "9cdea8f8ca4aa8736344eae1c6f0f5b60cc5e4b4ab75088168e08c16dccf5dfa",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/remove.rs",
+      "base_sha256": "e7d3b30c3b56b1cd8cc67340add9f6ef19675ac75da60404997c5a7a85e34c33",
+      "candidate_sha256": "e7d3b30c3b56b1cd8cc67340add9f6ef19675ac75da60404997c5a7a85e34c33",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/remove_tab.rs",
+      "base_sha256": "72fad5351ffc9c097398fb83aa7ace0ee0c3ad6884e392ce6c8449eebc3dc369",
+      "candidate_sha256": "72fad5351ffc9c097398fb83aa7ace0ee0c3ad6884e392ce6c8449eebc3dc369",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/remove_tests.rs",
+      "base_sha256": "f5369ab83756920cd69b53cf05abc379acb1950c2db4991082ca9944f62b2f85",
+      "candidate_sha256": "f5369ab83756920cd69b53cf05abc379acb1950c2db4991082ca9944f62b2f85",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/remove_view.rs",
+      "base_sha256": "5a91430dfc90a8c84715852635a46fc8d47e5ebef124be7944697242322212d1",
+      "candidate_sha256": "5a91430dfc90a8c84715852635a46fc8d47e5ebef124be7944697242322212d1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/snapshot.rs",
+      "base_sha256": "aa1598c9a11e710ded98deb2ab1ae894fb00f58e93285937b60a2539c0c49b14",
+      "candidate_sha256": "aa1598c9a11e710ded98deb2ab1ae894fb00f58e93285937b60a2539c0c49b14",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/store.rs",
+      "base_sha256": "ebc8d941394b7dcd3a268baa3be67c3da6c72b16acca40faf1f1c450167580a1",
+      "candidate_sha256": "ebc8d941394b7dcd3a268baa3be67c3da6c72b16acca40faf1f1c450167580a1",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/tab.rs",
+      "base_sha256": "573f0303361348c2bc3fc74e2ac23257ad09223179e4eb5f2b543e9fbe7bf075",
+      "candidate_sha256": "573f0303361348c2bc3fc74e2ac23257ad09223179e4eb5f2b543e9fbe7bf075",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/tab_tests.rs",
+      "base_sha256": "15ee1f1a31ba621a372d083ea57c900be58faa460ef72c0ae92110ea5ec5bed7",
+      "candidate_sha256": "15ee1f1a31ba621a372d083ea57c900be58faa460ef72c0ae92110ea5ec5bed7",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/tests.rs",
+      "base_sha256": "7481922f1f5056c123c6d8203552c32953febe409cccf42b2fc9aad4e2cfd281",
+      "candidate_sha256": "7481922f1f5056c123c6d8203552c32953febe409cccf42b2fc9aad4e2cfd281",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/tree.rs",
+      "base_sha256": "51757b087f5b6baaae3cd1326e5c854d64f80772a6341dca7bf4844bef5e1736",
+      "candidate_sha256": "51757b087f5b6baaae3cd1326e5c854d64f80772a6341dca7bf4844bef5e1736",
+      "changed": false
+    },
+    {
+      "path": "src/repo/timeline/view.rs",
+      "base_sha256": "2a029ca52997a4e4cad7187a9cd3b11361cf8d55c43a67ef8a9ab79f8cc3b735",
+      "candidate_sha256": "1d8edea4f09010cffc9084343b4999f78cffad1ed9fa0ca604586e5dfd9e5b6b",
+      "changed": true
+    },
+    {
+      "path": "src/repo/tour/mod.rs",
+      "base_sha256": "9f369478f4124b3e24485eb6f5b7ba81e629c8d6a90acbb5dacd51f7478bbf60",
+      "candidate_sha256": "9f369478f4124b3e24485eb6f5b7ba81e629c8d6a90acbb5dacd51f7478bbf60",
+      "changed": false
+    },
+    {
+      "path": "src/repo/unity/banner.rs",
+      "base_sha256": "037c47b8348ac441018c10020e4a9d42ed86c6f58ce700e7c1c580da7e7ee03a",
+      "candidate_sha256": "037c47b8348ac441018c10020e4a9d42ed86c6f58ce700e7c1c580da7e7ee03a",
+      "changed": false
+    },
+    {
+      "path": "src/repo/unity/mod.rs",
+      "base_sha256": "d085496c1c3bca2f54abeedfcc207ccff6aaa5c157037a327facd617153c9deb",
+      "candidate_sha256": "d085496c1c3bca2f54abeedfcc207ccff6aaa5c157037a327facd617153c9deb",
+      "changed": false
+    },
+    {
+      "path": "src/repo/unity/panel.rs",
+      "base_sha256": "62e70505b1e30ac3266cc19dc44289f447f3657ae49ab3e76e9f6553c6fbf5fe",
+      "candidate_sha256": "62e70505b1e30ac3266cc19dc44289f447f3657ae49ab3e76e9f6553c6fbf5fe",
+      "changed": false
+    },
+    {
+      "path": "src/repo/unity/smart_merge.rs",
+      "base_sha256": "f207c4a623a156b1cb83163ff3959771010110e3693a74a64657d43f00ca3506",
+      "candidate_sha256": "f207c4a623a156b1cb83163ff3959771010110e3693a74a64657d43f00ca3506",
+      "changed": false
+    },
+    {
+      "path": "src/repo/unity/tests.rs",
+      "base_sha256": "e5e898ce8ccb802b5b42423c852776f5477f411be94b077bf5481f8a8ed2c5c4",
+      "candidate_sha256": "e5e898ce8ccb802b5b42423c852776f5477f411be94b077bf5481f8a8ed2c5c4",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/mod.rs",
+      "base_sha256": "5a89853adfd585216b08e4c96764d855bd7707319534c9e8e0fc60f843552847",
+      "candidate_sha256": "5a89853adfd585216b08e4c96764d855bd7707319534c9e8e0fc60f843552847",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/pr_since.rs",
+      "base_sha256": "bfd8e558b381f0fa4e80e9d8f81dc5597f82554898684f7da30f295818c31518",
+      "candidate_sha256": "bfd8e558b381f0fa4e80e9d8f81dc5597f82554898684f7da30f295818c31518",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/pr_since/tests.rs",
+      "base_sha256": "7f9d7fd873aaa4fa892610bc88fe60db4dac28d5912bf44e5a7f809a38edcd88",
+      "candidate_sha256": "7f9d7fd873aaa4fa892610bc88fe60db4dac28d5912bf44e5a7f809a38edcd88",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/rewrites.rs",
+      "base_sha256": "cc8dd29d85aa7fec052dabf0f77e5af69096715f57d7a4b13294d75f11991da3",
+      "candidate_sha256": "cc8dd29d85aa7fec052dabf0f77e5af69096715f57d7a4b13294d75f11991da3",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/tests.rs",
+      "base_sha256": "41e8535c7775df228f44ffbc212d1a90155d5ff305a7f4cf55e7c73604bd1610",
+      "candidate_sha256": "41e8535c7775df228f44ffbc212d1a90155d5ff305a7f4cf55e7c73604bd1610",
+      "changed": false
+    },
+    {
+      "path": "src/repo/versions/view.rs",
+      "base_sha256": "b04df48c50779226540714c68c2e98987475070129a58a5b8524b92e4262bc62",
+      "candidate_sha256": "0f094599d7e8643277923e2f4aff56c77cf9a3459a3f61efb629ad3123d70a77",
+      "changed": true
+    },
+    {
+      "path": "src/repo/working_drafts/mod.rs",
+      "base_sha256": "dd8e8f84efe87d2b05b4c3e8cddedad16b7a3110a6a3d322d617b8ad22c55811",
+      "candidate_sha256": "dd8e8f84efe87d2b05b4c3e8cddedad16b7a3110a6a3d322d617b8ad22c55811",
+      "changed": false
+    },
+    {
+      "path": "src/repo/working_drafts/view.rs",
+      "base_sha256": "7131adc79fb059a370a2b801ec3ab843ace116a15344f9a0c5f0f16dd14708b4",
+      "candidate_sha256": "7131adc79fb059a370a2b801ec3ab843ace116a15344f9a0c5f0f16dd14708b4",
+      "changed": false
+    }
+  ],
+  "catalogs": [
+    {
+      "path": "locales/en-US/repo-workflows.ftl",
+      "base_sha256": "14bf819e3b0c8943e923c034876e3def97e79984dfd23594d3ebeeb9434c7adf",
+      "candidate_sha256": "1ab8fc01522a9a8691987d1155fb9a9a38647e67d7e9b9561484cfdac8227fcb",
+      "original_entry_count": 3508,
+      "final_entry_count": 3524,
+      "added_ids": [
+        "repo-workflows-r1-added",
+        "repo-workflows-r1-changed",
+        "repo-workflows-r1-choose",
+        "repo-workflows-r1-commented",
+        "repo-workflows-r1-done",
+        "repo-workflows-r1-dropped",
+        "repo-workflows-r1-elsewhere",
+        "repo-workflows-r1-locked",
+        "repo-workflows-r1-moved",
+        "repo-workflows-r1-tested",
+        "repo-workflows-r1-unknown",
+        "repo-workflows-r1-verdict-bad",
+        "repo-workflows-r1-verdict-good",
+        "repo-workflows-r1-verdict-skip",
+        "repo-workflows-r1-verdict-timeout",
+        "repo-workflows-r1-you"
+      ],
+      "original_exact_prefix": true
+    },
+    {
+      "path": "locales/de/repo-workflows.ftl",
+      "base_sha256": "2ad6a989577824deee1b27c872d6dfa5a6ffd174b275a8ad3acbb05950b993d8",
+      "candidate_sha256": "51f34347d8dbf081240c573620ebd940de12b4c1172c6ddb4943d130b60b5fd4",
+      "original_entry_count": 3508,
+      "final_entry_count": 3524,
+      "added_ids": [
+        "repo-workflows-r1-added",
+        "repo-workflows-r1-changed",
+        "repo-workflows-r1-choose",
+        "repo-workflows-r1-commented",
+        "repo-workflows-r1-done",
+        "repo-workflows-r1-dropped",
+        "repo-workflows-r1-elsewhere",
+        "repo-workflows-r1-locked",
+        "repo-workflows-r1-moved",
+        "repo-workflows-r1-tested",
+        "repo-workflows-r1-unknown",
+        "repo-workflows-r1-verdict-bad",
+        "repo-workflows-r1-verdict-good",
+        "repo-workflows-r1-verdict-skip",
+        "repo-workflows-r1-verdict-timeout",
+        "repo-workflows-r1-you"
+      ],
+      "original_exact_prefix": true
+    }
+  ],
+  "map_integration": {
+    "added_total": 20,
+    "added_fixed": 17,
+    "existing_fixed": 3,
+    "operations": 3,
+    "all_20_nonbinary_fixed_contracts": [
+      {
+        "raw": "History worker stopped",
+        "id": "repo-workflows-saved_views-poll-da12ac51",
+        "already_present": true
+      },
+      {
+        "raw": "History read cancelled",
+        "id": "repo-workflows-saved_views-poll-dc101692",
+        "already_present": true
+      },
+      {
+        "raw": "History worker panicked",
+        "id": "repo-workflows-saved_views-poll-33647b3e",
+        "already_present": true
+      },
+      {
+        "raw": "Use YYYY-MM-DD dates",
+        "id": "repo-workflows-atlas-read-atlas-02c42736",
+        "already_present": false
+      },
+      {
+        "raw": "Use YYYY-MM-DD dates, with start on or before end",
+        "id": "repo-workflows-atlas-read-atlas-67b18cbf",
+        "already_present": false
+      },
+      {
+        "raw": "Use dates such as 2026-11-07",
+        "id": "repo-workflows-history_activity-requested-range-4d18caf5",
+        "already_present": false
+      },
+      {
+        "raw": "The start date must be on or before the end date",
+        "id": "repo-workflows-history_activity-requested-range-25f6acd0",
+        "already_present": false
+      },
+      {
+        "raw": "Analysis cancelled. Refresh to try again.",
+        "id": "repo-workflows-history_activity-cancel-ddfe1c43",
+        "already_present": false
+      },
+      {
+        "raw": "No supported forge remote; commit history remains available",
+        "id": "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+        "already_present": false
+      },
+      {
+        "raw": "Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history",
+        "id": "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+        "already_present": false
+      },
+      {
+        "raw": "Trace cancelled",
+        "id": "repo-workflows-line_dossier-line-dossier-view-a8198076",
+        "already_present": false
+      },
+      {
+        "raw": "Repository changed. Refresh the file view.",
+        "id": "repo-workflows-file_comparison-invalidate-81f92ce0",
+        "already_present": false
+      },
+      {
+        "raw": "Invalid comparison sides",
+        "id": "repo-workflows-file_comparison-prepare-da3978aa",
+        "already_present": false
+      },
+      {
+        "raw": "More than 20,000 lines in a version; use the normal patch view",
+        "id": "repo-workflows-file_comparison-boundary-e44610d7",
+        "already_present": false
+      },
+      {
+        "raw": "Git could not align these raw versions",
+        "id": "repo-workflows-file_comparison-boundary-b861cbb0",
+        "already_present": false
+      },
+      {
+        "raw": "The raw patch is not UTF-8",
+        "id": "repo-workflows-file_comparison-boundary-5421cc1b",
+        "already_present": false
+      },
+      {
+        "raw": "Git could not produce a raw text patch for these differing bytes; use the normal patch view",
+        "id": "repo-workflows-file_comparison-boundary-6732715f",
+        "already_present": false
+      },
+      {
+        "raw": "Comparison cancelled. Refresh to try again.",
+        "id": "repo-workflows-file_comparison-file-comparison-view-725513de",
+        "already_present": false
+      },
+      {
+        "raw": "No key, agent, account or network action has run. Choose each step explicitly.",
+        "id": "repo-workflows-ssh_setup-new-8633c172",
+        "already_present": false
+      },
+      {
+        "raw": "Setup worker stopped; no later result will be applied.",
+        "id": "repo-workflows-ssh_setup-poll-380743c6",
+        "already_present": false
+      }
+    ],
+    "private_binary_excluded": true,
+    "previous_complete_map_suffix_exact": true
+  },
+  "C1_C2_source_invariants_verified": true,
+  "supplied_final_gates": [
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 0.308,
+      "selected_pass": null,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-check.log",
+      "sha256": "5aab06d65bb91e3aa8cecfe4990258386a36fed966fdc95cd4fb0da9d784bbc1"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::activity::tests::fluent_partition_actual_activity_adapter_formats_numbers_and_preserves_commands",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 62.639,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-1.log",
+      "sha256": "f2414ae73ce4efef2a6ce0b154c0dbe2948d6ece8c7c67fd6ef5f046e1f72e90"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::activity::tests::fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_diagnostics",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.376,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-2.log",
+      "sha256": "4213d0899693782161557df737a2fe22eeccb83e9beca16ccb29548c30666ff5"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agent::plan::fluent_ask_receipt_tests::fluent_partition_actual_cached_approval_asks_repaint_with_raw_equality_and_source_guards",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.402,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-3.log",
+      "sha256": "1445613ba331adfeb279f3d8610878b34c955567ec35ee7f5d0ec617fc81d666"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agent::preview::fluent_approval_note_tests::fluent_partition_actual_approval_card_projection_repaints_receipts_without_changing_snapshot",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.363,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-4.log",
+      "sha256": "15b404fcba3dadb57656acf3c6c9106cd729580982cf3e0c286a7a0e2d65874f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agents::recipe_editor::fluent_recipe_consumer_tests::fluent_partition_actual_recipe_form_retains_submitted_context_and_raw_save_action",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.375,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-5.log",
+      "sha256": "f89432d7657618b922145889642b5bfc37acb3db17c8b7d2e7f604194324fa1d"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agents::start::fluent_partition_tests::fluent_partition_actual_start_form_keeps_action_payload_in_both_languages",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.375,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-6.log",
+      "sha256": "dd4027ff5956f48bf2c69780a73325f98143e0b3f99386b5757b01fe753e250d"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agents::start::fluent_partition_tests::fluent_partition_actual_validation_preserves_named_repository_content",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.351,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-7.log",
+      "sha256": "830a7adc4584e84f287e3e0ad2c5957e29d89935d4fd02705ccb7c15a4a2b66b"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::agents::turns::fluent_r1_caption_tests::fluent_partition_r1_actual_turn_actions_keep_raw_captions_and_source_metadata",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.376,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-8.log",
+      "sha256": "b703d9d3cd0c6027cb7e6b5e9796681b14b1d1d2dcec521c35c4c39bf9f51935"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ai::fluent_r1_note_tests::fluent_partition_r1_ai_message_note_retains_numeric_coverage_and_raw_failure",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.365,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-9.log",
+      "sha256": "7fac04504d8f854d0a9877fb68a4046e423ab8e246c22e025beeb365125778c2"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::atlas::fluent_r1_cache_tests::fluent_partition_r1_atlas_cached_validation_keeps_inputs_and_page",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.354,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-10.log",
+      "sha256": "9839ec9f5c95b82b91c16c31f9fc6dcb816cf1e963cf9eb544011f4f957b0d85"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::bakeoff::fluent_kind_tests::fluent_partition_bakeoff_actual_kind_label_keeps_raw_classification",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.368,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-11.log",
+      "sha256": "38bc6f1c82d2e25e5cf599db7d33d4616155b40a3275cef466370bf6c5c6fd11"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::bakeoff::fluent_r1_note_tests::fluent_partition_r1_bakeoff_same_note_keeps_picks_request_and_opaque_branch",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-12.log",
+      "sha256": "991616beb05fbd4075c07e98efb3bf307c854fe9e3b239102ba102e4d1d25df3"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::bisect::items::fluent_mark_tests::fluent_partition_actual_bisect_mark_label_preserves_good_bad_and_custom_terms",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.351,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-13.log",
+      "sha256": "d71e3b61022199bec20145d4fe8003be290e82da08540d1297b7887418c0f78f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::collision_view::fluent_guard_tests::fluent_partition_collision_actual_error_paint_keeps_raw_result",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.364,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-14.log",
+      "sha256": "28d60d9819343377c859e3986b3b35f2d12c1563e206481631d17e1c1420681f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::collision_view::grid::fluent_guard_tests::fluent_partition_collision_actual_cell_tip_preserves_raw_classification",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.361,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-15.log",
+      "sha256": "34328c4849e3e02498c414c49cac6095fbe9620bc9f42bb09049e63d141f41bb"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::content_recovery::view::fluent_hit_tests::fluent_partition_actual_recovery_hit_summary_keeps_count_cap_numeric",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-16.log",
+      "sha256": "469651ea54cd16b3d4e09192c787954eb99864f8f1a3ab332fcbda8d57e88b65"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::dco::fluent_preview_tests::fluent_partition_dco_actual_preview_keeps_raw_labels_authors_and_numeric_plan",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.358,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-17.log",
+      "sha256": "3bb06427c85f0e67efaeb8038f87cedcf68a40ace4094f6be434b4106e849659"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::devcontainer::fluent_r1_result_tests::fluent_partition_r1_devcontainer_same_retained_state_repaints_without_work_or_consent_change",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.357,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-18.log",
+      "sha256": "f832f17a1ae54e5cac861fecadb15e68574a4c9a3252fb6e9eb39ac030dd6a59"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::doctor::config_section::fluent_r1_confirmation_tests::fluent_partition_r1_actual_remove_confirmation_keeps_opaque_value_path_and_argv",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.351,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-19.log",
+      "sha256": "222c5e680bb9855ad52cef3f0abd34a4811cb9cd00883e85b98c13b8221d563a"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::doctor::config_section::fluent_r1_confirmation_tests::fluent_partition_r1_actual_set_click_caches_raw_confirmation_and_projects_scope_at_paint",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.349,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-20.log",
+      "sha256": "2a0739a0e08960a72e9f513315291f1329bb6cecbb6597d398e59aea751608ed"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::doctor::flags_section::fluent_r1_confirmation_tests::fluent_partition_r1_cached_doctor_confirmation_repaints_without_changing_label_or_argv",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.347,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-21.log",
+      "sha256": "326151d35e15b7c76a7c6742e8241c6df91b20b5f462c5a6064cc9223fd8078c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::doctor::health_section::fluent_confirmation_tests::fluent_partition_doctor_actual_selection_keeps_confirmation_and_argv_in_both_languages",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.453,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-22.log",
+      "sha256": "eb93fdfa6af6f7c395db1d1b6ccc47e35af79e80f74e6e7572a6ccbeedae6315"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::doctor::health_section::fluent_r1_maintenance_cache_tests::fluent_partition_r1_actual_maintenance_selection_retains_raw_control_and_cached_command_provenance",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.375,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-23.log",
+      "sha256": "587fdfb0a72b20e212106e4d9063f412d689a4edac0a3c088fe9018743c8996c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::drift_view::fluent_guard_tests::fluent_partition_drift_actual_paint_reprojects_cached_raw_results",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.362,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-24.log",
+      "sha256": "f35c9017761fcf27851e02b2fde3392abe597f6fb7baa706a99699bf18836011"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::drift_view::items::fluent_section_tests::fluent_partition_drift_count_header_keeps_expansion_across_language_and_count",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.361,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-25.log",
+      "sha256": "10ad1fa6937041125251ef0456a192c94e65cdc0b36279018068025376229fa7"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::email::fluent_r1_failure_tests::fluent_partition_r1_email_cached_failure_retains_retry_hint_and_opaque_multiline_details",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.356,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-26.log",
+      "sha256": "90632d41489dc99727422c250f242a44188f330dbe6c569756d97e130df267cd"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::email::fluent_r1_result_tests::fluent_partition_r1_email_same_retained_state_repaints_without_work_or_consent_change",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.356,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-27.log",
+      "sha256": "ef6804b3857ddf79510257adb7e80ed388f2dbcfa0a9ccdcec5e1b61f16d77d7"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::fence_view::editor::fluent_receipt_tests::fluent_partition_fence_actual_receipt_repaints_and_preserves_raw_aggregate",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.361,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-28.log",
+      "sha256": "58b5d66375f1ddf74fe59580ae234fa84c046d46363806ae6114993d6110765f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::fence_view::fluent_confirmation_tests::fluent_partition_fence_actual_confirmation_keeps_paths_and_checks_raw",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-29.log",
+      "sha256": "0106625b0d7c9baaec4e73bb098e9d8de18ba029746d094c3a4e238cdf901f8a"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::fence_view::fluent_guard_target_tests::fluent_partition_fence_supplied_target_preserves_punctuation_and_raw_gate_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.358,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-30.log",
+      "sha256": "85dcb345a18abe2f7894fd7f10bea4b30c6f59bda041d097251b4d09c37ad80f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::file_comparison::model::fluent_r1_boundary_tests::fluent_partition_r1_binary_boundary_keeps_raw_reason_and_provider_lookalike_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.352,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-31.log",
+      "sha256": "4fad44854b879f0d0b14639edecb6b8f70e500376ad140a11db301a4133d9dec"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::forks::fluent_checkout_identity_tests::fluent_partition_actual_fork_checkout_dispatch_keeps_opaque_pr_number_and_owner",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.367,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-32.log",
+      "sha256": "945a4b55c2f6020d4c0bda13d6c5ba8157e941f97f150b2d01ebb45f1a5b1927"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::forks::fluent_tidy_tests::fluent_partition_forks_actual_tidy_preview_keeps_remote_names_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.361,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-33.log",
+      "sha256": "44367b3e264f3b95d3c03cf6b33c4f6682c154d9f4b5a7598a732e3f20304731"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::forks::plan::fluent_r1_identifier_tests::fluent_partition_r1_collision_names_preserve_decimal_pr_identity_and_planned_argv",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.36,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-34.log",
+      "sha256": "feef0eca7a31a09a7ef5f5201624be42bc0a7465cdde6bdebe6ba99bf3a93750"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ghost::plan::fluent_notice_tests::fluent_partition_ghost_actual_notices_keep_refs_opaque_and_counts_numeric",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.36,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-35.log",
+      "sha256": "3f23710b484e970a6c76009a7d045e916aaf562fdd569755d04f114270dd2064"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ghost::strip::fluent_cached_preview_tests::fluent_partition_actual_cached_ghost_preview_repaints_raw_notes_without_workers",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.376,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-36.log",
+      "sha256": "8cf6908ee319557a4b80fe40bba2ee8165ec2dad0a05d0f590391117eb205a4c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ghost::strip::fluent_witness_cache_tests::fluent_partition_actual_cached_ghost_failure_repaints_typed_witness_without_jobs",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.369,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-37.log",
+      "sha256": "97035d6e0cbe35ad1a02ef5956f347bd6bc6c062dd5bec311b5a915ab60e9147"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::guide::tips::tests::fluent_partition_manual_tip_caches_follow_language_without_changing_day_or_fit",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.354,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-38.log",
+      "sha256": "3daa1c85ab28648d8a023b784422bb4b28b51055e0b3dab0c6582017ee6a8af7"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::history_activity::fluent_r1_cache_tests::fluent_partition_r1_activity_cached_range_and_cancel_errors_keep_generation_and_query",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.369,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-39.log",
+      "sha256": "7e361b5847781876f1da2fa21c2d146596224f1fff8b3cbf1712c480d60b1377"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::history_activity::view::fluent_calendar_tests::fluent_partition_calendar_renders_both_languages_without_changing_iso_range",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.383,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-40.log",
+      "sha256": "59d1be3678bb9a8d31ec41bf25c97b47fad02b4c32d62e3d9d982c5b5186077a"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::history_activity::view::fluent_date_paint_tests::fluent_partition_actual_month_heading_preserves_iso_calendar_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.369,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-41.log",
+      "sha256": "cd32935bb02dc6c84e868e45dd0bd00ef55261da0eb7e241269c60e09954e8c0"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::lfs_locks::banner::fluent_r1_owner_tests::fluent_partition_r1_short_lock_owner_keeps_provider_words_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.36,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-42.log",
+      "sha256": "bdbd637d471de18da6643ebcb0c9fa4aa34bf29439ff5973c349ec9b9835e952"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::lfs_locks::fluent_identity_tests::fluent_partition_lfs_lock_display_preserves_raw_push_classification",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.384,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-43.log",
+      "sha256": "45a2beb0742ec7f767929e92f2aa346e052a5372bb570ae04b537ccf361b68a1"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::lfs_locks::fluent_r1_read_tests::fluent_partition_r1_lfs_locks_cached_read_error_preserves_raw_detail_and_generation",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.394,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-44.log",
+      "sha256": "ff71dbb5f5dbba74495a91e69d2dba2d2b41b5d7937effb8c5cec0f930950899"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::line_dossier::fluent_r1_cache_tests::fluent_partition_r1_dossier_cached_error_summary_and_evidence_keep_raw_source",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.35,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-45.log",
+      "sha256": "a8289a9c08b35f2955be8d8fc42edf11f8261117d2d58d417008e1ca81eb0cb1"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::local_ci::model::fluent_model_tests::fluent_partition_local_workflow_parser_localizes_errors_and_preserves_job_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.358,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-46.log",
+      "sha256": "a6261a5618f1fd5ead0ef3483b7d53924e1779649baf8c671457ff7d83bb682a"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::local_ci::run::fluent_r1_catalog_tests::fluent_partition_r1_local_actions_retains_typed_parser_and_opaque_yaml_details",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.361,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-47.log",
+      "sha256": "3b240c5215d5795d13f3b6ab2e2739c40426e8957d1bdeb0a2035fd1defc0fd1"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::package::view::fluent_package_witness_tests::fluent_partition_actual_package_three_cached_failure_slots_repaint_without_request_or_action_changes",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.379,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-48.log",
+      "sha256": "7e79543fc9b3831280ae0d8a35e2ccc9d9fb1cc94d5ee589702c0450f71e101c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::parallel_bisect::marks::fluent_r1_word_tests::fluent_partition_r1_fixed_verdict_display_preserves_raw_classifier_words",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.358,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-49.log",
+      "sha256": "25df79ebccc54cba94d3b57cff5e217d4ed7d40bb52785789ba90ddde510ff81"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::pr_view::page::fluent_provider_identifier_tests::fluent_partition_actual_pr_header_preserves_provider_identifier_while_counts_group",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.355,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-50.log",
+      "sha256": "9c288bc5d00de301b7058bbe1d311aaa5959d99722b1b0f2725e70bafa6163d5"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::pr_view::timeline::fluent_r1_word_tests::fluent_partition_r1_comment_words_repaint_but_review_provider_words_remain_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.354,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-51.log",
+      "sha256": "43460365338bd5e83a1837b252d0a21d624c64df16a13ca431efe26a2ace2ac3"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::release::fluent_r1_operation_tests::fluent_partition_r1_release_busy_and_undo_label_are_raw_in_both_languages",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.284,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-52.log",
+      "sha256": "78372f48a623c50923231d5b192a1bde4e354113d15cba102e990c7113814d74"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::release::view::fluent_release_tests::fluent_partition_release_actual_paint_keeps_validation_notes_errors_and_plan_raw",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.374,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-53.log",
+      "sha256": "9279a8ac592436d94a7633b8eba99a2775eb300364eb5b79c93981f57eb4e41f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::remerge::badge::fluent_badge_tests::fluent_partition_remerge_badge_uses_whole_plural_numeric_tooltip",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.352,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-54.log",
+      "sha256": "1a03bc79ff8b2766eaf3d5fbf980bd79434d0e33ec8dfd1f73b7ce1f032efc45"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::repository_tools::deferred::fluent_r1_caption_tests::fluent_partition_r1_actual_deferred_action_retains_branch_and_opaque_raw_payload",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.355,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-55.log",
+      "sha256": "84f89d02fa8a738f5fc742e3f3ae53b8bca4818486d304290818aa59504e2335"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::repository_tools::outbox::fluent_outbox_tests::fluent_partition_outbox_actual_summary_keeps_supplied_state_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.35,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-56.log",
+      "sha256": "5edcd48138cac244a407c7d35aa65c7c52e5863ddd7f8ab98d14fa6bcb507ae4"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::saved_views::fluent_r1_preset_tests::fluent_partition_r1_generated_preset_origin_persists_and_legacy_user_names_stay_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.357,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-57.log",
+      "sha256": "6ab43e29d1829c9b0cb20180bc41e8234bc883314baf55ad71c312f89f727fec"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::saved_views::reader::fluent_r1_reader_tests::fluent_partition_r1_saved_reader_retains_raw_result_across_de_en_de",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.352,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-58.log",
+      "sha256": "08fccf84bbb19f39cf32926510a407f65ebe1e6bcc69d7b7e0c3485b1987597e"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ssh_setup::fluent_r1_status_tests::fluent_partition_r1_ssh_fixed_cached_status_follows_locale_without_account_or_command_replay",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.35,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-59.log",
+      "sha256": "f5d91e9e48c5dfde36bf7f448a885b4b479bb616d454be725f71e30aee8fee7c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::ssh_setup::plan::fluent_plan_tests::fluent_partition_ssh_plan_localizes_validation_without_changing_argv",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.366,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-60.log",
+      "sha256": "07329746fa01473a71381a56a4db6d2b4e529f067864083389906c5d68e0829c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::stack::fluent_r1_read_tests::fluent_partition_r1_stack_cached_read_error_preserves_raw_detail_and_generation",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.351,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-61.log",
+      "sha256": "5f944aa17046eb128176220f2504447beaec3905ed2e9a92573d3309d5a8b02f"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::surgery::absorb::fluent_raw_operation_tests::fluent_partition_absorb_raw_in_progress_identity_and_command_are_locale_independent",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.283,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-62.log",
+      "sha256": "4cdcd0588274805ab07d9fcad183522821b2206ed8cd974078966267aad8676c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::test_lane::fluent_r1_read_tests::fluent_partition_r1_test_lane_cached_read_error_preserves_raw_detail_and_generation",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-63.log",
+      "sha256": "e679c8adb68b89371d23ee5d4ed3fa7d85f524c3ee679a7a5bd415c27ce543a9"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::test_lane::fluent_result_tests::fluent_partition_test_lane_actual_result_display_keeps_raw_status_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.355,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-64.log",
+      "sha256": "d3e19e91bed677e7855306ca7db3ce9d50ff16411aabde9e6e65e85e01b4681e"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::timeline::receipt::fluent_receipt_tests::fluent_partition_actual_receipt_sentence_localizes_counts_and_keeps_reflog_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.355,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-65.log",
+      "sha256": "1a7fcdb9ba7f807ef616876d596f294f9806e927a58d5985cc2604b369de43df"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::tour::fluent_tour_paint_tests::fluent_partition_tour_actual_cached_error_repaints_without_discovery",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.356,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-66.log",
+      "sha256": "ee49687bcdfa4df73020e59e8d8647f543e17979289a25b4f321e7b81c863cc0"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::versions::fluent_versions_tests::fluent_partition_version_heading_follows_language_and_summary_keeps_numeric_state",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-67.log",
+      "sha256": "1e37734d762f40fcf3a4a7c1fc926cde35fa18a751bc479ce60148cdea28e1fb"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::versions::view::fluent_r1_mark_tests::fluent_partition_r1_series_marker_words_repaint_without_mutating_pair_identity",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.351,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-68.log",
+      "sha256": "3ddaebde06a61e265bd82f67ceb54f0a942cca2ebbbd46382f5c5f51b8e049c3"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::devcontainer::fluent_r2_failure_tests::failure_receipt_repaints_full_original_guidance_and_preserves_supplied_state",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.359,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-69.log",
+      "sha256": "18097f5230b0530ae848d62b7c47a2723ce4165ae17378f80819ea230f217343"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::devcontainer::fluent_r2_failure_tests::failure_receipt_requires_raw_agreement_and_does_not_parse_provider_detail",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.286,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-70.log",
+      "sha256": "91d0d7fea15a9c6a9dcfaadec5a1639cef27d5bcdbeff38161f3e20eba968b4c"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::local_ci::fluent_r2_guard_tests::actual_context_guard_retains_raw_error_and_repaints_without_restoring_consent",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.353,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-71.log",
+      "sha256": "44d7116b19315306ee38aebfd2f0fd4942f37099d4ad3fc96c2d0feda2a6cef9"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::local_ci::fluent_r2_guard_tests::actual_matrix_guard_retains_raw_error_and_selection_eligibility_without_submitting",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.349,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-72.log",
+      "sha256": "9921c575017f100d546410f2aeaaa21ed8f485442b6d255c5325b5bd031166bd"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::local_ci::fluent_r2_guard_tests::local_guard_receipt_rejects_mismatch_and_leaves_unmarked_provider_details_opaque",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.35,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-73.log",
+      "sha256": "0d702e59ceaac45cdef7b07da65d62cfbfaf38568c8c61ab253576bac5d6a3af"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.421,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-74.log",
+      "sha256": "fb03a38e326a960419d3420e1f6dcbd0de67d222c99631eda6441664ce43faba"
+    },
+    {
+      "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "repo::messages::workflow::tests::workflow_r1_fixed_sentinels_and_raw_operation_templates_project_only_at_paint",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.371,
+      "selected_pass": 1,
+      "log": "/tmp/gitcraft-root-workflow-r2/immutable-75.log",
+      "sha256": "ea9bd56230028f6358f776a9893083cd53a9f7abd5e61f921374e5ed0fc24c96"
+    }
+  ],
+  "gate_coverage": {
+    "exact_immutable_candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+    "all_target_check": 1,
+    "individual_exact_tests": 75,
+    "retained_owner_selections": 68,
+    "new_residual_tests": 5,
+    "catalog": 1,
+    "map": 1,
+    "independent_rerun": false
+  },
+  "root_preexisting_test_scan": {
+    "base": "e4a884ee332e020fe49e9aca713c2f8e907cc318",
+    "candidate": "af4dc2700e7455a04cfd68eea46a50574622ab47",
+    "preexisting_test_count": 773,
+    "changed": [
+      {
+        "path": "src/repo/doctor/health_section.rs",
+        "test": "fluent_partition_doctor_actual_selection_keeps_confirmation_and_argv_in_both_languages",
+        "delta": "--- \n\n+++ \n\n@@ -409,11 +409,24 @@\n\n =\n >\n {\n-assert_eq\n-!\n-(\n+let\n+(\n+title\n+,\n+body\n+,\n+button\n+)\n+=\n confirmation\n .\n+displayed\n+(\n+)\n+;\n+assert_eq\n+!\n+(\n title\n ,\n if\n@@ -433,8 +446,6 @@\n\n assert_eq\n !\n (\n-confirmation\n-.\n button\n ,\n if\n@@ -454,8 +465,6 @@\n\n assert\n !\n (\n-confirmation\n-.\n body\n .\n starts_with\n@@ -467,8 +476,6 @@\n\n assert\n !\n (\n-confirmation\n-.\n body\n .\n contains\n@@ -509,8 +516,6 @@\n\n assert\n !\n (\n-confirmation\n-.\n body\n .\n contains",
+        "base_tokens_sha256": "8a80282985f767dc78757cbb3539fa3351ea8693ebf00ada5a93a27caa45bf57",
+        "candidate_tokens_sha256": "36e18b71715734ad4cbb53d7f1f3de7a4b84b761776301d2c681e15adcc0533d"
+      },
+      {
+        "path": "src/repo/doctor/tests.rs",
+        "test": "the_doctor_reads_settings_and_clears_flags_through_the_tab",
+        "delta": "--- \n\n+++ \n\n@@ -361,6 +361,10 @@\n\n :\n Confirm\n {\n+presentation\n+:\n+None\n+,\n title\n :\n \"Clear?\"",
+        "base_tokens_sha256": "b5392e945d96665bb57bc7375fe369de3a4b8b6041b11b27afd5e203d672f749",
+        "candidate_tokens_sha256": "5d1daf9f721a5cd2803a953abe61f5d2b0eb90f3b7d0604306ad4026b33a9836"
+      },
+      {
+        "path": "src/repo/saved_views/tests.rs",
+        "test": "persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed",
+        "delta": "--- \n\n+++ \n\n@@ -6,6 +6,10 @@\n\n version\n :\n 99\n+,\n+generated_active\n+:\n+None\n ,\n saved\n :\n@@ -95,6 +99,10 @@\n\n :\n 1\n ,\n+generated_active\n+:\n+None\n+,\n saved\n :\n vec",
+        "base_tokens_sha256": "979c410c15225a45f69f382a4cc587c316f9db192015477f29f6ca0892133996",
+        "candidate_tokens_sha256": "cb510467cc88d18da947c906e44126ba2c754ee0e99426832636176cfe4548f7"
+      }
+    ],
+    "reverse_transforms": [
+      {
+        "path": "src/repo/doctor/health_section.rs",
+        "test": "fluent_partition_doctor_actual_selection_keeps_confirmation_and_argv_in_both_languages",
+        "approved_reverse_transform_equal": true
+      },
+      {
+        "path": "src/repo/doctor/tests.rs",
+        "test": "the_doctor_reads_settings_and_clears_flags_through_the_tab",
+        "approved_reverse_transform_equal": true
+      },
+      {
+        "path": "src/repo/saved_views/tests.rs",
+        "test": "persisted_unknown_versions_bad_presets_and_saved_counts_fail_closed",
+        "approved_reverse_transform_equal": true
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/gitcraft-51-workflow-fluent-final-review.md",
+      "sha256": "9766f5c1ded17320f2843ade6e7f1f1dc2a52b5657ee7ca2affa1966c39f51d1",
+      "bytes": 21360
+    },
+    {
+      "path": "/tmp/gitcraft-51-workflow-fluent-final-review.json",
+      "sha256": "6767477801910181ccc633b110749dddd7b46d08c5959ede32311917907912a8",
+      "bytes": 219196
+    },
+    {
+      "path": "/tmp/gitcraft-51-workflow-r1-correction-review.md",
+      "sha256": "861722ca99a64a849f00a4ddcf7b62a65355e183149bf4dc70c24225e8a60a7d",
+      "bytes": 10730
+    },
+    {
+      "path": "/tmp/gitcraft-51-workflow-r1-correction-review.json",
+      "sha256": "44dc177bd7c214c6d039411bd947b136da1db906993b2a9a4350a6d3538b24a4",
+      "bytes": 114270
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/HANDOFF.md",
+      "sha256": "9da0dc631a3b4d4b0699d7827d01402010e5ce300e8b750b6fa179f82ae67f23",
+      "bytes": 5767
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/6b13ae41666c95cb323843c370e575f54d2fd521-receipt.json",
+      "sha256": "5b5ae3ea9852fed8e9256dc55f3b955ad48cf544a8b01d612939bfd343443e9f",
+      "bytes": 14304
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/source-proof.json",
+      "sha256": "6184cb339ac784f493f66e94b9dd0f46e26631bf8119624c37132653f42fdf05",
+      "bytes": 118117
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/fixture-proof.json",
+      "sha256": "89122a4ad6dc82c002cb0f2ec651b6831a97de9e94d9a42c5c25b4ceba8240c7",
+      "bytes": 117962
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/owned-correction.patch",
+      "sha256": "c0ce3ef981cca011acf4eb9cc00aa4d35e06283b2e9b3c475e0ef38f71a40def",
+      "bytes": 172632
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/raw-map-delta.json",
+      "sha256": "ffc2feb2396f1bf06d936901d7d6efd1d3fc1cbfe5a8d2971d40ae50f6a5303d",
+      "bytes": 26015
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r1/nested-worker-channels-OPEN.json",
+      "sha256": "626e84ca335f714dbc84b19df5d0a91fc859d07c1ab38e69dd41985ede448ff8",
+      "bytes": 55521
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r2-two-residuals/HANDOFF.md",
+      "sha256": "62cac4d43b0a93e64a8d05d9c539e91705b83069812fe95b2452af9e8ccdbe5e",
+      "bytes": 6092
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r2-two-residuals/two-residuals.patch",
+      "sha256": "ec44212cad10fadc6c4fdfd5f46238e9c2e6b87285cfdb6b662af494f19e4f83",
+      "bytes": 18706
+    },
+    {
+      "path": "/tmp/gitcraft-workflows-r2-two-residuals/source-control-oldtest-proof.json",
+      "sha256": "a4186875998f02a91dd5c671154d1943d575918291430d76cc301129276c64e7",
+      "bytes": 14383
+    },
+    {
+      "path": "/tmp/gitcraft-root-workflow-r1/source-integration.json",
+      "sha256": "8370138bf4632afba67acd7346b6deea5ca8b317b7473a6b8554dc2aa3077a5c",
+      "bytes": 8975
+    },
+    {
+      "path": "/tmp/gitcraft-root-workflow-r1/map-adoption.json",
+      "sha256": "5fbaa23c45582fe07ab022db8d6edc48a49940044204d1778c8a54b9b1657883",
+      "bytes": 3137
+    },
+    {
+      "path": "/tmp/gitcraft-root-workflow-r1/validation.json",
+      "sha256": "0fb70c308098466dc03abb637f703f495c75ab28a90db51dbeedf20a2182e007",
+      "bytes": 11990
+    },
+    {
+      "path": "/tmp/gitcraft-root-workflow-r2/gates.json",
+      "sha256": "b815f168463cd0f800df07e043cbac44bfc003d96deffab2709f2f754bdc6bb1",
+      "bytes": 43789
+    },
+    {
+      "path": "/tmp/gitcraft-root-workflow-r2/run-gates.py",
+      "sha256": "cff31f4612bdbbf70015b2b9b675068dc94517a45bf1b3e7769604582d2b0450",
+      "bytes": 10837
+    },
+    {
+      "path": "/tmp/gitcraft-final-review-inert.py",
+      "sha256": "24bf70e3d0fb989ed172aa11ed52d023a68a9e65885ccdb1f3f7779513bfc960",
+      "bytes": 2199
+    },
+    {
+      "path": "/tmp/gitcraft-final-review-tests.json",
+      "sha256": "f12c5ab5717cecfea0e432659d87be56c682335b3956a57e3becbab08dab2c0b",
+      "bytes": 2084
+    },
+    {
+      "path": "/tmp/gitcraft-final-review-evidence.py",
+      "sha256": "14ef3b03991d13b8fdaa269763c526bfcb292a909ae8c1bebc90db48df0eca96",
+      "bytes": 12853
+    }
+  ],
+  "head_observed_at_finish": "203b6180c244d467bba693d5f28d8f495a2024ec",
+  "working_tree_observed_at_finish": "",
+  "canonical_compare_blocks": [
+    {
+      "path": "src/repo/state.rs",
+      "start": "/// Transient provenance for fixed comparison captions",
+      "end": "/// Two points of history",
+      "sha256": "20e35659b7ec4c0207985a518941c5f61aeab6742bc4162ca338e2cdaa09508c",
+      "exact_canonical3cf_and_owner": true
+    },
+    {
+      "path": "src/repo/state.rs",
+      "start": "    pub(super) fn display_base_label",
+      "end": "    /// How the comparison calls",
+      "sha256": "7d05b48cc365ed08484563b037b5456a404c503141b17b3f0966ff51f45a43b9",
+      "exact_canonical3cf_and_owner": true
+    },
+    {
+      "path": "src/repo/detail/compare.rs",
+      "start": "#[cfg(test)]\nmod caption_tests",
+      "end": null,
+      "sha256": "559498994504087572aa2d9e1613e9a343d5223b80d0c1307d65c036116ddfd3",
+      "exact_canonical3cf_and_owner": true
+    }
+  ],
+  "review": "One finite independent workflow correction/assembly review",
+  "verdict": "STATIC_PASS",
+  "finding_dispositions": {
+    "WF-FL-R1-1": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-2": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-3": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-4": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-5": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-6": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-C1": "PASS within explicitly bounded local correction/assembly scope",
+    "WF-FL-R1-C2": "PASS within explicitly bounded local correction/assembly scope"
+  },
+  "integration_limits": [
+    "Only immutable e4..af4 reviewed; later root working-tree changes/commits excluded",
+    "Nested worker String diagnostic channels remain OPEN under explicit bounded scope",
+    "No overall workflow/cache/full combined feature or consolidated PR acceptance",
+    "Final exact supplied gates verified, not independently rerun",
+    "No strict-lint, full-suite, native/UI/platform, actual Git/process/network/FS-fixture, CI or PR claim"
+  ],
+  "execution": {
+    "source_edits": false,
+    "product_compiler_tests_runtime_constructors": false,
+    "ci_or_pr": false,
+    "agents": false,
+    "network": false,
+    "evidence_only": true
+  },
+  "report_sha256": "0627c3aef3e142f213bc9c87173478af9575e362f0b152179d19babd2b4c5c98",
+  "verification_sha256": "439bbaefd882c443447a3c7bda28687d2f395da7cd45103885292130bcc383cb"
+}

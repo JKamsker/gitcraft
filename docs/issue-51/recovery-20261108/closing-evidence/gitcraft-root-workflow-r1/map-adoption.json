@@ -1,0 +1,121 @@
+{
+  "rows": [
+    [
+      "(?s)^Use YYYY\\-MM\\-DD dates$",
+      "repo-workflows-atlas-read-atlas-02c42736",
+      []
+    ],
+    [
+      "(?s)^Use YYYY\\-MM\\-DD dates, with start on or before end$",
+      "repo-workflows-atlas-read-atlas-67b18cbf",
+      []
+    ],
+    [
+      "(?s)^Use dates such as 2026\\-11\\-07$",
+      "repo-workflows-history_activity-requested-range-4d18caf5",
+      []
+    ],
+    [
+      "(?s)^The start date must be on or before the end date$",
+      "repo-workflows-history_activity-requested-range-25f6acd0",
+      []
+    ],
+    [
+      "(?s)^Analysis cancelled\\. Refresh to try again\\.$",
+      "repo-workflows-history_activity-cancel-ddfe1c43",
+      []
+    ],
+    [
+      "(?s)^No supported forge remote; commit history remains available$",
+      "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+      []
+    ],
+    [
+      "(?s)^Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history$",
+      "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+      []
+    ],
+    [
+      "(?s)^Trace cancelled$",
+      "repo-workflows-line_dossier-line-dossier-view-a8198076",
+      []
+    ],
+    [
+      "(?s)^Repository changed\\. Refresh the file view\\.$",
+      "repo-workflows-file_comparison-invalidate-81f92ce0",
+      []
+    ],
+    [
+      "(?s)^Invalid comparison sides$",
+      "repo-workflows-file_comparison-prepare-da3978aa",
+      []
+    ],
+    [
+      "(?s)^More than 20,000 lines in a version; use the normal patch view$",
+      "repo-workflows-file_comparison-boundary-e44610d7",
+      []
+    ],
+    [
+      "(?s)^Git could not align these raw versions$",
+      "repo-workflows-file_comparison-boundary-b861cbb0",
+      []
+    ],
+    [
+      "(?s)^The raw patch is not UTF\\-8$",
+      "repo-workflows-file_comparison-boundary-5421cc1b",
+      []
+    ],
+    [
+      "(?s)^Git could not produce a raw text patch for these differing bytes; use the normal patch view$",
+      "repo-workflows-file_comparison-boundary-6732715f",
+      []
+    ],
+    [
+      "(?s)^Comparison cancelled\\. Refresh to try again\\.$",
+      "repo-workflows-file_comparison-file-comparison-view-725513de",
+      []
+    ],
+    [
+      "(?s)^No key, agent, account or network action has run\\. Choose each step explicitly\\.$",
+      "repo-workflows-ssh_setup-new-8633c172",
+      []
+    ],
+    [
+      "(?s)^Setup worker stopped; no later result will be applied\\.$",
+      "repo-workflows-ssh_setup-poll-380743c6",
+      []
+    ],
+    [
+      "(?s)^Cut release (.*?)$",
+      "repo-workflows-release-release-stopped-fbe3bbf7",
+      [
+        [
+          "run-plan-tag-1",
+          false
+        ]
+      ]
+    ],
+    [
+      "(?s)^Clear the flag of (.*?)$",
+      "repo-workflows-doctor-clear-7f76d2cf",
+      [
+        [
+          "one-path-1",
+          false
+        ]
+      ]
+    ],
+    [
+      "(?s)^Clear the flags of ([0-9]+) files$",
+      "repo-workflows-doctor-clear-e318945b",
+      [
+        [
+          "files-len-1",
+          true
+        ]
+      ]
+    ]
+  ],
+  "private_binary_excluded": true,
+  "owner_map": "6b13ae41666c95cb323843c370e575f54d2fd521"
+}

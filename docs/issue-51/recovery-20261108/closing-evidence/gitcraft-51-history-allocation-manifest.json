@@ -1,0 +1,349 @@
+{
+  "kind": "read-only history allocation preparation, not implementation/review acceptance",
+  "root": "9cd719ad11dd3b205fa17118837ae0e2e6132de7",
+  "base": "cea7dfb5ddcc290352958b63566cfd3e515a0d9f",
+  "checkpoint": "4c7d23b43152809acb0fccf72ac4709f713497ae",
+  "trees": {
+    "9cd719ad11dd3b205fa17118837ae0e2e6132de7": "c08cd5da7174a1b50ffa71198027046e6032f0ca",
+    "cea7dfb5ddcc290352958b63566cfd3e515a0d9f": "a8f6cb61087e6e61914d770653b6fc030f5d0fbb",
+    "4c7d23b43152809acb0fccf72ac4709f713497ae": "72d458c0981328a357669e563948239d2dbe8d8c"
+  },
+  "input_files": [
+    {
+      "path": "/tmp/gitcraft-51-final-feature-commit-map.md",
+      "sha256": "cb837768af51d76c077d8e27457548836dfa2627c71248d90a569f5714355e0b",
+      "bytes": 25439
+    },
+    {
+      "path": "/tmp/gitcraft-51-final-feature-commit-map.json",
+      "sha256": "aa4585525ec8b5003ca1e520ebaa2ff8f5d136dad66b5eee846bde9b5c689863",
+      "bytes": 177644
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-draft.json",
+      "sha256": "0d0196645ff7cbf8e23ab5e38d0690f1a383550383fad25ce079f5f4b0ed6f85",
+      "bytes": 190054
+    }
+  ],
+  "frozen_source_inputs": [
+    {
+      "commit": "9cd719ad11dd3b205fa17118837ae0e2e6132de7",
+      "path": "docs/issue-51/source-issues.json",
+      "blob": "0df8ad9758025feb8d7a1ac67bbfc5b30a43f076",
+      "sha256": "713daf634bf99d73adbe5cdbc4517e92bdc77561b8137d429779abda029305a7"
+    },
+    {
+      "commit": "9cd719ad11dd3b205fa17118837ae0e2e6132de7",
+      "path": "docs/issue-51/baseline-core.md",
+      "blob": "004088f66ae7d08523a22e80ce51f42a76a39f76",
+      "sha256": "ace6e8941b5340ac078b71142fb9345eec3d3aa48a6ece54fabeff4ce5f51006"
+    },
+    {
+      "commit": "9cd719ad11dd3b205fa17118837ae0e2e6132de7",
+      "path": "docs/issue-51/baseline-content.md",
+      "blob": "063c2b86709138f0b8d2c19d4c3bfb3a9ae43e80",
+      "sha256": "db38a3646f12d247e3a6ac6140008d237a76a0cd142bcff17903c330b34f6cd4"
+    },
+    {
+      "commit": "9cd719ad11dd3b205fa17118837ae0e2e6132de7",
+      "path": "docs/issue-51/baseline-platform.md",
+      "blob": "90bfb26f1b8ef936b6926062aa12523e73972f6c",
+      "sha256": "12ec9cfe568604a2798996e57c838c4036ae3d6a406bf49c41264e680ebbe0ee"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-0ea15c1c.patch",
+      "bytes": 1661,
+      "sha256": "44dc78707045eb799c3c39b87a32ebfd2bb75ba4d740ad5ade2886dd998c03fc"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-1ab37567.patch",
+      "bytes": 59760,
+      "sha256": "5c7f3921dc501172d1c4c542f17a0cdab07b1cd072767f48704660e9a42119c8"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-44b3c722.patch",
+      "bytes": 1417588,
+      "sha256": "5a93304d6a29ef570a3c0ce4fc5183759d935d145e4a88a86e2e17e463409aae"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-4b768a95.patch",
+      "bytes": 5880,
+      "sha256": "070497aaa42174213f1ea804a0453cae0730e6eb06d08fcb2034b992214d6d5d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-5a96acb1.patch",
+      "bytes": 6532,
+      "sha256": "ae67d639855e43d1ac06f74a1a031ff915d8525edb0c79d45e377b049c0a6acd"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-5b57cfeb.patch",
+      "bytes": 8821,
+      "sha256": "dfc1cdac977e32b6c200523ed14ac1b1ab39b7216e83f60a3d1ebf908e501fc3"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-60094d90.patch",
+      "bytes": 1380714,
+      "sha256": "3490f6de64c019700cc66912702cf6156efd7104cc9bb87d8393f0aa8f2f0aa3"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-6a7076d6.patch",
+      "bytes": 7561,
+      "sha256": "878ee65f6d18ff76a56d10b8fec9e8d164a42a342e20fc05832277d2c50ecef9"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-6e138bf7.patch",
+      "bytes": 48759,
+      "sha256": "12ed14414df4bd1b0253bae203870367e1c31399406ec0b3a1ea2c04d447c323"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-710830f0.patch",
+      "bytes": 259622,
+      "sha256": "80a7858cef639de78fa8ec8e68d4c32d083368f4d006a5283cb7359ebc1bfee0"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-771cbd99.patch",
+      "bytes": 35129,
+      "sha256": "ce841fb744da9b36cd69d2c6ea8776316a06ae4e7abf49dec93372883c7f1f57"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-799db3c5.patch",
+      "bytes": 760,
+      "sha256": "0cf51c5253573eb1cf1042fae439ba56259e5eae1015a8e227eab30a63d27492"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-7c85bdb5.patch",
+      "bytes": 8342,
+      "sha256": "99ea8a4cfa68bdc33dd6d9b553641213337e42760314aa5020fd9c1f7df71b63"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-9230e064.patch",
+      "bytes": 15427,
+      "sha256": "6280cb0502e5fad36f65d08a13411dde063b7c966023c35e5bd1a0ef3f625375"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-935d305c.patch",
+      "bytes": 53192,
+      "sha256": "0066ef513ee31a8bd994e254dff93877b925cc7352d9b251e9c02bf7ce3b4b31"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-9a57c7e6.patch",
+      "bytes": 1534,
+      "sha256": "c0b0ad617773ccb2decc120b1d71228b0e8f9f9e6d017da082333b189433ef6d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-9cd719ad.patch",
+      "bytes": 46695,
+      "sha256": "3def8b2b047671cf42f869b58254e091911803a7d83287de6e9eccb1ceadb997"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-ba6b0d82.patch",
+      "bytes": 5511,
+      "sha256": "dc1e03f51aaad4009b0c1049d5777d66b5b649bb485da63200b679ca4d903705"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-baseline-prefluent.patch",
+      "bytes": 10827705,
+      "sha256": "fda7875a3105bc07906a3cba496d20fc84fc5b6ea3665f9cc9113d74e1454d20"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-c6a8977e.patch",
+      "bytes": 27917,
+      "sha256": "68a62497fb4e61af4454710e159556bad7321b12d48e37861ab12ed51a7c8498"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-c908287a.patch",
+      "bytes": 15758,
+      "sha256": "73db6e12ec5acecf89ce6e4e8e03f0d39783e02e2ced1f430d96dfa4565b9a85"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-cc337f2f.patch",
+      "bytes": 714,
+      "sha256": "5ac07997f4760f9572e7507f3007a1b5c441f46201584d2d5fe3d593801d7044"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-cde548c3.patch",
+      "bytes": 1416,
+      "sha256": "02b797e914033ef61d06234066645582526651810c5c6ad5993d6b47e2c97d60"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-components.json",
+      "bytes": 471008,
+      "sha256": "4b5877fa5f3f68329488f542250ab6366de316147a680fea010ffa18928b2864"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-components.py",
+      "bytes": 7164,
+      "sha256": "2866caa0b181639ffc68040ad04d41778794f036f8622f74d84edd03a5bdb76f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-e8bef07e.patch",
+      "bytes": 7303,
+      "sha256": "2a237698a606cfb14dd7466ba31987f1fc7c40d434f1476e8e374d3a93ad37cc"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-hunks.tsv",
+      "bytes": 726519,
+      "sha256": "27fd8366cce7a90fa17babd6d047fb470afe84d501532041921613067bb57937"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-net.patch",
+      "bytes": 13374036,
+      "sha256": "7c4350aa5c35bf8ce1cff06178330f143db26110ea1fc9f3fe69e6bdb56d70c2"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-paths.tsv",
+      "bytes": 211172,
+      "sha256": "53a83f174a6fe49568b064184ec5a7fd4ca81d95a6f628ebfaad0608c14d2e6d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-report.py",
+      "bytes": 14220,
+      "sha256": "4b54d3d2df87d9dc039e641135b5cb26575c38fd699595b32d588728bb4fe21b"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-seams.json",
+      "bytes": 5599,
+      "sha256": "f65d13ded23256c9e1f49eb49fd3475febcd48e5c16ab7e195fa3058c90fc850"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-summary.json",
+      "bytes": 1939,
+      "sha256": "947f481370e9a106dd55f619744b5c6c23fd010b7fcf379eade782a9dab2427b"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation-unresolved.json",
+      "bytes": 3386188,
+      "sha256": "b3bf27bab59647a7b8c7c2df0fb6806b1ea4dacdfef67474206dfeaa64de3ee1"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation.json",
+      "bytes": 22312573,
+      "sha256": "6d7b237a376fd7c650ff9c9d865c04c5e32d78a7a3e7238fdfdd06dcea055f1e"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation.md",
+      "bytes": 10817,
+      "sha256": "1693141ba56caa00386574b00dfb67fcde1fa099d39924f069e3c59ff879018f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-history-allocation.py",
+      "bytes": 24325,
+      "sha256": "6a0abeb14c04fb8ec9daeb111012bec7ec932907f554c2fa431d42efc5c17123"
+    }
+  ],
+  "summary": {
+    "root_changed_paths": 1334,
+    "checkpoint_changed_paths": 1119,
+    "chronological_stages": 24,
+    "chronological_hunks": 8462,
+    "proposed_hunk_owner_counts": {
+      "39.4": 37,
+      "UNRESOLVED": 899,
+      "47.10": 20,
+      "40.10": 43,
+      "36.7": 11,
+      "35.4": 3,
+      "49.10": 13,
+      "47.9": 214,
+      "32.7": 22,
+      "F000": 339,
+      "37.11": 135,
+      "47.3": 16,
+      "49.9": 32,
+      "34.9": 14,
+      "37.7": 30,
+      "43.4": 28,
+      "43.2": 34,
+      "38.13": 70,
+      "34.6": 16,
+      "43.3": 27,
+      "48.7": 29,
+      "32.14": 59,
+      "43.1": 104,
+      "34.5": 17,
+      "39.1": 20,
+      "39.3": 4,
+      "49.1": 14,
+      "43.5": 101,
+      "48.5": 72,
+      "48.6": 35,
+      "47.6": 17,
+      "38.12": 143,
+      "45.1": 35,
+      "45.3": 16,
+      "38.5": 186,
+      "47.7": 3,
+      "36.6": 14,
+      "43.6": 11,
+      "46.3": 4,
+      "46.4": 3,
+      "37.12": 2,
+      "32.8": 77,
+      "35.5": 9,
+      "36.4": 23,
+      "40.17": 13,
+      "33.13": 29,
+      "33.14": 19,
+      "48.1": 20,
+      "33.15": 7,
+      "32.10": 12,
+      "40.13": 12,
+      "50.1": 5,
+      "40.8": 1,
+      "46.5": 2,
+      "36.8": 2,
+      "46.8": 5,
+      "32.1": 30,
+      "32.13": 8,
+      "49.11": 2,
+      "49.4": 3,
+      "49.14": 6,
+      "49.13": 3,
+      "49.8": 18,
+      "49.7": 2,
+      "49.6": 2,
+      "49.12": 1,
+      "49.5": 6,
+      "33.5": 23,
+      "46.2": 13,
+      "46.1": 9,
+      "44.1": 23,
+      "38.8": 33,
+      "50.4": 11,
+      "35.2": 3,
+      "46.7": 13,
+      "44.8": 3,
+      "43.8": 4,
+      "40.9": 48,
+      "40.15": 22,
+      "40.7": 27,
+      "45.2": 8,
+      "35.9": 2,
+      "42.8": 5,
+      "40.1": 3,
+      "38.14": 12,
+      "47.12": 1,
+      "35.1": 15,
+      "35.7": 10,
+      "35.11": 1,
+      "35.10": 1,
+      "35.8": 1,
+      "35.6": 3,
+      "47.15": 4959
+    },
+    "net_hunks": 5445,
+    "net_single_owner_hunks": 4250,
+    "net_split_hunks": 1195,
+    "module_wiring_line_proposals": 12339,
+    "text_replay_verified_paths": 1334,
+    "text_replay_errors": [],
+    "path_core_unique": 1041,
+    "path_core_multiple": 283,
+    "path_core_unallocated": 10
+  },
+  "scope": "all93 original feature IDs + process-only F000; final Fluent and source acceptance pending",
+  "validation": "inert split-line content replay only; exact terminators/modes retained in authoritative Git blobs; no index/tree assembly, runtime, build, tests, CI, network or Git writes",
+  "author_required": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+}

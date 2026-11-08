@@ -1,0 +1,338 @@
+[
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 0.302,
+    "selected_pass": null,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-check.log",
+    "sha256": "82b3e0544634fff248f8a3acb74d0bde45ced3d111f62b4e6bd136cfd1cfbf78"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::tests::retained_operation_envelopes_keep_771_raw_fields_and_repaint_at_current_locale",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 68.402,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-1.log",
+    "sha256": "c0038bc405bf4264e677dc74ee573d3149c2e17885ee9160115168a9bd147827"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::tests::retained_finished_uses_original_headline_and_discards_unselected_output",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.971,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-2.log",
+    "sha256": "ceb51471bb348975979cce98b76e1ae37a07cda8b91f611c58e368a27be417a4"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::view::operation_presentation_tests::same_recording_stack_check_repaints_retained_status_finished_and_actual_activity",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.612,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-3.log",
+    "sha256": "95d981584307690e5f28c24c95d1c1c2c6ef71bc468e817672687583debd75d5"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::view::operation_presentation_tests::provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.396,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-4.log",
+    "sha256": "66fefaa615678d36cec5af7f2f1ff120e749869b89c34ca00f892ea685bcba43"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.357,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-5.log",
+    "sha256": "c107666c1378b68447da9dbce22380a2bf3dbd1ada7f9a0a25a4cc51765b6f08"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "gerrit::display::tests::actual_recording_stack_validation_uses_same_log_context_and_keeps_unknowns_opaque",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.347,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-6.log",
+    "sha256": "27884c096ded6c7769163414ea664fac8b732b1f461acde6897d5dfaec4e4a5d"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "gerrit::display::tests::actual_validation_and_server_warning_render_without_mutating_identity_or_ops",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.34,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-7.log",
+    "sha256": "179d7eb23baae45172231ffba1e93490fd684063d54a7cd5f90032d0ae0f7822"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::tests::source_notice_moves_through_queues_and_repaints_without_changing_raw",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.329,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-8.log",
+    "sha256": "246301d6e7ac269f7d429c5222179847c210867dbf415e486cec76dec3934b9b"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::tests::any_raw_edit_retires_origin_before_noop_or_unwind",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.291,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-9.log",
+    "sha256": "649a15e80869c80c60f5bb603b11d0810bb908343db7182c226817a0a75f3596"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::an_entry_copies_as_text",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.333,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-10.log",
+    "sha256": "69d204e0888aff532fc119ed2a364e9ca2a2a1ac5b9281e6d59a03baf9b7a20e"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::activity::tests::the_same_background_failure_is_counted_not_repeated",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.277,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-11.log",
+    "sha256": "7babb8861a2f75be5b8455be3afe71d34e9e89de8ed53ef8b2388335a83726d8"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::dialogs::gerrit::warning_presentation_tests::actual_review_warning_paint_repaints_without_changing_raw_server_or_plan",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.356,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-12.log",
+    "sha256": "852d382c1a90e7615638fbbf763dbae3435b9fa41def414847d290971c4b0677"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "i18n::tests::embedded_catalogs_parse_without_duplicates_and_have_matching_message_ids",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.437,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-13.log",
+    "sha256": "184f04bfe3826338030509697a552aedcabbaa3601d85a310c566487bda11bf5"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::notice::operation::opaque_provider_tests::generic_provider_lfs_suffixes_never_acquire_push_provenance",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.365,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-14.log",
+    "sha256": "0e1b0cfe9b51baa04d3f01bf5e5c6d1a70e5a34ae03ae9f6b6415a219ce1b220"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "repo::messages::workflow::tests::workflow_r1_fixed_sentinels_and_raw_operation_templates_project_only_at_paint",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.398,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-15.log",
+    "sha256": "6def54d0ee877baa797921eb6f4d65bd46f43c32ef651586531002f02b1c0795"
+  },
+  {
+    "candidate": "844d74093b23a7520d68d57f5e2311e56190b0aa",
+    "argv": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "app::home::retained_error_tests::retained_home_errors_paint_en_de_en_from_original_source_without_io",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.33,
+    "selected_pass": 1,
+    "log": "/tmp/gitcraft-root-op-status-opacity/immutable-16.log",
+    "sha256": "44a5d957b46b17b404b2a38a90add9f3d3dd464bec66445f5f36db6a305494aa"
+  }
+]

@@ -1,0 +1,1524 @@
+{
+  "verdict": "STATICPASS",
+  "scope": "INT-FINAL-1 bounded independent correction review only",
+  "base": "5544af0dae87f3e44d206f6204effd969cdc0ffa",
+  "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+  "candidate_tree": "aa3c94493ce61457b006b364f34c0f16cf1d4bad",
+  "actual_parent": "016b70441de1402e28c5cf34980a8ab425fc4908",
+  "range_commits": [
+    "016b70441de1402e28c5cf34980a8ab425fc4908",
+    "7518a2a08f353f220fb7bc9163d6f04f4b088ee5"
+  ],
+  "findings": [],
+  "closed_findings": [
+    {
+      "id": "INT-FINAL-1",
+      "status": "CLOSED within this exact finite delta",
+      "basis": "Owned raw error and source arguments reach actual current-language Home paint; opaque replacement cannot manufacture provenance."
+    }
+  ],
+  "source_manifest": {
+    "base": "5544af0dae87f3e44d206f6204effd969cdc0ffa",
+    "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+    "changed_source": {
+      "src/app/clone.rs": {
+        "base_sha256": "c8f0d9a4ff0458273ffe67d564425ccd244e6b92b59d4d5267210fa5adbb88ed",
+        "candidate_sha256": "e6becddabfc478738374981e821188fcee9cbc4a61353826bb0d1bde2e5337cb",
+        "candidate_git_blob": "4f9d6a338333b3c0ea796b1c9df8d279ca4fe71e"
+      },
+      "src/app/dropped.rs": {
+        "base_sha256": "c6706bbea7068db16d2109bcff492fb006dcb9d821b0606a987a39a49cb664e7",
+        "candidate_sha256": "bd9d5a6446bceb9d64ec9c4ad9e978e0353249bf430c7a3fde8cda00348bbcb7",
+        "candidate_git_blob": "62079a5ed0abf5d8fa90a76c0968eaf7ca6bff89"
+      },
+      "src/app/home.rs": {
+        "base_sha256": "85fdab287ef7c5a7da8372493f9f707421c293414a530c7ec8d64fdb684a5b3b",
+        "candidate_sha256": "b79e80b28b155ec53b2dd0fb91e4e9d6180bd284d876e88c5858db4da8c8ce5b",
+        "candidate_git_blob": "4171eac6b55ac4e7bca1b21b9dc56f34ff5f6293"
+      },
+      "src/app/mod.rs": {
+        "base_sha256": "d127509d3285f60e10c306ac19136556a5bfef2ec8de8ffca163f327750f28f7",
+        "candidate_sha256": "72a1b0352d2508475fdd1c86156bb43b96441d734a3ed58da12e06ca345157fb",
+        "candidate_git_blob": "1f848758a9689226b366451eb456f550af32fe26"
+      },
+      "src/app/panels.rs": {
+        "base_sha256": "0809a9d43059d19c20e9175408a27eb52808adbba459656ea9901b679588cc77",
+        "candidate_sha256": "0d63782a1ffe3a9573e416b59aface1486dd9ec913d8e73b5e22eba8a2196499",
+        "candidate_git_blob": "893ff2034c5992c8b557c3756b0e169608430ab2"
+      },
+      "src/app/remote_open.rs": {
+        "base_sha256": "98ed48c4daf297967296e731bca3c361a3f0dbf8e443462a4c9a823ce4d2e5de",
+        "candidate_sha256": "08440143204924b58fa8ad0877c37ffcb9f1bcaf985e1514760ef8ed0767c612",
+        "candidate_git_blob": "5102c7b47011f4344b1ea8199a6661ea9b5cc993"
+      },
+      "src/app/windows.rs": {
+        "base_sha256": "9a84f5938c29668378b2e6bbbf04d80cc72f8ea307752625b95268014971c9d7",
+        "candidate_sha256": "09220ede269b026e6b1f1a339bb3b1c2669ffe1adc35df11da916b1413a2ada1",
+        "candidate_git_blob": "0adcecca37bafaef87eef54bb0d277d774ec3422"
+      },
+      "src/app/workspaces.rs": {
+        "base_sha256": "b5772401588a6ff106d3e1026bb9dfafb3be02c6edd84ec63959672b0bb415af",
+        "candidate_sha256": "5339510a5115096b22d52ffede2cf600cbf8befce78e438233ffb2b3460d6fe0",
+        "candidate_git_blob": "2365133409dc773edc5d17551db6ee3b7ea1874d"
+      }
+    },
+    "catalogs_unchanged": {
+      "locales/de/backend.ftl": "2a9ad3b7f8189f9bc632eed710a31872d55474d4245f03abf9d21640a51c8e74",
+      "locales/de/foundation.ftl": "c8c280088029e638eff5f6a4e7ea1459d63b9b71ddbe3f01d01c92ffc0bfb2aa",
+      "locales/de/interaction-execution.ftl": "99df39ef4451dcb51a82bd9248225b98a6283c9be1d4d2127e27476bf5b5fc09",
+      "locales/de/interaction-guards.ftl": "78e7b44bfdfd6db95cc71c532bb84eb4ce4d499b8d50b2bf027cc8247a58c397",
+      "locales/de/interaction-manual-features.ftl": "8033a0ec1fbff0d01d96458d39949c73ae8e637ff82313f3c6e59e0e88d256ce",
+      "locales/de/interaction-package-update.ftl": "a590b9a73f98f0c7b974838db47b4035edbdb08bfb70b26d7c35cde4e545c280",
+      "locales/de/interaction-practice-tour.ftl": "aaec9d135ee9b42df6452c82f8a2491d4716163cace88c1afa0a3d33b1b5674d",
+      "locales/de/interaction-remote.ftl": "060d38589008461d06d1eb67938355bf2383a3c538dc8cc4d214f81f4990e3cf",
+      "locales/de/interaction-standalone.ftl": "778fa2a4dab39be3be63b73cec4485259dee498a666d2bb7f02cf5f8dee15395",
+      "locales/de/interaction.ftl": "3b9b6c25aff6eaac82a7be6009163779ff74c63f99bcc1579ec95bec08cbf1f3",
+      "locales/de/repo-core.ftl": "5392f3b31ef3c1a66c404e3c13374b3893243c7e08998d12c83d535a8e9d3d67",
+      "locales/de/repo-workflows-review.ftl": "f58a6a4cf5f7e795985e374f4349832c63318c8b88f486c216592924e881f794",
+      "locales/de/repo-workflows.ftl": "2ad6a989577824deee1b27c872d6dfa5a6ffd174b275a8ad3acbb05950b993d8",
+      "locales/en-US/backend.ftl": "74ead2434a89fbe586ca144c97c220ee8962870b23f5bf8a58caae9dcc0caf5f",
+      "locales/en-US/foundation.ftl": "d2276dfd3a05e4fcb13841028e1f9e1bbf89d50af13ba8a61df278f3768e484a",
+      "locales/en-US/interaction-execution.ftl": "78e537b9c3fb8b2ead23a76dc36a63aa864cb37e91c786aa2047e9ff95e0e8fa",
+      "locales/en-US/interaction-guards.ftl": "47894c2469d6a7bd616d21755494e630a177316ab0afda20d0dddefe136afc33",
+      "locales/en-US/interaction-manual-features.ftl": "02a00b119217d1df7a56404f0e8ee9ec806c0ae31475bd6e3efa688464d49036",
+      "locales/en-US/interaction-package-update.ftl": "8507285453035fcc7705d943fedd766a76eadfb61158dff3bb906e31c6514837",
+      "locales/en-US/interaction-practice-tour.ftl": "7510b8f5b6ad7e6a2ec52c08d5b8eb95afde227f15e2a4f7c6735adf6d9f64b5",
+      "locales/en-US/interaction-remote.ftl": "8c9f41746e57448d92e6be84215c954ee851ec6fe506b92aa264bfe61742ff74",
+      "locales/en-US/interaction-standalone.ftl": "aae543be27c87ff3e50a6f54b4add8ea1d309705cfbfe70723e0ee3dd4648918",
+      "locales/en-US/interaction.ftl": "fb1dcb118cfe5b61334f41c8459d0091aa95933ce075815927d375bd9bdbf34b",
+      "locales/en-US/repo-core.ftl": "f4800740f9fc9dd8f1bfc7278ec114cc15d7c260fc1e2081477052e8071a9c87",
+      "locales/en-US/repo-workflows-review.ftl": "e53938fb088ddadf693aa824fb0d2e19168f4ae7ff6e940ad3f676d08480312e",
+      "locales/en-US/repo-workflows.ftl": "14bf819e3b0c8943e923c034876e3def97e79984dfd23594d3ebeeb9434c7adf"
+    },
+    "byte_identical_control_transport_sections": {
+      "src/app/dropped.rs impl PatchQueue {": "e823b82a3a9cb396ef38b8efeb4c52e8c4d6f1d76fe4b0c23553c730c5204566",
+      "src/app/dropped.rs /// The queue's session boundary": "91a6cdfbfff2910022e506c1976165c1b5f4a202ea9fed987f013f4dfb887af1",
+      "src/app/dropped.rs /// A veil over the window": "0df19addc806d7260c695dbd703cadb596b767d832a67b1c1305ed8369c7352b",
+      "src/app/mod.rs     fn open_repo(": "ac14d03920984eeac105fef2a6b2a1ffb8c46ab95e33b5a55208e798bc7d88b9",
+      "src/app/mod.rs     fn open_root(": "b2c94110320bd1cd4cd23e845bf5e867708fd7935b5aed8691e12a3cc362ab9f",
+      "src/app/panels.rs     fn from_notice(": "e7e6a2bec49976940eb8bf7d56567ef92263d5649a20217a56609ed7fb175763",
+      "src/app/panels.rs     fn display_text(": "5fa6441bcf7a1f0eeddbe9e4751b98af54893923bc27e5233d4d0cdc133b1338",
+      "src/app/panels.rs     /// Long operations that ended": "46c2e13349209461c739f82b844ffb31e6f9743b59cecf1bc012364ec10d5b9d"
+    }
+  },
+  "inputs_sha256": {
+    "/tmp/gitcraft-int-final-1-handoff.md": "96d1aac601a2d82674206664f6a86dcaef2393ae6f6fca7485ad544e42e3ce26",
+    "/tmp/gitcraft-int-final-1-handoff.json": "d56c25efe90571e9865b9cc0df6b96f6d797a3e801158b6bf308f553b6ad9a9f",
+    "/tmp/gitcraft-51-interaction-final-review.md": "ffad4b8522953da0e01f74ef61877e7e6cd318c287184cdacc1196462f142786",
+    "/tmp/gitcraft-51-interaction-final-review.json": "aef536e2499786d594574c44a1f19fa8042125a33ba1176eb175b1d18af56b0c",
+    "/tmp/gitcraft-int-final-1.patch": "4458f0c721ca3b28fd49873387cccdabe4e41a1a7c45ca1528ecf410efd9c0ce",
+    "/tmp/gitcraft-home-error-old-fixture-proof.json": "446ae0bcf11f047904ff63c7a4b208e2088a154745b73d3980bc80a797630eac",
+    "/tmp/gitcraft-home-error-source-manifest.json": "0ef45218a42def042e10124219219aaf3073431ba53b193a2df06bb3aef1d8d9",
+    "/tmp/gitcraft-home-error-authorship.log": "4a387dacb5a836f7308dfcd9dd3aa9add5a8a47637ea6fe79c96642d55adf3a5",
+    "/tmp/gitcraft-home-error-remote-proof.log": "00c6b82d0cf2db7e32fa7fe21f603276041a156beb5cf327f6dc7d351db330fa"
+  },
+  "gates_inspected_not_rerun": [
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-home-error-7518a2a0-check.log",
+      "sha256": "b76aed33246cf249a94228050a7f3647d7aa5995f54ae057497e4fa80f3adaa3",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      }
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::home::retained_error_tests",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-home-error-7518a2a0-retained.log",
+      "sha256": "b3dd11a53fa27eac134718a78daa8b559342b11ab6935705271b28ebdcee908c",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 2
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::panels::home_error_toast_tests::home_source_toast_keeps_delivery_text_error_flag_and_no_extra_actions",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-toast.log",
+      "exit_code": 0,
+      "sha256": "d715f0fb01831867ddc383ea7c355b338e8b07c584e528d28ead078da4a18fea",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 1
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::dropped::localization_tests",
+        "--",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-drop-localization.log",
+      "exit_code": 0,
+      "sha256": "0410a4e6111abc4db038014decaac95bfd48369ae62789382771a844672c692d",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 2
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::dropped::recording_tests::hidden_continuations_wait_advance_once_and_follow_the_live_session",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-drop-recording.log",
+      "exit_code": 0,
+      "sha256": "a07676988ab4d6ba7a0feba9d1f445edd24a57fac684712323614b6b47a86564",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 1
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::dropped::tests::dropped_items_are_told_apart",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-classify.log",
+      "exit_code": 0,
+      "sha256": "b6d3226079ffb0e1f1b45adb268b859b910d7a40a8efdadd1de5fb835b26e18f",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 1
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::dropped::tests::a_folder_outside_a_repository_says_so",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-folder.log",
+      "exit_code": 0,
+      "sha256": "3382264ff26884df39af5a8532fc815cb7439efc470eed2fc3d762845579959e",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 1
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "cargo",
+        "+1.95",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "app::panels::remote_display_tests::actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "/tmp/gitcraft-home-error-7518a2a0-fallback.log",
+      "exit_code": 0,
+      "sha256": "6ec6de4065673ec3c7724e45f1541572f264c73dab470f00dcf8046f3f0b6beb",
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+        "RUSTUP_AUTO_INSTALL": "0"
+      },
+      "passed_tests": 1
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "rustup",
+        "run",
+        "1.95",
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "src/app/home.rs",
+        "src/app/mod.rs",
+        "src/app/dropped.rs",
+        "src/app/panels.rs",
+        "src/app/remote_open.rs",
+        "src/app/clone.rs",
+        "src/app/windows.rs",
+        "src/app/workspaces.rs"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-home-error-7518a2a0-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "candidate": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "5544af0dae87f3e44d206f6204effd969cdc0ffa..7518a2a08f353f220fb7bc9163d6f04f4b088ee5"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-home-error-7518a2a0-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "prior_failed_gate": {
+    "candidate": "016b70441de1402e28c5cf34980a8ab425fc4908",
+    "command": [
+      "cargo",
+      "+1.95",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_TARGET_DIR": "/Users/jonas/.t3/worktrees/gitcraft/t3-8b63d063/target-home-error",
+      "RUSTUP_AUTO_INSTALL": "0"
+    },
+    "exit_code": 101,
+    "log": "/tmp/gitcraft-home-error-016b7044-check.log",
+    "sha256": "3000c5f1a84a1648325167aee951c5dc9e2093a59ad25aadff0251cd9188f9cf",
+    "reason": "Existing window fixture needed String ownership conversion before Into<AppError>."
+  },
+  "old_fixtures": [
+    {
+      "path": "src/app/clone.rs",
+      "test": "actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials",
+      "base_sha256": "91d2f9c41239fb1511bdbcd28d6b8757072a324d96bcbf6657944bb0bc88cf6d",
+      "candidate_sha256": "91d2f9c41239fb1511bdbcd28d6b8757072a324d96bcbf6657944bb0bc88cf6d",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/clone.rs",
+      "test": "clone_messages_keep_raw_auth_and_cancellation_identities_and_opaque_details",
+      "base_sha256": "e19fe6e1501bbe4bc2010c0c68940b447ab80dc01cc6f421883770a0e561d94c",
+      "candidate_sha256": "e19fe6e1501bbe4bc2010c0c68940b447ab80dc01cc6f421883770a0e561d94c",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "hidden_continuations_wait_advance_once_and_follow_the_live_session",
+      "base_sha256": "550e54917bd03e64a4b70ef54adcd396fd420de008ff20a8d1a71e56a9f432b0",
+      "candidate_sha256": "550e54917bd03e64a4b70ef54adcd396fd420de008ff20a8d1a71e56a9f432b0",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "dropped_items_are_told_apart",
+      "base_sha256": "1e4b2543072d2e0a445b021fef5424b30ba1895adb8ecfb9fb074ba81ce71097",
+      "candidate_sha256": "1e4b2543072d2e0a445b021fef5424b30ba1895adb8ecfb9fb074ba81ce71097",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "a_folder_outside_a_repository_says_so",
+      "base_sha256": "bcd01e2e779f5614b5842d17eff81c06c00db8b38212c0882f1e44eee45c07fd",
+      "candidate_sha256": "bcd01e2e779f5614b5842d17eff81c06c00db8b38212c0882f1e44eee45c07fd",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "remote_drops_are_told_by_their_name",
+      "base_sha256": "43302f16f4ea1cf12a90aadf8b7c5c6318e0db709dbd9eae2e885b044df19982",
+      "candidate_sha256": "43302f16f4ea1cf12a90aadf8b7c5c6318e0db709dbd9eae2e885b044df19982",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "a_folder_outside_a_repository_says_so_through_repo_root",
+      "base_sha256": "d7770f1813734e8462374b91295100c1a2fb9c75a5f8d769c4daaa0895daa65b",
+      "candidate_sha256": "d7770f1813734e8462374b91295100c1a2fb9c75a5f8d769c4daaa0895daa65b",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "dropped_patches_go_to_their_own_tab_and_stop_after_a_failure",
+      "base_sha256": "7ca0ded529f6fe7b568b4ad40ba00f1cb219993333229e93e8fd092d7c873cf6",
+      "candidate_sha256": "7ca0ded529f6fe7b568b4ad40ba00f1cb219993333229e93e8fd092d7c873cf6",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "actual_recorded_queue_keeps_raw_outcomes_and_paths_while_translating_only_captions",
+      "base_sha256": "eb834179388dd04dee016935f500c9e4957e7ae5d6258fde2cc88dcdfcbe8728",
+      "candidate_sha256": "eb834179388dd04dee016935f500c9e4957e7ae5d6258fde2cc88dcdfcbe8728",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "test": "actual_folder_classifier_and_target_guidance_preserve_opaque_names_and_unknown_errors",
+      "base_sha256": "1bb17f9f2eb37fa005065c8b95c603ac0638aa08c86a1f8d63f6754ce3c40e57",
+      "candidate_sha256": "1bb17f9f2eb37fa005065c8b95c603ac0638aa08c86a1f8d63f6754ce3c40e57",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/home.rs",
+      "test": "card_subtitles_stay_inside_their_card",
+      "base_sha256": "9c796b8663ce2be522737013a224b88036902e751b54e4aa1e1edd8b6ae8a03b",
+      "candidate_sha256": "9c796b8663ce2be522737013a224b88036902e751b54e4aa1e1edd8b6ae8a03b",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "test": "a_notification_shows_tags_as_text",
+      "base_sha256": "09ed98477a1580c9c5fc345acc23c0e6d1f34a3aa368b6c81e487b213d89e41e",
+      "candidate_sha256": "09ed98477a1580c9c5fc345acc23c0e6d1f34a3aa368b6c81e487b213d89e41e",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "test": "actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers",
+      "base_sha256": "321b6cd47e62b1b0d7cfbcf72848ddbf76f46481cddacb635ead5213d93426ce",
+      "candidate_sha256": "321b6cd47e62b1b0d7cfbcf72848ddbf76f46481cddacb635ead5213d93426ce",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "test": "retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline",
+      "base_sha256": "aa45fb63c5c1a0efec2ba7ff26c2de136bef8d5701646fa4709d3b16cb47f8b6",
+      "candidate_sha256": "aa45fb63c5c1a0efec2ba7ff26c2de136bef8d5701646fa4709d3b16cb47f8b6",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "test": "go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling",
+      "base_sha256": "2ac78bc91bfbe1fb8a07606ee36aff1b005839e5fae24041c9acceea46894eed",
+      "candidate_sha256": "2ac78bc91bfbe1fb8a07606ee36aff1b005839e5fae24041c9acceea46894eed",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "test": "actual_notice_toast_repaints_retained_source_and_preserves_raw_lifetime",
+      "base_sha256": "9cf48791567e3f45be3eb1728e7331e1429bb1954e957c472a8212c88bf7d48f",
+      "candidate_sha256": "9cf48791567e3f45be3eb1728e7331e1429bb1954e957c472a8212c88bf7d48f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "test": "the_form_names_a_folder_there",
+      "base_sha256": "70cd1faec948204880f3b347e31ec56a2aaf18a4edc19ea1348971b281d499ef",
+      "candidate_sha256": "70cd1faec948204880f3b347e31ec56a2aaf18a4edc19ea1348971b281d499ef",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "test": "a_wsl_folder_names_its_distribution",
+      "base_sha256": "4f7f949b4f0f5e60c8d0f76a2fec4aef77fb29f3df791a5c471de2695f3b294f",
+      "candidate_sha256": "4f7f949b4f0f5e60c8d0f76a2fec4aef77fb29f3df791a5c471de2695f3b294f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "test": "actual_remote_fields_switch_kind_with_opaque_targets_and_no_discovery",
+      "base_sha256": "38319dafb9c99cc88065d17a0e81386d6c5271a090362d6fde8afee15dbf0f12",
+      "candidate_sha256": "38319dafb9c99cc88065d17a0e81386d6c5271a090362d6fde8afee15dbf0f12",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "test": "remote_validation_and_status_are_display_only_and_keep_raw_machine_path_values",
+      "base_sha256": "a07d9ab5078ed59ae2d20a059db08e4e298ad53ca46fb45bbfba1d76140005be",
+      "candidate_sha256": "a07d9ab5078ed59ae2d20a059db08e4e298ad53ca46fb45bbfba1d76140005be",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "transfers_keep_one_live_box_and_preserve_selected_other_tabs",
+      "base_sha256": "3a19c3dd1134707b80ef5de3f93b2fdfe160961e46bec4840054db672e5765a6",
+      "candidate_sha256": "3a19c3dd1134707b80ef5de3f93b2fdfe160961e46bec4840054db672e5765a6",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "saved_windows_do_not_duplicate_main_tabs_and_old_state_defaults_to_no_windows",
+      "base_sha256": "bebd5ec3d4a6ae5a17ae342503c7a83cdfa430543c195817dbaae9682c2a5775",
+      "candidate_sha256": "bebd5ec3d4a6ae5a17ae342503c7a83cdfa430543c195817dbaae9682c2a5775",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "deferred_child_accepts_keys_and_closes_without_another_root_paint",
+      "base_sha256": "fdfafbf3345004e0d6ffad788db5982d6d41710ab615e4c9d87758281eb9d33f",
+      "candidate_sha256": "fdfafbf3345004e0d6ffad788db5982d6d41710ab615e4c9d87758281eb9d33f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "hidden_logic_drains_each_windows_completions_once_without_a_ui_pass",
+      "base_sha256": "b988c9325c63af9609405b3846946128f813968e621565e1cd907803fdfdf1ed",
+      "candidate_sha256": "b988c9325c63af9609405b3846946128f813968e621565e1cd907803fdfdf1ed",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "captured_release_after_source_exit_detaches_the_live_tab",
+      "base_sha256": "240bb4f7b6bf6650203962f283931385b8109b60aca01cb8731fc9e7d3b719b2",
+      "candidate_sha256": "240bb4f7b6bf6650203962f283931385b8109b60aca01cb8731fc9e7d3b719b2",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "captured_release_after_source_exit_targets_an_existing_window",
+      "base_sha256": "639b916bf079a3c20ac04e979a89100828333df71a035348e28b23f93ee49c43",
+      "candidate_sha256": "639b916bf079a3c20ac04e979a89100828333df71a035348e28b23f93ee49c43",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "reentrant_native_callbacks_keep_window_registrations_without_locking_again",
+      "base_sha256": "8dbb07559521289647d55f2213e123e17750910d35b938f4f1c226947efde78d",
+      "candidate_sha256": "8dbb07559521289647d55f2213e123e17750910d35b938f4f1c226947efde78d",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "restore_deduplicates_sessions_and_preserves_selection_after_missing_paths",
+      "base_sha256": "a97f2a649de917edd74c855af1e79d3c977343572c8490563c67c56bea248622",
+      "candidate_sha256": "a97f2a649de917edd74c855af1e79d3c977343572c8490563c67c56bea248622",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "desktop_drop_only_targets_another_windows_strip",
+      "base_sha256": "5e371aebc25115805d9221c88df5c6fad6cd4c249f4f0b5ed6a746f231a9da88",
+      "candidate_sha256": "5e371aebc25115805d9221c88df5c6fad6cd4c249f4f0b5ed6a746f231a9da88",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "resident_missing_git_still_accepts_quit_handoff_and_keeps_git_actions_guarded",
+      "base_sha256": "575c435a40af0ed2cbaa9754f469ef0682412d8a634f77610e210aa3b1ce5b50",
+      "candidate_sha256": "575c435a40af0ed2cbaa9754f469ef0682412d8a634f77610e210aa3b1ce5b50",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "resident_close_hides_only_when_opted_in_and_quit_bypasses_hide",
+      "base_sha256": "c6cb55d8770aa2f09aae60002a6fe58da561c873fecf2535d4720d5acb4b68ba",
+      "candidate_sha256": "c6cb55d8770aa2f09aae60002a6fe58da561c873fecf2535d4720d5acb4b68ba",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "hidden_root_close_is_cancelled_in_logic_but_explicit_quit_is_not",
+      "base_sha256": "3d1d5f74a5f2da3cfba4fdecf783066d2b878540b584077b20a7ec27af012bbc",
+      "candidate_sha256": "3d1d5f74a5f2da3cfba4fdecf783066d2b878540b584077b20a7ec27af012bbc",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "clone_form_is_owned_by_its_window_when_a_peer_renders_first",
+      "base_sha256": "e43d07160c5fc9ec0c71c3112fd298ab6024e3044ca1666245018c04ef904d0f",
+      "candidate_sha256": "e43d07160c5fc9ec0c71c3112fd298ab6024e3044ca1666245018c04ef904d0f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "recorded_completions_route_to_the_initiator_and_credentials_follow_parked_targets",
+      "base_sha256": "7ad0c4366f9a44b8c26b3fb8fe5c9da32b16a78400253f964a0744d60883113c",
+      "candidate_sha256": "7ad0c4366f9a44b8c26b3fb8fe5c9da32b16a78400253f964a0744d60883113c",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "closed_owner_falls_back_to_root_not_the_polling_peer",
+      "base_sha256": "b4740f7d38ae7793150fde60bf51980d82e005d53b0faca8c429943b4df98f1c",
+      "candidate_sha256": "cf5db604948caf5a882641c04b4592d7adf2ad361e052159e42d8b734962b674",
+      "byte_identical": false
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "hidden_logic_advances_the_patch_queue_without_a_paint_pass",
+      "base_sha256": "c56a0060d06975c09181a6b9676a7de26ce256ff541944d7eb3bae05bf87a2d4",
+      "candidate_sha256": "c56a0060d06975c09181a6b9676a7de26ce256ff541944d7eb3bae05bf87a2d4",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "restored_bounds_delegate_placement_and_fit_the_available_monitor",
+      "base_sha256": "cf532dd7aced83675ce32992fecb8f0db5bd0b23244d7f000f1ab8e65f1176db",
+      "candidate_sha256": "cf532dd7aced83675ce32992fecb8f0db5bd0b23244d7f000f1ab8e65f1176db",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "mixed_dpi_strips_and_source_pointer_use_physical_desktop_pixels",
+      "base_sha256": "c7bac5e43c461049dd9f67af11d806d206ea87b0ffc557b3c8609c249c5aab62",
+      "candidate_sha256": "c7bac5e43c461049dd9f67af11d806d206ea87b0ffc557b3c8609c249c5aab62",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "new_window_applies_physical_drop_position_using_its_actual_scale",
+      "base_sha256": "14550131604f6685d7367757715d00d17b09560130283a747a5823f5703f8ba3",
+      "candidate_sha256": "14550131604f6685d7367757715d00d17b09560130283a747a5823f5703f8ba3",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "contended_logic_defers_close_then_replays_keep_children_or_explicit_quit",
+      "base_sha256": "ddc1ec1b4ded2a417110105a529eb7eecfbe0e888cf2256da2faf6507d2b9773",
+      "candidate_sha256": "ddc1ec1b4ded2a417110105a529eb7eecfbe0e888cf2256da2faf6507d2b9773",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "test": "contended_root_ui_uses_the_same_deferred_close_policy",
+      "base_sha256": "9818d271b8d4dbf83721f70262bc388c74b0123bdfdd1b245e452735aec4290c",
+      "candidate_sha256": "9818d271b8d4dbf83721f70262bc388c74b0123bdfdd1b245e452735aec4290c",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/workspaces.rs",
+      "test": "actual_workspace_row_keeps_raw_errors_and_keyboard_remove_under_german_labels",
+      "base_sha256": "2f955b37187d5c40107db027ac24530b9388e743437fb109e798e2f00073f17f",
+      "candidate_sha256": "2f955b37187d5c40107db027ac24530b9388e743437fb109e798e2f00073f17f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/app/workspaces.rs",
+      "test": "locale_numbers_relative_age_and_error_classifiers_are_separate_from_raw_state",
+      "base_sha256": "4d9da1ba3abdc10b50fb4c7046e0c028f4ea842532c2aa2783697b42e2c3fe36",
+      "candidate_sha256": "4d9da1ba3abdc10b50fb4c7046e0c028f4ea842532c2aa2783697b42e2c3fe36",
+      "byte_identical": true
+    }
+  ],
+  "control_sections": [
+    {
+      "section": "src/app/dropped.rs impl PatchQueue {",
+      "sha256": "e823b82a3a9cb396ef38b8efeb4c52e8c4d6f1d76fe4b0c23553c730c5204566",
+      "bytes": 2996
+    },
+    {
+      "section": "src/app/dropped.rs /// The queue's session boundary",
+      "sha256": "91a6cdfbfff2910022e506c1976165c1b5f4a202ea9fed987f013f4dfb887af1",
+      "bytes": 948
+    },
+    {
+      "section": "src/app/dropped.rs /// A veil over the window",
+      "sha256": "0df19addc806d7260c695dbd703cadb596b767d832a67b1c1305ed8369c7352b",
+      "bytes": 12642
+    },
+    {
+      "section": "src/app/mod.rs     fn open_repo(",
+      "sha256": "ac14d03920984eeac105fef2a6b2a1ffb8c46ab95e33b5a55208e798bc7d88b9",
+      "bytes": 1439
+    },
+    {
+      "section": "src/app/mod.rs     fn open_root(",
+      "sha256": "b2c94110320bd1cd4cd23e845bf5e867708fd7935b5aed8691e12a3cc362ab9f",
+      "bytes": 29699
+    },
+    {
+      "section": "src/app/panels.rs     fn from_notice(",
+      "sha256": "e7e6a2bec49976940eb8bf7d56567ef92263d5649a20217a56609ed7fb175763",
+      "bytes": 178
+    },
+    {
+      "section": "src/app/panels.rs     fn display_text(",
+      "sha256": "5fa6441bcf7a1f0eeddbe9e4751b98af54893923bc27e5233d4d0cdc133b1338",
+      "bytes": 863
+    },
+    {
+      "section": "src/app/panels.rs     /// Long operations that ended",
+      "sha256": "46c2e13349209461c739f82b844ffb31e6f9743b59cecf1bc012364ec10d5b9d",
+      "bytes": 2369
+    }
+  ],
+  "checks": [
+    {
+      "check": "base is ancestor",
+      "passed": true
+    },
+    {
+      "check": "candidate tree",
+      "passed": true
+    },
+    {
+      "check": "exact eight changed paths",
+      "passed": true
+    },
+    {
+      "check": "src/app/clone.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/clone.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/clone.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/home.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/home.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/home.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs blob",
+      "passed": true
+    },
+    {
+      "check": "src/app/workspaces.rs base hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/workspaces.rs candidate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/workspaces.rs blob",
+      "passed": true
+    },
+    {
+      "check": "locales/de/backend.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/backend.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/foundation.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/foundation.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-execution.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-execution.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-guards.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-guards.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-manual-features.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-manual-features.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-package-update.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-package-update.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-practice-tour.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-practice-tour.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-remote.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-remote.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-standalone.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction-standalone.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/interaction.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-core.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-core.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-workflows-review.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-workflows-review.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-workflows.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/de/repo-workflows.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/backend.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/backend.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/foundation.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/foundation.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-execution.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-execution.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-guards.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-guards.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-manual-features.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-manual-features.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-package-update.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-package-update.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-practice-tour.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-practice-tour.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-remote.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-remote.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-standalone.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction-standalone.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/interaction.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-core.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-core.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-workflows-review.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-workflows-review.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-workflows.ftl base catalog hash",
+      "passed": true
+    },
+    {
+      "check": "locales/en-US/repo-workflows.ftl candidate catalog hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-51-interaction-final-review.md input hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-51-interaction-final-review.json input hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-int-final-1.patch artifact hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-old-fixture-proof.json artifact hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-source-manifest.json artifact hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-authorship.log artifact hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-remote-proof.log artifact hash",
+      "passed": true
+    },
+    {
+      "check": "source manifest exact JSON",
+      "passed": true
+    },
+    {
+      "check": "fixture proof exact JSON",
+      "passed": true
+    },
+    {
+      "check": "patch exact git diff",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-check.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-check.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-check.log compile finish",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-retained.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-retained.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-retained.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-toast.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-toast.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-toast.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-localization.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-localization.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-localization.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-recording.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-recording.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-drop-recording.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-classify.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-classify.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-classify.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-folder.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-folder.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-folder.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-fallback.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-fallback.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-fallback.log selected pass summary",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-fmt.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-fmt.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-diff-check.log hash",
+      "passed": true
+    },
+    {
+      "check": "/tmp/gitcraft-home-error-7518a2a0-diff-check.log receipt candidate",
+      "passed": true
+    },
+    {
+      "check": "7518a2a08f353f220fb7bc9163d6f04f4b088ee5 author/committer",
+      "passed": true
+    },
+    {
+      "check": "016b70441de1402e28c5cf34980a8ab425fc4908 author/committer",
+      "passed": true
+    },
+    {
+      "check": "prior failed gate hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/clone.rs::actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/clone.rs::clone_messages_keep_raw_auth_and_cancellation_identities_and_opaque_details old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::hidden_continuations_wait_advance_once_and_follow_the_live_session old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::dropped_items_are_told_apart old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::a_folder_outside_a_repository_says_so old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::remote_drops_are_told_by_their_name old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::a_folder_outside_a_repository_says_so_through_repo_root old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::dropped_patches_go_to_their_own_tab_and_stop_after_a_failure old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::actual_recorded_queue_keeps_raw_outcomes_and_paths_while_translating_only_captions old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs::actual_folder_classifier_and_target_guidance_preserve_opaque_names_and_unknown_errors old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/home.rs::card_subtitles_stay_inside_their_card old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs::a_notification_shows_tags_as_text old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs::actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs::retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs::go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs::actual_notice_toast_repaints_retained_source_and_preserves_raw_lifetime old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs::the_form_names_a_folder_there old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs::a_wsl_folder_names_its_distribution old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs::actual_remote_fields_switch_kind_with_opaque_targets_and_no_discovery old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/remote_open.rs::remote_validation_and_status_are_display_only_and_keep_raw_machine_path_values old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::transfers_keep_one_live_box_and_preserve_selected_other_tabs old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::saved_windows_do_not_duplicate_main_tabs_and_old_state_defaults_to_no_windows old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::deferred_child_accepts_keys_and_closes_without_another_root_paint old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::hidden_logic_drains_each_windows_completions_once_without_a_ui_pass old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::captured_release_after_source_exit_detaches_the_live_tab old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::captured_release_after_source_exit_targets_an_existing_window old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::reentrant_native_callbacks_keep_window_registrations_without_locking_again old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::restore_deduplicates_sessions_and_preserves_selection_after_missing_paths old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::desktop_drop_only_targets_another_windows_strip old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::resident_missing_git_still_accepts_quit_handoff_and_keeps_git_actions_guarded old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::resident_close_hides_only_when_opted_in_and_quit_bypasses_hide old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::hidden_root_close_is_cancelled_in_logic_but_explicit_quit_is_not old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::clone_form_is_owned_by_its_window_when_a_peer_renders_first old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::recorded_completions_route_to_the_initiator_and_credentials_follow_parked_targets old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::closed_owner_falls_back_to_root_not_the_polling_peer old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::closed_owner_falls_back_to_root_not_the_polling_peer sole mechanical conversion",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::hidden_logic_advances_the_patch_queue_without_a_paint_pass old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::restored_bounds_delegate_placement_and_fit_the_available_monitor old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::mixed_dpi_strips_and_source_pointer_use_physical_desktop_pixels old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::new_window_applies_physical_drop_position_using_its_actual_scale old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::contended_logic_defers_close_then_replays_keep_children_or_explicit_quit old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/windows.rs::contended_root_ui_uses_the_same_deferred_close_policy old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/workspaces.rs::actual_workspace_row_keeps_raw_errors_and_keyboard_remove_under_german_labels old body hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/workspaces.rs::locale_numbers_relative_age_and_error_classifiers_are_separate_from_raw_state old body hash",
+      "passed": true
+    },
+    {
+      "check": "old fixture count",
+      "passed": true
+    },
+    {
+      "check": "42 old test bodies unchanged",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs impl PatchQueue { section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs impl PatchQueue { candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs /// The queue's session boundary section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs /// The queue's session boundary candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs /// A veil over the window section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/dropped.rs /// A veil over the window candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs     fn open_repo( section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs     fn open_repo( candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs     fn open_root( section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/mod.rs     fn open_root( candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     fn from_notice( section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     fn from_notice( candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     fn display_text( section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     fn display_text( candidate exact section",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     /// Long operations that ended section hash",
+      "passed": true
+    },
+    {
+      "check": "src/app/panels.rs     /// Long operations that ended candidate exact section",
+      "passed": true
+    }
+  ],
+  "static_contract_review": [
+    {
+      "check": "raw-envelopes",
+      "source": "src/app/home.rs:109",
+      "disposition": "PASS",
+      "detail": "All six finite variant envelopes are locale-independent English; original init diagnostic, folder PathBuf/diagnostic/classification, unsupported name and patch name/has_repo are retained. Envelope wording agrees with the existing English catalog."
+    },
+    {
+      "check": "source-ownership",
+      "source": "src/app/home.rs:22",
+      "disposition": "PASS",
+      "detail": "AppError raw and presentation fields and HomeError enum are private; constructors attach source metadata directly. Immutable Deref<Target=str> exposes only the raw value; no DerefMut or public metadata mutation exists."
+    },
+    {
+      "check": "opaque-replacements",
+      "source": "src/app/home.rs:42",
+      "disposition": "PASS",
+      "detail": "From<String> always uses presentation=None, including equal raw text. There is no suffix parsing or inference from already-translated text. Equality checks only validate an existing source; mismatch returns raw unchanged."
+    },
+    {
+      "check": "actual-home-paint",
+      "source": "src/app/home.rs:312",
+      "disposition": "PASS",
+      "detail": "Actual Home calls error_label, which calls AppError::display at paint. A valid finite source calls current-language i18n functions each time; ordinary errors use the unchanged display_app_message chain."
+    },
+    {
+      "check": "init-source",
+      "source": "src/app/home.rs:210",
+      "disposition": "PASS",
+      "detail": "Both local and remote New repository init failures use AppError::init before retention. Repository resolution errors use From<String>. Selection, init/toplevel calls, success branches and flags retain original control flow."
+    },
+    {
+      "check": "remote-transport",
+      "source": "src/app/remote_open.rs:200",
+      "disposition": "PASS",
+      "detail": "Only the result error type/conversions change; source values survive worker/channel/poll/initiating-window/finish_connection/report. Panic and ordinary resolver errors use None metadata. Worker dispatch and operation identities are unchanged."
+    },
+    {
+      "check": "drop-source",
+      "source": "src/app/dropped.rs:70",
+      "disposition": "PASS",
+      "detail": "Original diagnostic classification is retained once from the actual error. Dropped folder, unsupported item and both patch-target contexts attach their source values before report; queue, target snapshot, path selection and success routing are unchanged."
+    },
+    {
+      "check": "ordinary-errors",
+      "source": "src/app/clone.rs:274",
+      "disposition": "PASS",
+      "detail": "Clone cancellation/failure, desktop-install, workspace and ordinary report routes retain their exact raw strings and acquire None metadata. Clear sites and per-window swap continue to clear/move the whole error value."
+    },
+    {
+      "check": "historical-toast",
+      "source": "src/app/panels.rs:42",
+      "disposition": "PASS",
+      "detail": "App::report uses Toast::from_app_error. Sourced messages resolve in delivery language; plain strings retain raw transport. Toast::new still means error=true, six seconds and no Notice/update receipt. Prior toasts_ui/display_text/from_notice/update behavior remains unchanged."
+    },
+    {
+      "check": "retained-headless-regression",
+      "source": "src/app/home.rs:560",
+      "disposition": "PASS",
+      "detail": "The new harness passes six retained AppError values through the exact Home label painter across EN-DE-EN and checks raw and source immutability, opaque Unicode/newline/lookalike text, both folder classifications and both patch contexts. Replacement test checks equal-text replacement, clearing, opaque lookalikes, canonical fallback and impossible stale private metadata."
+    },
+    {
+      "check": "test-containment",
+      "source": "src/app/home.rs:560",
+      "disposition": "PASS",
+      "detail": "New Home/toast tests use supplied values and accepted test-threadlocal locale selection with default harness fonts; no App/RepoTab construction, discovery, theme application, native/process/network/Git/FS fixture is introduced."
+    },
+    {
+      "check": "fixture-retention",
+      "source": "src/app/windows.rs:1602",
+      "disposition": "PASS",
+      "detail": "All 43 old fixture hashes independently matched. Exactly one body changes: recorded result .into() becomes .to_owned().into(). Literal and every old assertion remain unchanged; test helper wrappers call the production source factory/delivery renderer."
+    }
+  ],
+  "reviewer_execution": [
+    "Immutable Git object/diff/source inspection",
+    "Inert Python JSON/catalog/hash/body comparisons",
+    "Only requested review .md and .json artifacts written"
+  ],
+  "limits": [
+    "No test/compiler/build/runtime/helper/App/RepoTab/discovery/Git-under-test/process/native/network fixture, CI, PR or delegation executed by reviewer.",
+    "Preserved writer receipts inspected and hashed; reported nine selected passes are historical evidence, not new reviewer test execution.",
+    "Original interaction review broader acceptance, foreign source seams, native/source-window-exit holds and final combined acceptance/history/CI/PR obligations remain unchanged.",
+    "No strict lint, full-suite, cross-platform, native or full-feature acceptance is inferred.",
+    "No remote query was made: preserved fork branch SHA receipt was inspected and hash-bound."
+  ],
+  "report": {
+    "path": "/tmp/gitcraft-51-home-error-correction-review.md",
+    "sha256": "6d751d7f27f2ef6a2eafce00f95dde20742e3e2f51020c1b94005619af17e9bc"
+  }
+}
