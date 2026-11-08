@@ -106,10 +106,16 @@ pub(super) fn mailbox(bytes: &[u8]) -> Result<Vec<Message>, String> {
     if bytes.len() > MAX {
         return Err("Series exceeds 32 MiB".into());
     }
+    // b4 save_git_am_mbox uses this exact envelope and intentionally does not
+    // escape bare body "From " lines. Splitting every such line corrupts prose.
+    const ENVELOPE: &[u8] = b"From git@z Thu Jan  1 00:00:00 1970\n";
+    if !bytes.starts_with(ENVELOPE) {
+        return Err("Expected b4's git-am mailbox envelope".into());
+    }
     let mut starts = vec![0];
-    for (i, window) in bytes.windows(6).enumerate() {
-        if window == b"\nFrom " {
-            starts.push(i + 1);
+    for (i, window) in bytes.windows(ENVELOPE.len()).enumerate() {
+        if i > 0 && bytes[i - 1] == b'\n' && window == ENVELOPE {
+            starts.push(i);
         }
     }
     if starts.len() > 1024 {
@@ -161,7 +167,7 @@ pub(super) fn recipients(to: &str, cc: &str) -> Result<Vec<String>, String> {
 pub(super) fn command(args: &[String]) -> Vec<String> {
     let mut result = vec![
         "-c".into(),
-        "alias.gitcraft-b4=!f() { exec b4 --no-interactive --no-stdin \"$@\"; }; f".into(),
+        "alias.gitcraft-b4=!f() { exec b4 -c b4.save-maildirs=no --no-interactive --no-stdin \"$@\"; }; f".into(),
         "gitcraft-b4".into(),
     ];
     result.extend_from_slice(args);

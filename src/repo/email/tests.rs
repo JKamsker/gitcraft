@@ -11,10 +11,15 @@ fn mime_cover_patch_and_trailers_are_readable() -> Result<(), String> {
 }
 #[test]
 fn mbox_keeps_messages_and_escaped_from_body() -> Result<(), String> {
-    let wire = b"From one\nSubject: cover\n\n>From body\nFrom two\nSubject: patch\n\nSigned-off-by: A <a@example.test>\n";
+    let wire = b"From git@z Thu Jan  1 00:00:00 1970\nSubject: cover\n\n>From body\nFrom unescaped prose stays in cover\nFrom git@z Thu Jan  1 00:00:00 1970\nSubject: patch\n\nSigned-off-by: A <a@example.test>\n";
     let mails = model::mailbox(wire)?;
     assert_eq!(mails.len(), 2);
     assert!(mails[0].body.contains(">From body"));
+    assert!(
+        mails[0]
+            .body
+            .contains("From unescaped prose stays in cover")
+    );
     assert!(mails[1].body.contains("Signed-off-by"));
     Ok(())
 }
