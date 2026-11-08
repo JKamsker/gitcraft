@@ -690,6 +690,7 @@ impl RepoTab {
 }
 
 mod review;
+mod workflow;
 
 type TemplateSpec = (&'static str, &'static str, &'static [(&'static str, bool)]);
 
@@ -700,20 +701,50 @@ pub(crate) fn display_operation(label: &str) -> String {
     operation_display(label, 0)
 }
 
-fn operation_display(label: &str, depth: usize) -> String {
-    operation_display_inner(label, depth, true)
-        .or_else(|| operation_display_inner(label, depth, false))
-        .unwrap_or_else(|| label.to_owned())
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PaintFamily {
+    Review,
+    Workflow,
+    Legacy,
 }
 
-fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Option<String> {
-    if let Some(rendered) = review::fixed(label) {
-        return Some(rendered);
+enum Painted {
+    Known(String),
+    Opaque,
+}
+impl Painted {
+    fn text(self, raw: &str) -> String {
+        match self {
+            Self::Known(text) => text,
+            Self::Opaque => raw.to_owned(),
+        }
     }
-    if !review_only {
+}
+fn known_operation(label: &str, depth: usize) -> Option<Painted> {
+    operation_display_inner(label, depth, PaintFamily::Review)
+        .or_else(|| operation_display_inner(label, depth, PaintFamily::Workflow))
+        .or_else(|| operation_display_inner(label, depth, PaintFamily::Legacy))
+}
+
+fn operation_display(label: &str, depth: usize) -> String {
+    known_operation(label, depth).map_or_else(|| label.to_owned(), |painted| painted.text(label))
+}
+
+fn operation_display_inner(label: &str, depth: usize, family: PaintFamily) -> Option<Painted> {
+    if family == PaintFamily::Review {
+        return review::fixed(label)
+            .map(Painted::Known)
+            .or_else(|| operation_template(label, depth, family));
+    }
+    if family == PaintFamily::Workflow {
+        return workflow::special(label)
+            .map(Painted::Known)
+            .or_else(|| operation_template(label, depth, family));
+    }
+    if family == PaintFamily::Legacy {
         let shared = crate::operation_labels::display(label);
         if shared != label {
-            return Some(shared);
+            return Some(Painted::Known(shared));
         }
         if depth < 4 {
             for (prefix, id) in [
@@ -725,11 +756,14 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
                 if let Some(inner) = label.strip_prefix(prefix) {
                     let rendered = operation_display(inner, depth + 1);
                     if rendered != inner {
-                        return Some(crate::i18n::message(id, &[("operation", rendered.into())]));
+                        return Some(Painted::Known(crate::i18n::message(
+                            id,
+                            &[("operation", rendered.into())],
+                        )));
                     }
                     // A custom inner command must stay opaque as an entire wrapper. Do not
                     // let a more general label/path template reinterpret its first word.
-                    return Some(label.to_owned());
+                    return Some(Painted::Opaque);
                 }
             }
         }
@@ -742,10 +776,17 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
                 .and_then(|v| v.strip_suffix(suffix))
                 && !branch.is_empty()
             {
-                return Some(crate::i18n::message(id, &[("branch", branch.into())]));
+                return Some(Painted::Known(crate::i18n::message(
+                    id,
+                    &[("branch", branch.into())],
+                )));
             }
         }
     }
+    operation_template(label, depth, family)
+}
+
+fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<Painted> {
     use std::sync::OnceLock;
     struct Template {
         pattern: regex::Regex,
@@ -754,141 +795,7 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
     }
     static TEMPLATES: OnceLock<Vec<Template>> = OnceLock::new();
     let templates = TEMPLATES.get_or_init(|| {
-        review::TEMPLATES.iter().copied().chain([
-            ("(?s)^Revision\\ appended\\ to\\ \\.git\\-blame\\-ignore\\-revs;\\ staged\\ contents\\ preserved\\.\\ Ordinary\\ Git\\ blame\\ can\\ use\\ blame\\.ignoreRevsFile=\\.git\\-blame\\-ignore\\-revs\\.$", "repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff", &[][..]),
-            ("(?s)^Preview\\ ready\\.\\ The\\ exported\\ PNG\\ contains\\ exactly\\ this\\ composition;\\ ellipses\\ mark\\ shortened\\ or\\ width\\-limited\\ text\\.$", "repo-workflows-postcards-poll-postcards-5358001c", &[][..]),
-            ("(?s)^The\\ rebase\\ stopped\\ on\\ conflicts:\\ resolve\\ them\\ and\\ continue\\ it,\\ then\\ gitcraft\\ offers\\ to\\ push\\ it\\ \\(or\\ abort\\ it\\)$", "repo-workflows-forks-forks-op-done-9c338e90", &[][..]),
-            ("(?s)^Dependencies\\ finished,\\ but\\ the\\ parent\\ repository,\\ profile\\ or\\ sign\\-in\\ changed\\.\\ Prepare\\ its\\ push\\ again\\.$", "repo-workflows-repository_tools-dependency-job-a7b1dc6d", &[][..]),
-            ("(?s)^Pinned\\ release\\ range\\ loaded\\.\\ Review\\ the\\ disclosure\\ list,\\ then\\ compose\\ the\\ PNG\\ preview\\.$", "repo-workflows-postcards-poll-postcards-60ccb94f", &[][..]),
-            ("(?s)^Go\\ online\\ and\\ wait\\ for\\ the\\ current\\ operation\\ before\\ preparing\\ an\\ outbox\\ push$", "repo-workflows-repository_tools-act-d64d1e25", &[][..]),
-            ("(?s)^Profile\\ changed\\.\\ Read\\ the\\ release\\ range\\ again\\ before\\ composing\\ a\\ postcard\\.$", "repo-workflows-postcards-poll-postcards-4773e588", &[][..]),
-            ("(?s)^Nothing\\ to\\ commit\\ yet:\\ add\\ or\\ change\\ files\\ in\\ the\\ repository's\\ folder$", "repo-workflows-guide-start-first-commit-881f72cb", &[][..]),
-            ("(?s)^Finish\\ or\\ close\\ the\\ conflict\\ editor\\ or\\ the\\ interactive\\ rebase\\ first$", "repo-workflows-doctor-open-doctor-745454bd", &[][..]),
-            ("(?s)^Prepared\\ subtree\\ profile/sign\\-in\\ changed;\\ prepare\\ and\\ approve\\ again$", "repo-workflows-repository_tools-act-d021ec81", &[][..]),
-            ("(?s)^Prepared\\ outbox\\ profile/sign\\-in\\ changed;\\ prepare\\ and\\ approve\\ again$", "repo-workflows-repository_tools-start-send-628a48e6", &[][..]),
-            ("(?s)^HEAD\\ is\\ detached:\\ check\\ out\\ a\\ branch\\ to\\ make\\ the\\ first\\ commit\\ on$", "repo-workflows-guide-ask-empty-commit-348d9f75", &[][..]),
-            ("(?s)^Revision\\ already\\ present;\\ ignore\\ file\\ and\\ index\\ unchanged$", "repo-workflows-line_dossier-dossier-ignore-finished-366a809a", &[][..]),
-            ("(?s)^History\\ summary\\ cancelled\\ or\\ exceeded\\ its\\ output\\ limit$", "repo-workflows-line_dossier-run-a9f1b338", &[][..]),
-            ("(?s)^Moved\\-code\\ analysis\\ cancelled\\ or\\ exceeded\\ 40\\ seconds$", "repo-workflows-file_comparison-read-431f5828", &[][..]),
-            ("(?s)^Tracker\\ account\\ changed;\\ reload\\ the\\ issue\\ source$", "repo-workflows-issue_work-start-issue-563140a4", &[][..]),
-            ("(?s)^A\\ parallel\\ bisect\\ is\\ already\\ running\\ in\\ this\\ tab$", "repo-workflows-parallel_bisect-start-parallel-3450e92d", &[][..]),
-            ("(?s)^Convert\\ legacy\\ grafts\\ to\\ removable\\ replace\\ refs$", "repo-workflows-repository_tools-repository-tools-act-ad133eb8", &[][..]),
-            ("(?s)^The\\ pull\\ request's\\ branch\\ is\\ not\\ available\\ yet$", "repo-workflows-pr_view-select-pr-b788526c", &[][..]),
-            ("(?s)^Choose\\ one\\ saved\\ turn\\ to\\ preview\\ its\\ inverse$", "repo-workflows-repository_tools-act-6dc9a943", &[][..]),
-            ("(?s)^This\\ repository\\ has\\ no\\ remote\\ to\\ rebase\\ onto$", "repo-workflows-forks-plan-fork-rebase-1abac341", &[][..]),
-            ("(?s)^Publish\\ dependencies\\ before\\ parent\\ review$", "repo-workflows-repository_tools-dependency-job-f48f9c31", &[][..]),
-            ("(?s)^Wait\\ for\\ the\\ operation\\ going\\ on\\ to\\ finish$", "repo-workflows-parallel_bisect-mark-parallel-result-e5e3ecc5", &[][..]),
-            ("(?s)^Wait\\ for\\ the\\ running\\ operation\\ to\\ finish$", "repo-workflows-agents-start-agent-task-f80416ff", &[][..]),
-            ("(?s)^Check\\ submodule\\ publication\\ dependencies$", "repo-workflows-repository_tools-dependency-job-57895189", &[][..]),
-            ("(?s)^This\\ repository\\ has\\ no\\ CODEOWNERS\\ file$", "repo-workflows-owners-owners-act-9cd4150e", &[][..]),
-            ("(?s)^Wait\\ for\\ the\\ running\\ operation\\ to\\ end$", "repo-workflows-doctor-doctor-act-9bab8d95", &[][..]),
-            ("(?s)^Change\\ virtual\\ branch\\ materialization$", "repo-workflows-repository_tools-act-ce061d46", &[][..]),
-            ("(?s)^Join\\ imported\\ histories\\ temporarily$", "repo-workflows-repository_tools-repository-tools-act-a7b0c90c", &[][..]),
-            ("(?s)^Autosend\\ opted\\-in\\ plain\\ outbox\\ push$", "repo-workflows-repository_tools-start-send-e7b0c78d", &[][..]),
-            ("(?s)^Connection\\ changed;\\ reopen\\ outbox$", "repo-workflows-repository_tools-act-ccd2fdda", &[][..]),
-            ("(?s)^Commit\\ virtual\\ branch\\ owned\\ hunks$", "repo-workflows-repository_tools-act-de986fa8", &[][..]),
-            ("(?s)^Checking\\ against\\ the\\ agent\\ fence…$", "repo-workflows-fence_view-fence-gate-2b8e4f3b", &[][..]),
-            ("(?s)^Finish\\ or\\ close\\ the\\ editor\\ first$", "repo-workflows-file_comparison-open-file-comparison-a6cb5dc1", &[][..]),
-            ("(?s)^Cancelled\\ before\\ terminal\\ start$", "repo-workflows-devcontainer-terminal-f171832a", &[][..]),
-            ("(?s)^Reconcile\\ exact\\ replay\\ receipts$", "repo-workflows-repository_tools-act-c08c65bd", &[][..]),
-            ("(?s)^Moved\\-code\\ comparison\\ cancelled$", "repo-workflows-file_comparison-assemble-56abde67", &[][..]),
-            ("(?s)^PNG\\ saved\\ as\\ a\\ new\\ local\\ file\\.$", "repo-workflows-postcards-poll-postcards-10867442", &[][..]),
-            ("(?s)^Undo\\ accepted\\ isolated\\ replay$", "repo-workflows-repository_tools-act-346c061a", &[][..]),
-            ("(?s)^Save\\ virtual\\ branch\\ ownership$", "repo-workflows-repository_tools-act-901dccbe", &[][..]),
-            ("(?s)^Undo\\ virtual\\ branch\\ operation$", "repo-workflows-repository_tools-act-63403bc6", &[][..]),
-            ("(?s)^Replay\\ in\\ isolated\\ worktrees$", "repo-workflows-repository_tools-act-5bd57c48", &[][..]),
-            ("(?s)^Postcard\\ rendering\\ cancelled$", "repo-workflows-postcards-render-8e2ed023", &[][..]),
-            ("(?s)^Worktree\\ setup\\ recipe\\ saved$", "repo-workflows-agents-save-recipe-97381b52", &[][..]),
-            ("(?s)^Installing\\ the\\ agent\\ hooks…$", "repo-workflows-agents-install-hooks-2f5d6dc4", &[][..]),
-            ("(?s)^Publish\\ exact\\ subtree\\ split$", "repo-workflows-repository_tools-act-494336ed", &[][..]),
-            ("(?s)^Remove\\ unused\\ fork\\ remotes$", "repo-workflows-forks-plan-tidy-a7e148ae", &[][..]),
-            ("(?s)^Cancelled\\ before\\ starting$", "repo-workflows-devcontainer-devcontainer-act-84f8f92f", &[][..]),
-            ("(?s)^Resolve\\ submodule\\ pointer$", "repo-workflows-repository_tools-repository-tools-act-66f98362", &[][..]),
-            ("(?s)^Save\\ pull\\ and\\ push\\ routes$", "repo-workflows-repository_tools-repository-tools-act-82d14313", &[][..]),
-            ("(?s)^Save\\ remote\\ configuration$", "repo-workflows-repository_tools-repository-tools-act-4e161156", &[][..]),
-            ("(?s)^Continue\\ isolated\\ replay$", "repo-workflows-repository_tools-act-65d162a8", &[][..]),
-            ("(?s)^Postcard\\ work\\ cancelled\\.$", "repo-workflows-postcards-postcard-window-b6333aff", &[][..]),
-            ("(?s)^Close\\ isolated\\ proposal$", "repo-workflows-repository_tools-act-08cd49af", &[][..]),
-            ("(?s)^Unshelve\\ one\\ changelist$", "repo-workflows-repository_tools-act-551afaa9", &[][..]),
-            ("(?s)^File\\ history\\ cancelled$", "repo-workflows-atlas-new-70ba4563", &[][..]),
-            ("(?s)^Accept\\ isolated\\ replay$", "repo-workflows-repository_tools-act-b64c091a", &[][..]),
-            ("(?s)^Make\\ clone\\ independent$", "repo-workflows-repository_tools-repository-tools-act-07fb4089", &[][..]),
-            ("(?s)^Save\\ publication\\ group$", "repo-workflows-repository_tools-repository-tools-act-3c1c7a3a", &[][..]),
-            ("(?s)^Send\\ exact\\ queued\\ push$", "repo-workflows-repository_tools-start-send-994ea6b0", &[][..]),
-            ("(?s)^No\\ bisect\\ is\\ going\\ on$", "repo-workflows-bisect-mark-bisect-a1c6c771", &[][..]),
-            ("(?s)^Commit\\ one\\ changelist$", "repo-workflows-repository_tools-act-c1eec3a9", &[][..]),
-            ("(?s)^Shelve\\ one\\ changelist$", "repo-workflows-repository_tools-act-bea96408", &[][..]),
-            ("(?s)^Revert\\ one\\ saved\\ turn$", "repo-workflows-repository_tools-act-fc328635", &[][..]),
-            ("(?s)^Marked\\ in\\ the\\ bisect$", "repo-workflows-parallel_bisect-mark-parallel-result-e05d54d7", &[][..]),
-            ("(?s)^Migrate\\ ref\\ storage$", "repo-workflows-repository_tools-repository-tools-act-888e8b45", &[][..]),
-            ("(?s)^Remove\\ outbox\\ entry$", "repo-workflows-repository_tools-act-7f694b62", &[][..]),
-            ("(?s)^Remove\\ replace\\ ref$", "repo-workflows-repository_tools-repository-tools-act-69a2d9db", &[][..]),
-            ("(?s)^Subtree\\ operation$", "repo-workflows-repository_tools-act-88c16034", &[][..]),
-            ("(?s)^Summary\\ cancelled$", "repo-workflows-line_dossier-run-ae6f0623", &[][..]),
-            ("(?s)^Skip\\ this\\ commit$", "repo-workflows-bisect-mark-bisect-15306802", &[][..]),
-            ("(?s)^Isolated\\ restack$", "repo-workflows-repository_tools-show-9174163c", &[][..]),
-            ("(?s)^Queue\\ exact\\ push$", "repo-workflows-repository_tools-act-b967f21f", &[][..]),
-            ("(?s)^Recover\\ content$", "repo-workflows-content_recovery-content-perform-fbdf23f8", &[][..]),
-            ("(?s)^Save\\ changelist$", "repo-workflows-repository_tools-act-a3cbb206", &[][..]),
-            ("(?s)^Finish\\ bisect$", "repo-workflows-bisect-reset-bisect-1bdcc155", &[][..]),
-            ("(?s)^Start\\ bisect$", "repo-workflows-bisect-start-bisect-db936451", &[][..]),
-            ("(?s)^Stop\\ bisect$", "repo-workflows-bisect-reset-bisect-0ddac35c", &[][..]),
-            ("(?s)^Force\\ push$", "repo-workflows-agent-push-1d502fc3", &[][..]),
-            ("(?s)^Bisect\\ run$", "repo-workflows-bisect-start-bisect-run-d300d73e", &[][..]),
-            ("(?s)^setup$", "repo-workflows-agents-agent-act-8fb6d5f3", &[][..]),
-            ("(?s)^No\\ agent\\ terminal\\ in\\ this\\ worktree\\ to\\ send\\ (.*?)\\ to:\\ start\\ the\\ agent\\ \\(Start\\ agent\\ task…\\),\\ or\\ pick\\ its\\ terminal\\ next\\ to\\ Send\\ to\\ agent$", "repo-workflows-agents-send-to-agent-a6f80242", &[("what", false)][..]),
-            ("(?s)^Approving\\ runs\\ the\\ contributor's\\ code\\ on\\ your\\ CI:\\ look\\ through\\ \\#([0-9]+)'s\\ changes\\ first,\\ then\\ choose\\ Approve\\ and\\ run\\ again$", "repo-workflows-forks-approve-runs-a77eca22", &[("number", true)][..]),
-            ("(?s)^Didn't\\ check\\ out\\ (.*?):\\ couldn't\\ list\\ the\\ commits\\ it\\ would\\ leave\\ on\\ no\\ branch\\ \\((.*?)\\)$", "repo-workflows-detached-leave-to-48b0ce4c", &[("leave-label-1", false), ("e", false)][..]),
-            ("(?s)^(.*?)\\ is\\ rebased\\ here,\\ but\\ not\\ pushed\\ to\\ (.*?):\\ Ctrl\\+Z\\ puts\\ it\\ back\\ as\\ it\\ was$", "repo-workflows-forks-forks-op-done-8287ad6b", &[("plan-local-1", false), ("plan-fork-2", false)][..]),
-            ("(?s)^Couldn't\\ save\\ Sign\\ off\\ for\\ this\\ repository\\ \\(git\\ config\\ (.*?)\\):\\ (.*?)$", "repo-workflows-dco-dco-act-10fe4a7c", &[("signoff-sign-off-key-1", false), ("e", false)][..]),
-            ("(?s)^The\\ agent\\ checkpoint\\ hooks\\ weren't\\ installed:\\ (.*?)$", "repo-workflows-agents-after-worktree-add-9fd23075", &[("e", false)][..]),
-            ("(?s)^(.*?):\\ done\\.\\ Commit\\ \\.gitattributes\\ to\\ share\\ it\\.$", "repo-workflows-lfs_locks-lock-job-35b33376", &[("label", false)][..]),
-            ("(?s)^Wait\\ for\\ (.*?)\\ to\\ finish,\\ then\\ check\\ out\\ again$", "repo-workflows-detached-detached-act-70dad4a3", &[("busy", false)][..]),
-            ("(?s)^(.*?)\\ isn't\\ a\\ version\\ to\\ start\\ a\\ hotfix\\ from$", "repo-workflows-hotfix-hotfix-act-06b55025", &[("tag", false)][..]),
-            ("(?s)^The\\ worktree\\ setup\\ recipe\\ wasn't\\ run:\\ (.*?)$", "repo-workflows-agents-after-worktree-add-a2ffe669", &[("e", false)][..]),
-            ("(?s)^Didn't\\ check\\ out\\ (.*?):\\ (.*?)\\ started\\ meanwhile$", "repo-workflows-detached-leave-to-007a4c0e", &[("leave-label-1", false), ("busy", false)][..]),
-            ("(?s)^Couldn't\\ approve\\ \\#([0-9]+)'s\\ workflow\\ runs:\\ (.*?)$", "repo-workflows-forks-approve-runs-282082c7", &[("number", true), ("e", false)][..]),
-            ("(?s)^Couldn't\\ read\\ the\\ branches'\\ issues:\\ (.*?)$", "repo-workflows-issue_work-take-issue-read-bbcbbb59", &[("e", false)][..]),
-            ("(?s)^The\\ agent\\ hooks\\ weren't\\ installed:\\ (.*?)$", "repo-workflows-agents-install-hooks-a8f2778c", &[("e", false)][..]),
-            ("(?s)^Where\\ \\#([0-9]+)\\ comes\\ from\\ isn't\\ known\\ yet$", "repo-workflows-forks-checkout-fork-5ecb3bac", &[("number", true)][..]),
-            ("(?s)^Couldn't\\ send\\ (.*?)\\ to\\ the\\ (.*?)\\ terminal:\\ (.*?)$", "repo-workflows-agents-send-to-agent-4e9f0022", &[("what", false), ("label", false), ("e", false)][..]),
-            ("(?s)^Fetching\\ \\#([0-9]+)'s\\ branch\\ and\\ its\\ base…$", "repo-workflows-forks-plan-fork-rebase-ac71056e", &[("number", true)][..]),
-            ("(?s)^Could\\ not\\ set\\ what\\ LFS\\ fetches:\\ (.*?)$", "repo-workflows-lfs_storage-fetch-only-e3be5d1f", &[("e", false)][..]),
-            ("(?s)^Push\\ the\\ signed\\-off\\ commits\\ of\\ (.*?)$", "repo-workflows-dco-dco-op-done-55d2b32b", &[("plan-branch-1", false)][..]),
-            ("(?s)^Checkout\\ (.*?):\\ wait\\ for\\ (.*?)\\ to\\ finish$", "repo-workflows-detached-leave-to-28ae5898", &[("leave-label-1", false), ("busy", false)][..]),
-            ("(?s)^\\#([0-9]+)'s\\ workflow\\ runs\\ are\\ approved$", "repo-workflows-forks-approve-runs-a151ad19", &[("number", true)][..]),
-            ("(?s)^Forget\\ the\\ issue\\ of\\ (.*?)\\ failed:\\ (.*?)$", "repo-workflows-issue_work-unlink-issue-6df1900e", &[("branch", false), ("e", false)][..]),
-            ("(?s)^\\$(.*?)\\ can't\\ hold\\ a\\ NUL\\ character$", "repo-workflows-custom_commands-run-custom-44771367", &[("name", false)][..]),
-            ("(?s)^Approving\\ \\#([0-9]+)'s\\ workflow\\ runs…$", "repo-workflows-forks-approve-runs-2f659b28", &[("number", true)][..]),
-            ("(?s)^The\\ turns\\ weren't\\ deleted:\\ (.*?)$", "repo-workflows-agents-forget-turns-1d1d391e", &[("e", false)][..]),
-            ("(?s)^Couldn't\\ read\\ the\\ remotes:\\ (.*?)$", "repo-workflows-forks-plan-tidy-adf73b14", &[("e", false)][..]),
-            ("(?s)^Mark\\ in\\ the\\ bisect\\ failed:\\ (.*?)$", "repo-workflows-parallel_bisect-mark-parallel-result-48f3588b", &[("e", false)][..]),
-            ("(?s)^Finish\\ or\\ close\\ the\\ (.*?)\\ first$", "repo-workflows-ci_view-open-ci-991ae978", &[("editor", false)][..]),
-            ("(?s)^Start\\ work\\ on\\ (.*?):\\ wait\\ for\\ (.*?)$", "repo-workflows-issue_work-start-issue-e2b80c1b", &[("issue-key-1", false), ("busy", false)][..]),
-            ("(?s)^Can't\\ start\\ a\\ bisect:\\ (.*?)$", "repo-workflows-bisect-start-bisect-5c82e3e0", &[("why", false)][..]),
-            ("(?s)^No\\ fork\\ remote\\ can\\ go(.*?)$", "repo-workflows-forks-plan-tidy-da56e1d6", &[("kept", false)][..]),
-            ("(?s)^LFS\\ now\\ fetches\\ only\\ (.*?)$", "repo-workflows-lfs_storage-fetch-only-3f558a4c", &[("names-join-1", false)][..]),
-            ("(?s)^Comment\\ relocation:\\ (.*?)$", "repo-workflows-pr_view-pr-files-arrived-20be6481", &[("e", false)][..]),
-            ("(?s)^(.*?)\\ (.*?)\\ from\\ staging\\ lens$", "repo-workflows-file_comparison-comparison-pick-28dc27ab", &[("pick-verb-1", false), ("snapshot-spec-path-2", false)][..]),
-            ("(?s)^(.*?)\\ \\(stopped\\ part\\-way\\)$", "repo-workflows-hotfix-hotfix-op-done-fbdef87e", &[("run-label-1", false)][..]),
-            ("(?s)^Content\\ recovery:\\ (.*?)$", "repo-workflows-content_recovery-content-perform-9d57ebb2", &[("e", false)][..]),
-            ("(?s)^Start\\ agent\\ task\\ (.*?)$", "repo-workflows-agents-start-agent-task-d4ec2011", &[("new-branch-1", false)][..]),
-            ("(?s)^(.*?)\\ is\\ still\\ running$", "repo-workflows-repository_tools-repository-tool-mutation-988356ee", &[("busy", false)][..]),
-            ("(?s)^Ignore\\ revision:\\ (.*?)$", "repo-workflows-line_dossier-dossier-ignore-finished-4c50387c", &[("error", false)][..]),
-            ("(?s)^Remove\\ (.*?)\\ \\((.*?)\\)\\ from\\ (.*?)$", "repo-workflows-doctor-remove-confirm-b0b26eef", &[("origin-key-1", false), ("shortened-origin-shown-value-2", false), ("file", false)][..]),
-            ("(?s)^Remote\\ preview:\\ (.*?)$", "repo-workflows-repository_tools-remote-config-preview-bba0304c", &[("e", false)][..]),
-            ("(?s)^Start\\ work\\ on\\ (.*?):\\ (.*?)$", "repo-workflows-issue_work-start-issue-c14dd822", &[("issue-key-1", false), ("why", false)][..]),
-            ("(?s)^Container\\ (.*?)\\ ·\\ (.*?)$", "repo-workflows-devcontainer-terminal-77e417ed", &[("binding-id-12-1", false), ("binding-folder-2", false)][..]),
-            ("(?s)^Set\\ (.*?)\\ to\\ (.*?)\\ for\\ (.*?)$", "repo-workflows-doctor-set-row-921f564b", &[("setting-key-1", false), ("shortened-value-2", false), ("scope-choice-scope-to-lowercase-3", false)][..]),
-            ("(?s)^(.*?):\\ wait\\ for\\ (.*?)$", "repo-workflows-issue_work-refresh-issue-a0e9ad2a", &[("label", false), ("busy", false)][..]),
-            ("(?s)^Mark\\ (.*?)\\ as\\ (.*?)$", "repo-workflows-bisect-mark-bisect-22f6b91b", &[("short-rev-1", false), ("bisect-word-mark-2", false)][..]),
-            ("(?s)^(.*?)\\ failed:\\ (.*?)$", "repo-workflows-bisect-bisect-step-done-8336fbfe", &[("label", false), ("e", false)][..]),
-            ("(?s)^Turn\\ on:\\ (.*?)$", "repo-workflows-doctor-turn-on-action-d8e3e02d", &[("s-title-to-lowercase-1", false)][..]),
-            ("(?s)^(.*?):\\ (.*?):\\ done$", "repo-workflows-agent-agent-op-done-16d1e9b2", &[("running-agent-1", false), ("label", false)][..]),
-            ("(?s)^build\\ ·\\ (.*?)$", "repo-workflows-bakeoff-build-c9238812", &[("name", false)][..]),
-            ("(?s)^Mark\\ as\\ (.*?)$", "repo-workflows-bisect-mark-bisect-9b0f3138", &[("bisect-word-mark-1", false)][..]),
-            ("(?s)^Rebase\\ (.*?)$", "repo-workflows-repository_tools-show-34b10b8d", &[("name", false)][..]),
-            ("(?s)^([0-9]+)\\ paths$", "repo-workflows-agent-paths-label-26d36d06", &[("many-len-1", true)][..]),
+        review::TEMPLATES.iter().chain(workflow::TEMPLATES).copied().chain([
             ("(?s)^Inspect\\ shared\\ Git\\ directories\\ and\\ donors;\\ make\\ a\\ clone\\ independent$", "repo-core-0085", &[][..]),
             ("(?s)^Subtrees:\\ register,\\ update,\\ inspect\\ and\\ publish\\ vendored\\ folders…$", "repo-core-0082", &[][..]),
             ("(?s)^Push\\ outbox:\\ queue\\ exact\\ commit\\ or\\ send\\ selected\\ entries…$", "repo-core-0080", &[][..]),
@@ -1111,12 +1018,48 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
     });
     if depth < 4 {
         for template in templates {
-            if review_only && !template.id.starts_with("repo-workflows-review-") {
+            let source_family = if template.id.starts_with("repo-workflows-review-") {
+                PaintFamily::Review
+            } else if template.id.starts_with("repo-workflows-") {
+                PaintFamily::Workflow
+            } else {
+                PaintFamily::Legacy
+            };
+            if family != source_family {
                 continue;
             }
             let Some(captures) = template.pattern.captures(label) else {
                 continue;
             };
+            if family == PaintFamily::Workflow {
+                let mut args = Vec::new();
+                for (i, (name, numeric)) in template.args.iter().enumerate() {
+                    if name.is_empty() {
+                        continue;
+                    }
+                    let raw = captures.get(i + 1).map_or("", |v| v.as_str());
+                    let value: crate::i18n::Value<'_> = if *numeric {
+                        let Ok(number) = raw.parse::<u64>() else {
+                            return Some(Painted::Opaque);
+                        };
+                        number.into()
+                    } else {
+                        let adapted = workflow_argument(template.id, name, raw, depth);
+                        let Some(adapted) = adapted else {
+                            return Some(Painted::Opaque);
+                        };
+                        adapted.into()
+                    };
+                    args.push((*name, value));
+                }
+                // Repeated command-key placeholders must still match the same raw key.
+                if template.id == "repo-workflows-timeline-jump-b77dfff9"
+                    && captures.get(3).map(|v| v.as_str()) != captures.get(4).map(|v| v.as_str())
+                {
+                    return Some(Painted::Opaque);
+                }
+                return Some(Painted::Known(crate::i18n::message(template.id, &args)));
+            }
             // A template whose leading value is another operation must recognize it.
             // This prevents generic label/path forms from translating custom commands.
             if !matches!(
@@ -1134,38 +1077,6 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
                     continue;
                 }
             }
-            if crate::i18n::language() == crate::i18n::Language::German
-                && template.args.iter().enumerate().any(|(i, (name, _))| {
-                    matches!(
-                        (template.id, *name),
-                        ("repo-workflows-agent-agent-op-done-16d1e9b2", "label")
-                            | ("repo-workflows-bisect-bisect-step-done-8336fbfe", "label")
-                            | ("repo-workflows-detached-leave-to-28ae5898", "busy")
-                            | ("repo-workflows-detached-leave-to-007a4c0e", "busy")
-                            | ("repo-workflows-detached-detached-act-70dad4a3", "busy")
-                            | (
-                                "repo-workflows-repository_tools-repository-tool-mutation-988356ee",
-                                "busy"
-                            )
-                            | (
-                                "repo-workflows-file_comparison-comparison-pick-28dc27ab",
-                                "pick-verb-1"
-                            )
-                            | (
-                                "repo-workflows-hotfix-hotfix-op-done-fbdef87e",
-                                "run-label-1"
-                            )
-                            | ("repo-workflows-issue_work-start-issue-e2b80c1b", "busy")
-                            | ("repo-workflows-issue_work-refresh-issue-a0e9ad2a", "label")
-                            | ("repo-workflows-issue_work-refresh-issue-a0e9ad2a", "busy")
-                            | ("repo-workflows-lfs_locks-lock-job-35b33376", "label")
-                    ) && captures
-                        .get(i + 1)
-                        .is_some_and(|v| operation_display(v.as_str(), depth + 1) == v.as_str())
-                })
-            {
-                continue;
-            }
             let args: Vec<(&str, crate::i18n::Value<'_>)> = template
                 .args
                 .iter()
@@ -1177,30 +1088,7 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
                         raw.parse::<f64>()
                             .map(Into::into)
                             .unwrap_or_else(|_| raw.into())
-                    } else if (matches!(
-                        (template.id, *name),
-                        ("repo-workflows-agent-agent-op-done-16d1e9b2", "label")
-                            | ("repo-workflows-bisect-bisect-step-done-8336fbfe", "label")
-                            | ("repo-workflows-detached-leave-to-28ae5898", "busy")
-                            | ("repo-workflows-detached-leave-to-007a4c0e", "busy")
-                            | ("repo-workflows-detached-detached-act-70dad4a3", "busy")
-                            | (
-                                "repo-workflows-repository_tools-repository-tool-mutation-988356ee",
-                                "busy"
-                            )
-                            | (
-                                "repo-workflows-file_comparison-comparison-pick-28dc27ab",
-                                "pick-verb-1"
-                            )
-                            | (
-                                "repo-workflows-hotfix-hotfix-op-done-fbdef87e",
-                                "run-label-1"
-                            )
-                            | ("repo-workflows-issue_work-start-issue-e2b80c1b", "busy")
-                            | ("repo-workflows-issue_work-refresh-issue-a0e9ad2a", "label")
-                            | ("repo-workflows-issue_work-refresh-issue-a0e9ad2a", "busy")
-                            | ("repo-workflows-lfs_locks-lock-job-35b33376", "label")
-                    )) || !template.id.starts_with("repo-workflows-")
+                    } else if !template.id.starts_with("repo-workflows-")
                         && !matches!(
                             template.id,
                             "repo-core-0164" | "repo-core-2447" | "repo-core-1100"
@@ -1216,7 +1104,7 @@ fn operation_display_inner(label: &str, depth: usize, review_only: bool) -> Opti
                     (*name, value)
                 })
                 .collect();
-            return Some(crate::i18n::message(template.id, &args));
+            return Some(Painted::Known(crate::i18n::message(template.id, &args)));
         }
     }
     None
@@ -1247,9 +1135,8 @@ pub(crate) fn display_status(status: &str) -> String {
             return rendered;
         }
     }
-    let rendered = display_operation(status);
-    if rendered != status {
-        return rendered;
+    if let Some(rendered) = known_operation(status, 0) {
+        return rendered.text(status);
     }
     match status.split_once(": ") {
         Some((label, detail)) => format!(
@@ -1450,5 +1337,34 @@ pub(crate) fn display_intent_warning(raw: &str) -> String {
 }
 
 fn review_owned(raw: &str) -> String {
-    operation_display_inner(raw, 0, true).unwrap_or_else(|| raw.to_owned())
+    operation_display_inner(raw, 0, PaintFamily::Review)
+        .map_or_else(|| raw.to_owned(), |painted| painted.text(raw))
+}
+
+fn workflow_argument(id: &str, name: &str, raw: &str, depth: usize) -> Option<String> {
+    use workflow::Adapter;
+    match workflow::adapter(id, name) {
+        Some(Adapter::Operation) if depth < 4 => {
+            known_operation(raw, depth + 1).and_then(|painted| match painted {
+                Painted::Known(text) => Some(text),
+                Painted::Opaque => None,
+            })
+        }
+        Some(Adapter::Operation) => None,
+        Some(Adapter::Scope) => workflow::scope(raw),
+        Some(Adapter::Health) => workflow::health(raw),
+        Some(Adapter::Pick) if matches!(raw, "Stage" | "Unstage" | "Discard" | "Revert") => {
+            known_operation(raw, depth + 1).and_then(|painted| match painted {
+                Painted::Known(text) => Some(text),
+                Painted::Opaque => None,
+            })
+        }
+        Some(Adapter::Pick) => None,
+        Some(Adapter::Noun) => workflow::noun(raw),
+        Some(Adapter::Headline) => workflow::headline(raw),
+        Some(Adapter::Place) => workflow::place(raw),
+        Some(Adapter::InProgress) => workflow::in_progress(raw),
+        Some(Adapter::Receipt) => workflow::receipt(raw),
+        None => Some(raw.to_owned()),
+    }
 }
