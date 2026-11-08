@@ -99,6 +99,39 @@ fn the_second_step_lists_every_other_branch() {
 }
 
 #[test]
+fn operation_looking_branch_names_and_remote_hints_remain_opaque_in_both_locales()
+-> Result<(), String> {
+    let mut tab = tab_with_branches(0);
+    let names = ["Fetch", "Undo Fetch", "Check out topic", "001234"];
+    tab.refs.local.extend(names.map(|name| branch(name, false)));
+    tab.refs.remotes = vec![("Fetch".into(), vec![branch("Fetch/topic", false)])];
+    for locale in ["en-US", "de", "en-US"] {
+        crate::i18n::set_language(locale);
+        for (pick, key) in [(Pick::Checkout, "checkout"), (Pick::Merge, "merge")] {
+            let choices = tab.palette_choices(&pick);
+            for name in names {
+                let item = choices.iter().find(|i| i.key == format!("{key}:{name}"));
+                assert_eq!(item.map(|i| i.label.as_str()), Some(name));
+                let item = item.ok_or("actual branch choice missing")?;
+                match (&pick, &item.run) {
+                    (Pick::Checkout, PaletteRun::Action(Action::Checkout(raw))) => {
+                        assert_eq!(raw, name);
+                    }
+                    (Pick::Merge, PaletteRun::Action(Action::UndoableOps { label, ops, .. })) => {
+                        assert_eq!(label, &format!("Merge {name} into main"));
+                        assert_eq!(ops[0].last(), Some(&format!("refs/heads/{name}")));
+                    }
+                    _ => return Err("branch dispatch changed".into()),
+                }
+            }
+            let remote = choices.iter().find(|i| i.label == "Fetch/topic");
+            assert_eq!(remote.map(|i| i.hint.as_str()), Some("Fetch"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn with_only_one_branch_there_is_nothing_to_pick() {
     let mut tab = tab_with_branches(0);
     tab.refs.remotes.clear();

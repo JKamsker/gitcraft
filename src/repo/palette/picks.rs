@@ -109,7 +109,7 @@ impl RepoTab {
                         Some(_) => Action::CheckoutRemote(b.name.clone()),
                         None => Action::Checkout(b.name.clone()),
                     };
-                    PaletteItem::action(
+                    PaletteItem::named_action(
                         &b.name,
                         remote.unwrap_or(crate::i18n::text("repo-core-2601")),
                         action,
@@ -120,7 +120,7 @@ impl RepoTab {
             Pick::Push => self
                 .pushable()
                 .map(|(b, to, push)| {
-                    PaletteItem::action(
+                    PaletteItem::named_action(
                         &b.name,
                         &crate::i18n::message("repo-core-2981", &[("to", to.to_string().into())]),
                         push,
@@ -149,7 +149,7 @@ impl RepoTab {
                         };
                         let action = branch_action(pick, at, current)?;
                         Some(
-                            PaletteItem::action(
+                            PaletteItem::named_action(
                                 &b.name,
                                 remote.unwrap_or(crate::i18n::text("repo-core-2601")),
                                 action,

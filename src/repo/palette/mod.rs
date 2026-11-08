@@ -100,6 +100,18 @@ impl PaletteItem {
         Self::new(label, hint, PaletteRun::Action(action))
     }
 
+    /// A data label and an already-rendered hint, rather than an operation template.
+    fn named_action(label: &str, hint: &str, action: Action) -> Self {
+        Self {
+            key: label.to_owned(),
+            label: label.to_owned(),
+            hint: hint.to_owned(),
+            shortcut: None,
+            selection: false,
+            run: PaletteRun::Action(action),
+        }
+    }
+
     pub(crate) fn key(mut self, key: impl Into<String>) -> Self {
         self.key = key.into();
         self
