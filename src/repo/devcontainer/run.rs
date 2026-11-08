@@ -13,12 +13,69 @@ pub(super) fn detect(path: &Path) -> Result<Option<Config>, String> {
     let source = crate::safe_read::read_inside(path, model::CONFIG, 1024 * 1024).ok_or(
         "Dev container configuration must be readable inside the worktree and at most 1 MiB",
     )?;
+    let physical = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
+    let linked = metadata(&physical)?;
     Ok(Some(Config {
-        path: std::fs::canonicalize(path).map_err(|e| e.to_string())?,
+        path: physical,
+        linked,
         source: String::from_utf8(source)
             .map_err(|_| "Dev container configuration is not UTF-8")?,
         context: crate::connections::current(),
     }))
+}
+// Bounded metadata reads only; no Git command, helper or metadata rewrite.
+fn metadata_file(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    if !std::fs::symlink_metadata(path)
+        .map_err(|e| e.to_string())?
+        .file_type()
+        .is_file()
+    {
+        return Err("Linked metadata pointers must be regular files".into());
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .map_err(|e| e.to_string())?
+        .take(8193)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > 8192 {
+        return Err("Git metadata pointer exceeds 8 KiB".into());
+    }
+    String::from_utf8(bytes).map_err(|_| "Git metadata pointer is not UTF-8".into())
+}
+fn metadata(path: &Path) -> Result<Option<model::Linked>, String> {
+    let kind = std::fs::symlink_metadata(path.join(".git"))
+        .map_err(|e| format!("Container requires a physical worktree root: {e}"))?
+        .file_type();
+    if kind.is_dir() {
+        return Ok(None);
+    }
+    if !kind.is_file() || !cfg!(unix) {
+        return Err(
+            "This linked/symlink Git layout is unsupported by native container metadata mounting"
+                .into(),
+        );
+    }
+    let dotgit = metadata_file(&path.join(".git"))?;
+    let gitdir = path.join(model::gitdir_pointer(&dotgit)?);
+    let linked = model::linked(
+        path,
+        &dotgit,
+        &metadata_file(&gitdir.join("commondir"))?,
+        &metadata_file(&gitdir.join("gitdir"))?,
+    )?;
+    let expected_gitdir = linked
+        .common
+        .join("worktrees")
+        .join(gitdir.file_name().ok_or("Missing worktree metadata name")?);
+    if std::fs::canonicalize(&gitdir).map_err(|e| e.to_string())? != expected_gitdir
+        || std::fs::canonicalize(&linked.common).map_err(|e| e.to_string())? != linked.common
+        || !linked.common.join("objects").is_dir()
+    {
+        return Err("Symlinked or nonstandard common Git metadata layout is unsupported".into());
+    }
+    Ok(Some(linked))
 }
 fn guard(config: &Config) -> Result<(), String> {
     config.same(&detect(&config.path)?.ok_or("Dev container configuration disappeared")?)?;
@@ -91,7 +148,9 @@ fn verify_owned(binding: &Binding, current: &Config) -> Result<Value, String> {
 }
 pub(super) fn verify(binding: &Binding, config: &Config) -> Result<Value, String> {
     binding.config.same(config)?;
-    verify_owned(binding, config)
+    let data = verify_owned(binding, config)?;
+    model::metadata_ready(binding, &data)?;
+    Ok(data)
 }
 pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, String> {
     guard(config)?;
@@ -102,6 +161,16 @@ pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, S
         ));
     }
     let engine = engine(config)?;
+    if config.linked.is_some() {
+        let native = json(
+            config,
+            "devcontainer",
+            &engine.context,
+            &model::arguments(config, "read-configuration"),
+        )?;
+        model::native_configuration(config, &native)?;
+        guard(config)?;
+    }
     if let Some(binding) = old {
         if engine != binding.engine {
             return Err("Docker context/daemon changed since display; refusing rebuild".into());

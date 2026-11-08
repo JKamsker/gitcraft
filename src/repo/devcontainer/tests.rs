@@ -5,6 +5,7 @@ fn config() -> Config {
         path: "/owned/worktree one".into(),
         source: "{\n// jsonc\n\"image\":\"debian\"\n}".into(),
         context: Default::default(),
+        linked: None,
     }
 }
 fn binding() -> Binding {
@@ -31,7 +32,7 @@ fn per_worktree_up_has_no_global_cleanup_and_positional_arguments() {
             .any(|w| w == ["--workspace-folder", "/owned/worktree one"])
     );
     assert!(args.contains(&config.label()));
-    assert!(args.contains(&"--mount-workspace-git-root=false".into()));
+    assert!(args.contains(&"--mount-workspace-git-root=true".into()));
     assert!(args.contains(&"--mount-git-worktree-common-dir=true".into()));
     assert!(
         !args
@@ -175,5 +176,117 @@ fn refused_ownership_never_dispatches_remove_and_success_is_exactly_once() -> Re
         calls.borrow().as_slice(),
         &[vec!["rm".to_string(), "--force".into(), binding.id]]
     );
+    Ok(())
+}
+fn linked_config() -> Result<Config, String> {
+    let mut config = config();
+    config.linked = Some(model::linked(
+        &config.path,
+        "gitdir: ../main/.git/worktrees/topic\n",
+        "../..\n",
+        "../../../../worktree one/.git\n",
+    )?);
+    Ok(config)
+}
+#[test]
+fn linked_native_branch_refuses_skipped_and_missing_common_mount_plan() -> Result<(), String> {
+    let config = linked_config()?;
+    let native = json!({"configuration":{"image":"debian"},"workspace":{"additionalMountString":"type=bind,source=/owned/main/.git,target=/workspaces/main/.git"}});
+    model::native_configuration(&config, &native)?;
+    for configuration in [
+        json!({"dockerComposeFile":"compose.yml"}),
+        json!({"workspaceFolder":"/workspaces/topic","workspaceMount":"type=bind,source=/owned/worktree one,target=/workspaces/topic"}),
+    ] {
+        let mut skipped = native.clone();
+        skipped["configuration"] = configuration;
+        assert!(model::native_configuration(&config, &skipped).is_err());
+    }
+    let mut missing = native.clone();
+    missing["workspace"]["additionalMountString"] = json!(null);
+    assert!(model::native_configuration(&config, &missing).is_err());
+    // Native supports workspaceFolder alone: only the combined custom mount skips it.
+    let mut folder_only = native;
+    folder_only["configuration"]["workspaceFolder"] = json!("/workspaces/topic");
+    model::native_configuration(&config, &folder_only)?;
+    Ok(())
+}
+#[test]
+fn linked_readiness_requires_actual_relative_common_metadata_mount() -> Result<(), String> {
+    let mut bound = binding();
+    bound.config = linked_config()?;
+    let mut data = inspection(&bound);
+    model::inspect(&bound, &bound.config, &bound.engine, &data)?;
+    assert!(model::metadata_ready(&bound, &data).is_err());
+    data[0]["Mounts"].as_array_mut().ok_or("Missing fixture mounts")?.push(json!({"Type":"bind","Source":"/owned/main/.git","Destination":"/workspaces/main/.git","RW":true}));
+    model::metadata_ready(&bound, &data)?;
+    for (key, value) in [
+        ("Source", json!("/foreign/.git")),
+        ("Destination", json!("/wrong/.git")),
+        ("RW", json!(false)),
+    ] {
+        let mut missing = data.clone();
+        missing[0]["Mounts"][1][key] = value;
+        assert!(model::metadata_ready(&bound, &missing).is_err());
+    }
+    let mut parent_mount = data;
+    parent_mount[0]["Mounts"][0]["Source"] = json!("/owned");
+    assert!(model::inspect(&bound, &bound.config, &bound.engine, &parent_mount).is_err());
+    Ok(())
+}
+#[test]
+fn unsupported_linked_metadata_is_refused_without_rewriting() -> Result<(), String> {
+    let worktree = std::path::Path::new("/owned/worktree one");
+    assert!(
+        model::linked(
+            worktree,
+            "gitdir: /owned/main/.git/worktrees/topic",
+            "../..",
+            "../../../../worktree one/.git"
+        )
+        .is_err()
+    );
+    assert!(
+        model::linked(
+            worktree,
+            "gitdir: ../main/.git/worktrees/topic",
+            "../..",
+            "/owned/worktree one/.git"
+        )
+        .is_err()
+    );
+    assert!(
+        model::linked(
+            worktree,
+            "gitdir: ../main/.git/worktrees/topic",
+            "../../other",
+            "../../../../worktree one/.git"
+        )
+        .is_err()
+    );
+    assert!(
+        model::linked(
+            worktree,
+            "gitdir: ../main/.git/worktrees/topic",
+            "../..",
+            "../../../../other/.git"
+        )
+        .is_err()
+    );
+    assert!(
+        model::linked(
+            worktree,
+            "gitdir: ../main/.git/custom/topic",
+            "../..",
+            "../../../../worktree one/.git"
+        )
+        .is_err()
+    );
+    let linked = model::linked(
+        worktree,
+        "gitdir: ../main/.git/worktrees/topic",
+        "../..",
+        "../../../../worktree one/.git",
+    )?;
+    assert_eq!(linked.common, std::path::PathBuf::from("/owned/main/.git"));
     Ok(())
 }

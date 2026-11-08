@@ -176,7 +176,7 @@ impl RepoTab {
         }
         let mut open = true;
         egui::Window::new("Worktree environment · Dev Containers").id(egui::Id::new(("devcontainer", &self.path))).open(&mut open).default_width(730.0).vscroll(true).show(ctx, |ui| {
-            ui.label("Uses installed Docker and the Dev Container CLI on this machine. Linux containers with an exact worktree bind mount are supported. Linked Git worktrees require relative Git metadata paths for the native common-directory mount. Containers persist after closing this window.");
+            ui.label("Uses installed Docker and the Dev Container CLI on this machine. Linux containers with an exact worktree bind mount are supported. Linked Git worktrees require standard relative POSIX metadata and the native common-directory mount. Compose or combined custom workspaceFolder/workspaceMount linked layouts are refused; metadata is never rewritten. Containers persist after closing this window.");
             if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button("Cancel operation").clicked() { acts.push(Action::Devcontainer(Act::Cancel)); } }
             ui.add(egui::Label::new(&state.result).selectable(true));
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {

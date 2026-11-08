@@ -15,6 +15,7 @@ pub(super) struct Config {
     pub path: PathBuf,
     pub source: String,
     pub context: crate::connections::Context,
+    pub linked: Option<Linked>,
 }
 impl Config {
     pub fn label(&self) -> String {
@@ -82,7 +83,7 @@ pub(super) fn arguments(config: &Config, verb: &str) -> Vec<String> {
         config.path.to_string_lossy().into_owned(),
         "--config".into(),
         config.path.join(CONFIG).to_string_lossy().into_owned(),
-        "--mount-workspace-git-root=false".into(),
+        "--mount-workspace-git-root=true".into(),
         "--mount-git-worktree-common-dir=true".into(),
         "--id-label".into(),
         config.label(),
@@ -163,6 +164,7 @@ pub(super) fn inspect(
     if binding.engine != *engine
         || binding.config.path != current.path
         || binding.config.context != current.context
+        || binding.config.linked != current.linked
     {
         return Err(
             "Container belongs to another worktree, Docker daemon or selected profile".into(),
@@ -198,6 +200,40 @@ pub(super) fn inspect(
         })
     }) {
         return Err("Container does not bind this exact worktree into its displayed workspace. Volume-only or parent-directory workspace mounts are currently unsupported.".into());
+    }
+    Ok(())
+}
+/// Readiness requires the native metadata mapping; ownership alone is enough to
+/// rebuild an already broken displayed container after explicit confirmation.
+pub(super) fn metadata_ready(binding: &Binding, data: &Value) -> Result<(), String> {
+    let item = &data[0];
+    if let Some(linked) = &binding.config.linked {
+        let mounts = item["Mounts"]
+            .as_array()
+            .ok_or("Missing container mounts")?;
+        let worktree_mount = mounts
+            .iter()
+            .find(|m| {
+                m["Type"] == "bind"
+                    && m["Source"] == binding.config.path.to_string_lossy().as_ref()
+                    && m["Destination"].as_str().is_some_and(|dest| {
+                        dest.starts_with('/') && Path::new(&binding.folder).starts_with(dest)
+                    })
+            })
+            .ok_or("Missing physical worktree mount")?;
+        let destination = worktree_mount["Destination"]
+            .as_str()
+            .ok_or("Missing worktree destination")?;
+        let common_destination =
+            normalize(&Path::new(destination).join(&linked.gitdir).join("../.."))?;
+        if !mounts.iter().any(|m| {
+            m["Type"] == "bind"
+                && m["Source"] == linked.common.to_string_lossy().as_ref()
+                && m["Destination"] == common_destination.to_string_lossy().as_ref()
+                && m["RW"] == true
+        }) {
+            return Err("Linked worktree Git metadata is not mounted read/write at its required relative location; environment is not ready".into());
+        }
     }
     Ok(())
 }
@@ -246,4 +282,98 @@ pub(super) fn rebuild_checked<T>(
 ) -> Result<T, String> {
     verify()?;
     remove(&removal(binding)?)
+}
+
+/// Supported native layout: relative .git and backlink, standard common/worktrees/name.
+/// No Git metadata is changed. File reads and canonical-path checks belong to the worker.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Linked {
+    pub gitdir: String,
+    pub common: PathBuf,
+    pub backlink: String,
+}
+fn normalize(path: &Path) -> Result<PathBuf, String> {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !out.pop() {
+                    return Err("Git metadata path escapes the filesystem root".into());
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    Ok(out)
+}
+fn relative(value: &str) -> Result<&str, String> {
+    let value = value.trim();
+    if !clean(value) || value.contains(['\\', ':']) || Path::new(value).is_absolute() {
+        return Err("Linked containers require relative POSIX Git metadata paths; this layout is unsupported. Git metadata was not changed.".into());
+    }
+    Ok(value)
+}
+pub(super) fn gitdir_pointer(dotgit: &str) -> Result<&str, String> {
+    relative(
+        dotgit
+            .trim()
+            .strip_prefix("gitdir:")
+            .ok_or("Unsupported .git pointer")?,
+    )
+}
+pub(super) fn linked(
+    worktree: &Path,
+    dotgit: &str,
+    commondir: &str,
+    backlink: &str,
+) -> Result<Linked, String> {
+    let gitdir = gitdir_pointer(dotgit)?;
+    let metadata = normalize(&worktree.join(gitdir))?;
+    let parent = metadata.parent().ok_or("Missing Git metadata parent")?;
+    if parent.file_name().and_then(|s| s.to_str()) != Some("worktrees")
+        || commondir.trim() != "../.."
+    {
+        return Err("Native common-directory mounting supports only the standard relative common/worktrees/name layout".into());
+    }
+    let common = parent
+        .parent()
+        .ok_or("Missing common Git directory")?
+        .to_owned();
+    let backlink = relative(backlink)?;
+    if normalize(&metadata.join(backlink))? != worktree.join(".git") {
+        return Err("Linked Git metadata backlink does not point to this physical worktree".into());
+    }
+    Ok(Linked {
+        gitdir: gitdir.into(),
+        common,
+        backlink: backlink.into(),
+    })
+}
+/// v0.82.0 getWorkspaceConfiguration skips common-dir handling in these branches.
+/// Read the native parsed JSONC configuration rather than inventing a JSONC parser.
+pub(super) fn native_configuration(config: &Config, native: &Value) -> Result<(), String> {
+    if config.linked.is_none() {
+        return Ok(());
+    }
+    let configuration = native["configuration"]
+        .as_object()
+        .ok_or("CLI did not return parsed configuration for linked worktree")?;
+    let folder = match configuration.get("workspaceFolder") {
+        None | Some(Value::Null) => false,
+        Some(Value::String(value)) => !value.is_empty(),
+        _ => return Err("Invalid native workspaceFolder".into()),
+    };
+    if configuration.contains_key("dockerComposeFile")
+        || (folder && configuration.contains_key("workspaceMount"))
+    {
+        return Err("Linked worktree metadata mounting is unsupported for Compose or combined workspaceFolder/workspaceMount configurations; native CLI skips the required common-directory mount".into());
+    }
+    if native["workspace"]["additionalMountString"]
+        .as_str()
+        .is_none_or(|m| m.is_empty())
+    {
+        return Err("Native CLI did not plan the required linked Git common-directory mount; environment cannot start or rebuild".into());
+    }
+    Ok(())
 }
