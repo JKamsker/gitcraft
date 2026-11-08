@@ -1666,8 +1666,16 @@ pub(crate) fn push_preflight_with(
     let placeholder = format!("gitcraft-preflight-address://{opaque}");
     let mut values = vec![
         (format!("url.{address}.insteadOf"), placeholder.clone()),
+        (format!("remote.{opaque}.url"), String::new()),
         (format!("remote.{opaque}.url"), placeholder.clone()),
+        // An explicit pushurl disables pushInsteadOf for this private remote.
+        // Otherwise a push-only rule for the placeholder prefix can bypass the
+        // ordinary URL expansion proof while leaving its config stamp unchanged.
+        (format!("remote.{opaque}.pushurl"), String::new()),
+        (format!("remote.{opaque}.pushurl"), placeholder.clone()),
+        (format!("remote.{original_remote}.url"), String::new()),
         (format!("remote.{original_remote}.url"), placeholder.clone()),
+        (format!("remote.{original_remote}.pushurl"), String::new()),
         (format!("remote.{original_remote}.pushurl"), placeholder),
         ("core.hooksPath".into(), hooks.path()),
     ];
@@ -1687,7 +1695,7 @@ pub(crate) fn push_preflight_with(
     if !receive_pack.is_empty() {
         values.push((format!("remote.{opaque}.receivepack"), receive_pack.into()));
     }
-    const VARS: [(&str, &str); 12] = [
+    const VARS: [(&str, &str); 16] = [
         ("GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"),
         ("GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"),
         ("GIT_CONFIG_KEY_2", "GIT_CONFIG_VALUE_2"),
@@ -1700,6 +1708,10 @@ pub(crate) fn push_preflight_with(
         ("GIT_CONFIG_KEY_9", "GIT_CONFIG_VALUE_9"),
         ("GIT_CONFIG_KEY_10", "GIT_CONFIG_VALUE_10"),
         ("GIT_CONFIG_KEY_11", "GIT_CONFIG_VALUE_11"),
+        ("GIT_CONFIG_KEY_12", "GIT_CONFIG_VALUE_12"),
+        ("GIT_CONFIG_KEY_13", "GIT_CONFIG_VALUE_13"),
+        ("GIT_CONFIG_KEY_14", "GIT_CONFIG_VALUE_14"),
+        ("GIT_CONFIG_KEY_15", "GIT_CONFIG_VALUE_15"),
     ];
     if values.len() > VARS.len() {
         return Err("Too many pinned transport settings; no push was run.".into());
@@ -1716,13 +1728,7 @@ pub(crate) fn push_preflight_with(
     for ((key, value), (key_var, value_var)) in values.into_iter().zip(VARS) {
         extra.env.extend([(key_var, key), (value_var, value)]);
     }
-    if let Some(c) = creds {
-        extra.pre.extend(["-c", ENV_HELPER]);
-        extra.env.extend([
-            ("GITCRAFT_GIT_USERNAME", c.username.clone()),
-            ("GITCRAFT_GIT_PASSWORD", c.password.clone()),
-        ]);
-    }
+    preflight_credentials(&mut extra, address, creds)?;
     let mapping: Vec<_> = extra
         .env
         .iter()
@@ -1731,7 +1737,11 @@ pub(crate) fn push_preflight_with(
         .collect();
     if forecast_run(
         dir,
-        &["ls-remote", "--get-url", opaque],
+        // get-url requires a locally configured remote. The original and private
+        // alias now have the same single explicit URL/pushurl (empty entries
+        // clear inherited multi-address values). Prove push expansion using the
+        // configured original, while transport/hooks use the private alias.
+        &["remote", "get-url", "--push", "--all", original_remote],
         &mapping,
         &[0],
         &|| true,
@@ -1751,6 +1761,34 @@ pub(crate) fn push_preflight_with(
     } else {
         Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||"The reviewed push was refused or failed. Fetch and reopen preflight before trying again; server diagnostics were withheld because they can contain credentials or secrets.".into()))
     }
+}
+
+fn preflight_credentials(
+    extra: &mut Extra,
+    address: &str,
+    creds: Option<&Credentials>,
+) -> Result<(), String> {
+    let Some(creds) = creds else {
+        return Ok(());
+    };
+    // Refuse legacy/unbound state even when its endpoint would not match. A
+    // different reviewed destination may use its configured helpers, but never
+    // receives this endpoint's transient secret or a newly synthesized scope.
+    let environment = creds.helper_environment()?;
+    if creds
+        .scope
+        .as_ref()
+        .is_some_and(|scope| scope.matches_url(address))
+    {
+        extra.pre.extend([
+            "-c",
+            "credential.useHttpPath=true",
+            "-c",
+            super::CREDENTIAL_HELPER,
+        ]);
+        extra.env.extend(environment);
+    }
+    Ok(())
 }
 
 const PREFLIGHT_REMOVE: &[&str] = &[
@@ -1901,6 +1939,82 @@ fn reviewed_refusal(bytes: &[u8], source: &str, destination: &str) -> Option<Str
 #[cfg(test)]
 mod reviewed_push_tests {
     use super::*;
+    #[test]
+    fn recording_reviewed_push_uses_shared_scoped_helper_for_only_its_endpoint()
+    -> Result<(), String> {
+        let creds = Credentials::for_url(
+            "https://fixture.invalid/team/repo.git",
+            "alice".into(),
+            "DUMMY_ONLY".into(),
+        )?;
+        let mut extra = Extra::default();
+        preflight_credentials(
+            &mut extra,
+            "https://fixture.invalid/team/repo.git",
+            Some(&creds),
+        )?;
+        assert!(extra.pre.contains(&"credential.useHttpPath=true"));
+        assert!(extra.pre.contains(&super::super::CREDENTIAL_HELPER));
+        for (request, accepts) in [
+            ("https://fixture.invalid/team/repo.git", true),
+            ("https://other.invalid/team/repo.git", false),
+            ("https://fixture.invalid/team/other.git", false),
+            ("https://fixture.invalid/team/repo.git/info/lfs", false),
+            ("https://bob@fixture.invalid/team/repo.git", false),
+        ] {
+            let mut command = local_command(
+                None,
+                &extra,
+                &[
+                    "-c",
+                    "credential.helper=",
+                    "-c",
+                    super::super::CREDENTIAL_HELPER,
+                    "-c",
+                    "credential.useHttpPath=true",
+                    "credential",
+                    "fill",
+                ],
+            );
+            command.env("GIT_CONFIG_NOSYSTEM", "1").env(
+                "GIT_CONFIG_GLOBAL",
+                if cfg!(windows) { "NUL" } else { "/dev/null" },
+            );
+            let out = crate::processes::run(
+                command,
+                crate::processes::Options {
+                    input: Some(format!("url={request}\n\n").into_bytes()),
+                    ..Default::default()
+                },
+            )?
+            .complete()?;
+            assert_eq!(
+                String::from_utf8_lossy(&out.stdout).contains("DUMMY_ONLY"),
+                accepts,
+                "{request}"
+            );
+        }
+        let mut other = Extra::default();
+        preflight_credentials(
+            &mut other,
+            "https://second.invalid/team/repo.git",
+            Some(&creds),
+        )?;
+        assert!(other.env.is_empty() && other.pre.is_empty());
+        let legacy = Credentials {
+            scope: None,
+            ..creds
+        };
+        assert!(
+            preflight_credentials(
+                &mut other,
+                "https://second.invalid/team/repo.git",
+                Some(&legacy)
+            )
+            .is_err()
+        );
+        Ok(())
+    }
     #[test]
     fn explicit_repository_context_clears_redirects_and_retains_private_index_overrides() {
         let private = Extra {

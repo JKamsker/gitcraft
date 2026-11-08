@@ -408,7 +408,31 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
 mod tests {
     use super::*;
     use crate::push_preflight::tests::Fixture;
-    use crate::repo::UndoEntry;
+    use crate::repo::{OpKind, UndoEntry};
+
+    #[test]
+    fn reviewed_auth_dialog_uses_failed_push_endpoint_and_never_rebinds_an_expired_receipt()
+    -> Result<(), String> {
+        let f = Fixture::new()?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
+        let actual = "https://actual-push.invalid/other/project.git";
+        let failure = crate::push_preflight::remember_auth_endpoint(actual);
+        for expected in [actual, ""] {
+            tab.op_done(
+                "Push".into(),
+                Err(failure.clone()),
+                Refresh::Status,
+                OpKind::plain(),
+                false,
+                &ctx,
+            );
+            assert!(
+                matches!(&tab.dialog, Some(Dialog::Credentials { url, .. }) if url == expected)
+            );
+        }
+        Ok(())
+    }
 
     fn receive(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
         let deadline = Instant::now() + Duration::from_secs(20);

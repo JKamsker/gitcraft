@@ -1289,7 +1289,14 @@ pub(crate) fn execute_controlled(
             },
             creds,
             control,
-        )?;
+        )
+        .map_err(|error| {
+            if git::is_auth_error(&error) {
+                remember_auth_endpoint(url)
+            } else {
+                error
+            }
+        })?;
     }
     if let Some(reference) = &plan.tracking_ref {
         // A background fetch may already have updated it. Never overwrite a newer tip.
@@ -1330,6 +1337,38 @@ pub(crate) fn execute_controlled(
         )?;
     }
     Ok("Push completed to the reviewed target(s).".into())
+}
+
+const AUTH_ENDPOINT: &str = "[gitcraft-reviewed-auth:";
+fn auth_endpoints() -> &'static Mutex<BTreeMap<u64, String>> {
+    static ENDPOINTS: OnceLock<Mutex<BTreeMap<u64, String>>> = OnceLock::new();
+    ENDPOINTS.get_or_init(Default::default)
+}
+pub(crate) fn remember_auth_endpoint(url: &str) -> String {
+    static IDS: AtomicU64 = AtomicU64::new(1);
+    let id = IDS.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut endpoints) = auth_endpoints().lock() {
+        while endpoints.len() >= 64 {
+            if let Some(first) = endpoints.keys().next().copied() {
+                endpoints.remove(&first);
+            }
+        }
+        endpoints.insert(id, url.into());
+    }
+    // The log/status carries an opaque receipt, never URL userinfo/query values.
+    format!("Authentication failed for the reviewed push target. {AUTH_ENDPOINT}{id}]")
+}
+pub(crate) fn take_auth_endpoint(error: &str) -> Option<String> {
+    let id = error
+        .split_once(AUTH_ENDPOINT)?
+        .1
+        .strip_suffix(']')?
+        .parse::<u64>()
+        .ok()?;
+    auth_endpoints().lock().ok()?.remove(&id)
+}
+pub(crate) fn is_reviewed_auth_error(error: &str) -> bool {
+    error.contains(AUTH_ENDPOINT)
 }
 
 #[cfg(test)]

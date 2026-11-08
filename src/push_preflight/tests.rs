@@ -1,6 +1,89 @@
 use super::*;
 use std::path::PathBuf;
 
+#[test]
+fn reviewed_auth_receipts_keep_the_actual_failing_endpoint_out_of_logs() {
+    let a = "https://alice:DO_NOT_LOG@a.invalid/team/repo.git?private=DUMMY";
+    let b = "https://bob@b.invalid/another/repo.git";
+    let ea = remember_auth_endpoint(a);
+    let eb = remember_auth_endpoint(b);
+    assert!(git::is_auth_error(&ea));
+    assert!(!ea.contains("DO_NOT_LOG") && !ea.contains("a.invalid"));
+    assert_eq!(take_auth_endpoint(&eb).as_deref(), Some(b));
+    assert_eq!(take_auth_endpoint(&ea).as_deref(), Some(a));
+    assert!(take_auth_endpoint(&ea).is_none());
+    assert!(is_reviewed_auth_error(&ea)); // expiration never permits a fetch-URL fallback
+}
+
+#[cfg(unix)]
+#[test]
+fn recording_push_only_placeholder_rewrite_cannot_change_the_reviewed_receiver()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    let intended = f
+        .root
+        .join("uncontacted-A.git")
+        .to_string_lossy()
+        .into_owned();
+    let other = f
+        .root
+        .join("uncontacted-B.git")
+        .to_string_lossy()
+        .into_owned();
+    f.git(&[
+        "config",
+        &format!("url.{other}.pushInsteadOf"),
+        "gitcraft-preflight-address://",
+    ])?;
+    let marker = f.root.join("receiver-argv");
+    let shim = f.root.join("record-receiver");
+    std::fs::write(
+        &shim,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$1\" > {}\nexit 1\n",
+            crate::remote::sh_quote(&marker.to_string_lossy())
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&shim, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    for force in [false, true] {
+        let head = f.git(&["rev-parse", "HEAD"])?;
+        let alias = "gitcraft-fixture-recorded";
+        let mut args = vec!["push".into(), "--dry-run".into(), "--no-verify".into()];
+        if force {
+            args.push(format!("--force-with-lease=refs/heads/main:{head}"));
+        }
+        args.extend([alias.into(), format!("{head}:refs/heads/main")]);
+        let result = git::push_preflight_with(
+            &f.repo,
+            &args,
+            git::PushTarget {
+                address: &intended,
+                alias,
+                original_remote: "origin",
+                skip_hooks: true,
+                lfs_config: &[],
+                lfs_objects: &[],
+                receive_pack: shim.to_str().ok_or("shim path")?,
+            },
+            None,
+            None,
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(&marker)
+                .map_err(|e| format!("{e}: {result:?}"))?
+                .trim(),
+            intended
+        );
+        assert!(!std::path::Path::new(&intended).exists());
+        assert!(!std::path::Path::new(&other).exists());
+    }
+    Ok(())
+}
+
 pub(crate) struct Fixture {
     pub root: PathBuf,
     pub repo: PathBuf,

@@ -89,6 +89,10 @@ pub(super) fn credentials(
          token as the password.",
         &t,
     );
+    ui.label(format!(
+        "Endpoint: {}",
+        crate::push_preflight::target_label(url)
+    ));
     if refused {
         ui.colored_label(
             t.danger,

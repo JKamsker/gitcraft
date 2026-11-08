@@ -286,11 +286,16 @@ impl RepoTab {
                 // Typed credentials that were refused are forgotten.
                 let refused = self.credentials.take().is_some();
                 self.status = Some((format!("{label}: sign-in needed"), true));
-                let url = self
-                    .default_remote()
-                    .and_then(|r| self.remotes.iter().find(|x| x.name == r))
-                    .map(|r| r.url.clone())
-                    .unwrap_or_default();
+                let url = if crate::push_preflight::is_reviewed_auth_error(e) {
+                    // An expired receipt requires rechecking the reviewed push;
+                    // never replace its identity with the default fetch remote.
+                    crate::push_preflight::take_auth_endpoint(e).unwrap_or_default()
+                } else {
+                    self.default_remote()
+                        .and_then(|r| self.remotes.iter().find(|x| x.name == r))
+                        .map(|r| r.url.clone())
+                        .unwrap_or_default()
+                };
                 // An undo or redo stays where it is in the timeline until signing in runs it
                 // again, so that cancelling the sign-in keeps it.
                 self.dialog = Some(Dialog::credentials(&url, refused));
