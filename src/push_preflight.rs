@@ -1372,3 +1372,5 @@ pub(super) fn recording_input(
 pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
     config_stamp(repo, &|| !crate::tasks::cancellation().is_cancelled())
 }
+
+pub(crate) use fix::accept_rewrite;

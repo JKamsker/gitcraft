@@ -331,6 +331,7 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    deferred: repository_tools::DeferredCache,
     outbox_last: Option<std::time::Instant>,
     outbox_reading: bool,
     /// The release being prepared or cut (its dialog).
@@ -653,6 +654,7 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            deferred: Default::default(),
             outbox_last: None,
             outbox_reading: false,
             release: None,

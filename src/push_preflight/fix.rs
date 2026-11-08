@@ -323,3 +323,14 @@ pub(crate) fn fix(repo: &Path, plan: &Plan, kind: &str) -> Result<String, String
     }
     Ok("Outgoing history fixed. Reopen preflight to verify it; Ctrl+Z restores the previous history.".into())
 }
+
+/// Publish a reviewed isolated rewrite through the same proven native HEAD/ref and
+/// checkout transaction as preflight repair. Refuses dirty or stale original worktrees.
+pub(crate) fn accept_rewrite(
+    repo: &Path,
+    branch: &str,
+    old: &str,
+    new: &str,
+) -> Result<(), String> {
+    transaction::Hook::new(repo, branch, old, new)?.execute(repo)
+}

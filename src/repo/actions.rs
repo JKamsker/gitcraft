@@ -697,6 +697,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Conflicts that can wait: isolated rebase and restack…".into(),
+                "Deferred rewrites".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Deferred),
+            ),
+            (
                 "Parallel branches in this folder: hunk ownership…".into(),
                 "Virtual branches".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Virtuals),

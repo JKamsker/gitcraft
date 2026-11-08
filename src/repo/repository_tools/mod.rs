@@ -1,4 +1,6 @@
+mod deferred;
 mod lists;
+pub(super) use deferred::Cache as DeferredCache;
 mod outbox;
 mod sharing;
 mod turns;
@@ -35,10 +37,22 @@ enum Tool {
     Turn,
     Lists,
     Virtuals,
+    Deferred,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Deferred,
+    IsolatedStack(Vec<crate::git::stack::restack::Preview>),
+    StartDeferred(
+        Box<crate::git::drafts::deferred::View>,
+        String,
+        Vec<crate::git::drafts::deferred::Spec>,
+    ),
+    ContinueDeferred(Box<crate::git::drafts::deferred::View>, String),
+    AcceptDeferred(Box<crate::git::drafts::deferred::View>, String, bool),
+    CloseDeferred(Box<crate::git::drafts::deferred::View>, String),
+    ReconcileDeferred(Box<crate::git::drafts::deferred::View>, String),
     Virtuals,
     EditVirtual(
         Box<crate::git::drafts::virtuals::View>,
@@ -95,6 +109,11 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Deferred(crate::git::drafts::deferred::View),
+    DeferredStack(
+        crate::git::drafts::deferred::View,
+        Vec<crate::git::drafts::deferred::Spec>,
+    ),
     Virtual(crate::git::drafts::virtuals::View),
     VirtualCommit(Box<crate::git::drafts::virtuals::Prepared>),
     Lists(crate::git::drafts::lists::View),
@@ -127,6 +146,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match deferred::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match virtuals::act(self, act, ctx) {
             Some(act) => act,
             None => return,
@@ -260,6 +283,13 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Deferred => (String::new(), Tool::Deferred),
+            Act::IsolatedStack(..)
+            | Act::StartDeferred(..)
+            | Act::ContinueDeferred(..)
+            | Act::AcceptDeferred(..)
+            | Act::CloseDeferred(..)
+            | Act::ReconcileDeferred(..) => return,
             Act::Virtuals => (String::new(), Tool::Virtuals),
             Act::EditVirtual(..)
             | Act::ToggleVirtual(..)
@@ -326,6 +356,10 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Deferred => crate::git::drafts::deferred::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Deferred),
                 Tool::Virtuals => crate::git::drafts::virtuals::read(&path, &|| {
                     !crate::tasks::cancellation().is_cancelled()
                 })
@@ -368,6 +402,9 @@ impl RepoTab {
                 if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
                     && state.id == id
                 {
+                    if let Ok(Data::Deferred(view)) = &result {
+                        tab.deferred.observe(id, view);
+                    }
                     state.result = Some(result);
                 }
             },
@@ -431,6 +468,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Deferred {
+        deferred::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Virtuals {
         virtuals::show(ui, state, acts);
         return;
