@@ -2,7 +2,6 @@
 //! recent repository. Open tabs defer their automatic fetch to this owner; explicit operations
 //! still use the same task mutation key. Model decisions accept a clock and recording probe.
 use crate::forge::inbox::{Checks, InboxPr};
-#[cfg(not(test))]
 use crate::git;
 use crate::{connections, forge, tasks};
 use std::collections::{BTreeMap, HashSet};
@@ -34,12 +33,20 @@ struct Notice {
     text: String,
 }
 
+#[derive(Clone, Debug)]
+struct BranchChecks {
+    name: String,
+    sha: String,
+    failed: bool,
+}
+
 #[derive(Clone, Default, Debug)]
 struct Observation {
     default: Option<(String, String)>, // full remote ref and validated object id
     advanced: Option<u64>,
     prs: Option<Vec<InboxPr>>,
     ci_failed: Option<bool>,
+    branch_checks: Option<BranchChecks>,
     warnings: Vec<String>,
 }
 #[derive(Default)]
@@ -107,6 +114,9 @@ impl Model {
                     }
                     if observation.ci_failed.is_none() {
                         observation.ci_failed = before.ci_failed;
+                    }
+                    if observation.branch_checks.is_none() {
+                        observation.branch_checks.clone_from(&before.branch_checks);
                     }
                     if observation.default.is_none() {
                         observation.default.clone_from(&before.default);
@@ -177,7 +187,57 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
             text: "Default-branch checks failed".into(),
         });
     }
+    if let (Some(old), Some(new)) = (&before.branch_checks, &after.branch_checks)
+        && old.name == new.name
+        && new.failed
+        && (!old.failed || old.sha != new.sha)
+    {
+        out.push(Notice {
+            key: format!("repo:branch:{}:{}", new.name, new.sha),
+            text: format!("Checks failed on {}", new.name),
+        });
+    }
     out
+}
+
+struct BranchPlan {
+    name: String,
+    sha: String,
+    projects: Vec<crate::ci::Project>,
+}
+fn branch_plan(
+    forge: forge::Forge,
+    remotes: &[git::Remote],
+    refs: &git::Refs,
+) -> Option<BranchPlan> {
+    let name = refs.current.clone()?;
+    if !valid_oid(&refs.head) {
+        return None;
+    }
+    let main = crate::ci::Project::of(forge, remotes)?;
+    let mut current = refs.clone();
+    current.local.retain(|branch| branch.name == name);
+    current.remotes.clear(); // ask this branch's destination(s), not all repository tips
+    let plan = crate::ci::route::plan(
+        &crate::ci::route::Sources {
+            main: &main,
+            remotes,
+            refs: &current,
+            prs: Vec::new(),
+            recent: Vec::new(),
+        },
+        4,
+    );
+    let projects = plan
+        .into_iter()
+        .filter(|(_, shas)| shas.contains(&refs.head))
+        .map(|(project, _)| project)
+        .collect();
+    Some(BranchPlan {
+        name,
+        sha: refs.head.clone(),
+        projects,
+    })
 }
 
 /// All process/provider work is confined to this adapter, invoked by a task, never by a UI
@@ -187,6 +247,9 @@ trait Probe {
     fn hosting(&mut self) -> Option<forge::Hosting>;
     fn inbox(&mut self, hosting: &forge::Hosting) -> Result<Vec<InboxPr>, String>;
     fn ci_failed(&mut self, hosting: &forge::Hosting, sha: &str) -> Result<Option<bool>, String>;
+    fn branch_checks(&mut self, _: &forge::Hosting) -> Result<Option<BranchChecks>, String> {
+        Ok(None)
+    }
     fn may_run(&self) -> bool;
 }
 fn observe(probe: &mut impl Probe, before: Option<&Observation>) -> Result<Observation, String> {
@@ -257,6 +320,10 @@ fn observe(probe: &mut impl Probe, before: Option<&Observation>) -> Result<Obser
             Ok(prs) => snapshot.prs = Some(prs),
             Err(why) => snapshot.warnings.push(why),
         }
+        match probe.branch_checks(&hosting) {
+            Ok(checks) => snapshot.branch_checks = checks,
+            Err(why) => snapshot.warnings.push(why),
+        }
         if let Some((_, sha)) = &snapshot.default {
             match probe.ci_failed(&hosting, sha) {
                 Ok(state) => snapshot.ci_failed = state,
@@ -318,6 +385,41 @@ impl Probe for LiveProbe<'_> {
                 .get(sha)
                 .map(|s| s.state == crate::ci::CheckState::Failed)
         })
+    }
+    fn branch_checks(&mut self, hosting: &forge::Hosting) -> Result<Option<BranchChecks>, String> {
+        if !self.may_run() {
+            return Err("Background work was stopped or paused".into());
+        }
+        let remotes = git::remotes(self.path)?;
+        let refs = git::refs(self.path)?;
+        let Some(plan) = branch_plan(hosting.forge, &remotes, &refs) else {
+            return Ok(None);
+        };
+        let mut known = false;
+        let mut failed = false;
+        let mut errors = Vec::new();
+        for project in plan.projects {
+            if !self.may_run() {
+                return Err("Background work was stopped or paused".into());
+            }
+            match crate::ci::statuses(self.path, &project, std::slice::from_ref(&plan.sha)) {
+                Ok(statuses) => {
+                    if let Some(status) = statuses.get(&plan.sha) {
+                        known = true;
+                        failed |= status.state == crate::ci::CheckState::Failed;
+                    }
+                }
+                Err(why) => errors.push(why),
+            }
+        }
+        if !known && !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
+        Ok(known.then_some(BranchChecks {
+            name: plan.name,
+            sha: plan.sha,
+            failed,
+        }))
     }
     fn may_run(&self) -> bool {
         !self.cancel.is_cancelled() && crate::network::background_may_run()
@@ -424,6 +526,14 @@ impl Watcher {
                         self.notified
                             .retain(|_, sent| now.duration_since(*sent) < Duration::from_secs(300));
                         for notice in notifications {
+                            self.status = format!(
+                                "{}: {}",
+                                job.path
+                                    .file_name()
+                                    .unwrap_or(job.path.as_os_str())
+                                    .to_string_lossy(),
+                                notice.text
+                            );
                             let key = if notice.key.starts_with("repo:") {
                                 format!("{}:{}", job.path.display(), notice.key)
                             } else {

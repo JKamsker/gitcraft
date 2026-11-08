@@ -349,3 +349,94 @@ fn linked_worktrees_and_recent_aliases_share_the_recorded_mutation_owner() {
         vec![PathBuf::from("/worktree-one"), PathBuf::from("/other")]
     );
 }
+
+#[test]
+fn checked_out_branch_ci_uses_existing_push_destination_routes_and_keeps_transition_status()
+-> Result<(), String> {
+    let _network = crate::network::test_pause::set(None);
+    let remotes = vec![
+        git::Remote {
+            name: "origin".into(),
+            url: "https://github.com/Vancete/gitcraft.git".into(),
+        },
+        git::Remote {
+            name: "fork".into(),
+            url: "https://github.com/JKamsker/gitcraft.git".into(),
+        },
+    ];
+    let refs = git::Refs {
+        current: Some("dev".into()),
+        head: "a".repeat(40),
+        push_remotes: std::collections::HashMap::from([("dev".into(), "fork".into())]),
+        local: vec![git::Branch {
+            name: "dev".into(),
+            target: "a".repeat(40),
+            is_head: true,
+            upstream: "origin/dev".into(),
+            track: String::new(),
+        }],
+        ..Default::default()
+    };
+    let plan =
+        branch_plan(forge::Forge::GitHub, &remotes, &refs).ok_or("missing branch CI plan")?;
+    assert_eq!(plan.name, "dev");
+    assert_eq!(plan.sha, "a".repeat(40));
+    assert_eq!(
+        plan.projects
+            .iter()
+            .map(|p| p.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["JKamsker/gitcraft", "Vancete/gitcraft"]
+    );
+    let ctx = egui::Context::default();
+    let path = PathBuf::from("/recorded/repo");
+    let mut watcher = Watcher::default();
+    watcher
+        .model
+        .configure(1, connections::current(), vec![path.clone()]);
+    let mut before = snapshot('a', false, Checks::Passing);
+    before.branch_checks = Some(BranchChecks {
+        name: "dev".into(),
+        sha: "a".repeat(40),
+        failed: false,
+    });
+    watcher.model.finish(
+        &path,
+        Ok(before.clone()),
+        Instant::now(),
+        Duration::from_secs(60),
+    );
+    let mut after = before;
+    after.branch_checks = Some(BranchChecks {
+        name: "dev".into(),
+        sha: "b".repeat(40),
+        failed: true,
+    });
+    let (tx, rx) = std::sync::mpsc::channel();
+    tx.send(Ok(after)).map_err(|e| e.to_string())?;
+    watcher.running = Some(Running {
+        path: path.clone(),
+        rx,
+        cancel: Default::default(),
+        started: Instant::now(),
+        stale: false,
+    });
+    watcher.tick(
+        Inputs {
+            enabled: true,
+            profile: 1,
+            open: std::slice::from_ref(&path),
+            busy: &HashSet::new(),
+            recent: &[],
+            minutes: 10,
+            notifications_enabled: false,
+        },
+        &ctx,
+    );
+    assert_eq!(watcher.status, "repo: Checks failed on dev");
+    let rows = crate::tray::menu(std::slice::from_ref(&path), &watcher.status);
+    assert_eq!(rows[1].title, "repo: Checks failed on dev");
+    assert!(rows[1].action.is_none());
+    assert!(watcher.notified.is_empty()); // tray status works with desktop notifications off
+    Ok(())
+}
