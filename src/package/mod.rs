@@ -4,10 +4,13 @@
 
 mod archive;
 pub(crate) mod check;
+pub(crate) mod display;
 mod run;
 #[cfg(test)]
 mod tests;
 pub(crate) mod tools;
+pub(crate) mod witness;
+pub(crate) use witness::Failure;
 
 use std::path::Path;
 
@@ -76,19 +79,25 @@ pub(crate) struct Report {
 
 /// The packages the repository has: those of the manifests at its top.
 pub(crate) fn packages(repo: &Path) -> Result<Vec<Package>, String> {
+    packages_witnessed(repo).map_err(Failure::into_raw)
+}
+
+pub(crate) fn packages_witnessed(repo: &Path) -> Result<Vec<Package>, Failure> {
     let has = |file: &str| crate::remote::read_to_string(&crate::remote::join(repo, file)).is_ok();
     let (cargo, npm) = (has("Cargo.toml"), has("package.json"));
-    if !cargo && !npm {
-        return Err("No Cargo.toml or package.json at the top of the repository".to_owned());
-    }
-    tools::packages(repo, cargo, npm)
+    require_manifests(cargo, npm)?;
+    tools::packages_witnessed(repo, cargo, npm)
 }
 
 /// Works out the report of `pkg`, from its tool and git (the registry is asked apart:
 /// [`published`]).
 pub(crate) fn report(repo: &Path, pkg: &Package) -> Result<Report, String> {
-    let files = tools::files(repo, pkg)?;
-    let tracked = tracked(repo, &pkg.dir)?;
+    report_witnessed(repo, pkg).map_err(Failure::into_raw)
+}
+
+pub(crate) fn report_witnessed(repo: &Path, pkg: &Package) -> Result<Report, Failure> {
+    let files = tools::files_witnessed(repo, pkg)?;
+    let tracked = tracked(repo, &pkg.dir).map_err(Failure::Opaque)?;
     let manifest_path = if pkg.dir.is_empty() {
         pkg.ecosystem.manifest().to_owned()
     } else {
@@ -110,16 +119,18 @@ pub(crate) fn published(
     pkg: &Package,
     files: &[(String, Option<u64>)],
 ) -> Result<Option<Published>, String> {
-    if let Some(registry) = &pkg.registry {
-        return Err(format!(
-            "published to {registry}, not {}: not compared",
-            pkg.ecosystem.registry()
-        ));
-    }
-    let Some((version, url)) = tools::published(pkg)? else {
+    published_witnessed(pkg, files).map_err(Failure::into_raw)
+}
+
+pub(crate) fn published_witnessed(
+    pkg: &Package,
+    files: &[(String, Option<u64>)],
+) -> Result<Option<Published>, Failure> {
+    check_registry(pkg)?;
+    let Some((version, url)) = tools::published_witnessed(pkg)? else {
         return Ok(None);
     };
-    let before = tools::published_files(&url)?;
+    let before = tools::published_files_witnessed(&url)?;
     let (added, gone) = check::compare(pkg.ecosystem, files, &before);
     Ok(Some(Published {
         version,
@@ -148,4 +159,57 @@ fn tracked(repo: &Path, dir: &str) -> Result<Vec<String>, String> {
         .filter(|p| !p.is_empty())
         .filter_map(|p| p.strip_prefix(&prefix).map(str::to_owned))
         .collect())
+}
+
+// Pure source guards shared by the actual entry points and capture-path tests.
+fn require_manifests(cargo: bool, npm: bool) -> Result<(), Failure> {
+    if !cargo && !npm {
+        return Err(Failure::NoManifest {
+            raw: "No Cargo.toml or package.json at the top of the repository".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn check_registry(pkg: &Package) -> Result<(), Failure> {
+    if let Some(registry) = &pkg.registry {
+        return Err(Failure::OtherRegistry {
+            raw: format!(
+                "published to {registry}, not {}: not compared",
+                pkg.ecosystem.registry()
+            ),
+            registry: registry.clone(),
+            ecosystem: pkg.ecosystem,
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod witness_tests {
+    use super::*;
+
+    #[test]
+    fn actual_source_guards_capture_owned_witnesses_without_discovery() {
+        let missing = require_manifests(false, false).expect_err("no manifests");
+        assert!(require_manifests(true, false).is_ok());
+        assert!(require_manifests(false, true).is_ok());
+        let pkg = Package {
+            ecosystem: Ecosystem::Cargo,
+            name: "opaque".into(),
+            version: "1234.5".into(),
+            dir: "ref/main".into(),
+            registry: Some("https://example/1234.5; ;".into()),
+        };
+        let registry = check_registry(&pkg).expect_err("custom registry");
+        let raw = "published to https://example/1234.5; ;, not crates.io: not compared";
+        assert_eq!(registry.raw(), raw);
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            assert_eq!(missing.display() == missing.raw(), locale == "en-US");
+            assert_eq!(registry.display() == registry.raw(), locale == "en-US");
+            assert!(registry.display().contains("https://example/1234.5; ;"));
+            assert_eq!(registry.clone().into_raw(), raw);
+        }
+    }
 }
