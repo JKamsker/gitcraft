@@ -91,7 +91,10 @@ fn unreachable_args(
     limit: usize,
 ) -> Result<Vec<String>, String> {
     if let Some(bad) = old.iter().chain(new).find(|h| !is_oid(h)) {
-        return Err(format!("{bad} is not a commit id"));
+        return Err(crate::i18n::message(
+            "backend-bad-is-not-a-commit-id-e58577",
+            &[("bad", (bad).to_string().into())],
+        ));
     }
     if old.is_empty() {
         return Ok(Vec::new());
@@ -126,7 +129,8 @@ pub(crate) fn unreachable_bounded(
         vec![],
         &[0],
     )?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| "Invalid local reachability output")?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| crate::i18n::text("backend-invalid-local-reachability-output-108ac6"))?;
     let hashes: Vec<_> = text
         .lines()
         .map(str::trim)
@@ -134,7 +138,7 @@ pub(crate) fn unreachable_bounded(
         .map(str::to_owned)
         .collect();
     if hashes.len() > limit || hashes.iter().any(|s| !is_oid(s)) {
-        return Err("Invalid local reachability output".into());
+        return Err(crate::i18n::text("backend-invalid-local-reachability-output-108ac6").into());
     }
     Ok(hashes)
 }
@@ -143,7 +147,13 @@ pub(crate) fn unreachable_bounded(
 /// most `limit`: what leaves a branch that moves from `old` to `new`, wherever else they are.
 pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
     if !is_oid(old) || !is_oid(new) {
-        return Err(format!("{old} or {new} is not a commit id"));
+        return Err(crate::i18n::message(
+            "backend-old-or-new-is-not-a-commit-id-acc42a",
+            &[
+                ("old", (old).to_string().into()),
+                ("new", (new).to_string().into()),
+            ],
+        ));
     }
     let max = format!("--max-count={limit}");
     Ok(run(

@@ -28,7 +28,12 @@ impl GitVersion {
     /// The git that runs for `repo` (on its machine, for one in WSL or over SSH).
     pub fn of(repo: &Path) -> Result<Self, String> {
         let printed = super::super::run(Some(repo), &["version"])?;
-        Self::parse(&printed).ok_or_else(|| format!("unknown git version: {}", printed.trim()))
+        Self::parse(&printed).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-unknown-git-version-757618",
+                &[("printed", (printed.trim()).to_string().into())],
+            )
+        })
     }
 
     /// `git replay --onto` (2.44).

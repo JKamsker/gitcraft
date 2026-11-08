@@ -478,7 +478,7 @@ pub(super) fn capture_policies(
                 let parent = Path::new(&pin.physical)
                     .join(path)
                     .parent()
-                    .ok_or("Missing parent")?
+                    .ok_or(crate::i18n::text("backend-missing-parent-27f5e2"))?
                     .to_owned();
                 let dir = Directory::from_file(parent, held).map_err(|e| e.to_string())?;
                 let snapshot =

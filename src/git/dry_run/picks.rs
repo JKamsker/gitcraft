@@ -145,7 +145,13 @@ pub fn replay(
         }
     }
     scratch::replay(repo, &onto, picks, cancel).map_err(|e| match first_error {
-        Some(first) if e != CANCELLED => format!("{first}; in a scratch clone: {e}"),
+        Some(first) if e != CANCELLED => crate::i18n::message(
+            "backend-first-in-a-scratch-clone-e-5541cd",
+            &[
+                ("first", (first).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        ),
         _ => e,
     })
 }
@@ -188,7 +194,7 @@ fn with_git_replay(
     picks: &[String],
 ) -> Result<Option<Replay>, String> {
     if !tip.starts_with("refs/") || base.starts_with('-') {
-        return Err("git replay needs a branch".to_owned());
+        return Err(crate::i18n::text("backend-git-replay-needs-a-branch-f898a0").to_owned());
     }
     let range = format!("{base}..{tip}");
     let plain = lines(run(
@@ -196,7 +202,9 @@ fn with_git_replay(
         &["rev-list", "--reverse", "--topo-order", END_OPTS, &range],
     )?)?;
     if plain != picks {
-        return Err("the commits aren't a plain range".to_owned());
+        return Err(
+            crate::i18n::text("backend-the-commits-aren-t-a-plain-range-b0cf7b").to_owned(),
+        );
     }
     // From git 2.53, replay moves the branch itself unless told only to print the updates
     // (`--ref-action=print`, which an older git doesn't know; it ignores the config).
@@ -237,7 +245,7 @@ fn with_git_replay(
     let copies = read(&[&new_tip, &format!("^{onto}")])?;
     let first_parent_tree = match originals.first() {
         Some(first) => tree_of(repo, &format!("{}^", first.hash))?,
-        None => return Err("nothing was replayed".to_owned()),
+        None => return Err(crate::i18n::text("backend-nothing-was-replayed-0e02b4").to_owned()),
     };
     let mut steps = Vec::with_capacity(originals.len());
     let mut tree = tree_of(repo, onto)?;
@@ -260,7 +268,10 @@ fn with_git_replay(
         });
     }
     if next.peek().is_some() {
-        return Err("git replay's commits don't match the originals".to_owned());
+        return Err(crate::i18n::text(
+            "backend-git-replay-s-commits-don-t-match-the-originals-b428f7",
+        )
+        .to_owned());
     }
     Ok(Some(Replay {
         onto: onto.to_owned(),
@@ -303,7 +314,10 @@ pub(super) fn parse_merge_tree(out: &str) -> Result<(String, Vec<String>), Strin
     let mut fields = out.split('\0');
     let tree = fields.next().unwrap_or_default().trim().to_owned();
     if !is_oid(&tree) {
-        return Err(format!("git merge-tree said: {}", out.trim()));
+        return Err(crate::i18n::message(
+            "backend-git-merge-tree-said-9223d7",
+            &[("detail", (out.trim()).to_string().into())],
+        ));
     }
     let mut files: Vec<String> = Vec::new();
     for name in fields.take_while(|f| !f.is_empty()) {
@@ -336,13 +350,16 @@ fn stepwise(
         if cancel() {
             return Err(CANCELLED.to_owned());
         }
-        let (own_tree, parents) = info
-            .get(commit)
-            .ok_or_else(|| format!("{commit} is not a commit"))?;
+        let (own_tree, parents) = info.get(commit).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-commit-is-not-a-commit-9e1c80",
+                &[("commit", (commit).to_string().into())],
+            )
+        })?;
         let parent = parents.first().ok_or_else(|| {
-            format!(
-                "{} is a first commit, with nothing to replay from",
-                short(commit)
+            crate::i18n::message(
+                "backend-is-a-first-commit-with-nothing-to-replay-from-b32065",
+                &[("commit", (short(commit)).to_string().into())],
             )
         })?;
         let out = run_ok_codes(
@@ -382,7 +399,10 @@ fn stepwise(
             )?;
             let made = made.trim().to_owned();
             if !is_oid(&made) {
-                return Err(format!("git commit-tree said: {made}"));
+                return Err(crate::i18n::message(
+                    "backend-git-commit-tree-said-made-c61f36",
+                    &[("made", (made).to_string().into())],
+                ));
             }
             current.clone_from(&made);
             tree.clone_from(&merged);
