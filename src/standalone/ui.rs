@@ -439,7 +439,10 @@ mod tests {
         const NAME: &str =
             "standalone::ui::tests::hostile_profile_cannot_redirect_the_standalone_background_ui";
         if std::env::var_os(CHILD).is_some() {
-            crate::git::set_profile_config(Some("nonexistent-profile-config".into()));
+            crate::connections::set(crate::connections::Context {
+                git_config: Some("nonexistent-profile-config".into()),
+                ..Default::default()
+            });
             let (_temp, paths) = fixture()?;
             let (mut h, code) = harness(Invocation::Merge(paths.clone()));
             settle(&mut h)?;
