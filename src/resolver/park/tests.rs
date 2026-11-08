@@ -687,6 +687,8 @@ fn filtered_clean_edit_after_parking_is_refused_before_any_writes() -> Result<()
     std::fs::write(attributes, "notes.txt text eol=lf\n").map_err(|e| e.to_string())?;
     let parked = park(repo.path(), "post-clean-raw", &["a.txt".into()])?;
     write(repo.path(), "notes.txt", "notes\r\n")?;
+    // Refresh Git's stat cache through its clean filter: the indexed blob stays HEAD's.
+    repo.git(&["add", "notes.txt"])?;
     assert!(
         repo.git(&["status", "--porcelain", "--untracked-files=no"])?
             .is_empty()
