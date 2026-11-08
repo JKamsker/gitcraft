@@ -100,7 +100,7 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
             let _ = tx.send(git::run_owned_test(
                 test.dir,
                 &words,
-                &record,
+                record,
                 test.limit + GRACE,
                 cancel.clone(),
                 test.authority,
@@ -119,7 +119,7 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
                         });
                     }
                     let exit = result?;
-                    crate::remote::recover_owner(&record)
+                    crate::remote::recover_owner(record)
                         .map_err(|e| format!("test cleanup unknown; workspace preserved: {e}"))?;
                     if let Some(reason) = &exit.stopped
                         && reason != "cancelled"

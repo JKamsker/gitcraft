@@ -285,7 +285,8 @@ mod tests {
         }
     }
     #[test]
-    fn recording_claim_acknowledgement_requires_exact_generation_and_complete_bounded_frame() {
+    fn recording_claim_acknowledgement_requires_exact_generation_and_complete_bounded_frame()
+    -> Result<(), Box<dyn std::error::Error>> {
         let generation = "a".repeat(64);
         let reply = Reply {
             root: "/synthetic/repo/ledger".into(),
@@ -293,7 +294,7 @@ mod tests {
             generation: generation.clone(),
         };
         let mut frame = MARKER.to_vec();
-        frame.extend(serde_json::to_vec(&reply).unwrap());
+        frame.extend(serde_json::to_vec(&reply)?);
         frame.push(b'\n');
         for split in 0..frame.len() {
             let mut parser = Frame::default();
@@ -307,5 +308,6 @@ mod tests {
                 .feed(&vec![b'x'; 4097], &generation)
                 .is_none()
         );
+        Ok(())
     }
 }

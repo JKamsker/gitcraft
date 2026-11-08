@@ -127,7 +127,7 @@ fn record_stop_confirmation(
 mod recording_outcomes {
     use super::*;
     #[test]
-    fn shared_predispatch_guard_keeps_ancestor_cancellation_sticky() {
+    fn shared_predispatch_guard_keeps_ancestor_cancellation_sticky() -> Result<(), String> {
         let lease = Cancellation::default();
         let target = lease.child();
         assert_eq!(before_start(target.is_cancelled(), false), None);
@@ -140,7 +140,7 @@ mod recording_outcomes {
         }
         assert!(matches!(
             checked(Err(before_start(target.is_cancelled(), false)
-                .unwrap()
+                .ok_or("missing sticky cancellation")?
                 .into())),
             Err(Failure::CancelledBeforeStart)
         ));
@@ -148,6 +148,7 @@ mod recording_outcomes {
             before_start(false, true),
             Some("process timed out and was stopped")
         );
+        Ok(())
     }
     #[test]
     fn failed_ack_or_unavailable_cleanup_worker_always_surfaces_uncertainty() {

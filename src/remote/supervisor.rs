@@ -284,7 +284,8 @@ mod recording_tests {
         .ok_or("fixture parse failed".into())
     }
     #[test]
-    fn standalone_capture_limit_is_explicit_bounded_and_does_not_raise_pooled_limit() {
+    fn standalone_capture_limit_is_explicit_bounded_and_does_not_raise_pooled_limit()
+    -> Result<(), Box<dyn std::error::Error>> {
         let req = Request {
             cwd: None,
             script: "exec git pack-objects --stdout --revs".into(),
@@ -296,12 +297,13 @@ mod recording_tests {
             test: false,
             apart: false,
         };
-        let default = request(&req, "ab", None).unwrap();
+        let default = request(&req, "ab", None)?;
         assert!(!default.contains("output_limit"));
-        let standalone = streaming_bounded(&req, "ab", None, None, false, 256 << 20).unwrap();
+        let standalone = streaming_bounded(&req, "ab", None, None, false, 256 << 20)?;
         assert!(standalone.contains("\"output_limit\":268435456"));
         assert!(streaming_bounded(&req, "ab", None, None, false, 0).is_err());
         assert!(streaming_bounded(&req, "ab", None, None, false, (256 << 20) + 1).is_err());
+        Ok(())
     }
     #[test]
     fn exact_identity_and_full_receipt_are_required() -> Result<(), String> {

@@ -588,7 +588,7 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
                 .input
                 .as_ref()
                 .map(|value| {
-                    if value.len() > ((64 << 20) + 2) / 3 * 4 {
+                    if value.len() > (64usize << 20).div_ceil(3) * 4 {
                         return Err("oversized native input".to_owned());
                     }
                     base64::engine::general_purpose::STANDARD
@@ -692,17 +692,17 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
         std::thread::sleep(Duration::from_millis(20));
     };
     let (mut code, mut complete, mut stdout, mut stderr) = result;
-    if let Some(plan) = cleanup_plan {
-        if super::workspace_ledger::cleanup_complete_allowed(code, complete) {
-            match plan.complete() {
-                Ok(proof) => stdout = proof,
-                Err(error) => {
-                    code = 125;
-                    complete = false;
-                    stderr.extend_from_slice(
-                        format!("cleanup partial; external ledger retained: {error}").as_bytes(),
-                    );
-                }
+    if let Some(plan) = cleanup_plan
+        && super::workspace_ledger::cleanup_complete_allowed(code, complete)
+    {
+        match plan.complete() {
+            Ok(proof) => stdout = proof,
+            Err(error) => {
+                code = 125;
+                complete = false;
+                stderr.extend_from_slice(
+                    format!("cleanup partial; external ledger retained: {error}").as_bytes(),
+                );
             }
         }
     }
@@ -749,12 +749,13 @@ pub(crate) fn entrypoint() -> i32 {
 mod tests {
     use super::*;
     #[test]
-    fn recording_cancelled_pending_result_proves_no_dispatch_but_unknown_never_does() {
+    fn recording_cancelled_pending_result_proves_no_dispatch_but_unknown_never_does()
+    -> Result<(), Box<dyn std::error::Error>> {
         for result in [
             Err("cancelled".into()),
             Err("process timed out and was stopped".into()),
         ] {
-            let (code, complete, out, err) = terminal_parts(result).unwrap();
+            let (code, complete, out, err) = terminal_parts(result)?;
             assert_eq!(code, 125);
             assert!(!complete);
             assert!(out.is_empty() && err.is_empty());
@@ -771,6 +772,7 @@ mod tests {
             ))))
             .is_err()
         );
+        Ok(())
     }
     #[test]
     fn recording_native_exit_codes_preserve_windows_status_range() {

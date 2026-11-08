@@ -797,14 +797,14 @@ if [ -e "$1" ]; then [ -f "$1" ] && rm -- "$1" || exit 1; fi
 mod tests {
     use super::*;
     #[test]
-    fn recording_transfer_has_no_source_ref_mutations_and_creates_exact_generation_refs() {
+    fn recording_transfer_has_no_source_ref_mutations_and_creates_exact_generation_refs()
+    -> Result<(), Box<dyn std::error::Error>> {
         for width in [40, 64] {
             let wanted = vec!["a".repeat(width), "b".repeat(width)];
             let present = vec!["c".repeat(width)];
             let bundle =
-                TransferBundle::header(&wanted, &present, &"d".repeat(64), &"e".repeat(32))
-                    .unwrap();
-            let header = String::from_utf8(bundle.bytes.clone()).unwrap();
+                TransferBundle::header(&wanted, &present, &"d".repeat(64), &"e".repeat(32))?;
+            let header = String::from_utf8(bundle.bytes.clone())?;
             assert!(header.starts_with(if width == 40 {
                 "# v2 git bundle\n"
             } else {
@@ -834,9 +834,11 @@ mod tests {
             transfer_digest(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
+        Ok(())
     }
     #[test]
-    fn recording_cleanup_requires_exact_generation_and_structured_complete_receipt() {
+    fn recording_cleanup_requires_exact_generation_and_structured_complete_receipt()
+    -> Result<(), Box<dyn std::error::Error>> {
         let authority = WorkspaceAuthority {
             root: "/synthetic".into(),
             anchor: "original".into(),
@@ -844,15 +846,10 @@ mod tests {
             mode: FenceMode::Mutation,
         };
         let mut receipt = serde_json::json!({"v":1,"state":"cleaned","anchor":"original","generation":authority.generation,"records":2,"records_sha256":"b".repeat(64)});
-        assert!(cleaned_receipt(
-            &serde_json::to_vec(&receipt).unwrap(),
-            &authority
-        ));
+        assert!(cleaned_receipt(&serde_json::to_vec(&receipt)?, &authority));
         receipt["generation"] = "old".into();
-        assert!(!cleaned_receipt(
-            &serde_json::to_vec(&receipt).unwrap(),
-            &authority
-        ));
+        assert!(!cleaned_receipt(&serde_json::to_vec(&receipt)?, &authority));
         assert!(!cleaned_receipt(b"true", &authority));
+        Ok(())
     }
 }
