@@ -177,6 +177,9 @@ fn kept_run(repo: &Path, parked: &Parked) -> Option<Run> {
     })
 }
 
+/// What the tab says it is doing while a merge is brought back.
+const BRINGING_BACK: &str = "Bring the merge back";
+
 /// Drops `ws` away from the UI thread: dropping a scratch worktree runs git.
 fn let_go(ws: Option<Arc<Workspace>>) {
     if let Some(ws) = ws {
@@ -214,13 +217,15 @@ impl RepoTab {
         if self.resolver.run.is_some() {
             return;
         }
-        let Some(first) = self.resolver.parked.first().cloned() else {
+        let parked = self.resolver.parked.clone();
+        if parked.is_empty() {
             return;
-        };
+        }
         let repo = self.path.clone();
         self.then(
             ctx,
-            move || kept_run(&repo, &first),
+            // The first of them whose agent's work was kept.
+            move || parked.iter().find_map(|p| kept_run(&repo, p)),
             |tab, run, _| {
                 if tab.resolver.run.is_none() {
                     tab.resolver.run = run;
@@ -314,6 +319,7 @@ impl RepoTab {
             return;
         }
         let repo = self.path.clone();
+        self.busy_op = Some(BRINGING_BACK.to_owned());
         self.then(
             ctx,
             move || park::bring_back(&repo, &parked).map(|()| parked),
@@ -322,6 +328,9 @@ impl RepoTab {
     }
 
     fn brought_back(&mut self, back: Result<Parked, String>, ctx: &egui::Context) {
+        if self.busy_op.as_deref() == Some(BRINGING_BACK) {
+            self.busy_op = None;
+        }
         let parked = match back {
             Ok(p) => p,
             Err(e) => {
@@ -341,6 +350,48 @@ impl RepoTab {
             self.resolver.folded = false;
             self.resolver_act(super::ResolverAct::Review(0), ctx);
         }
+    }
+}
+
+impl RepoTab {
+    /// Drops the merge put aside as `id` without bringing it back: its files go on a branch of
+    /// their own, so nothing of it is lost; its run (and the agent's work) goes.
+    pub(super) fn drop_parked(&mut self, id: &str, ctx: &egui::Context) {
+        let Some(parked) = self.resolver.parked.iter().find(|p| p.id == id).cloned() else {
+            return;
+        };
+        let working = self.resolver.run.as_ref().is_some_and(|r| {
+            r.id == id && matches!(r.phase, Phase::Preparing | Phase::Working | Phase::Checking)
+        });
+        if working {
+            self.status = Some(("Stop the agent first".to_owned(), true));
+            return;
+        }
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || park::drop_to_branch(&repo, &parked).map(|b| (parked, b)),
+            |tab, dropped, ctx| match dropped {
+                Ok((parked, branch)) => {
+                    tab.resolver.parked.retain(|p| p.id != parked.id);
+                    if let Some(run) = tab.resolver.run.as_mut().filter(|r| r.id == parked.id) {
+                        run.parked = None;
+                    }
+                    if tab.resolver_owns(&parked.id) {
+                        tab.resolver_act(super::ResolverAct::Dismiss, ctx);
+                    }
+                    tab.status = Some((
+                        format!(
+                            "The {} was dropped: its files are on {branch}",
+                            parked.what()
+                        ),
+                        false,
+                    ));
+                    tab.reload(ctx);
+                }
+                Err(e) => tab.status = Some((format!("Not dropped: {e}"), true)),
+            },
+        );
     }
 }
 

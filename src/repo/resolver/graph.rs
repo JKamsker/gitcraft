@@ -114,7 +114,12 @@ impl RepoTab {
         background: Color32,
     ) {
         let what = parked.what();
-        let title = format!("{}{} put aside", what[..1].to_uppercase(), &what[1..]);
+        let mut chars = what.chars();
+        let first: String = chars
+            .next()
+            .map(|c| c.to_uppercase().collect())
+            .unwrap_or_default();
+        let title = format!("{first}{} put aside", chars.as_str());
         let r = painter.text(
             pos2(x, mid),
             Align2::LEFT_CENTER,
@@ -172,6 +177,19 @@ impl RepoTab {
         }
         if self.resolver_owns(&parked.id) && ui.button("Show the agent").clicked() {
             acts.push(Action::Resolver(ResolverAct::Fold(false)));
+            ui.close();
+        }
+        ui.separator();
+        if ui
+            .button("Drop it (keep its files on a branch)")
+            .on_hover_text(
+                "Leaves the merge put aside, without bringing it back: its files (conflict \
+                 markers and all) go on a branch of their own named parked/…, so nothing is \
+                 lost; the agent's work goes",
+            )
+            .clicked()
+        {
+            acts.push(Action::Resolver(ResolverAct::DropParked(parked.id.clone())));
             ui.close();
         }
     }

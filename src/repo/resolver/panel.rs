@@ -527,6 +527,16 @@ pub(super) fn bring_back_button(
     {
         acts.push(Action::Resolver(ResolverAct::BringBack(parked.id.clone())));
     }
+    if ui
+        .small_button("Drop…")
+        .on_hover_text(
+            "When it can't come back (its branch moved or is gone): leaves it put aside for good, \
+             its files (conflict markers and all) kept on a branch of their own, parked/…",
+        )
+        .clicked()
+    {
+        acts.push(Action::Resolver(ResolverAct::DropParked(parked.id.clone())));
+    }
 }
 
 fn applied(ui: &mut Ui, t: &Tokens, run: &Run, acts: &mut Vec<Action>) {

@@ -44,6 +44,8 @@ pub(crate) enum ResolverAct {
     CloseReview,
     /// Brings the merge put aside as this back into the worktree.
     BringBack(String),
+    /// Drops the merge put aside as this, its files kept on a branch of their own.
+    DropParked(String),
 }
 
 /// The agent's work under review, in the big area.
@@ -122,6 +124,9 @@ impl ResolverState {
         self.run.as_ref().is_some_and(|r| r.review.is_some())
     }
 }
+
+/// What the tab says it is doing while the merge is put aside.
+const PUTTING_ASIDE: &str = "Put the merge aside";
 
 /// How often the card's clock moves.
 const CLOCK: Duration = Duration::from_secs(1);
@@ -281,6 +286,7 @@ impl RepoTab {
                     .is_some_and(|r| r.parked.is_some()) => {}
             ResolverAct::Apply => self.apply_resolved(ctx),
             ResolverAct::BringBack(id) => self.bring_back(&id, ctx),
+            ResolverAct::DropParked(id) => self.drop_parked(&id, ctx),
             ResolverAct::Pick(path, on) => {
                 if let Some(run) = &mut self.resolver.run {
                     if on {
@@ -389,6 +395,10 @@ impl RepoTab {
             self.resolver.folded = false;
             return;
         }
+        if self.busy_op.is_some() {
+            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            return;
+        }
         // All of them: the merge is put aside meanwhile, the worktree free (one file is resolved
         // in place, from its conflict editor).
         let put_aside = files.is_none();
@@ -429,6 +439,10 @@ impl RepoTab {
         });
         let repo = self.path.clone();
         let for_id = id.clone();
+        // While the merge is put aside, nothing else runs on the worktree.
+        if put_aside {
+            self.busy_op = Some(PUTTING_ASIDE.to_owned());
+        }
         self.then(
             ctx,
             move || prepare(&repo, &files, engine, &for_id, put_aside),
@@ -442,6 +456,9 @@ impl RepoTab {
         prepared: Result<Prepared, String>,
         ctx: &egui::Context,
     ) {
+        if self.busy_op.as_deref() == Some(PUTTING_ASIDE) {
+            self.busy_op = None;
+        }
         // The merge put aside: the worktree changed under the tab, and the graph has its row.
         let parked = prepared.as_ref().ok().and_then(|p| p.parked.clone());
         let not_parked = prepared.as_ref().ok().and_then(|p| p.not_parked.clone());

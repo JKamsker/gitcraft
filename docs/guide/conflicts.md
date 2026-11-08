@@ -37,7 +37,12 @@ The three-pane conflict editor, Mergiraf, conflict warnings before you act, exte
   the merge back exactly as it was, then opens the review of what the agent did. It needs a
   clean worktree and the branch where it was; until then it waits, and it survives closing
   gitcraft (the agent's work too, once it is done). Files git doesn't track stay where they
-  are. A rebase, or a cherry-pick of several commits, isn't put aside: it is resolved in place.
+  are, and are never written over: when one (ignored ones too) is where a file of the merge
+  goes, bringing it back stops and says which, and nothing changes. When it can't come back
+  (its branch moved or is gone), _Drop it_ leaves it put aside for good with its files
+  (conflict markers and all) on a branch of their own, `parked/…`: nothing is lost. Files
+  marked assume-unchanged or left out of a sparse checkout, and merges that change
+  submodules, aren't put aside (they are resolved in place). A rebase, or a cherry-pick of several commits, isn't put aside: it is resolved in place.
   The merge's files are kept as a commit under `refs/gitcraft/parked/`, the rest under
   `.git/gitcraft/parked/` and `.git/gitcraft/resolver/`.
 - The agent works in a private copy of the checkout: a scratch worktree in the temporary

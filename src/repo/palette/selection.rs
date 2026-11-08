@@ -25,7 +25,8 @@ impl RepoTab {
         let Some(commit) = self.selected.and_then(|i| self.commits.get(i)) else {
             return Vec::new();
         };
-        if commit.hash == WIP_HASH {
+        // The changes row, a merge put aside: rows of no commit.
+        if commit.hash == WIP_HASH || commit.hash.starts_with('\u{0}') {
             return Vec::new();
         }
         let hash = commit.hash.as_str();
