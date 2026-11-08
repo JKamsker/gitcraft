@@ -424,3 +424,45 @@ fn uncertain_cleanup_preserves_workspace_record_and_blocks_apply() -> Result<(),
     std::fs::remove_file(artifact).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[test]
+fn insights_action_closes_only_the_read_only_resolver_review() -> Result<(), String> {
+    let repo = conflicted("resolver-insights-action")?;
+    let ws = std::sync::Arc::new(crate::resolver::workspace::Workspace::prepare(
+        repo.path(),
+        &["a.txt".into()],
+    )?);
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(repo.path().to_owned(), &ctx);
+    let mut run = super::look_tests::run(Phase::Ready, Instant::now());
+    run.workspace = Some(ws.clone());
+    run.review = Some(super::ReviewState {
+        files: Some(vec![]),
+        selected: 0,
+        as_diff: false,
+    });
+    let results = run.results.clone();
+    let picked = run.picked.clone();
+    let id = run.id.clone();
+    tab.resolver.run = Some(run);
+    assert!(tab.resolver.reviewing());
+    tab.apply(
+        Action::Insights(crate::repo::insights::InsightsAct::Open(
+            crate::repo::insights::Kind::Evolution,
+        )),
+        &ctx,
+    );
+    assert!(!tab.resolver.reviewing());
+    assert!(tab.insights.is_some());
+    let run = tab.resolver.run.as_ref().ok_or("lost run")?;
+    assert_eq!(run.id, id);
+    assert_eq!(run.phase, Phase::Ready);
+    assert_eq!(run.results, results);
+    assert_eq!(run.picked, picked);
+    assert!(std::sync::Arc::ptr_eq(
+        run.workspace.as_ref().ok_or("lost workspace")?,
+        &ws
+    ));
+    assert!(ws.dir().is_dir());
+    Ok(())
+}
