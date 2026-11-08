@@ -1211,6 +1211,7 @@ pub(crate) fn check(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    check_selected_snapshot(plan, |snapshot| snapshot.check_publication(repo))?;
     clean_lfs_config(repo, &plan.checkout_oid, active)?;
     if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
         return Err("The checked-out branch moved. Reopen push preflight.".into());
@@ -1239,6 +1240,16 @@ fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(
     .collect();
     if urls != plan.urls {
         return Err("The push addresses changed. Reopen push preflight.".into());
+    }
+    Ok(())
+}
+
+fn check_selected_snapshot(
+    plan: &Plan,
+    check: impl FnOnce(&git::repository_tools::guard::Snapshot) -> Result<(), String>,
+) -> Result<(), String> {
+    if let Some(selected) = &plan.selection {
+        check(&selected.snapshot)?;
     }
     Ok(())
 }
@@ -1517,6 +1528,62 @@ pub(crate) mod selected_continuation_recording {
             receive_pack: String::new(),
             selection: None,
         }
+    }
+
+    #[test]
+    fn prewrite_snapshot_guard_blocks_changed_selection_and_leaves_ordinary_pushes_unchanged()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let original = git::repository_tools::guard::Snapshot::recording();
+        for (selected, change) in [(true, 0), (true, 1), (true, 2), (false, 1)] {
+            let mut plan = plan(&route);
+            let expected_args = push_args(&plan)?;
+            if selected {
+                plan.retain_selection(PreparedPush {
+                    snapshot: original.clone(),
+                    route: route.clone(),
+                })?;
+            }
+            let mut current = original.clone();
+            match change {
+                1 => current.worktrees.push_str("new linked worktree"),
+                2 => current.status.push_str("tracked working changes"),
+                _ => {}
+            }
+            let mut checks = 0;
+            let mut endpoints = 0;
+            let result = check_selected_snapshot(&plan, |captured| {
+                checks += 1;
+                assert_eq!(captured, &original); // retained input, never recaptured
+                if *captured == current {
+                    Ok(())
+                } else {
+                    Err("selected Snapshot changed".into())
+                }
+            })
+            .and_then(|()| {
+                // Inert dispatch callback after the same production guard. No
+                // repository read, command constructor or endpoint is executed.
+                endpoints += 1;
+                push_args(&plan)
+            });
+            assert_eq!(checks, usize::from(selected));
+            if selected && change != 0 {
+                assert_eq!(result, Err("selected Snapshot changed".into()));
+                assert_eq!(endpoints, 0);
+            } else {
+                assert_eq!(result?, expected_args);
+                assert_eq!(endpoints, 1);
+            }
+        }
+        Ok(())
     }
 
     #[test]
