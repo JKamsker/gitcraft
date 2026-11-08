@@ -1,5 +1,6 @@
 //! Local runs retain their own identity and output beside hosted CI. They never masquerade
 //! as a forge run, and never rerun or publish a hosted check.
+mod context;
 mod model;
 mod run;
 #[cfg(test)]
@@ -32,6 +33,8 @@ pub(super) struct State {
     job: usize,
     matrix: usize,
     remote: String,
+    remote_override: bool,
+    displayed_context: Option<context::Context>,
     payload: String,
     platforms: String,
     architecture: String,
@@ -52,6 +55,8 @@ impl Default for State {
             job: 0,
             matrix: 0,
             remote: "origin".into(),
+            remote_override: false,
+            displayed_context: None,
             payload: "{}".into(),
             platforms: String::new(),
             architecture: String::new(),
@@ -147,7 +152,7 @@ impl State {
             Err(e) => self.result = Some(Err(e)),
         }
     }
-    fn ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
+    fn ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>, remotes: &[crate::git::Remote]) {
         self.poll(ui.ctx());
         egui::CollapsingHeader::new("Local Actions · installed act")
             .default_open(true)
@@ -155,12 +160,17 @@ impl State {
                 egui::ScrollArea::vertical()
                     .id_salt("local-actions-controls")
                     .max_height(340.0)
-                    .show(ui, |ui| self.controls(ui, acts));
+                    .show(ui, |ui| self.controls(ui, acts, remotes));
             });
         ui.separator();
     }
 
-    fn controls(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
+    fn controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        acts: &mut Vec<Action>,
+        remotes: &[crate::git::Remote],
+    ) {
         ui.label("Run the selected workflow against this worktree's current files. Local output is separate from hosted checks.");
         ui.horizontal(|ui| {
             if ui
@@ -189,7 +199,7 @@ impl State {
                 }
             }
         }
-        ui.add_enabled_ui(!self.busy(), |ui| self.selection_ui(ui, acts));
+        ui.add_enabled_ui(!self.busy(), |ui| self.selection_ui(ui, acts, remotes));
         if let Some(source) = &self.provenance {
             ui.label(source);
         }
@@ -219,7 +229,12 @@ impl State {
         }
     }
 
-    fn selection_ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
+    fn selection_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        acts: &mut Vec<Action>,
+        remotes: &[crate::git::Remote],
+    ) {
         let before = (self.workflow, self.job);
         egui::ComboBox::from_id_salt("local-workflow")
             .selected_text(
@@ -316,8 +331,24 @@ impl State {
         });
         ui.horizontal(|ui| {
             ui.label("Context remote");
-            ui.text_edit_singleline(&mut self.remote);
+            if ui.text_edit_singleline(&mut self.remote).changed() {
+                self.remote_override = true;
+                self.trust = false;
+            }
         });
+        let context = context::Context::capture(&self.remote, remotes);
+        if self.displayed_context.as_ref() != context.as_ref().ok() {
+            self.trust = false;
+            self.displayed_context = context.as_ref().ok().cloned();
+        }
+        match &context {
+            Ok(context) => {
+                ui.label(context.display());
+            }
+            Err(error) => {
+                ui.colored_label(egui::Color32::YELLOW, error);
+            }
+        }
         ui.label("act reads this remote's fetch URL for repository context. If its pushURL differs, review repository fields in the event JSON. Hosted CI retains its push-destination routing.");
         ui.label("Runner mappings · one label=container-image per line");
         ui.add(
@@ -361,7 +392,7 @@ impl State {
         );
         if ui
             .add_enabled(
-                self.trust && entries.get(self.matrix).is_some(),
+                self.trust && entries.get(self.matrix).is_some() && context.is_ok(),
                 egui::Button::new("Run selected entry locally"),
             )
             .clicked()
@@ -371,23 +402,33 @@ impl State {
     }
 }
 impl RepoTab {
+    pub(super) fn local_ci_context_default(&mut self) {
+        if self.local_ci.remote_override || self.local_ci.busy() {
+            return;
+        }
+        let remote = self
+            .refs
+            .current
+            .as_ref()
+            .and_then(|b| self.refs.push_remotes.get(b))
+            .cloned()
+            .or_else(|| {
+                self.remotes
+                    .iter()
+                    .find(|r| r.name == "origin")
+                    .or_else(|| self.remotes.first())
+                    .map(|r| r.name.clone())
+            });
+        if let Some(remote) = remote {
+            if self.local_ci.remote != remote {
+                self.local_ci.trust = false;
+            }
+            self.local_ci.remote = remote;
+        }
+    }
+
     pub(super) fn local_ci_act(&mut self, act: Act, ctx: &egui::Context) {
         if matches!(act, Act::Open) {
-            if let Some(remote) = self
-                .refs
-                .current
-                .as_ref()
-                .and_then(|branch| self.refs.push_remotes.get(branch))
-            {
-                self.local_ci.remote = remote.clone();
-            } else if let Some(remote) = self
-                .remotes
-                .iter()
-                .find(|r| r.name == "origin")
-                .or_else(|| self.remotes.first())
-            {
-                self.local_ci.remote = remote.name.clone();
-            }
             self.open_ci(self.refs.head.clone(), None, ctx);
             if self.ci_view.is_some() {
                 self.doctor = None;
@@ -412,7 +453,22 @@ impl RepoTab {
                 });
             }
             Act::Run => {
+                let context = match context::Context::capture(&self.local_ci.remote, &self.remotes)
+                {
+                    Ok(context) => context,
+                    Err(error) => {
+                        self.local_ci.result = Some(Err(error));
+                        return;
+                    }
+                };
                 let state = &mut self.local_ci;
+                if state.displayed_context.as_ref() != Some(&context) {
+                    state.trust = false;
+                    state.result = Some(Err(
+                        "Repository context changed since display; review it before running".into(),
+                    ));
+                    return;
+                }
                 if !state.trust {
                     return;
                 }
@@ -437,14 +493,15 @@ impl RepoTab {
                     }
                 };
                 state.provenance = Some(format!(
-                    "LOCAL · {} · {event} · {job} · {} · worktree {}",
+                    "LOCAL · {} · {event} · {job} · {} · worktree {} · {}",
                     workflow.file,
                     text(&matrix),
-                    crate::remote::display(&self.path)
+                    crate::remote::display(&self.path),
+                    context.display()
                 ));
                 let selection = run::Selection {
                     workflow,
-                    remote: state.remote.clone(),
+                    context,
                     event,
                     job,
                     matrix,
@@ -466,6 +523,7 @@ impl RepoTab {
         }
     }
     pub(super) fn local_ci_ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
-        self.local_ci.ui(ui, acts);
+        self.local_ci_context_default();
+        self.local_ci.ui(ui, acts, &self.remotes);
     }
 }

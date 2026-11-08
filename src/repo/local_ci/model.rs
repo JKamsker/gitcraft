@@ -157,6 +157,7 @@ impl Workflow {
         } else if !matches!(matrix["exclude"], Yaml::BadValue | Yaml::Null) {
             return Err("Matrix exclude must be a list".into());
         }
+        let mut extras = Vec::new();
         if let Some(include) = matrix["include"].as_vec() {
             for addition in include {
                 let fields = addition
@@ -190,15 +191,16 @@ impl Workflow {
                     }
                 }
                 if !applied {
-                    entries.push(addition.clone());
+                    extras.push(addition.clone());
                 }
-                if entries.len() > 256 {
+                if entries.len() + extras.len() > 256 {
                     return Err("Matrix exceeds 256 entries".into());
                 }
             }
         } else if !matches!(matrix["include"], Yaml::BadValue | Yaml::Null) {
             return Err("Matrix include must be a list".into());
         }
+        entries.extend(extras);
         Ok(entries)
     }
     pub fn dependencies(&self, job: &str) -> Result<Vec<String>, String> {

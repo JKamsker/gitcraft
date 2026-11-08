@@ -115,7 +115,7 @@ fn check_config() -> Result<(), String> {
 }
 pub(super) struct Selection {
     pub workflow: Workflow,
-    pub remote: String,
+    pub context: super::context::Context,
     pub event: String,
     pub job: String,
     pub matrix: yaml_rust2::Yaml,
@@ -130,13 +130,19 @@ pub(super) fn arguments(path: &Path, scratch: &Path, s: &Selection) -> Result<Ve
     if !payload.is_object() || s.payload.len() > model::MAX {
         return Err("Event JSON must be an object of at most 1 MiB".into());
     }
-    if s.remote.is_empty() || s.remote.starts_with('-') || s.remote.chars().any(char::is_control) {
-        return Err("Choose a valid context remote name".into());
-    }
     let mut args = vec![
         s.event.clone(),
         "--remote-name".into(),
-        s.remote.clone(),
+        s.context.name.clone(),
+        "--github-instance".into(),
+        "github.com".into(),
+        "--env".into(),
+        format!("GITHUB_REPOSITORY={}", s.context.repository),
+        "--env".into(),
+        format!(
+            "GITHUB_REPOSITORY_OWNER={}",
+            s.context.repository.split('/').next().unwrap_or_default()
+        ),
         "--directory".into(),
         path.to_string_lossy().into_owned(),
         "--workflows".into(),
@@ -253,6 +259,9 @@ pub(super) fn execute_with(
                 .into(),
         );
     }
+    s.context.revalidate_with(|args| {
+        crate::git::run_unattended_within(&path, args, Duration::from_secs(20))
+    })?;
     let scratch = Scratch::new()?;
     let nonce = scratch
         .0
@@ -285,27 +294,7 @@ pub(super) fn execute_with(
         command.env_remove(key);
     }
     crate::shell_path::apply(&mut command);
-    let stdout = Arc::clone(&log);
-    let repaint = ctx.clone();
-    let out = crate::processes::run(
-        command,
-        crate::processes::Options {
-            timeout: Some(Duration::from_secs(s.minutes.clamp(1, 120) * 60)),
-            background: true,
-            output_limit: 8 << 20,
-            stderr: Some(Box::new(move |bytes| {
-                stdout
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .append(bytes);
-                repaint.request_repaint();
-            })),
-            ..Default::default()
-        },
-    )?;
-    log.lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .append(&out.stdout);
+    let out = crate::processes::run(command, options(&s, &log, &ctx))?;
     if let Some(reason) = out.stopped {
         return Err(format!(
             "{reason}. The act process stopped; Docker containers/services may still be running. Inspect Docker resources before retrying; gitcraft performs no global cleanup."
@@ -318,4 +307,29 @@ pub(super) fn execute_with(
         ));
     }
     Ok("Local act run completed. This is not a hosted CI result.".into())
+}
+
+// Both callbacks deliver bounded visible output while the operation is running.
+// The process owner separately bounds capture and supervises termination.
+pub(super) fn options(
+    s: &Selection,
+    log: &Arc<Mutex<Log>>,
+    ctx: &egui::Context,
+) -> crate::processes::Options {
+    fn stream(log: Arc<Mutex<Log>>, repaint: egui::Context) -> crate::processes::Chunk {
+        Box::new(move |bytes| {
+            log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .append(bytes);
+            repaint.request_repaint();
+        })
+    }
+    crate::processes::Options {
+        timeout: Some(Duration::from_secs(s.minutes.clamp(1, 120) * 60)),
+        background: true,
+        output_limit: 8 << 20,
+        stdout: Some(stream(Arc::clone(log), ctx.clone())),
+        stderr: Some(stream(Arc::clone(log), ctx.clone())),
+        ..Default::default()
+    }
 }
