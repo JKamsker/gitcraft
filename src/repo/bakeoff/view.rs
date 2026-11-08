@@ -232,6 +232,8 @@ fn build_cell(
 ) {
     ui.horizontal(|ui| {
         match built {
+            Some(Built::Preparing) => {ui.label("preparing snapshot…");}
+            Some(Built::Unavailable) => {ui.colored_label(t.warning,"outcome unavailable").on_hover_text("Launch failed, terminal closed/output ended, or receipt is invalid. This does not prove all child processes finished.");}
             Some(Built::Running) => {
                 ui.add(crate::spinner::Spinner::new().size(12.0));
                 ui.label(RichText::new("building…").color(t.text_dim))
@@ -248,13 +250,14 @@ fn build_cell(
                 ui.label(RichText::new("not built").color(t.text_faint));
             }
         }
-        if built != Some(Built::Running) {
+        if built != Some(Built::Preparing) {
             let (label, tip) = match built {
                 Some(Built::Running) => (
-                    "Build again",
-                    "Stopped or closed its terminal? Starts the build over",
+                    "Retry in fresh workspace",
+                    "The old build may still run. Starts a separate retained snapshot; does not stop or clean up the old launch",
                 ),
-                Some(_) => ("Build again", "Runs the build command again"),
+                Some(Built::Unavailable) => ("Retry in fresh workspace", "The previous outcome is unknown and its processes may still run. Starts another retained workspace; no automatic stop or cleanup"),
+                Some(_) => ("Build again", "Runs the command in another fresh retained snapshot"),
                 None => (
                     "Build",
                     "Runs your command on the exact compared snapshot in a fresh detached worktree",
@@ -655,5 +658,64 @@ mod tests {
         assert_eq!(super::super::next_name("bakeoff/x"), "bakeoff/x-2");
         assert_eq!(super::super::next_name("bakeoff/x-2"), "bakeoff/x-3");
         assert_eq!(super::super::next_name("agent/fix-1"), "agent/fix-1-2");
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn pure_bakeoff_unavailable_and_running_cells_offer_explicit_fresh_workspace_retry() {
+        for built in [Built::Unavailable, Built::Running] {
+            let ctx = egui::Context::default();
+            let mut act = None;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 400.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            let position = output.shapes.iter().find_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.text() == "Retry in fresh workspace" => {
+                    Some(text.pos + text.galley.size() / 2.0)
+                }
+                _ => None,
+            });
+            output.textures_delta.clear();
+            let position = position.expect("retry remains reachable without a completion receipt");
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::PointerMoved(position),
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: true,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            output.textures_delta.clear();
+            assert!(matches!(act, Some(BakeAct::Build(0))));
+        }
     }
 }

@@ -11,7 +11,9 @@ pub(crate) const COMMAND_FILE: &str = "bakeoff-build.json";
 /// How a build of an attempt went, as far as is known.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Built {
+    Preparing,
     Running,
+    Unavailable,
     Passed,
     Failed(i32),
 }
@@ -68,15 +70,27 @@ pub(crate) fn script(command: &str, status: &str) -> String {
     s
 }
 
-/// What a status file says: `None` when it isn't there yet (still running).
-pub(crate) fn read_status(text: Option<&str>) -> Built {
+/// Parse a terminal receipt; absence or malformed bytes alone say nothing about liveness.
+pub(crate) fn read_status(text: Option<&str>) -> Option<Built> {
     match text.map(str::trim).map(str::parse::<i32>) {
-        Some(Ok(0)) => Built::Passed,
-        Some(Ok(code)) => Built::Failed(code),
-        _ => Built::Running,
+        Some(Ok(0)) => Some(Built::Passed),
+        Some(Ok(code)) => Some(Built::Failed(code)),
+        _ => None,
     }
 }
 
+/// Absence is a running result only while this specific launch still has an
+/// observed terminal/output lifetime. Unknown never asserts process completion.
+pub(crate) fn observed_status(text: Option<&str>, launch_open: bool) -> Built {
+    if let Some(status) = read_status(text) {
+        return status;
+    }
+    if launch_open && text.is_none_or(|text| text.trim().is_empty()) {
+        Built::Running
+    } else {
+        Built::Unavailable
+    }
+}
 /// Build an immutable compared tree, including uncommitted worktree attempts. No source
 /// checkout/index/ref is moved. The workspace remains registered for inspection/removal
 /// through Worktrees; automatic forced cleanup could delete a user's later edits.
@@ -159,5 +173,23 @@ mod workspace_tests {
         r.git(&["worktree", "remove", &a.to_string_lossy()])?;
         r.git(&["worktree", "remove", &b.to_string_lossy()])?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn pure_bakeoff_recorded_receipts_distinguish_running_terminal_and_unavailable_outcome() {
+        for text in [None, Some(""), Some(" \n")] {
+            assert_eq!(read_status(text), None);
+            assert_eq!(observed_status(text, true), Built::Running);
+            assert_eq!(observed_status(text, false), Built::Unavailable);
+        }
+        for open in [true, false] {
+            assert_eq!(observed_status(Some("garbage"), open), Built::Unavailable);
+            assert_eq!(observed_status(Some("0\n"), open), Built::Passed);
+            assert_eq!(observed_status(Some("17\n"), open), Built::Failed(17));
+        }
     }
 }

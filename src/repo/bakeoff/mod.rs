@@ -53,6 +53,7 @@ pub(crate) struct Bakeoff {
     rows: Vec<(String, Vec<bool>)>,
     /// Where each build leaves its status, once one was started.
     statuses: Vec<Option<PathBuf>>,
+    launches: Vec<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
     /// The commit _Assemble_ made last, to show in the graph.
     made: Option<String>,
     /// Close was asked for once with picks made: a second time drops them.
@@ -127,6 +128,7 @@ impl Bakeoff {
             picked_trees: Vec::new(),
             rows: Vec::new(),
             statuses: vec![None; n],
+            launches: vec![None; n],
             made: None,
             confirm_close: false,
         }
@@ -223,7 +225,12 @@ impl RepoTab {
             BakeAct::BuildAll => {
                 let idle: Vec<usize> = self.bakeoff.view.as_ref().map_or_else(Vec::new, |v| {
                     (0..v.attempts.len())
-                        .filter(|i| v.builds.get(*i) != Some(&Some(Built::Running)))
+                        .filter(|i| {
+                            !matches!(
+                                v.builds.get(*i),
+                                Some(Some(Built::Preparing | Built::Running))
+                            )
+                        })
                         .collect()
                 });
                 for i in idle {
@@ -251,6 +258,7 @@ impl RepoTab {
         view.comparison = None;
         view.builds.fill(None);
         view.statuses.fill(None);
+        view.launches.fill(None);
         view.file = None;
         view.request = next_request();
         let request = view.request;
@@ -394,7 +402,7 @@ impl RepoTab {
         let Some(compared) = comparison.attempts.get(n) else {
             return;
         };
-        if view.builds.get(n) == Some(&Some(Built::Running)) {
+        if view.builds.get(n) == Some(&Some(Built::Preparing)) {
             return;
         }
         let tree = compared.tree.clone();
@@ -413,7 +421,13 @@ impl RepoTab {
             .map(|a| a.name.clone())
             .unwrap_or_default();
         if let Some(slot) = view.builds.get_mut(n) {
-            *slot = Some(Built::Running);
+            *slot = Some(Built::Preparing);
+        }
+        if let Some(status) = view.statuses.get_mut(n) {
+            *status = None;
+        }
+        if let Some(launch) = view.launches.get_mut(n) {
+            *launch = None;
         }
         let repo = self.path.clone();
         let remembered = command.clone();
@@ -445,9 +459,9 @@ impl RepoTab {
                     if let Some(view) = &mut tab.bakeoff.view
                         && let Some(slot) = view.statuses.get_mut(n)
                     {
-                        *slot = Some(status);
+                        *slot = Some(status.clone());
                     }
-                    tab.start_launch(
+                    let launched = tab.start_launch_tracked(
                         Launch {
                             label: format!("build · {name}"),
                             worktree,
@@ -456,6 +470,9 @@ impl RepoTab {
                         },
                         ctx,
                     );
+                    if let Some(view) = &mut tab.bakeoff.view {
+                        view.accept_launch(request, n, &status, launched);
+                    }
                 }
                 Err(e) => {
                     if let Some(view) = &mut tab.bakeoff.view
@@ -463,7 +480,7 @@ impl RepoTab {
                     {
                         view.note = Some((e, true));
                         if let Some(slot) = view.builds.get_mut(n) {
-                            *slot = None;
+                            *slot = Some(Built::Unavailable);
                         }
                     }
                 }
@@ -473,16 +490,36 @@ impl RepoTab {
 
     /// Every frame the bake-off is shown: the builds still running are looked at now and then.
     fn poll_builds(&mut self, ctx: &egui::Context) {
+        // Atomic observation only: no try_wait, process search or signals on UI.
+        let terminals = self
+            .terminals
+            .iter()
+            .map(|terminal| terminal.output_lifetime())
+            .collect::<Vec<_>>();
         let Some(view) = &mut self.bakeoff.view else {
             return;
         };
-        let running: Vec<(usize, PathBuf)> = view
+        let running: Vec<(usize, PathBuf, bool)> = view
             .builds
             .iter()
             .zip(&view.statuses)
             .enumerate()
             .filter(|(_, (b, _))| **b == Some(Built::Running))
-            .filter_map(|(i, (_, file))| file.clone().map(|f| (i, f)))
+            .filter_map(|(i, (_, file))| {
+                file.clone().map(|f| {
+                    let open = view
+                        .launches
+                        .get(i)
+                        .and_then(|launch| launch.as_ref())
+                        .is_some_and(|witness| {
+                            !witness.load(std::sync::atomic::Ordering::Relaxed)
+                                && terminals
+                                    .iter()
+                                    .any(|terminal| std::sync::Arc::ptr_eq(terminal, witness))
+                        });
+                    (i, f, open)
+                })
+            })
             .collect();
         if running.is_empty() || view.polled.is_some_and(|t| t.elapsed() < BUILD_POLL) {
             if !running.is_empty() {
@@ -497,9 +534,9 @@ impl RepoTab {
             move || {
                 running
                     .into_iter()
-                    .map(|(i, file)| {
+                    .map(|(i, file, open)| {
                         let text = crate::remote::read_to_string(&file).ok();
-                        (i, file, build::read_status(text.as_deref()))
+                        (i, file, build::observed_status(text.as_deref(), open))
                     })
                     .collect::<Vec<_>>()
             },
@@ -526,6 +563,30 @@ fn next_name(branch: &str) -> String {
 mod tests;
 
 impl Bakeoff {
+    fn accept_launch(
+        &mut self,
+        request: u64,
+        n: usize,
+        status: &PathBuf,
+        launched: Result<std::sync::Arc<std::sync::atomic::AtomicBool>, String>,
+    ) {
+        if self.request != request
+            || self.statuses.get(n) != Some(&Some(status.clone()))
+            || self.builds.get(n) != Some(&Some(Built::Preparing))
+        {
+            return;
+        }
+        match launched {
+            Ok(witness) => {
+                self.launches[n] = Some(witness);
+                self.builds[n] = Some(Built::Running);
+            }
+            Err(error) => {
+                self.builds[n] = Some(Built::Unavailable);
+                self.note = Some((error, true));
+            }
+        }
+    }
     fn accept_builds(&mut self, request: u64, found: Vec<(usize, PathBuf, Built)>) {
         if self.request != request {
             return;
@@ -544,7 +605,43 @@ impl Bakeoff {
 mod generation_tests {
     use super::*;
     #[test]
-    fn closed_or_reloaded_comparisons_reject_old_build_statuses() {
+    fn pure_bakeoff_recorded_launch_failure_is_retryable_and_stale_launch_receipts_are_rejected() {
+        let mut view = Bakeoff::new(
+            vec![Attempt {
+                name: "a".into(),
+                rev: "a".into(),
+                worktree: None,
+            }],
+            String::new(),
+        );
+        let status = PathBuf::from("owned-unique-receipt");
+        view.statuses[0] = Some(status.clone());
+        view.builds[0] = Some(Built::Preparing);
+        view.accept_launch(view.request + 1, 0, &status, Err("old launch".into()));
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+        view.accept_launch(
+            view.request,
+            0,
+            &PathBuf::from("previous-launch"),
+            Err("stale path".into()),
+        );
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+        view.accept_launch(
+            view.request,
+            0,
+            &status,
+            Err("recorded PTY spawn failure".into()),
+        );
+        assert_eq!(view.builds[0], Some(Built::Unavailable));
+        assert!(view.note.as_ref().unwrap().0.contains("spawn failure"));
+        // Retry owns a different status path; no receipt from the old run wins.
+        view.statuses[0] = Some(PathBuf::from("fresh-owned-receipt"));
+        view.builds[0] = Some(Built::Preparing);
+        view.accept_builds(view.request, vec![(0, status, Built::Passed)]);
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+    }
+    #[test]
+    fn pure_bakeoff_closed_or_reloaded_comparisons_reject_old_build_statuses() {
         let attempts = vec![
             Attempt {
                 name: "a".into(),

@@ -76,6 +76,11 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    /// Observation only: output EOF is not proof that every descendant finished.
+    pub(crate) fn output_lifetime(&self) -> Arc<AtomicBool> {
+        self.exited.clone()
+    }
+
     /// Starts `shell` in `cwd`.
     pub fn spawn(cwd: &Path, shell: &ShellSpec, ctx: &egui::Context) -> Result<Self, String> {
         let (rows, cols) = (24, 100);
