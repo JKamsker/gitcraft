@@ -42,7 +42,7 @@ pub(super) struct Connecting {
     owner: egui::ViewportId,
     /// Where, as the start page says it.
     pub(super) label: String,
-    rx: Receiver<Result<PathBuf, String>>,
+    rx: Receiver<Result<PathBuf, super::AppError>>,
     /// Credentials typed to clone it, for its tab.
     creds: Option<git::Credentials>,
 }
@@ -190,7 +190,9 @@ impl App {
         ctx: &egui::Context,
     ) {
         let label = path.display().to_string();
-        self.connect_with(label, creds, ctx, move || repo_root(&path));
+        self.connect_with(label, creds, ctx, move || {
+            repo_root(&path).map_err(Into::into)
+        });
     }
 
     /// Opens, once `find` (run in the background) gives its top folder, a repository on
@@ -200,14 +202,14 @@ impl App {
         label: String,
         creds: Option<git::Credentials>,
         ctx: &egui::Context,
-        find: impl FnOnce() -> Result<PathBuf, String> + Send + 'static,
+        find: impl FnOnce() -> Result<PathBuf, super::AppError> + Send + 'static,
     ) {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         crate::connections::spawn(move || {
             // Said in the window, even if finding it fails unexpectedly.
             let found = std::panic::catch_unwind(std::panic::AssertUnwindSafe(find))
-                .unwrap_or_else(|_| Err("Connecting failed unexpectedly.".to_owned()));
+                .unwrap_or_else(|_| Err("Connecting failed unexpectedly.".to_owned().into()));
             let _ = tx.send(found);
             ctx2.request_repaint();
         });
@@ -243,7 +245,7 @@ impl App {
 
     pub(super) fn finish_connection(
         &mut self,
-        result: Result<PathBuf, String>,
+        result: Result<PathBuf, super::AppError>,
         creds: Option<git::Credentials>,
         ctx: &egui::Context,
     ) {
@@ -350,7 +352,7 @@ impl App {
                     let label = format!("{path} ({})", host.label());
                     self.connect_with(label, None, ctx, move || {
                         let path = resolve_home(&host, &path)?;
-                        repo_root(&remote::encode(&host, &path))
+                        repo_root(&remote::encode(&host, &path)).map_err(Into::into)
                     });
                 }
                 Err(e) => form.error = Some(e),

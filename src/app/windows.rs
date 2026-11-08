@@ -31,7 +31,7 @@ pub(super) struct Window {
     repo_scan: Option<super::repo_scan::RepoScan>,
     my_work: super::my_work::MyWork,
     pick_on_start: bool,
-    error: Option<String>,
+    error: Option<super::AppError>,
     error_card: Option<crate::error_card::ErrorCard>,
     manual: bool,
     was_focused: bool,
@@ -1599,7 +1599,7 @@ mod tests {
         app.in_window(peer, |app| {
             app.in_window(ViewportId::from_hash_of("closed-owner"), |app| {
                 assert_eq!(app.windows.current, ViewportId::ROOT);
-                app.error = Some("recorded result".into());
+                app.error = Some("recorded result".to_owned().into());
             });
             assert_eq!(app.windows.current, peer);
             assert!(app.error.is_none());

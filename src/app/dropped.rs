@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use egui::{Align2, Color32, Id, LayerId, Order, Stroke};
 
+use super::home::AppError;
 use super::panels::Toast;
 use super::{App, Tab, repo_root};
 use crate::repo::RepoTab;
@@ -58,7 +59,7 @@ pub(super) fn kind_of(path: &Path) -> DropKind {
 }
 
 /// The name of a dropped item, for a message.
-fn name_of(path: &Path) -> String {
+pub(super) fn name_of(path: &Path) -> String {
     path.file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.display().to_string())
@@ -66,20 +67,18 @@ fn name_of(path: &Path) -> String {
 
 /// What to say when a dropped folder can't be opened: git's reason, or plainly that it isn't in
 /// a repository.
-pub(super) fn folder_error(folder: &Path, err: &str) -> String {
-    let name = name_of(folder);
+pub(super) fn retained_folder_error(folder: &Path, err: &str) -> AppError {
     let lower = err.to_lowercase();
-    if lower.contains("not a git repository") || lower.contains("not inside a git repository") {
-        crate::i18n::message("interaction-drop-folder-not-repo", &[("name", name.into())])
-    } else {
-        crate::i18n::message(
-            "interaction-drop-folder-error",
-            &[
-                ("name", name.into()),
-                ("error", crate::git::display_error(err).into()),
-            ],
-        )
-    }
+    AppError::folder(
+        folder,
+        err,
+        lower.contains("not a git repository") || lower.contains("not inside a git repository"),
+    )
+}
+
+#[cfg(test)]
+fn folder_error(folder: &Path, err: &str) -> String {
+    retained_folder_error(folder, err).delivery_text()
 }
 
 /// The repository tab of `repo` among `tabs`.
@@ -305,10 +304,7 @@ impl App {
                         self.report(msg);
                     }
                 },
-                DropKind::Other => self.report(crate::i18n::message(
-                    "interaction-drop-unsupported",
-                    &[("name", name_of(&path).into())],
-                )),
+                DropKind::Other => self.report(AppError::unsupported(name_of(&path))),
             }
         }
         if hovered {
@@ -336,8 +332,8 @@ impl App {
     }
 
     /// Why a patch dropped where no repository is shown wasn't applied.
-    fn no_repo_for(&self, patch: &Path) -> String {
-        patch_target_message(
+    fn no_repo_for(&self, patch: &Path) -> AppError {
+        AppError::patch_target(
             self.tabs.iter().any(|t| matches!(t, Tab::Repo(_))),
             &name_of(patch),
         )
@@ -352,20 +348,14 @@ impl App {
         }
         match repo_root(path) {
             Ok(root) => self.open_root(root, ctx),
-            Err(e) => self.report(folder_error(path, &e)),
+            Err(e) => self.report(retained_folder_error(path, &e)),
         }
     }
 }
 
+#[cfg(test)]
 fn patch_target_message(has_repo: bool, name: &str) -> String {
-    crate::i18n::message(
-        if has_repo {
-            "interaction-drop-show-repo"
-        } else {
-            "interaction-drop-open-repo"
-        },
-        &[("name", name.into())],
-    )
+    AppError::patch_target(has_repo, name).delivery_text()
 }
 
 /// A veil over the window while files are dragged over it, saying what a drop does there.

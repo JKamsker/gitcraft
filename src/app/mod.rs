@@ -56,6 +56,7 @@ use crate::tab_look::TabLook;
 use crate::theme::{self, ThemeId, Tokens};
 use crate::update;
 use clone::CloneForm;
+use home::AppError;
 use palette::Palette;
 use panels::Toast;
 use remote_open::{Connecting, RemoteForm};
@@ -124,7 +125,7 @@ pub struct App {
     recent: Vec<PathBuf>,
     theme: ThemeId,
     clone_parent: Option<PathBuf>,
-    error: Option<String>,
+    error: Option<AppError>,
     /// What the start page's error is, when it is a git failure gitcraft can explain (see
     /// [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
@@ -429,9 +430,10 @@ impl App {
 
     /// Says why a repository couldn't be opened: on the start page, and in a toast when
     /// another tab is shown (where the start page's message would go unseen).
-    fn report(&mut self, e: String) {
+    fn report(&mut self, e: impl Into<AppError>) {
+        let e = e.into();
         if !matches!(self.tabs.get(self.active), Some(Tab::Home)) {
-            self.toasts.push(Toast::new(e.clone(), true));
+            self.toasts.push(Toast::from_app_error(&e));
         }
         self.error = Some(e);
     }
