@@ -125,7 +125,7 @@ impl Snapshot {
             policy: after,
         }))
     }
-    fn same_at(&self, dir: &Directory, name: &str) -> bool {
+    pub(super) fn same_at(&self, dir: &Directory, name: &str) -> bool {
         Self::read(dir, name, self.bytes.len())
             .ok()
             .flatten()

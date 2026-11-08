@@ -1,5 +1,6 @@
 mod deferred;
 mod lists;
+mod receipts;
 pub(super) use deferred::Cache as DeferredCache;
 mod outbox;
 mod sharing;
@@ -22,6 +23,7 @@ use crate::git::repository_tools::{
 use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tool {
+    StateReceipts,
     Refs,
     Object,
     Reftable,
@@ -42,6 +44,7 @@ enum Tool {
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    StateReceipts,
     Deferred,
     IsolatedStack(Vec<crate::git::stack::restack::Preview>),
     StartDeferred(
@@ -109,6 +112,7 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    StateReceipts(Vec<crate::git::drafts::publication::Report>),
     Deferred(crate::git::drafts::deferred::View),
     DeferredStack(
         crate::git::drafts::deferred::View,
@@ -283,6 +287,7 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::StateReceipts => (String::new(), Tool::StateReceipts),
             Act::Deferred => (String::new(), Tool::Deferred),
             Act::IsolatedStack(..)
             | Act::StartDeferred(..)
@@ -352,6 +357,10 @@ impl RepoTab {
             false,
             Err,
             move || match tool {
+                Tool::StateReceipts => crate::git::drafts::publication::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::StateReceipts),
                 Tool::Object => object::inspect(&path, &query, &|| {
                     !crate::tasks::cancellation().is_cancelled()
                 })
@@ -468,6 +477,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::StateReceipts {
+        receipts::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Deferred {
         deferred::show(ui, state, acts);
         return;

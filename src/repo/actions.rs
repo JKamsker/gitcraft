@@ -762,6 +762,11 @@ impl RepoTab {
                 Action::RepositoryTools(super::repository_tools::Act::Virtuals),
             ),
             (
+                "Inspect state publication receipts…".into(),
+                "Working-state transaction recovery".into(),
+                Action::RepositoryTools(super::repository_tools::Act::StateReceipts),
+            ),
+            (
                 "Named changelists: messages, commit and shelve…".into(),
                 "Working changes".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Lists),

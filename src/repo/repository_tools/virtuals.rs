@@ -68,6 +68,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     {
         acts.push(Action::RepositoryTools(Act::Virtuals));
     }
+    if ui.button("Inspect state publication receipts").clicked() {
+        acts.push(Action::RepositoryTools(Act::StateReceipts));
+    }
     let Some(result) = &mut state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;

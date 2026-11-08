@@ -11,7 +11,7 @@ fn native_apply(
     after: &Contents,
     policies: &Policies,
     check: &dyn Fn() -> Result<(), String>,
-    commit: &dyn Fn() -> Result<CommitOutcome, String>,
+    commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
     restored_policy: Option<&Policies>,
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
@@ -88,7 +88,7 @@ fn native_apply(
         for item in &items {
             item.verify_installed()?;
         }
-        commit()
+        commit(&evidence)
     })();
     match result {
         Ok(CommitOutcome::Committed) => Ok(format!("Native recovery entries retained: {evidence}")),
@@ -128,7 +128,7 @@ pub(super) fn apply(
         after,
         policies,
         check,
-        &|| Ok(CommitOutcome::Committed),
+        &|_| Ok(CommitOutcome::Committed),
         None,
         active,
     )
@@ -139,7 +139,7 @@ pub(super) fn apply_with_commit(
     after: &Contents,
     policies: &Policies,
     check: &dyn Fn() -> Result<(), String>,
-    commit: &dyn Fn() -> Result<CommitOutcome, String>,
+    commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
     restored_policy: Option<&Policies>,
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {

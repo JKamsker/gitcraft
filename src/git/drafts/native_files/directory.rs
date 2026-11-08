@@ -92,6 +92,9 @@ impl Directory {
             _ancestors: ancestors,
         })
     }
+    pub(in crate::git::drafts) fn same(&self, other: &Self) -> bool {
+        self.handle == other.handle
+    }
     pub fn unchanged(&self) -> bool {
         std::fs::symlink_metadata(&self.path)
             .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())

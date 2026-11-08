@@ -67,6 +67,7 @@ pub(super) fn entries(
     Ok(out)
 }
 fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Lists), String> {
+    publication::guard(ctx)?;
     let reference = format!("refs/gitcraft/changelists/{}/state", ctx.id);
     if !ctx
         .source(&["symbolic-ref", "-q", &reference], vec![], &[0, 1], active)?
@@ -275,8 +276,9 @@ fn publish(
     view: &View,
     lists: &Lists,
     commit: Option<&str>,
+    evidence: &str,
     active: &dyn Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<native_files::CommitOutcome, String> {
     let new = state_tree(ctx, lists, active)?;
     let zero = "0".repeat(new.len());
     let old = if view.version.is_empty() {
@@ -314,6 +316,17 @@ fn publish(
                 .map_err(|e| e.to_string())?;
         }
     }
+    let pending = publication::begin(
+        ctx,
+        "changelists",
+        &view.reference,
+        &view.version,
+        &new,
+        &view.source,
+        evidence,
+        active,
+    )?;
+    pending.append_receipt(&mut tx);
     let result = ctx.source(
         &[
             "update-ref",
@@ -325,18 +338,7 @@ fn publish(
         &[0],
         active,
     );
-    // A cancelled child can have committed before its acknowledgement was lost.
-    // Inspect the exact unique state object before permitting an index rollback.
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            if state(ctx, &|| true)?.1 == new {
-                Ok(())
-            } else {
-                Err(e)
-            }
-        }
-    }
+    Ok(pending.finish(ctx, result))
 }
 pub enum Edit {
     Create(String, String),
@@ -411,7 +413,7 @@ pub fn edit(
             }
         }
     }
-    publish(&ctx, view, &lists, None, active)?;
+    publish(&ctx, view, &lists, None, "", active)?.confirmed()?;
     Ok("Changelist saved".into())
 }
 pub(super) fn data(
@@ -615,23 +617,20 @@ pub fn commit(
     )?;
     verify(&ctx, view, true, active)?;
     let mut index = index::Index::new(&ctx, &view.source, bytes)?;
-    match publish(&ctx, view, &lists, Some(&new), active) {
-        Ok(()) => {
-            index.accept();
+    match publish(&ctx, view, &lists, Some(&new), &index.evidence(), active) {
+        Ok(native_files::CommitOutcome::Committed) => {
+            let evidence=index.accept().map_err(|e|format!("Refs committed; index release needs attention and no rollback was attempted: {e}"))?;
             Ok(format!(
-                "Committed only {} as {new}; other lists and staged contents retained",
+                "Committed only {} as {new}; other lists and staged contents retained. Index recovery: {evidence}",
                 list.name
             ))
         }
-        Err(e) => {
-            let head = ctx.source(&["rev-parse", "HEAD"], vec![], &[0], &|| true)?;
-            if head != format!("{}\n", view.source.head.as_deref().unwrap_or_default()).as_bytes() {
-                index.uncertain();
-                return Err(format!(
-                    "Publication outcome needs inspection; index.lock retained: {e}"
-                ));
-            }
-            Err(e)
+        Ok(native_files::CommitOutcome::Unknown(reason)) => {
+            Err(format!("{reason}. {}", index.uncertain()))
+        }
+        Err(error) => {
+            let rollback = index.abort();
+            Err(format!("{error}; index abort: {rollback:?}"))
         }
     }
 }
@@ -770,14 +769,24 @@ pub fn shelve(
     )?;
     verify(&ctx, view, true, active)?;
     let check = || verify(&ctx, view, false, active);
-    let commit = || {
+    let commit = |working_evidence: &str| {
         let mut index = index::Index::new(&ctx, &view.source, bytes.clone())?;
-        match publish(&ctx, view, &lists, None, active) {
-            Ok(()) => {
-                index.accept();
-                Ok(())
+        let evidence = format!("{working_evidence}; index: {}", index.evidence());
+        match publish(&ctx, view, &lists, None, &evidence, active) {
+            Ok(native_files::CommitOutcome::Committed) => match index.accept() {
+                Ok(_) => Ok(native_files::CommitOutcome::Committed),
+                Err(error) => Ok(native_files::CommitOutcome::Unknown(format!(
+                    "Refs committed but index release needs attention: {error}; {}",
+                    index.uncertain()
+                ))),
+            },
+            Ok(native_files::CommitOutcome::Unknown(reason)) => Ok(
+                native_files::CommitOutcome::Unknown(format!("{reason}; {}", index.uncertain())),
+            ),
+            Err(error) => {
+                let rollback = index.abort();
+                Err(format!("{error}; index abort: {rollback:?}"))
             }
-            Err(e) => Err(e),
         }
     };
     let evidence = working_transaction::apply_with_commit(
@@ -786,7 +795,7 @@ pub fn shelve(
         &target,
         &view.policies,
         &check,
-        &|| commit().map(|()| native_files::CommitOutcome::Committed),
+        &commit,
         if restore {
             list.shelf.as_ref().map(|s| &s.access)
         } else {

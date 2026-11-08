@@ -70,6 +70,7 @@ fn hash(bytes: &[u8]) -> String {
         .collect()
 }
 fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, State), String> {
+    publication::guard(ctx)?;
     let reference = format!("refs/gitcraft/virtual-branches/{}/state", ctx.id);
     if !ctx
         .source(&["symbolic-ref", "-q", &reference], vec![], &[0, 1], active)?
@@ -491,8 +492,9 @@ fn publish(
     view: &View,
     value: &State,
     moves: &[Move],
+    evidence: &str,
     active: &dyn Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<native_files::CommitOutcome, String> {
     let new = root(ctx, value, active)?;
     let head = view.source.source.head.as_deref().ok_or("No HEAD")?;
     let branch = view
@@ -587,22 +589,26 @@ fn publish(
         std::fs::set_permissions(hook, std::fs::Permissions::from_mode(0o700))
             .map_err(|e| e.to_string())?;
     }
-    match ctx.source(
+    let pending = publication::begin(
+        ctx,
+        "virtuals",
+        &view.reference,
+        &view.version,
+        &new,
+        &view.source.source,
+        evidence,
+        active,
+    )?;
+    pending.append_receipt(&mut tx);
+    let result = ctx.source(
         &["update-ref", "-m", "gitcraft virtual branches", "--stdin"],
         tx.into_bytes(),
         &[0],
         active,
-    ) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            if state(ctx, &|| true)?.1 == new {
-                Ok(())
-            } else {
-                Err(e)
-            }
-        }
-    }
+    );
+    Ok(pending.finish(ctx, result))
 }
+
 fn undo_record(
     view: &View,
     moves: Vec<Move>,
@@ -762,7 +768,7 @@ pub fn edit(
         BTreeMap::new(),
         BTreeMap::new(),
     ));
-    publish(&ctx, view, &next, &moves, active)?;
+    publish(&ctx, view, &next, &moves, "", active)?.confirmed()?;
     Ok("Virtual ownership saved; anchor, real index and working files retained".into())
 }
 fn unchanged<'a>(view: &'a View, name: &str) -> Result<&'a Branch, String> {
@@ -898,9 +904,7 @@ pub fn toggle(
         &target,
         &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
-        &|| {
-            publish(&ctx, view, &next, &[], active).map(|()| native_files::CommitOutcome::Committed)
-        },
+        &|evidence| publish(&ctx, view, &next, &[], evidence, active),
         if !b.active { Some(&b.access) } else { None },
         active,
     )?;
@@ -1025,7 +1029,7 @@ pub fn commit(repo: &Path, plan: &Prepared, active: &dyn Fn() -> bool) -> Result
         BTreeMap::new(),
     ));
     snapshot(&ctx, view, true, active)?;
-    publish(&ctx, view, &next, &moves, active)?;
+    publish(&ctx, view, &next, &moves, "", active)?.confirmed()?;
     Ok(format!(
         "Committed only {}'s owned hunks as {new}. Anchor, working files and staged contents retained",
         b.name
@@ -1087,10 +1091,7 @@ pub fn undo(repo: &Path, view: &View, active: &dyn Fn() -> bool) -> Result<Strin
         &target,
         &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
-        &|| {
-            publish(&ctx, view, &previous, &moves, active)
-                .map(|()| native_files::CommitOutcome::Committed)
-        },
+        &|evidence| publish(&ctx, view, &previous, &moves, evidence, active),
         Some(&u.access),
         active,
     )?;
