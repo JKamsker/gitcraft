@@ -24,11 +24,7 @@ fn url(repo: &Path, name: &str, push: bool) -> Result<String, String> {
 }
 impl Target {
     pub fn capture(repo: &Path, observed: &git::Remote) -> Result<Self, String> {
-        if !git::remotes(repo)?.iter().any(|r| r == observed) {
-            return Err("Sharing remote changed; refresh repository remotes and try again".into());
-        }
-        let source = git::CommandSource::capture(repo)?;
-        let captured_url = |push| {
+        let captured_url = |source: &Arc<git::CommandSource>, push| {
             let args = if push {
                 vec![
                     "remote",
@@ -54,9 +50,12 @@ impl Target {
                 ),
             }
         };
-        let fetch = captured_url(false)?;
-        let push = captured_url(true)?;
-        source.check_context()?;
+        let (source, fetch, push) = capture_destination(
+            observed,
+            || git::CommandSource::capture(repo),
+            captured_url,
+            |source| source.check_context(),
+        )?;
         Ok(Self {
             source,
             name: observed.name.clone(),
@@ -133,6 +132,24 @@ impl Target {
         )
     }
 }
+/// Selection and effective routing must agree inside the same frozen source. An
+/// earlier live `remotes` check cannot establish ownership of the later snapshot.
+fn capture_destination<S>(
+    observed: &git::Remote,
+    capture: impl FnOnce() -> Result<S, String>,
+    mut endpoint: impl FnMut(&S, bool) -> Result<String, String>,
+    check: impl FnOnce(&S) -> Result<(), String>,
+) -> Result<(S, String, String), String> {
+    let source = capture()?;
+    let fetch = endpoint(&source, false)?;
+    // Remote.url is the displayed fetch URL (including Git's URL rewrites).
+    if fetch != observed.url {
+        return Err("Sharing remote changed; refresh repository remotes and try again".into());
+    }
+    let push = endpoint(&source, true)?;
+    check(&source)?;
+    Ok((source, fetch, push))
+}
 fn cache_transaction(
     root: &str,
     before: &[(String, String)],
@@ -178,6 +195,60 @@ fn cache_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn r3_pure_sharing_selection_is_bound_to_the_frozen_endpoint_snapshot() -> Result<(), String> {
+        use std::cell::RefCell;
+        let observed = git::Remote {
+            name: "origin".into(),
+            url: "https://example.test/selected A".into(),
+        };
+        // Recording only: live selection was A, but capture consistently freezes B.
+        // Even an internally unchanged B snapshot must not become the destination.
+        let events = RefCell::new(Vec::new());
+        let changed = capture_destination(
+            &observed,
+            || {
+                events.borrow_mut().push("freeze B");
+                Ok("https://example.test/replacement B")
+            },
+            |frozen, push| {
+                assert!(!push, "must refuse before reading the replacement push URL");
+                events.borrow_mut().push("frozen fetch B");
+                Ok((*frozen).into())
+            },
+            |_| panic!("unchanged B cannot validate the observed A selection"),
+        );
+        assert!(
+            changed
+                .err()
+                .ok_or("accepted replacement")?
+                .contains("changed")
+        );
+        assert_eq!(*events.borrow(), ["freeze B", "frozen fetch B"]);
+
+        // A split push URL is legitimate: select using frozen effective fetch semantics,
+        // and retain the exact (possibly space-containing) effective endpoint strings.
+        let push = "ssh://push.example.test/team repo";
+        let (source, fetch, captured_push) = capture_destination(
+            &observed,
+            || Ok((observed.url.clone(), push.to_owned())),
+            |source, push| Ok(if push { &source.1 } else { &source.0 }.clone()),
+            |_| Ok(()),
+        )?;
+        assert_eq!(fetch, observed.url);
+        assert_eq!(captured_push, push);
+        assert_eq!(source, (fetch, captured_push));
+        assert!(
+            capture_destination(
+                &observed,
+                || Ok(observed.url.clone()),
+                |source, _| Ok(source.clone()),
+                |_| Err("context changed after capture".into()),
+            )
+            .is_err()
+        );
+        Ok(())
+    }
     #[test]
     fn r2_pure_artifact_cache_import_is_atomic_cas_and_cannot_cross_source() -> Result<(), String> {
         let root = "refs/gitcraft/intent-remotes/source/";

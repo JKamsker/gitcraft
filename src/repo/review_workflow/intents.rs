@@ -228,10 +228,13 @@ fn collect_selected(
             if !reference.starts_with(&root) {
                 continue;
             }
+            // Reaching the exact budget is complete only if no relevant refs remain,
+            // including in the next selected source. Refuse before reading another blob
+            // so a partial collection cannot be installed or marked freshly synced.
+            if bytes >= IMPORT_LIMIT {
+                return Err("Selected intent metadata exceeds the 4MiB import budget; read refused because more notes remain".into());
+            }
             let result: Result<Seen, String> = (|| {
-                if bytes >= IMPORT_LIMIT {
-                    return Err("Selected intent metadata exceeds the 4MiB import budget".into());
-                }
                 let text = blob(&object, CARD_LIMIT.min(IMPORT_LIMIT - bytes))?;
                 bytes = bytes.saturating_add(text.len());
                 if text.len() > CARD_LIMIT || bytes > IMPORT_LIMIT {
@@ -256,9 +259,6 @@ fn collect_selected(
                         reading.quarantine.push(format!("{reference}: {error}"));
                     }
                 }
-            }
-            if bytes >= IMPORT_LIMIT {
-                break;
             }
         }
     }
@@ -628,6 +628,62 @@ mod tests {
     }
     fn reference(root: &str, card: &Card) -> String {
         format!("{root}{:x}/{}", md5::compute(&card.email), card.id)
+    }
+    #[test]
+    fn r3_pure_intent_exact_budget_refuses_remaining_notes_without_fresh_sync() -> Result<(), String>
+    {
+        let count = IMPORT_LIMIT / CARD_LIMIT;
+        let selected = format!("{CACHE_ROOT}selected/");
+        // Exercise exactly full, one-more-in-source, and next-source boundary cases.
+        for (local_count, remote_count, refused) in
+            [(0, count, false), (0, count + 1, true), (count, 1, true)]
+        {
+            let mut reads = 0;
+            let result = collect_selected(
+                Some("selected"),
+                150,
+                |root| {
+                    let size = if root == ROOT {
+                        local_count
+                    } else {
+                        remote_count
+                    };
+                    assert!(root == ROOT || root == selected);
+                    Ok((0..size)
+                        .map(|n| {
+                            let card = card(&format!("{n:032x}"));
+                            (reference(root, &card), n.to_string())
+                        })
+                        .collect())
+                },
+                |object, budget| {
+                    reads += 1;
+                    assert_eq!(budget, CARD_LIMIT);
+                    let n: usize = object.parse().map_err(|_| "invalid recorded object")?;
+                    let card = card(&format!("{n:032x}"));
+                    let mut text = serde_json::to_string(&card).map_err(|e| e.to_string())?;
+                    // Valid trailing JSON whitespace reaches exactly 8192 bytes.
+                    text.push_str(&" ".repeat(CARD_LIMIT - text.len()));
+                    assert_eq!(text.len(), CARD_LIMIT);
+                    Ok(text)
+                },
+            );
+            assert_eq!(reads, count, "must never read the first omitted blob");
+            if refused {
+                let error = result.err().ok_or("silently accepted a partial read")?;
+                assert!(error.contains("4MiB") && error.contains("more notes remain"));
+                let mut state = State::default();
+                state.synced = 150;
+                assert!(state.accept(state.generation, Err(error)));
+                assert_eq!(state.synced, 0);
+                assert!(state.error.is_some());
+            } else {
+                let reading = result?;
+                assert_eq!(reading.rows.len(), count);
+                assert!(reading.quarantine.is_empty());
+            }
+        }
+        Ok(())
     }
     #[test]
     fn r2_pure_intent_sources_are_selected_before_parse_and_keep_same_id_separate()
