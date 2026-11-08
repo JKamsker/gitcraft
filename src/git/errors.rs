@@ -231,3 +231,82 @@ fn unquote(value: &str) -> String {
         None => value.to_owned(),
     }
 }
+
+/// Present only exact application-owned errors; preserve the raw error for classifiers.
+pub fn display_error(error: &str) -> String {
+    let id = match error {
+        "Account action cancelled." => "backend-account-action-cancelled-13efa7",
+        "Account check cancelled." => "backend-account-check-cancelled-34de37",
+        "Analysis cancelled" => "backend-analysis-cancelled-d5fe01",
+        "Atlas cancelled" => "backend-atlas-cancelled-b9165d",
+        "Bounded forge history lookup failed or was cancelled" => {
+            "backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7"
+        }
+        "Cancelled before this destination" => "backend-cancelled-before-this-destination-e79896",
+        "Comparison cancelled" => "backend-comparison-cancelled-fe0a3c",
+        "Content recovery cancelled or timed out" => {
+            "backend-content-recovery-cancelled-or-timed-out-b878c7"
+        }
+        "Draft cancelled" => "backend-draft-cancelled-426ba2",
+        "Draft permissions cancelled" => "backend-draft-permissions-cancelled-52db5c",
+        "Export cancelled" => "backend-export-cancelled-dbef83",
+        "File preview cancelled" => "backend-file-preview-cancelled-1db629",
+        "File recovery cancelled or exceeds 2 MiB" => {
+            "backend-file-recovery-cancelled-or-exceeds-2-mib-2d111b"
+        }
+        "Forge history response exceeded its budget or was cancelled" => {
+            "backend-forge-history-response-exceeded-its-budget-or-was-cancelled-233e64"
+        }
+        "Frame cancelled" => "backend-frame-cancelled-4d6f8f",
+        "GitLab operation cancelled" => "backend-gitlab-operation-cancelled-d11bad",
+        "History evidence request budget reached or cancelled" => {
+            "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d"
+        }
+        "History lookup cancelled" => "backend-history-lookup-cancelled-9533a8",
+        "Ignore edit cancelled before opening" => {
+            "backend-ignore-edit-cancelled-before-opening-012613"
+        }
+        "Ignore edit cancelled before publication" => {
+            "backend-ignore-edit-cancelled-before-publication-80ba37"
+        }
+        "Ignore preparation cancelled" => "backend-ignore-preparation-cancelled-a562fd",
+        "Ignore preview cancelled" => "backend-ignore-preview-cancelled-d6374a",
+        "Line history cancelled or exceeded120seconds" => {
+            "backend-line-history-cancelled-or-exceeded120seconds-7448a3"
+        }
+        "Not run: cancelled" => "backend-not-run-cancelled-02b0ef",
+        "Object inspection cancelled" => "backend-object-inspection-cancelled-e67f16",
+        "Provider request cancelled" => "backend-provider-request-cancelled-54eb9a",
+        "Provider request cancelled; refresh to establish any write outcome" => {
+            "backend-provider-request-cancelled-refresh-to-establish-any-write-outcome-70b94f"
+        }
+        "Public-key upload cancelled before sending." => {
+            "backend-public-key-upload-cancelled-before-sending-eecb8c"
+        }
+        "Push rejected, cancelled or outcome uncertain. Inspect the destination before queueing again." => {
+            "backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3"
+        }
+        "Read cancelled" => "backend-read-cancelled-045da9",
+        "Recovery cancelled" => "backend-recovery-cancelled-d0dd9f",
+        "Recovery cancelled before mutation" => "backend-recovery-cancelled-before-mutation-922fff",
+        "Replay cancelled" => "backend-replay-cancelled-c6ccd5",
+        "Review cancelled" => "backend-review-cancelled-519921",
+        "Saved graph view cancelled" => "backend-saved-graph-view-cancelled-754f0e",
+        "Setup operation cancelled" => "backend-setup-operation-cancelled-cdccbd",
+        "Symbol history cancelled or reached its time budget" => {
+            "backend-symbol-history-cancelled-or-reached-its-time-budget-6f2781"
+        }
+        "Symbol parsing cancelled" => "backend-symbol-parsing-cancelled-9fccaf",
+        "Symbol parsing cancelled or exceeded structural budget" => {
+            "backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57"
+        }
+        "Symbol parsing cancelled or exceeded two seconds" => {
+            "backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02"
+        }
+        "Working-folder publication cancelled" => {
+            "backend-working-folder-publication-cancelled-a8f541"
+        }
+        _ => return error.to_owned(),
+    };
+    crate::i18n::text(id).to_owned()
+}
