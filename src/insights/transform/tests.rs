@@ -266,3 +266,40 @@ fn a_branch_is_compared_since_its_merge_base_and_missing_heads_are_said() -> Res
     assert!(resolve(gone, &Ask::Commit("HEAD".into())).is_err());
     Ok(())
 }
+
+/// Hunks replacing line for line are an edit per line: the edits are bounded too, whole hunks
+/// kept, and the cut is said.
+#[test]
+fn edits_beyond_the_limit_are_left_out_by_whole_hunks() {
+    let lines: Vec<String> = (0..10).map(|i| format!("a{i}();")).collect();
+    let new: Vec<String> = (0..10).map(|i| format!("b{i}();")).collect();
+    let (lines, new): (Vec<&str>, Vec<&str>) = (
+        lines.iter().map(String::as_str).collect(),
+        new.iter().map(String::as_str).collect(),
+    );
+    let hunks: Vec<Hunk> = (0..5)
+        .map(|f| hunk(&format!("f{f}.rs"), 1, &lines, &new))
+        .collect();
+    let read = Read {
+        listed: hunks.len(),
+        hunks,
+        ..Read::default()
+    };
+    let t = analyze(
+        subject(),
+        read,
+        &Limits {
+            max_edits: 25,
+            ..Limits::default()
+        },
+    );
+    assert_eq!(t.edits.len(), 20, "two whole hunks of ten");
+    assert!(t.edits.iter().all(|e| e.hunk < 2));
+    assert!(
+        t.provenance
+            .partial
+            .as_deref()
+            .is_some_and(|p| p.contains("25 edits"))
+    );
+    assert_eq!(grouped(Vec::new()).edits.len(), 0);
+}

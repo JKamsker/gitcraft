@@ -651,7 +651,13 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let mut found_report = None;
     if let Some(name) = &name {
         let path = report_path(repo, name);
-        let too_big = |len: u64| format!("{name} is bigger than {} MB", MAX_REPORT >> 20);
+        let too_big = |len: u64| {
+            format!(
+                "{name} is {} MB, more than the {} MB read",
+                len >> 20,
+                MAX_REPORT >> 20
+            )
+        };
         if !crate::remote::is_remote(repo)
             && let Ok(meta) = std::fs::metadata(&path)
             && meta.len() > MAX_REPORT

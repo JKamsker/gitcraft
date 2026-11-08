@@ -31,6 +31,9 @@ pub struct Limits {
     pub max_hunks: usize,
     /// Edits with more tokens on a side than this aren't compared: each is its own group.
     pub max_tokens: usize,
+    /// At most so many edits are grouped (a hunk replacing as many lines as it removed is an
+    /// edit per line, so hunks alone don't bound them).
+    pub max_edits: usize,
 }
 
 impl Default for Limits {
@@ -40,6 +43,7 @@ impl Default for Limits {
             max_file_lines: 3000,
             max_hunks: 3000,
             max_tokens: 400,
+            max_edits: 6000,
         }
     }
 }
@@ -373,6 +377,12 @@ pub fn analyze(subject: Subject, read: diff::Read, limits: &Limits) -> Transform
             });
         }
     }
+    let edits_cut = edits.len() > limits.max_edits;
+    if edits_cut {
+        // Whole hunks are kept: an edit of a hunk isn't shown without the rest of it.
+        let last = edits[limits.max_edits].hunk;
+        edits.retain(|e| e.hunk < last);
+    }
     let signed: Vec<Signed> = edits
         .iter()
         .enumerate()
@@ -397,6 +407,12 @@ pub fn analyze(subject: Subject, read: diff::Read, limits: &Limits) -> Transform
             "{} files with over {} lines changed aren't read",
             read.too_large.len(),
             limits.max_file_lines
+        ));
+    }
+    if edits_cut {
+        partial.push(format!(
+            "only the first {} edits are grouped",
+            limits.max_edits
         ));
     }
     if read.hunks_cut {

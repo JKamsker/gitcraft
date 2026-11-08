@@ -145,7 +145,6 @@ pub(super) struct Extra {
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
 const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 
-/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 thread_local! {
     /// Git runs on this thread are reads that mustn't fetch (see [`offline`]).
     static OFFLINE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -167,6 +166,7 @@ pub fn offline<T>(work: impl FnOnce() -> T) -> T {
 
 const NO_LAZY_FETCH: &str = "GIT_NO_LAZY_FETCH";
 
+/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
     let with_offline;
