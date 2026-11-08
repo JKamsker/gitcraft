@@ -58,34 +58,95 @@ impl ByteHistory {
         }
         let mut open = true;
         let mut chosen = None;
-        egui::Window::new("Scanned file history across refs")
+        egui::Window::new(crate::i18n::text("repo-workflows-atlas-show-7269bb4e"))
             .id(egui::Id::new(("atlas-byte-history", &owner.repo)))
             .open(&mut open)
             .default_size([780.0, 520.0])
             .show(ctx, |ui| {
-                ui.label(format!("Exact path bytes: {}", clipped(&self.label,256)))
-                    .on_hover_text(&self.label);
-                ui.label(format!("{} touching commits among {} scanned unique commits · {} reference tips{}{}",
-                    self.rows.len(), self.history.commits.len(), self.history.tips,
-                    if self.history.more {" · partial history"} else {" · all reachable history scanned"},
-                    if self.history.shallow {" · shallow boundary"} else {""}));
-                ui.small("This list matches this exact path across the analyzed refs, including deletions. It uses the full scanned snapshot, independent of the atlas time window; it does not follow renames to other paths. Open a commit to inspect its changes. For older changes, use Scan more atlas history in the atlas.");
-                if self.reader.busy() {ui.label("Preparing file history…");}
-                if let Some(error) = &self.error {ui.colored_label(crate::theme::Tokens::get(ctx).danger,error);}
+                ui.label(crate::i18n::message(
+                    "repo-workflows-atlas-show-8647a64f",
+                    &[(
+                        "clipped-self-label-256-1",
+                        (clipped(&self.label, 256)).clone().into(),
+                    )],
+                ))
+                .on_hover_text(&self.label);
+                ui.label(crate::i18n::message(
+                    "repo-workflows-atlas-touching-summary",
+                    &[
+                        ("touching", (self.rows.len()).into()),
+                        ("scanned", (self.history.commits.len()).into()),
+                        ("tips", (self.history.tips).into()),
+                        (
+                            "partial",
+                            (if self.history.more { "yes" } else { "no" }).into(),
+                        ),
+                        (
+                            "shallow",
+                            (if self.history.shallow { "yes" } else { "no" }).into(),
+                        ),
+                    ],
+                ));
+                ui.small(crate::i18n::text("repo-workflows-atlas-show-076017ad"));
+                if self.reader.busy() {
+                    ui.label(crate::i18n::text("repo-workflows-atlas-show-01efcd54"));
+                }
+                if let Some(error) = &self.error {
+                    ui.colored_label(crate::theme::Tokens::get(ctx).danger, error);
+                }
                 let pages = self.rows.len().div_ceil(100).max(1);
-                self.page = self.page.min(pages-1);
+                self.page = self.page.min(pages - 1);
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(self.page>0,egui::Button::new("Previous file commits")).clicked() {self.page-=1;}
-                    ui.label(format!("{} / {pages}",self.page+1));
-                    if ui.add_enabled(self.page+1<pages,egui::Button::new("Next file commits")).clicked() {self.page+=1;}
-                });
-                egui::ScrollArea::vertical().max_height(380.0).show(ui,|ui| {
-                    for &at in self.rows.iter().skip(self.page*100).take(100) {
-                        let record=&self.history.commits[at];
-                        if ui.button(format!("{} · {} · {} · {}", record.day(self.clock), record.hash.get(..8).unwrap_or(&record.hash), clipped(&record.name,96), clipped(&record.subject,200))).clicked() {chosen=Some(record.hash.clone());}
+                    if ui
+                        .add_enabled(
+                            self.page > 0,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-atlas-show-56fe4d78",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.page -= 1;
                     }
-                    if self.rows.is_empty() && !self.reader.busy() && self.error.is_none() {ui.label("No scanned commits touch this exact path. Its history may precede the scan boundary.");}
+                    ui.label(format!(
+                        "{} / {}",
+                        crate::i18n::number(self.page + 1),
+                        crate::i18n::number(pages)
+                    ));
+                    if ui
+                        .add_enabled(
+                            self.page + 1 < pages,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-atlas-show-1abc4096",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.page += 1;
+                    }
                 });
+                egui::ScrollArea::vertical()
+                    .max_height(380.0)
+                    .show(ui, |ui| {
+                        for &at in self.rows.iter().skip(self.page * 100).take(100) {
+                            let record = &self.history.commits[at];
+                            if ui
+                                .button(format!(
+                                    "{} · {} · {} · {}",
+                                    record.day(self.clock),
+                                    record.hash.get(..8).unwrap_or(&record.hash),
+                                    clipped(&record.name, 96),
+                                    clipped(&record.subject, 200)
+                                ))
+                                .clicked()
+                            {
+                                chosen = Some(record.hash.clone());
+                            }
+                        }
+                        if self.rows.is_empty() && !self.reader.busy() && self.error.is_none() {
+                            ui.label(crate::i18n::text("repo-workflows-atlas-show-c256cd01"));
+                        }
+                    });
             });
         (open, chosen)
     }

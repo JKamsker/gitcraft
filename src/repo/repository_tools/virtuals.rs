@@ -60,15 +60,26 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
     None
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Parallel branches in this folder");
-    ui.label("Each hunk belongs to one real branch. The checked-out branch stays at its anchor commit, and Git's real index stays intact. Virtual branch commits use reviewed raw contents, create unsigned commits and bypass hooks and filters. Changed ownership and overlapping activation require explicit resolution. Working-folder changes require native macOS/Linux.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-eef651ca",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-6b30bed0",
+    ));
     if ui
-        .button("Refresh ownership and working snapshot")
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-ea721fba",
+        ))
         .clicked()
     {
         acts.push(Action::RepositoryTools(Act::Virtuals));
     }
-    if ui.button("Inspect state publication receipts").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-ab27abcb",
+        ))
+        .clicked()
+    {
         acts.push(Action::RepositoryTools(Act::StateReceipts));
     }
     let Some(result) = &mut state.result else {
@@ -88,16 +99,28 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, e);
             }
             if let Some(m) = &view.state.mode {
-                ui.label(format!(
-                    "Anchor: {} at {}",
-                    m.anchor,
-                    crate::repo::short(&m.base)
+                ui.label(crate::i18n::message(
+                    "repo-workflows-repository_tools-show-8fd0f155",
+                    &[
+                        ("m-anchor-1", (m.anchor).clone().into()),
+                        (
+                            "crate-repo-short-m-base-2",
+                            (crate::repo::short(&m.base)).clone().into(),
+                        ),
+                    ],
                 ));
             }
             ui.horizontal(|ui| {
-                ui.label("New real branch:");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-e5c0b5df",
+                ));
                 ui.text_edit_singleline(&mut state.query);
-                if ui.button("Create virtual branch").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-faf582fc",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::RepositoryTools(Act::EditVirtual(
                         Box::new(view.clone()),
                         logic::Edit::Create(state.query.clone()),
@@ -105,14 +128,21 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 }
             });
             ui.horizontal(|ui| {
-                if ui.button("Undo last virtual operation").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-469f9427",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::RepositoryTools(Act::UndoVirtual(Box::new(
                         view.clone(),
                     ))));
                 }
                 if view.state.mode.is_some()
                     && ui
-                        .button("Leave mode; retain files and branch refs")
+                        .button(crate::i18n::text(
+                            "repo-workflows-repository_tools-show-fff50056",
+                        ))
                         .clicked()
                 {
                     acts.push(Action::RepositoryTools(Act::EditVirtual(
@@ -122,55 +152,213 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 }
             });
             let Some(mode) = &view.state.mode else {
-                ui.label("Create a new branch to start. Existing working hunks remain unassigned until you choose their owners.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-efdfe52a",
+                ));
                 return;
             };
-            egui::ScrollArea::vertical().max_height(500.0).show(ui,|ui|{
-                for b in &mode.branches {
-                    egui::CollapsingHeader::new(format!("{} · {} · {} owned hunks",b.name,if b.active{"active"}else{"inactive"},b.owned.len())).id_salt(("virtual-branch",&b.name)).default_open(true).show(ui,|ui|{
-                        ui.label(format!("Real branch tip: {}",b.tip));
-                        let key=ui.id().with(("virtual-message",&view.version,&b.name));let mut message=ui.ctx().data_mut(|d|d.get_temp::<String>(key)).unwrap_or_else(||b.message.clone());
-                        if ui.add(egui::TextEdit::multiline(&mut message).hint_text("Draft commit message").desired_rows(2)).changed(){ui.ctx().data_mut(|d|d.insert_temp(key,message.clone()));}
-                        if message!=b.message&&ui.button("Save branch draft").clicked(){acts.push(Action::RepositoryTools(Act::EditVirtual(Box::new(view.clone()),logic::Edit::Message(b.name.clone(),message))));}
-                        ui.horizontal(|ui|{
-                            if ui.button(if b.active{"Deactivate these hunks"}else{"Activate these hunks"}).clicked(){acts.push(Action::RepositoryTools(Act::ToggleVirtual(Box::new(view.clone()),b.name.clone())));}
-                            if ui.add_enabled(b.active&&!b.message.trim().is_empty(),egui::Button::new("Preview commit of owned hunks…")).clicked(){acts.push(Action::RepositoryTools(Act::PrepareVirtual(Box::new(view.clone()),b.name.clone())));}
+            egui::ScrollArea::vertical()
+                .max_height(500.0)
+                .show(ui, |ui| {
+                    for b in &mode.branches {
+                        egui::CollapsingHeader::new(crate::i18n::message(
+                            "repo-workflows-repository_tools-show-6f2680ab",
+                            &[
+                                ("b-name-1", (b.name).clone().into()),
+                                (
+                                    "if-b-active-active-else-inactive-2",
+                                    (if b.active { "active" } else { "inactive" })
+                                        .clone()
+                                        .into(),
+                                ),
+                                ("b-owned-len-3", (b.owned.len()).clone().into()),
+                            ],
+                        ))
+                        .id_salt(("virtual-branch", &b.name))
+                        .default_open(true)
+                        .show(ui, |ui| {
+                            ui.label(crate::i18n::message(
+                                "repo-workflows-repository_tools-show-7ffc5022",
+                                &[("b-tip-1", (b.tip).clone().into())],
+                            ));
+                            let key = ui.id().with(("virtual-message", &view.version, &b.name));
+                            let mut message = ui
+                                .ctx()
+                                .data_mut(|d| d.get_temp::<String>(key))
+                                .unwrap_or_else(|| b.message.clone());
+                            if ui
+                                .add(
+                                    egui::TextEdit::multiline(&mut message)
+                                        .hint_text(crate::i18n::text(
+                                            "repo-workflows-repository_tools-show-f581c406",
+                                        ))
+                                        .desired_rows(2),
+                                )
+                                .changed()
+                            {
+                                ui.ctx().data_mut(|d| d.insert_temp(key, message.clone()));
+                            }
+                            if message != b.message
+                                && ui
+                                    .button(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-0ae1bed9",
+                                    ))
+                                    .clicked()
+                            {
+                                acts.push(Action::RepositoryTools(Act::EditVirtual(
+                                    Box::new(view.clone()),
+                                    logic::Edit::Message(b.name.clone(), message),
+                                )));
+                            }
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .button(if b.active {
+                                        crate::i18n::text(
+                                            "repo-workflows-repository_tools-show-a39608b9",
+                                        )
+                                    } else {
+                                        crate::i18n::text(
+                                            "repo-workflows-repository_tools-show-be1e9f5f",
+                                        )
+                                    })
+                                    .clicked()
+                                {
+                                    acts.push(Action::RepositoryTools(Act::ToggleVirtual(
+                                        Box::new(view.clone()),
+                                        b.name.clone(),
+                                    )));
+                                }
+                                if ui
+                                    .add_enabled(
+                                        b.active && !b.message.trim().is_empty(),
+                                        egui::Button::new(crate::i18n::text(
+                                            "repo-workflows-repository_tools-show-d329d33b",
+                                        )),
+                                    )
+                                    .clicked()
+                                {
+                                    acts.push(Action::RepositoryTools(Act::PrepareVirtual(
+                                        Box::new(view.clone()),
+                                        b.name.clone(),
+                                    )));
+                                }
+                            });
+                            for h in &b.owned {
+                                if b.active && view.hunks.iter().all(|now| now.key != h.key) {
+                                    ui.colored_label(
+                                        crate::theme::Tokens::get(ui.ctx()).danger,
+                                        crate::i18n::message(
+                                            "repo-workflows-repository_tools-show-ab31db17",
+                                            &[("h-path-1", (h.path).clone().into())],
+                                        ),
+                                    );
+                                    if ui
+                                        .button(crate::i18n::message(
+                                            "repo-workflows-repository_tools-show-8bbd26a7",
+                                            &[("h-key-8-1", (&h.key[..8]).clone().into())],
+                                        ))
+                                        .clicked()
+                                    {
+                                        acts.push(Action::RepositoryTools(Act::EditVirtual(
+                                            Box::new(view.clone()),
+                                            logic::Edit::Release(b.name.clone(), h.key.clone()),
+                                        )));
+                                    }
+                                } else if !b.active {
+                                    ui.label(crate::i18n::message(
+                                        "repo-workflows-repository_tools-show-a253af39",
+                                        &[
+                                            ("h-path-1", (h.path).clone().into()),
+                                            ("h-key-8-2", (&h.key[..8]).clone().into()),
+                                        ],
+                                    ));
+                                }
+                            }
                         });
-                        for h in &b.owned {if b.active && view.hunks.iter().all(|now|now.key!=h.key){ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger,format!("Stale ownership: {}",h.path));if ui.button(format!("Release stale ownership {}",&h.key[..8])).clicked(){acts.push(Action::RepositoryTools(Act::EditVirtual(Box::new(view.clone()),logic::Edit::Release(b.name.clone(),h.key.clone()))));}}else if !b.active{ui.label(format!("Saved inactive: {} · {}",h.path,&h.key[..8]));}}
-                    });
-                }
-                ui.separator();ui.label("Current hunks and their owners:");
-                for h in &view.hunks {
-                    let owner=mode.branches.iter().find(|b|b.active&&b.owned.iter().any(|own|own.key==h.key));
-                    ui.horizontal(|ui|{
-                        ui.label(&h.path);
-                        egui::ComboBox::from_id_salt(("virtual-owner",&h.key)).selected_text(owner.map_or("Unassigned",|b|b.name.as_str())).show_ui(ui,|ui|{
-                            if ui.selectable_label(owner.is_none(),"Unassigned").clicked(){acts.push(Action::RepositoryTools(Act::EditVirtual(Box::new(view.clone()),logic::Edit::Assign(String::new(),h.key.clone()))));}
-                            for b in mode.branches.iter().filter(|b|b.active){if ui.selectable_label(owner.is_some_and(|o|o.name==b.name),&b.name).clicked(){acts.push(Action::RepositoryTools(Act::EditVirtual(Box::new(view.clone()),logic::Edit::Assign(b.name.clone(),h.key.clone()))));}}
+                    }
+                    ui.separator();
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-5370d2e8",
+                    ));
+                    for h in &view.hunks {
+                        let owner = mode
+                            .branches
+                            .iter()
+                            .find(|b| b.active && b.owned.iter().any(|own| own.key == h.key));
+                        ui.horizontal(|ui| {
+                            ui.label(&h.path);
+                            egui::ComboBox::from_id_salt(("virtual-owner", &h.key))
+                                .selected_text(owner.map_or(
+                                    crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-14d33bd0",
+                                    ),
+                                    |b| b.name.as_str(),
+                                ))
+                                .show_ui(ui, |ui| {
+                                    if ui
+                                        .selectable_label(
+                                            owner.is_none(),
+                                            crate::i18n::text(
+                                                "repo-workflows-repository_tools-show-14d33bd0",
+                                            ),
+                                        )
+                                        .clicked()
+                                    {
+                                        acts.push(Action::RepositoryTools(Act::EditVirtual(
+                                            Box::new(view.clone()),
+                                            logic::Edit::Assign(String::new(), h.key.clone()),
+                                        )));
+                                    }
+                                    for b in mode.branches.iter().filter(|b| b.active) {
+                                        if ui
+                                            .selectable_label(
+                                                owner.is_some_and(|o| o.name == b.name),
+                                                &b.name,
+                                            )
+                                            .clicked()
+                                        {
+                                            acts.push(Action::RepositoryTools(Act::EditVirtual(
+                                                Box::new(view.clone()),
+                                                logic::Edit::Assign(b.name.clone(), h.key.clone()),
+                                            )));
+                                        }
+                                    }
+                                });
                         });
-                    });
-                    ui.monospace(h.patch.chars().take(12000).collect::<String>());if h.patch.chars().count()>12000{ui.label("Hunk display truncated; inspect the file diff before assigning ownership.");}
-                }
-            });
+                        ui.monospace(h.patch.chars().take(12000).collect::<String>());
+                        if h.patch.chars().count() > 12000 {
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-5f715b70",
+                            ));
+                        }
+                    }
+                });
         }
         Data::VirtualCommit(p) => {
-            ui.label(format!("Only owned hunks of {} will enter this branch commit. The folder, anchor and real index remain as reviewed.",p.name));
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-aaac53fc",
+                &[("p-name-1", (p.name).clone().into())],
+            ));
             egui::ScrollArea::vertical()
                 .max_height(430.0)
                 .show(ui, |ui| {
                     ui.monospace(p.patch.chars().take(64000).collect::<String>());
                 });
             if p.patch.chars().count() > 64000 {
-                ui.label("Preview display truncated at 64000 characters.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-5e3184e8",
+                ));
             }
             ui.checkbox(
                 &mut state.acknowledged,
-                "Commit this exact owned-hunk tree as an unsigned virtual branch commit",
+                crate::i18n::text("repo-workflows-repository_tools-show-9cbacb41"),
             );
             if ui
                 .add_enabled(
                     state.acknowledged,
-                    egui::Button::new("Commit this branch only"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-111eda2a",
+                    )),
                 )
                 .clicked()
             {

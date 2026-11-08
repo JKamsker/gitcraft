@@ -154,27 +154,36 @@ pub(crate) fn name_problem(name: &str) -> Option<String> {
         .find(|c| c.is_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'));
     let parts = || name.split('/');
     let why = if name.is_empty() {
-        "The branch needs a name".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-4b6fdeb4").to_owned()
     } else if name.starts_with('-') {
-        "A branch's name can't start with -".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-5e1d1dfc").to_owned()
     } else if name == "HEAD" || name == "@" {
-        format!("{name} is a name git keeps for itself")
+        crate::i18n::message(
+            "repo-workflows-issue_work-name-problem-7b27dd13",
+            &[("name", (name).clone().into())],
+        )
     } else if let Some(c) = bad {
         if c.is_control() {
-            "A branch's name can't have control characters in it".to_owned()
+            crate::i18n::text("repo-workflows-issue_work-name-problem-b9131e75").to_owned()
         } else {
-            format!("A branch's name can't have {c} in it")
+            crate::i18n::message(
+                "repo-workflows-issue_work-name-problem-4be6bde2",
+                &[("c", c.to_string().into())],
+            )
         }
     } else if let Some(two) = ["..", "@{"].into_iter().find(|s| name.contains(s)) {
-        format!("A branch's name can't have {two} in it")
+        crate::i18n::message(
+            "repo-workflows-issue_work-name-problem-72447597",
+            &[("two", (two).clone().into())],
+        )
     } else if parts().any(str::is_empty) {
-        "A branch's name can't start or end with /, nor have // in it".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-e2570ee3").to_owned()
     } else if parts().any(|part| part.starts_with('.')) {
-        "No part of a branch's name (between /) can start with .".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-b19e092f").to_owned()
     } else if parts().any(|part| part.ends_with(".lock")) {
-        "No part of a branch's name (between /) can end with .lock".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-64d737b0").to_owned()
     } else if name.ends_with('.') {
-        "A branch's name can't end with .".to_owned()
+        crate::i18n::text("repo-workflows-issue_work-name-problem-8e7a7abd").to_owned()
     } else {
         return None;
     };

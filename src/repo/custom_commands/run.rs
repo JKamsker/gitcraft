@@ -50,14 +50,26 @@ impl RepoTab {
     ) {
         let script = cc::captured_program(vars, command);
         let repo = self.path.clone();
-        self.finished.push((format!("Running {name}…"), false));
+        self.finished.push((
+            crate::i18n::message(
+                "repo-workflows-custom_commands-run-custom-captured-5215b5ab",
+                &[("name", (name).clone().into())],
+            ),
+            false,
+        ));
         self.then(
             ctx,
             move || crate::git::run_shell(&repo, &script),
             move |tab, ran, _| {
                 let toast = match ran {
                     Ok(out) => cc::toast_text(&name, out.code, &out.stdout, &out.stderr),
-                    Err(e) => (format!("{name} couldn't be run: {e}"), true),
+                    Err(e) => (
+                        crate::i18n::message(
+                            "repo-workflows-custom_commands-run-custom-captured-471b45de",
+                            &[("name", (name).clone().into()), ("e", (e).clone().into())],
+                        ),
+                        true,
+                    ),
                 };
                 tab.finished.push(toast);
             },
@@ -82,7 +94,12 @@ impl RepoTab {
                 self.active_terminal = self.terminals.len() - 1;
                 self.terminal_error = None;
             }
-            Err(e) => self.terminal_error = Some(format!("{name} couldn't be started: {e}")),
+            Err(e) => {
+                self.terminal_error = Some(crate::i18n::message(
+                    "repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3",
+                    &[("name", (name).clone().into()), ("e", (e).clone().into())],
+                ))
+            }
         }
         self.terminal_open = true;
     }

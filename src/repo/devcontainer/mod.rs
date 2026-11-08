@@ -100,7 +100,10 @@ impl RepoTab {
                         state.config = None;
                         state.binding = None;
                         state.checked = false;
-                        state.result = "Profile changed or operation cancelled. A created container may remain; inspect its displayed worktree labels before retrying.".into();
+                        state.result = crate::i18n::text(
+                            "repo-workflows-devcontainer-devcontainer-window-7cb7e0b2",
+                        )
+                        .into();
                     } else {
                         match reply {
                             Ok(Reply::Config(config)) => {
@@ -108,12 +111,22 @@ impl RepoTab {
                                     state.open = true;
                                 }
                                 state.config = config;
-                                state.result = if state.config.is_some() { "Configuration detected; review it before starting" } else { "No .devcontainer/devcontainer.json detected. Remote worktrees require the CLI on their own machine; this integration supports local worktrees." }.into();
+                                state.result = if state.config.is_some() {
+                                    crate::i18n::text(
+                                        "repo-workflows-devcontainer-devcontainer-window-a79d7c99",
+                                    )
+                                } else {
+                                    crate::i18n::text(
+                                        "repo-workflows-devcontainer-devcontainer-window-22f9e7ca",
+                                    )
+                                }
+                                .into();
                             }
                             Ok(Reply::Started(binding)) => {
-                                state.result =
-                                    "Environment started and its worktree mount/ownership checked"
-                                        .into();
+                                state.result = crate::i18n::text(
+                                    "repo-workflows-devcontainer-devcontainer-window-d66d64d1",
+                                )
+                                .into();
                                 state.binding = Some(binding);
                             }
                             Ok(Reply::Editor(result)) => state.result = result,
@@ -128,17 +141,21 @@ impl RepoTab {
                                     self.active_terminal = self.terminals.len() - 1;
                                     self.terminal_error = None;
                                     self.terminal_open = true;
-                                    state.result =
-                                        "Opened /bin/sh inside the displayed container".into();
+                                    state.result = crate::i18n::text(
+                                        "repo-workflows-devcontainer-devcontainer-window-bbd55e3e",
+                                    )
+                                    .into();
                                 } else {
-                                    state.result =
-                                        "Terminal handoff expired or was cancelled; open it again"
-                                            .into();
+                                    state.result = crate::i18n::text(
+                                        "repo-workflows-devcontainer-devcontainer-window-4564ef3d",
+                                    )
+                                    .into();
                                 }
                             }
                             Err(error) => {
-                                state.result = format!(
-                                    "{error}\nStart/rebuild may have partly completed. Check Docker availability, installed Dev Container CLI, build files and lifecycle-command errors above. No global cleanup is performed; inspect this worktree's labels before retrying."
+                                state.result = crate::i18n::message(
+                                    "repo-workflows-devcontainer-devcontainer-window-d8db68fe",
+                                    &[("error", (error).clone().into())],
                                 )
                             }
                         }
@@ -149,7 +166,10 @@ impl RepoTab {
                         self.busy_op = None;
                     }
                     state.pending = None;
-                    state.result = "Worker ended or was cancelled. A container may remain; inspect this worktree's labels before retrying.".into();
+                    state.result = crate::i18n::text(
+                        "repo-workflows-devcontainer-devcontainer-window-0c79d376",
+                    )
+                    .into();
                 }
                 Err(mpsc::TryRecvError::Empty) => {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
@@ -175,27 +195,150 @@ impl RepoTab {
             return;
         }
         let mut open = true;
-        egui::Window::new("Worktree environment · Dev Containers").id(egui::Id::new(("devcontainer", &self.path))).open(&mut open).default_width(730.0).vscroll(true).show(ctx, |ui| {
-            ui.label("Uses installed Docker and the Dev Container CLI on this machine. Linux containers with an exact worktree bind mount are supported. Linked Git worktrees require standard relative POSIX metadata and the native common-directory mount. Compose or combined custom workspaceFolder/workspaceMount linked layouts are refused; metadata is never rewritten. Containers persist after closing this window.");
-            if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button("Cancel operation").clicked() { acts.push(Action::Devcontainer(Act::Cancel)); } }
-            ui.add(egui::Label::new(&state.result).selectable(true));
+        egui::Window::new(crate::i18n::text(
+            "repo-workflows-devcontainer-devcontainer-window-b64ae277",
+        ))
+        .id(egui::Id::new(("devcontainer", &self.path)))
+        .open(&mut open)
+        .default_width(730.0)
+        .vscroll(true)
+        .show(ctx, |ui| {
+            ui.label(crate::i18n::text(
+                "repo-workflows-devcontainer-devcontainer-window-3c898437",
+            ));
+            if state.pending.is_some() {
+                ui.add(crate::spinner::Spinner::new());
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-devcontainer-devcontainer-window-b64a0d4f",
+                    ))
+                    .clicked()
+                {
+                    acts.push(Action::Devcontainer(Act::Cancel));
+                }
+            }
+            ui.add(
+                egui::Label::new(crate::repo::activity::display_workflow_error(&state.result))
+                    .selectable(true),
+            );
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
-                if ui.button("Read worktree configuration again").clicked() { acts.push(Action::Devcontainer(Act::Read)); }
-                let Some(config) = &state.config else { return; };
-                ui.monospace(format!("Worktree: {}\nOwnership: {}\nConfiguration SHA256: {}", config.path.display(), config.label(), model::hash(config.source.as_bytes())));
-                egui::CollapsingHeader::new("devcontainer.json (JSON with comments supported by native CLI)").show(ui, |ui| { ui.add(egui::Label::new(&config.source).selectable(true)); });
-                ui.label("Starting runs this repository's Docker/build/features and lifecycle commands. Review the repository and its referenced files first. Rebuilding deletes only the displayed owned container; unsaved container-only files are lost.");
-                ui.checkbox(&mut state.trust, "I trust this worktree's container configuration and lifecycle commands");
-                if ui.add_enabled(state.trust && !state.binding.as_ref().is_some_and(|b| b.config != *config), egui::Button::new("Start environment")).clicked() { acts.push(Action::Devcontainer(Act::Start)); }
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-devcontainer-devcontainer-window-437e57b5",
+                    ))
+                    .clicked()
+                {
+                    acts.push(Action::Devcontainer(Act::Read));
+                }
+                let Some(config) = &state.config else {
+                    return;
+                };
+                ui.monospace(crate::i18n::message(
+                    "repo-workflows-devcontainer-devcontainer-window-3675738c",
+                    &[
+                        (
+                            "config-path-display-1",
+                            config.path.display().to_string().into(),
+                        ),
+                        ("config-label-2", (config.label()).clone().into()),
+                        (
+                            "model-hash-config-source-as-byte-3",
+                            (model::hash(config.source.as_bytes())).clone().into(),
+                        ),
+                    ],
+                ));
+                egui::CollapsingHeader::new(crate::i18n::text(
+                    "repo-workflows-devcontainer-devcontainer-window-df4a39c8",
+                ))
+                .id_salt("devcontainer-source")
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(&config.source).selectable(true));
+                });
+                ui.label(crate::i18n::text(
+                    "repo-workflows-devcontainer-devcontainer-window-3a6ea0e2",
+                ));
+                ui.checkbox(
+                    &mut state.trust,
+                    crate::i18n::text("repo-workflows-devcontainer-devcontainer-window-c1f95bd8"),
+                );
+                if ui
+                    .add_enabled(
+                        state.trust && !state.binding.as_ref().is_some_and(|b| b.config != *config),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-devcontainer-devcontainer-window-05be654b",
+                        )),
+                    )
+                    .clicked()
+                {
+                    acts.push(Action::Devcontainer(Act::Start));
+                }
                 if let Some(binding) = &state.binding {
-                    ui.separator(); ui.monospace(format!("Container: {}\nDocker context: {}\nDaemon: {}\nWorkspace: {}\nUser: {}", binding.id, binding.engine.context, binding.engine.id, binding.folder, binding.user));
-                    ui.label(format!("Container configuration SHA256: {}", model::hash(binding.config.source.as_bytes())));
-                    if binding.config != *config { ui.label("Configuration changed: rebuild the displayed container before terminal/editor use. Containers from older app sessions/configurations can remain in Docker."); }
-                    ui.label("Terminal uses Docker exec with this native remote user and /bin/sh; editor requires VS Code with its Dev Containers extension.");
-                    ui.horizontal(|ui| { if ui.button("Terminal inside container").clicked() { acts.push(Action::Devcontainer(Act::Terminal)); }
-if ui.button("Open container in VS Code").clicked() { acts.push(Action::Devcontainer(Act::Editor)); } });
-                    ui.checkbox(&mut state.rebuild, "Delete this container and rebuild (container-only files will be lost)");
-                    if ui.add_enabled(state.trust && state.rebuild, egui::Button::new("Rebuild displayed environment")).clicked() { acts.push(Action::Devcontainer(Act::Rebuild)); }
+                    ui.separator();
+                    ui.monospace(crate::i18n::message(
+                        "repo-workflows-devcontainer-devcontainer-window-5d2a90a9",
+                        &[
+                            ("binding-id-1", (binding.id).clone().into()),
+                            (
+                                "binding-engine-context-2",
+                                (binding.engine.context).clone().into(),
+                            ),
+                            ("binding-engine-id-3", (binding.engine.id).clone().into()),
+                            ("binding-folder-4", (binding.folder).clone().into()),
+                            ("binding-user-5", (binding.user).clone().into()),
+                        ],
+                    ));
+                    ui.label(crate::i18n::message(
+                        "repo-workflows-devcontainer-devcontainer-window-473f0412",
+                        &[(
+                            "model-hash-binding-config-source-1",
+                            (model::hash(binding.config.source.as_bytes()))
+                                .clone()
+                                .into(),
+                        )],
+                    ));
+                    if binding.config != *config {
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-devcontainer-devcontainer-window-6e69284d",
+                        ));
+                    }
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-devcontainer-devcontainer-window-dfcb3d90",
+                    ));
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-devcontainer-devcontainer-window-2d5a4455",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Devcontainer(Act::Terminal));
+                        }
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-devcontainer-devcontainer-window-4227dbe9",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Devcontainer(Act::Editor));
+                        }
+                    });
+                    ui.checkbox(
+                        &mut state.rebuild,
+                        crate::i18n::text(
+                            "repo-workflows-devcontainer-devcontainer-window-8f14be4f",
+                        ),
+                    );
+                    if ui
+                        .add_enabled(
+                            state.trust && state.rebuild,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-devcontainer-devcontainer-window-20441b4a",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::Devcontainer(Act::Rebuild));
+                    }
                 }
             });
         });
@@ -308,7 +451,9 @@ if ui.button("Open container in VS Code").clicked() { acts.push(Action::Devconta
                     context: connections::current(),
                     mutation,
                 });
-                state.result = "Working…".into();
+                state.result =
+                    crate::i18n::text("repo-workflows-devcontainer-devcontainer-act-5474eef8")
+                        .into();
             }
             Err(error) => state.result = error,
         }

@@ -16,12 +16,14 @@ pub(crate) struct Destination {
 impl Destination {
     pub fn capture(path: &Path) -> Result<Self, String> {
         if !path.is_absolute() {
-            return Err("Choose an absolute local destination".into());
+            return Err(crate::i18n::text("repo-workflows-postcards-capture-169c28d7").into());
         }
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or("Destination filename is not UTF-8")?
+            .ok_or(crate::i18n::text(
+                "repo-workflows-postcards-capture-66ecc9df",
+            ))?
             .to_owned();
         let folded = name.to_lowercase();
         let stem = folded.split('.').next().unwrap_or_default();
@@ -30,9 +32,14 @@ impl Destination {
             || matches!(stem,"con"|"prn"|"aux"|"nul")
             || (stem.len()==4 && (stem.starts_with("com")||stem.starts_with("lpt")) && matches!(stem.as_bytes()[3],b'1'..=b'9'))
         {
-            return Err("Invalid export filename".into());
+            return Err(crate::i18n::text("repo-workflows-postcards-capture-1451a954").into());
         }
-        let parent = path.parent().ok_or("Missing export folder")?.to_path_buf();
+        let parent = path
+            .parent()
+            .ok_or(crate::i18n::text(
+                "repo-workflows-postcards-capture-bda5fa3f",
+            ))?
+            .to_path_buf();
         let held = hold(&parent)?;
         Ok(Self {
             held,
@@ -44,7 +51,7 @@ impl Destination {
     pub fn publish(&self, bytes: &[u8], active: &dyn Fn() -> bool) -> Result<(), String> {
         let _held = &self.held;
         if bytes.len() > 64 * 1024 * 1024 {
-            return Err("Export exceeds 64 MiB".into());
+            return Err(crate::i18n::text("repo-workflows-postcards-publish-5678375e").into());
         }
         if !active() {
             return Err("Export cancelled".into());
@@ -54,7 +61,9 @@ impl Destination {
         #[cfg(unix)]
         let mut file = {
             use rustix::fs::{Mode, OFlags, openat};
-            let parent = self.held.last().ok_or("Missing export folder")?;
+            let parent = self.held.last().ok_or(crate::i18n::text(
+                "repo-workflows-postcards-publish-bda5fa3f",
+            ))?;
             std::fs::File::from(
                 openat(
                     parent,
@@ -67,7 +76,10 @@ impl Destination {
                     Mode::from_bits_truncate(0o600),
                 )
                 .map_err(|e| {
-                    format!("Could not create PNG; existing destinations are preserved: {e}")
+                    crate::i18n::message(
+                        "repo-workflows-postcards-publish-6b87b34f",
+                        &[("e", (e).to_string().into())],
+                    )
                 })?,
             )
         };
@@ -77,12 +89,18 @@ impl Destination {
             .create_new(true)
             .open(self.parent.join(&self.name))
             .map_err(|e| {
-                format!("Could not create PNG; existing destinations are preserved: {e}")
+                crate::i18n::message(
+                    "repo-workflows-postcards-publish-6b87b34f",
+                    &[("e", (e).to_string().into())],
+                )
             })?;
         file.write_all(bytes)
             .and_then(|_| file.sync_all())
             .map_err(|e| {
-                format!("The new PNG may be incomplete; existing files were preserved: {e}")
+                crate::i18n::message(
+                    "repo-workflows-postcards-publish-eef2baa8",
+                    &[("e", (e).to_string().into())],
+                )
             })
     }
 }
@@ -97,13 +115,19 @@ fn hold(path: &Path) -> Result<Vec<std::fs::File>, String> {
         match part {
             Component::RootDir => {}
             Component::Normal(name) => {
-                let parent = held.last().ok_or("Missing held export parent")?;
+                let parent = held
+                    .last()
+                    .ok_or(crate::i18n::text("repo-workflows-postcards-hold-3d6afaad"))?;
                 held.push(std::fs::File::from(
-                    openat(parent, name, flags, Mode::empty())
-                        .map_err(|e| format!("Export folder is unavailable or linked: {e}"))?,
+                    openat(parent, name, flags, Mode::empty()).map_err(|e| {
+                        crate::i18n::message(
+                            "repo-workflows-postcards-hold-cad679ce",
+                            &[("e", (e).to_string().into())],
+                        )
+                    })?,
                 ));
             }
-            _ => return Err("Export folder must have a physical path without traversal".into()),
+            _ => return Err(crate::i18n::text("repo-workflows-postcards-hold-f60b468c").into()),
         }
     }
     Ok(held)
@@ -115,7 +139,7 @@ fn hold(path: &Path) -> Result<Vec<std::fs::File>, String> {
         .components()
         .any(|c| matches!(c, Component::ParentDir | Component::CurDir))
     {
-        return Err("Export folder has traversal".into());
+        return Err(crate::i18n::text("repo-workflows-postcards-hold-8e2e63e6").into());
     }
     let mut paths: Vec<_> = path.ancestors().filter(|p| p.has_root()).collect();
     paths.reverse();
@@ -129,7 +153,7 @@ fn hold(path: &Path) -> Result<Vec<std::fs::File>, String> {
             .map_err(|e| e.to_string())?;
         let m = file.metadata().map_err(|e| e.to_string())?;
         if !m.is_dir() || m.file_attributes() & 0x400 != 0 {
-            return Err("Export folder is linked or unavailable".into());
+            return Err(crate::i18n::text("repo-workflows-postcards-hold-62a99718").into());
         }
         held.push(file);
     }
@@ -137,7 +161,7 @@ fn hold(path: &Path) -> Result<Vec<std::fs::File>, String> {
 }
 #[cfg(not(any(unix, windows)))]
 fn hold(_: &Path) -> Result<Vec<std::fs::File>, String> {
-    Err("Held-directory export is unavailable on this platform".into())
+    Err(crate::i18n::text("repo-workflows-postcards-hold-f499eb77").into())
 }
 #[cfg(test)]
 mod tests {

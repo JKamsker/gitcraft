@@ -55,12 +55,15 @@ impl Move {
     pub fn problem(&self, counts: &[usize]) -> Option<(String, bool)> {
         if counts.get(1).copied().unwrap_or(0) == 0 {
             return Some((
-                "Click the files, hunks or lines to move: they get the chip 2".to_owned(),
+                crate::i18n::text("repo-workflows-surgery-problem-c7982ff3").to_owned(),
                 true,
             ));
         }
         if self.dest.is_none() {
-            return Some(("Pick on the left where they go".to_owned(), true));
+            return Some((
+                crate::i18n::text("repo-workflows-surgery-problem-5cf54a16").to_owned(),
+                true,
+            ));
         }
         None
     }
@@ -104,11 +107,20 @@ pub(crate) fn prepare(
         base.clone()
     } else {
         let file = git::save_patch_for(repo, stay)?;
-        git::tree_after(repo, parent, &[file]).map_err(|e| format!("what stays: {e}"))?
+        git::tree_after(repo, parent, &[file]).map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-surgery-prepare-d129ae6d",
+                &[("e", (e).clone().into())],
+            )
+        })?
     };
     let moved_file = git::save_patch_for(repo, moved)?;
-    let moved_tree =
-        git::tree_after(repo, parent, &[moved_file]).map_err(|e| format!("what moves: {e}"))?;
+    let moved_tree = git::tree_after(repo, parent, &[moved_file]).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-surgery-prepare-17c56a59",
+            &[("e", (e).clone().into())],
+        )
+    })?;
     let preview = Preview::new(&[
         (
             git::patch_between(repo, &base, &stay_tree)?,
@@ -136,12 +148,12 @@ fn todo(
     moved: Entry,
 ) -> Result<Vec<Entry>, String> {
     if !entries.iter().any(|e| e.commit.hash == from) {
-        return Err("the commit is no longer on the checked-out branch".to_owned());
+        return Err(crate::i18n::text("repo-workflows-surgery-todo-97891621").to_owned());
     }
     if let Some(to) = to
         && !entries.iter().any(|e| e.commit.hash == to)
     {
-        return Err("the commit to move them to is no longer on the branch".to_owned());
+        return Err(crate::i18n::text("repo-workflows-surgery-todo-41cdda9e").to_owned());
     }
     let mut out = Vec::new();
     let mut moved = Some(moved);
@@ -274,14 +286,20 @@ impl RepoTab {
             onto,
             move |entries| {
                 let Some(old) = entries.iter().find(|e| e.commit.hash == hash).cloned() else {
-                    return Err("the commit is no longer on the checked-out branch".to_owned());
+                    return Err(
+                        crate::i18n::text("repo-workflows-surgery-run-move-97891621").to_owned(),
+                    );
                 };
                 let Some(head) = entries.last().map(|e| e.commit.hash.clone()) else {
-                    return Err("the branch has no commits to rewrite".to_owned());
+                    return Err(
+                        crate::i18n::text("repo-workflows-surgery-run-move-145a2a94").to_owned(),
+                    );
                 };
                 let author = git::author_of(&path, &hash)?;
                 let [base, stay_tree, moved_tree] = &checked.trees[..] else {
-                    return Err("the move was not checked".to_owned());
+                    return Err(
+                        crate::i18n::text("repo-workflows-surgery-run-move-d1994fc1").to_owned(),
+                    );
                 };
                 let whole = git::tree_of(&path, &hash)?;
                 let note = format!("fixup! moved from {}", short(&hash));
@@ -317,8 +335,7 @@ impl RepoTab {
                     && end != git::tree_of(&path, &head)?
                 {
                     return Err(
-                        "a commit in between undoes or redoes these lines, so the branch would end up different: move them by hand"
-                            .to_owned(),
+                        crate::i18n::text("repo-workflows-surgery-run-move-9a1d6978").to_owned(),
                     );
                 }
                 Ok(todo)
@@ -355,9 +372,13 @@ impl SplitEditor {
         for slot in editor.owner.iter_mut().flatten() {
             *slot = 0;
         }
-        editor.groups[0].subject = format!("Stays in {}", short(&editor.hash));
+        editor.groups[0].subject = crate::i18n::message(
+            "repo-workflows-surgery-moving-4c6a80bb",
+            &[("short-editor-hash-1", (short(&editor.hash)).clone().into())],
+        );
         editor.groups[0].body.clear();
-        editor.groups[1].subject = "Moves".to_owned();
+        editor.groups[1].subject =
+            crate::i18n::text("repo-workflows-surgery-moving-26c84ac3").to_owned();
         editor.active = 1;
         editor.mode = Mode::Move(Move {
             targets,
@@ -379,8 +400,14 @@ impl SplitEditor {
         };
         m.dest = Some(dest);
         self.groups[1].subject = match m.target() {
-            Some(t) => format!("Moves to {} {}", short(&t.hash), t.summary),
-            None => "Moves to the working changes (staged)".to_owned(),
+            Some(t) => crate::i18n::message(
+                "repo-workflows-surgery-set-dest-556c2e6e",
+                &[
+                    ("short-t-hash-1", (short(&t.hash)).clone().into()),
+                    ("t-summary-2", (t.summary).clone().into()),
+                ],
+            ),
+            None => crate::i18n::text("repo-workflows-surgery-set-dest-0c40c6af").to_owned(),
         };
         self.checked = None;
         self.error = None;

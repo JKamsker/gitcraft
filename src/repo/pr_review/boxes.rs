@@ -15,7 +15,9 @@ pub(in crate::repo) fn comment_box(ui: &mut Ui, draft: &mut PrDraft, acts: &mut 
     ui.add_enabled(
         !draft.posting,
         egui::TextEdit::multiline(&mut draft.comment)
-            .hint_text("Leave a comment (Markdown works)")
+            .hint_text(crate::i18n::text(
+                "repo-workflows-pr_review-comment-box-e5841068",
+            ))
             .desired_width(f32::INFINITY)
             .desired_rows(3),
     );
@@ -23,7 +25,12 @@ pub(in crate::repo) fn comment_box(ui: &mut Ui, draft: &mut PrDraft, acts: &mut 
     error_label(ui, draft.error_at(Place::Comment));
     let can_send = !draft.comment.trim().is_empty() && !draft.posting;
     if ui
-        .add_enabled(can_send, egui::Button::new("Comment"))
+        .add_enabled(
+            can_send,
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-pr_review-comment-box-44f5e3fb",
+            )),
+        )
         .clicked()
     {
         pr_acts(acts, PrAct::PostComment);
@@ -42,9 +49,11 @@ pub(in crate::repo) fn review_box(
     let t = Tokens::get(ui.ctx());
     ui.spacing_mut().item_spacing.y = 6.0;
     ui.label(
-        RichText::new("REVIEW")
-            .font(theme::semibold(10.5))
-            .color(t.text_faint),
+        RichText::new(crate::i18n::text(
+            "repo-workflows-pr_review-review-box-182e4992",
+        ))
+        .font(theme::semibold(10.5))
+        .color(t.text_faint),
     );
     super::native_discussions::show(ui, draft, extras, acts);
     if extras.review_features.pending {
@@ -53,16 +62,20 @@ pub(in crate::repo) fn review_box(
     ui.add_enabled(
         !draft.posting,
         egui::TextEdit::multiline(&mut draft.review)
-            .hint_text("What do you think of it as a whole?")
+            .hint_text(crate::i18n::text(
+                "repo-workflows-pr_review-review-box-a0208868",
+            ))
             .desired_width(f32::INFINITY)
             .desired_rows(2),
     );
     error_label(ui, draft.error_at(Place::Review));
     if own && open {
         ui.label(
-            RichText::new("This one is yours: you can comment, but not approve it.")
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::text(
+                "repo-workflows-pr_review-review-box-9b1f2050",
+            ))
+            .color(t.text_faint)
+            .small(),
         );
     }
     ui.horizontal_wrapped(|ui| verdict_buttons(ui, draft, extras, own, open, acts));
@@ -79,9 +92,18 @@ fn verdict_buttons(
 ) {
     let count = extras.pending_comments().count();
     for (verdict, label) in [
-        (Verdict::Comment, "Comment"),
-        (Verdict::Approve, "Approve"),
-        (Verdict::RequestChanges, "Request changes"),
+        (
+            Verdict::Comment,
+            crate::i18n::text("repo-workflows-pr_review-verdict-buttons-44f5e3fb"),
+        ),
+        (
+            Verdict::Approve,
+            crate::i18n::text("repo-workflows-pr_review-verdict-buttons-6007acbe"),
+        ),
+        (
+            Verdict::RequestChanges,
+            crate::i18n::text("repo-workflows-pr_review-verdict-buttons-cb5d9f98"),
+        ),
     ] {
         if (verdict == Verdict::Approve && !extras.review_features.approve)
             || (verdict == Verdict::RequestChanges && !extras.review_features.request_changes)
@@ -105,8 +127,15 @@ fn verdict_buttons(
     }
     if extras.pending_review.is_some()
         && ui
-            .add_enabled(!draft.posting, egui::Button::new("Discard"))
-            .on_hover_text("Throw away the pending review with its comments")
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-verdict-buttons-eb1a70e3",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-pr_review-verdict-buttons-6832518c",
+            ))
             .clicked()
     {
         pr_acts(acts, PrAct::DiscardPending);
@@ -126,10 +155,9 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
         return;
     }
     ui.label(
-        RichText::new(format!(
-            "{} comment{} only you can see until you send this:",
-            waiting.len(),
-            if waiting.len() == 1 { "" } else { "s" }
+        RichText::new(crate::i18n::message(
+            "repo-workflows-pr-pending-comment-count",
+            &[("count", (waiting.len()).into())],
         ))
         .color(t.accent_fg)
         .small(),
@@ -154,13 +182,19 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
         };
         let remove = ui
             .interact(x, ui.id().with(("pending-remove", &comment.id)), sense)
-            .on_hover_text("Remove from the review");
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-pr_review-pending-list-d74b2a22",
+            ));
         if !posting {
             crate::repo::widgets::a11y(&remove, egui::WidgetType::Button, || {
                 let what = first_line(&comment.body);
-                format!(
-                    "Remove the comment on {}{line} from the review: {what}",
-                    thread.path
+                crate::i18n::message(
+                    "repo-workflows-pr_review-pending-list-761b2619",
+                    &[
+                        ("thread-path-1", (thread.path).clone().into()),
+                        ("line", (line).clone().into()),
+                        ("what", (what).clone().into()),
+                    ],
                 )
             });
         }

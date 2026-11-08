@@ -26,7 +26,13 @@ impl Tree {
                 .collect::<Vec<_>>()
                 .join(" → ")
         } else {
-            format!("{} → {} branches", self.root, self.rows.len())
+            crate::i18n::message(
+                "repo-workflows-stack-title-6bb263ae",
+                &[
+                    ("self-root-1", (self.root).clone().into()),
+                    ("self-rows-len-2", (self.rows.len()).clone().into()),
+                ],
+            )
         }
     }
 

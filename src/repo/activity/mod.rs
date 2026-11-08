@@ -174,10 +174,16 @@ pub(super) fn bounded(output: &str) -> String {
     let head_end = floor_char(output, KEEP_HEAD);
     let tail_start = ceil_char(output, output.len() - (MAX_OUTPUT - KEEP_HEAD));
     let left_out = tail_start - head_end;
-    format!(
-        "{}\n… {left_out} bytes left out …\n{}",
-        &output[..head_end],
-        &output[tail_start..]
+    crate::i18n::message(
+        "repo-workflows-activity-bounded-62a56981",
+        &[
+            ("output-head-end-1", (&output[..head_end]).clone().into()),
+            ("left-out", (left_out).clone().into()),
+            (
+                "output-tail-start-2",
+                (&output[tail_start..]).clone().into(),
+            ),
+        ],
     )
 }
 
@@ -204,10 +210,18 @@ pub(super) fn short_command_line(args: &[String]) -> String {
     if args.len() <= SHOWN_ARGS {
         return command_line(args);
     }
-    format!(
-        "{} … {} more",
-        command_line(&args[..SHOWN_ARGS]),
-        args.len() - SHOWN_ARGS
+    crate::i18n::message(
+        "repo-workflows-activity-short-command-line-c85cf117",
+        &[
+            (
+                "command-line-args-shown-args-1",
+                (command_line(&args[..SHOWN_ARGS])).clone().into(),
+            ),
+            (
+                "args-len-shown-args-2",
+                (args.len() - SHOWN_ARGS).clone().into(),
+            ),
+        ],
     )
 }
 
@@ -232,17 +246,20 @@ fn shell_word(word: &str) -> String {
 
 pub(super) fn exit_text(code: Option<i32>) -> String {
     match code {
-        Some(0) => "exit 0".to_owned(),
-        Some(c) => format!("exit {c}"),
-        None => "did not finish".to_owned(),
+        Some(0) => crate::i18n::text("repo-workflows-activity-exit-text-c22995ad").to_owned(),
+        Some(c) => crate::i18n::message(
+            "repo-workflows-activity-exit-text-bd2f2ddf",
+            &[("c", (c).clone().into())],
+        ),
+        None => crate::i18n::text("repo-workflows-activity-exit-text-64df366e").to_owned(),
     }
 }
 
 pub(super) fn outcome_text(outcome: &Outcome) -> &'static str {
     match outcome {
-        Outcome::Done => "done",
-        Outcome::Failed(_) => "failed",
-        Outcome::Cancelled => "cancelled",
+        Outcome::Done => crate::i18n::text("repo-workflows-activity-outcome-text-a4c3ed04"),
+        Outcome::Failed(_) => crate::i18n::text("repo-workflows-activity-outcome-text-5d28a90f"),
+        Outcome::Cancelled => crate::i18n::text("repo-workflows-activity-outcome-text-8b47045e"),
     }
 }
 
@@ -250,9 +267,21 @@ pub(super) fn outcome_text(outcome: &Outcome) -> &'static str {
 pub(super) fn seconds(d: Duration) -> String {
     let ms = d.as_millis();
     match ms {
-        0..10_000 => format!("{:.1} s", d.as_secs_f32()),
-        10_000..60_000 => format!("{} s", d.as_secs()),
-        _ => format!("{} min {} s", d.as_secs() / 60, d.as_secs() % 60),
+        0..10_000 => crate::i18n::message(
+            "repo-workflows-activity-seconds-6f29d45b",
+            &[("d-as-secs-f32-1", (d.as_secs_f32()).clone().into())],
+        ),
+        10_000..60_000 => crate::i18n::message(
+            "repo-workflows-activity-seconds-af37e50f",
+            &[("d-as-secs-1", (d.as_secs()).clone().into())],
+        ),
+        _ => crate::i18n::message(
+            "repo-workflows-activity-seconds-fba4d59d",
+            &[
+                ("d-as-secs-60-1", (d.as_secs() / 60).clone().into()),
+                ("d-as-secs-60-2", (d.as_secs() % 60).clone().into()),
+            ],
+        ),
     }
 }
 
@@ -337,5 +366,45 @@ impl super::RepoTab {
         let (msg, _) = self.status.as_ref()?;
         let (linked, id) = self.activity.status_link.as_ref()?;
         (linked == msg).then_some(*id)
+    }
+}
+
+/// Finite workflow-owned control errors: presentation only; unknown diagnostics remain opaque.
+pub(in crate::repo) fn display_workflow_error(error: &str) -> String {
+    match error {
+        "Cancelled before starting" => {
+            crate::i18n::text("repo-workflows-local_ci-submit-84f8f92f").to_owned()
+        }
+        "Cancelled before terminal start" => {
+            crate::i18n::text("repo-workflows-devcontainer-terminal-f171832a").to_owned()
+        }
+        "File history cancelled" => {
+            crate::i18n::text("repo-workflows-atlas-new-70ba4563").to_owned()
+        }
+        "History read cancelled" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-dc101692").to_owned()
+        }
+        "History summary cancelled or exceeded its output limit" => {
+            crate::i18n::text("repo-workflows-line_dossier-run-a9f1b338").to_owned()
+        }
+        "History worker panicked" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-33647b3e").to_owned()
+        }
+        "History worker stopped" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-da12ac51").to_owned()
+        }
+        "Moved-code analysis cancelled or exceeded 40 seconds" => {
+            crate::i18n::text("repo-workflows-file_comparison-read-431f5828").to_owned()
+        }
+        "Moved-code comparison cancelled" => {
+            crate::i18n::text("repo-workflows-file_comparison-assemble-56abde67").to_owned()
+        }
+        "Postcard rendering cancelled" => {
+            crate::i18n::text("repo-workflows-postcards-bounded-graph-8e2ed023").to_owned()
+        }
+        "Summary cancelled" => {
+            crate::i18n::text("repo-workflows-line_dossier-run-ae6f0623").to_owned()
+        }
+        other => crate::git::display_error(&crate::forge::inbox::display_error(other)),
     }
 }

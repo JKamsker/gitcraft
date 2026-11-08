@@ -72,7 +72,9 @@ fn why_whole(raw: &str, header: &str, lines: &[DiffLine]) -> Option<&'static str
         .collect();
     let has = |start: &str| preamble.iter().any(|l| l.starts_with(start));
     if has("GIT binary patch") || has("Binary files") {
-        Some("a binary file")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-2dab3c8e",
+        ))
     } else if has("new file mode 120000")
         || has("deleted file mode 120000")
         || preamble
@@ -80,23 +82,33 @@ fn why_whole(raw: &str, header: &str, lines: &[DiffLine]) -> Option<&'static str
             .any(|l| l.starts_with("index ") && l.ends_with(" 120000"))
     {
         // A link's target is one line: half of it is no link at all.
-        Some("a symbolic link")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-f5d6a31f",
+        ))
     } else if has("deleted file mode") {
         Some("deleted")
     } else if has("old mode") || has("new mode") {
-        Some("its mode changes")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-c7123097",
+        ))
     } else if lines
         .iter()
         .any(|l| l.raw.starts_with("+Subproject commit"))
     {
-        Some("a submodule")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-fcedacb9",
+        ))
     } else if header.is_empty() {
-        Some("no lines changed")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-070ca29b",
+        ))
     } else if lines
         .iter()
         .any(|l| l.kind == Kind::Meta && !l.raw.starts_with('\\'))
     {
-        Some("too long to pick lines from")
+        Some(crate::i18n::text(
+            "repo-workflows-surgery-why-whole-fa288625",
+        ))
     } else {
         None
     }
@@ -116,10 +128,12 @@ pub(crate) fn files_of(patch: &[u8], paths: Vec<String>) -> Result<Vec<FilePatch
     }
     sections.retain(|s| s.starts_with(b"diff --git "));
     if sections.len() != paths.len() {
-        return Err(format!(
-            "git listed {} files but its patch has {}",
-            paths.len(),
-            sections.len()
+        return Err(crate::i18n::message(
+            "repo-workflows-surgery-files-of-758821ec",
+            &[
+                ("paths-len-1", (paths.len()).clone().into()),
+                ("sections-len-2", (sections.len()).clone().into()),
+            ],
         ));
     }
     paths
@@ -128,8 +142,9 @@ pub(crate) fn files_of(patch: &[u8], paths: Vec<String>) -> Result<Vec<FilePatch
         .map(|(path, raw)| match String::from_utf8(raw) {
             Ok(raw) => Ok(FilePatch::new(path, raw)),
             // A patch of it read with its odd bytes replaced would write the replacements.
-            Err(_) => Err(format!(
-                "{path} isn't UTF-8 text (Latin-1…), whose lines can't be picked apart here: do it in the terminal"
+            Err(_) => Err(crate::i18n::message(
+                "repo-workflows-surgery-files-of-caaf4495",
+                &[("path", (path).clone().into())],
             )),
         })
         .collect()

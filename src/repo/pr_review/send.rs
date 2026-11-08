@@ -160,7 +160,9 @@ impl RepoTab {
             what,
             result: match pages.target(&repo, &hosting, &details) {
                 Some(target) => job(target.as_ref()),
-                None => Err("This pull request can't be acted on from here".to_owned()),
+                None => {
+                    Err(crate::i18n::text("repo-workflows-pr_review-pr-send-73ed2a2f").to_owned())
+                }
             },
         });
     }
@@ -274,7 +276,10 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
                     t.apply_suggestion(&suggestion)?;
                     if resolve {
                         t.set_resolved(&thread, true).map_err(|e| {
-                            format!("The change is committed, but the thread wasn't resolved: {e}")
+                            crate::i18n::message(
+                                "repo-workflows-pr_review-post-job-76c33b59",
+                                &[("e", (e).clone().into())],
+                            )
                         })?;
                     }
                     Ok(())

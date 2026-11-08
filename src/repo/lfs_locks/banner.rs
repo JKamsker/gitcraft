@@ -109,32 +109,42 @@ impl RepoTab {
             Some(lock) if lock.theirs() => {
                 crate::menu_item::MenuItem::new(lock_label(lock, git::now()))
                     .icon("lock")
-                    .refused(Some("Someone else holds this file’s lock"))
+                    .refused(Some(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-menu-items-bafa9d65",
+                    )))
                     .show(ui);
-                if crate::menu_item::MenuItem::new("LFS locks…")
-                    .icon("command")
-                    .show(ui)
-                    .clicked()
+                if crate::menu_item::MenuItem::new(crate::i18n::text(
+                    "repo-workflows-lfs_locks-lock-menu-items-03d23d29",
+                ))
+                .icon("command")
+                .show(ui)
+                .clicked()
                 {
                     acts.push(Action::LfsLocks(LockAct::OpenPanel));
                 }
             }
             Some(lock) => {
                 let tip = if changed {
-                    "git-lfs won't give back the lock of a file with changes: commit them first"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-menu-items-6526301c")
                 } else if lock.ours.is_none() {
-                    "The server can't say whose lock this is: unlocking fails if it isn't yours"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-menu-items-0c28d273")
                 } else {
-                    "Give the LFS lock back so others can push changes to the file"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-menu-items-052a679c")
                 };
-                let r = crate::menu_item::MenuItem::new("Unlock")
-                    .icon("lock")
-                    .refused(if busy {
-                        Some("An LFS lock operation is running")
-                    } else {
-                        changed.then_some("Commit the file’s changes before unlocking it")
-                    })
-                    .show(ui);
+                let r = crate::menu_item::MenuItem::new(crate::i18n::text(
+                    "repo-workflows-lfs_locks-lock-menu-items-4ac709aa",
+                ))
+                .icon("lock")
+                .refused(if busy {
+                    Some(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-menu-items-b8fc75d5",
+                    ))
+                } else {
+                    changed.then_some(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-menu-items-bea7de48",
+                    ))
+                })
+                .show(ui);
                 if r.on_hover_text(tip).on_disabled_hover_text(tip).clicked() {
                     acts.push(Action::LfsLocks(LockAct::Unlock {
                         locks: vec![(lock.id.clone(), lock.path.clone())],
@@ -143,12 +153,18 @@ impl RepoTab {
                 }
             }
             None => {
-                let r = crate::menu_item::MenuItem::new("Lock")
-                    .icon("lock")
-                    .refused(busy.then_some("An LFS lock operation is running"))
-                    .show(ui);
-                if r.on_hover_text("Take the file's LFS lock: nobody else can push changes to it")
-                    .clicked()
+                let r = crate::menu_item::MenuItem::new(crate::i18n::text(
+                    "repo-workflows-lfs_locks-lock-menu-items-db44b8db",
+                ))
+                .icon("lock")
+                .refused(busy.then_some(crate::i18n::text(
+                    "repo-workflows-lfs_locks-lock-menu-items-b8fc75d5",
+                )))
+                .show(ui);
+                if r.on_hover_text(crate::i18n::text(
+                    "repo-workflows-lfs_locks-lock-menu-items-3f09bd22",
+                ))
+                .clicked()
                 {
                     acts.push(Action::LfsLocks(LockAct::Lock(vec![path.to_owned()])));
                 }
@@ -168,10 +184,14 @@ impl RepoTab {
         let d = &state.derived;
         if !state.read_ok {
             if state.error.is_some() && !d.unlocked.is_empty() && state.reading.is_none() {
-                let text =
-                    "Couldn't read the LFS locks, so who holds your changed files isn't known.";
+                let text = crate::i18n::text("repo-workflows-lfs_locks-lock-banners-f8368582");
                 let retry = Box::new(|ui: &mut Ui| {
-                    if ui.button("Retry").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-lfs_locks-lock-banners-942087cc",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::LfsLocks(LockAct::Refresh));
                     }
                 });
@@ -187,30 +207,40 @@ impl RepoTab {
                 .filter_map(|&i| state.locks.get(i))
                 .collect();
             let text = match theirs.as_slice() {
-                [one] => format!(
-                    "{} holds the lock on {}: your push of it will be refused until the lock is \
-                     given back.",
-                    if one.owner.is_empty() {
-                        "Someone else"
-                    } else {
-                        &one.owner
-                    },
-                    one.path
+                [one] => crate::i18n::message(
+                    "repo-workflows-lfs_locks-lock-banners-11ae36a8",
+                    &[
+                        (
+                            "if-one-owner-is-empty-someone-el-1",
+                            (if one.owner.is_empty() {
+                                crate::i18n::text("repo-workflows-lfs_locks-lock-banners-3233cb04")
+                            } else {
+                                &one.owner
+                            })
+                            .clone()
+                            .into(),
+                        ),
+                        ("one-path-2", (one.path).clone().into()),
+                    ],
                 ),
                 many => {
                     let names: Vec<String> = many
                         .iter()
                         .map(|l| format!("{} ({})", l.path, short_owner(l)))
                         .collect();
-                    format!(
-                        "Locked by someone else: {}. Your push of them will be refused until the \
-                         locks are given back.",
-                        list(&names)
+                    crate::i18n::message(
+                        "repo-workflows-lfs_locks-lock-banners-2737026b",
+                        &[("list-names-1", (list(&names)).clone().into())],
                     )
                 }
             };
             let open = Box::new(|ui: &mut Ui| {
-                if ui.button("LFS locks…").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-lfs_locks-lock-banners-03d23d29",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::LfsLocks(LockAct::OpenPanel));
                 }
             });
@@ -218,19 +248,22 @@ impl RepoTab {
         }
         if !d.unlocked.is_empty() {
             let text = match d.unlocked.as_slice() {
-                [one] => format!(
-                    "{one} can be locked and nobody holds it. Lock it so nobody else pushes \
-                     changes to it while you work."
+                [one] => crate::i18n::message(
+                    "repo-workflows-lfs_locks-lock-banners-82b7be09",
+                    &[("one", (one).clone().into())],
                 ),
-                many => format!(
-                    "{} changed files can be locked and nobody holds them. Lock them so nobody \
-                     else pushes changes to them while you work.",
-                    many.len()
+                many => crate::i18n::message(
+                    "repo-workflows-lfs_locks-lock-banners-96ed4625",
+                    &[("many-len-1", (many.len()).clone().into())],
                 ),
             };
             let paths = d.unlocked.clone();
             let lock = Box::new(|ui: &mut Ui| {
-                let label = if paths.len() == 1 { "Lock" } else { "Lock all" };
+                let label = if paths.len() == 1 {
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-db44b8db")
+                } else {
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-ac5bb7e1")
+                };
                 if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
                     acts.push(Action::LfsLocks(LockAct::Lock(paths)));
                 }
@@ -240,21 +273,20 @@ impl RepoTab {
         let offer = &state.offer;
         if !offer.is_empty() {
             let text = match offer.as_slice() {
-                [one] => format!(
-                    "You pushed {} and still hold its lock: give it back so others can change it?",
-                    one.path
+                [one] => crate::i18n::message(
+                    "repo-workflows-lfs_locks-lock-banners-4fa40890",
+                    &[("one-path-1", (one.path).clone().into())],
                 ),
-                many => format!(
-                    "You pushed {} files and still hold their locks: give them back so others \
-                     can change them?",
-                    many.len()
+                many => crate::i18n::message(
+                    "repo-workflows-lfs_locks-lock-banners-4caac7c4",
+                    &[("many-len-1", (many.len()).clone().into())],
                 ),
             };
             let buttons = Box::new(|ui: &mut Ui| {
                 let label = if offer.len() == 1 {
-                    "Unlock"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-4ac709aa")
                 } else {
-                    "Unlock all"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-379e383e")
                 };
                 if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
                     acts.push(Action::LfsLocks(LockAct::Unlock {
@@ -266,9 +298,9 @@ impl RepoTab {
                     }));
                 }
                 let keep = if offer.len() == 1 {
-                    "Keep it locked"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-bb83044b")
                 } else {
-                    "Keep them locked"
+                    crate::i18n::text("repo-workflows-lfs_locks-lock-banners-6df5e70f")
                 };
                 if ui.button(keep).clicked() {
                     acts.push(Action::LfsLocks(LockAct::DismissOffer));
@@ -284,8 +316,18 @@ fn list(names: &[String]) -> String {
     match names {
         [] => String::new(),
         [one] => one.clone(),
-        [a, b] => format!("{a} and {b}"),
-        [a, b, rest @ ..] => format!("{a}, {b} and {} more", rest.len()),
+        [a, b] => crate::i18n::message(
+            "repo-workflows-lfs_locks-list-04f767bd",
+            &[("a", (a).clone().into()), ("b", (b).clone().into())],
+        ),
+        [a, b, rest @ ..] => crate::i18n::message(
+            "repo-workflows-lfs_locks-list-e6b59dc4",
+            &[
+                ("a", (a).clone().into()),
+                ("b", (b).clone().into()),
+                ("rest-len-1", (rest.len()).clone().into()),
+            ],
+        ),
     }
 }
 

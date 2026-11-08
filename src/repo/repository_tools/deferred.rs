@@ -116,7 +116,9 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                             Ok(logic::Spec {
                                 expected: old
                                     .get(&p.step.branch)
-                                    .ok_or("Source branch disappeared from the reviewed graph")?
+                                    .ok_or(crate::i18n::text(
+                                        "repo-workflows-repository_tools-act-e3e83f28",
+                                    ))?
                                     .clone(),
                                 branch: p.step.branch,
                                 old_base: p.step.old_base,
@@ -213,11 +215,16 @@ impl RepoTab {
             acts.push(Action::RepositoryTools(Act::Deferred));
         }
         response.on_hover_ui(|ui| {
-            ui.label("Isolated rewrite; original branch retained until guarded acceptance");
+            ui.label(crate::i18n::text(
+                "repo-workflows-repository_tools-deferred-badge-a5eafc03",
+            ));
             for m in markers {
                 ui.label(&m.branch);
                 for p in &m.conflicts {
-                    ui.label(format!("Conflict waiting: {p}"));
+                    ui.label(crate::i18n::message(
+                        "repo-workflows-repository_tools-deferred-badge-8daa08a5",
+                        &[("p", (p).clone().into())],
+                    ));
                 }
             }
         });
@@ -225,9 +232,18 @@ impl RepoTab {
     }
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Conflicts that can wait");
-    ui.label("Rebase and restack run in their own retained, detached worktrees. Originals stay unchanged until you accept. Resolve conflicts and stage the result in the proposal's worktree, then Continue. Replays are unsigned and skip repository hooks. Acceptance uses the guarded native transaction and refuses dirty/stale original worktrees; layers report partial success individually. Undo restores each accepted original tip through the same guard. No worktree is deleted automatically.");
-    if ui.button("Refresh proposals and receipts").clicked() {
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-7d86e238",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-c757c39b",
+    ));
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-7c52fd3d",
+        ))
+        .clicked()
+    {
         acts.push(Action::RepositoryTools(Act::Deferred));
     }
     let Some(result) = &state.result else {
@@ -242,15 +258,24 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
     };
     if let Data::DeferredStack(view, specs) = data {
-        ui.label("Reviewed isolated restack inputs (children use the preceding rewritten parent result):");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-412ec52f",
+        ));
         for p in specs {
-            ui.monospace(format!(
-                "{}: {} after {} → {}",
-                p.branch, p.expected, p.old_base, p.onto
+            ui.monospace(crate::i18n::message(
+                "repo-workflows-repository_tools-show-b2f82ce9",
+                &[
+                    ("p-branch-1", (p.branch).clone().into()),
+                    ("p-expected-2", (p.expected).clone().into()),
+                    ("p-old-base-3", (p.old_base).clone().into()),
+                    ("p-onto-4", (p.onto).clone().into()),
+                ],
             ));
         }
         if ui
-            .button("Replay this stack in separate worktrees")
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-1919101c",
+            ))
             .clicked()
         {
             acts.push(Action::RepositoryTools(Act::StartDeferred(
@@ -265,7 +290,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         return;
     };
     ui.horizontal(|ui| {
-        ui.label("Source branch:");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-4829ff52",
+        ));
         egui::ComboBox::from_id_salt("deferred-source")
             .selected_text(if state.query.is_empty() {
                 &view.branch
@@ -279,14 +306,23 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             });
     });
     ui.horizontal(|ui| {
-        ui.label("Old base (replay commits after):");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-80c567ae",
+        ));
         ui.text_edit_singleline(&mut state.filter);
     });
     ui.horizontal(|ui| {
-        ui.label("New base:");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-0d37e057",
+        ));
         ui.text_edit_singleline(&mut state.parent);
     });
-    if ui.button("Run rebase in an isolated worktree").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-0256e5a0",
+        ))
+        .clicked()
+    {
         let name = if state.query.is_empty() {
             view.branch.clone()
         } else {
@@ -306,26 +342,162 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             )));
         }
     }
-    ui.checkbox(&mut state.acknowledged,"I reviewed each original → candidate OID and the candidate diff before accepting or undoing");
-    egui::ScrollArea::vertical().max_height(430.0).show(ui,|ui|{
-        for job in &view.jobs.jobs {
-            ui.separator();ui.strong(format!("{} · {} / {} replayed{}",job.title,job.cursor,job.steps.len(),if job.cancelled{" · closed"}else{""}));ui.label(&job.notice);if job.busy{ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning,"In flight or interrupted: inspect its worktree and reconcile receipts explicitly");}
-            for s in &job.steps {
-                ui.monospace(format!("{}: {} → {}{}",s.branch,s.old,s.result.as_deref().unwrap_or("candidate not yet complete"),if s.accepted{" · accepted"}else{""}));
-                ui.label(format!("Replay {} after {} onto {}",s.branch,s.old_base,s.onto));
-                if s.made&&ui.link(s.worktree.display().to_string()).clicked(){acts.push(Action::OpenWorktree(s.worktree.clone()));}
-                for p in &s.conflicts{ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger,format!("Conflict waiting: {p}"));}
-                if let Some(new)=&s.result&& ui.button(format!("Compare candidate of {}",s.branch)).clicked(){acts.push(Action::Compare{base:s.old.clone(),base_label:format!("original {}",s.branch),target:Some(new.clone()),target_label:format!("candidate {}",s.branch),captions:[None,None],since_fork:false});}
+    ui.checkbox(
+        &mut state.acknowledged,
+        crate::i18n::text("repo-workflows-repository_tools-show-3a7402e9"),
+    );
+    egui::ScrollArea::vertical()
+        .max_height(430.0)
+        .show(ui, |ui| {
+            for job in &view.jobs.jobs {
+                ui.separator();
+                ui.strong(crate::i18n::message(
+                    "repo-workflows-deferred-replay-progress",
+                    &[
+                        (
+                            "title",
+                            (crate::repo::messages::display_operation(&job.title)).into(),
+                        ),
+                        ("done", (job.cursor).into()),
+                        ("total", (job.steps.len()).into()),
+                        ("closed", (if job.cancelled { "yes" } else { "no" }).into()),
+                    ],
+                ));
+                ui.label(crate::repo::messages::display_status(&job.notice));
+                if job.busy {
+                    ui.colored_label(
+                        crate::theme::Tokens::get(ui.ctx()).warning,
+                        crate::i18n::text("repo-workflows-repository_tools-show-aa785909"),
+                    );
+                }
+                for s in &job.steps {
+                    ui.monospace(format!(
+                        "{}: {} → {}{}",
+                        s.branch,
+                        s.old,
+                        s.result.as_deref().unwrap_or(crate::i18n::text(
+                            "repo-workflows-repository_tools-show-6bdc8428"
+                        )),
+                        if s.accepted { " · accepted" } else { "" }
+                    ));
+                    ui.label(crate::i18n::message(
+                        "repo-workflows-repository_tools-show-616296e8",
+                        &[
+                            ("s-branch-1", (s.branch).clone().into()),
+                            ("s-old-base-2", (s.old_base).clone().into()),
+                            ("s-onto-3", (s.onto).clone().into()),
+                        ],
+                    ));
+                    if s.made && ui.link(s.worktree.display().to_string()).clicked() {
+                        acts.push(Action::OpenWorktree(s.worktree.clone()));
+                    }
+                    for p in &s.conflicts {
+                        ui.colored_label(
+                            crate::theme::Tokens::get(ui.ctx()).danger,
+                            crate::i18n::message(
+                                "repo-workflows-repository_tools-show-8daa08a5",
+                                &[("p", (p).clone().into())],
+                            ),
+                        );
+                    }
+                    if let Some(new) = &s.result {
+                        if ui
+                            .button(crate::i18n::message(
+                                "repo-workflows-repository_tools-show-19af9596",
+                                &[("s-branch-1", (s.branch).clone().into())],
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Compare {
+                                base: s.old.clone(),
+                                base_label: crate::i18n::message(
+                                    "repo-workflows-repository_tools-show-507eaa08",
+                                    &[("s-branch-1", (s.branch).clone().into())],
+                                ),
+                                target: Some(new.clone()),
+                                target_label: crate::i18n::message(
+                                    "repo-workflows-repository_tools-show-7bd990ec",
+                                    &[("s-branch-1", (s.branch).clone().into())],
+                                ),
+                                captions: [None, None],
+                                since_fork: false,
+                            });
+                        }
+                    }
+                }
+                ui.horizontal_wrapped(|ui| {
+                    if !job.cancelled
+                        && job.cursor < job.steps.len()
+                        && ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-98a12458",
+                            ))
+                            .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::ContinueDeferred(
+                            Box::new(view.clone()),
+                            job.id.clone(),
+                        )));
+                    }
+                    if !job.cancelled
+                        && job.cursor == job.steps.len()
+                        && ui
+                            .add_enabled(
+                                state.acknowledged && !job.busy,
+                                egui::Button::new(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-ba765b08",
+                                )),
+                            )
+                            .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::AcceptDeferred(
+                            Box::new(view.clone()),
+                            job.id.clone(),
+                            false,
+                        )));
+                    }
+                    if job.steps.iter().any(|s| s.accepted)
+                        && ui
+                            .add_enabled(
+                                state.acknowledged && !job.busy,
+                                egui::Button::new(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-440174a7",
+                                )),
+                            )
+                            .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::AcceptDeferred(
+                            Box::new(view.clone()),
+                            job.id.clone(),
+                            true,
+                        )));
+                    }
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-repository_tools-show-5471de9c",
+                        ))
+                        .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::ReconcileDeferred(
+                            Box::new(view.clone()),
+                            job.id.clone(),
+                        )));
+                    }
+                    if !job.cancelled
+                        && ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-33463eb4",
+                            ))
+                            .clicked()
+                    {
+                        acts.push(Action::RepositoryTools(Act::CloseDeferred(
+                            Box::new(view.clone()),
+                            job.id.clone(),
+                        )));
+                    }
+                });
             }
-            ui.horizontal_wrapped(|ui|{
-                if !job.cancelled&&job.cursor<job.steps.len()&&ui.button("Continue / reconcile candidate worktree").clicked(){acts.push(Action::RepositoryTools(Act::ContinueDeferred(Box::new(view.clone()),job.id.clone())));}
-                if !job.cancelled&&job.cursor==job.steps.len()&&ui.add_enabled(state.acknowledged && !job.busy,egui::Button::new("Accept ready candidates")).clicked(){acts.push(Action::RepositoryTools(Act::AcceptDeferred(Box::new(view.clone()),job.id.clone(),false)));}
-                if job.steps.iter().any(|s|s.accepted)&&ui.add_enabled(state.acknowledged && !job.busy,egui::Button::new("Undo accepted layers")).clicked(){acts.push(Action::RepositoryTools(Act::AcceptDeferred(Box::new(view.clone()),job.id.clone(),true)));}
-                if ui.button("Reconcile exact acceptance receipts").clicked(){acts.push(Action::RepositoryTools(Act::ReconcileDeferred(Box::new(view.clone()),job.id.clone())));}
-                if !job.cancelled&&ui.button("Close proposal; retain worktrees").clicked(){acts.push(Action::RepositoryTools(Act::CloseDeferred(Box::new(view.clone()),job.id.clone())));}
-            });
-        }
-    });
+        });
 }
 
 #[cfg(test)]

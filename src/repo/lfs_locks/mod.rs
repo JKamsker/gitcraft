@@ -163,13 +163,27 @@ impl LockState {
 /// "Locked by Ana 2 days ago", "Locked by you just now".
 pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
     let who = match lock.ours {
-        Some(true) => "you",
-        _ if lock.owner.is_empty() => "someone",
+        Some(true) => crate::i18n::text("repo-workflows-lfs_locks-lock-label-bb0347a4"),
+        _ if lock.owner.is_empty() => {
+            crate::i18n::text("repo-workflows-lfs_locks-lock-label-2a59d59e")
+        }
         _ => lock.owner.as_str(),
     };
     match lock.locked_at {
-        Some(at) => format!("Locked by {who} {}", git::relative_time(at, now)),
-        None => format!("Locked by {who}"),
+        Some(at) => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-398e9b81",
+            &[
+                ("who", (who).clone().into()),
+                (
+                    "git-relative-time-at-now-1",
+                    (git::relative_time(at, now)).clone().into(),
+                ),
+            ],
+        ),
+        None => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-6329feb6",
+            &[("who", (who).clone().into())],
+        ),
     }
 }
 
@@ -280,5 +294,49 @@ impl RepoTab {
                 tab.read_locks(git::Asked::Background, ctx);
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_identity_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_lfs_lock_display_preserves_raw_push_classification() {
+        let lock = LfsLock {
+            id: "server-id".into(),
+            path: "Art/My File.psd".into(),
+            owner: "Opaque Owner".into(),
+            locked_at: None,
+            ours: None,
+        };
+        for (language, displayed) in [
+            ("en-US", "Locked by Opaque Owner"),
+            ("de", "Von Opaque Owner gesperrt"),
+        ] {
+            crate::i18n::set_language(language);
+            assert_eq!(lock_label(&lock, 0), displayed);
+            let rendered = crate::repo::messages::display_operation("Push topic to origin");
+            assert_eq!(
+                rendered,
+                if language == "de" {
+                    "topic nach origin pushen"
+                } else {
+                    "Push topic to origin"
+                }
+            );
+            assert_eq!(
+                crate::repo::messages::display_operation("opaque external operation"),
+                "opaque external operation"
+            );
+            assert!(pushes_current("Push topic to origin", Some("topic")));
+            assert!(!pushes_current("Push tag v1 to origin", Some("topic")));
+            assert!(!pushes_current(
+                "external arbitrary operation",
+                Some("topic")
+            ));
+            assert_eq!(lock.id, "server-id");
+            assert_eq!(lock.path, "Art/My File.psd");
+        }
+        crate::i18n::set_language("en-US");
     }
 }

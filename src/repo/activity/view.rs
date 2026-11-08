@@ -16,26 +16,50 @@ impl RepoTab {
     pub(in crate::repo) fn activity_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Activity").font(theme::semibold(12.5)));
             ui.label(
-                RichText::new(format!(
-                    "{} operations{}, newest first",
-                    self.activity.len(),
-                    if self.busy_op.is_some() {
-                        " and the one running"
-                    } else {
-                        ""
-                    }
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-activity-activity-panel-38da1505",
+                ))
+                .font(theme::semibold(12.5)),
+            );
+            ui.label(
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-activity-count",
+                    &[
+                        ("count", (self.activity.len()).into()),
+                        (
+                            "running",
+                            (if self.busy_op.is_some() {
+                                crate::i18n::text("repo-workflows-activity-running-extra")
+                            } else {
+                                ""
+                            })
+                            .into(),
+                        ),
+                    ],
                 ))
                 .color(t.text_dim),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::small_button(ui, "x", "Close the Activity panel").clicked() {
+                if icons::small_button(
+                    ui,
+                    "x",
+                    crate::i18n::text("repo-workflows-activity-activity-panel-6e279c58"),
+                )
+                .clicked()
+                {
                     acts.push(Action::ToggleActivity);
                 }
                 if ui
-                    .add_enabled(self.activity.len() > 0, egui::Button::new("Clear"))
-                    .on_hover_text("Forget the operations listed here")
+                    .add_enabled(
+                        self.activity.len() > 0,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-activity-activity-panel-83b12c22",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-activity-activity-panel-3756b124",
+                    ))
                     .clicked()
                 {
                     self.activity.clear();
@@ -49,10 +73,9 @@ impl RepoTab {
             .show(ui, |ui| {
                 if self.activity.len() == 0 && self.busy_op.is_none() {
                     ui.label(
-                        RichText::new(
-                            "Nothing yet: what this tab runs (fetch, commit, checkout…) is listed \
-                             here with its git commands and all they printed.",
-                        )
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-activity-activity-panel-0a4cf721",
+                        ))
                         .color(t.text_dim),
                     );
                 }
@@ -70,7 +93,10 @@ impl RepoTab {
         };
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
-            ui.label(RichText::new(op).font(theme::medium(12.5)));
+            ui.label(
+                RichText::new(crate::repo::messages::display_operation(op))
+                    .font(theme::medium(12.5)),
+            );
             if let Some(p) = running.control.progress() {
                 ui.label(RichText::new(p.label()).color(t.text_dim));
             }
@@ -106,32 +132,49 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
     }
     let header = state.show_header(ui, |ui| {
         icons::inline(ui, icon, 13.0, color);
-        ui.label(RichText::new(&entry.label).font(theme::medium(12.5)));
-        let mut when = format!(
-            "{} · {} · {} ago",
-            outcome_text(&entry.outcome),
-            seconds(entry.took),
-            ago(entry.at.elapsed())
+        ui.label(
+            RichText::new(crate::repo::messages::display_operation(&entry.label))
+                .font(theme::medium(12.5)),
         );
-        if entry.background {
-            when.push_str(" · in the background");
-        }
-        if entry.repeats > 1 {
-            when.push_str(&format!(" · {} times in a row", entry.repeats));
-        }
+        let when = crate::i18n::message(
+            "repo-workflows-activity-entry-summary",
+            &[
+                ("outcome", (outcome_text(&entry.outcome)).into()),
+                ("duration", (seconds(entry.took)).into()),
+                ("age", (ago(entry.at.elapsed())).into()),
+                (
+                    "background",
+                    (if entry.background { "yes" } else { "no" }).into(),
+                ),
+                ("repeats", (entry.repeats).into()),
+            ],
+        );
         ui.label(RichText::new(when).color(t.text_dim));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "copy", "Copy the commands and all they printed").clicked() {
+            if icons::small_button(
+                ui,
+                "copy",
+                crate::i18n::text("repo-workflows-activity-entry-ui-332e9c9d"),
+            )
+            .clicked()
+            {
                 ui.ctx().copy_text(entry.as_text());
             }
         });
     });
     let (_, header_resp, _) = header.body(|ui| {
         if let Outcome::Failed(why) = &entry.outcome {
-            ui.label(RichText::new(why).color(t.danger));
+            ui.label(
+                RichText::new(crate::repo::activity::display_workflow_error(why)).color(t.danger),
+            );
         }
         if entry.steps.is_empty() {
-            ui.label(RichText::new("No git command ran.").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-activity-entry-ui-599c9e61",
+                ))
+                .color(t.text_dim),
+            );
         }
         for (i, (step, line)) in entry.steps.iter().zip(&entry.lines).enumerate() {
             ui.label(
@@ -167,8 +210,17 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
 /// "12 s", "3 min", "2 h".
 fn ago(d: std::time::Duration) -> String {
     match d.as_secs() {
-        s @ 0..60 => format!("{s} s"),
-        s @ 60..3600 => format!("{} min", s / 60),
-        s => format!("{} h", s / 3600),
+        s @ 0..60 => crate::i18n::message(
+            "repo-workflows-activity-ago-d2916a22",
+            &[("s", (s).clone().into())],
+        ),
+        s @ 60..3600 => crate::i18n::message(
+            "repo-workflows-activity-ago-e823f861",
+            &[("s-60-1", (s / 60).clone().into())],
+        ),
+        s => crate::i18n::message(
+            "repo-workflows-activity-ago-4d631fe4",
+            &[("s-3600-1", (s / 3600).clone().into())],
+        ),
     }
 }

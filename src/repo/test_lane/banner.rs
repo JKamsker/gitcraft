@@ -16,18 +16,24 @@ impl RepoTab {
                 match &self.test_lane.run {
                     Some(run) if run.going() => {
                         if ui
-                            .button("Stop")
-                            .on_hover_text(
-                                "Stops the tests: those that finished keep their result, those \
-                                 part way through are dropped",
-                            )
+                            .button(crate::i18n::text(
+                                "repo-workflows-test_lane-test-banner-cae7d57b",
+                            ))
+                            .on_hover_text(crate::i18n::text(
+                                "repo-workflows-test_lane-test-banner-195bb39a",
+                            ))
                             .clicked()
                         {
                             acts.push(Action::TestLane(LaneAct::Stop));
                         }
                     }
                     _ => {
-                        if ui.button("Close").clicked() {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-test_lane-test-banner-7d9eb7ac",
+                            ))
+                            .clicked()
+                        {
                             acts.push(Action::TestLane(LaneAct::Close));
                         }
                     }
@@ -35,7 +41,11 @@ impl RepoTab {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.set_clip_rect(ui.clip_rect().intersect(ui.max_rect()));
                     crate::icons::inline(ui, "flask-conical", 14.0, t.accent);
-                    widgets::chip(ui, "Tests", t.accent);
+                    widgets::chip(
+                        ui,
+                        crate::i18n::text("repo-workflows-test_lane-test-banner-e5c9d703"),
+                        t.accent,
+                    );
                     ui.add_space(4.0);
                     match &self.test_lane.run {
                         Some(run) => self.run_status(ui, run, acts),
@@ -53,16 +63,24 @@ impl RepoTab {
     fn run_status(&self, ui: &mut Ui, run: &LaneRun, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         if let Some(Err(e)) = &run.ended {
-            let said = format!("Couldn't test {}: {e}", run.range);
+            let said = super::display_ended_message(&run.range, &Err(e.clone())).0;
             ui.add(egui::Label::new(RichText::new(&said).color(t.danger)).truncate())
-                .on_hover_text(said);
+                .on_hover_text(run.ended.as_ref().map_or_else(
+                    || said.clone(),
+                    |result| super::display_ended_message(&run.range, result).0,
+                ));
             return;
         }
         if let Some((_, commit)) = &run.first_bad {
-            let label = format!("First failure: {}", short(commit));
+            let label = crate::i18n::message(
+                "repo-workflows-test_lane-run-status-71902fb1",
+                &[("short-commit-1", (short(commit)).clone().into())],
+            );
             if ui
                 .link(RichText::new(label).color(t.danger))
-                .on_hover_text("Select the oldest commit that failed")
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-test_lane-run-status-514e35e8",
+                ))
                 .clicked()
             {
                 acts.push(Action::SelectHash(commit.clone()));
@@ -71,7 +89,10 @@ impl RepoTab {
         }
         let said = progress_text(run);
         ui.add(egui::Label::new(RichText::new(&said).color(t.text_dim)).truncate())
-            .on_hover_text(said);
+            .on_hover_text(run.ended.as_ref().map_or_else(
+                || said.clone(),
+                |result| super::display_ended_message(&run.range, result).0,
+            ));
     }
 }
 
@@ -81,32 +102,60 @@ pub(super) fn progress_text(run: &LaneRun) -> String {
     let done = run.good + run.bad + run.failed;
     let mut parts = Vec::new();
     match (run.going(), run.total) {
-        (true, None) => parts.push("listing the commits…".to_owned()),
-        (true, Some(total)) => parts.push(format!("{done} of {total} done")),
-        (false, _) => parts.push(format!("{done} done")),
+        (true, None) => parts
+            .push(crate::i18n::text("repo-workflows-test_lane-progress-text-3142ee46").to_owned()),
+        (true, Some(total)) => parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-1df05863",
+            &[
+                ("done", (done).clone().into()),
+                ("total", (total).clone().into()),
+            ],
+        )),
+        (false, _) => parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-6a3a9451",
+            &[("done", (done).clone().into())],
+        )),
     }
     if done > 0 {
-        parts.push(format!("{} passed", run.good));
+        parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-939ee5d9",
+            &[("run-good-1", (run.good).clone().into())],
+        ));
     }
     if run.bad > 0 {
-        parts.push(format!("{} failed", run.bad));
+        parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-1516ec62",
+            &[("run-bad-1", (run.bad).clone().into())],
+        ));
     }
     if run.failed > 0 {
-        parts.push(format!("{} couldn't be tested", run.failed));
+        parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-190f5f35",
+            &[("run-failed-1", (run.failed).clone().into())],
+        ));
     }
     if run.going() && !run.running.is_empty() {
-        parts.push(format!("{} running", run.running.len()));
+        parts.push(crate::i18n::message(
+            "repo-workflows-test_lane-progress-text-030be8be",
+            &[("run-running-len-1", (run.running.len()).clone().into())],
+        ));
     }
     let stopped = matches!(&run.ended, Some(Ok(s)) if s.stopped);
-    let verb = match (run.going(), stopped) {
-        (true, _) => "Testing",
-        (false, true) => "Stopped testing",
-        (false, false) => "Tested",
-    };
-    format!(
-        "{verb} {} with `{}`: {}",
-        run.range,
-        run.command,
-        parts.join(" · ")
+    crate::i18n::message(
+        "repo-workflows-test-lane-progress-head",
+        &[
+            (
+                "state",
+                (match (run.going(), stopped) {
+                    (true, _) => "running",
+                    (false, true) => "stopped",
+                    _ => "done",
+                })
+                .into(),
+            ),
+            ("range", (run.range.as_str()).into()),
+            ("command", (run.command.as_str()).into()),
+            ("details", (parts.join(" · ")).into()),
+        ],
     )
 }

@@ -130,31 +130,52 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let count = self.timeline.entries.len();
-        widgets::panel_header(ui, "Timeline", |ui| {
-            if icons_button(ui, "x", "Close (Esc)") {
-                acts.push(Action::ToggleTimeline);
-            }
-            ui.menu_button(RichText::new("Forget…").size(12.0), |ui| {
-                if ui
-                    .button("Forget all but the newest 50 (and the way to where you are)")
-                    .clicked()
-                {
-                    acts.push(Action::Timeline(TimelineAct::AskForget(50)));
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-workflows-timeline-timeline-view-ui-9dcff98e"),
+            |ui| {
+                if icons_button(
+                    ui,
+                    "x",
+                    crate::i18n::text("repo-workflows-timeline-timeline-view-ui-961b2a04"),
+                ) {
+                    acts.push(Action::ToggleTimeline);
                 }
-                if ui.button("Forget the whole timeline").clicked() {
-                    acts.push(Action::Timeline(TimelineAct::AskForget(0)));
-                }
-            });
-            let cmd = crate::manual::command();
-            ui.label(
-                RichText::new(format!(
-                    "{count} {} · {cmd}+Z / {cmd}+Y step back / forward",
-                    if count == 1 { "entry" } else { "entries" }
-                ))
-                .size(11.5)
-                .color(t.text_faint),
-            );
-        });
+                ui.menu_button(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-timeline-timeline-view-ui-8225e6ab",
+                    ))
+                    .size(12.0),
+                    |ui| {
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-timeline-timeline-view-ui-3b4f9f54",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Timeline(TimelineAct::AskForget(50)));
+                        }
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-timeline-timeline-view-ui-9f54c719",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Timeline(TimelineAct::AskForget(0)));
+                        }
+                    },
+                );
+                let cmd = crate::manual::command();
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-timeline-entry-count",
+                        &[("count", (count).into()), ("command", (cmd).into())],
+                    ))
+                    .size(11.5)
+                    .color(t.text_faint),
+                );
+            },
+        );
         if let Some(e) = &self.timeline_error {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
@@ -169,17 +190,17 @@ impl RepoTab {
             ui.add_space(30.0);
             ui.vertical_centered(|ui| {
                 ui.label(
-                    RichText::new("Nothing in the timeline yet")
-                        .font(theme::semibold(15.0))
-                        .color(t.text),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-timeline-timeline-view-ui-1d9ae2c2",
+                    ))
+                    .font(theme::semibold(15.0))
+                    .color(t.text),
                 );
                 ui.add_space(4.0);
                 ui.label(
-                    RichText::new(
-                        "Commits, merges, rebases, resets, checkouts and branch changes show up \
-                         here, those made in gitcraft and those made elsewhere, and stay after a \
-                         restart.",
-                    )
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-timeline-timeline-view-ui-232c6bba",
+                    ))
                     .size(12.5)
                     .color(t.text_dim),
                 );
@@ -207,8 +228,10 @@ impl RepoTab {
                 .default_size(280.0)
                 .show(ui, |ui| {
                     ui.label(
-                        RichText::new("Hovered state · release the pointer to end preview")
-                            .color(t.text_dim),
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-timeline-view-ui-d4512de3",
+                        ))
+                        .color(t.text_dim),
                     );
                     ui.add_enabled_ui(false, |ui| self.graph_view(ui, &mut Vec::new()));
                 });
@@ -239,7 +262,6 @@ impl RepoTab {
                 .filter(|e| !path.contains(&e.id))
                 .count()
         };
-        let what = if gone == 1 { "entry" } else { "entries" };
         egui::Frame::new()
             .fill(t.card)
             .stroke(Stroke::new(1.0, t.field_border))
@@ -248,17 +270,30 @@ impl RepoTab {
             .outer_margin(egui::Margin::same(8))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!(
-                        "Forget {gone} {what}? Undo won't reach them any more, and the old commits only they kept can be removed by git gc. Your branches don't change."
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-timeline-forget-confirm",
+                        &[("count", (gone).into())],
                     ))
                     .color(t.text),
                 );
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary_button(ui, "Forget", gone > 0, 80.0).clicked() {
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-timeline-forget-confirm-a6bd489d"),
+                        gone > 0,
+                        80.0,
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::Forget(keep)));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-timeline-forget-confirm-19766ed6",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::CancelForget));
                     }
                 });
@@ -304,8 +339,11 @@ impl RepoTab {
             }
             let text_x = rect.left() + 8.0 + graph_w;
             let (label, faint) = match entry {
-                Some(e) => (e.label.clone(), !on_path),
-                None => ("Before the oldest entry".to_owned(), false),
+                Some(e) => (crate::repo::messages::display_operation(&e.label), !on_path),
+                None => (
+                    crate::i18n::text("repo-workflows-timeline-tree-rows-6fa556f4").to_owned(),
+                    false,
+                ),
             };
             let label_color = if faint { t.text_faint } else { t.text };
             let when = entry.map(|e| crate::git::relative_time(e.time, now));
@@ -354,15 +392,14 @@ impl RepoTab {
             let resp = resp.on_hover_text(match entry {
                 Some(e) => format!(
                     "{}\n{}",
-                    e.label,
+                    crate::repo::messages::display_operation(&e.label),
                     if e.origin == Origin::Outside {
-                        "Made outside gitcraft (terminal, another app, or while it was closed)"
+                        crate::i18n::text("repo-workflows-timeline-tree-rows-d5686d26")
                     } else {
-                        "Made in gitcraft"
+                        crate::i18n::text("repo-workflows-timeline-tree-rows-601272f1")
                     }
                 ),
-                None => "The branches as they were before the oldest entry still in the timeline"
-                    .to_owned(),
+                None => crate::i18n::text("repo-workflows-timeline-tree-rows-06b96bb5").to_owned(),
             });
             super::super::ghost::offer(&resp, || super::super::ghost::GhostOp::Timeline {
                 state: self.timeline.state_at(&self.ref_state(), row.id),
@@ -403,24 +440,25 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let confirm = self.timeline_view.as_ref().and_then(|v| v.confirm);
         let Some(entry) = id.and_then(|id| self.timeline.get(id)) else {
-            heading(ui, "Before the oldest entry");
+            heading(
+                ui,
+                crate::i18n::text("repo-workflows-timeline-entry-detail-6fa556f4"),
+            );
             ui.label(
-                RichText::new(
-                    "The branches as they were before the oldest entry still in the timeline.",
-                )
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-timeline-entry-detail-f1c36dc4",
+                ))
                 .color(t.text_dim),
             );
             ui.add_space(10.0);
             self.jump_controls(ui, None, idle, confirm, acts);
             return;
         };
-        heading(ui, &entry.label);
+        heading(ui, &crate::repo::messages::display_operation(&entry.label));
         let now = crate::git::now();
         let who = match entry.origin {
-            Origin::Gitcraft => "Made in gitcraft",
-            Origin::Outside => {
-                "Made outside gitcraft (terminal, another app, or while gitcraft was closed)"
-            }
+            Origin::Gitcraft => crate::i18n::text("repo-workflows-timeline-entry-detail-601272f1"),
+            Origin::Outside => crate::i18n::text("repo-workflows-timeline-entry-detail-dfe997bf"),
         };
         ui.label(
             RichText::new(format!(
@@ -431,11 +469,20 @@ impl RepoTab {
             .color(t.text_faint),
         );
         let state = if self.timeline.current == Some(entry.id) {
-            ("The repository is here now", t.success)
+            (
+                crate::i18n::text("repo-workflows-timeline-entry-detail-cc07e410"),
+                t.success,
+            )
         } else if self.timeline.is_done(entry.id) {
-            ("Done: the repository is past this point", t.text_dim)
+            (
+                crate::i18n::text("repo-workflows-timeline-entry-detail-26583776"),
+                t.text_dim,
+            )
         } else {
-            ("Undone, or on a side path of the tree", t.warning)
+            (
+                crate::i18n::text("repo-workflows-timeline-entry-detail-03a933b9"),
+                t.warning,
+            )
         };
         ui.label(RichText::new(state.0).size(12.0).color(state.1));
         ui.add_space(10.0);
@@ -465,15 +512,19 @@ impl RepoTab {
         let here = self.timeline.current == id;
         if confirm != Some(id) {
             let button = ui
-                .add_enabled(idle && !here, egui::Button::new("Go here"))
-                .on_hover_text(
-                    "Put the branches and HEAD back as they were right after this (Double-click a \
-                     row does too)",
+                .add_enabled(
+                    idle && !here,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-timeline-jump-controls-26d159f6",
+                    )),
                 )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-timeline-jump-controls-8020ed90",
+                ))
                 .on_disabled_hover_text(if here {
-                    "The repository is here already"
+                    crate::i18n::text("repo-workflows-timeline-jump-controls-1dec3ad6")
                 } else {
-                    "Wait until the current git operation finishes"
+                    crate::i18n::text("repo-workflows-timeline-jump-controls-ecbb5934")
                 });
             if button.clicked() {
                 acts.push(Action::Timeline(TimelineAct::AskJump(id)));
@@ -493,13 +544,18 @@ impl RepoTab {
             .show(ui, |ui| {
                 if lines.is_empty() {
                     ui.label(
-                        RichText::new(
-                            "Nothing changes in the repository: only the marker in the timeline moves.",
-                        )
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-jump-controls-c651b224",
+                        ))
                         .color(t.text_dim),
                     );
                 } else {
-                    ui.label(RichText::new("Going here changes:").color(t.text));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-jump-controls-3006b913",
+                        ))
+                        .color(t.text),
+                    );
                     for line in &lines {
                         ui.label(
                             RichText::new(format!("•  {line}"))
@@ -508,20 +564,31 @@ impl RepoTab {
                         );
                     }
                     ui.label(
-                        RichText::new(
-                            "Changes in files are kept; staged ones end up unstaged, and git \
-                             refuses where they'd be lost. Stashes and tags stay as they are.",
-                        )
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-jump-controls-b968e7d2",
+                        ))
                         .size(11.5)
                         .color(t.text_faint),
                     );
                 }
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary_button(ui, "Go here", idle, 90.0).clicked() {
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-timeline-jump-controls-26d159f6"),
+                        idle,
+                        90.0,
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::Jump(id)));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-timeline-jump-controls-19766ed6",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::CancelJump));
                     }
                 });
@@ -532,9 +599,17 @@ impl RepoTab {
     fn changed_refs(&self, ui: &mut Ui, entry: &Entry, idle: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let changes = entry.changes();
-        section(ui, "Branches");
+        section(
+            ui,
+            crate::i18n::text("repo-workflows-timeline-changed-refs-2eee037c"),
+        );
         if changes.is_empty() {
-            ui.label(RichText::new("No branch moved (a stash, a tag…)").color(t.text_faint));
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-timeline-changed-refs-1b870022",
+                ))
+                .color(t.text_faint),
+            );
             return;
         }
         for change in changes {
@@ -558,13 +633,21 @@ impl RepoTab {
             if is_branch && !change.old.is_empty() {
                 ui.horizontal_wrapped(|ui| {
                     ui.add_space(12.0);
-                    let back = format!("Put {} back at {}", change.name, short(&change.old));
+                    let back = crate::i18n::message(
+                        "repo-workflows-timeline-changed-refs-92e3b324",
+                        &[
+                            ("change-name-1", (change.name).clone().into()),
+                            ("short-change-old-2", (short(&change.old)).clone().into()),
+                        ],
+                    );
                     if ui
                         .add_enabled(idle, egui::Button::new(back).small())
-                        .on_hover_text(format!(
-                            "Moves {} back to {} (resets it if it is checked out; uncommitted changes are kept). Undo undoes it.",
-                            change.name,
-                            short(&change.old)
+                        .on_hover_text(crate::i18n::message(
+                            "repo-workflows-timeline-changed-refs-312c661d",
+                            &[
+                                ("change-name-1", (change.name).clone().into()),
+                                ("short-change-old-2", (short(&change.old)).clone().into()),
+                            ],
                         ))
                         .clicked()
                     {
@@ -574,16 +657,29 @@ impl RepoTab {
                         }));
                     }
                     if ui
-                        .add_enabled(idle, egui::Button::new("New branch there").small())
-                        .on_hover_text(format!(
-                            "Makes {} at {}, leaving {} as it is",
-                            self.free_branch_name(&format!(
-                                "{}-was-{}",
-                                change.name,
-                                short(&change.old)
-                            )),
-                            short(&change.old),
-                            change.name
+                        .add_enabled(
+                            idle,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-timeline-changed-refs-a7884d9f",
+                            ))
+                            .small(),
+                        )
+                        .on_hover_text(crate::i18n::message(
+                            "repo-workflows-timeline-changed-refs-e46853a8",
+                            &[
+                                (
+                                    "self-free-branch-name-format-was-1",
+                                    (self.free_branch_name(&format!(
+                                        "{}-was-{}",
+                                        change.name,
+                                        short(&change.old)
+                                    )))
+                                    .clone()
+                                    .into(),
+                                ),
+                                ("short-change-old-2", (short(&change.old)).clone().into()),
+                                ("change-name-3", (change.name).clone().into()),
+                            ],
                         ))
                         .clicked()
                     {
@@ -593,7 +689,9 @@ impl RepoTab {
                         }));
                     }
                     if ui
-                        .small_button("Copy hash")
+                        .small_button(crate::i18n::text(
+                            "repo-workflows-timeline-changed-refs-4ea9935c",
+                        ))
                         .on_hover_text(change.old.as_str())
                         .clicked()
                     {
@@ -609,9 +707,17 @@ impl RepoTab {
 /// The files the entry changed.
 fn changed_files(ui: &mut Ui, entry: &Entry) {
     let t = Tokens::get(ui.ctx());
-    section(ui, "Files");
+    section(
+        ui,
+        crate::i18n::text("repo-workflows-timeline-changed-files-abc7e989"),
+    );
     if entry.files.is_empty() {
-        ui.label(RichText::new("No file content changed").color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-timeline-changed-files-88ffdf28",
+            ))
+            .color(t.text_faint),
+        );
         return;
     }
     for file in &entry.files {
@@ -623,7 +729,13 @@ fn changed_files(ui: &mut Ui, entry: &Entry) {
     }
     let more = entry.files_total.saturating_sub(entry.files.len());
     if more > 0 {
-        ui.label(RichText::new(format!("and {more} more")).color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-workflows-timeline-changed-files-e1614a83",
+                &[("more", (more).clone().into())],
+            ))
+            .color(t.text_faint),
+        );
     }
 }
 

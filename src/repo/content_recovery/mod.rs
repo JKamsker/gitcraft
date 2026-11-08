@@ -66,11 +66,9 @@ impl RepoTab {
         let repo = self.path.clone();
         self.content_recovery.selected = Some(hit);
         self.content_recovery.queue(move |active| {
-            let hit = results
-                .report
-                .hits
-                .get(hit)
-                .ok_or("Invalid content selection")?;
+            let hit = results.report.hits.get(hit).ok_or(crate::i18n::text(
+                "repo-workflows-content_recovery-content-inspect-e3ceaa94",
+            ))?;
             engine::inspect(&repo, &results, hit, source, active)
                 .map(|p| Read::Preview(Arc::new(p)))
         });

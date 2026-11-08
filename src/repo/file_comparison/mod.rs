@@ -40,7 +40,7 @@ impl ReadOnlyComparison {
         let boundary = model::boundary("standalone", &versions[0], &versions[1], active)?;
         let [a, b]: [files::Version; 2] = versions
             .try_into()
-            .map_err(|_| "Invalid comparison sides")?;
+            .map_err(|_| crate::i18n::text("repo-workflows-file_comparison-prepare-da3978aa"))?;
         Ok(Self(model::Pair {
             labels,
             versions: [a, b],
@@ -91,7 +91,10 @@ impl State {
         self.request = 0;
         self.data_request = 0;
         self.loading = false;
-        self.data = Some(Err("Repository changed. Refresh the file view.".into()));
+        self.data = Some(Err(crate::i18n::text(
+            "repo-workflows-file_comparison-invalidate-81f92ce0",
+        )
+        .into()));
         self.pair = None;
     }
     fn begin(&mut self, clear: bool) -> u64 {

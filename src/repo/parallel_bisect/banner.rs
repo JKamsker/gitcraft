@@ -25,11 +25,17 @@ impl RepoTab {
                 ui.set_clip_rect(ui.clip_rect().intersect(ui.max_rect()));
                 let t = Tokens::get(ui.ctx());
                 crate::icons::inline(ui, "flask-conical", 14.0, t.accent);
-                widgets::chip(ui, "Parallel bisect", t.accent);
+                widgets::chip(
+                    ui,
+                    crate::i18n::text("repo-workflows-parallel_bisect-parallel-banner-45515967"),
+                    t.accent,
+                );
                 ui.add_space(4.0);
                 match &view.outcome {
                     None => progress(ui, view, &t),
-                    Some(outcome) => self.parallel_outcome(ui, outcome, &view.machine, acts),
+                    Some(outcome) => {
+                        self.parallel_outcome(ui, outcome, &view.machine_label(), acts)
+                    }
                 }
             });
         });
@@ -47,16 +53,30 @@ impl RepoTab {
     fn parallel_buttons(&self, ui: &mut Ui, view: &View, acts: &mut Vec<Action>) {
         if view.running() {
             if ui
-                .add_enabled(!view.cancelling, egui::Button::new("Cancel"))
-                .on_disabled_hover_text("Stopping the tests and removing the worktrees…")
-                .on_hover_text("Stops every test running and removes the worktrees")
+                .add_enabled(
+                    !view.cancelling,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-buttons-19766ed6",
+                    )),
+                )
+                .on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-buttons-6e22ee66",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-buttons-920ea26f",
+                ))
                 .clicked()
             {
                 acts.push(Action::ParallelBisect(ParallelAct::Cancel));
             }
             return;
         }
-        if ui.button("Close").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac",
+            ))
+            .clicked()
+        {
             acts.push(Action::ParallelBisect(ParallelAct::Close));
         }
         // Only between the same marks: another range may say nothing of the bisect's.
@@ -67,12 +87,18 @@ impl RepoTab {
         if bisecting && matches!(view.outcome, Some(Outcome::FirstBad(_))) {
             let idle = self.busy_op.is_none();
             if ui
-                .add_enabled(idle, egui::Button::new("Mark in the bisect"))
-                .on_hover_text(
-                    "Marks the first bad commit bad and its parents good in the bisect going on, \
-                     which then ends there too",
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-buttons-ec156be0",
+                    )),
                 )
-                .on_disabled_hover_text("Wait for the operation going on to finish")
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-buttons-da3f866e",
+                ))
+                .on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5",
+                ))
                 .clicked()
             {
                 acts.push(Action::ParallelBisect(ParallelAct::MarkInBisect));
@@ -91,14 +117,19 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         match outcome {
             Outcome::FirstBad(hash) => {
-                ui.label(RichText::new("First bad commit:").color(t.text));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-outcome-8b3812c0",
+                    ))
+                    .color(t.text),
+                );
                 self.parallel_link(ui, hash, acts);
             }
             Outcome::OneOf(hashes) => {
                 ui.label(
-                    RichText::new(format!(
-                        "Only skipped commits are left: the first bad commit is one of these {}:",
-                        hashes.len()
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-parallel_bisect-parallel-outcome-25230d8d",
+                        &[("hashes-len-1", (hashes.len()).clone().into())],
                     ))
                     .color(t.text),
                 );
@@ -107,32 +138,43 @@ impl RepoTab {
                 }
                 if hashes.len() > MAX_NAMED {
                     ui.label(
-                        RichText::new(format!("and {} more", hashes.len() - MAX_NAMED))
-                            .color(t.text_dim),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-parallel_bisect-parallel-outcome-683768ab",
+                            &[(
+                                "hashes-len-max-named-1",
+                                (hashes.len() - MAX_NAMED).clone().into(),
+                            )],
+                        ))
+                        .color(t.text_dim),
                     );
                 }
             }
             Outcome::GoodEndFails { hash, output } => {
-                let text = format!(
-                    "The good end already fails: {} fails the test on {machine}, so there is \
-                     nothing to look for after it. Check the command, or mark an older good \
-                     commit.",
-                    short(hash)
+                let text = crate::i18n::message(
+                    "repo-workflows-parallel_bisect-parallel-outcome-7997ad5c",
+                    &[
+                        ("short-hash-1", (short(hash)).clone().into()),
+                        ("machine", (machine).clone().into()),
+                    ],
                 );
                 warning(ui, &text, output, &t);
             }
             Outcome::BadEndPasses { hash, output } => {
-                let text = format!(
-                    "The bad end passes: {} passes the test on {machine}, so the test doesn't \
-                     show the problem there. Check the command.",
-                    short(hash)
+                let text = crate::i18n::message(
+                    "repo-workflows-parallel_bisect-parallel-outcome-a804fbac",
+                    &[
+                        ("short-hash-1", (short(hash)).clone().into()),
+                        ("machine", (machine).clone().into()),
+                    ],
                 );
                 warning(ui, &text, output, &t);
             }
             Outcome::Cancelled => {
                 ui.label(
-                    RichText::new("Cancelled: the tests were stopped and the worktrees removed.")
-                        .color(t.text_dim),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-parallel_bisect-parallel-outcome-ac8a5ffa",
+                    ))
+                    .color(t.text_dim),
                 );
             }
             Outcome::Failed(e) => {
@@ -158,7 +200,12 @@ impl RepoTab {
             .sense(egui::Sense::click())
             .truncate();
         let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-        if resp.on_hover_text("Show this commit").clicked() {
+        if resp
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-parallel_bisect-parallel-link-63633913",
+            ))
+            .clicked()
+        {
             acts.push(Action::SelectHash(hash.to_owned()));
         }
     }
@@ -177,24 +224,17 @@ fn progress(ui: &mut Ui, view: &View, t: &Tokens) {
 
 /// "Round 2, about 1 more · 37 of 412 commits left · 8 at once on SSH · build".
 fn progress_text(view: &View) -> String {
-    let round = match (view.round, view.rounds_left) {
-        (0, _) => "Getting ready".to_owned(),
-        (n, 0) => format!("Round {n}, the last"),
-        (n, 1) => format!("Round {n}, about 1 more"),
-        (n, more) => format!("Round {n}, about {more} more"),
-    };
-    let left = match view.remaining.len() {
-        1 => "1 commit left".to_owned(),
-        n => format!("{n} of {} commits left", view.total),
-    };
-    let testing = match view.testing.len() {
-        0 => String::new(),
-        1 => " · testing 1".to_owned(),
-        n => format!(" · testing {n}"),
-    };
-    format!(
-        "{round} · {left}{testing} · {} at once on {}",
-        view.parallel, view.machine
+    crate::i18n::message(
+        "repo-workflows-parallel-progress",
+        &[
+            ("round", (view.round).into()),
+            ("more", (view.rounds_left).into()),
+            ("left", (view.remaining.len()).into()),
+            ("total", (view.total).into()),
+            ("testing", (view.testing.len()).into()),
+            ("parallel", (view.parallel).into()),
+            ("machine", (view.machine_label()).into()),
+        ],
     )
 }
 
@@ -205,7 +245,13 @@ fn warning(ui: &mut Ui, text: &str, output: &str, t: &Tokens) {
     if shown.is_empty() {
         resp.on_hover_text(text);
     } else {
-        resp.on_hover_text(format!("{text}\n\nThe test said:\n{shown}"));
+        resp.on_hover_text(crate::i18n::message(
+            "repo-workflows-parallel_bisect-warning-4e969ad3",
+            &[
+                ("text", (text).clone().into()),
+                ("shown", (shown).clone().into()),
+            ],
+        ));
     }
 }
 
@@ -215,7 +261,12 @@ fn hash_link(ui: &mut Ui, hash: &str, acts: &mut Vec<Action>) {
     let link =
         egui::Label::new(RichText::new(short(hash)).color(t.accent)).sense(egui::Sense::click());
     let resp = ui.add(link).on_hover_cursor(egui::CursorIcon::PointingHand);
-    if resp.on_hover_text("Show this commit").clicked() {
+    if resp
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-parallel_bisect-hash-link-63633913",
+        ))
+        .clicked()
+    {
         acts.push(Action::SelectHash(hash.to_owned()));
     }
 }

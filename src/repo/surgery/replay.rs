@@ -29,11 +29,14 @@ pub(crate) fn ends_as(repo: &Path, onto: &str, todo: &[Entry]) -> Result<Option<
             &[0, 1],
         )
         .map_err(|e| {
-            format!("could not play the rewrite through (git 2.40 or newer is needed): {e}")
+            crate::i18n::message(
+                "repo-workflows-surgery-ends-as-a54fc1a0",
+                &[("e", (e).clone().into())],
+            )
         })?;
         let mut lines = out.lines();
         let Some(tree) = lines.next().map(str::trim).filter(|t| !t.is_empty()) else {
-            return Err("git merge-tree gave no tree".to_owned());
+            return Err(crate::i18n::text("repo-workflows-surgery-ends-as-810c20dd").to_owned());
         };
         if lines.any(|l| !l.trim().is_empty()) {
             return Ok(None);

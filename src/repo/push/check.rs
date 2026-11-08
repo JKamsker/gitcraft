@@ -134,9 +134,9 @@ pub(super) fn check(
         creds,
     )?;
     if git::resolve(path, &remote).is_err() {
-        return Err(format!(
-            "{} moved while it was being fetched: check again",
-            target.label()
+        return Err(crate::i18n::message(
+            "repo-workflows-push-check-67e345ac",
+            &[("target-label-1", (target.label()).clone().into())],
         ));
     }
     let (ahead, behind) = apart(path, &local, &remote)?;
@@ -179,7 +179,12 @@ fn push_target(path: &Path, branch: &str, to: &str, remotes: &[String]) -> Resul
         .or_else(|| config("remote.pushDefault"))
         .or_else(|| config(&format!("branch.{branch}.remote")))
         .or_else(|| remotes.iter().find(|r| *r == "origin").cloned())
-        .ok_or_else(|| format!("{branch} pushes to no remote gitcraft knows"))?;
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "repo-workflows-push-push-target-1b9119c5",
+                &[("branch", (branch).clone().into())],
+            )
+        })?;
     pick_target(&remote, branch, to, remotes)
 }
 
@@ -192,8 +197,12 @@ pub(super) fn pick_target(
     remotes: &[String],
 ) -> Result<Target, String> {
     if !remotes.iter().any(|r| r == remote) {
-        return Err(format!(
-            "{branch} pushes to {remote}, which is not one of this repository's remotes"
+        return Err(crate::i18n::message(
+            "repo-workflows-push-pick-target-acf19d61",
+            &[
+                ("branch", (branch).clone().into()),
+                ("remote", (remote).clone().into()),
+            ],
         ));
     }
     let name = to.strip_prefix("refs/heads/").unwrap_or(branch);
@@ -222,7 +231,12 @@ fn apart(path: &Path, local: &str, remote: &str) -> Result<(u32, u32), String> {
             &format!("{local}...{remote}"),
         ],
     )?;
-    parse_counts(&out).ok_or_else(|| format!("unexpected answer from git rev-list: {out}"))
+    parse_counts(&out).ok_or_else(|| {
+        crate::i18n::message(
+            "repo-workflows-push-apart-b578bb02",
+            &[("out", (out).clone().into())],
+        )
+    })
 }
 
 /// `3\t5` → (3, 5).

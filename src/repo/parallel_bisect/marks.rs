@@ -54,18 +54,34 @@ impl RepoTab {
             RowMark::FirstBad => (
                 t.danger,
                 0.16,
-                "The first bad commit, as the parallel bisect found".to_owned(),
+                crate::i18n::text("repo-workflows-parallel_bisect-parallel-mark-bbf45cc1")
+                    .to_owned(),
             ),
-            RowMark::Testing => (t.accent, 0.10, format!("Being tested on {}…", view.machine)),
+            RowMark::Testing => (
+                t.accent,
+                0.10,
+                crate::i18n::message(
+                    "repo-workflows-parallel_bisect-parallel-mark-6215068d",
+                    &[("view-machine-1", view.machine_label().into())],
+                ),
+            ),
             RowMark::Tested(verdict) => {
                 let result = self.parallel_result(hash);
                 let how = if result.is_some_and(|r| r.cached) {
-                    "its tree was tested before"
+                    crate::i18n::text("repo-workflows-parallel_bisect-parallel-mark-d81987fc")
                 } else {
                     "tested"
                 };
-                let mut said =
-                    format!("{} in the parallel bisect ({how})", capital(verdict.word()));
+                let mut said = crate::i18n::message(
+                    "repo-workflows-parallel_bisect-parallel-mark-f2395948",
+                    &[
+                        (
+                            "capital-verdict-word-1",
+                            (capital(verdict.word())).clone().into(),
+                        ),
+                        ("how", (how).clone().into()),
+                    ],
+                );
                 if let Some(output) = result.map(|r| last_lines(&r.output, OUTPUT_LINES))
                     && !output.is_empty()
                 {
@@ -77,7 +93,8 @@ impl RepoTab {
             RowMark::Left => (
                 t.accent,
                 0.0,
-                "May still be the first bad commit".to_owned(),
+                crate::i18n::text("repo-workflows-parallel_bisect-parallel-mark-51062cd0")
+                    .to_owned(),
             ),
         };
         let band = rect.shrink2(vec2(0.0, ROW_GAP / 2.0));

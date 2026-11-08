@@ -62,7 +62,13 @@ fn layout(ui: &egui::Ui, part: &Boundary, width: Option<f32>) -> Arc<Layout> {
 pub(super) fn show(ui: &mut egui::Ui, part: &Boundary, t: &Tokens) {
     let id = ui.id().with("content-comparison-wrap");
     let mut wrap = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
-    if ui.selectable_label(wrap, "Wrap").clicked() {
+    if ui
+        .selectable_label(
+            wrap,
+            crate::i18n::text("repo-workflows-file_comparison-show-70bfd7fb"),
+        )
+        .clicked()
+    {
         wrap = !wrap;
         ui.ctx().data_mut(|d| d.insert_temp(id, wrap));
     }

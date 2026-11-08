@@ -48,11 +48,11 @@ impl Section {
 
     pub(crate) fn title(self) -> &'static str {
         match self {
-            Section::Ignore => "Ignore rules and attributes",
-            Section::Hooks => "Hooks",
-            Section::Health => "Health and maintenance",
-            Section::Config => "Which configuration wins",
-            Section::Flags => "Hidden changes",
+            Section::Ignore => crate::i18n::text("repo-workflows-doctor-title-94ec061c"),
+            Section::Hooks => crate::i18n::text("repo-workflows-doctor-title-d412a062"),
+            Section::Health => crate::i18n::text("repo-workflows-doctor-title-8d6acfc3"),
+            Section::Config => crate::i18n::text("repo-workflows-doctor-title-8b2d57fa"),
+            Section::Flags => crate::i18n::text("repo-workflows-doctor-title-1e6bed5e"),
         }
     }
 

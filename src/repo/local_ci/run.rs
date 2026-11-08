@@ -8,17 +8,21 @@ use std::{
 
 pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), String> {
     if crate::remote::is_remote(path) {
-        return Err("Local Actions needs a worktree on this machine. Use act on the repository's machine for a remote worktree.".into());
+        return Err(crate::i18n::text("repo-workflows-local_ci-read-catalog-56e09929").into());
     }
-    let entries = std::fs::read_dir(path.join(".github/workflows"))
-        .map_err(|e| format!("Cannot read .github/workflows: {e}"))?;
+    let entries = std::fs::read_dir(path.join(".github/workflows")).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-local_ci-read-catalog-e3297274",
+            &[("e", (e).to_string().into())],
+        )
+    })?;
     let mut files = entries
         .filter_map(Result::ok)
         .map(|e| e.file_name())
         .collect::<Vec<_>>();
     files.sort();
     if files.len() > 256 {
-        return Err("More than 256 workflow files; narrow the workflow directory first".into());
+        return Err(crate::i18n::text("repo-workflows-local_ci-read-catalog-4a734aad").into());
     }
     let (mut workflows, mut errors) = (Vec::new(), Vec::new());
     for name in files {
@@ -32,15 +36,23 @@ pub(super) fn read_catalog(path: &Path) -> Result<(Vec<Workflow>, Vec<String>), 
         let parsed = read_source(path, &file).and_then(|s| model::parse(file.clone(), s));
         match parsed {
             Ok(w) => workflows.push(w),
-            Err(e) => errors.push(format!("{file}: {e}")),
+            Err(e) => errors.push(crate::i18n::message(
+                "repo-workflows-local_ci-read-catalog-34bc7dab",
+                &[
+                    ("file", (file).clone().into()),
+                    ("e", (e).to_string().into()),
+                ],
+            )),
         }
     }
     Ok((workflows, errors))
 }
 fn read_source(path: &Path, file: &str) -> Result<String, String> {
-    let bytes = crate::safe_read::read_inside(path, file, model::MAX as u64)
-        .ok_or("Workflow is missing, linked outside the worktree, unreadable, or exceeds 1 MiB")?;
-    String::from_utf8(bytes).map_err(|_| "Workflow is not UTF-8".into())
+    let bytes = crate::safe_read::read_inside(path, file, model::MAX as u64).ok_or(
+        crate::i18n::text("repo-workflows-local_ci-read-source-0066c097"),
+    )?;
+    String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("repo-workflows-local_ci-read-source-02772e72").into())
 }
 
 pub(super) struct Scratch(pub PathBuf);
@@ -67,7 +79,7 @@ impl Scratch {
                 Err(e) => return Err(e.to_string()),
             }
         }
-        Err("Cannot allocate private act workspace".into())
+        Err(crate::i18n::text("repo-workflows-local_ci-new-35401ccc").into())
     }
 }
 impl Drop for Scratch {
@@ -97,15 +109,18 @@ fn check_config() -> Result<(), String> {
                 if s.lines()
                     .any(|s| !s.trim().is_empty() && !s.trim().starts_with('#')) =>
             {
-                return Err(format!(
-                    "Ambient act configuration at {} could change this run. Move its options into the explicit runner mapping, or run act directly.",
-                    path.display()
+                return Err(crate::i18n::message(
+                    "repo-workflows-local_ci-check-config-284c844f",
+                    &[("path-display-1", path.display().to_string().into())],
                 ));
             }
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                return Err(format!(
-                    "Cannot inspect act configuration at {}: {e}",
-                    path.display()
+                return Err(crate::i18n::message(
+                    "repo-workflows-local_ci-check-config-d57e1227",
+                    &[
+                        ("path-display-1", path.display().to_string().into()),
+                        ("e", (e).to_string().into()),
+                    ],
                 ));
             }
             _ => {}
@@ -125,10 +140,14 @@ pub(super) struct Selection {
     pub minutes: u64,
 }
 pub(super) fn arguments(path: &Path, scratch: &Path, s: &Selection) -> Result<Vec<String>, String> {
-    let payload: serde_json::Value =
-        serde_json::from_str(&s.payload).map_err(|e| format!("Event JSON: {e}"))?;
+    let payload: serde_json::Value = serde_json::from_str(&s.payload).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-local_ci-arguments-d09062d3",
+            &[("e", (e).to_string().into())],
+        )
+    })?;
     if !payload.is_object() || s.payload.len() > model::MAX {
-        return Err("Event JSON must be an object of at most 1 MiB".into());
+        return Err(crate::i18n::text("repo-workflows-local_ci-arguments-7e0ae020").into());
     }
     let mut args = vec![
         s.event.clone(),
@@ -173,27 +192,24 @@ pub(super) fn arguments(path: &Path, scratch: &Path, s: &Selection) -> Result<Ve
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>();
     if platforms.is_empty() {
-        return Err(
-            "Supply explicit runner-label=container-image mappings; host runners are not started"
-                .into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-local_ci-arguments-9ada5400").into());
     }
     for mapping in platforms {
-        let (label, image) = mapping
-            .split_once('=')
-            .ok_or("Runner mapping must be label=container-image")?;
+        let (label, image) = mapping.split_once('=').ok_or(crate::i18n::text(
+            "repo-workflows-local_ci-arguments-2686361a",
+        ))?;
         if label.trim().is_empty()
             || image.trim().is_empty()
             || image.starts_with('-')
             || mapping.contains('\0')
         {
-            return Err("Invalid runner mapping; host execution is not supported".into());
+            return Err(crate::i18n::text("repo-workflows-local_ci-arguments-48f831c2").into());
         }
         args.extend(["--platform".into(), mapping.into()]);
     }
     if !s.architecture.is_empty() {
         if !["linux/amd64", "linux/arm64", "linux/arm/v7"].contains(&s.architecture.as_str()) {
-            return Err("Unsupported container architecture".into());
+            return Err(crate::i18n::text("repo-workflows-local_ci-arguments-39e7fe22").into());
         }
         args.extend(["--container-architecture".into(), s.architecture.clone()]);
     }
@@ -254,10 +270,7 @@ pub(super) fn execute_with(
 ) -> Result<String, String> {
     check_config()?;
     if read_source(&path, &s.workflow.file)? != s.workflow.source {
-        return Err(
-            "Workflow changed since selection. Reload workflows and review the new job/matrix."
-                .into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-local_ci-execute-with-bdf39918").into());
     }
     s.context.revalidate_with(|args| {
         crate::git::run_unattended_within(&path, args, Duration::from_secs(20))
@@ -266,7 +279,9 @@ pub(super) fn execute_with(
     let nonce = scratch
         .0
         .file_name()
-        .ok_or("Missing private directory name")?
+        .ok_or(crate::i18n::text(
+            "repo-workflows-local_ci-execute-with-77a6f13d",
+        ))?
         .to_string_lossy();
     let snapshot = s.workflow.snapshot(&s.event, &s.job, &s.matrix, &nonce)?;
     let args = arguments(&path, &scratch.0, &s)?;
@@ -296,17 +311,18 @@ pub(super) fn execute_with(
     crate::shell_path::apply(&mut command);
     let out = crate::processes::run(command, options(&s, &log, &ctx))?;
     if let Some(reason) = out.stopped {
-        return Err(format!(
-            "{reason}. The act process stopped; Docker containers/services may still be running. Inspect Docker resources before retrying; gitcraft performs no global cleanup."
+        return Err(crate::i18n::message(
+            "repo-workflows-local_ci-execute-with-2ea8f492",
+            &[("reason", (reason).clone().into())],
         ));
     }
     if !out.status.success() {
-        return Err(format!(
-            "act exited with {}. See local output. No hosted CI result was changed.",
-            out.status
+        return Err(crate::i18n::message(
+            "repo-workflows-local_ci-execute-with-142bda92",
+            &[("out-status-1", out.status.to_string().into())],
         ));
     }
-    Ok("Local act run completed. This is not a hosted CI result.".into())
+    Ok(crate::i18n::text("repo-workflows-local_ci-execute-with-3e3b1e0a").into())
 }
 
 // Both callbacks deliver bounded visible output while the operation is running.

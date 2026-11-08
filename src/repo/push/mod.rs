@@ -493,10 +493,10 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        let what = q
-            .target
-            .as_ref()
-            .map_or_else(|| "the remote".to_owned(), Target::label);
+        let what = q.target.as_ref().map_or_else(
+            || crate::i18n::text("repo-workflows-push-check-remote-d6f3f0c2").to_owned(),
+            Target::label,
+        );
         self.busy_op = Some(format!("Checking {what}"));
         let path = self.path.clone();
         let creds = self.credentials.clone();
@@ -665,7 +665,7 @@ fn force_dialog(r: &Rejection) -> (Attempt, Dialog) {
     let dialog = Dialog::confirm(
         &title,
         banner::force_body(r),
-        "Force push",
+        crate::i18n::text("repo-workflows-push-force-dialog-1d502fc3"),
         force_push_ops(r),
         None,
     );

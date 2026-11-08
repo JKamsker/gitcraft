@@ -46,20 +46,28 @@ pub(super) fn apply_stash(pick: &Pick) -> Action {
 /// Why the commit can't be cherry-picked, if it can't; `in_head`: what is checked out has it.
 fn no_cherry_pick(pick: &Pick, head: &str, in_head: bool) -> Option<&'static str> {
     if pick.hash == head {
-        Some("It is the commit checked out")
+        Some(crate::i18n::text(
+            "repo-workflows-reflog-no-cherry-pick-4788af31",
+        ))
     } else if pick.stash {
-        Some("A dropped stash: apply it instead")
+        Some(crate::i18n::text(
+            "repo-workflows-reflog-no-cherry-pick-f9c0aa5a",
+        ))
     } else if pick.merge {
-        Some("A merge commit is cherry-picked from the terminal, choosing its parent (-m)")
+        Some(crate::i18n::text(
+            "repo-workflows-reflog-no-cherry-pick-439c2b34",
+        ))
     } else if in_head {
-        Some("What is checked out has it already")
+        Some(crate::i18n::text(
+            "repo-workflows-reflog-no-cherry-pick-832424d9",
+        ))
     } else {
         None
     }
 }
 
-const BUSY: &str = "An operation is running";
-const CHERRY_PICK_TIP: &str = "Apply its changes on top of what is checked out, as a new commit";
+const BUSY: &str = "repo-workflows-reflog--1af58b4f";
+const CHERRY_PICK_TIP: &str = "repo-workflows-reflog--41e8eb8b";
 
 impl RepoTab {
     /// Whether the detail pane says what is checked out has `pick` (read for the selected one).
@@ -71,16 +79,25 @@ impl RepoTab {
 
     /// The buttons under the list, for the commit selected.
     pub(super) fn reflog_buttons(&self, ui: &mut Ui, pick: &Pick, acts: &mut Vec<Action>) {
-        if widgets::primary_button(ui, "Create branch here…", true, 0.0)
-            .on_hover_text(
-                "A new branch at this commit; nothing else changes (also a double-click)",
-            )
-            .clicked()
+        if widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-reflog-reflog-buttons-aa1b2809"),
+            true,
+            0.0,
+        )
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-reflog-reflog-buttons-a369afe1",
+        ))
+        .clicked()
         {
             acts.push(create_branch(pick));
         }
         self.recover_items(ui, pick, acts);
-        let more = crate::icons::small_button(ui, "chevron-down", "More");
+        let more = crate::icons::small_button(
+            ui,
+            "chevron-down",
+            crate::i18n::text("repo-workflows-reflog-reflog-buttons-d47d7cb0"),
+        );
         egui::Popup::menu(&more)
             .style(crate::theme::menu_style)
             .show(|ui| self.reflog_menu_items(ui, pick, acts));
@@ -90,19 +107,23 @@ impl RepoTab {
     pub(super) fn reflog_menu_items(&self, ui: &mut Ui, pick: &Pick, acts: &mut Vec<Action>) {
         let idle = self.busy_op.is_none();
         let head = self.refs.head.as_str();
-        if crate::menu_item::MenuItem::new("Create branch here…")
-            .icon("git-branch-plus")
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-reflog-reflog-menu-items-aa1b2809",
+        ))
+        .icon("git-branch-plus")
+        .show(ui)
+        .clicked()
         {
             acts.push(create_branch(pick));
         }
         self.recover_items(ui, pick, acts);
         if self.graph_has(&pick.hash)
-            && crate::menu_item::MenuItem::new("Show in graph")
-                .icon("command")
-                .show(ui)
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-reflog-reflog-menu-items-916e34d4",
+            ))
+            .icon("command")
+            .show(ui)
+            .clicked()
         {
             acts.push(Action::SelectHash(pick.hash.clone()));
         }
@@ -128,23 +149,30 @@ impl RepoTab {
             head,
         };
         let why = if head.is_empty() {
-            Some("Nothing is checked out yet")
+            Some(crate::i18n::text(
+                "repo-workflows-reflog-reflog-menu-items-4188c300",
+            ))
         } else if pick.hash == head {
-            Some("It is the commit checked out")
+            Some(crate::i18n::text(
+                "repo-workflows-reflog-reflog-menu-items-4788af31",
+            ))
         } else if !idle {
-            Some(BUSY)
+            Some(crate::i18n::text(BUSY))
         } else {
             None
         };
         {
-            crate::menu_item::MenuItem::new(format!("Reset {target} to here"))
-                .icon("undo-2")
-                .refused(why)
-                .submenu(ui, |ui| {
-                    reset_items(ui, &rewrite, acts);
-                })
-                .response
-                .on_disabled_hover_text(why.unwrap_or(BUSY));
+            crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-reflog-reflog-menu-items-22e4b72a",
+                &[("target", (target).clone().into())],
+            ))
+            .icon("undo-2")
+            .refused(why)
+            .submenu(ui, |ui| {
+                reset_items(ui, &rewrite, acts);
+            })
+            .response
+            .on_disabled_hover_text(why.unwrap_or(crate::i18n::text(BUSY)));
         }
     }
 
@@ -153,47 +181,61 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let head = self.refs.head.as_str();
         if pick.stash
-            && crate::menu_item::MenuItem::new("Apply stash")
-                .icon("archive")
-                .enabled(idle)
-                .show(ui)
-                .on_hover_text("Put its changes back on the working tree (git stash apply)")
-                .on_disabled_hover_text(BUSY)
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-reflog-recover-items-008c67fe",
+            ))
+            .icon("archive")
+            .enabled(idle)
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-reflog-recover-items-468e2d34",
+            ))
+            .on_disabled_hover_text(crate::i18n::text(BUSY))
+            .clicked()
         {
             acts.push(apply_stash(pick));
         }
         let why = no_cherry_pick(pick, head, self.in_head(pick));
-        if crate::menu_item::MenuItem::new("Cherry-pick")
-            .icon("command")
-            .enabled(idle)
-            .refused(why)
-            .show(ui)
-            .on_hover_text(CHERRY_PICK_TIP)
-            .on_disabled_hover_text(why.unwrap_or(BUSY))
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-4c49fdb6",
+        ))
+        .icon("command")
+        .enabled(idle)
+        .refused(why)
+        .show(ui)
+        .on_hover_text(crate::i18n::text(CHERRY_PICK_TIP))
+        .on_disabled_hover_text(why.unwrap_or(crate::i18n::text(BUSY)))
+        .clicked()
         {
             acts.push(cherry_pick(pick));
         }
-        if crate::menu_item::MenuItem::new("Check out (detached)")
-            .icon("log-in")
-            .enabled(idle)
-            .refused((pick.hash == head).then_some("It is the commit checked out"))
-            .show(ui)
-            .on_hover_text("Check out this commit, on no branch")
-            .on_disabled_hover_text(if pick.hash == head {
-                "It is the commit checked out"
-            } else {
-                BUSY
-            })
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-6be4594f",
+        ))
+        .icon("log-in")
+        .enabled(idle)
+        .refused((pick.hash == head).then_some(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-4788af31",
+        )))
+        .show(ui)
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-614692c1",
+        ))
+        .on_disabled_hover_text(if pick.hash == head {
+            crate::i18n::text("repo-workflows-reflog-recover-items-4788af31")
+        } else {
+            crate::i18n::text(BUSY)
+        })
+        .clicked()
         {
             acts.push(checkout(pick));
         }
-        if crate::menu_item::MenuItem::new("Copy commit hash")
-            .icon("copy")
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-reflog-recover-items-61e6a768",
+        ))
+        .icon("copy")
+        .show(ui)
+        .clicked()
         {
             ui.ctx().copy_text(pick.hash.clone());
         }

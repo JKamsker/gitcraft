@@ -182,8 +182,12 @@ impl RepoTab {
             .is_some_and(|(msg, err)| msg == done && !err);
         if shown
             && ui
-                .small_button("Compare before / after")
-                .on_hover_text("The branch's commits before and after, side by side")
+                .small_button(crate::i18n::text(
+                    "repo-workflows-versions-fresh-rewrite-button-e6be1703",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-versions-fresh-rewrite-button-fce3e9e3",
+                ))
                 .clicked()
         {
             acts.push(Action::Versions(VersionsAct::Rewrite(rewrite.clone())));
@@ -203,10 +207,15 @@ impl RepoTab {
         if let Some(rewrite) = rewrite {
             let when = git::relative_time(rewrite.time, git::now());
             if ui
-                .button("Compare before / after the last rewrite")
-                .on_hover_text(format!(
-                    "{} as it was before it was rewritten {when}, and after",
-                    b.name
+                .button(crate::i18n::text(
+                    "repo-workflows-versions-versions-items-a2e93753",
+                ))
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-8e286a1d",
+                    &[
+                        ("b-name-1", (b.name).clone().into()),
+                        ("when", (when).clone().into()),
+                    ],
                 ))
                 .clicked()
             {
@@ -215,11 +224,16 @@ impl RepoTab {
         }
         if diverged
             && ui
-                .button(format!("Compare commits with {}", b.upstream))
-                .on_hover_text(format!(
-                    "Left, the commits only {} has; right, those only {} has; the same \
-                     change on both sides paired up",
-                    b.upstream, b.name
+                .button(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-a0142396",
+                    &[("b-upstream-1", (b.upstream).clone().into())],
+                ))
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-28feb7ce",
+                    &[
+                        ("b-upstream-1", (b.upstream).clone().into()),
+                        ("b-name-2", (b.name).clone().into()),
+                    ],
                 ))
                 .clicked()
         {
@@ -240,7 +254,10 @@ impl RepoTab {
             .latest_rewrite(current)
             .or_else(|| self.versions.rewrites.first())?;
         Some((
-            format!("Compare {} before / after its last rewrite", rewrite.branch),
+            crate::i18n::message(
+                "repo-workflows-versions-versions-palette-item-67f7dd27",
+                &[("rewrite-branch-1", (rewrite.branch).clone().into())],
+            ),
             "compare".into(),
             Action::Versions(VersionsAct::Rewrite(rewrite.clone())),
         ))

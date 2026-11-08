@@ -20,8 +20,7 @@ use crate::git::{self, RunStop, RunSummary, TestEnd, TestEvent, TestPlan, Verdic
 use crate::settings::Settings;
 
 /// What the header's menu and the settings say of the lane.
-pub(crate) const TEST_LANE_TIP: &str =
-    "A pass / fail square by each commit for the test command; Test commits… fills it in";
+pub(crate) const TEST_LANE_TIP: &str = "repo-workflows-test_lane--1238d9b6";
 
 /// A run that takes longer than this gets a notification when it ends.
 const LONG_RUN: Duration = Duration::from_secs(4);
@@ -237,7 +236,12 @@ impl RepoTab {
                         lane.results = results;
                         lane.error = None;
                     }
-                    Err(e) => lane.error = Some(format!("Couldn't read the test results: {e}")),
+                    Err(e) => {
+                        lane.error = Some(crate::i18n::message(
+                            "repo-workflows-test_lane-read-test-lane-46a9cf6f",
+                            &[("e", (e).clone().into())],
+                        ))
+                    }
                 }
             },
         );
@@ -337,7 +341,9 @@ impl RepoTab {
             }));
             match ran {
                 Ok(result) => send(Box::new(move |tab, ctx| tab.tests_ended(id, result, ctx))),
-                Err(_) => failed("Internal error: the test run stopped".to_owned()),
+                Err(_) => failed(
+                    crate::i18n::text("repo-workflows-test_lane-start-tests-da24c844").to_owned(),
+                ),
             }
         });
     }
@@ -420,12 +426,25 @@ impl RepoTab {
 
     /// The palette's entries for the lane.
     pub(super) fn test_palette_items(&self) -> Vec<(String, String, Action)> {
-        let item = |label: &str, action| (label.to_owned(), "tests test lane".to_owned(), action);
+        let item = |label: &str, action| {
+            (
+                label.to_owned(),
+                crate::i18n::text("repo-workflows-test_lane-test-palette-items-a7530fc4")
+                    .to_owned(),
+                action,
+            )
+        };
         let mut items = Vec::new();
         if self.test_lane.running() {
-            items.push(item("Stop testing", Action::TestLane(LaneAct::Stop)));
+            items.push(item(
+                crate::i18n::text("repo-workflows-test_lane-test-palette-items-e30e705a"),
+                Action::TestLane(LaneAct::Stop),
+            ));
         } else if !self.refs.head.is_empty() {
-            items.push(item("Test commits…", self.test_dialog(None)));
+            items.push(item(
+                crate::i18n::text("repo-workflows-test_lane-test-palette-items-8e8e56f9"),
+                self.test_dialog(None),
+            ));
         }
         items
     }
@@ -433,17 +452,21 @@ impl RepoTab {
     /// The commit menu's entry: test the commits up to `hash`.
     pub(super) fn test_menu_items(&self, ui: &mut egui::Ui, hash: &str, acts: &mut Vec<Action>) {
         let running = self.test_lane.running();
-        if crate::menu_item::MenuItem::new("Test commits up to here…")
-            .icon("command")
-            .refused(running.then_some("Tests are running: stop them first"))
-            .show(ui)
-            .on_hover_text(
-                "Runs a test command at each commit from the base branch to this one (just this \
-                 one when it is on the base branch), in scratch worktrees, and shows a pass / \
-                 fail square by each",
-            )
-            .on_disabled_hover_text("Tests are running: stop them first")
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-test_lane-test-menu-items-8bbd923c",
+        ))
+        .icon("command")
+        .refused(running.then_some(crate::i18n::text(
+            "repo-workflows-test_lane-test-menu-items-d589fd6f",
+        )))
+        .show(ui)
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-test_lane-test-menu-items-fff40573",
+        ))
+        .on_disabled_hover_text(crate::i18n::text(
+            "repo-workflows-test_lane-test-menu-items-d589fd6f",
+        ))
+        .clicked()
         {
             acts.push(self.test_dialog(Some(hash)));
             ui.close();
@@ -531,22 +554,164 @@ pub(crate) fn ended_message(range: &str, result: &Result<RunSummary, String>) ->
 
 /// How the dot of `state` reads on hover, for the tree `tree` and the test `command`.
 pub(crate) fn dot_tip(state: DotState, command: Option<&str>, tree: &str, ran: bool) -> String {
-    let cmd = command.map_or_else(|| "the test".to_owned(), |c| format!("`{c}`"));
+    let cmd = command.map_or_else(
+        || crate::i18n::text("repo-workflows-test_lane-dot-tip-ad6afd6e").to_owned(),
+        |c| format!("`{c}`"),
+    );
     let what = match state {
-        DotState::Good => format!("Passed {cmd}"),
-        DotState::Bad => format!("Failed {cmd}"),
-        DotState::Running => format!("Running {cmd}…"),
-        DotState::Queued => "Waiting to be tested".to_owned(),
-        DotState::Failed => "Couldn't be tested".to_owned(),
+        DotState::Good => crate::i18n::message(
+            "repo-workflows-test_lane-dot-tip-4d352018",
+            &[("cmd", (cmd).clone().into())],
+        ),
+        DotState::Bad => crate::i18n::message(
+            "repo-workflows-test_lane-dot-tip-bc50fea6",
+            &[("cmd", (cmd).clone().into())],
+        ),
+        DotState::Running => crate::i18n::message(
+            "repo-workflows-test_lane-dot-tip-992c6c78",
+            &[("cmd", (cmd).clone().into())],
+        ),
+        DotState::Queued => {
+            crate::i18n::text("repo-workflows-test_lane-dot-tip-5830cb10").to_owned()
+        }
+        DotState::Failed => {
+            crate::i18n::text("repo-workflows-test_lane-dot-tip-4db748be").to_owned()
+        }
     };
     let how = match state {
-        DotState::Good | DotState::Bad if ran => "\nClick to see what it printed",
-        DotState::Failed => "\nClick to see why",
+        DotState::Good | DotState::Bad if ran => {
+            crate::i18n::text("repo-workflows-test_lane-dot-tip-c91f64ce")
+        }
+        DotState::Failed => crate::i18n::text("repo-workflows-test_lane-dot-tip-3ebdbb8b"),
         DotState::Good | DotState::Bad => {
-            "\nA stored result (kept by tree in refs/notes/tests/default, shared with git-test); \
-             tested before this session, so there is no output to show"
+            crate::i18n::text("repo-workflows-test_lane-dot-tip-10d4cd00")
         }
         _ => "",
     };
-    format!("{what} · tree {}{how}", short(tree))
+    crate::i18n::message(
+        "repo-workflows-test_lane-dot-tip-f9f1c77d",
+        &[
+            ("what", (what).clone().into()),
+            ("short-tree-1", (short(tree)).clone().into()),
+            ("how", (how).clone().into()),
+        ],
+    )
+}
+
+/// Presentation of the supplied result; the stored status factory above remains raw.
+pub(super) fn display_ended_message(
+    range: &str,
+    result: &Result<RunSummary, String>,
+) -> (String, bool) {
+    match result {
+        Err(error) => (
+            crate::i18n::message(
+                "repo-workflows-test_lane-ended-message-b4c579e3",
+                &[
+                    ("range", range.into()),
+                    (
+                        "e",
+                        crate::repo::activity::display_workflow_error(error).into(),
+                    ),
+                ],
+            ),
+            true,
+        ),
+        Ok(s) => {
+            let tested = s.good + s.bad - s.known;
+            let display = crate::i18n::message(
+                "repo-workflows-test-lane-ended-display",
+                &[
+                    ("stopped", (if s.stopped { "yes" } else { "no" }).into()),
+                    ("range", (range).into()),
+                    ("count", (tested).into()),
+                    ("known", (s.known).into()),
+                    ("good", (s.good).into()),
+                    ("bad", (s.bad).into()),
+                    ("unavailable", (s.failed.len()).into()),
+                    (
+                        "cleanup",
+                        (if s.cleanup.is_some() { "yes" } else { "no" }).into(),
+                    ),
+                    (
+                        "detail",
+                        (s.cleanup
+                            .as_deref()
+                            .map(crate::repo::activity::display_workflow_error)
+                            .unwrap_or_default())
+                        .into(),
+                    ),
+                ],
+            );
+            (
+                display,
+                s.bad > 0 || !s.failed.is_empty() || s.cleanup.is_some(),
+            )
+        }
+    }
+}
+#[cfg(test)]
+mod fluent_result_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_test_lane_actual_result_display_keeps_raw_status_identity() {
+        let summary = RunSummary {
+            good: 1234,
+            bad: 1,
+            known: 2,
+            failed: vec![("opaque tree".into(), "provider failure".into())],
+            stopped: true,
+            cleanup: Some("Opaque cleanup / ß".into()),
+        };
+        let result = Ok(summary);
+        crate::i18n::set_language("en-US");
+        let raw = ended_message("refs/heads/ß..HEAD", &result);
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            assert_eq!(ended_message("refs/heads/ß..HEAD", &result), raw);
+            let (display, bad) = display_ended_message("refs/heads/ß..HEAD", &result);
+            assert!(bad);
+            assert!(display.contains("refs/heads/ß..HEAD"));
+            assert!(display.contains("Opaque cleanup / ß"));
+            assert!(display.contains(if language == "de" {
+                "1.234 bestanden"
+            } else {
+                "1,234 passed"
+            }));
+            assert!(display.contains(if language == "de" {
+                "1.233 Commits"
+            } else {
+                "1,233 commits"
+            }));
+            let one = Ok(RunSummary {
+                good: 1,
+                ..Default::default()
+            });
+            let shown = display_ended_message("range/ß", &one);
+            assert!(!shown.1);
+            assert!(shown.0.contains(if language == "de" {
+                "Ein Commit"
+            } else {
+                "one commit"
+            }));
+            assert_eq!(
+                ended_message("range/ß", &one).0,
+                "Tested 1 commit of range/ß: 1 passed"
+            );
+            let failure = Err("Opaque error refs/heads/ß".into());
+            assert_eq!(
+                ended_message("range", &failure),
+                (
+                    "Couldn't test range: Opaque error refs/heads/ß".into(),
+                    true
+                )
+            );
+            assert!(
+                display_ended_message("range", &failure)
+                    .0
+                    .contains("Opaque error refs/heads/ß")
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

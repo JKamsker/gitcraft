@@ -202,7 +202,13 @@ impl RepoTab {
                 Ok(witness)
             }
             Err(e) => {
-                let error = format!("Could not start {}: {e}", launch.label);
+                let error = crate::i18n::message(
+                    "repo-workflows-agents-start-launch-tracked-d71ae829",
+                    &[
+                        ("launch-label-1", (launch.label).clone().into()),
+                        ("e", (e).clone().into()),
+                    ],
+                );
                 self.terminal_error = Some(error.clone());
                 Err(error)
             }
@@ -362,18 +368,18 @@ impl RepoTab {
             form.saving = true;
         }
         let repo = self.path.clone();
+        let submitted = recipe.clone();
         self.then(
             ctx,
             move || recipe.save(&repo),
-            |tab, result, _| match result {
+            move |tab, result, _| match result {
                 Ok(()) => {
                     tab.agents.dialog = None;
                     tab.status = Some(("Worktree setup recipe saved".to_owned(), false));
                 }
                 Err(e) => {
                     if let Some(AgentDialog::Recipe(form)) = &mut tab.agents.dialog {
-                        form.saving = false;
-                        form.error = Some(e);
+                        form.save_failed(e, submitted);
                     }
                 }
             },

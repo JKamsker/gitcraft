@@ -26,12 +26,7 @@ pub(super) fn ui(
     locked: bool,
     acts: &mut Vec<Action>,
 ) {
-    faint(
-        ui,
-        "Why a file seems to vanish, why line endings keep changing, why a merge driver doesn't \
-         run: the rule that ignores a file and the attributes git gives it, as the working \
-         tree has them. A file's menu (Ignore rules and attributes) brings it here.",
-    );
+    faint(ui, crate::i18n::text("repo-workflows-doctor-ui-678f7b82"));
     explain_card(ui, state, top, acts);
     ignored_card(ui, state, acts);
     rules_card(ui, state, locked, acts);
@@ -40,47 +35,57 @@ pub(super) fn ui(
 /// The path to explain, and what was found.
 fn explain_card(ui: &mut Ui, state: &mut IgnoreState, top: &str, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
-    card(ui, "Explain a file", None, |ui| {
-        let typed = ignore::clean_path(&state.typed, top);
-        ui.horizontal(|ui| {
-            let field = ui.add(
-                egui::TextEdit::singleline(&mut state.typed)
-                    .hint_text("path/in/the/repository")
-                    .font(crate::theme::mono(12.0))
-                    .desired_width(ui.available_width() - 90.0),
-            );
-            let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            let go = ui.add_enabled(typed.is_ok(), egui::Button::new("Explain"));
-            if (go.clicked() || enter)
-                && let Ok(path) = &typed
+    card(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-explain-card-7486f5b7"),
+        None,
+        |ui| {
+            let typed = ignore::clean_path(&state.typed, top);
+            ui.horizontal(|ui| {
+                let field = ui.add(
+                    egui::TextEdit::singleline(&mut state.typed)
+                        .hint_text("path/in/the/repository")
+                        .font(crate::theme::mono(12.0))
+                        .desired_width(ui.available_width() - 90.0),
+                );
+                let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let go = ui.add_enabled(
+                    typed.is_ok(),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-doctor-explain-card-3b61e4e9",
+                    )),
+                );
+                if (go.clicked() || enter)
+                    && let Ok(path) = &typed
+                {
+                    acts.push(act(IgnoreAct::Explain(path.clone())));
+                }
+            });
+            if let Err(why) = &typed
+                && !state.typed.is_empty()
             {
-                acts.push(act(IgnoreAct::Explain(path.clone())));
+                ui.label(RichText::new(why).color(t.danger));
             }
-        });
-        if let Err(why) = &typed
-            && !state.typed.is_empty()
-        {
-            ui.label(RichText::new(why).color(t.danger));
-        }
-        let Some((_, read)) = &state.explained else {
-            return;
-        };
-        let Some(found) = reading(ui, read) else {
-            return;
-        };
-        ui.add_space(8.0);
-        let files = state.files.as_ref().and_then(|f| f.as_ref().ok());
-        let editing = state.editing.as_ref().map(|e| e.file.label.as_str());
-        let unsaved = state.unsaved();
-        explained(
-            ui,
-            found,
-            files.map_or(&[][..], Vec::as_slice),
-            editing,
-            unsaved,
-            acts,
-        );
-    });
+            let Some((_, read)) = &state.explained else {
+                return;
+            };
+            let Some(found) = reading(ui, read) else {
+                return;
+            };
+            ui.add_space(8.0);
+            let files = state.files.as_ref().and_then(|f| f.as_ref().ok());
+            let editing = state.editing.as_ref().map(|e| e.file.label.as_str());
+            let unsaved = state.unsaved();
+            explained(
+                ui,
+                found,
+                files.map_or(&[][..], Vec::as_slice),
+                editing,
+                unsaved,
+                acts,
+            );
+        },
+    );
 }
 
 fn explained(
@@ -105,8 +110,15 @@ fn explained(
             let open = at.is_some_and(|i| editing == Some(files[i].label.as_str()));
             if let Some(i) = at.filter(|_| !open)
                 && ui
-                    .add_enabled(!unsaved, egui::Button::new("Edit this file"))
-                    .on_disabled_hover_text("Save or discard the changes being edited first")
+                    .add_enabled(
+                        !unsaved,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-doctor-explained-98353ed7",
+                        )),
+                    )
+                    .on_disabled_hover_text(crate::i18n::text(
+                        "repo-workflows-doctor-explained-55b528ba",
+                    ))
                     .clicked()
             {
                 acts.push(act(IgnoreAct::Edit(i)));
@@ -125,40 +137,39 @@ fn verdict(e: &Explained, t: &Tokens) -> Vec<(egui::Color32, String)> {
     if e.folder {
         out.push((
             t.text_dim,
-            "A folder: the rule shown decides for everything in it (git doesn't look inside an \
-             ignored folder)."
-                .to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-b78474c9").to_owned(),
         ));
     } else if e.missing {
         out.push((
             t.text_faint,
-            "There is no such file here: the rules are read as for a file of that name (a rule \
-             for folders, ending in /, can't match it)."
-                .to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-c3b9d549").to_owned(),
         ));
     }
     let (color, text) = match &e.rule {
-        _ if e.ignored() => (t.danger, "Ignored by this rule.".to_owned()),
+        _ if e.ignored() => (
+            t.danger,
+            crate::i18n::text("repo-workflows-doctor-verdict-b796f495").to_owned(),
+        ),
         Some(rule) if rule.negated() && e.tracked => (
             t.success,
-            "Tracked, and the last rule that matches it is this ! rule.".to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-f0d742e1").to_owned(),
         ),
         Some(rule) if rule.negated() => (
             t.success,
-            "Not ignored: this ! rule is the last one that matches it.".to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-a292bdad").to_owned(),
         ),
         Some(_) => (
             t.warning,
-            "Tracked: ignore rules don't apply to files git already tracks, so this rule has no \
-             effect on it. To have it ignored, stop tracking it (git rm --cached; the file stays \
-             on disk)."
-                .to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-050f8d52").to_owned(),
         ),
         None if e.tracked => (
             t.success,
-            "Tracked, and no ignore rule matches it.".to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-a1c6264a").to_owned(),
         ),
-        None => (t.success, "No ignore rule matches it.".to_owned()),
+        None => (
+            t.success,
+            crate::i18n::text("repo-workflows-doctor-verdict-2459673a").to_owned(),
+        ),
     };
     out.push((color, text));
     // A rule for its folder wins over any ! rule for the file itself.
@@ -169,9 +180,7 @@ fn verdict(e: &Explained, t: &Tokens) -> Vec<(egui::Color32, String)> {
     {
         out.push((
             t.text_faint,
-            "Its folder is ignored: git doesn't look inside, so a ! rule for a file in it has no \
-             effect. Un-ignore the folder (!folder/), or ignore folder/* instead."
-                .to_owned(),
+            crate::i18n::text("repo-workflows-doctor-verdict-765462d4").to_owned(),
         ));
     }
     out
@@ -187,7 +196,7 @@ fn same_file(label: &str, source: &str) -> bool {
 fn eol_word(v: &str) -> &str {
     match v {
         "" => "—",
-        "none" => "no line breaks",
+        "none" => crate::i18n::text("repo-workflows-doctor-eol-word-ec3e00be"),
         "-text" => "binary",
         other => other,
     }
@@ -199,15 +208,28 @@ fn attributes(ui: &mut Ui, e: &Explained) {
     if let Some(eol) = &e.eol {
         dim(
             ui,
-            format!(
-                "Line endings · in the repository: {} · in the working tree: {} · attributes: {}",
-                eol_word(&eol.index),
-                eol_word(&eol.worktree),
-                if eol.attr.is_empty() {
-                    "—"
-                } else {
-                    &eol.attr
-                }
+            crate::i18n::message(
+                "repo-workflows-doctor-attributes-68cb5f93",
+                &[
+                    (
+                        "eol-word-eol-index-1",
+                        (eol_word(&eol.index)).clone().into(),
+                    ),
+                    (
+                        "eol-word-eol-worktree-2",
+                        (eol_word(&eol.worktree)).clone().into(),
+                    ),
+                    (
+                        "if-eol-attr-is-empty-else-eol-at-3",
+                        (if eol.attr.is_empty() {
+                            "—"
+                        } else {
+                            &eol.attr
+                        })
+                        .clone()
+                        .into(),
+                    ),
+                ],
             ),
         );
         for (warn, note) in eol_notes(eol) {
@@ -218,8 +240,7 @@ fn attributes(ui: &mut Ui, e: &Explained) {
     if e.attrs.is_empty() {
         faint(
             ui,
-            "No attributes: git guesses text or binary for diffs and merges, and core.autocrlf \
-             alone decides line endings.",
+            crate::i18n::text("repo-workflows-doctor-attributes-cb2060cc"),
         );
     }
     for line in ignore::meaning(&e.attrs) {
@@ -227,26 +248,33 @@ fn attributes(ui: &mut Ui, e: &Explained) {
     }
     for d in &e.missing_drivers {
         let text = match (d.attr.as_str(), d.name.as_str()) {
-            ("filter", "lfs") => "filter=lfs, but Git LFS isn't set up here (git lfs install): \
-                                  checkouts leave pointer files, and files you add go into git \
-                                  itself, not LFS."
-                .to_owned(),
-            ("filter", name) if d.required => format!(
-                "filter={name} is required but has no clean or smudge command here: git refuses \
-                 to add or check out this file."
+            ("filter", "lfs") => {
+                crate::i18n::text("repo-workflows-doctor-attributes-82806016").to_owned()
+            }
+            ("filter", name) if d.required => crate::i18n::message(
+                "repo-workflows-doctor-attributes-ec97a4d2",
+                &[("name", (name).clone().into())],
             ),
-            ("filter", name) => format!(
-                "filter={name} names a filter this configuration doesn't define: git stores and \
-                 checks the file out as it is."
+            ("filter", name) => crate::i18n::message(
+                "repo-workflows-doctor-attributes-4af8906f",
+                &[("name", (name).clone().into())],
             ),
-            (attr, name) => format!(
-                "{attr}={name} names a driver this configuration doesn't define \
-                 ({attr}.{name}.*): git {} as usual.",
-                if attr == "merge" {
-                    "merges it"
-                } else {
-                    "diffs it"
-                }
+            (attr, name) => crate::i18n::message(
+                "repo-workflows-doctor-attributes-c6b25148",
+                &[
+                    ("attr", (attr).clone().into()),
+                    ("name", (name).clone().into()),
+                    (
+                        "if-attr-merge-merges-it-else-dif-1",
+                        (if attr == "merge" {
+                            crate::i18n::text("repo-workflows-doctor-attributes-f31e8d7f")
+                        } else {
+                            crate::i18n::text("repo-workflows-doctor-attributes-2176c800")
+                        })
+                        .clone()
+                        .into(),
+                    ),
+                ],
             ),
         };
         let color = if d.required { t.danger } else { t.warning };
@@ -274,16 +302,13 @@ pub(super) fn eol_notes(eol: &Eol) -> Vec<(bool, &'static str)> {
     if !binary && matches!(eol.index.as_str(), "crlf" | "mixed") {
         out.push((
             true,
-            "Stored in the repository with CRLF or mixed line endings: whoever has core.autocrlf \
-             set will see the whole file change.",
+            crate::i18n::text("repo-workflows-doctor-eol-notes-868d3e72"),
         ));
     }
     if eol.attr.is_empty() && !binary && !eol.index.is_empty() {
         out.push((
             false,
-            "No text or eol attribute: each machine's core.autocrlf decides its line endings, \
-             which is how line-ending churn starts; `* text=auto` in .gitattributes makes it the \
-             same everywhere.",
+            crate::i18n::text("repo-workflows-doctor-eol-notes-384973dd"),
         ));
     }
     out
@@ -293,30 +318,43 @@ pub(super) fn eol_notes(eol: &Eol) -> Vec<(bool, &'static str)> {
 fn ignored_card(ui: &mut Ui, state: &IgnoreState, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let title = match &state.ignored {
-        Some(Ok((_, total))) => format!("Ignored files ({total})"),
-        _ => "Ignored files".to_owned(),
+        Some(Ok((_, total))) => crate::i18n::message(
+            "repo-workflows-doctor-ignored-card-37abda7f",
+            &[("total", (total).clone().into())],
+        ),
+        _ => crate::i18n::text("repo-workflows-doctor-ignored-card-0384b20e").to_owned(),
     };
-    let note = "Untracked files git ignores; a folder stands for all it holds. Click one to \
-                explain it.";
+    let note = crate::i18n::text("repo-workflows-doctor-ignored-card-fb0ae18f");
     card(ui, &title, Some(note), |ui| {
         let Some((list, total)) = reading(ui, &state.ignored) else {
             return;
         };
         if list.is_empty() {
-            faint(ui, "Nothing is ignored.");
+            faint(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-ignored-card-1303e9b5"),
+            );
             return;
         }
         for path in list {
             let resp = ui
                 .add(egui::Label::new(code(path).color(t.text_dim)).sense(egui::Sense::click()))
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .on_hover_text("Explain it");
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-doctor-ignored-card-cdd2ef27",
+                ));
             if resp.clicked() {
                 acts.push(act(IgnoreAct::Explain(path.clone())));
             }
         }
         if *total > list.len().min(IGNORED_SHOWN) {
-            faint(ui, format!("and {} more", total - list.len()));
+            faint(
+                ui,
+                crate::i18n::message(
+                    "repo-workflows-doctor-ignored-card-683768ab",
+                    &[("total-list-len-1", (total - list.len()).clone().into())],
+                ),
+            );
         }
     });
 }
@@ -327,8 +365,10 @@ fn rules_card(ui: &mut Ui, state: &mut IgnoreState, locked: bool, acts: &mut Vec
     let unsaved = state.unsaved();
     card(
         ui,
-        "Files of ignore rules",
-        Some("Edit one, preview what the change would ignore, then save it."),
+        crate::i18n::text("repo-workflows-doctor-rules-card-91b1b197"),
+        Some(crate::i18n::text(
+            "repo-workflows-doctor-rules-card-379ee96f",
+        )),
         |ui| {
             let Some(files) = reading(ui, &state.files) else {
                 return;
@@ -341,10 +381,15 @@ fn rules_card(ui: &mut Ui, state: &mut IgnoreState, locked: bool, acts: &mut Vec
                     let open = editing.as_deref() == Some(file.label.as_str());
                     if !open
                         && ui
-                            .add_enabled(!unsaved, egui::Button::new("Edit"))
-                            .on_disabled_hover_text(
-                                "Save or discard the changes being edited first",
+                            .add_enabled(
+                                !unsaved,
+                                egui::Button::new(crate::i18n::text(
+                                    "repo-workflows-doctor-rules-card-464c4ffd",
+                                )),
                             )
+                            .on_disabled_hover_text(crate::i18n::text(
+                                "repo-workflows-doctor-rules-card-55b528ba",
+                            ))
                             .clicked()
                     {
                         acts.push(act(IgnoreAct::Edit(i)));
@@ -362,9 +407,15 @@ fn editor(ui: &mut Ui, e: &mut Editing, locked: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let unsaved = e.unsaved();
     let title = if unsaved {
-        format!("Editing {} · not saved", e.file.label)
+        crate::i18n::message(
+            "repo-workflows-doctor-editor-b5bfc677",
+            &[("e-file-label-1", (e.file.label).clone().into())],
+        )
     } else {
-        format!("Editing {}", e.file.label)
+        crate::i18n::message(
+            "repo-workflows-doctor-editor-52448408",
+            &[("e-file-label-1", (e.file.label).clone().into())],
+        )
     };
     card(ui, &title, Some(e.file.kind), |ui| {
         if std::mem::take(&mut e.scroll_to) {
@@ -388,16 +439,19 @@ fn editor(ui: &mut Ui, e: &mut Editing, locked: bool, acts: &mut Vec<Action>) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(changed, egui::Button::new("Preview"))
-                .on_disabled_hover_text("Change the rules first")
+                .add_enabled(
+                    changed,
+                    egui::Button::new(crate::i18n::text("repo-workflows-doctor-editor-324b134f")),
+                )
+                .on_disabled_hover_text(crate::i18n::text("repo-workflows-doctor-editor-a875327e"))
                 .clicked()
             {
                 acts.push(act(IgnoreAct::Preview));
             }
             let save_text = if e.confirm_save {
-                "Save outside the repository"
+                crate::i18n::text("repo-workflows-doctor-editor-5902680c")
             } else {
-                "Save"
+                crate::i18n::text("repo-workflows-doctor-editor-1509f561")
             };
             let save = ui
                 .add_enabled(
@@ -405,16 +459,20 @@ fn editor(ui: &mut Ui, e: &mut Editing, locked: bool, acts: &mut Vec<Action>) {
                     egui::Button::new(save_text),
                 )
                 .on_disabled_hover_text(if e.saving {
-                    "Saving…"
+                    crate::i18n::text("repo-workflows-doctor-editor-23e39291")
                 } else if locked {
-                    "Wait for the running operation"
+                    crate::i18n::text("repo-workflows-doctor-editor-b5c82673")
                 } else {
-                    "Nothing changed"
+                    crate::i18n::text("repo-workflows-doctor-editor-0ba2a573")
                 });
             if save.clicked() {
                 acts.push(act(IgnoreAct::Save));
             }
-            let close = if unsaved { "Discard changes" } else { "Close" };
+            let close = if unsaved {
+                crate::i18n::text("repo-workflows-doctor-editor-f9bfa3dc")
+            } else {
+                crate::i18n::text("repo-workflows-doctor-editor-7d9eb7ac")
+            };
             if ui.button(close).clicked() {
                 acts.push(act(IgnoreAct::CloseEditor));
             }
@@ -424,22 +482,27 @@ fn editor(ui: &mut Ui, e: &mut Editing, locked: bool, acts: &mut Vec<Action>) {
         });
         if e.confirm_save {
             ui.label(
-                RichText::new(format!(
-                    "{} isn't a file of this repository: it applies to every repository that \
-                     reads it. Click again to save it.",
-                    e.file.label
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-doctor-editor-1ee81c8e",
+                    &[("e-file-label-1", (e.file.label).clone().into())],
                 ))
                 .color(t.warning),
             );
         }
         match &e.saved {
             Some(Ok(())) => {
-                ui.label(RichText::new("Saved.").color(t.success));
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-doctor-editor-fca046cc"))
+                        .color(t.success),
+                );
             }
             Some(Err(err)) => {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new(err).color(t.danger));
-                    if ui.button("Read it again").clicked() {
+                    if ui
+                        .button(crate::i18n::text("repo-workflows-doctor-editor-6c1adba2"))
+                        .clicked()
+                    {
                         acts.push(act(IgnoreAct::Reread));
                     }
                 });
@@ -459,9 +522,7 @@ fn preview(ui: &mut Ui, p: &Preview) {
     let t = Tokens::get(ui.ctx());
     faint(
         ui,
-        "By this file's rules alone: rules in other files are left out, so a ! rule here that \
-         takes back what another file ignores doesn't show, and another file may still ignore \
-         a path listed here.",
+        crate::i18n::text("repo-workflows-doctor-preview-cd2605b4"),
     );
     let list = |ui: &mut Ui, title: &str, paths: &[String], color| {
         if paths.is_empty() {
@@ -469,7 +530,7 @@ fn preview(ui: &mut Ui, p: &Preview) {
         }
         ui.add_space(4.0);
         ui.label(
-            RichText::new(format!("{title} ({})", paths.len()))
+            RichText::new(format!("{title} ({})", crate::i18n::number(paths.len())))
                 .font(crate::theme::semibold(12.5))
                 .color(color),
         );
@@ -477,20 +538,39 @@ fn preview(ui: &mut Ui, p: &Preview) {
             ui.label(code(path).color(t.text_dim));
         }
         if paths.len() > PREVIEW_SHOWN {
-            faint(ui, format!("and {} more", paths.len() - PREVIEW_SHOWN));
+            faint(
+                ui,
+                crate::i18n::message(
+                    "repo-workflows-doctor-preview-683768ab",
+                    &[(
+                        "paths-len-preview-shown-1",
+                        (paths.len() - PREVIEW_SHOWN).clone().into(),
+                    )],
+                ),
+            );
         }
     };
     if p.newly_ignored.is_empty() && p.no_longer_ignored.is_empty() {
         faint(
             ui,
-            "This change wouldn't start or stop ignoring any untracked file.",
+            crate::i18n::text("repo-workflows-doctor-preview-bbb0c0cc"),
         );
     }
-    list(ui, "Newly ignored", &p.newly_ignored, t.danger);
-    list(ui, "No longer ignored", &p.no_longer_ignored, t.success);
     list(
         ui,
-        "Tracked files this file's rules match (they stay tracked)",
+        crate::i18n::text("repo-workflows-doctor-preview-63666b35"),
+        &p.newly_ignored,
+        t.danger,
+    );
+    list(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-preview-0f241c6b"),
+        &p.no_longer_ignored,
+        t.success,
+    );
+    list(
+        ui,
+        crate::i18n::text("repo-workflows-doctor-preview-8c8b9b2a"),
         &p.tracked_matching,
         t.warning,
     );

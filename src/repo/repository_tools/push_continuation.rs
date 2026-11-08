@@ -28,11 +28,11 @@ impl RepoTab {
             false,
             Err,
             move || {
-                if alive.strong_count() == 0 { return Err("Push preparation canceled".into()); }
+                if alive.strong_count() == 0 { return Err(crate::i18n::text("repo-workflows-repository_tools-prepare-branch-review-2685a3d8").into()); }
                 match (branch, force) {
                     (Some((name, oid)), None) => routing::prepare_push(&repo, &name, &oid),
                     (None, Some(plan)) => Ok(routing::PreparedPush::from(&plan)),
-                    _ => Err("Invalid selected push continuation".into()),
+                    _ => Err(crate::i18n::text("repo-workflows-repository_tools-prepare-branch-review-77a313b9").into()),
                 }
             },
             move |tab, result, ctx| {
@@ -41,7 +41,7 @@ impl RepoTab {
                     || crate::connections::current() != context || tab.connection_context != context
                     || tab.https_generation != generation
                 {
-                    tab.dialog = Some(Dialog::PushError("The repository, profile or sign-in changed. Choose the push action again.".into()));
+                    tab.dialog = Some(Dialog::PushError(crate::i18n::text("repo-workflows-repository_tools-prepare-branch-review-a89fdaff").into()));
                     return;
                 }
                 match result {
@@ -59,7 +59,7 @@ impl RepoTab {
     ) {
         self.with_selected_push(prepared, |tab, ops| {
             tab.run_ops_ex(
-                "Push selected route",
+                crate::i18n::text("repo-workflows-repository_tools-review-prepared-push-88d2d1a8"),
                 ops,
                 crate::repo::Refresh::All,
                 crate::repo::OpKind::plain(),

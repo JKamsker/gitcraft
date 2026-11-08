@@ -1,8 +1,12 @@
 use super::{Act, Data, State};
 use crate::{git, repo::Action};
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Publish to several hosts");
-    ui.label("These pushes are not atomic. A successful host stays published if another host fails. Each destination receives the exact commit shown; retry sends only failed destinations.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-057248ff",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-d15b2630",
+    ));
     let Some(result) = &mut state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -16,10 +20,14 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
     };
     ui.horizontal(|ui| {
-        ui.label("Group:");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-aff83496",
+        ));
         ui.text_edit_singleline(&mut m.group);
         egui::ComboBox::from_id_salt("publication_groups")
-            .selected_text("Saved groups")
+            .selected_text(crate::i18n::text(
+                "repo-workflows-repository_tools-show-ae033504",
+            ))
             .show_ui(ui, |ui| {
                 for name in m.groups.keys() {
                     if ui.selectable_label(m.group == *name, name).clicked() {
@@ -40,10 +48,20 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
     }
     ui.horizontal(|ui| {
-        if ui.button("Save named group").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-7790f11b",
+            ))
+            .clicked()
+        {
             acts.push(Action::RepositoryTools(Act::SaveGroup(Box::new(m.clone()))));
         }
-        if ui.button("Prepare exact commit and destinations").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-f66ce8b9",
+            ))
+            .clicked()
+        {
             acts.push(Action::RepositoryTools(Act::PreparePublication(Box::new(
                 m.clone(),
             ))));
@@ -51,9 +69,13 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     });
     if let Some(p) = &m.plan {
         ui.separator();
-        ui.label(format!(
-            "Group {} · {} → refs/heads/{}",
-            p.group, p.commit, p.branch
+        ui.label(crate::i18n::message(
+            "repo-workflows-repository_tools-show-5fb1b07d",
+            &[
+                ("p-group-1", (p.group).clone().into()),
+                ("p-commit-2", (p.commit).clone().into()),
+                ("p-branch-3", (p.branch).clone().into()),
+            ],
         ));
         egui::ScrollArea::vertical()
             .id_salt("publication_results")
@@ -63,10 +85,18 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     ui.label(format!("{} · {}", d.remote, git::redact(&d.url, None)));
                     match &d.result {
                         None => {
-                            ui.label("Ready");
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-5fa7aac5",
+                            ));
                         }
                         Some(Ok(output)) => {
-                            ui.label(format!("Published: {}", git::redact(output, None)));
+                            ui.label(crate::i18n::message(
+                                "repo-workflows-repository_tools-show-8472b5d8",
+                                &[(
+                                    "git-redact-output-none-1",
+                                    (git::redact(output, None)).clone().into(),
+                                )],
+                            ));
                         }
                         Some(Err(e)) => {
                             ui.colored_label(
@@ -79,7 +109,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             });
         ui.checkbox(
             &mut state.acknowledged,
-            "I reviewed every destination and accept partial publication",
+            crate::i18n::text("repo-workflows-repository_tools-show-8edc0123"),
         );
         let fresh = p.destinations.iter().all(|d| d.result.is_none());
         let failed = p
@@ -90,9 +120,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             .add_enabled(
                 state.acknowledged && (fresh || failed),
                 egui::Button::new(if fresh {
-                    "Publish group"
+                    crate::i18n::text("repo-workflows-repository_tools-show-3cc9a2c6")
                 } else {
-                    "Retry failed destinations only"
+                    crate::i18n::text("repo-workflows-repository_tools-show-2c00ff77")
                 }),
             )
             .clicked()

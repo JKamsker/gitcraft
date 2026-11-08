@@ -122,7 +122,12 @@ fn reviewers_for(
         .into_iter()
         .chain([format!("refs/heads/{base}")])
         .find(|r| crate::git::resolve(repo, r).is_ok())
-        .ok_or_else(|| format!("{base} isn't a branch here"))?;
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "repo-workflows-owners-reviewers-for-d68c1cfb",
+                &[("base", (base).clone().into())],
+            )
+        })?;
     let Some(file) = codeowners::read(repo, &base_ref, forge, None)? else {
         return Ok(Vec::new());
     };
@@ -148,9 +153,9 @@ pub(crate) fn reviewers_ui(ui: &mut Ui, suggested: &mut [Suggested], draft: bool
     let t = Tokens::get(ui.ctx());
     ui.add_space(6.0);
     let note = if draft {
-        "Ask for reviews (from CODEOWNERS) once it isn't a draft"
+        crate::i18n::text("repo-workflows-owners-reviewers-ui-796e0df8")
     } else {
-        "Ask for reviews (from CODEOWNERS)"
+        crate::i18n::text("repo-workflows-owners-reviewers-ui-da35c68e")
     };
     ui.label(RichText::new(note).color(t.text_dim).small());
     ui.add_enabled_ui(!draft, |ui| {
@@ -158,9 +163,9 @@ pub(crate) fn reviewers_ui(ui: &mut Ui, suggested: &mut [Suggested], draft: bool
             for s in suggested.iter_mut() {
                 let label = s.reviewer.label();
                 let tip = if s.reviewer.team {
-                    "A team: the forge asks its members"
+                    crate::i18n::text("repo-workflows-owners-reviewers-ui-7a8a3ca3")
                 } else {
-                    "An account"
+                    crate::i18n::text("repo-workflows-owners-reviewers-ui-d8e1731e")
                 };
                 ui.checkbox(&mut s.ask, label).on_hover_text(tip);
             }

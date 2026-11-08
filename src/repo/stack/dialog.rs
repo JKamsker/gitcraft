@@ -91,15 +91,17 @@ impl RepoTab {
             .show(ctx, |ui| {
                 ui.set_width(400.0);
                 ui.label(
-                    RichText::new(format!("{} is based on…", dialog.branch))
-                        .font(theme::semibold(15.0)),
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-stack-stack-dialogs-48de49a3",
+                        &[("dialog-branch-1", (dialog.branch).clone().into())],
+                    ))
+                    .font(theme::semibold(15.0)),
                 );
                 ui.add_space(6.0);
                 ui.label(
-                    RichText::new(
-                        "The branch it is a layer on in a stack: STACKS then shows the commits \
-                         it adds, and warns when that branch moves on.",
-                    )
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-stack-stack-dialogs-3ed31566",
+                    ))
                     .color(t.text_dim),
                 );
                 ui.add_space(10.0);
@@ -107,7 +109,7 @@ impl RepoTab {
                 egui::ComboBox::from_id_salt("stack-parent")
                     .width(ui.available_width())
                     .selected_text(if dialog.choice.is_empty() {
-                        "Pick a branch"
+                        crate::i18n::text("repo-workflows-stack-stack-dialogs-834da95d")
                     } else {
                         dialog.choice.as_str()
                     })
@@ -125,27 +127,46 @@ impl RepoTab {
                 ui.horizontal(|ui| match &dialog.suggestion {
                     None => {
                         ui.add(crate::spinner::Spinner::new());
-                        ui.label(RichText::new("Looking at history…").color(t.text_faint));
+                        ui.label(
+                            RichText::new(crate::i18n::text(
+                                "repo-workflows-stack-stack-dialogs-e4fe8b0e",
+                            ))
+                            .color(t.text_faint),
+                        );
                     }
                     Some(Ok(Some(name))) => {
                         ui.label(
-                            RichText::new(format!("Suggested from history: {name}"))
-                                .color(t.text_faint),
+                            RichText::new(crate::i18n::message(
+                                "repo-workflows-stack-stack-dialogs-e3dadccb",
+                                &[("name", (name).clone().into())],
+                            ))
+                            .color(t.text_faint),
                         );
-                        if *name != dialog.choice && ui.small_button("Use").clicked() {
+                        if *name != dialog.choice
+                            && ui
+                                .small_button(crate::i18n::text(
+                                    "repo-workflows-stack-stack-dialogs-c36d819e",
+                                ))
+                                .clicked()
+                        {
                             acts.push(Action::Stack(StackAct::PickParent(name.clone())));
                         }
                     }
                     Some(Ok(None)) => {
                         ui.label(
-                            RichText::new("No other branch shares history with it.")
-                                .color(t.text_faint),
+                            RichText::new(crate::i18n::text(
+                                "repo-workflows-stack-stack-dialogs-0681a692",
+                            ))
+                            .color(t.text_faint),
                         );
                     }
                     Some(Err(e)) => {
                         ui.label(
-                            RichText::new(format!("Couldn't look at history: {e}"))
-                                .color(t.warning),
+                            RichText::new(crate::i18n::message(
+                                "repo-workflows-stack-stack-dialogs-87dad22d",
+                                &[("e", (e).clone().into())],
+                            ))
+                            .color(t.warning),
                         );
                     }
                 });
@@ -153,11 +174,20 @@ impl RepoTab {
                     let gone = !self.refs.local.iter().any(|b| b.name == r.parent);
                     let (text, color) = if gone {
                         (
-                            format!("Now based on {}, which is gone", r.parent),
+                            crate::i18n::message(
+                                "repo-workflows-stack-stack-dialogs-9ba88e00",
+                                &[("r-parent-1", (r.parent).clone().into())],
+                            ),
                             t.warning,
                         )
                     } else {
-                        (format!("Now based on {}", r.parent), t.text_faint)
+                        (
+                            crate::i18n::message(
+                                "repo-workflows-stack-stack-dialogs-8511ea38",
+                                &[("r-parent-1", (r.parent).clone().into())],
+                            ),
+                            t.text_faint,
+                        )
                     };
                     ui.label(RichText::new(text).color(color));
                 }
@@ -168,13 +198,24 @@ impl RepoTab {
                     !egui::Popup::is_any_open(ui.ctx()) && ui.input(|i| i.key_pressed(Key::Enter));
                 ui.horizontal(|ui| {
                     let can = idle && !dialog.choice.is_empty();
-                    if widgets::primary_button(ui, "Set parent", can, 90.0).clicked()
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-stack-stack-dialogs-0772e513"),
+                        can,
+                        90.0,
+                    )
+                    .clicked()
                         || (can && enter)
                     {
                         done = true;
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-stack-dialogs-19766ed6",
+                            ))
+                            .min_size(egui::vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::CloseDialog));

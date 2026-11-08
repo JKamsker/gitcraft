@@ -15,36 +15,64 @@ pub(in crate::repo) fn history(
     undo: bool,
 ) -> Outcome {
     ui.set_width(700.0);
-    ui.heading("Earlier versions of working changes");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-working_drafts-history-d0ea2534",
+    ));
     let t = Tokens::get(ui.ctx());
     let mut outcome = Outcome::Open;
     if ui
         .add_enabled(
             idle && (*on || error.is_none()),
-            egui::Checkbox::new(on, "Automatically save working drafts (opt in)"),
+            egui::Checkbox::new(
+                on,
+                crate::i18n::text("repo-workflows-working_drafts-history-210ff933"),
+            ),
         )
         .changed()
     {
         return done(Action::DraftEnable(*on));
     }
-    ui.label("Save after 15 seconds of quiet and before checkout/rebase. Includes tracked changes and nonignored untracked regular files; ignored files and submodule contents stay out. Changed links/conflicts/special files require a manual backup.");
-    ui.label(egui::RichText::new("Index and working contents are saved separately, locally under protected tree refs. Normal pushes skip them; mirror pushes or manual all-ref exports can include drafts. Keep up to 50 versions for 14 days. Limits: 8 MiB/file, 32 MiB changed content, 2000 changed/20000 index paths. Git must support --no-lazy-fetch.").small().color(t.text_dim));
+    ui.label(crate::i18n::text(
+        "repo-workflows-working_drafts-history-65b35d4c",
+    ));
+    ui.label(
+        egui::RichText::new(crate::i18n::text(
+            "repo-workflows-working_drafts-history-ffdc452f",
+        ))
+        .small()
+        .color(t.text_dim),
+    );
     if let Some(error) = error {
         ui.colored_label(t.warning, error.chars().take(500).collect::<String>())
             .on_hover_text(error);
     }
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(idle && *on, egui::Button::new("Save version now"))
+            .add_enabled(
+                idle && *on,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-working_drafts-history-a2a28532",
+                )),
+            )
             .clicked()
         {
             outcome = done(Action::DraftSnapshot);
         }
-        if ui.button("Refresh").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-working_drafts-history-0e916101",
+            ))
+            .clicked()
+        {
             outcome = done(Action::EarlierVersions);
         }
         if ui
-            .add_enabled(idle && undo, egui::Button::new("Undo last recovery…"))
+            .add_enabled(
+                idle && undo,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-working_drafts-history-2f1765a5",
+                )),
+            )
             .clicked()
         {
             outcome = done(Action::DraftUndo);
@@ -53,29 +81,54 @@ pub(in crate::repo) fn history(
     ui.separator();
     ui.checkbox(
         index,
-        "Preview the saved staged/index contents (otherwise the working version)",
+        crate::i18n::text("repo-workflows-working_drafts-history-171888ea"),
     );
-    ui.label("Remote recovery preserves file permissions using Python 3 on that machine. Staged versions contain raw Git blobs (including LFS pointers). Recovery does not run filters or line-ending conversions; working versions contain the saved on-disk bytes.");
+    ui.label(crate::i18n::text(
+        "repo-workflows-working_drafts-history-5e6c0d68",
+    ));
     egui::ScrollArea::vertical()
         .max_height(420.0)
         .show(ui, |ui| {
             if versions.is_empty() {
-                ui.label("No saved versions. Enabling drafts starts saving after the next pause; a clean tree has nothing to save.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-working_drafts-history-51423780",
+                ));
             }
             for draft in versions {
-                let title = format!(
-                    "{} · {} · {} files",
-                    crate::git::relative_time(draft.metadata.created, crate::git::now()),
-                    draft.metadata.reason,
-                    draft.metadata.files.len()
+                let title = crate::i18n::message(
+                    "repo-workflows-draft-history-title",
+                    &[
+                        (
+                            "when",
+                            (crate::git::relative_time(draft.metadata.created, crate::git::now()))
+                                .into(),
+                        ),
+                        ("reason", (draft_reason(&draft.metadata.reason)).into()),
+                        ("count", (draft.metadata.files.len()).into()),
+                    ],
                 );
                 egui::CollapsingHeader::new(title)
                     .id_salt(&draft.id.reference)
                     .show(ui, |ui| {
                         ui.label(format!(
                             "{} · {}",
-                            draft.metadata.branch.as_deref().unwrap_or("detached/unborn"),
-                            draft.metadata.head.as_deref().unwrap_or("no HEAD").chars().take(12).collect::<String>()
+                            draft
+                                .metadata
+                                .branch
+                                .as_deref()
+                                .unwrap_or_else(|| crate::i18n::text(
+                                    "repo-workflows-paint-detached-unborn"
+                                )),
+                            draft
+                                .metadata
+                                .head
+                                .as_deref()
+                                .unwrap_or(crate::i18n::text(
+                                    "repo-workflows-working_drafts-history-9d0c13d9"
+                                ))
+                                .chars()
+                                .take(12)
+                                .collect::<String>()
                         ));
                         egui::ScrollArea::vertical()
                             .max_height(200.0)
@@ -84,10 +137,14 @@ pub(in crate::repo) fn history(
                                 for file in &draft.metadata.files[rows] {
                                     let mut label: String = file.path.chars().take(75).collect();
                                     if file.untracked {
-                                        label.push_str(" (untracked)");
+                                        label.push_str(crate::i18n::text(
+                                            "repo-workflows-working_drafts-history-36ceae04",
+                                        ));
                                     }
-                                    if ui.add_enabled(idle, egui::Button::new(label))
-                                        .on_hover_text(&file.path).clicked()
+                                    if ui
+                                        .add_enabled(idle, egui::Button::new(label))
+                                        .on_hover_text(&file.path)
+                                        .clicked()
                                     {
                                         outcome = done(Action::DraftPreview {
                                             id: draft.id.clone(),
@@ -100,7 +157,12 @@ pub(in crate::repo) fn history(
                     });
             }
         });
-    if ui.button("Close").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-working_drafts-history-7d9eb7ac",
+        ))
+        .clicked()
+    {
         outcome = Outcome::Cancel;
     }
     outcome
@@ -115,23 +177,39 @@ pub(in crate::repo) fn recovery(
     idle: bool,
 ) -> Outcome {
     ui.set_width(760.0);
-    ui.heading(format!("Recover {}", preview.path));
-    ui.label(format!(
-        "Current: {} bytes · saved {}: {} bytes",
-        preview.before_len,
-        if preview.index_layer {
-            "staged version"
-        } else {
-            "working version"
-        },
-        preview.saved_len
+    ui.heading(crate::i18n::message(
+        "repo-workflows-working_drafts-recovery-86201db4",
+        &[("preview-path-1", (preview.path).clone().into())],
     ));
-    ui.label("Choose the hunks to put back. Other working edits and the actual index stay as they are. Recovery first saves a safety version, even when automatic drafts are off; Undo recovery opens that version.");
+    ui.label(crate::i18n::message(
+        "repo-workflows-working_drafts-recovery-eb7ee658",
+        &[
+            ("preview-before-len-1", (preview.before_len).clone().into()),
+            (
+                "if-preview-index-layer-staged-ve-2",
+                (if preview.index_layer {
+                    crate::i18n::text("repo-workflows-working_drafts-recovery-87ca587d")
+                } else {
+                    crate::i18n::text("repo-workflows-working_drafts-recovery-1d540f7f")
+                })
+                .clone()
+                .into(),
+            ),
+            ("preview-saved-len-3", (preview.saved_len).clone().into()),
+        ],
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-working_drafts-recovery-3ef7c934",
+    ));
     if preview.binary {
-        ui.label("Binary files are recovered as a whole.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-working_drafts-recovery-33fc31a9",
+        ));
     }
     if preview.hunks.is_empty() {
-        ui.label("No content changes to recover. Mode-only changes are read-only here.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-working_drafts-recovery-092db2a8",
+        ));
     }
     egui::ScrollArea::vertical()
         .max_height(120.0)
@@ -160,7 +238,9 @@ pub(in crate::repo) fn recovery(
         if ui
             .add_enabled(
                 idle && !selected.is_empty(),
-                egui::Button::new("Back up current, then recover selected"),
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-working_drafts-recovery-ec7046f0",
+                )),
             )
             .clicked()
         {
@@ -169,10 +249,20 @@ pub(in crate::repo) fn recovery(
                 hunks: selected.iter().copied().collect(),
             });
         }
-        if ui.button("Back").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-working_drafts-recovery-76900f1b",
+            ))
+            .clicked()
+        {
             outcome = done(Action::EarlierVersions);
         }
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-working_drafts-recovery-19766ed6",
+            ))
+            .clicked()
+        {
             outcome = Outcome::Cancel;
         }
     });
@@ -181,4 +271,12 @@ pub(in crate::repo) fn recovery(
 
 fn done(action: Action) -> Outcome {
     Outcome::Done(Box::new(action))
+}
+
+fn draft_reason(raw: &str) -> &str {
+    match raw {
+        "Pause" => crate::i18n::text("repo-workflows-draft-reason-pause"),
+        "Saved manually" => crate::i18n::text("repo-workflows-draft-reason-manual"),
+        other => other,
+    }
 }

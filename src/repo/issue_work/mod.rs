@@ -164,9 +164,10 @@ impl RepoTab {
         let hosting = self.hosting.clone();
         let label = source.map_or_else(
             || {
-                hosting
-                    .as_ref()
-                    .map_or("Repository forge", |h| h.forge.name())
+                hosting.as_ref().map_or(
+                    crate::i18n::text("repo-workflows-issue_work-open-issue-picker-3a89bbe3"),
+                    |h| h.forge.name(),
+                )
             },
             |k| k.name(),
         );
@@ -183,12 +184,26 @@ impl RepoTab {
         self.issue_work.picker = Some(picker);
         let path = self.path.clone();
         let connection = crate::connections::current();
-        self.then(ctx,move || match source {
-            Some(kind)=>crate::trackers::assigned(kind),
-            None=>hosting.ok_or_else(||"No repository forge detected. Select Jira or Linear above, or configure the repository remote".to_owned()).and_then(|h|h.forge.provider().assigned_issues(&path,&h)),
-        },move |tab,result,_| {
-            if tab.issue_work.requests==request && connection==crate::connections::current() && let Some(picker)=&mut tab.issue_work.picker{picker.listed(result);}
-        });
+        self.then(
+            ctx,
+            move || match source {
+                Some(kind) => crate::trackers::assigned(kind),
+                None => hosting
+                    .ok_or_else(|| {
+                        crate::i18n::text("repo-workflows-issue_work-open-issue-picker-2a41bd2f")
+                            .to_owned()
+                    })
+                    .and_then(|h| h.forge.provider().assigned_issues(&path, &h)),
+            },
+            move |tab, result, _| {
+                if tab.issue_work.requests == request
+                    && connection == crate::connections::current()
+                    && let Some(picker) = &mut tab.issue_work.picker
+                {
+                    picker.listed(result);
+                }
+            },
+        );
     }
 
     fn start_issue(&mut self, issue: &Issue, branch: &str, worktree: bool, ctx: &egui::Context) {
@@ -248,22 +263,27 @@ impl RepoTab {
         }
         if self.refs.head.is_empty() {
             return refuse(
-                "the repository has no commits yet: commit something to start work from".into(),
+                crate::i18n::text("repo-workflows-issue_work-issue-plan-2bd468f0").into(),
             );
         }
         let base = self.issue_base();
         if branch == base.name {
-            return refuse(format!(
-                "{branch} is the default branch: the work on an issue goes on a branch of its own"
+            return refuse(crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-0dd9c97f",
+                &[("branch", (branch).clone().into())],
             ));
         }
         let mut warnings = Vec::new();
         if let Some(other) = self.issue_work.links.get(branch)
             && other.key() != key
         {
-            warnings.push(format!(
-                "{branch} is for {} already: starting makes it the branch of {key} instead",
-                other.key()
+            warnings.push(crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-8dbd7c09",
+                &[
+                    ("branch", (branch).clone().into()),
+                    ("other-key-1", (other.key()).clone().into()),
+                    ("key", (key).clone().into()),
+                ],
             ));
         }
         let exists = self.refs.local.iter().any(|b| b.name == branch);
@@ -285,36 +305,66 @@ impl RepoTab {
             &self.work.conflicted,
         ];
         if checkout_here && changes.iter().any(|files| !files.is_empty()) {
-            warnings.push(format!(
-                "The working tree has changes: they go along to {branch}, unless they'd be \
-                 overwritten (then nothing is done)"
+            warnings.push(crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-c9fafe01",
+                &[("branch", (branch).clone().into())],
             ));
         }
         let where_ = match &place {
-            Place::Here => "checked out here".to_owned(),
-            Place::NewWorktree(_) => format!("in a new worktree, {}", folder(&open)),
+            Place::Here => {
+                crate::i18n::text("repo-workflows-issue_work-issue-plan-dbeefca3").to_owned()
+            }
+            Place::NewWorktree(_) => crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-ae567fc0",
+                &[("folder-open-1", (folder(&open)).clone().into())],
+            ),
             Place::Worktree => String::new(),
         };
         let (source, fetch, note) = if exists {
             let note = match &place {
-                Place::Here if !checkout_here => {
-                    format!("{branch} is checked out here already: it's linked to {key}.")
-                }
-                Place::Worktree => format!(
-                    "{branch} is checked out in {} already: it's linked to {key}, and that \
-                     worktree opens.",
-                    folder(&open)
+                Place::Here if !checkout_here => crate::i18n::message(
+                    "repo-workflows-issue_work-issue-plan-952a7458",
+                    &[
+                        ("branch", (branch).clone().into()),
+                        ("key", (key).clone().into()),
+                    ],
                 ),
-                _ => format!("{branch} exists already: work goes on on it as it is, {where_}."),
+                Place::Worktree => crate::i18n::message(
+                    "repo-workflows-issue_work-issue-plan-b341ef66",
+                    &[
+                        ("branch", (branch).clone().into()),
+                        ("folder-open-1", (folder(&open)).clone().into()),
+                        ("key", (key).clone().into()),
+                    ],
+                ),
+                _ => crate::i18n::message(
+                    "repo-workflows-issue_work-issue-plan-cf90f159",
+                    &[
+                        ("branch", (branch).clone().into()),
+                        ("where-", (where_).clone().into()),
+                    ],
+                ),
             };
             (Source::Exists, None, note)
         } else if let Some(remote) = remote_branch {
-            let note = format!("{remote} is there: a branch tracking it, {where_}.");
+            let note = crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-1f8c993f",
+                &[
+                    ("remote", (remote).clone().into()),
+                    ("where-", (where_).clone().into()),
+                ],
+            );
             let from = remote_start(&remote);
             (Source::Track { from }, None, note)
         } else {
             let (from, fetch, said) = self.issue_start_point(&base);
-            let note = format!("A new branch from {said}, {where_}.");
+            let note = crate::i18n::message(
+                "repo-workflows-issue_work-issue-plan-38012887",
+                &[
+                    ("said", (said).clone().into()),
+                    ("where-", (where_).clone().into()),
+                ],
+            );
             (Source::New { from }, fetch, note)
         };
         Plan {
@@ -404,9 +454,15 @@ impl RepoTab {
             let known = self.refs.remotes.iter().flat_map(|(_, l)| l);
             if known.into_iter().any(|b| b.name == tracking) {
                 let said = if base.known {
-                    format!("{tracking} (the remote's default branch), fetched first")
+                    crate::i18n::message(
+                        "repo-workflows-issue_work-issue-start-point-ceee14ee",
+                        &[("tracking", (tracking).clone().into())],
+                    )
                 } else {
-                    format!("{tracking}, fetched first")
+                    crate::i18n::message(
+                        "repo-workflows-issue_work-issue-start-point-212218a3",
+                        &[("tracking", (tracking).clone().into())],
+                    )
                 };
                 let fetch = Some((remote.clone(), name.clone()));
                 return (remote_start(&tracking), fetch, said);
@@ -414,14 +470,29 @@ impl RepoTab {
         }
         if self.refs.local.iter().any(|b| b.name == *name) {
             let said = match &base.remote {
-                Some(remote) => format!("{name} as it is here ({remote} has no {name})"),
-                None => format!("{name} (there is no remote)"),
+                Some(remote) => crate::i18n::message(
+                    "repo-workflows-issue_work-issue-start-point-d844f1e9",
+                    &[
+                        ("name", (name).clone().into()),
+                        ("remote", (remote).clone().into()),
+                    ],
+                ),
+                None => crate::i18n::message(
+                    "repo-workflows-issue_work-issue-start-point-497395b3",
+                    &[("name", (name).clone().into())],
+                ),
             };
             return (format!("refs/heads/{name}"), None, said);
         }
-        let said = format!(
-            "HEAD ({}): there's no {name} here or on the remote to start from",
-            super::short(&self.refs.head)
+        let said = crate::i18n::message(
+            "repo-workflows-issue_work-issue-start-point-3c20246c",
+            &[
+                (
+                    "super-short-self-refs-head-1",
+                    (super::short(&self.refs.head)).clone().into(),
+                ),
+                ("name", (name).clone().into()),
+            ],
         );
         (self.refs.head.clone(), None, said)
     }
@@ -445,7 +516,9 @@ impl RepoTab {
             move || match &link.tracker {
                 Some(identity) => crate::trackers::one(identity),
                 None => hosting
-                    .ok_or_else(|| "The repository forge is unavailable".into())
+                    .ok_or_else(|| {
+                        crate::i18n::text("repo-workflows-issue_work-refresh-issue-0c6fd7a6").into()
+                    })
                     .and_then(|h| h.forge.provider().issue(&path, &h, link.number)),
             },
             move |tab, result, ctx| {

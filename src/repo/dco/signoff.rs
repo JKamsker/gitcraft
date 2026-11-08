@@ -214,15 +214,23 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
         .trim()
         .to_owned();
     let Some(branch) = full.strip_prefix("refs/heads/").map(str::to_owned) else {
-        return Err("Check out the pull request's branch first: HEAD is detached".to_owned());
+        return Err(crate::i18n::text("repo-workflows-dco-plan-d866c6e0").to_owned());
     };
     let head = git::head(repo);
     if let Some(expected) = expected.filter(|e| *e != head) {
-        return Err(format!(
-            "{branch} is at {}, the pull request at {}: pull or push it first, so that the \
-             commits signed off are the pull request's",
-            crate::repo::short(&head),
-            crate::repo::short(expected)
+        return Err(crate::i18n::message(
+            "repo-workflows-dco-plan-589b41e2",
+            &[
+                ("branch", (branch).clone().into()),
+                (
+                    "crate-repo-short-head-1",
+                    (crate::repo::short(&head)).clone().into(),
+                ),
+                (
+                    "crate-repo-short-expected-2",
+                    (crate::repo::short(expected)).clone().into(),
+                ),
+            ],
         ));
     }
     let dirty = git::run(
@@ -230,34 +238,50 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
         &["status", "--porcelain", "--untracked-files=no"],
     )?;
     if !dirty.trim().is_empty() {
-        return Err(
-            "Commit or stash your changes first: signing off rebases the branch".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-dco-plan-cfb9aeb9").to_owned());
     }
-    let merge_base = git::merge_base(repo, &head, base)
-        .map_err(|e| format!("The branch and its base have no commit in common: {e}"))?;
+    let merge_base = git::merge_base(repo, &head, base).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-dco-plan-0ac1ebd9",
+            &[("e", (e).clone().into())],
+        )
+    })?;
     let commits = commits(repo, &format!("{merge_base}..{head}"))?;
     if commits.is_empty() {
-        return Err(format!("{branch} has no commits of its own since its base"));
+        return Err(crate::i18n::message(
+            "repo-workflows-dco-plan-4c71d659",
+            &[("branch", (branch).clone().into())],
+        ));
     }
     if commits.iter().any(|c| c.merge) {
-        return Err(format!(
-            "{branch} has merge commits since its base, which a rebase would flatten. Sign it \
-             off in a terminal (git rebase --signoff --rebase-merges {}), or ask its authors to",
-            crate::repo::short(&merge_base)
+        return Err(crate::i18n::message(
+            "repo-workflows-dco-plan-d7cbaa06",
+            &[
+                ("branch", (branch).clone().into()),
+                (
+                    "crate-repo-short-merge-base-1",
+                    (crate::repo::short(&merge_base)).clone().into(),
+                ),
+            ],
         ));
     }
     if missing(&commits).next().is_none() {
-        return Err(format!("Every commit of {branch} is already signed off"));
+        return Err(crate::i18n::message(
+            "repo-workflows-dco-plan-a16c4b9b",
+            &[("branch", (branch).clone().into())],
+        ));
     }
     let push = push_target(repo, &branch)?;
     if let Some(seen) = push.as_ref().and_then(|p| p.seen.as_deref())
         && !is_ancestor(repo, seen, &head)?
     {
         let label = push.as_ref().map(PushTarget::label).unwrap_or_default();
-        return Err(format!(
-            "{label} has commits {branch} hasn't: pull them first, or the push would throw them \
-             away"
+        return Err(crate::i18n::message(
+            "repo-workflows-dco-plan-927db158",
+            &[
+                ("label", (label).clone().into()),
+                ("branch", (branch).clone().into()),
+            ],
         ));
     }
     Ok(Plan {

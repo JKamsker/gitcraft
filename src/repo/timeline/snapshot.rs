@@ -146,37 +146,36 @@ pub(crate) fn restore_steps(
         })
         .collect();
     if let Some((name, ..)) = moved.iter().find(|(n, ..)| elsewhere.contains(n)) {
-        return Err(format!(
-            "{name} is checked out in another worktree: check it out elsewhere there first"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-restore-steps-2912ea1a",
+            &[("name", (name).clone().into())],
         ));
     }
     if !target.branch.is_empty() && !target.branches.contains_key(&target.branch) {
-        return Err(format!(
-            "{} had no commit yet then: pick a later entry, or use New branch there",
-            target.branch
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-restore-steps-ebcbed7a",
+            &[("target-branch-1", (target.branch).clone().into())],
         ));
     }
     if target.branch.is_empty() && target.head.is_empty() {
-        return Err(
-            "Nothing was committed yet then: pick a later entry, or use New branch there"
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-timeline-restore-steps-41b8db1b").to_owned());
     }
     if let Some(name) = std::iter::once(&target.branch)
         .chain(moved.iter().map(|(n, ..)| *n))
         .find(|n| n.starts_with('-'))
     {
-        return Err(format!(
-            "{name} reads like an option to git: rename it first"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-restore-steps-8ffa662e",
+            &[("name", (name).clone().into())],
         ));
     }
     if !target.branch.is_empty()
         && target.branch != now.branch
         && elsewhere.contains(&target.branch)
     {
-        return Err(format!(
-            "{} is checked out in another worktree: check it out elsewhere there first",
-            target.branch
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-restore-steps-749ee471",
+            &[("target-branch-1", (target.branch).clone().into())],
         ));
     }
     let current = now.branch.as_str();
@@ -231,9 +230,9 @@ pub(crate) fn restore_steps(
         match new {
             Some(new) => steps.push(strings(&["reset", "--keep", new])),
             None => {
-                return Err(format!(
-                    "{} didn't exist then, and it is checked out: check out another branch first",
-                    target.branch
+                return Err(crate::i18n::message(
+                    "repo-workflows-timeline-restore-steps-115ccf2e",
+                    &[("target-branch-1", (target.branch).clone().into())],
                 ));
             }
         }
@@ -243,28 +242,58 @@ pub(crate) fn restore_steps(
 
 /// What [`restore_steps`] would change, as a line each ("main: 1a2b3c4d → 5e6f7a8b").
 pub(crate) fn describe(now: &RefState, target: &RefState) -> Vec<String> {
-    let short = |c: Option<&String>| c.map_or("gone", |c| crate::repo::short(c)).to_owned();
+    let short = |c: Option<&String>| {
+        c.map_or(
+            crate::i18n::text("repo-workflows-timeline-describe-283bb9de"),
+            |c| crate::repo::short(c),
+        )
+        .to_owned()
+    };
     let mut lines: Vec<String> = names(now, target)
         .into_iter()
         .filter(|n| now.branches.get(*n) != target.branches.get(*n))
         .map(|n| {
             let (old, new) = (now.branches.get(n), target.branches.get(n));
             match (old, new) {
-                (None, Some(_)) => format!("{n}: made again at {}", short(new)),
-                (Some(_), None) => format!("{n}: deleted (it is kept here, at {})", short(old)),
+                (None, Some(_)) => crate::i18n::message(
+                    "repo-workflows-timeline-describe-39787410",
+                    &[
+                        ("n", (n).clone().into()),
+                        ("short-new-1", (short(new)).clone().into()),
+                    ],
+                ),
+                (Some(_), None) => crate::i18n::message(
+                    "repo-workflows-timeline-describe-891c0723",
+                    &[
+                        ("n", (n).clone().into()),
+                        ("short-old-1", (short(old)).clone().into()),
+                    ],
+                ),
                 _ => format!("{n}: {} → {}", short(old), short(new)),
             }
         })
         .collect();
     let at = |s: &RefState| {
         if s.branch.is_empty() {
-            format!("a detached HEAD at {}", crate::repo::short(&s.head))
+            crate::i18n::message(
+                "repo-workflows-timeline-describe-ca9be28b",
+                &[(
+                    "crate-repo-short-s-head-1",
+                    (crate::repo::short(&s.head)).clone().into(),
+                )],
+            )
         } else {
             s.branch.clone()
         }
     };
     if at(now) != at(target) {
-        lines.push(format!("Checked out: {} → {}", at(now), at(target)));
+        lines.push(crate::i18n::message(
+            "repo-workflows-timeline-describe-0e4c8e5b",
+            &[
+                ("at-now-1", (at(now)).clone().into()),
+                ("at-target-2", (at(target)).clone().into()),
+            ],
+        ));
     }
     lines
 }

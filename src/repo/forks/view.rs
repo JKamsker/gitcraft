@@ -18,21 +18,24 @@ pub(crate) fn badges(tab: &RepoTab, number: u64, sha: &str) -> Vec<(&'static str
     let waiting = tab.forks.waiting(sha).len();
     if waiting > 0 {
         out.push((
-            "awaiting approval",
-            format!(
-                "{waiting} workflow run{} of its latest commit wait for a maintainer to approve \
-                 them: Approve and run in its menu",
-                if waiting == 1 { "" } else { "s" }
+            crate::i18n::text("repo-workflows-forks-badges-84e3eb92"),
+            crate::i18n::message(
+                "repo-workflows-fork-waiting-runs",
+                &[("count", (waiting).into())],
             ),
             true,
         ));
     }
     if info.cross && info.maintainers_can_edit && !info.repo_path.is_empty() {
         out.push((
-            "can edit",
-            format!(
-                "{} lets maintainers push to their branch {}: Check out to push to {} in its menu",
-                info.owner, info.branch, info.owner
+            crate::i18n::text("repo-workflows-forks-badges-42d0a9e0"),
+            crate::i18n::message(
+                "repo-workflows-forks-badges-aea3a983",
+                &[
+                    ("info-owner-1", (info.owner).clone().into()),
+                    ("info-branch-2", (info.branch).clone().into()),
+                    ("info-owner-3", (info.owner).clone().into()),
+                ],
             ),
             false,
         ));
@@ -40,7 +43,10 @@ pub(crate) fn badges(tab: &RepoTab, number: u64, sha: &str) -> Vec<(&'static str
     if info.first_time {
         out.push((
             "first-time",
-            format!("{}'s first contribution to the repository", info.owner),
+            crate::i18n::message(
+                "repo-workflows-forks-badges-e3d8fbdd",
+                &[("info-owner-1", (info.owner).clone().into())],
+            ),
             false,
         ));
     }
@@ -81,9 +87,9 @@ pub(crate) fn paint_badges(
 /// What the forge calls letting maintainers push to a pull request's branch.
 fn allow_edits(forge: Option<Forge>) -> &'static str {
     match forge {
-        Some(Forge::GitHub) => "Allow edits by maintainers",
-        Some(Forge::GitLab) => "Allow commits from members who can merge to the target branch",
-        _ => "Allow edits from maintainers",
+        Some(Forge::GitHub) => crate::i18n::text("repo-workflows-forks-allow-edits-6bb2bbb0"),
+        Some(Forge::GitLab) => crate::i18n::text("repo-workflows-forks-allow-edits-9e60d9b6"),
+        _ => crate::i18n::text("repo-workflows-forks-allow-edits-ddc30ba0"),
     }
 }
 
@@ -129,38 +135,59 @@ impl RepoTab {
             item(
                 ui,
                 false,
-                "Its fork was deleted",
-                "The branch can't be checked out to push to: its repository is gone",
+                crate::i18n::text("repo-workflows-forks-fork-items-bdee4479"),
+                crate::i18n::text("repo-workflows-forks-fork-items-9862a39c"),
             );
         } else if info.cross {
             let set_up = self.pushing_to_fork(info);
-            let refused = format!(
-                "{} doesn't let maintainers push to {}: ask them to tick “{}”",
-                info.owner,
-                info.branch,
-                allow_edits(self.forge())
+            let refused = crate::i18n::message(
+                "repo-workflows-forks-fork-items-6c1751f8",
+                &[
+                    ("info-owner-1", (info.owner).clone().into()),
+                    ("info-branch-2", (info.branch).clone().into()),
+                    (
+                        "allow-edits-self-forge-3",
+                        (allow_edits(self.forge())).clone().into(),
+                    ),
+                ],
             );
             let (text, tip) = if !info.maintainers_can_edit {
                 (
-                    format!("Check out to push to {}", info.owner),
+                    crate::i18n::message(
+                        "repo-workflows-forks-fork-items-c8fd7141",
+                        &[("info-owner-1", (info.owner).clone().into())],
+                    ),
                     refused.clone(),
                 )
             } else if let Some(b) = set_up {
                 (
-                    format!("Check out {} (pushes to {})", b.name, info.owner),
-                    format!(
-                        "Set up already: a push goes to {}'s {}",
-                        info.owner, info.branch
+                    crate::i18n::message(
+                        "repo-workflows-forks-fork-items-9e40421a",
+                        &[
+                            ("b-name-1", (b.name).clone().into()),
+                            ("info-owner-2", (info.owner).clone().into()),
+                        ],
+                    ),
+                    crate::i18n::message(
+                        "repo-workflows-forks-fork-items-7e44168f",
+                        &[
+                            ("info-owner-1", (info.owner).clone().into()),
+                            ("info-branch-2", (info.branch).clone().into()),
+                        ],
                     ),
                 )
             } else {
                 (
-                    format!("Check out to push to {}", info.owner),
-                    format!(
-                        "Adds {}'s fork as a remote (unless one is it already), checks their \
-                         branch {} out tracking it, and sets the branch's pushRemote so that \
-                         Push goes back to them. Ctrl+Z undoes it",
-                        info.owner, info.branch
+                    crate::i18n::message(
+                        "repo-workflows-forks-fork-items-c8fd7141",
+                        &[("info-owner-1", (info.owner).clone().into())],
+                    ),
+                    crate::i18n::message(
+                        "repo-workflows-forks-fork-items-a33fed38",
+                        &[
+                            ("info-owner-1", (info.owner).clone().into()),
+                            ("info-branch-2", (info.branch).clone().into()),
+                        ],
                     ),
                 )
             };
@@ -171,24 +198,43 @@ impl RepoTab {
             let tip = if !info.maintainers_can_edit {
                 refused
             } else if here {
-                format!(
-                    "Fetches {} and {}'s branch, rebases it onto {}, then force-pushes it to \
-                     them with a lease, after showing what it will do",
-                    info.base, info.owner, info.base
+                crate::i18n::message(
+                    "repo-workflows-forks-fork-items-a0b3b5ed",
+                    &[
+                        ("info-base-1", (info.base).clone().into()),
+                        ("info-owner-2", (info.owner).clone().into()),
+                        ("info-base-3", (info.base).clone().into()),
+                    ],
                 )
             } else {
-                format!("Check out {}'s branch to push to them first", info.owner)
+                crate::i18n::message(
+                    "repo-workflows-forks-fork-items-2b48edeb",
+                    &[("info-owner-1", (info.owner).clone().into())],
+                )
             };
-            let text = format!("Rebase onto {} and push to {}", info.base, info.owner);
+            let text = crate::i18n::message(
+                "repo-workflows-forks-fork-items-3450c709",
+                &[
+                    ("info-base-1", (info.base).clone().into()),
+                    ("info-owner-2", (info.owner).clone().into()),
+                ],
+            );
             if item(ui, idle && here && info.maintainers_can_edit, &text, &tip) {
                 acts.push(Action::Fork(ForkAct::Rebase(number)));
             }
         }
         let waiting = self.forks.waiting(&info.sha).len();
         if waiting > 0 {
-            let tip = "Approves the workflow runs of its latest commit, which then run the \
-                       contributor's code on your CI: look through its changes first";
-            if item(ui, idle, &format!("Approve and run ({waiting})…"), tip) {
+            let tip = crate::i18n::text("repo-workflows-forks-fork-items-afc89aab");
+            if item(
+                ui,
+                idle,
+                &crate::i18n::message(
+                    "repo-workflows-forks-fork-items-99b20173",
+                    &[("waiting", (waiting).clone().into())],
+                ),
+                tip,
+            ) {
                 acts.push(Action::Fork(ForkAct::Approve(number)));
             }
         }

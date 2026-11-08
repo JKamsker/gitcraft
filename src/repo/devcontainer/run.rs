@@ -11,7 +11,7 @@ pub(super) fn detect(path: &Path) -> Result<Option<Config>, String> {
         Ok(_) => {}
     }
     let source = crate::safe_read::read_inside(path, model::CONFIG, 1024 * 1024).ok_or(
-        "Dev container configuration must be readable inside the worktree and at most 1 MiB",
+        crate::i18n::text("repo-workflows-devcontainer-detect-01821b94"),
     )?;
     let physical = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
     let linked = metadata(&physical)?;
@@ -19,7 +19,7 @@ pub(super) fn detect(path: &Path) -> Result<Option<Config>, String> {
         path: physical,
         linked,
         source: String::from_utf8(source)
-            .map_err(|_| "Dev container configuration is not UTF-8")?,
+            .map_err(|_| crate::i18n::text("repo-workflows-devcontainer-detect-764255b7"))?,
         context: crate::connections::current(),
     }))
 }
@@ -31,7 +31,7 @@ fn metadata_file(path: &Path) -> Result<String, String> {
         .file_type()
         .is_file()
     {
-        return Err("Linked metadata pointers must be regular files".into());
+        return Err(crate::i18n::text("repo-workflows-devcontainer-metadata-file-bd4adcf1").into());
     }
     let mut bytes = Vec::new();
     std::fs::File::open(path)
@@ -40,22 +40,25 @@ fn metadata_file(path: &Path) -> Result<String, String> {
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
     if bytes.len() > 8192 {
-        return Err("Git metadata pointer exceeds 8 KiB".into());
+        return Err(crate::i18n::text("repo-workflows-devcontainer-metadata-file-ddb7553c").into());
     }
-    String::from_utf8(bytes).map_err(|_| "Git metadata pointer is not UTF-8".into())
+    String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("repo-workflows-devcontainer-metadata-file-a1a99ba5").into())
 }
 fn metadata(path: &Path) -> Result<Option<model::Linked>, String> {
     let kind = std::fs::symlink_metadata(path.join(".git"))
-        .map_err(|e| format!("Container requires a physical worktree root: {e}"))?
+        .map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-devcontainer-metadata-b9388ff2",
+                &[("e", (e).to_string().into())],
+            )
+        })?
         .file_type();
     if kind.is_dir() {
         return Ok(None);
     }
     if !kind.is_file() || !cfg!(unix) {
-        return Err(
-            "This linked/symlink Git layout is unsupported by native container metadata mounting"
-                .into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-devcontainer-metadata-735e6123").into());
     }
     let dotgit = metadata_file(&path.join(".git"))?;
     let gitdir = path.join(model::gitdir_pointer(&dotgit)?);
@@ -68,17 +71,21 @@ fn metadata(path: &Path) -> Result<Option<model::Linked>, String> {
     let expected_gitdir = linked
         .common
         .join("worktrees")
-        .join(gitdir.file_name().ok_or("Missing worktree metadata name")?);
+        .join(gitdir.file_name().ok_or(crate::i18n::text(
+            "repo-workflows-devcontainer-metadata-0a13f60e",
+        ))?);
     if std::fs::canonicalize(&gitdir).map_err(|e| e.to_string())? != expected_gitdir
         || std::fs::canonicalize(&linked.common).map_err(|e| e.to_string())? != linked.common
         || !linked.common.join("objects").is_dir()
     {
-        return Err("Symlinked or nonstandard common Git metadata layout is unsupported".into());
+        return Err(crate::i18n::text("repo-workflows-devcontainer-metadata-b2bab91f").into());
     }
     Ok(Some(linked))
 }
 fn guard(config: &Config) -> Result<(), String> {
-    config.same(&detect(&config.path)?.ok_or("Dev container configuration disappeared")?)?;
+    config.same(&detect(&config.path)?.ok_or(crate::i18n::text(
+        "repo-workflows-devcontainer-guard-7103bfb5",
+    ))?)?;
     if crate::tasks::cancellation().is_cancelled() {
         return Err("Cancelled".into());
     }
@@ -95,16 +102,21 @@ fn invoke(config: &Config, tool: &str, context: &str, args: &[String]) -> Result
 fn json(config: &Config, tool: &str, context: &str, args: &[String]) -> Result<Value, String> {
     let raw = invoke(config, tool, context, args)?;
     if raw.len() > 8 * 1024 * 1024 {
-        return Err("Container CLI result exceeds 8 MiB".into());
+        return Err(crate::i18n::text("repo-workflows-devcontainer-json-0d639c4b").into());
     }
-    serde_json::from_str(&raw).map_err(|e| format!("Invalid {tool} JSON result: {e}"))
+    serde_json::from_str(&raw).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-devcontainer-json-edd11b13",
+            &[
+                ("tool", (tool).clone().into()),
+                ("e", (e).to_string().into()),
+            ],
+        )
+    })
 }
 pub(super) fn engine(config: &Config) -> Result<Engine, String> {
     if std::env::var_os("DOCKER_HOST").is_some_and(|v| !v.is_empty()) {
-        return Err(
-            "Select a local Docker context and unset DOCKER_HOST before using this integration"
-                .into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-devcontainer-engine-1cfeec69").into());
     }
     // Docker context show honors DOCKER_CONTEXT. A context is then pinned for all later invocations.
     let context = invoke(config, "docker", "", &["context".into(), "show".into()])?
@@ -130,8 +142,12 @@ pub(super) fn engine(config: &Config) -> Result<Engine, String> {
     )?;
     model::engine(
         &context,
-        id.as_str().ok_or("Missing Docker daemon identity")?,
-        endpoint.as_str().ok_or("Missing Docker endpoint")?,
+        id.as_str().ok_or(crate::i18n::text(
+            "repo-workflows-devcontainer-engine-f6690c9e",
+        ))?,
+        endpoint.as_str().ok_or(crate::i18n::text(
+            "repo-workflows-devcontainer-engine-161bfc12",
+        ))?,
     )
 }
 fn verify_owned(binding: &Binding, current: &Config) -> Result<Value, String> {
@@ -155,9 +171,9 @@ pub(super) fn verify(binding: &Binding, config: &Config) -> Result<Value, String
 pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, String> {
     guard(config)?;
     if let Some(pause) = crate::network::refused() {
-        return Err(format!(
-            "{}; starting an environment can pull images/features",
-            pause.why()
+        return Err(crate::i18n::message(
+            "repo-workflows-devcontainer-start-87b3fed2",
+            &[("pause-why-1", (pause.why()).clone().into())],
         ));
     }
     let engine = engine(config)?;
@@ -173,7 +189,7 @@ pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, S
     }
     if let Some(binding) = old {
         if engine != binding.engine {
-            return Err("Docker context/daemon changed since display; refusing rebuild".into());
+            return Err(crate::i18n::text("repo-workflows-devcontainer-start-6a0249a9").into());
         }
         // Only the exact displayed ID, after ownership inspection. No ps selector/prune/global cleanup.
         model::rebuild_checked(
@@ -200,9 +216,7 @@ pub(super) fn terminal(
 ) -> Result<crate::terminal::Terminal, String> {
     let data = verify(binding, config)?;
     if data[0]["State"]["Running"] != true {
-        return Err(
-            "Container stopped; start the environment again before opening a terminal".into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-devcontainer-terminal-b74a6469").into());
     }
     if crate::tasks::cancellation().is_cancelled() {
         return Err("Cancelled before terminal start".into());
@@ -217,7 +231,7 @@ pub(super) fn terminal(
 pub(super) fn editor(binding: &Binding, config: &Config) -> Result<String, String> {
     let data = verify(binding, config)?;
     if data[0]["State"]["Running"] != true {
-        return Err("Container stopped; start the environment before editor handoff".into());
+        return Err(crate::i18n::text("repo-workflows-devcontainer-editor-47c00405").into());
     }
     let uri = model::editor_uri(binding)?;
     invoke(
@@ -238,5 +252,5 @@ pub(super) fn editor(binding: &Binding, config: &Config) -> Result<String, Strin
         &args.iter().map(String::as_str).collect::<Vec<_>>(),
         Duration::from_secs(30),
     )?;
-    Ok("Handed the bound container workspace to VS Code. Its Dev Containers extension must be installed.".into())
+    Ok(crate::i18n::text("repo-workflows-devcontainer-editor-806df56f").into())
 }

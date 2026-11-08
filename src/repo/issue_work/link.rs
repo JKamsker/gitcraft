@@ -233,8 +233,13 @@ pub(crate) fn start_ops(start: &Start, link: &IssueLink) -> Vec<Vec<String>> {
         ops.push(s(&["worktree", "prune"]));
     }
     if let Some((remote, base)) = &start.fetch {
-        let says =
-            format!("couldn't fetch {remote}, so it starts from {remote}/{base} as last fetched");
+        let says = crate::i18n::message(
+            "repo-workflows-issue_work-start-ops-4c405286",
+            &[
+                ("remote", (remote).clone().into()),
+                ("base", (base).clone().into()),
+            ],
+        );
         ops.push(try_step(&["fetch", remote, base], &says));
     }
     let (track, from) = match &start.source {

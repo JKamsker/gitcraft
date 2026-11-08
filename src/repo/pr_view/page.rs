@@ -26,15 +26,22 @@ impl RepoTab {
         };
         page_header(ui, view, popped, acts);
         if let Some(relocated) = view.relocations().filter(|m| !m.is_empty()) {
-            egui::CollapsingHeader::new(format!(
-                "{} earlier comment anchors relocated",
-                relocated.len()
+            egui::CollapsingHeader::new(crate::i18n::message(
+                "repo-workflows-pr_view-pr-view-ui-c6f6b4c5",
+                &[("relocated-len-1", (relocated.len()).clone().into())],
             ))
+            .id_salt("pr-relocations")
             .show(ui, |ui| {
                 if let Some(Ok(files)) = &view.files {
                     for target in relocated.values() {
                         if ui
-                            .button(format!("{}:{} · unchanged text", target.path, target.line))
+                            .button(crate::i18n::message(
+                                "repo-workflows-pr_view-pr-view-ui-13197fd2",
+                                &[
+                                    ("target-path-1", (target.path).clone().into()),
+                                    ("target-line-2", (target.line).clone().into()),
+                                ],
+                            ))
                             .clicked()
                         {
                             acts.push(Action::OpenDiff(DiffKey::Range {
@@ -50,7 +57,10 @@ impl RepoTab {
         }
 
         if let Some(error) = &view.relocated.error {
-            ui.weak(format!("Earlier comment locations unavailable: {error}"));
+            ui.weak(crate::i18n::message(
+                "repo-workflows-pr_view-pr-view-ui-14efff25",
+                &[("error", (error).clone().into())],
+            ));
         }
         if let Some(Ok(_)) = &view.details {
             crate::repo::versions::since_banner(
@@ -67,7 +77,12 @@ impl RepoTab {
             }
             Some(Err(e)) => {
                 ui.add_space(20.0);
-                ui.vertical_centered(|ui| ui.colored_label(t.danger, e));
+                ui.vertical_centered(|ui| {
+                    ui.colored_label(
+                        t.danger,
+                        git::display_error(&crate::forge::inbox::display_error(e)),
+                    )
+                });
             }
             Some(Ok(_)) => {
                 // Text wraps to this; only what can't (a table of images) scrolls sideways.
@@ -118,7 +133,11 @@ impl RepoTab {
     /// The right pane: the files the pull request changes.
     pub(in crate::repo) fn pr_files_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Changed files", crate::repo::branch_tree::files_toggle);
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-workflows-pr_view-pr-files-panel-5d4041aa"),
+            crate::repo::branch_tree::files_toggle,
+        );
         let Some(view) = &self.pr_view else {
             return;
         };
@@ -145,9 +164,12 @@ impl RepoTab {
                         });
                     } else if let Some(e) = self.forks.error() {
                         ui.label(
-                            egui::RichText::new(format!(
-                                "Couldn't tell where the pull requests come from: {}",
-                                e.lines().next().unwrap_or_default()
+                            egui::RichText::new(crate::i18n::message(
+                                "repo-workflows-pr_view-pr-files-panel-846bc938",
+                                &[(
+                                    "e-lines-next-unwrap-or-default-1",
+                                    (e.lines().next().unwrap_or_default()).clone().into(),
+                                )],
                             ))
                             .color(t.text_faint)
                             .small(),
@@ -190,7 +212,13 @@ impl RepoTab {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(14, 12))
                     .show(ui, |ui| {
-                        ui.colored_label(t.danger, format!("Couldn't read the changes: {e}"));
+                        ui.colored_label(
+                            t.danger,
+                            crate::i18n::message(
+                                "repo-workflows-pr_view-pr-files-panel-80b9e65e",
+                                &[("e", (e).clone().into())],
+                            ),
+                        );
                     });
             }
             Some(Ok(files)) => {
@@ -233,22 +261,36 @@ fn page_header(ui: &mut Ui, view: &PrView, popped: bool, acts: &mut Vec<Action>)
         Some(Ok(details)) => Some(details.url.clone()),
         _ => None,
     };
-    let title = format!("Pull request #{}", view.number);
+    let title = pull_request_title(view.number);
     let loading = view.loading;
     widgets::panel_header(ui, &title, |ui| {
-        let tip = popout::close_tip(popped, "Back to the graph (Esc)");
+        let tip = popout::close_tip(
+            popped,
+            crate::i18n::text("repo-workflows-pr_view-page-header-80403162"),
+        );
         if icons::small_button(ui, "x", tip).clicked() {
             acts.push(Action::ClosePr);
         }
         popout::button(ui, Panel::Pr, popped, acts);
         if let Some(url) = url
-            && icons::small_button(ui, "external-link", "Open in the browser").clicked()
+            && icons::small_button(
+                ui,
+                "external-link",
+                crate::i18n::text("repo-workflows-pr_view-page-header-a7eac6b5"),
+            )
+            .clicked()
         {
             acts.push(Action::OpenUrl(url));
         }
         if loading {
             ui.add(crate::spinner::Spinner::new());
-        } else if icons::small_button(ui, "refresh-cw", "Load again").clicked() {
+        } else if icons::small_button(
+            ui,
+            "refresh-cw",
+            crate::i18n::text("repo-workflows-pr_view-page-header-d62bc4a3"),
+        )
+        .clicked()
+        {
             acts.push(Action::ReloadPr);
         }
     });
@@ -276,30 +318,51 @@ fn page(
         return;
     };
     header(ui, details);
-    section(ui, "DESCRIPTION");
+    section(
+        ui,
+        crate::i18n::text("repo-workflows-pr_view-page-9cc35840"),
+    );
     if view.body.is_empty() {
         ui.label(
-            RichText::new("No description.")
+            RichText::new(crate::i18n::text("repo-workflows-pr_view-page-06a69482"))
                 .color(t.text_faint)
                 .italics(),
         );
     }
     blocks(ui, &mut view.markdown, "body", &view.body, width);
-    section(ui, "BUILD STATUS");
+    section(
+        ui,
+        crate::i18n::text("repo-workflows-pr_view-page-7503c27e"),
+    );
     checks(ui, details, acts);
     if dco::pr_shows(dco.state, details) {
-        section(ui, "SIGN-OFF (DCO)");
+        section(
+            ui,
+            crate::i18n::text("repo-workflows-pr_view-page-0744b935"),
+        );
         dco::pr_section(ui, dco.state, details, dco.current, dco.idle, acts);
     }
     if details.state == "OPEN" {
-        section(ui, "MERGE");
+        section(
+            ui,
+            crate::i18n::text("repo-workflows-pr_view-page-fc2b737d"),
+        );
         crate::repo::pr_merge::merge_box(ui, draft, details, acts);
     } else if let Some(error) = draft.error_at(Place::Merge) {
         // The box is gone, but what went wrong with it still counts.
         ui.add_space(8.0);
         ui.colored_label(t.warning, error);
     }
-    section(ui, &format!("COMMENTS ({})", details.timeline.len()));
+    section(
+        ui,
+        &crate::i18n::message(
+            "repo-workflows-pr_view-page-607d89a5",
+            &[(
+                "details-timeline-len-1",
+                (details.timeline.len()).clone().into(),
+            )],
+        ),
+    );
     // Lines are shown in the changes of the commit the page names, not in those of an earlier
     // one still listed until the new ones come.
     let files = view
@@ -317,9 +380,21 @@ fn page(
         width,
         acts,
     );
-    section(ui, "ADD A COMMENT");
+    section(
+        ui,
+        crate::i18n::text("repo-workflows-pr_view-page-bc4bf274"),
+    );
     pr_review::comment_box(ui, draft, acts);
-    section(ui, &format!("COMMITS ({})", details.commits.len()));
+    section(
+        ui,
+        &crate::i18n::message(
+            "repo-workflows-pr_view-page-878ee775",
+            &[(
+                "details-commits-len-1",
+                (details.commits.len()).clone().into(),
+            )],
+        ),
+    );
     let signoffs = dco::pr_shows(dco.state, details)
         .then(|| dco.state.for_pr(details.number, &details.head_oid))
         .flatten();
@@ -351,22 +426,44 @@ fn header(ui: &mut Ui, d: &PrDetails) {
     ui.add_space(6.0);
     ui.horizontal_wrapped(|ui| {
         let (state, color) = match (d.state.as_str(), d.draft) {
-            ("MERGED", _) => ("Merged", t.accent_fg),
-            ("CLOSED", _) => ("Closed", t.danger),
-            (_, true) => ("Draft", t.text_dim),
-            _ => ("Open", t.success),
+            ("MERGED", _) => (
+                crate::i18n::text("repo-workflows-pr_view-header-bd0a0620"),
+                t.accent_fg,
+            ),
+            ("CLOSED", _) => (
+                crate::i18n::text("repo-workflows-pr_view-header-c21ead06"),
+                t.danger,
+            ),
+            (_, true) => (
+                crate::i18n::text("repo-workflows-pr_view-header-ebf12ef4"),
+                t.text_dim,
+            ),
+            _ => (
+                crate::i18n::text("repo-workflows-pr_view-header-ed077f3d"),
+                t.success,
+            ),
         };
         widgets::chip(ui, state, color);
-        ui.label(RichText::new(&d.author).font(theme::medium(12.5)));
-        let verb = match d.state.as_str() {
-            // Whoever opened it isn't necessarily who merged it.
-            "MERGED" | "CLOSED" => "proposed merging",
-            _ => "wants to merge",
-        };
-        ui.label(RichText::new(verb).color(t.text_dim));
-        ui.label(RichText::new(&d.head_branch).font(theme::mono(11.5)));
-        ui.label(RichText::new("into").color(t.text_dim));
-        ui.label(RichText::new(&d.base_branch).font(theme::mono(11.5)));
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-workflows-pr-merge-intention",
+                &[
+                    ("author", (d.author.as_str()).into()),
+                    (
+                        "closed",
+                        (if matches!(d.state.as_str(), "MERGED" | "CLOSED") {
+                            "yes"
+                        } else {
+                            "no"
+                        })
+                        .into(),
+                    ),
+                    ("head", (d.head_branch.as_str()).into()),
+                    ("base", (d.base_branch.as_str()).into()),
+                ],
+            ))
+            .color(t.text_dim),
+        );
     });
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| stats(ui, d));
@@ -379,10 +476,18 @@ fn stats(ui: &mut Ui, d: &PrDetails) {
     let t = Tokens::get(ui.ctx());
     let now = git::now();
     ui.label(
-        RichText::new(format!(
-            "Opened {} · updated {} ·",
-            git::relative_time(d.created_at, now),
-            git::relative_time(d.updated_at, now)
+        RichText::new(crate::i18n::message(
+            "repo-workflows-pr_view-stats-78774f9f",
+            &[
+                (
+                    "git-relative-time-d-created-at-n-1",
+                    (git::relative_time(d.created_at, now)).clone().into(),
+                ),
+                (
+                    "git-relative-time-d-updated-at-n-2",
+                    (git::relative_time(d.updated_at, now)).clone().into(),
+                ),
+            ],
         ))
         .color(t.text_faint)
         .small(),
@@ -398,10 +503,9 @@ fn stats(ui: &mut Ui, d: &PrDetails) {
             .small(),
     );
     ui.label(
-        RichText::new(format!(
-            "· {} file{}",
-            d.changed_files,
-            if d.changed_files == 1 { "" } else { "s" }
+        RichText::new(crate::i18n::message(
+            "repo-workflows-pr-file-count",
+            &[("count", (d.changed_files).into())],
         ))
         .color(t.text_faint)
         .small(),
@@ -418,16 +522,41 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
         "Review required" => t.warning,
         _ => t.text_dim,
     };
-    widgets::chip(ui, label, color);
+    widgets::chip(
+        ui,
+        match label {
+            "Approved" => crate::i18n::text("repo-workflows-pr_view-chips-87b42e40"),
+            "Changes requested" => crate::i18n::text("repo-workflows-pr_view-chips-10a92a8a"),
+            "Review required" => crate::i18n::text("repo-workflows-pr_view-chips-f0742e3a"),
+            other => other,
+        },
+        color,
+    );
     // Whether it can be merged only means something while it can still be.
     if d.state == "OPEN" {
         match d.mergeable.as_str() {
-            "MERGEABLE" => widgets::chip(ui, "No conflicts", t.success),
-            "CONFLICTING" => widgets::chip(ui, "Has conflicts", t.danger),
-            _ => widgets::chip(ui, "Checking for conflicts", t.text_dim),
+            "MERGEABLE" => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-pr_view-chips-e72e14ae"),
+                t.success,
+            ),
+            "CONFLICTING" => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-pr_view-chips-dac5ae00"),
+                t.danger,
+            ),
+            _ => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-pr_view-chips-ab0fbfd3"),
+                t.text_dim,
+            ),
         };
         if d.merge_state == "BEHIND" {
-            widgets::chip(ui, "Behind its base", t.warning);
+            widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-pr_view-chips-e62d2df5"),
+                t.warning,
+            );
         }
     }
     for label in &d.labels {
@@ -438,12 +567,18 @@ fn chips(ui: &mut Ui, d: &PrDetails) {
 fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     if let Some(e) = &d.checks_error {
-        ui.colored_label(t.warning, format!("Couldn't read the checks: {e}"));
+        ui.colored_label(
+            t.warning,
+            crate::i18n::message(
+                "repo-workflows-pr_view-checks-3afaa0c5",
+                &[("e", (e).clone().into())],
+            ),
+        );
         return;
     }
     if d.checks.is_empty() {
         ui.label(
-            RichText::new("No checks ran on this pull request.")
+            RichText::new(crate::i18n::text("repo-workflows-pr_view-checks-7845db2e"))
                 .color(t.text_faint)
                 .italics(),
         );
@@ -458,7 +593,12 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
     ]
     .iter()
     .filter(|(n, _)| *n > 0)
-    .map(|(n, word)| format!("{n} {word}"))
+    .map(|(n, word)| {
+        crate::i18n::message(
+            "repo-workflows-pr-check-tally",
+            &[("count", (*n).into()), ("state", (*word).into())],
+        )
+    })
     .collect();
     ui.label(RichText::new(summary.join(" · ")).color(t.text_dim));
     ui.add_space(4.0);
@@ -515,7 +655,10 @@ fn checks(ui: &mut Ui, d: &PrDetails, acts: &mut Vec<Action>) {
             continue;
         }
         let r = match run {
-            Some(_) => r.on_hover_text(format!("{}\nClick to show the run", check.url)),
+            Some(_) => r.on_hover_text(crate::i18n::message(
+                "repo-workflows-pr_view-checks-8432e03f",
+                &[("check-url-1", (check.url).clone().into())],
+            )),
             None => r.on_hover_text(&check.url),
         };
         if r.clicked() {
@@ -536,10 +679,12 @@ fn commits(ui: &mut Ui, d: &PrDetails, signoffs: Option<&dco::PrSignoffs>) {
     for commit in &d.commits {
         ui.horizontal(|ui| {
             if dco::unsigned(signoffs, &commit.oid) {
-                ui.label(RichText::new("no sign-off").color(t.warning).small())
-                    .on_hover_text(
-                        "No sign-off of its author or committer: the DCO check refuses it",
-                    );
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-pr_view-commits-36f7d679"))
+                        .color(t.warning)
+                        .small(),
+                )
+                .on_hover_text(crate::i18n::text("repo-workflows-pr_view-commits-a8da9e62"));
             }
             ui.label(
                 RichText::new(short(&commit.oid))
@@ -549,5 +694,30 @@ fn commits(ui: &mut Ui, d: &PrDetails, signoffs: Option<&dco::PrSignoffs>) {
             ui.label(&commit.headline);
             ui.label(RichText::new(&commit.author).color(t.text_faint).small());
         });
+    }
+}
+
+fn pull_request_title(number: u64) -> String {
+    crate::i18n::message(
+        "repo-workflows-pr_view-page-header-38cc20ee",
+        &[("view-number-1", number.to_string().into())],
+    )
+}
+#[cfg(test)]
+mod fluent_provider_identifier_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_pr_header_preserves_provider_identifier_while_counts_group() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            let title = pull_request_title(1234);
+            assert!(title.ends_with("#1234"));
+            assert!(!title.contains("1.234"));
+            assert!(!title.contains("1,234"));
+            assert_eq!(
+                crate::i18n::number(1234usize),
+                if language == "de" { "1.234" } else { "1,234" }
+            );
+        }
     }
 }

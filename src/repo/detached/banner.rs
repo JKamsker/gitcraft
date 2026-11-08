@@ -7,8 +7,7 @@ use crate::repo::{Action, Dialog, RepoTab, short};
 use crate::theme::{self, Tokens};
 
 /// What the banner says, as the issue asked for it.
-pub(super) const SAYS: &str =
-    "You're looking at an old version; new commits here belong to no branch.";
+pub(super) const SAYS: &str = "repo-workflows-detached--bff74cc9";
 
 impl RepoTab {
     /// The banner, in a panel of its own under the toolbar, when it shows: other banners (a
@@ -37,15 +36,31 @@ impl RepoTab {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(branch) = &back
                 && ui
-                    .add_enabled(idle, egui::Button::new(format!("Back to {branch}")))
-                    .on_hover_text(format!("Check {branch} out"))
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(crate::i18n::message(
+                            "repo-workflows-detached-detached-banner-f76b5669",
+                            &[("branch", (branch).clone().into())],
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::message(
+                        "repo-workflows-detached-detached-banner-f5cd526a",
+                        &[("branch", (branch).clone().into())],
+                    ))
                     .clicked()
             {
                 acts.push(Action::Checkout(branch.clone()));
             }
             if ui
-                .add_enabled(idle, egui::Button::new("Create branch here"))
-                .on_hover_text("A branch at this commit, checked out: new commits go on it")
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-detached-detached-banner-15bbfb59",
+                    )),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-detached-detached-banner-f16cf1bf",
+                ))
                 .clicked()
             {
                 acts.push(Action::Dialog(Dialog::create_branch(&head, short(&head))));
@@ -53,13 +68,16 @@ impl RepoTab {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 icons::inline(ui, "circle-alert", 15.0, t.warning);
                 ui.add(
-                    egui::Label::new(RichText::new(SAYS).color(t.text).font(theme::medium(12.5)))
-                        .truncate(),
+                    egui::Label::new(
+                        RichText::new(crate::i18n::text(SAYS))
+                            .color(t.text)
+                            .font(theme::medium(12.5)),
+                    )
+                    .truncate(),
                 )
-                .on_hover_text(format!(
-                    "HEAD is detached at {}: it is on no branch. Commits made now are on no \
-                     branch either, and checking out something else leaves them behind.",
-                    short(&head)
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-detached-detached-banner-3d7f6bc2",
+                    &[("short-head-1", (short(&head)).clone().into())],
                 ));
             });
         });

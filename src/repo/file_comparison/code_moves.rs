@@ -50,7 +50,7 @@ pub(super) fn read(
             // An unborn HEAD is a valid empty before-side.
             let head = files::resolve(repo, "HEAD", &live).ok();
             (
-                "Staged changes · HEAD → index".into(),
+                crate::i18n::text("repo-workflows-file_comparison-read-0378d2b4").into(),
                 head.into_iter().collect::<Vec<_>>(),
             )
         }
@@ -59,7 +59,13 @@ pub(super) fn read(
                 ["show", "--format=", "--root", "--diff-merges=first-parent"].map(str::to_owned),
             );
             let oid = files::resolve(repo, to, &live)?;
-            (format!("Commit {} · first parent", &oid[..8]), vec![oid])
+            (
+                crate::i18n::message(
+                    "repo-workflows-file_comparison-read-5e3dd301",
+                    &[("oid-8-1", (&oid[..8]).clone().into())],
+                ),
+                vec![oid],
+            )
         }
         2 => {
             args.push("diff".into());
@@ -70,7 +76,7 @@ pub(super) fn read(
         3 => {
             args.push("diff".into());
             (
-                "Working copy · index → working copy (tracked files)".into(),
+                crate::i18n::text("repo-workflows-file_comparison-read-fcc615d7").into(),
                 Vec::new(),
             )
         }
@@ -78,11 +84,14 @@ pub(super) fn read(
             args.push("diff".into());
             let oid = files::resolve(repo, from, &live)?;
             (
-                format!("{} → working copy (tracked files)", &oid[..8]),
+                crate::i18n::message(
+                    "repo-workflows-file_comparison-read-bf031806",
+                    &[("oid-8-1", (&oid[..8]).clone().into())],
+                ),
                 vec![oid],
             )
         }
-        _ => return Err("Unknown moved-code source".into()),
+        _ => return Err(crate::i18n::text("repo-workflows-file_comparison-read-3fbe0e2d").into()),
     };
     args.extend(
         [
@@ -117,19 +126,25 @@ pub(super) fn read(
         let raw = run(&["--patch", "--unified=3"], Some(&path))?;
         bytes = bytes.saturating_add(raw.len());
         if bytes > 6 * 1024 * 1024 {
-            return Err("Changed patches exceed 6 MiB. Compare a smaller range.".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-read-a6767f12").into());
         }
         let Ok(text) = String::from_utf8(raw) else {
-            notes.push(format!(
-                "{}: non-UTF8 patch skipped",
-                files::display_path(path.as_bytes())
+            notes.push(crate::i18n::message(
+                "repo-workflows-file_comparison-read-f42f63e5",
+                &[(
+                    "files-display-path-path-as-bytes-1",
+                    (files::display_path(path.as_bytes())).clone().into(),
+                )],
             ));
             continue;
         };
         if text.contains("ENC[AES256_GCM") {
-            notes.push(format!(
-                "{}: encrypted content excluded",
-                files::display_path(path.as_bytes())
+            notes.push(crate::i18n::message(
+                "repo-workflows-file_comparison-read-6289d4ba",
+                &[(
+                    "files-display-path-path-as-bytes-1",
+                    (files::display_path(path.as_bytes())).clone().into(),
+                )],
             ));
             continue;
         }
@@ -139,11 +154,13 @@ pub(super) fn read(
     // manifest alone cannot detect another edit to an already modified working file.
     if matches!(source, 0 | 3 | 4) {
         if run(&["--name-status", "-z"], None)? != names {
-            return Err("Changed paths changed during analysis. Refresh.".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-read-fc054b54").into());
         }
         for p in &patches {
             if run(&["--patch", "--unified=3"], Some(&p.path))? != p.text.as_bytes() {
-                return Err("File content changed during analysis. Refresh.".into());
+                return Err(
+                    crate::i18n::text("repo-workflows-file_comparison-read-6adc8019").into(),
+                );
             }
         }
         if source == 0
@@ -153,7 +170,7 @@ pub(super) fn read(
                 .collect::<Vec<_>>()
                 != pins
         {
-            return Err("HEAD changed during analysis. Refresh.".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-read-259fd376").into());
         }
     }
     if !live() {
@@ -167,23 +184,30 @@ fn paths(bytes: &[u8]) -> Result<ChangedPaths, String> {
     let mut paths = Vec::new();
     let mut notes = Vec::new();
     while let Some(code) = fields.next() {
-        let path = fields.next().ok_or("Incomplete changed-file list")?;
-        let code = *code.first().ok_or("Missing change status")? as char;
+        let path = fields.next().ok_or(crate::i18n::text(
+            "repo-workflows-file_comparison-paths-e3561990",
+        ))?;
+        let code = *code.first().ok_or(crate::i18n::text(
+            "repo-workflows-file_comparison-paths-58fb2d6a",
+        ))? as char;
         if !matches!(code, 'A' | 'M' | 'D' | 'T' | 'U') {
-            return Err("Unexpected changed-file status".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-paths-ae3de607").into());
         }
         if code == 'U' {
-            return Err("Resolve conflicts before analyzing moved code".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-paths-28803ea3").into());
         }
         match std::str::from_utf8(path) {
             Ok(p) => paths.push((p.to_owned(), code)),
-            Err(_) => notes.push(format!(
-                "{}: non-UTF8 path skipped",
-                files::display_path(path)
+            Err(_) => notes.push(crate::i18n::message(
+                "repo-workflows-file_comparison-paths-59a504f9",
+                &[(
+                    "files-display-path-path-1",
+                    (files::display_path(path)).clone().into(),
+                )],
             )),
         }
         if paths.len() + notes.len() > 300 {
-            return Err("More than 300 changed files. Compare a smaller range.".into());
+            return Err(crate::i18n::text("repo-workflows-file_comparison-paths-d4097e54").into());
         }
     }
     Ok((paths, notes))
@@ -213,7 +237,9 @@ fn assemble(
             owners.push(i);
         }
         if lines.len() >= 50_000 {
-            return Err("More than 50,000 patch lines. Compare a smaller range.".into());
+            return Err(
+                crate::i18n::text("repo-workflows-file_comparison-assemble-1641af0b").into(),
+            );
         }
     }
     let detected = moved::detect(&lines);
@@ -294,15 +320,20 @@ pub(super) fn view(
     acts: &mut Vec<Action>,
 ) {
     ui.label(&data.label);
-    ui.label(format!(
-        "{} blocks moved across files · shared M-markers pair both locations",
-        data.locations.len()
+    ui.label(crate::i18n::message(
+        "repo-workflows-file_comparison-view-746eb9db",
+        &[(
+            "data-locations-len-1",
+            (data.locations.len()).clone().into(),
+        )],
     ));
     for note in &data.notes {
         ui.colored_label(t.text_dim, note);
     }
     if data.locations.is_empty() {
-        ui.label("No cross-file moved blocks found (minimum 20 letters/digits). Same-file moves remain in the normal patch.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-file_comparison-view-a47d33a8",
+        ));
     }
     egui::ScrollArea::vertical()
         .id_salt("code-move-list")
@@ -324,9 +355,9 @@ pub(super) fn view(
                     ui.colored_label(
                         t.text_dim,
                         if data.data.moves.blocks[i].exact {
-                            "unchanged / re-indented"
+                            crate::i18n::text("repo-workflows-file_comparison-view-b8b66b62")
                         } else {
-                            "edited during move"
+                            crate::i18n::text("repo-workflows-file_comparison-view-baa2bc90")
                         },
                     );
                 });
@@ -338,13 +369,26 @@ pub(super) fn view(
     let loc = &data.locations[i];
     ui.separator();
     ui.horizontal_wrapped(|ui| {
-        ui.colored_label(block_color(t, i), format!("M{} · Moved to…", i + 1));
+        ui.colored_label(
+            block_color(t, i),
+            crate::i18n::message(
+                "repo-workflows-file_comparison-view-8bb733fc",
+                &[("i-1-1", (i + 1).clone().into())],
+            ),
+        );
         for (side, l) in loc.iter().enumerate() {
             if ui
-                .button(format!(
-                    "Open {} {}",
-                    if side == 0 { "source" } else { "destination" },
-                    l.label()
+                .button(crate::i18n::message(
+                    "repo-workflows-file_comparison-view-4699e093",
+                    &[
+                        (
+                            "if-side-0-source-else-destinatio-1",
+                            (if side == 0 { "source" } else { "destination" })
+                                .clone()
+                                .into(),
+                        ),
+                        ("l-label-2", (l.label()).clone().into()),
+                    ],
                 ))
                 .clicked()
             {

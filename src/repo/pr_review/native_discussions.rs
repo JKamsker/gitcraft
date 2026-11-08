@@ -17,26 +17,48 @@ pub(super) fn show(
             format!(
                 " · {}:{} ({})",
                 thread.path,
-                thread
-                    .line
-                    .map_or_else(|| "unmapped".into(), |n| n.to_string()),
+                thread.line.map_or_else(
+                    || crate::i18n::text("repo-workflows-paint-unmapped").into(),
+                    |n| n.to_string()
+                ),
                 if thread.side == crate::pull_request::DiffSide::Left {
-                    "old side"
+                    crate::i18n::text("repo-workflows-pr_review-show-05dc48b8")
                 } else {
-                    "new side"
+                    crate::i18n::text("repo-workflows-pr_review-show-39fe3ef4")
                 }
             )
         };
-        egui::CollapsingHeader::new(format!(
-            "Discussion · {}{}{}{}",
-            thread.comments.first().map_or("", |c| c.author.as_str()),
-            coordinate,
-            if thread.outdated {
-                " · outdated position"
-            } else {
-                ""
-            },
-            if thread.resolved { " · resolved" } else { "" }
+        egui::CollapsingHeader::new(crate::i18n::message(
+            "repo-workflows-pr_review-show-025733eb",
+            &[
+                (
+                    "thread-comments-first-map-or-c-c-1",
+                    (thread.comments.first().map_or("", |c| c.author.as_str()))
+                        .clone()
+                        .into(),
+                ),
+                ("coordinate-2", (coordinate).clone().into()),
+                (
+                    "if-thread-outdated-outdated-posi-3",
+                    (if thread.outdated {
+                        crate::i18n::text("repo-workflows-pr_review-show-2578675f")
+                    } else {
+                        ""
+                    })
+                    .clone()
+                    .into(),
+                ),
+                (
+                    "if-thread-resolved-resolved-else-4",
+                    (if thread.resolved {
+                        crate::i18n::text("repo-workflows-pr_review-show-a9d6f2cd")
+                    } else {
+                        ""
+                    })
+                    .clone()
+                    .into(),
+                ),
+            ],
         ))
         .id_salt(("native-discussion", &thread.id))
         .default_open(thread.outdated)
@@ -47,14 +69,24 @@ pub(super) fn show(
             }
             if thread.can_resolve
                 && ui
-                    .add_enabled(!draft.posting, egui::Button::new("Resolve discussion"))
+                    .add_enabled(
+                        !draft.posting,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-pr_review-show-d5c36543",
+                        )),
+                    )
                     .clicked()
             {
                 pr_acts(acts, PrAct::SetResolved(thread.id.clone(), true));
             }
             if thread.can_unresolve
                 && ui
-                    .add_enabled(!draft.posting, egui::Button::new("Reopen discussion"))
+                    .add_enabled(
+                        !draft.posting,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-pr_review-show-6b7cd0c1",
+                        )),
+                    )
                     .clicked()
             {
                 pr_acts(acts, PrAct::SetResolved(thread.id.clone(), false));
@@ -63,13 +95,15 @@ pub(super) fn show(
                 ui.add_enabled(
                     !draft.posting,
                     egui::TextEdit::multiline(&mut draft.comment)
-                        .hint_text("Reply to this discussion")
+                        .hint_text(crate::i18n::text("repo-workflows-pr_review-show-4535c73b"))
                         .desired_rows(2),
                 );
                 if ui
                     .add_enabled(
                         !draft.posting && !draft.comment.trim().is_empty(),
-                        egui::Button::new("Reply to discussion"),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-pr_review-show-c40288c7",
+                        )),
                     )
                     .clicked()
                 {

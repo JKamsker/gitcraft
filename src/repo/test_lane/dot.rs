@@ -107,10 +107,13 @@ impl RepoTab {
         let rect = Rect::from_center_size(center, vec2(12.0, 12.0));
         crate::icons::paint(ui, rect, "flask-conical", 12.0, t.text_faint);
         let tip = match self.test_lane.command() {
-            Some(command) => {
-                format!("Tests: `{command}` (test.default.command)\nClick to test commits")
+            Some(command) => crate::i18n::message(
+                "repo-workflows-test_lane-test-lane-header-9b3f6adb",
+                &[("command", (command).clone().into())],
+            ),
+            None => {
+                crate::i18n::text("repo-workflows-test_lane-test-lane-header-f4c5a803").to_owned()
             }
-            None => "Tests: no test command yet\nClick to test commits with one".to_owned(),
         };
         let id = ui.id().with("test-lane-header");
         let resp = ui.interact(rect.expand(3.0), id, Sense::click());

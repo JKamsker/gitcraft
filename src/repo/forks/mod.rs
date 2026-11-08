@@ -184,7 +184,7 @@ impl RepoTab {
             .unwrap_or_else(|| self.refs.head.clone());
         match plan::checkout(&info, &self.remotes, &self.forks.setup, &locals, &previous) {
             Ok(plan) => {
-                let label = format!("Check out #{number} to push to {}", info.owner);
+                let label = checkout_operation_label(number, &info.owner);
                 self.run_undoable(
                     &label,
                     plan.steps.clone(),
@@ -227,12 +227,17 @@ impl RepoTab {
                     let label = format!("Rebase #{} onto {} and push", info.number, info.base);
                     let body = rebase_preview(&info, &plan);
                     tab.dialog = Some(
-                        Dialog::confirm(&label, body, "Rebase and push", plan.steps(), None).undo(
-                            Undo::Custom {
-                                undo: plan.undo_steps(),
-                                redo: plan.redo_steps(),
-                            },
-                        ),
+                        Dialog::confirm(
+                            &label,
+                            body,
+                            crate::i18n::text("repo-workflows-forks-plan-fork-rebase-a3647cfa"),
+                            plan.steps(),
+                            None,
+                        )
+                        .undo(Undo::Custom {
+                            undo: plan.undo_steps(),
+                            redo: plan.redo_steps(),
+                        }),
                     );
                     tab.forks.running = Some((label, plan));
                 }
@@ -296,14 +301,8 @@ impl RepoTab {
                 tab.dialog = Some(
                     Dialog::confirm(
                         "Remove unused fork remotes",
-                        format!(
-                            "Removes the remotes gitcraft added for forks that no branch pulls \
-                             from or pushes to any more: {}, with their remote-tracking \
-                             branches. Ctrl+Z adds them back (fetch them for their \
-                             branches).{kept}",
-                            unused.join(", ")
-                        ),
-                        "Remove",
+                        tidy_body(&unused, &keep),
+                        crate::i18n::text("repo-workflows-forks-plan-tidy-c3812fc4"),
                         steps.clone(),
                         None,
                     )
@@ -332,13 +331,15 @@ impl RepoTab {
         self.dialog = Some(
             Dialog::confirm(
                 &label,
-                format!(
-                    "The rebase is done. Force-pushes {} to {}'s {} with a lease: refused if \
-                     they pushed there since it was fetched. Ctrl+Z puts their branch back as \
-                     it was (and yours with the next Ctrl+Z).",
-                    plan.local, plan.fork, plan.branch
+                crate::i18n::message(
+                    "repo-workflows-forks-offer-push-after-conflict-dcc709d6",
+                    &[
+                        ("plan-local-1", (plan.local).clone().into()),
+                        ("plan-fork-2", (plan.fork).clone().into()),
+                        ("plan-branch-3", (plan.branch).clone().into()),
+                    ],
                 ),
-                "Push",
+                crate::i18n::text("repo-workflows-forks-offer-push-after-conflict-731ce7ed"),
                 plan.push_now(),
                 None,
             )
@@ -485,22 +486,88 @@ impl RepoTab {
 
 /// What the rebase dialog says it will do.
 fn rebase_preview(info: &ForkInfo, plan: &plan::Rebase) -> String {
-    format!(
-        "Rebases {} ({}'s branch {} of #{}) onto {}, which has {} commit{} it hasn't, then \
-         force-pushes it to {} (their fork) with a lease: refused if {} pushed there since it \
-         was fetched a moment ago.\n\nIf the rebase stops on conflicts, resolve them and \
-         continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.\n\n\
-         Ctrl+Z puts the branch back as it was, on the fork and here.",
-        plan.local,
-        info.owner,
-        info.branch,
-        info.number,
-        plan.onto
-            .strip_prefix("refs/remotes/")
-            .unwrap_or(&plan.onto),
-        plan.behind,
-        if plan.behind == 1 { "" } else { "s" },
-        plan.fork,
-        info.owner,
+    crate::i18n::message(
+        "repo-workflows-fork-rebase-preview",
+        &[
+            ("local", (plan.local.as_str()).into()),
+            ("owner", (info.owner.as_str()).into()),
+            ("branch", (info.branch.as_str()).into()),
+            ("number", (info.number.to_string()).into()),
+            (
+                "onto",
+                (plan
+                    .onto
+                    .strip_prefix("refs/remotes/")
+                    .unwrap_or(&plan.onto))
+                .into(),
+            ),
+            ("behind", (plan.behind).into()),
+            ("fork", (plan.fork.as_str()).into()),
+        ],
     )
+}
+
+fn tidy_body(unused: &[String], keep: &[String]) -> String {
+    crate::i18n::message(
+        "repo-workflows-forks-tidy-complete-body",
+        &[
+            ("unused", unused.join(", ").into()),
+            ("kept", (if keep.is_empty() { "no" } else { "yes" }).into()),
+            ("names", keep.join(", ").into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_tidy_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_forks_actual_tidy_preview_keeps_remote_names_opaque() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for keep in [vec![], vec!["fork/1234-ß".into()]] {
+                let body = tidy_body(&["unused/1234".into()], &keep);
+                assert!(body.contains("unused/1234"));
+                assert_eq!(body.contains("fork/1234-"), !keep.is_empty());
+                if !keep.is_empty() {
+                    assert!(body.contains(if language == "de" {
+                        "Behalten:"
+                    } else {
+                        "Kept:"
+                    }));
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+/// Dispatch identity; only the canonical repository paint map localizes its presentation.
+fn checkout_operation_label(number: u64, owner: &str) -> String {
+    format!("Check out #{number} to push to {owner}")
+}
+#[cfg(test)]
+mod fluent_checkout_identity_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_fork_checkout_dispatch_keeps_opaque_pr_number_and_owner() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            let raw = checkout_operation_label(1234, "raw-owner/ß");
+            assert_eq!(raw, "Check out #1234 to push to raw-owner/ß");
+            let painted = crate::i18n::message(
+                "repo-workflows-forks-checkout-fork-abaaf4c3",
+                &[
+                    ("number", 1234u64.to_string().into()),
+                    ("info-owner-1", "raw-owner/ß".into()),
+                ],
+            );
+            assert!(painted.contains("#1234"));
+            assert!(painted.contains("raw-owner/ß"));
+            if language == "en-US" {
+                assert_eq!(painted, raw)
+            } else {
+                assert_ne!(painted, raw)
+            }
+        }
+    }
 }

@@ -10,20 +10,26 @@ pub(super) struct Context {
 impl Context {
     pub fn capture(name: &str, remotes: &[Remote]) -> Result<Self, String> {
         if name.is_empty() || name.starts_with('-') || name.chars().any(char::is_control) {
-            return Err("Choose a configured context remote".into());
+            return Err(crate::i18n::text("repo-workflows-local_ci-capture-3a6208be").into());
         }
         let remote = remotes
             .iter()
             .find(|r| r.name == name)
-            .ok_or("Context remote is missing; refresh repository remotes and choose again")?;
-        let path = remote.url.strip_prefix("https://github.com/")
+            .ok_or(crate::i18n::text(
+                "repo-workflows-local_ci-capture-06580fa5",
+            ))?;
+        let path = remote
+            .url
+            .strip_prefix("https://github.com/")
             .or_else(|| remote.url.strip_prefix("ssh://git@github.com/"))
             .or_else(|| remote.url.strip_prefix("git@github.com:"))
-            .ok_or("Local Actions currently supports direct GitHub.com HTTPS or git SSH fetch URLs only. Enterprise and other hosts, URL aliases, credentials and custom ports require running act directly with an explicit GitHub instance.")?;
+            .ok_or(crate::i18n::text(
+                "repo-workflows-local_ci-capture-eb158ced",
+            ))?;
         let path = path.strip_suffix(".git").unwrap_or(path);
-        let (owner, repo) = path
-            .split_once('/')
-            .ok_or("Context URL must identify owner/repository")?;
+        let (owner, repo) = path.split_once('/').ok_or(crate::i18n::text(
+            "repo-workflows-local_ci-capture-cbef0bd4",
+        ))?;
         if owner.is_empty()
             || repo.is_empty()
             || matches!(repo, "." | "..")
@@ -34,7 +40,7 @@ impl Context {
                 .bytes()
                 .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
         {
-            return Err("Context URL must identify a plain GitHub owner/repository without URL parameters or credentials".into());
+            return Err(crate::i18n::text("repo-workflows-local_ci-capture-534b1c84").into());
         }
         Ok(Self {
             name: name.into(),
@@ -43,9 +49,13 @@ impl Context {
         })
     }
     pub fn display(&self) -> String {
-        format!(
-            "{} · host github.com · repository {} · fetch URL {}",
-            self.name, self.repository, self.url
+        crate::i18n::message(
+            "repo-workflows-local_ci-display-8dc95fe7",
+            &[
+                ("self-name-1", (self.name).clone().into()),
+                ("self-repository-2", (self.repository).clone().into()),
+                ("self-url-3", (self.url).clone().into()),
+            ],
         )
     }
     pub fn revalidate_with(
@@ -57,10 +67,12 @@ impl Context {
         let key = format!("remote.{}.url", self.name);
         let value =
             read(&["config", "--local", "--no-includes", "--get-all", &key]).map_err(|_| {
-                "Cannot confirm the local context remote; refresh remotes before running".to_owned()
+                crate::i18n::text("repo-workflows-local_ci-revalidate-with-e02bce32").to_owned()
             })?;
         if value.trim_end_matches('\n') != self.url {
-            return Err("Context remote URL changed or is ambiguous. Refresh remotes, review repository context and run again.".into());
+            return Err(
+                crate::i18n::text("repo-workflows-local_ci-revalidate-with-d12b2aa8").into(),
+            );
         }
         Ok(())
     }

@@ -150,8 +150,9 @@ impl RepoTab {
                 }
                 crate::forge::history::lookup(
                     &repo,
-                    &hosting
-                        .ok_or("No supported forge remote; commit history remains available")?,
+                    &hosting.ok_or(crate::i18n::text(
+                        "repo-workflows-line_dossier-poll-line-dossier-45e16671",
+                    ))?,
                     &query,
                     active,
                 )
@@ -178,7 +179,10 @@ impl RepoTab {
                                 if old.cards.len() >= 256
                                     || bytes.saturating_add(card.text.len()) > 32 * 1024 * 1024
                                 {
-                                    history.stopped="Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history".into();
+                                    history.stopped = crate::i18n::text(
+                                        "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
+                                    )
+                                    .into();
                                     history.continuation = None;
                                     history.alternatives.clear();
                                     break;

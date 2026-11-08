@@ -38,16 +38,32 @@ impl RepoTab {
         let Some(doctor) = self.doctor.as_deref_mut() else {
             return;
         };
-        widgets::panel_header(ui, "Repository doctor", |ui| {
-            if icons::small_button(ui, "x", "Back (Esc)").clicked() {
-                acts.push(Action::Doctor(DoctorAct::Close));
-            }
-            if doctor.waiting || busy {
-                ui.add(crate::spinner::Spinner::new());
-            } else if icons::small_button(ui, "refresh-cw", "Read again").clicked() {
-                acts.push(Action::Doctor(DoctorAct::Reload));
-            }
-        });
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-workflows-doctor-doctor-ui-3095e533"),
+            |ui| {
+                if icons::small_button(
+                    ui,
+                    "x",
+                    crate::i18n::text("repo-workflows-doctor-doctor-ui-8c6c9cf3"),
+                )
+                .clicked()
+                {
+                    acts.push(Action::Doctor(DoctorAct::Close));
+                }
+                if doctor.waiting || busy {
+                    ui.add(crate::spinner::Spinner::new());
+                } else if icons::small_button(
+                    ui,
+                    "refresh-cw",
+                    crate::i18n::text("repo-workflows-doctor-doctor-ui-d8cb92fa"),
+                )
+                .clicked()
+                {
+                    acts.push(Action::Doctor(DoctorAct::Reload));
+                }
+            },
+        );
         confirm_modal(ui, doctor, acts);
         ui.horizontal_top(|ui| {
             ui.add_space(20.0);
@@ -115,10 +131,13 @@ fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
             .unwrap_or_default();
         ask(
             ui,
-            "Discard your changes?",
-            &format!("Your changes to {file} aren't saved: closing the doctor drops them."),
-            "Discard",
-            "Keep editing",
+            crate::i18n::text("repo-workflows-doctor-confirm-modal-3b13192b"),
+            &crate::i18n::message(
+                "repo-workflows-doctor-confirm-modal-c324130d",
+                &[("file", (file).clone().into())],
+            ),
+            crate::i18n::text("repo-workflows-doctor-confirm-modal-eb1a70e3"),
+            crate::i18n::text("repo-workflows-doctor-confirm-modal-e76fd2ad"),
             |yes| Action::Doctor(DoctorAct::AnswerClose(yes)),
             acts,
         );
@@ -132,7 +151,7 @@ fn confirm_modal(ui: &mut Ui, doctor: &DoctorView, acts: &mut Vec<Action>) {
         &confirm.title,
         &confirm.body,
         &confirm.button,
-        "Cancel",
+        crate::i18n::text("repo-workflows-doctor-confirm-modal-19766ed6"),
         |yes| Action::Doctor(DoctorAct::Answer(yes)),
         acts,
     );

@@ -39,15 +39,23 @@ impl RepoTab {
                     ui.spacing_mut().item_spacing.x = 6.0;
                     icons::inline(ui, "book-open", 13.0, t.text_faint);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        off = icons::small_button(ui, "eye-off", TURN_OFF_TIP).clicked();
+                        off = icons::small_button(ui, "eye-off", crate::i18n::text(TURN_OFF_TIP))
+                            .clicked();
                         ui.add_space(8.0);
-                        next = icons::small_button(ui, "chevron-right", "Next tip").clicked();
+                        next = icons::small_button(
+                            ui,
+                            "chevron-right",
+                            crate::i18n::text("repo-workflows-guide-tip-bar-c1567088"),
+                        )
+                        .clicked();
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             ui.label(
-                                RichText::new("Did you know?")
-                                    .color(t.text_dim)
-                                    .small()
-                                    .strong(),
+                                RichText::new(crate::i18n::text(
+                                    "repo-workflows-guide-tip-bar-3e9b3541",
+                                ))
+                                .color(t.text_dim)
+                                .small()
+                                .strong(),
                             );
                             ui.add(
                                 egui::Label::new(RichText::new(tip).color(t.text_faint).small())
@@ -103,7 +111,13 @@ impl RepoTab {
         // Gone by itself once its time is up.
         ctx.request_repaint_after(left);
         let t = Tokens::get(&ctx);
-        if icons::small_button(ui, "x", "Close the hint").clicked() {
+        if icons::small_button(
+            ui,
+            "x",
+            crate::i18n::text("repo-workflows-guide-hint-status-2c0ee188"),
+        )
+        .clicked()
+        {
             self.guide.hints.close();
         }
         let text = hint.text();
@@ -120,8 +134,7 @@ impl RepoTab {
 }
 
 /// What the ✕ of the tips line does.
-const TURN_OFF_TIP: &str =
-    "Turn off tips and first-time hints (Settings → General → Tips turns them back on)";
+const TURN_OFF_TIP: &str = "repo-workflows-guide--b7acfeab";
 
 /// What the status line says once tips are turned off.
 pub(crate) const TIPS_OFF: &str = "Tips turned off: Settings → General → Tips turns them back on";

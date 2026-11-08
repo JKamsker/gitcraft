@@ -34,6 +34,7 @@ pub(crate) struct FenceState {
     pub(crate) found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
     /// Writing the agents' configs into a worktree failed: where, and why.
     pub(crate) write_errors: Vec<String>,
+    write_error_context: Vec<RootFailure>,
     checking: bool,
     /// Checked again once this check is in (the repository was read again meanwhile).
     again: bool,
@@ -92,6 +93,43 @@ struct Checked {
     targets: fence::Targets,
     found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
     write_errors: Vec<String>,
+    write_error_context: Vec<RootFailure>,
+}
+
+#[derive(Clone)]
+struct RootFailure {
+    root: String,
+    detail: String,
+}
+impl RootFailure {
+    fn new(root: &std::path::Path, detail: String) -> Self {
+        Self {
+            root: crate::remote::display(root),
+            detail,
+        }
+    }
+    fn raw(&self) -> String {
+        format!("{}: {}", self.root, self.detail)
+    }
+    fn display(&self) -> String {
+        format!(
+            "{}: {}",
+            self.root,
+            fence::display::diagnostic(&self.detail)
+        )
+    }
+}
+fn display_write_errors(raw: &[String], context: &[RootFailure]) -> String {
+    raw.iter()
+        .enumerate()
+        .map(|(index, error)| {
+            context
+                .get(index)
+                .filter(|source| source.raw() == *error)
+                .map_or_else(|| error.clone(), RootFailure::display)
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl RepoTab {
@@ -124,10 +162,12 @@ impl RepoTab {
                 let targets = fence::read_targets(&repo);
                 let patterns = fence::parse_list(&list);
                 let mut write_errors = Vec::new();
+                let mut write_error_context = Vec::new();
                 if !patterns.is_empty() {
                     for root in &roots {
                         if let Err(e) = fence::write_all(root, &patterns, targets) {
                             write_errors.push(format!("{}: {e}", crate::remote::display(root)));
+                            write_error_context.push(RootFailure::new(root, e));
                         }
                     }
                 }
@@ -146,6 +186,7 @@ impl RepoTab {
                     targets,
                     found,
                     write_errors,
+                    write_error_context,
                 })
             },
             |tab, result, ctx| {
@@ -156,6 +197,7 @@ impl RepoTab {
                         tab.fence.targets = c.targets;
                         tab.fence.found = c.found;
                         tab.fence.write_errors = c.write_errors;
+                        tab.fence.write_error_context = c.write_error_context;
                         tab.fence.loaded = true;
                     }
                     Err(e) => tab.status = Some((e, true)),
@@ -215,7 +257,7 @@ impl RepoTab {
                     Some(Err(e)) => Err(e.clone()),
                     None => Ok(Vec::new()),
                 };
-                (w.name(), found)
+                (w.name(), found, crate::remote::display(&w.path))
             });
         if self.busy_op.is_some() {
             return Some(pass);
@@ -223,6 +265,7 @@ impl RepoTab {
         self.busy_op = Some("Checking against the agent fence".to_owned());
         self.status = Some(("Checking against the agent fence…".to_owned(), false));
         let repo = self.path.clone();
+        let display_tip = tip.clone();
         self.then(
             ctx,
             move || {
@@ -239,9 +282,9 @@ impl RepoTab {
                 let mut errors: Vec<String> = Vec::new();
                 match commits {
                     Ok(v) => found.extend(v),
-                    Err(e) => errors.push(e),
+                    Err(e) => errors.push(fence::display::check_diagnostic(&e, &display_tip)),
                 }
-                if let Some((_, wt)) = &worktree {
+                if let Some((_, wt, target)) = &worktree {
                     match wt {
                         Ok(v) => found.extend(
                             v.iter()
@@ -249,7 +292,7 @@ impl RepoTab {
                                 .cloned()
                                 .collect::<Vec<_>>(),
                         ),
-                        Err(e) => errors.push(e.clone()),
+                        Err(e) => errors.push(fence::display::check_diagnostic(e, target)),
                     }
                 }
                 if found.is_empty() && errors.is_empty() {
@@ -272,8 +315,14 @@ impl RepoTab {
                     &errors,
                 );
                 tab.dialog = Some(
-                    Dialog::confirm(&format!("{label}{PAST}"), body, "Merge anyway", ops, None)
-                        .undo(undo),
+                    Dialog::confirm(
+                        &format!("{label}{PAST}"),
+                        body,
+                        crate::i18n::text("repo-workflows-fence_view-fence-gate-214a3091"),
+                        ops,
+                        None,
+                    )
+                    .undo(undo),
                 );
             },
         );
@@ -299,10 +348,31 @@ pub(crate) fn list_violations(found: &[Violation]) -> String {
     let mut out: Vec<String> = found
         .iter()
         .take(LISTED)
-        .map(|v| format!("  {} ({}; fence: {})", v.path, v.how.label(), v.pattern))
+        .map(|v| {
+            crate::i18n::message(
+                "repo-workflows-fence-violation-line",
+                &[
+                    ("path", (v.path.as_str()).into()),
+                    (
+                        "how",
+                        (match v.how.label() {
+                            "committed" => "committed",
+                            "not committed" => "uncommitted",
+                            "untracked" => "untracked",
+                            _ => "ignored",
+                        })
+                        .into(),
+                    ),
+                    ("pattern", (v.pattern.as_str()).into()),
+                ],
+            )
+        })
         .collect();
     if found.len() > LISTED {
-        out.push(format!("  and {} more", found.len() - LISTED));
+        out.push(crate::i18n::message(
+            "repo-workflows-fence_view-list-violations-a6d5a69b",
+            &[("found-len-listed-1", (found.len() - LISTED).clone().into())],
+        ));
     }
     out.join("\n")
 }
@@ -313,23 +383,121 @@ fn confirm_body(
     found: &[Violation],
     errors: &[String],
 ) -> String {
-    let mut body = match worktree {
-        Some(wt) => format!("{branch} (checked out in the worktree {wt})"),
-        None => branch.to_owned(),
-    };
-    if !found.is_empty() {
-        body.push_str(&format!(
-            " touched paths agents must stay out of:\n{}",
-            list_violations(found)
-        ));
+    crate::i18n::message(
+        "repo-workflows-fence-confirm-body",
+        &[
+            ("branch", (branch).into()),
+            (
+                "worktree",
+                (if worktree.is_some() { "yes" } else { "no" }).into(),
+            ),
+            ("folder", (worktree.unwrap_or_default()).into()),
+            (
+                "found",
+                (if found.is_empty() { "no" } else { "yes" }).into(),
+            ),
+            ("paths", (list_violations(found)).into()),
+            (
+                "errors",
+                (if errors.is_empty() { "no" } else { "yes" }).into(),
+            ),
+            (
+                "details",
+                (errors.join(
+                    "
+  ",
+                ))
+                .into(),
+            ),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_confirmation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_fence_actual_confirmation_keeps_paths_and_checks_raw() {
+        let violation = Violation {
+            path: "secret/ß file".into(),
+            pattern: "secret/**".into(),
+            how: fence::How::Untracked,
+        };
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for has_found in [false, true] {
+                for has_errors in [false, true] {
+                    for worktree in [None, Some("/supplied/ß tree")] {
+                        let found = if has_found {
+                            vec![violation.clone()]
+                        } else {
+                            vec![]
+                        };
+                        let errors = if has_errors {
+                            vec!["Opaque provider detail 日本語".into()]
+                        } else {
+                            vec![]
+                        };
+                        let body = confirm_body("feature/ß", worktree, &found, &errors);
+                        assert!(body.starts_with("feature/ß"));
+                        assert_eq!(body.contains("/supplied/ß tree"), worktree.is_some());
+                        assert_eq!(body.contains("secret/ß file"), has_found);
+                        assert_eq!(body.contains("secret/**"), has_found);
+                        assert_eq!(body.contains("Opaque provider detail 日本語"), has_errors);
+                        assert!(body.ends_with(if language == "de" {
+                            "Trotzdem fortfahren?"
+                        } else {
+                            "Go ahead all the same?"
+                        }));
+                        if has_found {
+                            assert!(body.contains(if language == "de" {
+                                "Agenten nicht verändern dürfen"
+                            } else {
+                                "agents must stay out of"
+                            }));
+                            assert!(body.contains(if language == "de" {
+                                "nicht versioniert; Grenze:"
+                            } else {
+                                "untracked; fence:"
+                            }));
+                        }
+                        if has_errors {
+                            assert!(body.contains(if language == "de" {
+                                "konnte"
+                            } else {
+                                "could not"
+                            }));
+                        }
+                        assert_eq!(violation.how.label(), "untracked");
+                        assert_eq!(found.len(), usize::from(has_found));
+                        assert_eq!(errors.len(), usize::from(has_errors));
+                    }
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
-    if !errors.is_empty() {
-        body.push_str(&format!(
-            "{}couldn't be checked against the agent fence:\n  {}",
-            if found.is_empty() { " " } else { "\nIt also " },
-            errors.join("\n  ")
-        ));
+}
+
+#[cfg(test)]
+mod fluent_guard_target_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_fence_supplied_target_preserves_punctuation_and_raw_gate_identity() {
+        let target = "/supplied/x against the agent fence: y/ß";
+        let raw = format!(
+            "Could not check {target} against the agent fence: there is no main branch to compare with"
+        );
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let errors = vec![fence::display::check_diagnostic(&raw, target)];
+            let body = confirm_body("refs/heads/ß", Some(target), &[], &errors);
+            assert!(body.contains(target));
+            assert_eq!(body.contains("keinen Hauptbranch"), lang == "de");
+            assert_eq!(fence::display::diagnostic(&raw), raw);
+            assert_eq!(fence::display::check_diagnostic(&raw, "different"), raw);
+            assert!(format!("Merge refs/heads/ß{PAST}").ends_with(PAST));
+            assert_eq!(PAST, " (past the agent fence)");
+        }
+        crate::i18n::set_language("en-US");
     }
-    body.push_str("\n\nGo ahead all the same?");
-    body
 }

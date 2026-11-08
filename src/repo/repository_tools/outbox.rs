@@ -123,7 +123,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                         result
                     } else {
                         Err(
-                            "Outbox preparation used a previous profile/sign-in; prepare again"
+                            crate::i18n::text("repo-workflows-repository_tools-act-519202af")
                                 .into(),
                         )
                     };
@@ -217,9 +217,15 @@ impl RepoTab {
     }
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Push outbox");
-    ui.label("Queue consent pins the selected profile, connection account metadata and any scoped transient sign-in. A changed or missing legacy witness requires renewed approval. Prepared results expire after profile/sign-in changes.");
-    ui.label("Only the recorded commit is sent. Rewrites, destination changes and rejected or uncertain sends pause for review. Sending after a crash is uncertain and is never retried automatically. Queue data and protected commits are local application refs; do not mirror-push application refs.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-52b07a38",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-96a8a275",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-4d07d136",
+    ));
     let Some(result) = &mut state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -228,7 +234,12 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         Ok(data) => data,
         Err(e) => {
             ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, e.as_str());
-            if ui.button("Read outbox again").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-a2869e42",
+                ))
+                .clicked()
+            {
                 acts.push(Action::RepositoryTools(Act::Outbox));
             }
             return;
@@ -236,10 +247,18 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     };
     match data {
         Data::Outbox(view) => {
-            ui.label(format!("Current source: {}", view.branch));
-            ui.checkbox(&mut state.compatible,"Opt in: automatically send this plain push when online, only if preflight has no findings");
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-1bd5bcfa",
+                &[("view-branch-1", (view.branch).clone().into())],
+            ));
+            ui.checkbox(
+                &mut state.compatible,
+                crate::i18n::text("repo-workflows-repository_tools-show-202c8fbc"),
+            );
             if ui
-                .button("Queue this exact commit using its push route")
+                .button(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-4c8748ea",
+                ))
                 .clicked()
             {
                 acts.push(Action::RepositoryTools(Act::QueuePush(
@@ -254,31 +273,37 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                         ui.separator();
                         ui.label(format!("{} → {} / {}", e.source, e.remote, e.destination));
                         ui.monospace(&e.commit);
-                        ui.label(e.consent.as_ref().map_or(
-                            "Legacy entry: profile/account consent missing".into(),
-                            |consent| {
-                                format!(
-                                    "Approved profile {} · selected account metadata pinned",
-                                    consent.profile
-                                )
-                            },
-                        ));
-                        ui.label(format!(
-                            "{:?} · {} pinned endpoint(s) · autosend {}",
-                            e.status,
+                        ui.label(
+                            e.consent.as_ref().map_or(
+                                crate::i18n::text("repo-workflows-repository_tools-show-8cc484e4")
+                                    .into(),
+                                |consent| {
+                                    crate::i18n::message(
+                                        "repo-workflows-repository_tools-show-a2bc21d3",
+                                        &[("consent-profile-1", (consent.profile).clone().into())],
+                                    )
+                                },
+                            ),
+                        );
+                        ui.label(outbox_entry_summary(
+                            &e.status,
                             e.endpoints.len(),
-                            e.autosend
+                            e.autosend,
                         ));
                         if !e.receipt.is_empty() {
-                            egui::CollapsingHeader::new("Receipt")
-                                .id_salt(&e.id)
-                                .show(ui, |ui| {
-                                    ui.label(&e.receipt);
-                                });
+                            egui::CollapsingHeader::new(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-dad5a969",
+                            ))
+                            .id_salt(&e.id)
+                            .show(ui, |ui| {
+                                ui.label(&e.receipt);
+                            });
                         }
                         if matches!(e.status, logic::Status::Paused(_) | logic::Status::Sending)
                             && ui
-                                .button("Review pinned commit and current destination…")
+                                .button(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-fccdc9ec",
+                                ))
                                 .clicked()
                         {
                             acts.push(Action::RepositoryTools(Act::ReviewOutbox(e.id.clone())));
@@ -287,7 +312,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             if ui
                                 .add_enabled(
                                     e.status == logic::Status::Ready,
-                                    egui::Button::new("Prepare selected send…"),
+                                    egui::Button::new(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-222bd382",
+                                    )),
                                 )
                                 .clicked()
                             {
@@ -298,7 +325,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             if ui
                                 .add_enabled(
                                     e.status != logic::Status::Sending,
-                                    egui::Button::new("Remove entry"),
+                                    egui::Button::new(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-d653a1c5",
+                                    )),
                                 )
                                 .clicked()
                             {
@@ -313,43 +342,71 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
         Data::PreparedOutbox(p) => {
             if p.review {
-                ui.colored_label(crate::theme::Tokens::get(ui.ctx()).warning,"Renewed approval keeps the ORIGINAL pinned commit and accepts the CURRENT destination and source history. Verify any uncertain prior outcome on the remote first. Autosend is disabled.");
+                ui.colored_label(
+                    crate::theme::Tokens::get(ui.ctx()).warning,
+                    crate::i18n::text("repo-workflows-repository_tools-show-b9cc89c6"),
+                );
             }
-            ui.label(format!(
-                "Exact commit {} → {} / {}",
-                p.plan.head, p.plan.remote, p.plan.destination
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-a17b0445",
+                &[
+                    ("p-plan-head-1", (p.plan.head).clone().into()),
+                    ("p-plan-remote-2", (p.plan.remote).clone().into()),
+                    ("p-plan-destination-3", (p.plan.destination).clone().into()),
+                ],
             ));
-            ui.label(format!(
-                "Selected profile {} · connection account metadata pinned",
-                p.consent.profile
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-99256c25",
+                &[("p-consent-profile-1", (p.consent.profile).clone().into())],
             ));
             if let Some((endpoint, account, username)) = &p.consent.principal {
-                ui.label(format!(
-                    "Scoped sign-in: {} · account {} · username {}",
-                    crate::git::redact(endpoint, None),
-                    account,
-                    username
+                ui.label(crate::i18n::message(
+                    "repo-workflows-repository_tools-show-8fb60b6e",
+                    &[
+                        (
+                            "crate-git-redact-endpoint-none-1",
+                            (crate::git::redact(endpoint, None)).clone().into(),
+                        ),
+                        ("account-2", (account).clone().into()),
+                        ("username-3", (username).clone().into()),
+                    ],
                 ));
             }
             for target in &p.plan.targets {
                 ui.label(target);
             }
-            ui.label(format!(
-                "{} outgoing commits inspected",
-                p.plan.commits.len()
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-9b1cea76",
+                &[(
+                    "p-plan-commits-len-1",
+                    (p.plan.commits.len()).clone().into(),
+                )],
             ));
-            egui::ScrollArea::vertical().max_height(300.0).show(ui,|ui|{
-                if p.plan.findings.is_empty(){ui.label("No preflight findings in identity, signatures, messages, secrets, large blobs or remote history.");}
-                for f in &p.plan.findings{ui.label(format!("{:?}: {} {} {}",f.kind,f.commit,f.path,f.detail));}
-            });
+            egui::ScrollArea::vertical()
+                .max_height(300.0)
+                .show(ui, |ui| {
+                    if p.plan.findings.is_empty() {
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-repository_tools-show-80ef5663",
+                        ));
+                    }
+                    for f in &p.plan.findings {
+                        ui.label(format!(
+                            "{:?}: {} {} {}",
+                            f.kind, f.commit, f.path, f.detail
+                        ));
+                    }
+                });
             ui.checkbox(
                 &mut state.acknowledged,
-                "I reviewed this exact queued commit, every endpoint and preflight finding",
+                crate::i18n::text("repo-workflows-repository_tools-show-2e1d0813"),
             );
             if ui
                 .add_enabled(
                     state.acknowledged,
-                    egui::Button::new("Send selected exact push"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-78f32476",
+                    )),
                 )
                 .clicked()
             {
@@ -421,5 +478,79 @@ mod consent_tests {
             &a,
             4
         ));
+    }
+}
+
+fn outbox_entry_summary(status: &logic::Status, endpoints: usize, automatic: bool) -> String {
+    crate::i18n::message(
+        "repo-workflows-outbox-entry-summary",
+        &[
+            (
+                "status",
+                (match status {
+                    logic::Status::Ready => "ready",
+                    logic::Status::Sending => "sending",
+                    logic::Status::Sent => "sent",
+                    logic::Status::Paused(_) => "paused",
+                })
+                .into(),
+            ),
+            (
+                "detail",
+                (match status {
+                    logic::Status::Paused(detail) => {
+                        crate::repo::activity::display_workflow_error(detail)
+                    }
+                    _ => String::new(),
+                })
+                .into(),
+            ),
+            ("endpoints", (endpoints).into()),
+            ("automatic", (if automatic { "yes" } else { "no" }).into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_outbox_tests {
+    use super::*;
+
+    #[test]
+    fn fluent_partition_outbox_actual_summary_keeps_supplied_state_opaque() {
+        let paused = logic::Status::Paused("Provider detail / refs/heads/ß".into());
+        for (language, ready, count, paused_label) in [
+            ("en-US", "Ready", "1,234 pinned endpoints", "Paused:"),
+            ("de", "Bereit", "1.234 festgelegte Endpunkte", "Pausiert:"),
+        ] {
+            crate::i18n::set_language(language);
+            let summary = outbox_entry_summary(&logic::Status::Ready, 1234, true);
+            assert!(summary.starts_with(ready));
+            assert!(summary.contains(count));
+            let summary = outbox_entry_summary(&paused, 1, false);
+            assert!(summary.starts_with(paused_label));
+            assert!(summary.contains("Provider detail / refs/heads/ß"));
+            assert!(summary.contains(if language == "de" {
+                "ein festgelegter Endpunkt"
+            } else {
+                "one pinned endpoint"
+            }));
+            assert_eq!(
+                paused,
+                logic::Status::Paused("Provider detail / refs/heads/ß".into())
+            );
+            assert!(
+                outbox_entry_summary(&logic::Status::Sending, 0, false).starts_with(
+                    if language == "de" {
+                        "Wird gesendet"
+                    } else {
+                        "Sending"
+                    }
+                )
+            );
+            assert!(
+                outbox_entry_summary(&logic::Status::Sent, 0, false)
+                    .starts_with(if language == "de" { "Gesendet" } else { "Sent" })
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

@@ -61,10 +61,10 @@ impl RepoTab {
                     None => {
                         let hint = match view.source {
                             Source::Ref(_) => {
-                                "Select an entry to see its commit; Create branch here gets it back"
+                                crate::i18n::text("repo-workflows-reflog-reflog-contents-7e0b72b2")
                             }
                             Source::Lost => {
-                                "Select a commit to see it; Create branch here gets it back"
+                                crate::i18n::text("repo-workflows-reflog-reflog-contents-92034002")
                             }
                         };
                         ui.label(egui::RichText::new(hint).color(t.text_faint));
@@ -83,12 +83,20 @@ impl RepoTab {
         ui.horizontal(|ui| {
             // Close and reload first, from the right: the rest gets what is left, never them.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                if icons::small_button(
+                    ui,
+                    "x",
+                    crate::i18n::text("repo-workflows-reflog-reflog-bar-961b2a04"),
+                )
+                .clicked()
+                {
                     acts.push(Action::CloseReflog);
                 }
                 let tip = match view.source {
-                    Source::Ref(_) => "Read the reflog again",
-                    Source::Lost => "Scan again",
+                    Source::Ref(_) => {
+                        crate::i18n::text("repo-workflows-reflog-reflog-bar-83f07529")
+                    }
+                    Source::Lost => crate::i18n::text("repo-workflows-reflog-reflog-bar-3d04584d"),
                 };
                 if icons::small_button(ui, "refresh-cw", tip).clicked() {
                     acts.push(Action::Reflog(ReflogAct::Reload));
@@ -97,7 +105,14 @@ impl RepoTab {
                     ui.set_clip_rect(ui.max_rect().intersect(ui.clip_rect()));
                     icons::inline(ui, "history", 16.0, t.icon);
                     let on = usize::from(view.source == Source::Lost);
-                    match widgets::switch(ui, &["Reflog", "Lost commits"], on) {
+                    match widgets::switch(
+                        ui,
+                        &[
+                            crate::i18n::text("repo-workflows-reflog-reflog-bar-abd5e345"),
+                            crate::i18n::text("repo-workflows-reflog-reflog-bar-ec09fe01"),
+                        ],
+                        on,
+                    ) {
                         Some(0) => acts.push(Action::Reflog(ReflogAct::Show(Source::head()))),
                         Some(_) => acts.push(Action::Reflog(ReflogAct::Show(Source::Lost))),
                         None => {}
@@ -130,7 +145,9 @@ impl RepoTab {
                 }
             })
             .response
-            .on_hover_text("HEAD's reflog, or a local branch's");
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-reflog-ref-picker-c2e6cb5f",
+            ));
     }
 
     fn reflog_list(&self, ui: &mut Ui, view: &ReflogView, reference: &str, acts: &mut Vec<Action>) {
@@ -144,9 +161,9 @@ impl RepoTab {
                 ui.centered_and_justified(|ui| ui.add(spinner::Spinner::new()));
             } else {
                 let name = reference.strip_prefix("refs/heads/").unwrap_or(reference);
-                let text = format!(
-                    "No reflog for {name}. git keeps one from when a branch is made (unless \
-                     core.logAllRefUpdates is off); HEAD has none before the first commit."
+                let text = crate::i18n::message(
+                    "repo-workflows-reflog-reflog-list-31d0c09c",
+                    &[("name", (name).clone().into())],
                 );
                 message(ui, &text, t.text_dim);
             }
@@ -261,7 +278,7 @@ impl RepoTab {
             Some(Ok(found)) => found,
         };
         if found.is_empty() {
-            let text = "Nothing lost: every commit is on a branch, a tag or a stash.";
+            let text = crate::i18n::text("repo-workflows-reflog-lost-list-625e19f0");
             message(ui, text, t.text_dim);
             return;
         }
@@ -320,13 +337,18 @@ impl RepoTab {
             t.text_faint,
         );
         times(&p, &t, &cols, mid, c.time, &c.date, now);
-        let tip = format!(
-            "{}\n{}\nBy {}, committed {} ({})",
-            c.hash,
-            c.summary,
-            c.author,
-            c.date,
-            git::relative_time(c.time, now)
+        let tip = crate::i18n::message(
+            "repo-workflows-reflog-lost-row-379fcead",
+            &[
+                ("c-hash-1", (c.hash).clone().into()),
+                ("c-summary-2", (c.summary).clone().into()),
+                ("c-author-3", (c.author).clone().into()),
+                ("c-date-4", (c.date).clone().into()),
+                (
+                    "git-relative-time-c-time-now-5",
+                    (git::relative_time(c.time, now)).clone().into(),
+                ),
+            ],
         );
         let resp = resp.on_hover_text(tip);
         self.row_clicks(&resp, i, &Pick::of_lost(c), acts);
@@ -484,13 +506,17 @@ fn scanning(ui: &mut Ui, t: &Tokens, secs: u64, acts: &mut Vec<Action>) {
         ui.add(spinner::Spinner::new().size(20.0));
         ui.add_space(10.0);
         ui.label(
-            egui::RichText::new(format!(
-                "Looking through every object for commits nothing reaches… {secs} s"
+            egui::RichText::new(crate::i18n::message(
+                "repo-workflows-reflog-scanning-7ed409a6",
+                &[("secs", (secs).clone().into())],
             ))
             .color(t.text_dim),
         );
         ui.add_space(8.0);
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text("repo-workflows-reflog-scanning-19766ed6"))
+            .clicked()
+        {
             acts.push(Action::Reflog(ReflogAct::CancelScan));
         }
     });
@@ -504,16 +530,20 @@ fn not_scanned(ui: &mut Ui, t: &Tokens, acts: &mut Vec<Action>) {
     ui.vertical_centered(|ui| {
         ui.set_max_width(520.0);
         ui.label(
-            egui::RichText::new(
-                "Finds the commits no branch, tag or stash reaches any more, even once their \
-                 reflog has expired: what a reset, a deleted branch or a rebase left behind, \
-                 and dropped stashes. They stay until git gc prunes them. On a big repository \
-                 this takes a while.",
-            )
+            egui::RichText::new(crate::i18n::text(
+                "repo-workflows-reflog-not-scanned-e1899125",
+            ))
             .color(t.text_dim),
         );
         ui.add_space(10.0);
-        if widgets::primary_button(ui, "Find lost commits", true, 0.0).clicked() {
+        if widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-reflog-not-scanned-faab01a6"),
+            true,
+            0.0,
+        )
+        .clicked()
+        {
             acts.push(Action::Reflog(ReflogAct::Scan));
         }
     });

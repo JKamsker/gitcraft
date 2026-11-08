@@ -66,9 +66,18 @@ impl Drop for AiState {
 fn elapsed(since: Instant) -> String {
     let secs = since.elapsed().as_secs();
     if secs < 60 {
-        format!("{secs} s")
+        crate::i18n::message(
+            "repo-workflows-ai-elapsed-127483e6",
+            &[("secs", (secs).clone().into())],
+        )
     } else {
-        format!("{} min {} s", secs / 60, secs % 60)
+        crate::i18n::message(
+            "repo-workflows-ai-elapsed-fba4d59d",
+            &[
+                ("secs-60-1", (secs / 60).clone().into()),
+                ("secs-60-2", (secs % 60).clone().into()),
+            ],
+        )
     }
 }
 
@@ -76,10 +85,9 @@ fn elapsed(since: Instant) -> String {
 fn coverage(files: usize, left_out: usize) -> Option<String> {
     (left_out > 0).then(|| {
         let whole = files.saturating_sub(left_out);
-        format!(
-            "The tool saw {whole} of {files} file{} in full; the rest only in part or by name \
-             (Settings → AI sets how much is sent).",
-            if files == 1 { "" } else { "s" }
+        crate::i18n::message(
+            "repo-workflows-ai-coverage",
+            &[("whole", (whole).into()), ("files", (files).into())],
         )
     })
 }

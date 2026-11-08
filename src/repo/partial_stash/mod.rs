@@ -111,18 +111,24 @@ fn all_files(work: &WorkStatus) -> impl Iterator<Item = &git::StatusFile> {
 pub(crate) fn row_problem(f: &git::StatusFile) -> Option<String> {
     let path = &f.path;
     if f.area == git::Area::Conflicted {
-        return Some(format!("“{path}” has conflicts: resolve them first"));
+        return Some(crate::i18n::message(
+            "repo-workflows-partial_stash-row-problem-a2071523",
+            &[("path", (path).clone().into())],
+        ));
     }
     if let Some(old) = &f.old_path {
-        return Some(format!(
-            "“{old}” → “{path}” is a staged rename, which git can't stash by file name: \
-             unstage it first, or stash only what is staged"
+        return Some(crate::i18n::message(
+            "repo-workflows-partial_stash-row-problem-78f72f91",
+            &[
+                ("old", (old).clone().into()),
+                ("path", (path).clone().into()),
+            ],
         ));
     }
     if f.area == git::Area::Staged && f.code == 'D' {
-        return Some(format!(
-            "the deletion of “{path}” is staged, which git can't stash by file name: \
-             unstage it first, or stash only what is staged"
+        return Some(crate::i18n::message(
+            "repo-workflows-partial_stash-row-problem-140ed58d",
+            &[("path", (path).clone().into())],
         ));
     }
     None
@@ -135,24 +141,27 @@ const PATHS_BUDGET: usize = 24 * 1024;
 /// Why git can't stash just `paths` as they are in `work`, if it can't (see [`row_problem`]).
 pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<String> {
     if paths.is_empty() {
-        return Some(format!(
-            "pick the files to stash first ({}+click them in the changes)",
-            crate::manual::command()
+        return Some(crate::i18n::message(
+            "repo-workflows-partial_stash-files-problem-bdb546dd",
+            &[(
+                "crate-manual-command-1",
+                (crate::manual::command()).clone().into(),
+            )],
         ));
     }
     let bytes: usize = paths.iter().map(|p| p.len() + 12).sum();
     if bytes > PATHS_BUDGET {
-        return Some(format!(
-            "{} files are too many to stash by name in one go (git's command line would be too \
-             long): pick fewer, or stash everything",
-            paths.len()
+        return Some(crate::i18n::message(
+            "repo-workflows-partial_stash-files-problem-0a39f709",
+            &[("paths-len-1", (paths.len()).clone().into())],
         ));
     }
     for path in paths {
         let mut entries = all_files(work).filter(|f| &f.path == path).peekable();
         if entries.peek().is_none() {
-            return Some(format!(
-                "“{path}” has no changes any more: cancel and pick the files again"
+            return Some(crate::i18n::message(
+                "repo-workflows-partial_stash-files-problem-9175a257",
+                &[("path", (path).clone().into())],
             ));
         }
         if let Some(problem) = entries.find_map(row_problem) {
@@ -172,9 +181,9 @@ pub(crate) fn has_tracked_changes(work: &WorkStatus) -> bool {
 /// Why stashing everything (or a snapshot) can't be done now, if it can't.
 pub(crate) fn everything_problem(work: &WorkStatus, untracked: bool) -> Option<String> {
     if work.is_clean() {
-        Some("there are no changes to stash".into())
+        Some(crate::i18n::text("repo-workflows-partial_stash-everything-problem-a7f01d16").into())
     } else if !untracked && !has_tracked_changes(work) {
-        Some("only untracked files have changes: tick Include untracked files".into())
+        Some(crate::i18n::text("repo-workflows-partial_stash-everything-problem-63cc5481").into())
     } else {
         None
     }
@@ -196,7 +205,11 @@ pub(crate) fn has_untracked(paths: &[String], work: &WorkStatus) -> bool {
 pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec<String>, String> {
     let mut args = vec!["stash".to_owned(), "push".to_owned()];
     let paths = match &request.mode {
-        StashMode::Snapshot => return Err("a snapshot isn't made with git stash push".into()),
+        StashMode::Snapshot => {
+            return Err(
+                crate::i18n::text("repo-workflows-partial_stash-push-args-0a7314b3").into(),
+            );
+        }
         StashMode::Everything => {
             if let Some(problem) = everything_problem(work, request.untracked) {
                 return Err(problem);
@@ -208,7 +221,9 @@ pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec
         }
         StashMode::Staged => {
             if work.staged.is_empty() {
-                return Err("nothing is staged".into());
+                return Err(
+                    crate::i18n::text("repo-workflows-partial_stash-push-args-e90b2782").into(),
+                );
             }
             args.push("--staged".to_owned());
             None
@@ -325,9 +340,11 @@ pub(crate) fn run_push(
     }
     let result = match result {
         Ok(out) if out.contains("No local changes to save") => {
-            Err("there are no changes to stash".to_owned())
+            Err(crate::i18n::text("repo-workflows-partial_stash-run-push-a7f01d16").to_owned())
         }
-        Err(e) if e.trim() == "No staged changes" => Err("nothing is staged".to_owned()),
+        Err(e) if e.trim() == "No staged changes" => {
+            Err(crate::i18n::text("repo-workflows-partial_stash-run-push-e90b2782").to_owned())
+        }
         Err(e) => Err(after_failed_push(
             path,
             before.as_deref(),
@@ -357,20 +374,24 @@ fn after_failed_push(path: &Path, before: Option<&str>, e: &str, roll_back_stage
         && git::run(Some(path), &["stash", "drop", "-q", "stash@{0}"]).is_ok()
     {
         let why = if e.contains("binary patch") {
-            "git can't take only the staged part of a binary file out of the working tree. \
-             Pick the files and stash them, or stash everything"
+            crate::i18n::text("repo-workflows-partial_stash-after-failed-push-289207a8")
         } else {
-            "git couldn't take the staged changes out of the working tree, perhaps because \
-             unstaged changes touch the same lines. Pick the files and stash them, or stash \
-             everything"
+            crate::i18n::text("repo-workflows-partial_stash-after-failed-push-26daff34")
         };
-        return format!("nothing was stashed: {why} (git said: {})", one_line(e));
+        return crate::i18n::message(
+            "repo-workflows-partial_stash-after-failed-push-8f99c6b0",
+            &[
+                ("why", (why).clone().into()),
+                ("one-line-e-1", (one_line(e)).clone().into()),
+            ],
+        );
     }
-    format!(
-        "git saved the stash ({}), then stopped. The changes are in that stash and may still \
-         be in the working tree too: check them before you pop or drop it (git said: {})",
-        super::short(&now),
-        one_line(e)
+    crate::i18n::message(
+        "repo-workflows-partial_stash-after-failed-push-493b498c",
+        &[
+            ("super-short-now-1", (super::short(&now)).clone().into()),
+            ("one-line-e-2", (one_line(e)).clone().into()),
+        ],
     )
 }
 
@@ -395,13 +416,19 @@ fn run_snapshot(
         Ok(Some(s)) => s,
         Ok(None) if untracked => {
             return (
-                Err("there are no changes to save".to_owned()),
+                Err(
+                    crate::i18n::text("repo-workflows-partial_stash-run-snapshot-f67020b0")
+                        .to_owned(),
+                ),
                 OpKind::plain(),
             );
         }
         Ok(None) => {
             return (
-                Err("only untracked files have changes: tick Include untracked files".to_owned()),
+                Err(
+                    crate::i18n::text("repo-workflows-partial_stash-run-snapshot-63cc5481")
+                        .to_owned(),
+                ),
                 OpKind::plain(),
             );
         }

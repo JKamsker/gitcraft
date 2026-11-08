@@ -20,14 +20,14 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
 }
 pub(super) fn snapshot(path: &Path) -> Result<Snapshot, String> {
     if crate::remote::is_remote(path) {
-        return Err("Email patches currently require a worktree on this machine and the supported b4 ce4c1158 (0.17-dev) source build installed there".into());
+        return Err(crate::i18n::text("repo-workflows-email-snapshot-a55ce185").into());
     }
     let config = git(path, &["config", "--null", "--list", "--includes"])?;
     let mut config = config.into_bytes();
     match std::fs::symlink_metadata(path.join(".b4-config")) {
         Ok(_) => config.extend(
             crate::safe_read::read_inside(path, ".b4-config", 1024 * 1024)
-                .ok_or(".b4-config must be readable inside the worktree and at most 1 MiB")?,
+                .ok_or(crate::i18n::text("repo-workflows-email-snapshot-2627ca9e"))?,
         ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.to_string()),
@@ -52,10 +52,10 @@ pub(super) fn guard(path: &Path, expected: &Snapshot) -> Result<(), String> {
 }
 pub(super) fn compare(expected: &Snapshot, current: &Snapshot) -> Result<(), String> {
     if current != expected {
-        return Err("Worktree HEAD, branch, changes, configuration or selected profile changed; read/preview again".into());
+        return Err(crate::i18n::text("repo-workflows-email-compare-b5921a15").into());
     }
     if !expected.status.is_empty() {
-        return Err("Commit or stash worktree changes first".into());
+        return Err(crate::i18n::text("repo-workflows-email-compare-6921220f").into());
     }
     Ok(())
 }
@@ -63,11 +63,16 @@ fn invoke_b4(path: &Path, args: &[String], confirmed: bool) -> Result<String, St
     use std::io::Read;
     let script = crate::shell_path::resolve("b4");
     if !Path::new(&script).is_absolute() {
-        return Err("Install b4 in an absolute executable PATH directory (a Python virtual environment is supported)".into());
+        return Err(crate::i18n::text("repo-workflows-email-invoke-b4-8728290f").into());
     }
     let mut prefix = Vec::new();
     std::fs::File::open(&script)
-        .map_err(|e| format!("Cannot read installed b4 entrypoint: {e}"))?
+        .map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-email-invoke-b4-c9d943f4",
+                &[("e", (e).to_string().into())],
+            )
+        })?
         .take(4096)
         .read_to_end(&mut prefix)
         .map_err(|e| e.to_string())?;
@@ -104,7 +109,7 @@ impl Scratch {
                 Err(e) => return Err(e.to_string()),
             }
         }
-        Err("Cannot allocate private mail directory".into())
+        Err(crate::i18n::text("repo-workflows-email-new-21656993").into())
     }
 }
 impl Drop for Scratch {
@@ -141,29 +146,31 @@ pub(super) fn receive(path: &Path, source: &str, revision: u32) -> Result<Receiv
     for entry in std::fs::read_dir(&directory.0).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name();
-        let name = name.to_str().ok_or("Non-UTF8 b4 output filename")?;
+        let name = name
+            .to_str()
+            .ok_or(crate::i18n::text("repo-workflows-email-receive-7fcd485d"))?;
         if (name.ends_with(".mbx") || name.ends_with(".mbox"))
             && file.replace(entry.path()).is_some()
         {
-            return Err("b4 produced several mailboxes; select a single series".into());
+            return Err(crate::i18n::text("repo-workflows-email-receive-b0772e5b").into());
         }
         if name.ends_with(".cover") {
             let bytes = crate::safe_read::read_inside(&directory.0, name, model::MAX as u64)
-                .ok_or("Cannot read bounded cover letter")?;
+                .ok_or(crate::i18n::text("repo-workflows-email-receive-9820d0e4"))?;
             cover = model::parse(&bytes)
                 .map(|m| format!("{}\n{}", m.headers, m.body))
                 .unwrap_or_else(|_| String::from_utf8_lossy(&bytes).into_owned());
         }
     }
-    let file = file.ok_or("b4 produced no mailbox")?;
+    let file = file.ok_or(crate::i18n::text("repo-workflows-email-receive-4350d1be"))?;
     let bytes = crate::safe_read::read_inside(
         &directory.0,
         file.file_name()
             .and_then(|n| n.to_str())
-            .ok_or("Invalid mailbox name")?,
+            .ok_or(crate::i18n::text("repo-workflows-email-receive-61e11166"))?,
         model::MAX as u64,
     )
-    .ok_or("Cannot read bounded mailbox")?;
+    .ok_or(crate::i18n::text("repo-workflows-email-receive-3b985b29"))?;
     Ok(Received {
         snapshot,
         directory,
@@ -181,7 +188,10 @@ pub(super) fn apply(path: &Path, received: &Received) -> Result<String, String> 
         &[
             "am",
             "--3way",
-            received.file.to_str().ok_or("Invalid mailbox path")?,
+            received
+                .file
+                .to_str()
+                .ok_or(crate::i18n::text("repo-workflows-email-apply-61c57973"))?,
         ],
     )
 }
@@ -208,23 +218,25 @@ pub(super) fn preview(path: &Path, recipients: Vec<String>) -> Result<Preview, S
         .map_err(|e| e.to_string())?;
     files.sort_by_key(|e| e.file_name());
     if files.len() > 1024 {
-        return Err("More than 1024 outgoing messages".into());
+        return Err(crate::i18n::text("repo-workflows-email-preview-ca11bd96").into());
     }
     let mut messages = Vec::new();
     let mut total = 0;
     for file in files {
         let name = file.file_name();
-        let name = name.to_str().ok_or("Invalid outgoing filename")?;
+        let name = name
+            .to_str()
+            .ok_or(crate::i18n::text("repo-workflows-email-preview-7a897da3"))?;
         let bytes = crate::safe_read::read_inside(&dir.0, name, model::MAX as u64)
-            .ok_or("Cannot read bounded outgoing message")?;
+            .ok_or(crate::i18n::text("repo-workflows-email-preview-2345df14"))?;
         total += bytes.len();
         if total > model::MAX {
-            return Err("Outgoing series exceeds 32 MiB".into());
+            return Err(crate::i18n::text("repo-workflows-email-preview-d135ecfa").into());
         }
         messages.push(model::parse(&bytes)?);
     }
     if messages.is_empty() {
-        return Err("b4 produced no outgoing messages".into());
+        return Err(crate::i18n::text("repo-workflows-email-preview-ff2f2c5c").into());
     }
     guard(path, &before)?;
     Ok(Preview {
@@ -243,7 +255,19 @@ pub(super) fn send(path: &Path, shown: &Preview) -> Result<String, String> {
     args.extend(shown.recipients.clone());
     model::send_reviewed(&shown.messages, &fresh.messages, || {
         guard(path, &shown.snapshot)?;
-        invoke_b4(path, &args, true).map(|output| format!("b4 reported a successful send. Inspect native sent tags and revision before sending again.\n{output}")).map_err(|e| format!("Send did not report success: {e}. Some mail may already have been delivered. Inspect b4/mail state before retrying."))
+        invoke_b4(path, &args, true)
+            .map(|output| {
+                crate::i18n::message(
+                    "repo-workflows-email-send-a590b131",
+                    &[("output", (output).clone().into())],
+                )
+            })
+            .map_err(|e| {
+                crate::i18n::message(
+                    "repo-workflows-email-send-9753828b",
+                    &[("e", (e).to_string().into())],
+                )
+            })
     })
 }
 pub(super) fn prepare(
@@ -268,23 +292,23 @@ pub(super) fn prepare(
         "enroll" => {
             if value.is_empty() || value.starts_with('-') || value.chars().any(char::is_whitespace)
             {
-                return Err("Enter a fork-point revision".into());
+                return Err(crate::i18n::text("repo-workflows-email-prepare-b8cd601f").into());
             }
             args.extend(["-e".into(), value.into()]);
         }
         "revision" => {
             let number = value
                 .parse::<u32>()
-                .map_err(|_| "Expected a positive revision number")?;
+                .map_err(|_| crate::i18n::text("repo-workflows-email-prepare-7fa1230f"))?;
             if number == 0 {
-                return Err("Revision must be positive".into());
+                return Err(crate::i18n::text("repo-workflows-email-prepare-d287cfde").into());
             }
             args.extend(["--force-revision".into(), number.to_string()]);
         }
         "reroll" => {
             args.extend(["--manual-reroll".into(), model::reroll_id(value)?]);
         }
-        _ => return Err("Unknown preparation action".into()),
+        _ => return Err(crate::i18n::text("repo-workflows-email-prepare-ad82832b").into()),
     }
     b4(path, &args)
 }

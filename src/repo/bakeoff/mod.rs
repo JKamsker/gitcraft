@@ -181,9 +181,9 @@ impl RepoTab {
                     view.confirm_close = true;
                     let n = view.picks.len();
                     view.note = Some((
-                        format!(
-                            "{n} file{} picked and not assembled: close again to drop them",
-                            if n == 1 { "" } else { "s" }
+                        crate::i18n::message(
+                            "repo-workflows-bakeoff-unassembled",
+                            &[("count", (n).into())],
                         ),
                         true,
                     ));
@@ -287,7 +287,7 @@ impl RepoTab {
                     if trees != view.picked_trees {
                         if !view.picks.is_empty() {
                             view.note = Some((
-                                "Picks cleared: the attempts changed since they were made"
+                                crate::i18n::text("repo-workflows-bakeoff-load-bakeoff-c6f043db")
                                     .to_owned(),
                                 true,
                             ));
@@ -376,7 +376,16 @@ impl RepoTab {
                             // Another go at it needs a name of its own.
                             view.branch = next_name(branch);
                             (
-                                format!("Made {branch} at {}", crate::repo::short(commit)),
+                                crate::i18n::message(
+                                    "repo-workflows-bakeoff-assemble-c7f55e42",
+                                    &[
+                                        ("branch", (branch).clone().into()),
+                                        (
+                                            "crate-repo-short-commit-1",
+                                            (crate::repo::short(commit)).clone().into(),
+                                        ),
+                                    ],
+                                ),
                                 false,
                             )
                         }
@@ -410,7 +419,7 @@ impl RepoTab {
         let request = view.request;
         if command.is_empty() {
             view.note = Some((
-                "Type the command that builds the project first".to_owned(),
+                crate::i18n::text("repo-workflows-bakeoff-build-c18d3706").to_owned(),
                 true,
             ));
             return;
@@ -441,8 +450,12 @@ impl RepoTab {
                 if let Some(dir) = status.parent() {
                     let _ = crate::remote::create_dir_all(dir);
                 }
-                crate::remote::write(&status, b"")
-                    .map_err(|e| format!("could not prepare the build's status file: {e}"))?;
+                crate::remote::write(&status, b"").map_err(|e| {
+                    crate::i18n::message(
+                        "repo-workflows-bakeoff-build-06d160c3",
+                        &[("e", (e).to_string().into())],
+                    )
+                })?;
                 Ok((worktree, status))
             },
             move |tab, status, ctx| match status {
@@ -677,5 +690,55 @@ mod generation_tests {
         assert_eq!(current.builds[0], Some(Built::Running));
         current.accept_builds(current.request, vec![(0, path, Built::Passed)]);
         assert_eq!(current.builds[0], Some(Built::Passed));
+    }
+}
+
+impl Side {
+    fn display_kind(&self) -> &'static str {
+        let id = match self.kind() {
+            "unchanged" => "repo-workflows-bakeoff-kind-unchanged",
+            "deleted" => "repo-workflows-bakeoff-kind-deleted",
+            "added" => "repo-workflows-bakeoff-kind-added",
+            "changed" => "repo-workflows-bakeoff-kind-changed",
+            other => return other,
+        };
+        crate::i18n::text(id)
+    }
+}
+#[cfg(test)]
+mod fluent_kind_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_bakeoff_actual_kind_label_keeps_raw_classification() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for (patch, raw, german) in [
+                ("", "unchanged", "unverändert"),
+                (
+                    "diff --git a/x b/x\ndeleted file mode 100644",
+                    "deleted",
+                    "gelöscht",
+                ),
+                (
+                    "diff --git a/x b/x\nnew file mode 100644",
+                    "added",
+                    "hinzugefügt",
+                ),
+                ("@@ -1 +1 @@\n-before\n+after", "changed", "geändert"),
+            ] {
+                let side = Side {
+                    patch: patch.into(),
+                    hunks: Vec::new(),
+                };
+                assert_eq!(side.kind(), raw);
+                assert_eq!(
+                    side.display_kind(),
+                    if language == "de" { german } else { raw }
+                );
+                assert_eq!(side.kind() != "unchanged", !patch.is_empty());
+                assert_eq!(side.patch, patch);
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

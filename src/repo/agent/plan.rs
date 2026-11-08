@@ -29,7 +29,7 @@ pub(crate) struct Plan {
 }
 
 /// What the approval card says.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub(crate) struct Ask {
     /// What and on what: "Delete branch feature/x".
     pub title: String,
@@ -37,10 +37,505 @@ pub(crate) struct Ask {
     pub body: String,
     /// What undo can and can't do about it afterwards, said once under the commands.
     pub undo_note: String,
+    pub(super) presentation: Option<AskReceipt>,
+}
+
+const RAW_NO_UNDO: &str = "This can't be undone from gitcraft.";
+
+/// Facts retained only by the seven existing application-owned confirmation producers.
+#[derive(Clone, Debug)]
+pub(super) enum AskPresentation {
+    Stage {
+        conflicted: Vec<String>,
+    },
+    HardReset {
+        target: String,
+        from: String,
+        to: String,
+        subject: String,
+        lost: usize,
+        left: usize,
+    },
+    MixedReset {
+        target: String,
+        from: String,
+        to: String,
+        subject: String,
+        files: usize,
+    },
+    Drop {
+        commit: String,
+        subject: String,
+        branch: String,
+        after: usize,
+    },
+    DeleteBranch {
+        name: String,
+        commit: String,
+        subject: String,
+        force: bool,
+    },
+    Push {
+        branch: String,
+        remote: String,
+        there: String,
+        publish: bool,
+        force: bool,
+        ahead: u32,
+        behind: u32,
+    },
+    Fallback {
+        label: String,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct AskReceipt {
+    kind: AskPresentation,
+    original: (String, String, String),
+    source_suffix: String,
+}
+
+impl AskPresentation {
+    fn raw(&self) -> Ask {
+        match self.clone() {
+            Self::Stage { conflicted } => Ask {
+                title: "Mark conflicts resolved".to_owned(),
+                undo_note: RAW_NO_UNDO.to_owned(),
+                body: format!(
+                    "Stage {} as resolved: {}. git then forgets the conflict and its three \
+                     sides.",
+                    if conflicted.len() == 1 {
+                        "this conflicted file"
+                    } else {
+                        "these conflicted files"
+                    },
+                    conflicted.join(", ")
+                ),
+                presentation: None,
+            },
+            Self::HardReset {
+                target,
+                from,
+                to,
+                subject,
+                lost,
+                left,
+            } => {
+                let lost = match lost {
+                    0 => "There are no uncommitted changes to tracked files now.".to_owned(),
+                    1 => "The uncommitted changes to 1 tracked file are thrown away for good."
+                        .to_owned(),
+                    n => format!(
+                        "The uncommitted changes to {n} tracked files are thrown away for good."
+                    ),
+                };
+                let left = match left {
+                    0 => String::new(),
+                    1 => format!(" The commit after {} is no longer on {target}.", to.clone()),
+                    n => format!(
+                        " The {n} commits after {} are no longer on {target}.",
+                        to.clone()
+                    ),
+                };
+                Ask {
+                    title: format!("Hard reset {target} to {}", to.clone()),
+                    body: format!(
+                        "Move {target} from {} to {} (“{}”) and make the working tree match it. \
+             {lost}{left} Untracked files stay.",
+                        from.clone(),
+                        to.clone(),
+                        subject.clone()
+                    ),
+                    undo_note: format!(
+                        "Ctrl+Z moves {target} back afterwards; the thrown-away changes stay lost."
+                    ),
+                    presentation: None,
+                }
+            }
+            Self::MixedReset {
+                target,
+                from,
+                to,
+                subject,
+                files,
+            } => Ask {
+                title: format!("Reset {target} to {} (mixed)", to.clone()),
+                body: format!(
+                    "Move {target} from {} to {} (“{}”) and unstage everything: the {files} staged \
+             file{} keep their changes, unstaged. The working tree stays as it is.",
+                    from.clone(),
+                    to.clone(),
+                    subject.clone(),
+                    if files == 1 { "" } else { "s" },
+                ),
+                undo_note: format!(
+                    "Ctrl+Z moves {target} back afterwards, but doesn't stage those changes again."
+                ),
+                presentation: None,
+            },
+            Self::Drop {
+                commit,
+                subject,
+                branch,
+                after,
+            } => Ask {
+                title: format!("Drop commit {}", commit.clone()),
+                body: format!(
+                    "Remove {} (“{}”) and its changes from {branch}, and replay the {after} commit{} \
+             after it. If a later commit conflicts, the rebase stops for you to finish or abort.",
+                    commit.clone(),
+                    subject.clone(),
+                    if after == 1 { "" } else { "s" },
+                ),
+                undo_note: format!("Ctrl+Z puts {branch} back as it is now."),
+                presentation: None,
+            },
+            Self::DeleteBranch {
+                name,
+                commit,
+                subject,
+                force,
+            } => {
+                let merged_note = if force {
+                    " even if it isn't merged"
+                } else {
+                    " (git refuses if it isn't merged)"
+                };
+                Ask {
+                    title: format!("Delete branch {name}"),
+                    body: format!(
+                        "Delete the local branch “{name}”, at {} (“{}”),{merged_note}. Its copy on a \
+                 remote stays.",
+                        commit.clone(),
+                        subject.clone()
+                    ),
+                    undo_note: "Ctrl+Z makes it again at that commit.".to_owned(),
+                    presentation: None,
+                }
+            }
+            Self::Push {
+                branch,
+                remote,
+                there,
+                publish,
+                force,
+                ahead,
+                behind,
+            } => {
+                let to = format!("{remote}/{there}");
+                let plural = |n: u32| if n == 1 { "" } else { "s" };
+                let (title, body) = if publish {
+                    (
+                        format!("Publish {branch} on {remote}"),
+                        format!("Send {branch} to {remote} as a new branch {there}, and track it."),
+                    )
+                } else if force {
+                    let gone = match behind {
+                        0 => format!(
+                            "{to} has no commits that {branch} lacks, as of the last fetch."
+                        ),
+                        n => format!(
+                            "The {n} commit{} on {to} that {branch} doesn't have are removed from it, for \
+                 everyone who uses it.",
+                            plural(n)
+                        ),
+                    };
+                    (
+                        format!("Force push {branch} to {to}"),
+                        format!(
+                            "Overwrite {to} with {branch}. {gone} git refuses if {to} has changed since \
+                 it was last fetched."
+                        ),
+                    )
+                } else {
+                    (
+                        format!("Push {branch} to {to}"),
+                        format!(
+                            "Send {branch}'s {ahead} new commit{} to {to}.",
+                            plural(ahead)
+                        ),
+                    )
+                };
+                Ask {
+                    title,
+                    body,
+                    undo_note: RAW_NO_UNDO.to_owned(),
+                    presentation: None,
+                }
+            }
+            Self::Fallback { label } => Ask {
+                title: label.clone(),
+                body: label,
+                undo_note: RAW_NO_UNDO.to_owned(),
+                presentation: None,
+            },
+        }
+    }
+    fn display(&self) -> Ask {
+        match self.clone() {
+            Self::Stage { conflicted } => Ask {
+                title: crate::i18n::text("repo-workflows-agent-stage-17e7b517").to_owned(),
+                undo_note: crate::i18n::text(NO_UNDO).to_owned(),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-stage-conflicts",
+                    &[
+                        ("count", (conflicted.len()).into()),
+                        ("paths", (conflicted.join(", ")).into()),
+                    ],
+                ),
+                presentation: None,
+            },
+            Self::HardReset {
+                target,
+                from,
+                to,
+                subject,
+                lost,
+                left,
+            } => Ask {
+                title: crate::i18n::message(
+                    "repo-workflows-agent-hard-ask-e720ce31",
+                    &[
+                        ("target", (target).clone().into()),
+                        ("short-hash-1", (to.clone()).clone().into()),
+                    ],
+                ),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-hard-reset-body",
+                    &[
+                        ("target", (target.clone()).into()),
+                        ("from", (from.clone()).into()),
+                        ("to", (to.clone()).into()),
+                        ("subject", (subject.clone()).into()),
+                        ("lost", (lost).into()),
+                        ("left", (left).into()),
+                    ],
+                ),
+                undo_note: crate::i18n::message(
+                    "repo-workflows-agent-hard-ask-8de2bf44",
+                    &[("target", (target).clone().into())],
+                ),
+                presentation: None,
+            },
+            Self::MixedReset {
+                target,
+                from,
+                to,
+                subject,
+                files,
+            } => Ask {
+                title: crate::i18n::message(
+                    "repo-workflows-agent-mixed-ask-2c1fd48b",
+                    &[
+                        ("target", (target).clone().into()),
+                        ("short-hash-1", (to.clone()).clone().into()),
+                    ],
+                ),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-mixed-reset-body",
+                    &[
+                        ("target", (target.clone()).into()),
+                        ("from", (from.clone()).into()),
+                        ("to", (to.clone()).into()),
+                        ("subject", (subject.clone()).into()),
+                        ("files", (files).into()),
+                    ],
+                ),
+                undo_note: crate::i18n::message(
+                    "repo-workflows-agent-mixed-ask-2ddd09f5",
+                    &[("target", (target).clone().into())],
+                ),
+                presentation: None,
+            },
+            Self::Drop {
+                commit,
+                subject,
+                branch,
+                after,
+            } => Ask {
+                title: crate::i18n::message(
+                    "repo-workflows-agent-rewrite-fc4198eb",
+                    &[("short-hash-1", (commit.clone()).clone().into())],
+                ),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-drop-body",
+                    &[
+                        ("commit", (commit.clone()).into()),
+                        ("subject", (subject.clone()).into()),
+                        ("branch", (branch.as_str()).into()),
+                        ("after", (after).into()),
+                    ],
+                ),
+                undo_note: crate::i18n::message(
+                    "repo-workflows-agent-rewrite-177f568d",
+                    &[("branch", (branch).clone().into())],
+                ),
+                presentation: None,
+            },
+            Self::DeleteBranch {
+                name,
+                commit,
+                subject,
+                force,
+            } => Ask {
+                title: crate::i18n::message(
+                    "repo-workflows-agent-delete-branch-d32d800a",
+                    &[("name", (name).clone().into())],
+                ),
+                body: crate::i18n::message(
+                    "repo-workflows-agent-delete-body",
+                    &[
+                        ("name", (name.clone()).into()),
+                        ("commit", (commit.clone()).into()),
+                        ("subject", (subject.clone()).into()),
+                        ("force", (if force { "yes" } else { "no" }).into()),
+                    ],
+                ),
+                undo_note: crate::i18n::text("repo-workflows-agent-delete-branch-7ef8245e")
+                    .to_owned(),
+                presentation: None,
+            },
+            Self::Push {
+                branch,
+                remote,
+                there,
+                publish,
+                force,
+                ahead,
+                behind,
+            } => {
+                let to = format!("{remote}/{there}");
+                let (title, body) = if publish {
+                    (
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-7d6400fd",
+                            &[
+                                ("branch", (branch).clone().into()),
+                                ("remote", (remote).clone().into()),
+                            ],
+                        ),
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-747bd6a7",
+                            &[
+                                ("branch", (branch).clone().into()),
+                                ("remote", (remote).clone().into()),
+                                ("there", (there).clone().into()),
+                            ],
+                        ),
+                    )
+                } else if force {
+                    let gone = match behind {
+                        0 => crate::i18n::message(
+                            "repo-workflows-agent-push-a74bf451",
+                            &[
+                                ("to", (to).clone().into()),
+                                ("branch", (branch).clone().into()),
+                            ],
+                        ),
+                        n => crate::i18n::message(
+                            "repo-workflows-agent-force-lost",
+                            &[
+                                ("count", (n).into()),
+                                ("to", (to.as_str()).into()),
+                                ("branch", (branch.as_str()).into()),
+                            ],
+                        ),
+                    };
+                    (
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-ccafdcaa",
+                            &[
+                                ("branch", (branch).clone().into()),
+                                ("to", (to).clone().into()),
+                            ],
+                        ),
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-56d04849",
+                            &[
+                                ("to", (to).clone().into()),
+                                ("branch", (branch).clone().into()),
+                                ("gone", (gone).clone().into()),
+                            ],
+                        ),
+                    )
+                } else {
+                    (
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-cb055d06",
+                            &[
+                                ("branch", (branch).clone().into()),
+                                ("to", (to).clone().into()),
+                            ],
+                        ),
+                        crate::i18n::message(
+                            "repo-workflows-agent-push-body",
+                            &[
+                                ("branch", (branch.as_str()).into()),
+                                ("count", (ahead).into()),
+                                ("to", (to.as_str()).into()),
+                            ],
+                        ),
+                    )
+                };
+                Ask {
+                    title,
+                    body,
+                    undo_note: crate::i18n::text(NO_UNDO).to_owned(),
+                    presentation: None,
+                }
+            }
+            Self::Fallback { label } => Ask {
+                title: label.clone(),
+                body: label,
+                undo_note: crate::i18n::text(NO_UNDO).to_owned(),
+                presentation: None,
+            },
+        }
+    }
+}
+
+impl PartialEq for Ask {
+    fn eq(&self, other: &Self) -> bool {
+        self.title == other.title && self.body == other.body && self.undo_note == other.undo_note
+    }
+}
+impl Eq for Ask {}
+
+impl Ask {
+    pub(super) fn from_presentation(kind: AskPresentation) -> Self {
+        let mut ask = kind.raw();
+        ask.presentation = Some(AskReceipt {
+            original: (ask.title.clone(), ask.body.clone(), ask.undo_note.clone()),
+            kind,
+            source_suffix: String::new(),
+        });
+        ask
+    }
+    pub(super) fn append_source_suffix(&mut self, suffix: &str) {
+        self.body.push_str(suffix);
+        if let Some(receipt) = &mut self.presentation {
+            receipt.source_suffix.push_str(suffix);
+        }
+    }
+    pub(super) fn for_display(&self) -> Self {
+        let Some(receipt) = &self.presentation else {
+            return self.clone();
+        };
+        if self.title != receipt.original.0
+            || self.undo_note != receipt.original.2
+            || self.body != format!("{}{}", receipt.original.1, receipt.source_suffix)
+        {
+            return self.clone();
+        }
+        let mut shown = receipt.kind.display();
+        shown.body.push_str(&receipt.source_suffix);
+        shown
+    }
 }
 
 /// Said under a card's commands for what can't be undone from gitcraft.
-const NO_UNDO: &str = "This can't be undone from gitcraft.";
+const NO_UNDO: &str = "repo-workflows-agent--14b0fc42";
 
 /// The repository as a plan needs it: HEAD's commit (empty before the first commit) and the
 /// branch checked out (`None` when detached).
@@ -74,7 +569,7 @@ impl Here {
     fn branch(&self) -> Result<&str, String> {
         self.branch
             .as_deref()
-            .ok_or_else(|| "HEAD is detached: check out a branch first".to_owned())
+            .ok_or_else(|| crate::i18n::text("repo-workflows-agent-branch-7776bacf").to_owned())
     }
 
     /// The guard that the same branch (or a detached HEAD) is still checked out.
@@ -131,7 +626,12 @@ fn commit_of(repo: &Path, rev: &str) -> Result<String, String> {
     .map(|s| s.trim().to_owned())
     .ok()
     .filter(|h| !h.is_empty())
-    .ok_or_else(|| format!("`{rev}` is not a commit in this repository"))
+    .ok_or_else(|| {
+        crate::i18n::message(
+            "repo-workflows-agent-commit-of-8c23b76d",
+            &[("rev", (rev).clone().into())],
+        )
+    })
 }
 
 /// The commit the local branch `name` is at, if there is such a branch.
@@ -153,7 +653,7 @@ fn summary(repo: &Path, hash: &str) -> String {
 
 fn checked_paths(paths: &[String]) -> Result<Vec<String>, String> {
     if paths.is_empty() {
-        return Err("name at least one path".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-checked-paths-0e0e013b").to_owned());
     }
     paths
         .iter()
@@ -188,10 +688,15 @@ fn conflicted_among(repo: &Path, paths: &[String]) -> Result<Vec<String>, String
 /// undo can't start it again.
 fn not_in_progress(repo: &Path, what: &str) -> Result<(), String> {
     match git::status(repo)?.in_progress {
-        Some(state) => Err(format!(
-            "a {} is in progress: {what} would end it, which can't be undone. Finish or abort \
-             it first (see `conflicts`)",
-            state.label().to_lowercase()
+        Some(state) => Err(crate::i18n::message(
+            "repo-workflows-agent-not-in-progress-1049b227",
+            &[
+                (
+                    "state-label-to-lowercase-1",
+                    (state.label().to_lowercase()).clone().into(),
+                ),
+                ("what", (what).clone().into()),
+            ],
         )),
         None => Ok(()),
     }
@@ -292,20 +797,9 @@ fn stage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
             ops: vec![add],
             refresh: Refresh::All,
             undo: Undo::None,
-            ask: Some(Ask {
-                title: "Mark conflicts resolved".to_owned(),
-                undo_note: NO_UNDO.to_owned(),
-                body: format!(
-                    "Stage {} as resolved: {}. git then forgets the conflict and its three \
-                     sides.",
-                    if conflicted.len() == 1 {
-                        "this conflicted file"
-                    } else {
-                        "these conflicted files"
-                    },
-                    conflicted.join(", ")
-                ),
-            }),
+            ask: Some(Ask::from_presentation(AskPresentation::Stage {
+                conflicted: conflicted.clone(),
+            })),
         });
     }
     let staged = staged_entries(repo, &paths)?;
@@ -325,14 +819,17 @@ fn unstage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
     let paths = checked_paths(paths)?;
     let conflicted = conflicted_among(repo, &paths)?;
     if !conflicted.is_empty() {
-        return Err(format!(
-            "{} conflicted: resolve the conflict first (unstaging would end it)",
-            conflicted.join(", ")
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-unstage-9d879ab6",
+            &[("conflicted-join-1", (conflicted.join(", ")).clone().into())],
         ));
     }
     let staged = staged_entries(repo, &paths)?;
     if staged.is_empty() {
-        return Err(format!("nothing is staged in {}", paths.join(", ")));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-unstage-a79ec226",
+            &[("paths-join-1", (paths.join(", ")).clone().into())],
+        ));
     }
     let step = reset_index(here, &paths);
     Ok(Plan {
@@ -359,13 +856,11 @@ fn headline(message: &str) -> String {
 fn commit(repo: &Path, here: &Here, message: &str, amend: bool) -> Result<Plan, String> {
     let message = args::message(message)?;
     if amend && here.head.is_empty() {
-        return Err("there is no commit to amend yet".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-commit-abf5ac58").to_owned());
     }
     let staged = git::run(Some(repo), &["diff", "--cached", "--name-only", "-z"])?;
     if staged.is_empty() && !amend {
-        return Err(
-            "nothing is staged: stage the changes to commit first (tool `stage`)".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-agent-commit-d5a3b056").to_owned());
     }
     let mut step = vec!["commit".to_owned()];
     if amend {
@@ -389,7 +884,12 @@ fn check_branch_name(repo: &Path, name: &str) -> Result<(), String> {
     let name = args::branch_name(name)?;
     git::run(Some(repo), &["check-ref-format", "--branch", name])
         .map(|_| ())
-        .map_err(|_| format!("`{name}` can't be a branch name"))
+        .map_err(|_| {
+            crate::i18n::message(
+                "repo-workflows-agent-check-branch-name-89d905bf",
+                &[("name", (name).clone().into())],
+            )
+        })
 }
 
 fn create_branch(
@@ -401,7 +901,10 @@ fn create_branch(
 ) -> Result<Plan, String> {
     check_branch_name(repo, name)?;
     if branch_at(repo, name).is_some() {
-        return Err(format!("a branch called {name} already exists"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-create-branch-8464d926",
+            &[("name", (name).clone().into())],
+        ));
     }
     let at = commit_of(repo, start.unwrap_or("HEAD"))?;
     let step: Vec<String> = if checkout {
@@ -426,10 +929,16 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
     args::branch_name(from)?;
     check_branch_name(repo, to)?;
     if branch_at(repo, from).is_none() {
-        return Err(format!("there is no local branch called {from}"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rename-branch-00b004f0",
+            &[("from", (from).clone().into())],
+        ));
     }
     if branch_at(repo, to).is_some() {
-        return Err(format!("a branch called {to} already exists"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rename-branch-4fe447cd",
+            &[("to", (to).clone().into())],
+        ));
     }
     Ok(Plan {
         label: format!("Rename {from} to {to}"),
@@ -446,14 +955,21 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
 fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
     args::branch_name(branch)?;
     if branch_at(repo, branch).is_none() {
-        return Err(format!(
-            "there is no local branch called {branch} (create it with `create_branch`)"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-checkout-994822a7",
+            &[("branch", (branch).clone().into())],
         ));
     }
     if here.branch.as_deref() == Some(branch) {
-        return Err(format!("{branch} is checked out already"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-checkout-31e4be52",
+            &[("branch", (branch).clone().into())],
+        ));
     }
-    not_in_progress(repo, "checking out")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-checkout-7a3686d6"),
+    )?;
     let previous = here.checked_out();
     // `--`: the name is a branch, never a file to throw the changes of away.
     let run = ops(&[&["checkout", branch, "--"]]);
@@ -476,12 +992,15 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
 
 fn stash(repo: &Path, message: &str) -> Result<Plan, String> {
     if git::status(repo)?.is_clean() {
-        return Err("there are no changes to stash".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-stash-a7f01d16").to_owned());
     }
-    not_in_progress(repo, "stashing")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-stash-4fce16d0"),
+    )?;
     let message = message.trim();
     if message.chars().any(char::is_control) || message.len() > 1000 {
-        return Err("the stash message must be one line of at most 1000 bytes".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-stash-ee431f75").to_owned());
     }
     let mut args: Vec<&str> = stash_push_args().to_vec();
     if !message.is_empty() {
@@ -552,35 +1071,16 @@ fn commits_between(repo: &Path, from: &str, to: &str) -> usize {
 
 /// The card of a hard reset of `target` (at `here`) to `hash`.
 fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
-    let lost = match tracked_changes(repo) {
-        0 => "There are no uncommitted changes to tracked files now.".to_owned(),
-        1 => "The uncommitted changes to 1 tracked file are thrown away for good.".to_owned(),
-        n => format!("The uncommitted changes to {n} tracked files are thrown away for good."),
-    };
-    let left = match commits_between(repo, hash, &here.head) {
-        0 => String::new(),
-        1 => format!(
-            " The commit after {} is no longer on {target}.",
-            short(hash)
-        ),
-        n => format!(
-            " The {n} commits after {} are no longer on {target}.",
-            short(hash)
-        ),
-    };
-    Ask {
-        title: format!("Hard reset {target} to {}", short(hash)),
-        body: format!(
-            "Move {target} from {} to {} (“{}”) and make the working tree match it. \
-             {lost}{left} Untracked files stay.",
-            short(&here.head),
-            short(hash),
-            summary(repo, hash)
-        ),
-        undo_note: format!(
-            "Ctrl+Z moves {target} back afterwards; the thrown-away changes stay lost."
-        ),
-    }
+    let lost = tracked_changes(repo);
+    let left = commits_between(repo, hash, &here.head);
+    Ask::from_presentation(AskPresentation::HardReset {
+        target: target.to_owned(),
+        from: short(&here.head).to_owned(),
+        to: short(hash).to_owned(),
+        subject: summary(repo, hash),
+        lost,
+        left,
+    })
 }
 
 /// The card of a mixed reset when something is staged: unstaging it isn't undone (undo moves
@@ -591,34 +1091,36 @@ fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Optio
     if files == 0 {
         return Ok(None);
     }
-    Ok(Some(Ask {
-        title: format!("Reset {target} to {} (mixed)", short(hash)),
-        body: format!(
-            "Move {target} from {} to {} (“{}”) and unstage everything: the {files} staged \
-             file{} keep their changes, unstaged. The working tree stays as it is.",
-            short(&here.head),
-            short(hash),
-            summary(repo, hash),
-            if files == 1 { "" } else { "s" },
-        ),
-        undo_note: format!(
-            "Ctrl+Z moves {target} back afterwards, but doesn't stage those changes again."
-        ),
-    }))
+    Ok(Some(Ask::from_presentation(AskPresentation::MixedReset {
+        target: target.to_owned(),
+        from: short(&here.head).to_owned(),
+        to: short(hash).to_owned(),
+        subject: summary(repo, hash),
+        files,
+    })))
 }
 
 fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan, String> {
     if here.head.is_empty() {
-        return Err("there are no commits to reset to yet".to_owned());
+        return Err(crate::i18n::text("repo-workflows-agent-reset-7c10af6a").to_owned());
     }
     let hash = commit_of(repo, commit)?;
     let target = here.branch.clone().unwrap_or_else(|| "HEAD".to_owned());
     if hash == here.head {
         // Nothing would move, so nothing would go on the undo list, while the index (and a
         // hard reset's working tree) would still change.
-        return Err(format!("{target} is at {} already", short(&hash)));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-reset-5247bb50",
+            &[
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(&hash)).clone().into()),
+            ],
+        ));
     }
-    not_in_progress(repo, "a reset")?;
+    not_in_progress(
+        repo,
+        crate::i18n::text("repo-workflows-agent-reset-c6ebf3c0"),
+    )?;
     let word = match mode {
         ResetMode::Soft => "soft",
         ResetMode::Mixed => "mixed",
@@ -656,9 +1158,12 @@ fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan
 fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, String> {
     let branch = here.branch()?.to_owned();
     if let Some(state) = git::status(repo)?.in_progress {
-        return Err(format!(
-            "a {} is in progress: finish or abort it first",
-            state.label().to_lowercase()
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-rewrite-7d959a5b",
+            &[(
+                "state-label-to-lowercase-1",
+                (state.label().to_lowercase()).clone().into(),
+            )],
         ));
     }
     let hash = commit_of(repo, commit)?;
@@ -670,18 +1175,17 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
         Edit::Drop => "Drop commit",
         Edit::MoveUp => "Move commit up",
         Edit::MoveDown => "Move commit down",
-        Edit::Message => return Err("the message is changed with `commit` and `amend`".to_owned()),
+        Edit::Message => {
+            return Err(crate::i18n::text("repo-workflows-agent-rewrite-ff973443").to_owned());
+        }
     };
-    let ask = (edit == Edit::Drop).then(|| Ask {
-        title: format!("Drop commit {}", short(&hash)),
-        body: format!(
-            "Remove {} (“{}”) and its changes from {branch}, and replay the {after} commit{} \
-             after it. If a later commit conflicts, the rebase stops for you to finish or abort.",
-            short(&hash),
-            summary(repo, &hash),
-            if after == 1 { "" } else { "s" },
-        ),
-        undo_note: format!("Ctrl+Z puts {branch} back as it is now."),
+    let ask = (edit == Edit::Drop).then(|| {
+        Ask::from_presentation(AskPresentation::Drop {
+            commit: short(&hash).to_owned(),
+            subject: summary(repo, &hash),
+            branch: branch.clone(),
+            after,
+        })
     });
     Ok(Plan {
         label: format!("{what} {}", short(&hash)),
@@ -699,11 +1203,15 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
 fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Plan, String> {
     args::branch_name(name)?;
     let Some(target) = branch_at(repo, name) else {
-        return Err(format!("there is no local branch called {name}"));
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-delete-branch-55a975e8",
+            &[("name", (name).clone().into())],
+        ));
     };
     if here.branch.as_deref() == Some(name) {
-        return Err(format!(
-            "{name} is checked out: check out another branch first"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-delete-branch-94d21a83",
+            &[("name", (name).clone().into())],
         ));
     }
     let flag = if force { "-D" } else { "-d" };
@@ -712,11 +1220,7 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
         expect_ref_at(&format!("refs/heads/{name}"), &target),
         ops(&[&["branch", flag, "--", name]]).concat(),
     ];
-    let merged_note = if force {
-        " even if it isn't merged"
-    } else {
-        " (git refuses if it isn't merged)"
-    };
+
     Ok(Plan {
         label: format!("Delete branch {name}"),
         ops: steps,
@@ -725,16 +1229,12 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
             undo: ops(&[&["branch", "--", name, &target]]),
             redo: redo_delete(name, ops(&[&["branch", "-D", "--", name]])),
         },
-        ask: Some(Ask {
-            title: format!("Delete branch {name}"),
-            body: format!(
-                "Delete the local branch “{name}”, at {} (“{}”),{merged_note}. Its copy on a \
-                 remote stays.",
-                short(&target),
-                summary(repo, &target)
-            ),
-            undo_note: "Ctrl+Z makes it again at that commit.".to_owned(),
-        }),
+        ask: Some(Ask::from_presentation(AskPresentation::DeleteBranch {
+            name: name.to_owned(),
+            commit: short(&target).to_owned(),
+            subject: summary(repo, &target),
+            force,
+        })),
     })
 }
 
@@ -758,7 +1258,12 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
         .local
         .iter()
         .find(|b| b.name == branch)
-        .ok_or_else(|| format!("{branch} has no commits to push yet"))?;
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "repo-workflows-agent-push-e5edacbd",
+                &[("branch", (branch).clone().into())],
+            )
+        })?;
     let tracked = (!local.upstream.is_empty() && !local.upstream_gone())
         .then(|| split_upstream(&remotes, &local.upstream))
         .flatten();
@@ -770,15 +1275,20 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
                 .map(|r| r.name.as_str())
                 .find(|r| *r == "origin")
                 .or_else(|| remotes.first().map(|r| r.name.as_str()))
-                .ok_or("this repository has no remote to push to")?
+                .ok_or(crate::i18n::text("repo-workflows-agent-push-f86f9688"))?
                 .to_owned();
             (remote, branch.clone(), true)
         }
     };
     let (ahead, behind) = local.ahead_behind();
     if !publish && !force && ahead == 0 {
-        return Err(format!(
-            "nothing to push: {branch} has no commits that {remote}/{there} lacks"
+        return Err(crate::i18n::message(
+            "repo-workflows-agent-push-2d7f2003",
+            &[
+                ("branch", (branch).clone().into()),
+                ("remote", (remote).clone().into()),
+                ("there", (there).clone().into()),
+            ],
         ));
     }
     let refspec = format!("refs/heads/{branch}:refs/heads/{there}");
@@ -794,38 +1304,6 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
         step.push("-u".to_owned());
     }
     step.extend([remote.clone(), refspec]);
-    let to = format!("{remote}/{there}");
-    let plural = |n: u32| if n == 1 { "" } else { "s" };
-    let (title, body) = if publish {
-        (
-            format!("Publish {branch} on {remote}"),
-            format!("Send {branch} to {remote} as a new branch {there}, and track it."),
-        )
-    } else if force {
-        let gone = match behind {
-            0 => format!("{to} has no commits that {branch} lacks, as of the last fetch."),
-            n => format!(
-                "The {n} commit{} on {to} that {branch} doesn't have are removed from it, for \
-                 everyone who uses it.",
-                plural(n)
-            ),
-        };
-        (
-            format!("Force push {branch} to {to}"),
-            format!(
-                "Overwrite {to} with {branch}. {gone} git refuses if {to} has changed since \
-                 it was last fetched."
-            ),
-        )
-    } else {
-        (
-            format!("Push {branch} to {to}"),
-            format!(
-                "Send {branch}'s {ahead} new commit{} to {to}.",
-                plural(ahead)
-            ),
-        )
-    };
     // What is sent is the branch as the card describes it: not commits made since.
     let at = local.target.clone();
     Ok(Plan {
@@ -833,13 +1311,183 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
         ops: vec![expect_ref_at(&format!("refs/heads/{branch}"), &at), step],
         refresh: Refresh::All,
         undo: Undo::None,
-        ask: Some(Ask {
-            title,
-            body,
-            undo_note: NO_UNDO.to_owned(),
-        }),
+        ask: Some(Ask::from_presentation(AskPresentation::Push {
+            branch: branch.clone(),
+            remote: remote.clone(),
+            there: there.clone(),
+            publish,
+            force,
+            ahead,
+            behind,
+        })),
     })
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod fluent_ask_receipt_tests {
+    use super::*;
+    use crate::repo::agent::CardView;
+    use egui_kittest::{Harness, kittest::Queryable};
+    use std::time::Duration;
+
+    #[test]
+    fn fluent_partition_actual_cached_approval_asks_repaint_with_raw_equality_and_source_guards() {
+        let raw_name = "raw/ß; Exact source guards: not-a-delimiter\n日本語";
+        let kinds = vec![
+            AskPresentation::Stage {
+                conflicted: vec![raw_name.into(), "second/path".into()],
+            },
+            AskPresentation::HardReset {
+                target: raw_name.into(),
+                from: "01234567".into(),
+                to: "89abcdef".into(),
+                subject: "opaque subject { $value }".into(),
+                lost: 1234,
+                left: 1234,
+            },
+            AskPresentation::MixedReset {
+                target: raw_name.into(),
+                from: "01234567".into(),
+                to: "89abcdef".into(),
+                subject: "opaque subject { $value }".into(),
+                files: 1234,
+            },
+            AskPresentation::Drop {
+                commit: "89abcdef".into(),
+                subject: "opaque subject { $value }".into(),
+                branch: raw_name.into(),
+                after: 1234,
+            },
+            AskPresentation::DeleteBranch {
+                name: raw_name.into(),
+                commit: "89abcdef".into(),
+                subject: "opaque subject { $value }".into(),
+                force: true,
+            },
+            AskPresentation::Push {
+                branch: raw_name.into(),
+                remote: "fork/raw".into(),
+                there: "target/ß".into(),
+                publish: false,
+                force: true,
+                ahead: 1234,
+                behind: 1234,
+            },
+            AskPresentation::Fallback {
+                label: "Delete branch feature/x".into(),
+            },
+        ];
+        let suffix = "\nExact source guards: raw-digest\n[[\"\\0expect-ref\", \"refs/heads/ß; Exact source guards: \\n\"]]";
+        for kind in kinds {
+            crate::i18n::set_language("en-US");
+            let mut ask = Ask::from_presentation(kind.clone());
+            let raw_before = ask.clone();
+            let mut without_receipt = ask.clone();
+            without_receipt.presentation = None;
+            assert_eq!(
+                ask, without_receipt,
+                "presentation metadata never participates in replan equality"
+            );
+            ask.append_source_suffix(suffix);
+            assert_eq!(ask.body, format!("{}{suffix}", raw_before.body));
+            let card=CardView {agent:"opaque-agent".into(),preview:None,ask,commands:vec!["git push --force-with-lease=refs/heads/raw:01234567 fork refs/heads/raw:refs/heads/there".into()],undoable:false,left:Duration::from_secs(100),shown_for:Duration::from_secs(2)};
+            let retained = card.clone();
+            let mut installed = false;
+            let mut h = Harness::new_ui_state(
+                |ui, cached: &mut CardView| {
+                    if !installed {
+                        crate::theme::install_fonts(ui.ctx());
+                        installed = true;
+                        ui.ctx().request_discard("install supplied fonts");
+                        return;
+                    }
+                    let shown = cached.clone().for_display();
+                    ui.label(&shown.ask.title);
+                    ui.label(&shown.ask.body);
+                    ui.label(&shown.ask.undo_note);
+                },
+                card,
+            );
+            for language in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(language);
+                h.run();
+                let shown = h.state().clone().for_display();
+                for value in [&shown.ask.title, &shown.ask.body, &shown.ask.undo_note] {
+                    assert!(h.get_all_by_label(value).count() >= 1);
+                }
+                assert_eq!(h.state(), &retained);
+                assert_eq!(h.state().ask.body, retained.ask.body);
+                assert_eq!(h.state().ask.title, raw_before.title);
+                assert_eq!(h.state().ask.undo_note, raw_before.undo_note);
+                assert_eq!(shown.commands, retained.commands);
+                assert_eq!(shown.undoable, retained.undoable);
+                assert_eq!(shown.left, retained.left);
+                assert_eq!(shown.shown_for, retained.shown_for);
+                assert!(shown.ask.body.ends_with(suffix));
+                match &kind {
+                    AskPresentation::Fallback { label } => {
+                        assert_eq!(&shown.ask.title, label);
+                        assert_eq!(shown.ask.body, format!("{label}{suffix}"));
+                        assert_eq!(
+                            shown.ask.undo_note,
+                            if language == "de" {
+                                "Dies lässt sich in gitcraft nicht rückgängig machen."
+                            } else {
+                                RAW_NO_UNDO
+                            }
+                        );
+                    }
+                    _ => {
+                        assert!(shown.ask.body.contains(raw_name));
+                        if language == "de" {
+                            assert_ne!(shown.ask.body, retained.ask.body);
+                        }
+                    }
+                }
+                if matches!(
+                    kind,
+                    AskPresentation::HardReset { .. }
+                        | AskPresentation::MixedReset { .. }
+                        | AskPresentation::Drop { .. }
+                        | AskPresentation::Push { .. }
+                ) {
+                    assert!(shown.ask.body.contains(if language == "de" {
+                        "1.234"
+                    } else {
+                        "1,234"
+                    }));
+                }
+                let mut changed = retained.ask.clone();
+                changed.body.push_str("changed raw guard");
+                assert_ne!(changed, retained.ask);
+                assert_eq!(changed.for_display().body, changed.body);
+            }
+        }
+        for count in [0, 1, 1234] {
+            for force in [false, true] {
+                for publish in [false, true] {
+                    let kind = AskPresentation::Push {
+                        branch: "feature/raw".into(),
+                        remote: "fork".into(),
+                        there: "target".into(),
+                        publish,
+                        force,
+                        ahead: count,
+                        behind: count,
+                    };
+                    let raw = kind.raw();
+                    for language in ["en-US", "de", "en-US"] {
+                        crate::i18n::set_language(language);
+                        let ask = Ask::from_presentation(kind.clone());
+                        assert_eq!(ask, raw);
+                        assert_eq!(ask.for_display().body, kind.display().body);
+                    }
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

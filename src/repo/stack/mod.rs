@@ -93,9 +93,18 @@ impl Stacks {
 /// Why `branch` can't be based on `parent`: that would make a loop.
 fn loop_problem(branch: &str, parent: &str) -> String {
     if branch == parent {
-        format!("{branch} can't be based on itself.")
+        crate::i18n::message(
+            "repo-workflows-stack-loop-problem-27b30746",
+            &[("branch", (branch).clone().into())],
+        )
     } else {
-        format!("{parent} is based on {branch}: {branch} can't be based on it too.")
+        crate::i18n::message(
+            "repo-workflows-stack-loop-problem-bc8dbf35",
+            &[
+                ("parent", (parent).clone().into()),
+                ("branch", (branch).clone().into()),
+            ],
+        )
     }
 }
 
@@ -129,7 +138,12 @@ impl RepoTab {
                         tab.stacks.pending = pending;
                         tab.stacks.error = None;
                     }
-                    Err(e) => tab.stacks.error = Some(format!("Couldn't read the stacks: {e}")),
+                    Err(e) => {
+                        tab.stacks.error = Some(crate::i18n::message(
+                            "repo-workflows-stack-read-stacks-4272623a",
+                            &[("e", (e).clone().into())],
+                        ))
+                    }
                 }
             },
         );
@@ -211,10 +225,16 @@ impl RepoTab {
     /// Why `branch` can't be based on `parent`, if it can't (as far as the last read knows).
     fn parent_problem(&self, branch: &str, parent: &str) -> Option<String> {
         if parent.is_empty() {
-            return Some(format!("Pick the branch {branch} is based on."));
+            return Some(crate::i18n::message(
+                "repo-workflows-stack-parent-problem-61a1cff0",
+                &[("branch", (branch).clone().into())],
+            ));
         }
         if !self.refs.local.iter().any(|b| b.name == parent) {
-            return Some(format!("{parent} is not a local branch."));
+            return Some(crate::i18n::message(
+                "repo-workflows-stack-parent-problem-f7032e38",
+                &[("parent", (parent).clone().into())],
+            ));
         }
         if stack::would_loop(&self.stacks.recorded, branch, parent) {
             return Some(loop_problem(branch, parent));
@@ -267,11 +287,25 @@ impl RepoTab {
     /// The line a branch's tooltip gets when it is a layer of a stack.
     pub(super) fn stack_line(&self, branch: &str) -> Option<String> {
         let layer = self.stacks.layer(branch)?;
-        let mut line = format!("Stack: {}", chain(&self.stacks.layers, branch).join(" → "));
+        let mut line = crate::i18n::message(
+            "repo-workflows-stack-stack-line-559ed9fe",
+            &[(
+                "chain-self-stacks-layers-branch--1",
+                (chain(&self.stacks.layers, branch).join(" → "))
+                    .clone()
+                    .into(),
+            )],
+        );
         if layer.parent_missing {
-            line.push_str(&format!(" · {} is gone", layer.parent));
+            line.push_str(&crate::i18n::message(
+                "repo-workflows-stack-stack-line-e4355cbd",
+                &[("layer-parent-1", (layer.parent).clone().into())],
+            ));
         } else if layer.needs_restack() {
-            line.push_str(&format!(" · {} moved on: needs restacking", layer.parent));
+            line.push_str(&crate::i18n::message(
+                "repo-workflows-stack-stack-line-c5c1ffb4",
+                &[("layer-parent-1", (layer.parent).clone().into())],
+            ));
         }
         Some(line)
     }

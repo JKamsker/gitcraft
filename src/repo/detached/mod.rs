@@ -187,7 +187,9 @@ impl RepoTab {
                     let now = git::head(&path);
                     git::left_behind(&path, &target).map(|commits| (now, commits))
                 });
-                listed.unwrap_or_else(|_| Err("the listing stopped unexpectedly".to_owned()))
+                listed.unwrap_or_else(|_| {
+                    Err(crate::i18n::text("repo-workflows-detached-leave-to-c6023785").to_owned())
+                })
             },
             move |tab, found, ctx| {
                 tab.detached.checking = false;

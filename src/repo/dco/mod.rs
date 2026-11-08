@@ -74,8 +74,14 @@ pub(crate) enum Reason {
 impl Reason {
     pub(crate) fn text(&self) -> String {
         match self {
-            Reason::File(file) => format!("this repository has a {file} file"),
-            Reason::FailingCheck(n) => format!("the DCO check of #{n} fails"),
+            Reason::File(file) => crate::i18n::message(
+                "repo-workflows-dco-text-e5458838",
+                &[("file", (file).clone().into())],
+            ),
+            Reason::FailingCheck(n) => crate::i18n::message(
+                "repo-workflows-dco-text-dc4915c9",
+                &[("n", (n).to_string().into())],
+            ),
         }
     }
 }

@@ -18,47 +18,67 @@ impl RepoTab {
             return;
         };
         let mut open = true;
-        egui::Window::new(format!("Rehearsal: {} with {}", run.branch, run.other))
-            .id(egui::Id::new(("gitcraft-rehearsal", self.path.clone())))
-            .open(&mut open)
-            .collapsible(false)
-            .default_width(520.0)
-            .show(ctx, |ui| {
-                let idle = self.busy_op.is_none();
-                for &kind in &run.kinds {
-                    let result = run.results.iter().find(|(k, _)| *k == kind).map(|(_, r)| r);
-                    card(ui, run, kind, result, idle && !run.applying, acts);
-                    ui.add_space(8.0);
-                }
-                let t = Tokens::get(ui.ctx());
-                if let [(_, Ok(a)), (_, Ok(b))] = run.results.as_slice()
-                    && let Some(line) = compare_line(a, b)
-                {
-                    ui.label(RichText::new(line).color(t.text_dim));
-                }
-                ui.horizontal(|ui| {
-                    if run.ended {
+        egui::Window::new(crate::i18n::message(
+            "repo-workflows-rehearse-rehearse-window-fcc1b928",
+            &[
+                ("run-branch-1", (run.branch).clone().into()),
+                ("run-other-2", (run.other).clone().into()),
+            ],
+        ))
+        .id(egui::Id::new(("gitcraft-rehearsal", self.path.clone())))
+        .open(&mut open)
+        .collapsible(false)
+        .default_width(520.0)
+        .show(ctx, |ui| {
+            let idle = self.busy_op.is_none();
+            for &kind in &run.kinds {
+                let result = run.results.iter().find(|(k, _)| *k == kind).map(|(_, r)| r);
+                card(ui, run, kind, result, idle && !run.applying, acts);
+                ui.add_space(8.0);
+            }
+            let t = Tokens::get(ui.ctx());
+            if let [(_, Ok(a)), (_, Ok(b))] = run.results.as_slice()
+                && let Some(line) = compare_line(a, b)
+            {
+                ui.label(RichText::new(line).color(t.text_dim));
+            }
+            ui.horizontal(|ui| {
+                if run.ended {
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-rehearse-rehearse-window-13b34c20",
+                        ))
+                        .color(t.text_faint),
+                    );
+                } else {
+                    ui.add(crate::spinner::Spinner::new());
+                    if run.stop.stopped() {
+                        // A rebase or merge under way finishes its step first.
                         ui.label(
-                            RichText::new(
-                                "Nothing was changed. Doing it now checks first that neither \
-                                 branch moved; Ctrl+Z undoes it.",
-                            )
-                            .color(t.text_faint),
+                            RichText::new(crate::i18n::text(
+                                "repo-workflows-rehearse-rehearse-window-bbe85741",
+                            ))
+                            .color(t.text_dim),
                         );
                     } else {
-                        ui.add(crate::spinner::Spinner::new());
-                        if run.stop.stopped() {
-                            // A rebase or merge under way finishes its step first.
-                            ui.label(RichText::new("Stopping…").color(t.text_dim));
-                        } else {
-                            ui.label(RichText::new("Rehearsing…").color(t.text_dim));
-                            if ui.button("Stop").clicked() {
-                                acts.push(Action::Rehearse(RehearseAct::Stop));
-                            }
+                        ui.label(
+                            RichText::new(crate::i18n::text(
+                                "repo-workflows-rehearse-rehearse-window-25ffbf44",
+                            ))
+                            .color(t.text_dim),
+                        );
+                        if ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-rehearse-rehearse-window-cae7d57b",
+                            ))
+                            .clicked()
+                        {
+                            acts.push(Action::Rehearse(RehearseAct::Stop));
                         }
                     }
-                });
+                }
             });
+        });
         if !open {
             acts.push(Action::Rehearse(if run.ended {
                 RehearseAct::Close
@@ -90,13 +110,25 @@ fn card(
             ui.label(RichText::new(&title).font(theme::semibold(13.5)));
             match result {
                 None if run.ended => {
-                    ui.label(RichText::new("Not rehearsed: stopped").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-workflows-rehearse-card-5dd72467"))
+                            .color(t.text_dim),
+                    );
                 }
                 None => {
-                    ui.label(RichText::new("Waiting…").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-workflows-rehearse-card-612ffc5c"))
+                            .color(t.text_dim),
+                    );
                 }
                 Some(Err(e)) => {
-                    ui.label(RichText::new(format!("Couldn't rehearse: {e}")).color(t.danger));
+                    ui.label(
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-rehearse-card-958a566f",
+                            &[("e", (e).clone().into())],
+                        ))
+                        .color(t.danger),
+                    );
                 }
                 Some(Ok(r)) => outcome(ui, &t, run, kind, r, can_apply, acts),
             }
@@ -124,8 +156,14 @@ fn outcome(
         }
         if conflicts.len() > MAX_FILES {
             ui.label(
-                RichText::new(format!("  … and {} more", conflicts.len() - MAX_FILES))
-                    .color(t.text_dim),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-rehearse-outcome-687392eb",
+                    &[(
+                        "conflicts-len-max-files-1",
+                        (conflicts.len() - MAX_FILES).clone().into(),
+                    )],
+                ))
+                .color(t.text_dim),
             );
         }
     }
@@ -152,14 +190,12 @@ fn outcome(
     if run.ended && !matches!(r.played, Played::UpToDate | Played::Failed(_)) {
         ui.add_space(4.0);
         let label = match kind {
-            RehearseKind::Rebase => "Rebase now",
-            RehearseKind::Merge => "Merge now",
+            RehearseKind::Rebase => crate::i18n::text("repo-workflows-rehearse-outcome-2a75fa8b"),
+            RehearseKind::Merge => crate::i18n::text("repo-workflows-rehearse-outcome-fed7ed2e"),
         };
         let tip = match &r.played {
-            Played::Stopped { .. } => {
-                "Does it for real: it stops at the same place, for you to solve the conflicts"
-            }
-            _ => "Does it for real, once it has checked that neither branch moved",
+            Played::Stopped { .. } => crate::i18n::text("repo-workflows-rehearse-outcome-ae00a254"),
+            _ => crate::i18n::text("repo-workflows-rehearse-outcome-07564e65"),
         };
         if widgets::primary_button(ui, label, can_apply, 110.0)
             .on_hover_text(tip)

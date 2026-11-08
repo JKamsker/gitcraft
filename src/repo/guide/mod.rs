@@ -123,7 +123,7 @@ impl RepoTab {
     fn start_first_commit(&mut self, ctx: &egui::Context) {
         let Some(row) = self.commits.iter().position(|c| c.hash == WIP_HASH) else {
             self.status = Some((
-                "Nothing to commit yet: add or change files in the repository's folder".to_owned(),
+                crate::i18n::text("repo-workflows-guide-start-first-commit-881f72cb").to_owned(),
                 false,
             ));
             return;

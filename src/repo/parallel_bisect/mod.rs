@@ -55,7 +55,7 @@ pub(super) struct Parallel {
 
 /// What the banner and the graph show of a parallel bisect.
 pub(super) struct View {
-    machine: String,
+    machine: Machine,
     parallel: usize,
     /// What it is doing, before the rounds (or after them, while clearing up).
     step: Option<String>,
@@ -87,9 +87,16 @@ pub(super) struct Tested {
 }
 
 impl View {
+    fn machine_label(&self) -> String {
+        match &self.machine {
+            Machine::Here => crate::i18n::text("repo-workflows-parallel-machine-here").to_owned(),
+            Machine::There(_) => self.machine.label(),
+        }
+    }
+
     fn new(setup: &pb::Setup) -> Self {
         Self {
-            machine: setup.machine.label(),
+            machine: setup.machine.clone(),
             parallel: setup.parallel,
             step: None,
             round: 0,
@@ -230,7 +237,10 @@ impl RepoTab {
                     && view.running()
                 {
                     view.cancelling = true;
-                    view.step = Some("Stopping the tests…".to_owned());
+                    view.step = Some(
+                        crate::i18n::text("repo-workflows-parallel_bisect-parallel-act-b0e5ccdc")
+                            .to_owned(),
+                    );
                 }
             }
             ParallelAct::Close => {
@@ -287,7 +297,7 @@ impl RepoTab {
         let long = view.started.elapsed() > LONG_RUN;
         // These foreign caches still carry raw status/notification identities. Their
         // owners must retain the typed outcome/receipt and resolve at final paint.
-        let (message, failed) = outcome_message(&outcome, &view.machine);
+        let (message, failed) = outcome_message(&outcome, &view.machine.label());
         if long {
             self.finished
                 .push((format!("{} · {message}", self.name), failed));

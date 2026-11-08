@@ -74,7 +74,7 @@ fn is_plain_ref(r: &str) -> bool {
 /// Makes sure the commits of `pr` are here, fetching them from the forge if not.
 fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<(), String> {
     if !is_oid(&pr.head) {
-        return Err("the forge named a head that isn't a commit id".to_owned());
+        return Err(crate::i18n::text("repo-workflows-versions-have-head-54ea0ca1").to_owned());
     }
     let has = |oid: &str| {
         git::run(
@@ -86,10 +86,9 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
     if has(&pr.head) {
         return Ok(());
     }
-    let remote = pr
-        .remote
-        .as_deref()
-        .ok_or("no remote of this repository has the pull request")?;
+    let remote = pr.remote.as_deref().ok_or(crate::i18n::text(
+        "repo-workflows-versions-have-head-c36591b2",
+    ))?;
     // Nobody waits on this: it asks nobody to sign in.
     let fetch = |what: &str| {
         let args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, what];
@@ -100,7 +99,7 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
     let by_ref = if is_plain_ref(&pr.fetch_ref) {
         fetch(&pr.fetch_ref)
     } else {
-        Err("the forge named no ref git can fetch".to_owned())
+        Err(crate::i18n::text("repo-workflows-versions-have-head-5c35312b").to_owned())
     };
     if !has(&pr.head) {
         fetch(&pr.head).map_err(|e| by_ref.err().unwrap_or(e))?;
@@ -108,7 +107,10 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
     if has(&pr.head) {
         Ok(())
     } else {
-        Err(format!("the forge didn't give {}", short(&pr.head)))
+        Err(crate::i18n::message(
+            "repo-workflows-versions-have-head-36c411a3",
+            &[("short-pr-head-1", (short(&pr.head)).clone().into())],
+        ))
     }
 }
 
@@ -131,9 +133,9 @@ fn base_of(repo: &Path, pr: &PrHead, seen: Option<&Series>) -> Result<String, St
             return Ok(base);
         }
     }
-    Err(format!(
-        "can't tell where the commits of #{} start: open its page, or fetch its base branch",
-        pr.number
+    Err(crate::i18n::message(
+        "repo-workflows-versions-base-of-e9c2679e",
+        &[("pr-number-1", (pr.number).to_string().into())],
     ))
 }
 
@@ -318,6 +320,7 @@ impl RepoTab {
         // last looked at as they were.
         if let Some(view) = &mut self.versions.view {
             view.seen_when_shown = Some((number, seen));
+            view.heading = Some(super::VersionHeading::Since(number));
         }
         if self
             .status
@@ -433,16 +436,24 @@ impl RepoTab {
     ) {
         if self.pr_moved_since_seen(pr)
             && ui
-                .button("What changed since you last looked")
-                .on_hover_text("Its commits as you last saw them and as they are now, paired up")
+                .button(crate::i18n::text(
+                    "repo-workflows-versions-pr-since-items-49804fd7",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-versions-pr-since-items-528089c6",
+                ))
                 .clicked()
         {
             acts.push(Action::Versions(VersionsAct::PrSince(pr.number)));
         }
         if !self.versions.seen_heads.contains_key(&pr.number) || self.pr_moved_since_seen(pr) {
             let r = ui
-                .button("Mark as seen")
-                .on_hover_text("The next push is compared with the version it has now");
+                .button(crate::i18n::text(
+                    "repo-workflows-versions-pr-since-items-20383a22",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-versions-pr-since-items-aeced7e0",
+                ));
             if r.clicked() {
                 acts.push(Action::Versions(VersionsAct::PrSeen(pr.number)));
             }
@@ -455,20 +466,21 @@ impl RepoTab {
 pub(in crate::repo) fn banner_text(since: &Since) -> (String, bool) {
     let c = &since.counts;
     if since.rewritten && c.changed == 0 && c.added == 0 && c.dropped == 0 {
-        let moved = if c.moved > 0 {
-            ", only their order"
-        } else {
-            ""
-        };
         return (
-            format!("Rebased since you last looked; no commit changed{moved}"),
+            crate::i18n::message(
+                "repo-workflows-versions-rebased-banner",
+                &[(
+                    "moved",
+                    (if since.counts.moved > 0 { "yes" } else { "no" }).into(),
+                )],
+            ),
             c.moved > 0,
         );
     }
     let what = if since.rewritten {
-        "Rewritten since you last looked"
+        crate::i18n::text("repo-workflows-versions-banner-text-c600fba5")
     } else {
-        "New commits since you last looked"
+        crate::i18n::text("repo-workflows-versions-banner-text-1b763c24")
     };
     (format!("{what}: {}", super::summary(c)), true)
 }
@@ -500,15 +512,23 @@ pub(in crate::repo) fn since_banner(
                         egui::Label::new(RichText::new(text).color(t.text))
                             .sense(egui::Sense::click()),
                     )
-                    .on_hover_text("Compare the two versions")
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-versions-since-banner-7b518252",
+                    ))
                     .on_hover_cursor(egui::CursorIcon::PointingHand);
-                let compare = ui.button("Compare versions");
+                let compare = ui.button(crate::i18n::text(
+                    "repo-workflows-versions-since-banner-9e053092",
+                ));
                 if r.clicked() || compare.clicked() {
                     acts.push(Action::Versions(VersionsAct::PrSince(number)));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if crate::icons::small_button(ui, "x", "Mark as seen without comparing")
-                        .clicked()
+                    if crate::icons::small_button(
+                        ui,
+                        "x",
+                        crate::i18n::text("repo-workflows-versions-since-banner-a9306697"),
+                    )
+                    .clicked()
                     {
                         acts.push(Action::Versions(VersionsAct::PrSeen(number)));
                     }
