@@ -3,17 +3,28 @@
 //! Plain replacements have no presentation receipt, even when their text happens to be
 //! identical. Classifiers, activity linkage and copy actions continue to read the raw tuple.
 
+mod parallel;
+
 use crate::authorship::branch::Figures;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
 pub struct Notice {
     raw: (String, bool),
-    presentation: Option<Presentation>,
+    presentation: Option<Arc<Presentation>>,
 }
 
 #[derive(Clone, Debug)]
 enum Presentation {
-    Authorship { branch: String, figures: Figures },
+    Authorship {
+        branch: String,
+        figures: Figures,
+    },
+    Parallel(parallel::Summary),
+    Repository {
+        name: String,
+        source: Arc<Presentation>,
+    },
 }
 
 impl Notice {
@@ -27,15 +38,38 @@ impl Notice {
     pub(crate) fn authorship(branch: String, figures: Figures) -> Self {
         Self {
             raw: (figures.headline(&branch), false),
-            presentation: Some(Presentation::Authorship { branch, figures }),
+            presentation: Some(Arc::new(Presentation::Authorship { branch, figures })),
         }
+    }
+
+    pub(super) fn parallel(
+        outcome: &crate::parallel_bisect::Outcome,
+        machine: &crate::parallel_bisect::Machine,
+        receipt: Option<crate::parallel_bisect::presentation::Presentation>,
+    ) -> Self {
+        Self {
+            raw: super::parallel_bisect::outcome_message(outcome, &machine.label()),
+            presentation: Some(Arc::new(Presentation::Parallel(
+                parallel::Summary::capture(outcome, machine, receipt),
+            ))),
+        }
+    }
+
+    /// This prefix is supplied by the same completion, never recovered from raw text.
+    pub(super) fn for_repository(mut self, name: &str) -> Self {
+        self.raw.0 = format!("{name} · {}", self.raw.0);
+        self.presentation = self.presentation.map(|source| {
+            Arc::new(Presentation::Repository {
+                name: name.to_owned(),
+                source,
+            })
+        });
+        self
     }
 
     /// No source classification is performed here: only the producer can create a receipt.
     pub(crate) fn projected(&self) -> Option<String> {
-        self.presentation.as_ref().map(|source| match source {
-            Presentation::Authorship { branch, figures } => figures.display_headline(branch),
-        })
+        self.presentation.as_ref().map(|source| source.display())
     }
 
     pub(crate) fn raw(&self) -> &(String, bool) {
@@ -50,6 +84,16 @@ impl Notice {
     pub(super) fn edit_raw(&mut self) -> &mut (String, bool) {
         self.presentation = None;
         &mut self.raw
+    }
+}
+
+impl Presentation {
+    fn display(&self) -> String {
+        match self {
+            Self::Authorship { branch, figures } => figures.display_headline(branch),
+            Self::Parallel(summary) => summary.display(),
+            Self::Repository { name, source } => format!("{name} · {}", source.display()),
+        }
     }
 }
 
