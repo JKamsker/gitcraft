@@ -1,0 +1,265 @@
+{
+  "review": "batch-c-agent-feature-r1",
+  "candidate": "b9e5d2d4bf8151af4debe55f90bcc1782e752f04",
+  "verdict": "FAIL",
+  "source_access": "Immutable Git archive /tmp/gitcraft-c-agent-b9e5d2d4, relevant files byte-verified against git show candidate:path; mutable writer source not used",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "66af36bac88105ef58ab8b6f6f551b6a354ed708",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/git/drafts/turn.rs",
+      "git_blob": "f88ccbcd5478457564c559dc489a4ce2963b94d0",
+      "sha256": "18da10400cacaf504edca4e706ef0b742e48ae8f65835261ad097c3eede9e239",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/git/drafts/working_transaction.rs",
+      "git_blob": "f583f90535f63ea6a6c7d87f6161f4449cfb366f",
+      "sha256": "d7cc8a742de32c1faf72b15b4f96e2e930dc7ae536517db38337708bb98c6aa0",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/git/drafts/context.rs",
+      "git_blob": "b2d8a67029240aae8893f0776b9da800244a56e0",
+      "sha256": "666770a5278197820f2e6cf212c17df8d4839e8a07c8158c6a58bfde2625cc81",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/repository_tools/turns.rs",
+      "git_blob": "4b894335ffe77b6f4c29152b0223671109b781bc",
+      "sha256": "62adca1805194d51784ceabc232963502f820a569e0e3a60d03bb30199dee0f7",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/repository_tools/mod.rs",
+      "git_blob": "a2bd63ab74ae3cd0d9015bf92e62f41a907e3d77",
+      "sha256": "35192491473aa327d5bcc3a643d5c074b30ee742dae121a11d55642e91c8e53a",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/agents/turns.rs",
+      "git_blob": "a2b076b68c21c301b78e0429a2d34899110afbef",
+      "sha256": "1b0f48a5470f1adaeb19d1dc55ce4fe752456f3303641ab597a458783bb2ef2a",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/agent/bakeoff/build.rs",
+      "git_blob": "44e962b69ad5fc70d8567713af09b1e9a8a8e9bc",
+      "sha256": "3781237f7ac140a977aafe4caef962b2102df0375d7ce35909a808b051c0a2f2",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/bakeoff/mod.rs",
+      "git_blob": "0ed736046bb771204c49fab376a4a20478db2395",
+      "sha256": "183a0a76eee73090082faa84600d9d0b8b4955f91f1281f4bcf08c798dfa218b",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/bakeoff/view.rs",
+      "git_blob": "036fa086cd7fd2b50289ebf291854578027860a6",
+      "sha256": "b0542d18bd02557e331add709084f77e3e2c143dfe4c3282ac7d56bb989d1388",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/agents/mod.rs",
+      "git_blob": "f9d71907bf1df1c51f673859dacedd7d307e8628",
+      "sha256": "3edc2f8134e13eb44cd46fc53f3ff9462c8060b30032f6de8be7d6133a22d861",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/mcp/tools/attribution.rs",
+      "git_blob": "51e5c956157f0d396ad5851b7792c1c8cb545925",
+      "sha256": "a978ab9b3ea8ebd2db467b698fba7efb5d8b974289d0f63d0c4d4bc83142d5a9",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/mcp/tools/mod.rs",
+      "git_blob": "04a7891d963bd6e23bea221bb6967f646b5c91e3",
+      "sha256": "deb1829eee32defb6a86ad85ef10b6bd1980052bf1c057dd125738148dc0e865",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/agent/mod.rs",
+      "git_blob": "1315c4bfeb8b8b7108e5f269ba2df8f8db9d147e",
+      "sha256": "e58950ef63d01fa5e613da9d89af983f89955d1121f7ef049b8345e14d39f4e3",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/agent/preview.rs",
+      "git_blob": "69200b9caa3f82a314a9c5b83ed2b8682b845bc0",
+      "sha256": "9f2815744ad1da290f7ec45caed6531a5d2af00663ab76333b42493654fe71d4",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/agent/plan.rs",
+      "git_blob": "b0018341e993cbbe4cf9ae62adea2e95cb815842",
+      "sha256": "f22f247ceb43a5eebde00b0f4b86b669222505514506750616364c6aca2c6549",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/repo/ghost/mod.rs",
+      "git_blob": "672924c0e8c49b2b3b2382553e4181a7a1b55d4a",
+      "sha256": "ec9c01956759930dd08c743da57a76e8b508be9aa3d2fa9adf441fff2dc0c14b",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/app/agent_card.rs",
+      "git_blob": "75264667ea4127c4bd87c5b4afa623aa28123a76",
+      "sha256": "77b765f778f58826244896f3201d07c38e7b248e6587515e1385d07fa25bc3fb",
+      "archive_matches_git_object": true
+    },
+    {
+      "path": "src/authorship/load.rs",
+      "git_blob": "bd1585930357c015a5c07109a3323e9910fcaddb",
+      "sha256": "697b96ef35deced3ddbc839a0ef8f43f70c3102ca9815925684082874cb9a3a8",
+      "archive_matches_git_object": true
+    }
+  ],
+  "independent_execution": {
+    "class": "inert pure/recording harness only",
+    "toolchain": "rustup run 1.95.0 rustc --edition 2024 --test",
+    "tests": 4,
+    "passed": 4,
+    "artifacts": [
+      {
+        "path": "/tmp/gitcraft-c-agent-review-r1-harness/review.rs",
+        "sha256": "f0783b6bb3527f074b907ac76550c38c2a758383442b3c743abe4483f4f48df4"
+      },
+      {
+        "path": "/tmp/gitcraft-c-agent-review-r1-harness/extraction.txt",
+        "sha256": "457afa577f1bd3fcd46ce5005ed87bfb897e7612673cd7b9a04300d315870581"
+      },
+      {
+        "path": "/tmp/gitcraft-c-agent-review-r1-harness/review-tests",
+        "sha256": "9b115f22d079c045cc87adc4844430f07ad3ed7b72386ed3f845e410cc338d67"
+      },
+      {
+        "path": "/tmp/gitcraft-c-agent-review-r1-harness/result.log",
+        "sha256": "48c3c1ec051d5e37bc28ad0192fea7dba35e5d5c7284e5d35861711d7ad6102c"
+      }
+    ],
+    "native_or_program_under_test_execution": false,
+    "notes": "Exact split/digest/Built/read_status and rollback method body; rollback dependencies are in-memory doubles, not native filesystem APIs. Positive tests demonstrate counterexamples, not feature acceptance."
+  },
+  "historical_evidence": [
+    {
+      "path": "/private/tmp/gitcraft-c-b58acb6a-bakeoff.log",
+      "sha256": "c39ca0b10b9e7fbda58b84944ed1b94e02f8b5559c6dbc6b4addb461b540f1fd",
+      "claimed_source_prefix": "b58acb6a",
+      "execution_class": "mixed pure and historical actual Git/build-shell/PTY UI fixtures; 21 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-e2501e27-mcp.log",
+      "sha256": "27de39f7a1e903154ccadf12b9a146154525f57ed2dea1fdae8300394d821732",
+      "claimed_source_prefix": "e2501e27",
+      "execution_class": "historical actual Git attribution fixture; 1 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-561dd065-agent.log",
+      "sha256": "a229f4544d400573b932129280f6e59d59128e0750babfe11944561510ba1f75",
+      "claimed_source_prefix": "561dd065",
+      "execution_class": "mixed historical actual Git/operation and pure UI/flow fixtures; 31 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-97ab0cec-review.log",
+      "sha256": "2da2f29d27108be9f808c30d11f7cc39cc467b132a4ff7306401f40cf4becd9e",
+      "claimed_source_prefix": "97ab0cec",
+      "execution_class": "historical actual Git review-mark fixture; 1 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-97ab0cec-inverse.log",
+      "sha256": "9aef562eb33082723f9b03e3d9cffac12b8830ec22112dab7614a7b33cccaca9",
+      "claimed_source_prefix": "97ab0cec",
+      "execution_class": "historical actual Git/native inverse fixture; 1 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-97ab0cec-rollback.log",
+      "sha256": "3778c1362e021b751173255c369e2d97ccec311808136b5bc7346ae3636aa253",
+      "claimed_source_prefix": "97ab0cec",
+      "execution_class": "historical actual Git/native rollback fixture; 1 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    },
+    {
+      "path": "/private/tmp/gitcraft-c-97ab0cec-turn-ui.log",
+      "sha256": "7f2721edf23b5c33c970846dfee7dbd79188a2971e0d8d50bb78fd22ea4fa806",
+      "claimed_source_prefix": "97ab0cec",
+      "execution_class": "historical actual Git + headless UI fixture; 1 passed; not rerun",
+      "binding_limit": "Writer filename/source-diff evidence, not an independently verified original binary receipt"
+    }
+  ],
+  "inherited_source_checks": [
+    {
+      "from": "b58acb6a542297cc704852c917fae7b71e1b8fa6",
+      "to": "b9e5d2d4bf8151af4debe55f90bcc1782e752f04",
+      "paths": [
+        "src/agent/bakeoff",
+        "src/repo/bakeoff"
+      ],
+      "git_diff_empty": true
+    },
+    {
+      "from": "e2501e27e8e29d6771f2235fddfd7105ab8a2d90",
+      "to": "b9e5d2d4bf8151af4debe55f90bcc1782e752f04",
+      "paths": [
+        "src/mcp/tools/attribution.rs",
+        "src/repo/agent/preview.rs"
+      ],
+      "git_diff_empty": true
+    },
+    {
+      "from": "561dd065",
+      "to": "b9e5d2d4bf8151af4debe55f90bcc1782e752f04",
+      "paths": [
+        "src/repo/agent",
+        "src/app/agent_card.rs",
+        "src/mcp",
+        "src/repo/ghost/mod.rs"
+      ],
+      "git_diff_empty": true
+    },
+    {
+      "from": "97ab0cecc3f33ec0c67874cdb969eae5ec1feb48",
+      "to": "b9e5d2d4bf8151af4debe55f90bcc1782e752f04",
+      "paths": [
+        "src/git/drafts/turn.rs",
+        "src/repo/repository_tools/turns.rs"
+      ],
+      "git_diff_empty": true,
+      "shared_working_transaction_changed": true
+    }
+  ],
+  "held_gates": [
+    "actual Git fixtures",
+    "real builds/build-under-test",
+    "agent/MCP end-to-end server or HTTP/provider calls",
+    "PTY/native process execution or cancellation/timeout fixtures",
+    "native filesystem concurrency/rollback execution",
+    "full suite",
+    "CI",
+    "remote/source modifications"
+  ],
+  "finding_ids": [
+    "C-AGENT-1",
+    "C-AGENT-2",
+    "C-AGENT-3",
+    "C-AGENT-4"
+  ],
+  "dependencies_not_certified": [
+    "history0de454f05f8fbdf932fc841b5d696bfc7d9b0cca",
+    "internals3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+    "deferred replay uncommitted outside exact target"
+  ],
+  "report": {
+    "path": "/tmp/gitcraft-51-batch-c-agent-review-r1.md",
+    "sha256": "867074da27e9dbc1e0f2d21b607a049103875a939be4cccbea5b548fe32242c7"
+  }
+}
