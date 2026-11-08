@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use egui::{Event, Key};
-use egui_kittest::kittest::Queryable;
 
 use super::Palette;
 use crate::app::{App, Saved, Tab};

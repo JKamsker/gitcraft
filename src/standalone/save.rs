@@ -700,15 +700,38 @@ mod tests {
         let inputs = vec![Snapshot::read(&source, &|| true)?];
         let output = Output::capture(&merged, &inputs)?;
         let mut writer = None;
-        let saved = output.save_with(b"new result", &inputs, &mut |phase| {
+        let save = output.save_with(b"new result", &inputs, &mut |phase| {
             if phase == Phase::BeforeMove {
                 writer = std::fs::OpenOptions::new().write(true).open(&merged).ok();
             }
-        })?;
+        });
+        #[cfg(windows)]
+        let saved = {
+            // Windows pins the displaced file without write sharing while checking
+            // its identity. An already-open writer must cause a safe refusal,
+            // not a successful save based on an unstable snapshot.
+            assert!(writer.is_some(), "No fixture writer");
+            assert!(save.is_err(), "Windows must refuse an active writer");
+            assert_eq!(read(&merged)?, b"original");
+            assert_eq!(read(&source)?, b"input\0\xff");
+            drop(writer.take());
+            Output::capture(&merged, &inputs)?.save(b"new result", &inputs)?
+        };
+        #[cfg(not(windows))]
+        let saved = save?;
         assert_eq!(read(&merged)?, b"new result");
         assert_eq!(read(&source)?, b"input\0\xff");
         let backup = saved.previous.ok_or("No displaced recovery file")?;
         assert_eq!(read(&backup)?, b"original");
+        // Recovery must preserve the old file identity, not just copy its bytes.
+        let old_identity = output.original.as_ref().and_then(|s| s.handle.clone());
+        assert_eq!(Snapshot::read(&backup, &|| true)?.handle, old_identity);
+        #[cfg(windows)]
+        let mut writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&backup)
+            .map_err(|e| e.to_string())?;
+        #[cfg(not(windows))]
         let mut writer = writer.ok_or("No fixture writer")?;
         writer
             .seek(SeekFrom::Start(0))
