@@ -1007,8 +1007,24 @@ pub(in crate::repo) mod core_guard_paint_tests {
         events: Vec<Event>,
         draw: &mut impl FnMut(&mut egui::Ui),
     ) -> FullOutput {
-        ctx.all_styles_mut(|style| style.animation_time = 0.0);
-        let time = ctx.input(|i| i.time) + 1.0;
+        let initialized = ctx.data_mut(|data| {
+            let id = egui::Id::new("core-guard-inert-fonts");
+            let initialized = data.get_temp::<bool>(id).unwrap_or(false);
+            data.insert_temp(id, true);
+            initialized
+        });
+        if !initialized {
+            // Embedded font/image bytes only; no native renderer or theme discovery.
+            crate::theme::install_fonts(ctx);
+            egui_extras::install_image_loaders(ctx);
+        }
+        ctx.all_styles_mut(|style| {
+            style.animation_time = 0.0;
+            style.interaction.tooltip_delay = 0.0;
+            style.interaction.show_tooltips_only_when_still = false;
+        });
+        // Pointer press/release must remain inside egui's ordinary click interval.
+        let time = ctx.input(|i| i.time) + 0.1;
         let mut output = ctx.run_ui(
             RawInput {
                 screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1800., 4000.))),
