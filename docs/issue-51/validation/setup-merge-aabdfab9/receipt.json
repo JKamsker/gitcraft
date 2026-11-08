@@ -1,0 +1,23 @@
+{
+  "application": "aabdfab9fd8b9bd0f0661e3c6274a5f32f87a041",
+  "merge": "8387856aa21b6ee8659b2912a6425c548d4728fc",
+  "owner": "8aaadb4fb1af291a12368c3ff0160892126885c1",
+  "command": "env CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+  "final_result": "PASS",
+  "logs": [
+    {
+      "path": "setup-merge-8387856a-check.log.gz",
+      "sha256": "194548fa8cd94ddab1c070919db25e56e072dc4edc986b72b619dd448d9ffdf4",
+      "exit_code": 101
+    },
+    {
+      "path": "setup-merge-aabdfab9-check.log.gz",
+      "sha256": "d0babc89cafbbc93f15b60265ef0bd3667c25384079aa1b9b64ac2c764c85b10",
+      "exit_code": 0
+    }
+  ],
+  "failure_disposition": "old standalone hostile-profile test referenced removed set_profile_config; adapted to connections::set Context, actual fixture not run",
+  "merge_conflicts": "retain audio/doctor/portability modules; preserve standalone explicit args and install profile helper dispatch; clear both file comparison and tour on leaving pages",
+  "runtime": "No actual program-under-test/runtime fixtures; global hold unchanged",
+  "documentation_rule": "Application files unchanged by archival commit; prior application check bound, no new test execution"
+}
