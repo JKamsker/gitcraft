@@ -73,12 +73,8 @@ fn inherited_redirects_cannot_change_selected_decisions() -> Result<(), String> 
     let base = selected.commit("TARGET_BASE", &[])?;
     let tip = selected.commit("TARGET_TIP", &[])?;
     let foreign = crate::git::fixture::Repo::new("foreign-env-regression")?;
-    foreign.git(&[
-        "fetch",
-        &selected.path().to_string_lossy(),
-        "main:refs/heads/main",
-    ])?;
-    foreign.git(&["checkout", "main"])?;
+    foreign.git(&["fetch", &selected.path().to_string_lossy(), "main"])?;
+    foreign.git(&["checkout", "-B", "main", "FETCH_HEAD"])?;
     let tree = foreign.tree("main")?;
     let root = foreign.git(&["commit-tree", &tree, "-m", "DECOY_ROOT"])?;
     foreign.git(&["replace", &tip, root.trim()])?;
