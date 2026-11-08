@@ -49,14 +49,17 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial =
-            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
+        let partial = matches!(&view.data, Some(Ok(d)) if d.partial)
+            && idle
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
         // A stash's changes aren't a commit's to revert.
         let revert = self.stash_view.is_none();
         let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert)
             && idle
-            && !view.structural.enabled;
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -65,7 +68,7 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = view.key.renders().then_some(self.diff_rendered);
-        let folded = if as_file || markdown == Some(true) {
+        let folded = if as_file || markdown == Some(true) || view.encrypted.enabled {
             None
         } else {
             self.fold_reason(view, &settings, acts)
@@ -87,6 +90,29 @@ impl RepoTab {
             acts,
         );
 
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label("SOPS encrypted file");
+                if view.lines.is_some() {
+                    ui.label("Decryption compares the complete file versions, not selected history lines.");
+                }
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding").selected_text(encoding.label()).show_ui(ui, |ui| {
+                    use super::encrypted::JsonEncoding;
+                    for choice in [JsonEncoding::Ask,JsonEncoding::Document,JsonEncoding::Binary] { ui.selectable_value(&mut encoding,choice,choice.label()); }
+                });
+                if encoding != view.encrypted.json_encoding { acts.push(Action::DiffDecryptedEncoding(encoding)); }
+                if view.encrypted.enabled {
+                    if ui.button("Encrypted patch / cancel").clicked() { acts.push(Action::DiffDecrypted(false)); }
+                } else if ui.add_enabled(idle && !self.loading && view.request == view.data_request, egui::Button::new("Show decrypted")).on_hover_text("Use local SOPS and keys. SSH/WSL supply only ciphertext. Plaintext is discarded when leaving this view.").clicked() { acts.push(Action::DiffDecrypted(true)); }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                super::encrypted::show(ui, &mut view.encrypted);
+            }
+            return;
+        }
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
             match &view.rendered {
@@ -267,12 +293,14 @@ impl RepoTab {
         rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
+        let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
 
         if let Some(view) = &mut self.diff {
             view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
+            view.wrap_offsets = wrap_offsets;
             view.jump = None;
             view.scroll_to = None;
             view.jump_line = None;
@@ -426,6 +454,7 @@ impl RepoTab {
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -434,19 +463,40 @@ impl RepoTab {
                             && view.lines.is_none()
                             && self.stash_view.is_none()
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
                         }
                         ui.add_space(8.0);
                         if !as_file && !rendered && !folded && !rich_ready && view.lines.is_none() {
+                            if matches!(view.key, DiffKey::Work(_))
+                                && ui.button("Three-state").clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::Lens,
+                                ));
+                            }
+                            if !matches!(view.key, DiffKey::Remerge { .. })
+                                && ui.button("Moves across files").clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::CodeMoves,
+                                ));
+                            }
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }
                         // A folded diff shows no lines to arrange.
-                        if !as_file && !rendered && !folded && view.structural.shows_patch() {
+                        if !as_file
+                            && !rendered
+                            && !folded
+                            && !view.encrypted.enabled
+                            && view.structural.shows_patch()
+                        {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
+                            wrap_control(ui, acts);
                             if view.lines.is_none() {
                                 view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                                 ui.add_space(4.0);
@@ -682,6 +732,17 @@ fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
     format!("{noun} {}", parts.join(", "))
 }
 
+fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {
+    let wrap = crate::settings::Settings::get(ui.ctx()).diff_wrap;
+    if ui
+        .selectable_label(wrap, "Wrap")
+        .on_hover_text("Wrap long patch lines in any text file")
+        .clicked()
+    {
+        acts.push(Action::DiffWrap(!wrap));
+    }
+}
+
 /// Whitespace, whole file, side by side and unified toggles, laid out right to left.
 fn view_options(
     ui: &mut Ui,
@@ -794,8 +855,23 @@ fn ready_data<'a>(
         return None;
     }
     if let Some(images) = &data.image {
-        image_view(ui, images);
-        return None;
+        if images.svg {
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(!view.svg_source, "Rendered SVG")
+                    .clicked()
+                {
+                    acts.push(Action::DiffSvgSource(false));
+                }
+                if ui.selectable_label(view.svg_source, "SVG source").clicked() {
+                    acts.push(Action::DiffSvgSource(true));
+                }
+            });
+        }
+        if !images.svg || !view.svg_source {
+            image_view(ui, images);
+            return None;
+        }
     }
     if let Some(binary) = &data.binary {
         binary_view(ui, binary, view.key.path());

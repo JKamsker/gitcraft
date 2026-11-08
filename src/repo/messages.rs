@@ -370,6 +370,9 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.shown = shown;
+        if !shown || self.fs_pending.is_some() {
+            self.discard_decrypted();
+        }
         if let Some(poller) = &mut self.poller {
             poller.tick(ctx);
         }

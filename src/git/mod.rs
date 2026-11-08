@@ -22,8 +22,10 @@ mod diff;
 mod diff_algorithm;
 pub mod doctor;
 pub mod dry_run;
+pub(crate) mod dvc;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
 pub(crate) mod growth;
@@ -383,3 +385,5 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) use bundles::bundle_git_path;

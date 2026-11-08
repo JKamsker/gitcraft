@@ -24,7 +24,8 @@ pub type LineRange = (u32, u32);
 const LINE_LOG_FORMAT: &str = "--format=\x1e%H\x1f%an\x1f%ae\x1f%at\x1f%s";
 
 /// What makes git print a plain patch, whatever the user's config says.
-const PLAIN_PATCH: [&str; 4] = [
+const PLAIN_PATCH: [&str; 5] = [
+    "--no-textconv",
     "--no-color",
     "--no-ext-diff",
     "--src-prefix=a/",
@@ -56,6 +57,7 @@ pub fn line_history(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
         LINE_LOG_FORMAT,
         &spec,
         super::END_OPTS,
@@ -88,6 +90,7 @@ pub fn line_diff(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
     ];
     args.extend(specs.iter().map(String::as_str));
     args.extend([super::END_OPTS, hash]);
@@ -158,6 +161,7 @@ fn committed_range(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
     ];
     if *at == LinesAt::Index {
         args.push("--cached");

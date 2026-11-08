@@ -56,6 +56,31 @@ impl RepoTab {
                 acts.push(Action::Reload);
             }
             widgets::toolbar_separator(ui);
+            ui.menu_button("File views", |ui| {
+                for (label, page) in [
+                    (
+                        "Code moved across files",
+                        super::file_comparison::Page::CodeMoves,
+                    ),
+                    (
+                        "File migration map",
+                        super::file_comparison::Page::Migration,
+                    ),
+                    (
+                        "Three-state staging lens",
+                        super::file_comparison::Page::Lens,
+                    ),
+                    (
+                        "File versions across branches",
+                        super::file_comparison::Page::Matrix,
+                    ),
+                ] {
+                    if ui.button(label).clicked() {
+                        acts.push(Action::OpenFileComparison(page));
+                        ui.close();
+                    }
+                }
+            });
             self.head_label(ui, idle, acts);
             self.target_conflict_badge(ui);
             self.network_chip(ui, acts);

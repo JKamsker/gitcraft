@@ -231,6 +231,7 @@ impl App {
             .unwrap_or_default();
         let ctx = &cc.egui_ctx;
         egui_extras::install_image_loaders(ctx);
+        crate::svg::install(ctx);
         crate::image_fit::install(ctx);
         crate::image_cache::install(ctx);
         theme::install_fonts(ctx);

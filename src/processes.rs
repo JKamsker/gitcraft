@@ -350,6 +350,28 @@ pub(crate) fn service() -> Result<&'static Service, String> {
 pub(crate) fn run(command: Command, options: Options) -> ResultOutput {
     service()?.submit(command, options)?.wait()
 }
+/// Wait for an owned request while a snapshot's UI lifetime remains current.
+/// Cancellation and cleanup stay entirely in the shared process service.
+pub(crate) fn run_while(
+    command: Command,
+    options: Options,
+    active: &dyn Fn() -> bool,
+) -> ResultOutput {
+    if !active() {
+        return Err("Comparison cancelled".into());
+    }
+    let ticket = service()?.submit(command, options)?;
+    loop {
+        if !active() {
+            ticket.cancel.cancel();
+        }
+        match ticket.reply.recv_timeout(POLL) {
+            Ok(result) => return result,
+            Err(mpsc::RecvTimeoutError::Timeout) => (),
+            Err(_) => return Err("Process service stopped before returning a result".into()),
+        }
+    }
+}
 pub(crate) fn counts() -> Option<Counts> {
     SERVICE
         .get()

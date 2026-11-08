@@ -114,7 +114,9 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
-                if self.conflict.is_some() {
+                if self.file_comparison.is_some() {
+                    self.file_comparison_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
@@ -257,7 +259,9 @@ impl RepoTab {
             });
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
-            if esc && self.close_drop_menu() {
+            if esc && self.file_comparison.is_some() {
+                acts.push(Action::CloseFileComparison);
+            } else if esc && self.close_drop_menu() {
             } else if esc && diff_keys && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,

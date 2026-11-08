@@ -93,6 +93,7 @@ pub struct Settings {
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
+    pub diff_wrap: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
@@ -210,6 +211,7 @@ impl Default for Settings {
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
+            diff_wrap: false,
             diff_whole_file: false,
             diff_beside_graph: false,
             diff_algorithms: Default::default(),
@@ -930,6 +932,19 @@ impl Settings {
                     "Mergiraf",
                     Some("Solves merge conflicts from the syntax of the code."),
                     |card| self.mergiraf_ui(card),
+                );
+                section(
+                    ui,
+                    f,
+                    "Git file tools",
+                    Some("Use gitcraft as Git's difftool and mergetool."),
+                    |card| {
+                        card.row(
+                            "Register gitcraft",
+                            "difftool mergetool compare files standalone global config",
+                            crate::standalone::registration::settings_ui,
+                        );
+                    },
                 );
                 section(
                     ui,
