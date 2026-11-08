@@ -36,6 +36,8 @@ mod lfs_storage;
 pub(crate) mod lfs_test_server;
 mod line_log;
 mod locks;
+mod machines;
+pub(crate) use machines::*;
 mod log_order;
 mod notebook_filter;
 mod notes;
