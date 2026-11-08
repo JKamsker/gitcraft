@@ -192,13 +192,10 @@ impl RepoTab {
         let spawned = launch
             .program(&shell, crate::agent::launch::windows_sh)
             .and_then(|(spec, cwd)| Terminal::spawn(&cwd, &spec, ctx));
-        self.terminal_open = true;
         match spawned {
             Ok(term) => {
                 let witness = term.output_lifetime();
-                self.terminals.push(term);
-                self.active_terminal = self.terminals.len() - 1;
-                self.terminal_error = None;
+                self.terminals.opened(Ok(term));
                 Ok(witness)
             }
             Err(e) => {
@@ -209,7 +206,7 @@ impl RepoTab {
                         ("e", (e).clone().into()),
                     ],
                 );
-                self.terminal_error = Some(error.clone());
+                self.terminals.opened(Err(error.clone()));
                 Err(error)
             }
         }

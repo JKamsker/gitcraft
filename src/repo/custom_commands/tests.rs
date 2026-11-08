@@ -415,8 +415,8 @@ fn a_terminal_command_opens_a_terminal_of_its_own() {
         }),
         &ctx,
     );
-    let opened = tab.terminals.len() == before + 1 && tab.terminal_open;
-    let label = tab.terminals.last().map(|t| t.shell.clone());
+    let opened = tab.terminals.len() == before + 1 && tab.terminals.is_open();
+    let label = tab.terminals.shells().last().map(|t| t.shell.clone());
     let mut ran = false;
     for _ in 0..200 {
         if marker.exists() {
@@ -429,7 +429,7 @@ fn a_terminal_command_opens_a_terminal_of_its_own() {
     let toasts = tab.finished.len();
     tab.terminals.clear();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(opened, "{:?}", tab.terminal_error);
+    assert!(opened, "{:?}", tab.terminals.error());
     assert_eq!(label.as_deref(), Some("Watch it"));
     assert!(ran);
     assert_eq!(toasts, 0);

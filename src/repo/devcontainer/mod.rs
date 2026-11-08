@@ -128,10 +128,7 @@ impl RepoTab {
                                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                                     .take()
                                 {
-                                    self.terminals.push(term);
-                                    self.active_terminal = self.terminals.len() - 1;
-                                    self.terminal_error = None;
-                                    self.terminal_open = true;
+                                    self.terminals.opened(Ok(term));
                                     state.remember_result(LocalResult::TerminalOpened);
                                 } else {
                                     state.remember_result(LocalResult::TerminalExpired);

@@ -88,20 +88,13 @@ impl RepoTab {
                 (shell_spec(name, program, args), self.path.clone())
             }
         };
-        match Terminal::spawn(&cwd, &spec, ctx) {
-            Ok(term) => {
-                self.terminals.push(term);
-                self.active_terminal = self.terminals.len() - 1;
-                self.terminal_error = None;
-            }
-            Err(e) => {
-                self.terminal_error = Some(crate::i18n::message(
+        self.terminals
+            .opened(Terminal::spawn(&cwd, &spec, ctx).map_err(|e| {
+                crate::i18n::message(
                     "repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3",
-                    &[("name", (name).into()), ("e", (e).clone().into())],
-                ))
-            }
-        }
-        self.terminal_open = true;
+                    &[("name", name.into()), ("e", e.into())],
+                )
+            }));
     }
 }
 

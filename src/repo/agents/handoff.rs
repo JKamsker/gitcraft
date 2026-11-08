@@ -156,7 +156,7 @@ impl RepoTab {
                 }
             }
             TrayAct::SendTo(i) => {
-                tray.send_to = self.terminals.get(i).map(|t| (i, t.shell.clone()));
+                tray.send_to = self.terminals.shells().get(i).map(|t| (i, t.shell.clone()));
             }
             TrayAct::SendNotes => {
                 let message = handoff::notes_message(&self.agents.tray.notes);
@@ -178,13 +178,7 @@ impl RepoTab {
             .map(|a| a.label.to_owned())
             .chain(self.agents.tasks.iter().map(|t| agent_label(&t.agent)))
             .collect();
-        let ended: Vec<bool> = self.terminals.iter_mut().map(|t| t.has_exited()).collect();
-        let list: Vec<(&str, bool)> = self
-            .terminals
-            .iter()
-            .map(|t| t.shell.as_str())
-            .zip(ended)
-            .collect();
+        let list = self.terminals.handoff_targets();
         let picked = self
             .agents
             .tray
@@ -206,14 +200,12 @@ impl RepoTab {
             )));
             return false;
         };
-        let Some(term) = self.terminals.get_mut(i) else {
+        let Some(term) = self.terminals.shells().get(i) else {
             return false;
         };
         let label = term.shell.clone();
-        match term.paste_message(message) {
+        match self.terminals.paste_message(i, message) {
             Ok(()) => {
-                self.terminal_open = true;
-                self.active_terminal = i;
                 self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-workflows-agent-send-confirmation",
@@ -329,7 +321,12 @@ impl RepoTab {
         if self.terminals.is_empty() {
             return;
         }
-        let labels: Vec<&str> = self.terminals.iter().map(|t| t.shell.as_str()).collect();
+        let labels: Vec<&str> = self
+            .terminals
+            .shells()
+            .iter()
+            .map(|t| t.shell.as_str())
+            .collect();
         let shown = to
             .and_then(|i| labels.get(i).copied())
             .unwrap_or(crate::i18n::text(

@@ -168,7 +168,7 @@ impl RepoTab {
         Unfinished {
             operation: self.busy_op.is_some()
                 || self.ssh_setup.as_ref().is_some_and(|s| s.running()),
-            terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
+            terminal: self.terminals.has_running(),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()
                 || self.reword.is_some()
