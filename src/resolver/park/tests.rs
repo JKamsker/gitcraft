@@ -629,7 +629,10 @@ fn dropping_to_a_branch_keeps_accessible_byte_exact_recovery() -> Result<(), Str
     let parked = park(repo.path(), "raw-recovery", &["a.txt".into()])?;
     let branch = drop_to_branch(repo.path(), &parked)?;
     let archived = crate::agent::repo_file(repo.path(), "parked-recovery/raw-recovery/parked")?;
-    assert_eq!(std::fs::read(archived.join("raw/notes.txt")).unwrap(), raw);
+    assert_eq!(
+        std::fs::read(archived.join("raw/notes.txt")).map_err(|e| e.to_string())?,
+        raw
+    );
     assert!(archived.join("index").is_file());
     assert!(archived.join("parked.json").is_file());
     let description = repo.git(&["config", &format!("branch.{branch}.description")])?;
@@ -653,7 +656,7 @@ fn a_filtered_clean_file_is_also_kept_byte_exact() -> Result<(), String> {
     assert!(parked.raw.contains(&"notes.txt".into()));
     bring_back(repo.path(), &parked)?;
     assert_eq!(
-        std::fs::read(repo.path().join("notes.txt")).unwrap(),
+        std::fs::read(repo.path().join("notes.txt")).map_err(|e| e.to_string())?,
         b"notes\r\n"
     );
     Ok(())
@@ -667,7 +670,10 @@ fn recovery_archive_collision_keeps_both_originals() -> Result<(), String> {
     std::fs::create_dir_all(&archive).map_err(|e| e.to_string())?;
     std::fs::write(archive.join("existing"), b"mine").map_err(|e| e.to_string())?;
     assert!(drop_to_branch(repo.path(), &parked).is_err());
-    assert_eq!(std::fs::read(archive.join("existing")).unwrap(), b"mine");
+    assert_eq!(
+        std::fs::read(archive.join("existing")).map_err(|e| e.to_string())?,
+        b"mine"
+    );
     assert_eq!(list(repo.path())?, vec![parked.clone()]);
     assert!(folder(repo.path(), &parked.id)?.join("raw/a.txt").is_file());
     Ok(())

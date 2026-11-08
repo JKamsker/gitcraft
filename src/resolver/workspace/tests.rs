@@ -361,8 +361,14 @@ fn atomic_replacement_never_removes_an_existing_temporary_file() -> Result<(), S
     std::fs::write(&target, b"original").map_err(|e| e.to_string())?;
     std::fs::write(&temp, b"someone else's file").map_err(|e| e.to_string())?;
     assert!(replace_with_temp(&target, &temp, b"replacement").is_err());
-    assert_eq!(std::fs::read(target).unwrap(), b"original");
-    assert_eq!(std::fs::read(temp).unwrap(), b"someone else's file");
+    assert_eq!(
+        std::fs::read(target).map_err(|e| e.to_string())?,
+        b"original"
+    );
+    assert_eq!(
+        std::fs::read(temp).map_err(|e| e.to_string())?,
+        b"someone else's file"
+    );
     Ok(())
 }
 
@@ -372,6 +378,6 @@ fn atomic_replacement_supports_long_file_names() -> Result<(), String> {
     let file = repo.path().join("a".repeat(240));
     std::fs::write(&file, b"old").map_err(|e| e.to_string())?;
     replace(&file, b"new").map_err(|e| e.to_string())?;
-    assert_eq!(std::fs::read(file).unwrap(), b"new");
+    assert_eq!(std::fs::read(file).map_err(|e| e.to_string())?, b"new");
     Ok(())
 }

@@ -661,14 +661,23 @@ mod restored_run_tests {
             run
         };
         tab.select_restored_run("wrong-id", Some(restored()), &ctx);
-        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "previous");
+        assert_eq!(
+            tab.resolver.run.as_ref().map(|r| r.id.as_str()),
+            Some("previous")
+        );
         tab.select_restored_run("restored", None, &ctx);
-        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "previous");
+        assert_eq!(
+            tab.resolver.run.as_ref().map(|r| r.id.as_str()),
+            Some("previous")
+        );
         tab.select_restored_run("restored", Some(restored()), &ctx);
-        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "restored");
+        assert_eq!(
+            tab.resolver.run.as_ref().map(|r| r.id.as_str()),
+            Some("restored")
+        );
         assert!(Workspace::load(&directory).is_ok());
         assert_eq!(
-            std::fs::read_to_string(directory.join("run.json")).unwrap(),
+            std::fs::read_to_string(directory.join("run.json")).map_err(|e| e.to_string())?,
             "original record"
         );
         Ok(())
