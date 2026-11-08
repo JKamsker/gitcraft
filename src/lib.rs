@@ -28,7 +28,6 @@ mod glossary;
 mod graph;
 mod i18n;
 mod icons;
-mod i18n;
 mod image_cache;
 mod image_fit;
 mod instance;
