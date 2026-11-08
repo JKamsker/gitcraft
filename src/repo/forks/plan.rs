@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use super::guard::Destination;
+use super::guard::{CheckoutDestination, Destination};
 use crate::forge::{ForkInfo, Hosting};
 use crate::git::{self, Remote};
 use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
@@ -269,19 +269,24 @@ pub(crate) fn checkout(
             (name, true)
         }
     };
-    let fetch_url = remotes
-        .iter()
-        .find(|r| r.name == remote)
-        .map_or(url.as_str(), |r| r.url.as_str());
     let tracking = format!("refs/remotes/{remote}/{}", info.branch);
     let fetch = strings(&[
         "fetch",
         "--",
-        fetch_url,
+        &remote,
         &format!("+refs/heads/{}:{tracking}", info.branch),
     ]);
     let mut steps = Vec::new();
     let mut undo = Vec::new();
+    if let Some(hosting) = hosting {
+        let fork = Hosting {
+            path: info.repo_path.clone(),
+            ..hosting.clone()
+        };
+        let guard = CheckoutDestination::new(&remote, &url, new_remote, &fork).step();
+        steps.push(guard.clone());
+        undo.push(guard);
+    }
     if new_remote {
         steps.push(strings(&["remote", "add", "--", &remote, &url]));
         steps.push(strings(&[
