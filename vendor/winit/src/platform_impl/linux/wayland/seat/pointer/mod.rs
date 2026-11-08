@@ -164,6 +164,13 @@ impl PointerHandler for WinitState {
                     } else {
                         ElementState::Released
                     };
+                    // Preserve the captured source-surface release location after a leave.
+                    if state == ElementState::Released && button == MouseButton::Left {
+                        self.events_sink.push_window_event(
+                            WindowEvent::CursorMoved { device_id, position },
+                            window_id,
+                        );
+                    }
                     self.events_sink.push_window_event(
                         WindowEvent::MouseInput { device_id, state, button },
                         window_id,

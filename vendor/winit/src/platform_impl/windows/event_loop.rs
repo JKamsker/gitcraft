@@ -1803,6 +1803,19 @@ unsafe fn public_window_callback_inner(
 
             update_modifiers(window, userdata);
 
+            // Captured button-up includes signed client coordinates even outside this HWND.
+            // Restore the position after CursorLeft before delivering the release to egui-winit.
+            userdata.send_event(Event::WindowEvent {
+                window_id: RootWindowId(WindowId(window)),
+                event: WindowEvent::CursorMoved {
+                    device_id: DEVICE_ID,
+                    position: PhysicalPosition::new(
+                        super::get_x_lparam(lparam as u32) as f64,
+                        super::get_y_lparam(lparam as u32) as f64,
+                    ),
+                },
+            });
+
             userdata.send_event(Event::WindowEvent {
                 window_id: RootWindowId(WindowId(window)),
                 event: MouseInput { device_id: DEVICE_ID, state: Released, button: Left },

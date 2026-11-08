@@ -1064,6 +1064,18 @@ impl EventProcessor {
             return;
         }
 
+        // An implicit grab delivers the release to the source window after CursorLeft.
+        // Do not deduplicate this position: the GUI adapter may have forgotten it on exit.
+        if state == ElementState::Released && event.detail as u32 == xlib::Button1 {
+            callback(&self.target, Event::WindowEvent {
+                window_id,
+                event: WindowEvent::CursorMoved {
+                    device_id,
+                    position: PhysicalPosition::new(event.event_x, event.event_y),
+                },
+            });
+        }
+
         let event = match event.detail as u32 {
             xlib::Button1 => {
                 WindowEvent::MouseInput { device_id, state, button: MouseButton::Left }

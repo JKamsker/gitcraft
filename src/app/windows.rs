@@ -948,8 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn pointer_drag_outside_the_actual_strip_transfers_the_live_tab_on_release()
-    -> Result<(), String> {
+    fn captured_release_after_source_exit_detaches_the_live_tab() -> Result<(), String> {
         use egui::{Event, Modifiers, PointerButton};
         let h = harness();
         let ctx = h.ctx.clone();
@@ -998,15 +997,31 @@ mod tests {
         let outside = egui::pos2(160.0, 140.0);
         frame(&mut app, vec![Event::PointerMoved(outside)]);
         assert!(app.tab_drag.is_some());
+        frame(&mut app, vec![Event::PointerGone]);
+        for _ in 0..3 {
+            frame(&mut app, vec![]);
+            assert!(
+                app.tab_drag.is_some(),
+                "leaving the source must retain the captured drag"
+            );
+            assert_eq!(identity(&app.tabs[0]), owned);
+        }
+        // Recorded backend output: CursorMoved at the native captured mouse-up location
+        // MUST precede MouseInput Released, even though no ordinary motion arrived after exit.
+        let released = egui::pos2(-240.0, 140.0);
         frame(
             &mut app,
-            vec![Event::PointerButton {
-                pos: outside,
-                button: PointerButton::Primary,
-                pressed: false,
-                modifiers: Modifiers::NONE,
-            }],
+            vec![
+                Event::PointerMoved(released),
+                Event::PointerButton {
+                    pos: released,
+                    button: PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
         );
+        assert!(app.tab_drag.is_none());
         assert_eq!(app.tabs.len(), 1);
         assert_eq!(app.windows.parked.len(), 1);
         let window = app
@@ -1016,13 +1031,12 @@ mod tests {
             .next()
             .ok_or("drag did not detach")?;
         assert_eq!(identity(&window.tabs[0]), owned);
-        assert_eq!(window.place_at_pixels, Some(egui::pos2(260.0, 340.0)));
+        assert_eq!(window.place_at_pixels, Some(egui::pos2(-140.0, 340.0)));
         Ok(())
     }
 
     #[test]
-    fn pointer_drag_between_existing_window_strips_transfers_without_reopening()
-    -> Result<(), String> {
+    fn captured_release_after_source_exit_targets_an_existing_window() -> Result<(), String> {
         use egui::{Event, Modifiers, PointerButton};
         let h = harness();
         let ctx = h.ctx.clone();
@@ -1043,7 +1057,7 @@ mod tests {
         );
         app.windows.strips.insert(
             peer,
-            Rect::from_min_size(egui::pos2(200.0, 320.0), egui::vec2(800.0, 40.0)),
+            Rect::from_min_size(egui::pos2(-200.0, 320.0), egui::vec2(100.0, 40.0)),
         );
         let owned = identity(&app.tabs[0]);
         let mut time = 1.0;
@@ -1084,15 +1098,31 @@ mod tests {
         let outside = egui::pos2(160.0, 140.0);
         frame(&mut app, vec![Event::PointerMoved(outside)]);
         assert!(app.tab_drag.is_some());
+        frame(&mut app, vec![Event::PointerGone]);
+        for _ in 0..3 {
+            frame(&mut app, vec![]);
+            assert!(
+                app.tab_drag.is_some(),
+                "leaving the source must retain the captured drag"
+            );
+            assert_eq!(identity(&app.tabs[0]), owned);
+        }
+        // Recorded backend output: CursorMoved at the native captured mouse-up location
+        // MUST precede MouseInput Released, even though no ordinary motion arrived after exit.
+        let released = egui::pos2(-240.0, 140.0);
         frame(
             &mut app,
-            vec![Event::PointerButton {
-                pos: outside,
-                button: PointerButton::Primary,
-                pressed: false,
-                modifiers: Modifiers::NONE,
-            }],
+            vec![
+                Event::PointerMoved(released),
+                Event::PointerButton {
+                    pos: released,
+                    button: PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
         );
+        assert!(app.tab_drag.is_none());
         assert_eq!(app.tabs.len(), 1);
         assert_eq!(app.windows.parked.len(), 1);
         let window = app

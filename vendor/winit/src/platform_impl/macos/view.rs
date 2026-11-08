@@ -1049,6 +1049,11 @@ impl WinitView {
     fn mouse_click(&self, event: &NSEvent, button_state: ElementState) {
         let button = mouse_button(event);
 
+        // CursorLeft clears egui-winit's pointer position. AppKit retains the view's mouse
+        // capture until mouseUp; restore that event's actual location before releasing a drag.
+        if button_state == ElementState::Released && button == MouseButton::Left {
+            self.mouse_motion_at(event, true);
+        }
         self.update_modifiers(event, false);
 
         self.queue_event(WindowEvent::MouseInput {
@@ -1059,6 +1064,10 @@ impl WinitView {
     }
 
     fn mouse_motion(&self, event: &NSEvent) {
+        self.mouse_motion_at(event, false);
+    }
+
+    fn mouse_motion_at(&self, event: &NSEvent, captured_release: bool) {
         let window_point = unsafe { event.locationInWindow() };
         let view_point = self.convertPoint_fromView(window_point, None);
         let frame = self.frame();
@@ -1069,8 +1078,9 @@ impl WinitView {
             || view_point.y > frame.size.height
         {
             let mouse_buttons_down = unsafe { NSEvent::pressedMouseButtons() };
-            if mouse_buttons_down == 0 {
-                // Point is outside of the client area (view) and no buttons are pressed
+            if mouse_buttons_down == 0 && !captured_release {
+                // Ordinary hover outside the client area is ignored, but the last captured
+                // release still carries the location needed to finish an out-of-window drag.
                 return;
             }
         }
