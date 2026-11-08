@@ -3642,3 +3642,5 @@ interaction-shell-prose-files = Dateien (GNOME)
 interaction-shell-prose-description = Ein kleiner visueller Git-Client
 
 interaction-shell-prose-links = Öffnet gitcraft://-Links aus dem Browser in gitcraft
+
+interaction-home-fullscreen = Vollbild aktivieren
