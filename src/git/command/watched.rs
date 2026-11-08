@@ -249,13 +249,7 @@ pub(in crate::git) fn run_watched_extra_recorded(
             .lines()
             .any(|l| remote::is_missing_folder(l.as_bytes()))
     {
-        let e = crate::i18n::message(
-            "backend-isn-t-a-folder-on-859699",
-            &[
-                ("path", (t.path).to_string().into()),
-                ("t", (t.host.label()).to_string().into()),
-            ],
-        );
+        let e = super::missing_folder(t);
         return (Err(e), recorded);
     }
     let e = failure_message(

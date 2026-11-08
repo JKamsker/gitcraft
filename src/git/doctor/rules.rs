@@ -163,7 +163,7 @@ pub fn read(file: &RulesFile) -> Result<String, String> {
         Err(e) => Err(crate::i18n::message(
             "backend-could-not-read-e-6dfcf3",
             &[
-                ("label", (file.label).to_string().into()),
+                ("path", (file.label).to_string().into()),
                 ("detail", (e).to_string().into()),
             ],
         )),
@@ -222,7 +222,7 @@ pub fn save(file: &RulesFile, expected: &str, text: &str) -> Result<(), String> 
         crate::i18n::message(
             "backend-could-not-write-e-6c22d7",
             &[
-                ("label", (file.label).to_string().into()),
+                ("path", (file.label).to_string().into()),
                 ("detail", (e).to_string().into()),
             ],
         )

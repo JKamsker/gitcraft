@@ -476,7 +476,7 @@ pub fn shell_command_here(dir: &Path, script: &str) -> (String, Vec<String>) {
 }
 
 // Kept raw for recent-status/across classification. Translate only at display_error.
-fn missing_folder(target: &Target) -> String {
+pub(super) fn missing_folder(target: &Target) -> String {
     format!("{} isn't a folder on {}", target.path, target.host.label())
 }
 
