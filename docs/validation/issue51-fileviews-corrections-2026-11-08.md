@@ -1,5 +1,7 @@
 # Issue #51 fileviews: implementation corrections after independent R1 failure
 
+Historical candidate: independent R2 subsequently found three remaining blockers. See [the subsequent corrections and stricter-hold validation](issue51-fileviews-r2-corrections-2026-11-08.md). This record does not clear those findings or bind its runtime gates to later source.
+
 Corrected application source: `10727c7e88725b4510350ec3416bd1e4ebfcfeda`. Branch: `t3/diff-staging-views`, write remote `JKamsker/gitcraft`. The source and every corrective unit were committed, pushed and checked against the remote SHA with author Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>. The checkout remains based on `a850de26`; parent owns integration with advanced origin/dev and final history assembly.
 
 Status: **implementation corrected and locally validated; parent independent R2 review and combined validation pending**. This is an implementation handoff, not independent approval. Candidate `c82112a5` / application `5df74dbb` failed the three independent R1 reports. Their positive tests did not cover or clear these eleven findings. The earlier validation record is historical evidence only.
