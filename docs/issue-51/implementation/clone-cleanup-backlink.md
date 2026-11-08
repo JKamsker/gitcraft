@@ -113,3 +113,30 @@ adapters and compressed/generated receipts remain outside it. No generated binar
 evidence is introduced by these commits. The parent owns independent review and
 combined runtime/CI gates after containment clearance; this writer does not claim
 those gates from source inspection or compile/pure/headless results.
+
+## Exact application candidate gates
+
+Application commit `be95891e049ceb07121c12813a936f27572b2467` is preserved and
+remote-SHA verified. Rust 1.95.0 formatting, all-target checking, compile-only
+complete test build, and **12 audited pure/recording/headless tests** passed on
+that immutable commit. The real owned fixtures were compiled, not executed.
+
+All-target Clippy with `-D warnings -A dead_code` **failed** with 127 inherited
+lint diagnostics; none points to an added line, and none is in the new feature
+modules. This is not an all-target lint pass. The JSON receipt records each
+command, exit code, log hash, source hash, diagnostic file counts and untouched
+shared baseline paths. Complete logs/runner remain under
+`/tmp/gitcraft-51-orchestration/clone-cleanup-backlink-be95891e`.
+
+Preserved feature commits: clone `d232ee4d477e5504a5042393b4408a97c5795fb9`,
+clone recording follow-up `613d530a728a73844cc94f00eaa2e6947e8fbd5f`, cleanup
+`54527173e93b9a5498ef2f011f428172ea29fe47`, backlink
+`fcf2b052f040208280acb93f51ed02570212639b`, and clone completion/metadata follow-up
+`be95891e049ceb07121c12813a936f27572b2467`. The parent can fold the clone follow-ups
+into one feature commit while preserving this published provenance.
+
+Interaction-owner overlap is confined to additive fields/options validation and
+the managed worker call in `app/clone.rs`; `poll_clone` and window targeting were
+not edited. Shared module/state/dialog/Graph-tools registrations are additive.
+No edits touch Batch C's drafts/working transaction/native files/index publisher,
+credential consumer policy, native-git backend or worktree-root policy.
