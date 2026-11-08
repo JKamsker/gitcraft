@@ -270,24 +270,10 @@ impl RepoTab {
             self.busy_op = None;
             self.op_started = None;
         }
-        self.status = Some(match result {
-            Ok(crate::git::investigations::ignore::Appended::Changed) => (
-                crate::i18n::text("repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff")
-                    .into(),
-                false,
-            ),
-            Ok(crate::git::investigations::ignore::Appended::AlreadyPresent) => (
-                crate::i18n::text("repo-workflows-line_dossier-dossier-ignore-finished-366a809a")
-                    .into(),
-                false,
-            ),
-            Err(error) => (
-                crate::i18n::message(
-                    "repo-workflows-line_dossier-dossier-ignore-finished-4c50387c",
-                    &[("error", (error).clone().into())],
-                ),
-                true,
-            ),
+        self.status=Some(match result{
+            Ok(crate::git::investigations::ignore::Appended::Changed)=>("Revision appended to .git-blame-ignore-revs; staged contents preserved. Ordinary Git blame can use blame.ignoreRevsFile=.git-blame-ignore-revs.".into(),false),
+            Ok(crate::git::investigations::ignore::Appended::AlreadyPresent)=>("Revision already present; ignore file and index unchanged".into(),false),
+            Err(error)=>(format!("Ignore revision: {error}"),true),
         });
         self.reload_status(ctx);
     }

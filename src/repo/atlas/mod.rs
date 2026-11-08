@@ -128,7 +128,7 @@ impl RepoTab {
                 refresh |= ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-34dd32fc")).clicked();
             });
             if view.reader.busy() { ui.label(crate::i18n::text("repo-workflows-atlas-atlas-window-ef7caa7d")); if ui.button(crate::i18n::text("repo-workflows-atlas-atlas-window-d16ccfdf")).clicked() { view.reader.cancel(); } }
-            if let Some(error) = &view.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, error); }
+            if let Some(error) = &view.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, crate::repo::activity::display_workflow_error(&error)); }
             let Some(data) = &view.data else { return; };
             ui.label(format!("{} of {} scanned unique commits in period · {} reference tips · tree {}{}{}", data.selected, data.history.commits.len(), data.history.tips, data.head.get(..8).unwrap_or(&data.head), if data.history.more { " · partial history" } else { " · all reachable history" }, if data.history.shallow { " · shallow boundary" } else { "" }));
             ui.small(format!("Applied period: {} – {} ({:?}). Churn counts changed paths per commit, including deletions; folder totals count file touches. Zero-byte/deleted entries get a minimum visible area. File bytes are from the pinned HEAD tree.", data.query.from.map(|d|d.to_string()).unwrap_or_else(||crate::i18n::text("repo-workflows-atlas-atlas-window-c2e87ba8").into()), data.query.through.map(|d|d.to_string()).unwrap_or_else(||crate::i18n::text("repo-workflows-atlas-atlas-window-48c740b7").into()), data.query.clock));

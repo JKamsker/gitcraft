@@ -89,7 +89,7 @@ impl RepoTab {
                 }
                 Ok(_) => {
                     tab.status = Some((
-                        crate::i18n::text("repo-workflows-guide-ask-empty-commit-348d9f75").into(),
+                        "HEAD is detached: check out a branch to make the first commit on".into(),
                         true,
                     ));
                 }

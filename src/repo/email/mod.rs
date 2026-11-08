@@ -140,7 +140,7 @@ impl RepoTab {
                     acts.push(Action::Email(Act::Cancel));
                 }
             }
-            ui.label(&state.result);
+            ui.label(crate::repo::activity::display_workflow_error(&state.result));
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
                 ui.heading(crate::i18n::text(
                     "repo-workflows-email-email-window-03712771",
@@ -424,10 +424,7 @@ impl RepoTab {
                 tasks::Priority::Interactive,
                 Some(super::messages::mutation_key(&self.path)),
                 Some(Box::new(move || {
-                    let _ = cancelled.send(Err(crate::i18n::text(
-                        "repo-workflows-email-email-act-84f8f92f",
-                    )
-                    .into()));
+                    let _ = cancelled.send(Err("Cancelled before starting".into()));
                     failure_repaint.request_repaint();
                 })),
                 Box::new(move || {

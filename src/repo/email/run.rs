@@ -46,7 +46,7 @@ pub(super) fn snapshot(path: &Path) -> Result<Snapshot, String> {
 pub(super) fn guard(path: &Path, expected: &Snapshot) -> Result<(), String> {
     compare(expected, &snapshot(path)?)?;
     if crate::tasks::cancellation().is_cancelled() {
-        return Err(crate::i18n::text("repo-workflows-email-guard-d353a99e").into());
+        return Err("Cancelled".into());
     }
     Ok(())
 }

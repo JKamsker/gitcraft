@@ -378,21 +378,9 @@ impl RepoTab {
                     Ok(include) => {
                         let names: Vec<String> =
                             include.iter().map(|p| git::pattern_label(p)).collect();
-                        (
-                            crate::i18n::message(
-                                "repo-workflows-lfs_storage-fetch-only-3f558a4c",
-                                &[("names-join-1", (names.join(", ")).clone().into())],
-                            ),
-                            false,
-                        )
+                        (format!("LFS now fetches only {}", names.join(", ")), false)
                     }
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-lfs_storage-fetch-only-e3be5d1f",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ),
+                    Err(e) => (format!("Could not set what LFS fetches: {e}"), true),
                 });
                 if let Some(panel) = &mut tab.lfs_storage.panel {
                     panel.usage = None;

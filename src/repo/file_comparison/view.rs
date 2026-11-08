@@ -283,7 +283,7 @@ impl RepoTab {
         }
         let data = state.data.as_ref().and_then(|r| r.as_ref().ok()).cloned();
         if let Some(Err(e)) = &state.data {
-            ui.colored_label(t.danger, e);
+            ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(&e));
         }
         if let Some(data) = data {
             ui.separator();
@@ -299,7 +299,7 @@ impl RepoTab {
             match pair {
                 Ok(p) => show_pair(ui, p, &t),
                 Err(e) => {
-                    ui.colored_label(t.danger, e);
+                    ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(&e));
                 }
             }
         }

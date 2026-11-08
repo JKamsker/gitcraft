@@ -341,3 +341,19 @@ fn fluent_partition_actual_activity_adapter_formats_numbers_and_preserves_comman
     }
     crate::i18n::set_language("en-US");
 }
+
+#[test]
+fn fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_diagnostics() {
+    let raw = "Moved-code comparison cancelled";
+    for (language, expected) in [
+        ("en-US", raw),
+        ("de", "Vergleich verschobenen Codes abgebrochen"),
+    ] {
+        crate::i18n::set_language(language);
+        assert_eq!(display_workflow_error(raw), expected);
+        assert_eq!(raw, "Moved-code comparison cancelled");
+        let external = "fatal: opaque external diagnostic refs/heads/topic --force";
+        assert_eq!(display_workflow_error(external), external);
+    }
+    crate::i18n::set_language("en-US");
+}

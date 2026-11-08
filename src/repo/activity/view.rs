@@ -93,7 +93,10 @@ impl RepoTab {
         };
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
-            ui.label(RichText::new(op).font(theme::medium(12.5)));
+            ui.label(
+                RichText::new(crate::repo::messages::display_operation(op))
+                    .font(theme::medium(12.5)),
+            );
             if let Some(p) = running.control.progress() {
                 ui.label(RichText::new(p.label()).color(t.text_dim));
             }
@@ -129,7 +132,10 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
     }
     let header = state.show_header(ui, |ui| {
         icons::inline(ui, icon, 13.0, color);
-        ui.label(RichText::new(&entry.label).font(theme::medium(12.5)));
+        ui.label(
+            RichText::new(crate::repo::messages::display_operation(&entry.label))
+                .font(theme::medium(12.5)),
+        );
         let when = crate::i18n::message(
             "repo-workflows-activity-entry-summary",
             &[
@@ -158,7 +164,9 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
     });
     let (_, header_resp, _) = header.body(|ui| {
         if let Outcome::Failed(why) = &entry.outcome {
-            ui.label(RichText::new(why).color(t.danger));
+            ui.label(
+                RichText::new(crate::repo::activity::display_workflow_error(why)).color(t.danger),
+            );
         }
         if entry.steps.is_empty() {
             ui.label(

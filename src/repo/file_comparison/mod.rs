@@ -128,11 +128,7 @@ impl State {
 impl RepoTab {
     pub(super) fn open_file_comparison(&mut self, page: Page, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some((
-                crate::i18n::text("repo-workflows-file_comparison-open-file-comparison-a6cb5dc1")
-                    .into(),
-                true,
-            ));
+            self.status = Some(("Finish or close the editor first".into(), true));
             return;
         }
         let focused = self

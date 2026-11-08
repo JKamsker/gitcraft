@@ -25,13 +25,7 @@ impl RepoTab {
             .map(|(p, a)| (p.variable.clone(), a.clone()))
             .collect();
         if let Some((name, _)) = named.iter().find(|(_, a)| a.contains('\0')) {
-            self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-custom_commands-run-custom-44771367",
-                    &[("name", (name).clone().into())],
-                ),
-                true,
-            ));
+            self.status = Some((format!("${name} can't hold a NUL character"), true));
             return;
         }
         let repo = crate::remote::git_path(&self.path);

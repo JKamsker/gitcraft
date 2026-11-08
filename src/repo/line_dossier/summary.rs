@@ -29,7 +29,7 @@ pub(super) fn run(
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     if !active() {
-        return Err(crate::i18n::text("repo-workflows-line_dossier-run-ae6f0623").into());
+        return Err("Summary cancelled".into());
     }
     let input = prompt(cards).into_bytes();
     if input.len() > 256 * 1024 {
@@ -91,7 +91,7 @@ pub(super) fn run(
         output.stdout
     };
     if !active() || out.len() > 1024 * 1024 {
-        return Err(crate::i18n::text("repo-workflows-line_dossier-run-a9f1b338").into());
+        return Err("History summary cancelled or exceeded its output limit".into());
     }
     let answer = String::from_utf8(out)
         .map_err(|_| crate::i18n::text("repo-workflows-line_dossier-run-25d4488a"))?;

@@ -135,10 +135,8 @@ impl State {
                 tasks::Priority::Background,
                 key,
                 Some(Box::new(move || {
-                    let _ = cancelled.send(Reply::Finished(Err(crate::i18n::text(
-                        "repo-workflows-local_ci-submit-84f8f92f",
-                    )
-                    .into())));
+                    let _ =
+                        cancelled.send(Reply::Finished(Err("Cancelled before starting".into())));
                     fail_repaint.request_repaint();
                 })),
                 Box::new(move || {
@@ -207,7 +205,10 @@ impl State {
             }
         });
         for error in &self.errors {
-            ui.colored_label(egui::Color32::YELLOW, error);
+            ui.colored_label(
+                egui::Color32::YELLOW,
+                crate::repo::activity::display_workflow_error(&error),
+            );
         }
         if let Some(result) = &self.result {
             match result {
@@ -215,7 +216,10 @@ impl State {
                     ui.label(s);
                 }
                 Err(e) => {
-                    ui.colored_label(egui::Color32::LIGHT_RED, e);
+                    ui.colored_label(
+                        egui::Color32::LIGHT_RED,
+                        crate::repo::activity::display_workflow_error(&e),
+                    );
                 }
             }
         }
@@ -307,7 +311,10 @@ impl State {
         let entries = match workflow.matrices(job) {
             Ok(entries) => entries,
             Err(e) => {
-                ui.colored_label(egui::Color32::YELLOW, e);
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    crate::repo::activity::display_workflow_error(&e),
+                );
                 return;
             }
         };
@@ -337,7 +344,10 @@ impl State {
                 ));
             }
             Err(e) => {
-                ui.colored_label(egui::Color32::YELLOW, e);
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    crate::repo::activity::display_workflow_error(&e),
+                );
                 return;
             }
         }
@@ -371,7 +381,10 @@ impl State {
                 ui.label(context.display());
             }
             Err(error) => {
-                ui.colored_label(egui::Color32::YELLOW, error);
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    crate::repo::activity::display_workflow_error(&error),
+                );
             }
         }
         ui.label(crate::i18n::text(

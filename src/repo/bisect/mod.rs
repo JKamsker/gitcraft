@@ -193,13 +193,7 @@ impl RepoTab {
 
     fn start_bisect(&mut self, bad: String, good: Option<String>, ctx: &egui::Context) {
         if let Some(why) = self.bisect_blocker() {
-            self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-bisect-start-bisect-5c82e3e0",
-                    &[("why", (why).clone().into())],
-                ),
-                true,
-            ));
+            self.status = Some((format!("Can't start a bisect: {why}"), true));
             return;
         }
         self.bisect_step("Start bisect", ctx, move |path| {
@@ -209,10 +203,7 @@ impl RepoTab {
 
     fn mark_bisect(&mut self, mark: Mark, rev: Option<String>, ctx: &egui::Context) {
         let Some(bisect) = self.bisect.state.clone() else {
-            self.status = Some((
-                crate::i18n::text("repo-workflows-bisect-mark-bisect-a1c6c771").to_owned(),
-                true,
-            ));
+            self.status = Some(("No bisect is going on".to_owned(), true));
             return;
         };
         let label = match (&rev, mark) {
@@ -258,13 +249,7 @@ impl RepoTab {
         self.op_started = None;
         self.status = Some(match result {
             Ok(said) => (format!("{label}: {}", said_briefly(&said)), false),
-            Err(e) => (
-                crate::i18n::message(
-                    "repo-workflows-bisect-bisect-step-done-8336fbfe",
-                    &[("label", (label).clone().into()), ("e", (e).clone().into())],
-                ),
-                true,
-            ),
+            Err(e) => (format!("{label} failed: {e}"), true),
         });
         self.reload(ctx);
     }

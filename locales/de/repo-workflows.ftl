@@ -1295,8 +1295,6 @@ repo-workflows-devcontainer-gitdir-pointer-a66f1615 = Nicht unterstützter .git-
 
 repo-workflows-devcontainer-guard-7103bfb5 = Dev-Container-Konfiguration verschwunden
 
-repo-workflows-devcontainer-guard-d353a99e = Abgebrochen
-
 repo-workflows-devcontainer-inspect-2227e9c4 = Ungültiges Eigentumslabel
 
 repo-workflows-devcontainer-inspect-2e29e769 = Container gehört zu einem anderen Worktree, Docker-Daemon oder ausgewählten Profil
@@ -1904,8 +1902,6 @@ repo-workflows-email-email-window-e6ec08b2 = Gesendete Serie überarbeiten
 repo-workflows-email-email-window-e70c5648 = Geprüfte Serie anwenden (git am --3way)
 
 repo-workflows-email-email-window-f4b06ef6 = An
-
-repo-workflows-email-guard-d353a99e = Abgebrochen
 
 repo-workflows-email-interpreter-409abb66 = Installiertes b4 benötigt ein Python-Skript als Einstiegspunkt
 
@@ -3662,6 +3658,8 @@ repo-workflows-partial_stash-run-snapshot-f67020b0 = Es gibt keine Änderungen z
 
 repo-workflows-partial_stash-stash-8336fbfe = { $label } fehlgeschlagen: { $e }
 
+repo-workflows-postcards-bounded-graph-8e2ed023 = Postkartenrendering abgebrochen
+
 repo-workflows-postcards-bounded-graph-b345a27f = Der Postkartengraph überschreitet { $edge-limit } Elternkanten. Einen Bereich mit weniger Merge-Eltern wählen.
 
 repo-workflows-postcards-bounded-graph-d2afb115 = Ungültige Postkartengröße
@@ -3771,6 +3769,8 @@ repo-workflows-postcards-render-259a4df4 = Gitcraft · Postkarte zum Release-Ver
 repo-workflows-postcards-render-470fb84c = Nicht unterstützter Zeichen-Callback für Postkarten
 
 repo-workflows-postcards-render-64aa9927 = Ungültige Aktualisierung des Schriftatlas
+
+repo-workflows-postcards-render-8e2ed023 = Postkartenrendering abgebrochen
 
 repo-workflows-postcards-render-94fd1b4d = Ungültige Postkartenpixel
 

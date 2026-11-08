@@ -128,13 +128,7 @@ impl RepoTab {
             } else {
                 crate::i18n::text("repo-workflows-ci_view-open-ci-680d5c5f")
             };
-            self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-ci_view-open-ci-991ae978",
-                    &[("editor", (editor).clone().into())],
-                ),
-                true,
-            ));
+            self.status = Some((format!("Finish or close the {editor} first"), true));
             return;
         }
         self.diff = None;

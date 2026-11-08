@@ -222,10 +222,7 @@ impl RepoTab {
         }
         self.busy_op =
             Some(crate::i18n::text("repo-workflows-fence_view-fence-gate-6b730ef5").to_owned());
-        self.status = Some((
-            crate::i18n::text("repo-workflows-fence_view-fence-gate-2b8e4f3b").to_owned(),
-            false,
-        ));
+        self.status = Some(("Checking against the agent fence…".to_owned(), false));
         let repo = self.path.clone();
         self.then(
             ctx,

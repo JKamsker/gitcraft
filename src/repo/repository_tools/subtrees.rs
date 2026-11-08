@@ -122,7 +122,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                 )
             {
                 tab.status = Some((
-                    crate::i18n::text("repo-workflows-repository_tools-act-d021ec81").into(),
+                    "Prepared subtree profile/sign-in changed; prepare and approve again".into(),
                     true,
                 ));
                 return None;

@@ -58,10 +58,7 @@ impl RepoTab {
                 let prefix = self.hotfix_prefix();
                 let Some(name) = plan::start_name(&tag, &prefix) else {
                     self.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-hotfix-hotfix-act-06b55025",
-                            &[("tag", (tag).clone().into())],
-                        ),
+                        format!("{tag} isn't a version to start a hotfix from"),
                         true,
                     ));
                     return;

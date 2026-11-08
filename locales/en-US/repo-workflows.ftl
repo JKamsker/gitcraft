@@ -1295,8 +1295,6 @@ repo-workflows-devcontainer-gitdir-pointer-a66f1615 = Unsupported .git pointer
 
 repo-workflows-devcontainer-guard-7103bfb5 = Dev container configuration disappeared
 
-repo-workflows-devcontainer-guard-d353a99e = Cancelled
-
 repo-workflows-devcontainer-inspect-2227e9c4 = Invalid ownership label
 
 repo-workflows-devcontainer-inspect-2e29e769 = Container belongs to another worktree, Docker daemon or selected profile
@@ -1904,8 +1902,6 @@ repo-workflows-email-email-window-e6ec08b2 = Reroll from sent series
 repo-workflows-email-email-window-e70c5648 = Apply reviewed series (git am --3way)
 
 repo-workflows-email-email-window-f4b06ef6 = To
-
-repo-workflows-email-guard-d353a99e = Cancelled
 
 repo-workflows-email-interpreter-409abb66 = Installed b4 must have a Python script entrypoint
 
@@ -3662,6 +3658,8 @@ repo-workflows-partial_stash-run-snapshot-f67020b0 = there are no changes to sav
 
 repo-workflows-partial_stash-stash-8336fbfe = { $label } failed: { $e }
 
+repo-workflows-postcards-bounded-graph-8e2ed023 = Postcard rendering cancelled
+
 repo-workflows-postcards-bounded-graph-b345a27f = Postcard graph exceeds { $edge-limit } parent edges; choose a range with fewer merge parents
 
 repo-workflows-postcards-bounded-graph-d2afb115 = Invalid postcard size
@@ -3771,6 +3769,8 @@ repo-workflows-postcards-render-259a4df4 = Gitcraft · release history postcard
 repo-workflows-postcards-render-470fb84c = Unsupported postcard paint callback
 
 repo-workflows-postcards-render-64aa9927 = Invalid font atlas patch
+
+repo-workflows-postcards-render-8e2ed023 = Postcard rendering cancelled
 
 repo-workflows-postcards-render-94fd1b4d = Invalid postcard pixels
 

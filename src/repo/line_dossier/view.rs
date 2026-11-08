@@ -75,7 +75,10 @@ impl RepoTab {
             "repo-workflows-line_dossier-line-dossier-view-f31d5024",
         ));
         if let Some(error) = &self.dossier.error {
-            ui.colored_label(t.danger, clip(error, 2000));
+            ui.colored_label(
+                t.danger,
+                clip(&crate::repo::activity::display_workflow_error(&error), 2000),
+            );
         }
         ui.horizontal(|ui| {
             if ui
@@ -118,7 +121,10 @@ impl RepoTab {
                     );
                 }
                 Err(error) => {
-                    ui.colored_label(t.warning, error);
+                    ui.colored_label(
+                        t.warning,
+                        crate::repo::activity::display_workflow_error(&error),
+                    );
                 }
             }
         }

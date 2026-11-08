@@ -80,7 +80,7 @@ impl RepoTab {
         settings.tips = false;
         settings.set(ctx);
         self.guide.hints.close();
-        self.status = Some((crate::i18n::text(TIPS_OFF).to_owned(), false));
+        self.status = Some((TIPS_OFF.to_owned(), false));
     }
 
     /// The first-time hint up, if any, with a button closing it (drawn right to left, left of
@@ -137,4 +137,4 @@ impl RepoTab {
 const TURN_OFF_TIP: &str = "repo-workflows-guide--b7acfeab";
 
 /// What the status line says once tips are turned off.
-pub(crate) const TIPS_OFF: &str = "repo-workflows-guide--21dad442";
+pub(crate) const TIPS_OFF: &str = "Tips turned off: Settings → General → Tips turns them back on";

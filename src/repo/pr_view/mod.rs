@@ -249,13 +249,7 @@ impl RepoTab {
                                 Err(e) => {
                                     view.relocated = Default::default();
                                     view.relocated.error = Some(e.clone());
-                                    tab.status = Some((
-                                        crate::i18n::message(
-                                            "repo-workflows-pr_view-pr-files-arrived-20be6481",
-                                            &[("e", (e).clone().into())],
-                                        ),
-                                        true,
-                                    ))
+                                    tab.status = Some((format!("Comment relocation: {e}"), true))
                                 }
                             }
                         }

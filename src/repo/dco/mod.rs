@@ -204,15 +204,10 @@ impl RepoTab {
                     |tab, result, _| {
                         if let Err(e) = result {
                             tab.status = Some((
-                                crate::i18n::message(
-                                    "repo-workflows-dco-dco-act-10fe4a7c",
-                                    &[
-                                        (
-                                            "signoff-sign-off-key-1",
-                                            (signoff::SIGN_OFF_KEY).clone().into(),
-                                        ),
-                                        ("e", (e).clone().into()),
-                                    ],
+                                format!(
+                                    "Couldn't save Sign off for this repository \
+                                     (git config {}): {e}",
+                                    signoff::SIGN_OFF_KEY
                                 ),
                                 true,
                             ));

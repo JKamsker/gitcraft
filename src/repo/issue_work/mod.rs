@@ -154,13 +154,7 @@ impl RepoTab {
         match read.links {
             Ok(links) => self.issue_work.links = links,
             Err(e) if self.status.is_none() && self.busy_op.is_none() => {
-                self.status = Some((
-                    crate::i18n::message(
-                        "repo-workflows-issue_work-take-issue-read-bbcbbb59",
-                        &[("e", (e).clone().into())],
-                    ),
-                    true,
-                ));
+                self.status = Some((format!("Couldn't read the branches' issues: {e}"), true));
             }
             Err(_) => {}
         }
@@ -219,7 +213,7 @@ impl RepoTab {
             .is_some_and(|i| !i.selected(&crate::connections::current()))
         {
             self.status = Some((
-                crate::i18n::text("repo-workflows-issue_work-start-issue-563140a4").into(),
+                "Tracker account changed; reload the issue source".into(),
                 true,
             ));
             return;
@@ -227,13 +221,7 @@ impl RepoTab {
 
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-issue_work-start-issue-e2b80c1b",
-                    &[
-                        ("issue-key-1", (issue.key()).clone().into()),
-                        ("busy", (busy).clone().into()),
-                    ],
-                ),
+                format!("Start work on {}: wait for {busy}", issue.key()),
                 true,
             ));
             return;
@@ -242,16 +230,7 @@ impl RepoTab {
         let start = match plan.start {
             Ok(start) => start,
             Err(why) => {
-                self.status = Some((
-                    crate::i18n::message(
-                        "repo-workflows-issue_work-start-issue-c14dd822",
-                        &[
-                            ("issue-key-1", (issue.key()).clone().into()),
-                            ("why", (why).clone().into()),
-                        ],
-                    ),
-                    true,
-                ));
+                self.status = Some((format!("Start work on {}: {why}", issue.key()), true));
                 return;
             }
         };
@@ -553,31 +532,14 @@ impl RepoTab {
                 match result {
                     Ok(issue) => match &tab.busy_op {
                         Some(busy) => {
-                            tab.status = Some((
-                                crate::i18n::message(
-                                    "repo-workflows-issue_work-refresh-issue-a0e9ad2a",
-                                    &[
-                                        ("label", (label).clone().into()),
-                                        ("busy", (busy).clone().into()),
-                                    ],
-                                ),
-                                true,
-                            ));
+                            tab.status = Some((format!("{label}: wait for {busy}"), true));
                         }
                         None => {
                             let ops = link::write_ops(&branch, &IssueLink::of(&issue));
                             tab.run_ops(&label, ops, Refresh::All, OpKind::plain(), ctx);
                         }
                     },
-                    Err(e) => {
-                        tab.status = Some((
-                            crate::i18n::message(
-                                "repo-workflows-issue_work-refresh-issue-8336fbfe",
-                                &[("label", (label).clone().into()), ("e", (e).clone().into())],
-                            ),
-                            true,
-                        ))
-                    }
+                    Err(e) => tab.status = Some((format!("{label} failed: {e}"), true)),
                 }
             },
         );
@@ -594,16 +556,7 @@ impl RepoTab {
             move || link::unlink(&path, &target),
             move |tab, result, ctx| {
                 if let Err(e) = result {
-                    tab.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-issue_work-unlink-issue-6df1900e",
-                            &[
-                                ("branch", (branch).clone().into()),
-                                ("e", (e).clone().into()),
-                            ],
-                        ),
-                        true,
-                    ));
+                    tab.status = Some((format!("Forget the issue of {branch} failed: {e}"), true));
                 }
                 tab.reload(ctx);
             },

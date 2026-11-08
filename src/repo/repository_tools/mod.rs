@@ -469,13 +469,7 @@ impl RepoTab {
         work: impl FnOnce(&guard::Runner<'_>) -> Result<String, String> + Send + 'static,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-repository_tools-repository-tool-mutation-988356ee",
-                    &[("busy", (busy).clone().into())],
-                ),
-                true,
-            ));
+            self.status = Some((format!("{busy} is still running"), true));
             return;
         }
         if network && let Some(why) = crate::network::refused() {
@@ -1008,7 +1002,7 @@ impl RepoTab {
                 {
                     match result {
                         Ok(editor) => state.result = Some(Ok(Data::Remote(editor))),
-                        Err(e) => tab.status = Some((crate::i18n::message("repo-workflows-repository_tools-remote-config-preview-bba0304c", &[("e", (e).to_string().into())]), true)),
+                        Err(e) => tab.status = Some((format!("Remote preview: {e}"), true)),
                     }
                 }
             },
@@ -1169,29 +1163,17 @@ impl RepoTab {
             },
             move |tab, result, ctx| {
                 let parent = if publish {
-                    result
-                        .as_ref()
-                        .ok()
-                        .and_then(push_continuation::parent_continuation)
+                    result.as_ref().ok().and_then(push_continuation::parent_continuation)
                 } else {
                     None
                 };
                 let outcome = result.as_ref().map_err(Clone::clone).and_then(|p| {
                     if p.parent_result.as_ref().is_some_and(Result::is_err) {
-                        Err(crate::i18n::text(
-                            "repo-workflows-repository_tools-dependency-job-96731680",
-                        )
-                        .into())
+                        Err(crate::i18n::text("repo-workflows-repository_tools-dependency-job-96731680").into())
                     } else if p.dependencies.iter().any(|n| n.problem.is_some()) {
-                        Err(crate::i18n::text(
-                            "repo-workflows-repository_tools-dependency-job-f7c1dc97",
-                        )
-                        .into())
+                        Err(crate::i18n::text("repo-workflows-repository_tools-dependency-job-f7c1dc97").into())
                     } else {
-                        Ok(crate::i18n::text(
-                            "repo-workflows-repository_tools-dependency-job-80d8056a",
-                        )
-                        .into())
+                        Ok(crate::i18n::text("repo-workflows-repository_tools-dependency-job-80d8056a").into())
                     }
                 });
                 tab.op_done(
@@ -1216,19 +1198,11 @@ impl RepoTab {
                 if let Some(parent) = parent
                     && matches!(&tab.dialog, Some(Dialog::RepositoryTools(state)) if state.id == id)
                 {
-                    if tab.path != expected_path
-                        || crate::settings::Settings::get(ctx).profile() != profile
-                        || crate::connections::current() != context
-                        || tab.connection_context != context
+                    if tab.path != expected_path || crate::settings::Settings::get(ctx).profile() != profile
+                        || crate::connections::current() != context || tab.connection_context != context
                         || tab.https_generation != generation
                     {
-                        tab.status = Some((
-                            crate::i18n::text(
-                                "repo-workflows-repository_tools-dependency-job-a7b1dc6d",
-                            )
-                            .into(),
-                            true,
-                        ));
+                        tab.status = Some(("Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.".into(), true));
                         return;
                     }
                     tab.review_prepared_push(parent, ctx);

@@ -213,7 +213,8 @@ impl RepoTab {
                 self.postcards.commits = None;
                 self.postcards.preview = None;
                 self.postcards.status = Some(
-                    crate::i18n::text("repo-workflows-postcards-poll-postcards-4773e588").into(),
+                    "Profile changed. Read the release range again before composing a postcard."
+                        .into(),
                 );
             }
             return;
@@ -222,10 +223,7 @@ impl RepoTab {
             match answer {
                 Ok(Answer::Range(commits)) => {
                     self.postcards.commits = Some(commits);
-                    self.postcards.status = Some(
-                        crate::i18n::text("repo-workflows-postcards-poll-postcards-60ccb94f")
-                            .into(),
-                    );
+                    self.postcards.status=Some("Pinned release range loaded. Review the disclosure list, then compose the PNG preview.".into());
                 }
                 Ok(Answer::Preview(snapshot, image, png)) => {
                     let texture = ctx.load_texture(
@@ -239,15 +237,11 @@ impl RepoTab {
                         png: Arc::new(png),
                     });
                     self.postcards.status = Some(
-                        crate::i18n::text("repo-workflows-postcards-poll-postcards-5358001c")
-                            .into(),
+                        "Preview ready. The exported PNG contains exactly this composition; ellipses mark shortened or width-limited text.".into(),
                     );
                 }
                 Ok(Answer::Saved) => {
-                    self.postcards.status = Some(
-                        crate::i18n::text("repo-workflows-postcards-poll-postcards-10867442")
-                            .into(),
-                    )
+                    self.postcards.status = Some("PNG saved as a new local file.".into())
                 }
                 Err(error) => self.postcards.status = Some(error),
             }
@@ -436,7 +430,7 @@ impl RepoTab {
                 });
             }
             if let Some(status) = &self.postcards.status {
-                ui.label(status);
+                ui.label(crate::repo::activity::display_workflow_error(status));
             }
             if let Some(preview) = &self.postcards.preview {
                 ui.separator();
@@ -480,8 +474,7 @@ impl RepoTab {
         }
         if cancel {
             self.postcards.reader.cancel();
-            self.postcards.status =
-                Some(crate::i18n::text("repo-workflows-postcards-postcard-window-b6333aff").into());
+            self.postcards.status = Some("Postcard work cancelled.".into());
         }
         if load {
             self.postcards.preview = None;

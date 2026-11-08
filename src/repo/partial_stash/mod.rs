@@ -466,15 +466,7 @@ impl RepoTab {
                 let staged = request.mode == StashMode::Staged;
                 self.stash_job(label, ctx, move |path| run_push(path, args, head, staged));
             }
-            Err(e) => {
-                self.status = Some((
-                    crate::i18n::message(
-                        "repo-workflows-partial_stash-stash-8336fbfe",
-                        &[("label", (label).clone().into()), ("e", (e).clone().into())],
-                    ),
-                    true,
-                ))
-            }
+            Err(e) => self.status = Some((format!("{label} failed: {e}"), true)),
         }
     }
 

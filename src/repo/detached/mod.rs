@@ -166,13 +166,7 @@ impl RepoTab {
         }
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-detached-leave-to-28ae5898",
-                    &[
-                        ("leave-label-1", (leave.label()).clone().into()),
-                        ("busy", (busy).clone().into()),
-                    ],
-                ),
+                format!("Checkout {}: wait for {busy} to finish", leave.label()),
                 true,
             ));
             return;
@@ -203,12 +197,9 @@ impl RepoTab {
                 // and the checkout wouldn't start anyway.
                 if let Some(busy) = &tab.busy_op {
                     tab.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-detached-leave-to-007a4c0e",
-                            &[
-                                ("leave-label-1", (leave.label()).clone().into()),
-                                ("busy", (busy).clone().into()),
-                            ],
+                        format!(
+                            "Didn't check out {}: {busy} started meanwhile",
+                            leave.label()
                         ),
                         true,
                     ));
@@ -227,12 +218,10 @@ impl RepoTab {
                     }
                     Err(e) => {
                         tab.status = Some((
-                            crate::i18n::message(
-                                "repo-workflows-detached-leave-to-48b0ce4c",
-                                &[
-                                    ("leave-label-1", (leave.label()).clone().into()),
-                                    ("e", (e).clone().into()),
-                                ],
+                            format!(
+                                "Didn't check out {}: couldn't list the commits it would \
+                                 leave on no branch ({e})",
+                                leave.label()
                             ),
                             true,
                         ))
@@ -254,10 +243,7 @@ impl RepoTab {
     pub(super) fn detached_act(&mut self, act: DetachedAct, ctx: &egui::Context) {
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-detached-detached-act-70dad4a3",
-                    &[("busy", (busy).clone().into())],
-                ),
+                format!("Wait for {busy} to finish, then check out again"),
                 true,
             ));
             return;

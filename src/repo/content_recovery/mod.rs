@@ -129,13 +129,7 @@ impl RepoTab {
                 tab.op_started = None;
                 tab.status = Some(match result {
                     Ok(s) => (s, false),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-content_recovery-content-perform-9d57ebb2",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ),
+                    Err(e) => (format!("Content recovery: {e}"), true),
                 });
                 tab.content_recovery.preview = None;
                 tab.reload(ctx);

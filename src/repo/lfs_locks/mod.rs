@@ -315,6 +315,19 @@ mod fluent_identity_tests {
         ] {
             crate::i18n::set_language(language);
             assert_eq!(lock_label(&lock, 0), displayed);
+            let rendered = crate::repo::messages::display_operation("Push topic to origin");
+            assert_eq!(
+                rendered,
+                if language == "de" {
+                    "topic nach origin pushen"
+                } else {
+                    "Push topic to origin"
+                }
+            );
+            assert_eq!(
+                crate::repo::messages::display_operation("opaque external operation"),
+                "opaque external operation"
+            );
             assert!(pushes_current("Push topic to origin", Some("topic")));
             assert!(!pushes_current("Push tag v1 to origin", Some("topic")));
             assert!(!pushes_current(

@@ -235,26 +235,11 @@ impl RepoTab {
                 tab.lfs_locks.busy = None;
                 tab.status = Some(match &result {
                     Ok(()) if made_lockable => (
-                        crate::i18n::message(
-                            "repo-workflows-lfs_locks-lock-job-35b33376",
-                            &[("label", (label).clone().into())],
-                        ),
+                        format!("{label}: done. Commit .gitattributes to share it."),
                         false,
                     ),
-                    Ok(()) => (
-                        crate::i18n::message(
-                            "repo-workflows-lfs_locks-lock-job-36f5baee",
-                            &[("label", (label).clone().into())],
-                        ),
-                        false,
-                    ),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-lfs_locks-lock-job-8336fbfe",
-                            &[("label", (label).clone().into()), ("e", (e).clone().into())],
-                        ),
-                        true,
-                    ),
+                    Ok(()) => (format!("{label}: done"), false),
+                    Err(e) => (format!("{label} failed: {e}"), true),
                 });
                 tab.lfs_locks.job_error = result.as_ref().err().map(|e| {
                     crate::i18n::message(

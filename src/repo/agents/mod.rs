@@ -273,21 +273,12 @@ impl RepoTab {
             move |tab, (recipe, listed, hooks), ctx| {
                 if let Some(Err(e)) = hooks {
                     tab.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-agents-after-worktree-add-9fd23075",
-                            &[("e", (e).clone().into())],
-                        ),
+                        format!("The agent checkpoint hooks weren't installed: {e}"),
                         true,
                     ));
                 }
                 let recipe = recipe.unwrap_or_else(|e| {
-                    tab.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-agents-after-worktree-add-a2ffe669",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ));
+                    tab.status = Some((format!("The worktree setup recipe wasn't run: {e}"), true));
                     Recipe::default()
                 });
                 if let Some(listed) = listed {
@@ -317,10 +308,7 @@ impl RepoTab {
 
     fn start_agent_task(&mut self, new: start::NewTask, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some((
-                crate::i18n::text("repo-workflows-agents-start-agent-task-f80416ff").to_owned(),
-                true,
-            ));
+            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
             return;
         }
         self.agents.dialog = None;
@@ -386,10 +374,7 @@ impl RepoTab {
             |tab, result, _| match result {
                 Ok(()) => {
                     tab.agents.dialog = None;
-                    tab.status = Some((
-                        crate::i18n::text("repo-workflows-agents-save-recipe-97381b52").to_owned(),
-                        false,
-                    ));
+                    tab.status = Some(("Worktree setup recipe saved".to_owned(), false));
                 }
                 Err(e) => {
                     if let Some(AgentDialog::Recipe(form)) = &mut tab.agents.dialog {

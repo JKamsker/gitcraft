@@ -121,7 +121,7 @@ pub(super) fn read(
     let mut bytes = 0usize;
     for (path, code) in paths {
         if !live() {
-            return Err(crate::i18n::text("repo-workflows-file_comparison-read-431f5828").into());
+            return Err("Moved-code analysis cancelled or exceeded 40 seconds".into());
         }
         let raw = run(&["--patch", "--unified=3"], Some(&path))?;
         bytes = bytes.saturating_add(raw.len());
@@ -174,7 +174,7 @@ pub(super) fn read(
         }
     }
     if !live() {
-        return Err(crate::i18n::text("repo-workflows-file_comparison-read-431f5828").into());
+        return Err("Moved-code analysis cancelled or exceeded 40 seconds".into());
     }
     assemble(label, patches, notes, source, &pins, &live)
 }
@@ -296,14 +296,12 @@ fn assemble(
     let mut opened = Vec::with_capacity(data.moves.blocks.len());
     for i in 0..data.moves.blocks.len() {
         if !active() {
-            return Err(
-                crate::i18n::text("repo-workflows-file_comparison-assemble-56abde67").into(),
-            );
+            return Err("Moved-code comparison cancelled".into());
         }
         opened.push(moved_view::Opened::new(&data, i));
     }
     if !active() {
-        return Err(crate::i18n::text("repo-workflows-file_comparison-assemble-56abde67").into());
+        return Err("Moved-code comparison cancelled".into());
     }
     Ok(CodeMoves {
         opened,

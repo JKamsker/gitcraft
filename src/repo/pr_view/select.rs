@@ -26,7 +26,7 @@ impl RepoTab {
         };
         let Some(target) = self.pr_target(&pr) else {
             self.status = Some((
-                crate::i18n::text("repo-workflows-pr_view-select-pr-b788526c").to_owned(),
+                "The pull request's branch is not available yet".to_owned(),
                 true,
             ));
             return;

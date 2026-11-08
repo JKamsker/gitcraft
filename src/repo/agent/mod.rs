@@ -402,16 +402,7 @@ impl RepoTab {
         };
         let reply = match result {
             Ok(_) => {
-                self.status = Some((
-                    crate::i18n::message(
-                        "repo-workflows-agent-agent-op-done-16d1e9b2",
-                        &[
-                            ("running-agent-1", (running.agent).clone().into()),
-                            ("label", (label).clone().into()),
-                        ],
-                    ),
-                    false,
-                ));
+                self.status = Some((format!("{}: {label}: done", running.agent), false));
                 let how = if undoable {
                     crate::i18n::text("repo-workflows-agent-agent-op-done-d5e3a3af")
                 } else {

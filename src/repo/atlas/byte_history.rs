@@ -27,7 +27,7 @@ impl ByteHistory {
             let mut rows = Vec::new();
             for (i, record) in snapshot.commits.iter().enumerate() {
                 if !owned() || crate::git::profile_config() != profile {
-                    return Err(crate::i18n::text("repo-workflows-atlas-new-70ba4563").into());
+                    return Err("File history cancelled".into());
                 }
                 if record.paths.contains(&path) {
                     rows.push(i);

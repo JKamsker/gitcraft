@@ -217,7 +217,10 @@ impl RepoTab {
                     acts.push(Action::Devcontainer(Act::Cancel));
                 }
             }
-            ui.add(egui::Label::new(&state.result).selectable(true));
+            ui.add(
+                egui::Label::new(crate::repo::activity::display_workflow_error(&state.result))
+                    .selectable(true),
+            );
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
                 if ui
                     .button(crate::i18n::text(
@@ -408,10 +411,7 @@ impl RepoTab {
                 tasks::Priority::Interactive,
                 key,
                 Some(Box::new(move || {
-                    let _ = failure.send(Err(crate::i18n::text(
-                        "repo-workflows-devcontainer-devcontainer-act-84f8f92f",
-                    )
-                    .into()));
+                    let _ = failure.send(Err("Cancelled before starting".into()));
                     fail_repaint.request_repaint();
                 })),
                 Box::new(move || {

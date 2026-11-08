@@ -25,10 +25,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             let profile = crate::settings::Settings::get(ctx).profile();
             let context = crate::connections::current();
             if tab.connection_context != context {
-                tab.status = Some((
-                    crate::i18n::text("repo-workflows-repository_tools-act-ccd2fdda").into(),
-                    true,
-                ));
+                tab.status = Some(("Connection changed; reopen outbox".into(), true));
                 return None;
             }
             tab.repository_tool_mutation("Queue exact push", false, ctx, move |r| {
@@ -66,7 +63,8 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
         Act::PrepareOutbox(id) | Act::ReviewOutbox(id) => {
             if tab.is_busy() || crate::network::refused().is_some() {
                 tab.status = Some((
-                    crate::i18n::text("repo-workflows-repository_tools-act-d64d1e25").into(),
+                    "Go online and wait for the current operation before preparing an outbox push"
+                        .into(),
                     true,
                 ));
                 return None;
@@ -158,7 +156,7 @@ fn start_send(tab: &mut RepoTab, p: Box<logic::Prepared>, automatic: bool, ctx: 
         })
     {
         tab.status = Some((
-            crate::i18n::text("repo-workflows-repository_tools-start-send-628a48e6").into(),
+            "Prepared outbox profile/sign-in changed; prepare and approve again".into(),
             true,
         ));
         return;

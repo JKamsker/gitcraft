@@ -178,7 +178,7 @@ impl RepoTab {
     pub(super) fn open_doctor(&mut self, section: Section, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
             self.status = Some((
-                crate::i18n::text("repo-workflows-doctor-open-doctor-745454bd").to_owned(),
+                "Finish or close the conflict editor or the interactive rebase first".to_owned(),
                 true,
             ));
             return;
@@ -212,10 +212,7 @@ impl RepoTab {
             DoctorAct::Reload => self.load_doctor(ctx),
             DoctorAct::Run { label, ops } => {
                 if self.busy_op.is_some() {
-                    self.status = Some((
-                        crate::i18n::text("repo-workflows-doctor-doctor-act-9bab8d95").to_owned(),
-                        true,
-                    ));
+                    self.status = Some(("Wait for the running operation to end".to_owned(), true));
                     return;
                 }
                 if let Some(doctor) = &mut self.doctor {

@@ -198,9 +198,9 @@ impl RepoTab {
     pub(super) fn send_to_agent(&mut self, message: &str, what: &str) -> bool {
         let Some(i) = self.agent_terminal() else {
             self.status = Some((
-                crate::i18n::message(
-                    "repo-workflows-agents-send-to-agent-a6f80242",
-                    &[("what", (what).clone().into())],
+                format!(
+                    "No agent terminal in this worktree to send {what} to: start the agent \
+                     (Start agent task…), or pick its terminal next to Send to agent"
                 ),
                 true,
             ));
@@ -228,14 +228,7 @@ impl RepoTab {
             }
             Err(e) => {
                 self.status = Some((
-                    crate::i18n::message(
-                        "repo-workflows-agents-send-to-agent-4e9f0022",
-                        &[
-                            ("what", (what).clone().into()),
-                            ("label", (label).clone().into()),
-                            ("e", (e).clone().into()),
-                        ],
-                    ),
+                    format!("Couldn't send {what} to the {label} terminal: {e}"),
                     true,
                 ));
                 false

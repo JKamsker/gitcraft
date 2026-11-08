@@ -52,23 +52,14 @@ impl RepoTab {
 
     pub(super) fn install_hooks(&mut self, ctx: &egui::Context) {
         let repo = self.path.clone();
-        self.status = Some((
-            crate::i18n::text("repo-workflows-agents-install-hooks-2f5d6dc4").to_owned(),
-            false,
-        ));
+        self.status = Some(("Installing the agent hooks…".to_owned(), false));
         self.then(
             ctx,
             move || crate::agent::hooks::install(&repo),
             |tab, result, _| {
                 tab.status = Some(match result {
                     Ok(said) => (said.join(" "), false),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-agents-install-hooks-a8f2778c",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ),
+                    Err(e) => (format!("The agent hooks weren't installed: {e}"), true),
                 });
             },
         );
@@ -82,13 +73,7 @@ impl RepoTab {
             |tab, result, _| {
                 tab.agents.turns_for = None;
                 if let Err(e) = result {
-                    tab.status = Some((
-                        crate::i18n::message(
-                            "repo-workflows-agents-forget-turns-1d1d391e",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ));
+                    tab.status = Some((format!("The turns weren't deleted: {e}"), true));
                 }
             },
         );

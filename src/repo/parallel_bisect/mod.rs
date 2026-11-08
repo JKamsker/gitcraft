@@ -253,8 +253,7 @@ impl RepoTab {
     fn start_parallel(&mut self, setup: pb::Setup, ctx: &egui::Context) {
         if self.parallel.running() {
             self.status = Some((
-                crate::i18n::text("repo-workflows-parallel_bisect-start-parallel-3450e92d")
-                    .to_owned(),
+                "A parallel bisect is already running in this tab".to_owned(),
                 true,
             ));
             return;
@@ -325,11 +324,7 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() {
-            self.status = Some((
-                crate::i18n::text("repo-workflows-parallel_bisect-mark-parallel-result-e5e3ecc5")
-                    .to_owned(),
-                true,
-            ));
+            self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
             return;
         }
         let parents = self
@@ -356,20 +351,8 @@ impl RepoTab {
                 tab.busy_op = None;
                 tab.op_started = None;
                 tab.status = Some(match result {
-                    Ok(_) => (
-                        crate::i18n::text(
-                            "repo-workflows-parallel_bisect-mark-parallel-result-e05d54d7",
-                        )
-                        .to_owned(),
-                        false,
-                    ),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-parallel_bisect-mark-parallel-result-48f3588b",
-                            &[("e", (e).clone().into())],
-                        ),
-                        true,
-                    ),
+                    Ok(_) => ("Marked in the bisect".to_owned(), false),
+                    Err(e) => (format!("Mark in the bisect failed: {e}"), true),
                 });
                 tab.reload(ctx);
             },

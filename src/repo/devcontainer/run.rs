@@ -87,7 +87,7 @@ fn guard(config: &Config) -> Result<(), String> {
         "repo-workflows-devcontainer-guard-7103bfb5",
     ))?)?;
     if crate::tasks::cancellation().is_cancelled() {
-        return Err(crate::i18n::text("repo-workflows-devcontainer-guard-d353a99e").into());
+        return Err("Cancelled".into());
     }
     Ok(())
 }
@@ -219,7 +219,7 @@ pub(super) fn terminal(
         return Err(crate::i18n::text("repo-workflows-devcontainer-terminal-b74a6469").into());
     }
     if crate::tasks::cancellation().is_cancelled() {
-        return Err(crate::i18n::text("repo-workflows-devcontainer-terminal-f171832a").into());
+        return Err("Cancelled before terminal start".into());
     }
     let shell = crate::terminal::ShellSpec {
         program: crate::shell_path::resolve("docker"),

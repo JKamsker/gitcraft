@@ -12,10 +12,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             update_marks(tab, *review, None, ctx);
         }
         Act::PreviewInverse(review) if review.aggregate.is_some() => {
-            tab.status = Some((
-                crate::i18n::text("repo-workflows-repository_tools-act-6dc9a943").into(),
-                true,
-            ));
+            tab.status = Some(("Choose one saved turn to preview its inverse".into(), true));
         }
         Act::PreviewInverse(review) => {
             let repo = tab.path.clone();
