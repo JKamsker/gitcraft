@@ -68,3 +68,24 @@ fn every_view_is_in_the_palette_and_listed_once() {
         assert!(crate::icons::known(kind.icon()), "{:?}", kind);
     }
 }
+
+#[test]
+fn insights_replaces_investigation_and_document_pages() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/insights-navigation".into(), &ctx);
+    // Keep this transition test inert: all requested insight data is already loaded.
+    let mut view = super::InsightsView::new(Kind::Evolution);
+    view.loaded.insert(Kind::Evolution);
+    tab.insights = Some(Box::new(view));
+    tab.symbols.open = true;
+    tab.dossier.open = true;
+    tab.review_document.open = true;
+    tab.apply(Action::Insights(InsightsAct::Open(Kind::Evolution)), &ctx);
+    assert!(!tab.symbols.open);
+    assert!(!tab.dossier.open);
+    assert!(!tab.review_document.open);
+    assert_eq!(
+        tab.insights.as_ref().map(|view| view.kind),
+        Some(Kind::Evolution)
+    );
+}

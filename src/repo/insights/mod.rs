@@ -264,6 +264,11 @@ impl RepoTab {
         }
         let pr = self.pr_view.as_ref().map(|v| v.number);
         // The page takes the big area: what was open over it closes.
+        self.file_comparison = None;
+        self.tour = None;
+        self.symbols.close();
+        self.dossier.close();
+        self.review_document.open = false;
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;
