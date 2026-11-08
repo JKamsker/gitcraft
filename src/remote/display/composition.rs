@@ -336,6 +336,10 @@ mod tests {
         assert!(claim.contains("\"workspace claim unavailable: {}\""));
         let cases = [
             (
+                "gitcraft owned endpoint: vendor; atomic cleanup proof unavailable: native terminal receipt unavailable\n",
+                "gitcraft-Eigentümerendpunkt: vendor; der atomare Bereinigungsnachweis ist nicht verfügbar: Die native Abschlussbestätigung ist nicht verfügbar.\n",
+            ),
+            (
                 "native owner unavailable; cleanup unknown; atomic cleanup proof unavailable: native terminal receipt unavailable",
                 "Der native Eigentümer ist nicht verfügbar; der Bereinigungsstatus ist unbekannt.; der atomare Bereinigungsnachweis ist nicht verfügbar: Die native Abschlussbestätigung ist nicht verfügbar.",
             ),
@@ -383,7 +387,7 @@ mod tests {
                 "invalid native request\n\n",
                 "invalid native request\r\n",
                 "Traceback:\nValueError: invalid native request",
-                "vendor; atomic cleanup proof unavailable: native terminal receipt unavailable",
+                "vendor: atomic cleanup proof unavailable: native terminal receipt unavailable",
                 "invalid native request; NotDispatched proof publication failed: vendor\nsecond line",
             ] {
                 let raw = format!("gitcraft owned endpoint: {detail}");
