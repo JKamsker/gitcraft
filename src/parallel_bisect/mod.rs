@@ -10,6 +10,7 @@
 pub(crate) mod bundle;
 mod cache;
 mod dag;
+pub(crate) mod display;
 mod machine;
 pub(crate) mod observe;
 mod runner;

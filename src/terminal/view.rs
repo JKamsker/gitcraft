@@ -76,7 +76,7 @@ impl Terminal {
         crate::a11y::a11y(
             &resp,
             egui::WidgetType::TextEdit,
-            "Terminal. Tab and arrow keys go to the shell. Shift+Escape returns focus to the app.",
+            super::display::accessibility(),
         );
         ui.ctx().accesskit_node_builder(resp.id, |node| {
             node.set_role(egui::accesskit::Role::Terminal);
@@ -296,7 +296,7 @@ impl Terminal {
             painter.text(
                 rect.right_top() + vec2(-10.0, 8.0),
                 egui::Align2::RIGHT_TOP,
-                format!("↑ {} lines", self.scroll),
+                super::display::scrollback(self.scroll),
                 FontId::proportional(11.0),
                 t.text_faint,
             );
