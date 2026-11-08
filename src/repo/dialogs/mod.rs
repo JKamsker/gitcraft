@@ -10,6 +10,7 @@ mod fold;
 mod gerrit;
 mod interaction;
 mod keep_detached;
+mod linked_machines;
 mod parallel_bisect;
 mod preview;
 mod rehearse;
@@ -68,6 +69,7 @@ pub enum Dialog {
         skip_hooks: bool,
         web_warning: Option<String>,
     },
+    LinkedMachines(Box<linked_machines::Form>),
     BundleLoading(u64),
     BundleExport {
         refs: Vec<crate::git::BundleRef>,
@@ -534,6 +536,7 @@ impl RepoTab {
                     super::repository_tools::show(ui, state, acts);
                     if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
+                Dialog::LinkedMachines(form) => form.show(ui),
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");

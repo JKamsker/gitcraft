@@ -486,6 +486,7 @@ impl RepoTab {
             Action::ReviewBranch { branch, base } => self.start_review(ctx, branch, base),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenLinkedMachines => self.open_linked_machines(ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleInspect => self.open_bundle_inspect(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),

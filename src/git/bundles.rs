@@ -254,7 +254,7 @@ fn verification_command<'a>(
     Ok((args, input))
 }
 
-fn no_lazy_fetch(repo: &Path) -> Result<Vec<&'static str>, String> {
+pub(super) fn no_lazy_fetch(repo: &Path) -> Result<Vec<&'static str>, String> {
     let probe = bounded::run(
         repo,
         &["--no-lazy-fetch", "rev-parse", "--git-dir"],
