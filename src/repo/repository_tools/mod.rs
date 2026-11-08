@@ -2,6 +2,7 @@ mod lists;
 mod outbox;
 mod sharing;
 mod turns;
+mod virtuals;
 use crate::git::repository_tools::sharing as borrowing;
 mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
@@ -33,10 +34,20 @@ enum Tool {
     Outbox,
     Turn,
     Lists,
+    Virtuals,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Virtuals,
+    EditVirtual(
+        Box<crate::git::drafts::virtuals::View>,
+        crate::git::drafts::virtuals::Edit,
+    ),
+    ToggleVirtual(Box<crate::git::drafts::virtuals::View>, String),
+    UndoVirtual(Box<crate::git::drafts::virtuals::View>),
+    PrepareVirtual(Box<crate::git::drafts::virtuals::View>, String),
+    CommitVirtual(Box<crate::git::drafts::virtuals::Prepared>),
     Lists,
     EditList(
         Box<crate::git::drafts::lists::View>,
@@ -84,6 +95,8 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Virtual(crate::git::drafts::virtuals::View),
+    VirtualCommit(Box<crate::git::drafts::virtuals::Prepared>),
     Lists(crate::git::drafts::lists::View),
     Turn(crate::git::drafts::turn::Review),
     Inverse(Box<crate::git::drafts::turn::Inverse>),
@@ -114,6 +127,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match virtuals::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match lists::act(self, act, ctx) {
             Some(act) => act,
             None => return,
@@ -243,6 +260,12 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Virtuals => (String::new(), Tool::Virtuals),
+            Act::EditVirtual(..)
+            | Act::ToggleVirtual(..)
+            | Act::UndoVirtual(..)
+            | Act::PrepareVirtual(..)
+            | Act::CommitVirtual(..) => return,
             Act::Lists => (String::new(), Tool::Lists),
             Act::EditList(..) | Act::CommitList(..) | Act::ShelveList(..) => return,
             Act::Turn(parent, turn, session) => {
@@ -303,6 +326,10 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Virtuals => crate::git::drafts::virtuals::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Virtual),
                 Tool::Lists => crate::git::drafts::lists::read(&path, &|| {
                     !crate::tasks::cancellation().is_cancelled()
                 })
@@ -404,6 +431,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Virtuals {
+        virtuals::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Lists {
         lists::show(ui, state, acts);
         return;

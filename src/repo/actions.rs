@@ -697,6 +697,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Parallel branches in this folder: hunk ownership…".into(),
+                "Virtual branches".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Virtuals),
+            ),
+            (
                 "Named changelists: messages, commit and shelve…".into(),
                 "Working changes".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Lists),

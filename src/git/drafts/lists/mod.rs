@@ -31,11 +31,11 @@ pub struct View {
     pub paths: Vec<String>,
     pub version: String,
     pub reference: String,
-    source: Arc<Source>,
-    work: Arc<Contents>,
-    head: Arc<BTreeMap<String, Entry>>,
+    pub(super) source: Arc<Source>,
+    pub(super) work: Arc<Contents>,
+    pub(super) head: Arc<BTreeMap<String, Entry>>,
 }
-fn entries(
+pub(super) fn entries(
     ctx: &Context,
     rev: &str,
     active: &dyn Fn() -> bool,
@@ -357,7 +357,7 @@ pub fn edit(
     publish(&ctx, view, &lists, None, active)?;
     Ok("Changelist saved".into())
 }
-fn data(
+pub(super) fn data(
     ctx: &Context,
     entries: &BTreeMap<String, Option<Entry>>,
     active: &dyn Fn() -> bool,
@@ -387,7 +387,7 @@ fn data(
         })
         .collect()
 }
-fn raw_entries(
+pub(super) fn raw_entries(
     ctx: &Context,
     data: &Contents,
     active: &dyn Fn() -> bool,

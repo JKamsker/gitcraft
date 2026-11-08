@@ -7,6 +7,7 @@ mod restore;
 #[cfg(test)]
 mod tests;
 pub mod turn;
+pub mod virtuals;
 mod working_transaction;
 
 use crate::{git, remote};
