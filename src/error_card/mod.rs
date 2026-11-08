@@ -177,7 +177,7 @@ impl ErrorCard {
             Err(TryRecvError::Empty) => return,
             Err(TryRecvError::Disconnected) => {
                 self.earlier_undone = Some(Err(
-                    "Internal error: the undo stopped before it was done".to_owned(),
+                    crate::i18n::text("interaction-error-undo-stopped").to_owned()
                 ))
             }
         }
@@ -205,7 +205,7 @@ impl ErrorCard {
             // It panicked (a bug): say so rather than wait for good.
             Err(TryRecvError::Disconnected) => {
                 self.rx = None;
-                let e = "Internal error: the check stopped before it was done".to_owned();
+                let e = crate::i18n::text("interaction-error-check-stopped").to_owned();
                 if self.found.is_none() {
                     self.found = Some(Err(e));
                 } else {
@@ -222,7 +222,10 @@ impl ErrorCard {
             Reply::Undone(Ok(what)) => self.stage = Stage::Undone(what),
             Reply::Undone(Err((e, fix))) => {
                 self.stage = Stage::Done {
-                    what: format!("Undo failed: {e}"),
+                    what: crate::i18n::message(
+                        "interaction-error-undo-failed",
+                        &[("error", e.as_str().into())],
+                    ),
                     undo: Some(fix),
                 }
             }

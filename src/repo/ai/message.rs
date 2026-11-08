@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use egui::{RichText, Ui};
 
-use super::{Running, coverage, elapsed};
+use super::{MessageNote, Running, elapsed};
 use crate::ai::detect::{self, Look};
 use crate::ai::prompt::split_message;
 use crate::ai::{self, AiTool, Answer, Question, RunError};
@@ -26,22 +26,21 @@ impl RepoTab {
         let settings = Settings::get(ui.ctx()).ai;
         let busy = self.ai.writing.is_some();
         let tip = if !editable {
-            "Not while a rebase or patch continues: reword the commit once it is done".to_owned()
+            crate::i18n::text("repo-workflows-ai-ai-message-button-9553c66f").to_owned()
         } else if busy {
-            "Writing the message…".to_owned()
+            crate::i18n::text("repo-workflows-ai-ai-message-button-04254124").to_owned()
         } else if settings.enabled() && self.amend {
-            format!(
-                "Write the message with {} from the last commit and what is staged\nRight-click \
-                 for another tool",
-                settings.tool.short()
+            crate::i18n::message(
+                "repo-workflows-ai-ai-message-button-05060623",
+                &[("settings-tool-short-1", (settings.tool.short()).into())],
             )
         } else if settings.enabled() {
-            format!(
-                "Write the message with {} from the staged changes\nRight-click for another tool",
-                settings.tool.short()
+            crate::i18n::message(
+                "repo-workflows-ai-ai-message-button-33272cf9",
+                &[("settings-tool-short-1", (settings.tool.short()).into())],
             )
         } else {
-            "Have an AI tool you have installed write the message".to_owned()
+            crate::i18n::text("repo-workflows-ai-ai-message-button-a1323968").to_owned()
         };
         let resp = ui.add_enabled(editable && !busy, |ui: &mut Ui| {
             icons::small_button(ui, "sparkles", &tip)
@@ -50,7 +49,7 @@ impl RepoTab {
             self.start_message(ui.ctx());
         }
         let popup = if settings.enabled() {
-            egui::Popup::context_menu(&resp)
+            crate::menu_item::context(&resp)
         } else {
             egui::Popup::menu(&resp)
         };
@@ -73,27 +72,50 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         self.look_for_tools(ui.ctx());
         let settings = Settings::get(ui.ctx()).ai;
-        let place = crate::remote::parse(&self.path)
-            .map_or_else(|| "this machine".to_owned(), |t| t.host.label());
+        let place = crate::remote::parse(&self.path).map_or_else(
+            || crate::i18n::text("repo-workflows-ai-tool-menu-e223809d").to_owned(),
+            |t| t.host.label(),
+        );
         ui.label(
-            RichText::new(format!("AI tool, for messages and reviews (on {place})"))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-ai-tool-menu-72f76d6c",
+                &[("place", (place).clone().into())],
+            ))
+            .color(t.text_faint)
+            .small(),
         );
         let mut chosen = None;
         for tool in AiTool::CHOICES {
             let found = self.ai.tools.has(tool);
             let no_command = tool == AiTool::Custom && settings.custom_command.trim().is_empty();
             let text = match found {
-                Some(true) if no_command => format!("{} — set it in Settings → AI", tool.label()),
+                Some(true) if no_command => crate::i18n::message(
+                    "repo-workflows-ai-tool-menu-671a1cd9",
+                    &[("tool-label-1", (tool.label()).into())],
+                ),
                 Some(true) => tool.label().to_owned(),
-                Some(false) => format!("{} — not found", tool.label()),
+                Some(false) => crate::i18n::message(
+                    "repo-workflows-ai-tool-menu-9b1177a4",
+                    &[("tool-label-1", (tool.label()).into())],
+                ),
                 None if matches!(self.ai.tools, Look::Failed(_)) => tool.label().to_owned(),
-                None => format!("{} — looking…", tool.label()),
+                None => crate::i18n::message(
+                    "repo-workflows-ai-tool-menu-0c0aa296",
+                    &[("tool-label-1", (tool.label()).into())],
+                ),
             };
-            let can = found != Some(false) && !no_command;
-            if ui
-                .add_enabled(can, egui::Button::selectable(current == tool, text))
+            let refused = if no_command {
+                Some(crate::i18n::text("repo-workflows-ai-tool-menu-77cbb6fb"))
+            } else if found == Some(false) {
+                Some(crate::i18n::text("repo-workflows-ai-tool-menu-9950df89"))
+            } else {
+                None
+            };
+            if crate::menu_item::MenuItem::new(text)
+                .icon("sparkles")
+                .selected(current == tool)
+                .refused(refused)
+                .show(ui)
                 .clicked()
             {
                 chosen = Some(tool);
@@ -103,19 +125,29 @@ impl RepoTab {
             ui.label(RichText::new(e).color(t.danger).small());
         }
         if matches!(self.ai.tools, Look::Found(_) | Look::Failed(_))
-            && ui
-                .button("Look again")
-                .on_hover_text("Look for the tools again, after installing one")
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-ai-tool-menu-d36feef0",
+            ))
+            .icon("refresh-cw")
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-workflows-ai-tool-menu-1440bda3"))
+            .clicked()
         {
             self.ai.tools = Look::NotYet;
         }
         ui.separator();
-        if current != AiTool::Off && ui.button("Turn off").clicked() {
+        if current != AiTool::Off
+            && crate::menu_item::MenuItem::new(crate::i18n::text(
+                "repo-workflows-ai-tool-menu-06f0e210",
+            ))
+            .icon("x")
+            .show(ui)
+            .clicked()
+        {
             chosen = Some(AiTool::Off);
         }
         ui.label(
-            RichText::new("Prompts, a command of your own, how much is sent: Settings → AI")
+            RichText::new(crate::i18n::text("repo-workflows-ai-tool-menu-5e2d9c98"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -179,6 +211,7 @@ impl RepoTab {
             return;
         }
         self.ai.writing = None;
+        self.ai.note_presentation = None;
         let answer = match answer {
             Ok(answer) => answer,
             Err(RunError::Cancelled) => return,
@@ -189,10 +222,19 @@ impl RepoTab {
         };
         let (summary, body) = split_message(&answer.text);
         if summary.is_empty() {
-            self.ai.note = Some(("The tool's answer had no summary line.".to_owned(), true));
+            self.ai.remember_message_note(MessageNote::Empty, true);
             return;
         }
-        self.ai.note = coverage(answer.files, answer.left_out).map(|n| (n, false));
+        self.ai.note = None;
+        if answer.left_out > 0 {
+            self.ai.remember_message_note(
+                MessageNote::Coverage {
+                    files: answer.files,
+                    left_out: answer.left_out,
+                },
+                false,
+            );
+        }
         if self.commit_summary.trim().is_empty() && self.commit_body.trim().is_empty() {
             self.commit_summary = summary;
             self.commit_body = body;
@@ -225,8 +267,20 @@ impl RepoTab {
             let mut dismissed = false;
             ui.horizontal(|ui| {
                 let color = if *error { t.danger } else { t.text_faint };
-                ui.add(egui::Label::new(RichText::new(text).color(color).small()).wrap());
-                dismissed = icons::small_button(ui, "x", "Dismiss").clicked();
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.ai.display_message_note(text))
+                            .color(color)
+                            .small(),
+                    )
+                    .wrap(),
+                );
+                dismissed = icons::small_button(
+                    ui,
+                    "x",
+                    crate::i18n::text("repo-workflows-ai-ai-message-status-48845bff"),
+                )
+                .clicked();
             });
             if dismissed {
                 self.ai.note = None;
@@ -242,15 +296,21 @@ fn writing_row(ui: &mut Ui, running: &Running) -> bool {
     ui.horizontal(|ui| {
         ui.add(crate::spinner::Spinner::new());
         ui.label(
-            RichText::new(format!(
-                "{} is writing the message… {}",
-                running.tool.short(),
-                elapsed(running.started)
+            RichText::new(crate::i18n::message(
+                "repo-workflows-ai-writing-row-ea07a4e5",
+                &[
+                    ("running-tool-short-1", (running.tool.short()).into()),
+                    (
+                        "elapsed-running-started-2",
+                        (elapsed(running.started)).clone().into(),
+                    ),
+                ],
             ))
             .color(t.text_dim)
             .small(),
         );
-        ui.button("Cancel").clicked()
+        ui.button(crate::i18n::text("repo-workflows-ai-writing-row-19766ed6"))
+            .clicked()
     })
     .inner
 }
@@ -268,9 +328,11 @@ fn suggestion_card(ui: &mut Ui, summary: &str, body: &str) -> Option<bool> {
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
-                RichText::new("The tool's message (yours is kept until you choose):")
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-ai-suggestion-card-e3bbc8d9",
+                ))
+                .color(t.text_faint)
+                .small(),
             );
             ui.add(egui::Label::new(RichText::new(summary).font(theme::semibold(12.5))).wrap());
             if !body.is_empty() {
@@ -283,13 +345,22 @@ fn suggestion_card(ui: &mut Ui, summary: &str, body: &str) -> Option<bool> {
             }
             ui.horizontal(|ui| {
                 if ui
-                    .button("Use it")
-                    .on_hover_text("Replace the summary and description with it")
+                    .button(crate::i18n::text(
+                        "repo-workflows-ai-suggestion-card-57a64561",
+                    ))
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-ai-suggestion-card-5a6b5767",
+                    ))
                     .clicked()
                 {
                     choice = Some(true);
                 }
-                if ui.button("Keep mine").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-ai-suggestion-card-0335c833",
+                    ))
+                    .clicked()
+                {
                     choice = Some(false);
                 }
             });

@@ -18,6 +18,17 @@ struct DraggedRow {
 }
 
 impl Step {
+    pub(super) fn command(self) -> crate::keymap::Command {
+        use crate::keymap::Command;
+        match self {
+            Self::Pick => Command::RebasePick,
+            Self::Reword => Command::RebaseReword,
+            Self::Edit => Command::RebaseEdit,
+            Self::Squash => Command::RebaseSquash,
+            Self::Fixup => Command::RebaseFixup,
+            Self::Drop => Command::RebaseDrop,
+        }
+    }
     /// The action a key sets, as git's todo list abbreviates it.
     pub(super) fn for_key(key: Key) -> Option<Step> {
         Some(match key {
@@ -31,18 +42,6 @@ impl Step {
         })
     }
 }
-
-/// The keys the editor reads, in the order they are checked.
-const KEYS: [Key; 8] = [
-    Key::ArrowUp,
-    Key::ArrowDown,
-    Key::P,
-    Key::R,
-    Key::E,
-    Key::S,
-    Key::F,
-    Key::D,
-];
 
 /// Where entry `from` ends up when dropped on entry `target`, on its upper half (`above`) or
 /// its lower one; `None` when that is where it already is. `entries` run oldest first and the
@@ -131,32 +130,31 @@ impl RebaseEditor {
         if !free || self.starting {
             return Keys::default();
         }
-        // In the order they came, each with whether Alt was held; with Ctrl, Cmd or Shift
-        // they are someone else's shortcuts.
-        let pressed: Vec<(Key, bool)> = ui.input_mut(|i| {
-            let mut pressed = Vec::new();
-            i.events.retain(|e| match e {
-                egui::Event::Key {
-                    key,
-                    pressed: true,
-                    modifiers,
-                    ..
-                } if KEYS.contains(key)
-                    && !(modifiers.command || modifiers.ctrl || modifiers.mac_cmd)
-                    && !modifiers.shift =>
-                {
-                    pressed.push((*key, modifiers.alt));
-                    false
-                }
-                _ => true,
-            });
-            pressed
-        });
+        use crate::keymap::{self, Scope};
+        keymap::active(
+            ui.ctx(),
+            vec![Scope::Window, Scope::Repository, Scope::Rebase],
+        );
+        let pressed = keymap::pressed(ui.ctx(), Scope::Rebase);
         let mut keys = Keys {
             reveal: !pressed.is_empty(),
             ..Keys::default()
         };
-        for (key, alt) in pressed {
+        for command in pressed {
+            use crate::keymap::Command;
+            let (key, alt) = match command {
+                Command::RebasePrevious => (Key::ArrowUp, false),
+                Command::RebaseNext => (Key::ArrowDown, false),
+                Command::RebaseMoveUp => (Key::ArrowUp, true),
+                Command::RebaseMoveDown => (Key::ArrowDown, true),
+                Command::RebasePick => (Key::P, false),
+                Command::RebaseReword => (Key::R, false),
+                Command::RebaseEdit => (Key::E, false),
+                Command::RebaseSquash => (Key::S, false),
+                Command::RebaseFixup => (Key::F, false),
+                Command::RebaseDrop => (Key::D, false),
+                _ => continue,
+            };
             keys.reworded |= self.press(key, alt);
         }
         keys
@@ -300,15 +298,32 @@ impl RebaseEditor {
                     let handle = ui.dnd_drag_source(id, DraggedRow { editor, index: i }, grip);
                     picked |= handle.response.drag_started();
                     ui.add_enabled_ui(i + 1 < n, |ui| {
-                        if icons::small_button(ui, "chevron-up", "Move up, later (Alt+↑)").clicked()
+                        if icons::small_button(
+                            ui,
+                            "chevron-up",
+                            &crate::keymap::tip(
+                                ui.ctx(),
+                                crate::i18n::text("repo-core-3246"),
+                                crate::keymap::Command::RebaseMoveUp,
+                            ),
+                        )
+                        .clicked()
                         {
                             *swap = Some((i, i + 1));
                             picked = true;
                         }
                     });
                     ui.add_enabled_ui(i > 0, |ui| {
-                        if icons::small_button(ui, "chevron-down", "Move down, earlier (Alt+↓)")
-                            .clicked()
+                        if icons::small_button(
+                            ui,
+                            "chevron-down",
+                            &crate::keymap::tip(
+                                ui.ctx(),
+                                crate::i18n::text("repo-core-3247"),
+                                crate::keymap::Command::RebaseMoveDown,
+                            ),
+                        )
+                        .clicked()
                         {
                             *swap = Some((i, i - 1));
                             picked = true;
@@ -321,10 +336,15 @@ impl RebaseEditor {
                         .show_ui(ui, |ui| {
                             for step in Step::ALL {
                                 ui.selectable_value(&mut e.step, step, step.label())
-                                    .on_hover_text(format!("{} ({})", step.explain(), step.key()));
+                                    .on_hover_text(format!(
+                                        "{} ({})",
+                                        step.explain(),
+                                        crate::keymap::label(ui.ctx(), step.command())
+                                    ));
                             }
                         });
                     picked |= e.step != before;
+                    super::weather::badge(ui, self.weather.rows.get(i), e.step == Step::Drop, t);
                     let dim = e.step == Step::Drop;
                     let hash = ui.add(
                         egui::Label::new(
@@ -351,17 +371,31 @@ impl RebaseEditor {
                             .selectable(false)
                             .sense(Sense::click()),
                     );
+                    let label = || {
+                        crate::i18n::message(
+                            "repo-core-rebase-commit-accessible",
+                            &[
+                                ("hash", short(&e.commit.hash).into()),
+                                ("summary", e.commit.summary.as_str().into()),
+                                ("author", e.commit.author.as_str().into()),
+                                ("step", e.step.label().into()),
+                            ],
+                        )
+                    };
+                    for response in [&hash, &avatar, &summary] {
+                        crate::a11y::a11y_selected(response, label, selected);
+                    }
                     picked |= hash.clicked() || avatar.clicked() || summary.clicked();
                     if matches!(e.step, Step::Squash | Step::Fixup) {
                         ui.label(
-                            egui::RichText::new("↓ into the commit below")
+                            egui::RichText::new(crate::i18n::text("repo-core-3250"))
                                 .color(t.accent_fg)
                                 .small(),
                         );
                     }
                     if e.step == Step::Edit {
                         ui.label(
-                            egui::RichText::new("stops here so you can change it")
+                            egui::RichText::new(crate::i18n::text("repo-core-3251"))
                                 .color(t.accent_fg)
                                 .small(),
                         );
@@ -371,6 +405,7 @@ impl RebaseEditor {
                         egui::vec2(ui.available_width(), 20.0),
                         Sense::click(),
                     );
+                    crate::a11y::a11y_selected(&rest.1, label, selected);
                     picked |= rest.1.clicked();
                 });
                 if e.step == Step::Reword {
@@ -425,7 +460,8 @@ fn ghost(ui: &Ui, t: &Tokens, pos: egui::Pos2, hash: &str, summary: &str) {
 }
 
 impl Step {
-    /// The key that sets it.
+    /// The default Git todo abbreviation, checked against the registry in tests.
+    #[cfg(test)]
     fn key(self) -> char {
         match self {
             Step::Pick => 'P',
@@ -449,7 +485,7 @@ fn grip(ui: &mut Ui) {
                 .circle_filled(rect.center() + egui::vec2(col, row), 1.4, color);
         }
     }
-    resp.on_hover_text("Drag to move the commit");
+    resp.on_hover_text(crate::i18n::text("repo-core-4240"));
 }
 
 #[cfg(test)]
@@ -624,6 +660,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn configured_commands_reach_actual_rebase_keys_and_step_hints() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = crate::settings::Settings::default();
+        settings.key_bindings.insert(
+            Command::RebaseDrop.id().into(),
+            vec![Stroke::new(Key::F8, Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        let mut ed = editor(&["a", "b"]);
+        frame(&ctx, &mut ed, vec![]);
+        frame(&ctx, &mut ed, vec![key(Key::F8, Modifiers::NONE)]);
+        assert_eq!(ed.entries[1].step, Step::Drop);
+        assert!(super::super::keys_hint(&ctx).contains("Drop: F8"));
+        ed.entries[1].step = Step::Pick;
+        frame(&ctx, &mut ed, vec![key(Key::D, Modifiers::NONE)]);
+        assert_eq!(
+            ed.entries[1].step,
+            Step::Pick,
+            "replaced default must not continue executing"
+        );
+    }
     #[test]
     fn keys_pressed_over_the_list_act_on_it() {
         let ctx = egui::Context::default();

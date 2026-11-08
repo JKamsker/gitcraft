@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use egui::{Event, Key, Modifiers, RawInput};
 
 use super::*;
@@ -28,51 +26,34 @@ fn parse(combo: &str) -> Option<(Key, bool, bool, bool)> {
     Some((key, cmd, shift, alt))
 }
 
-const EVERY_COMMAND: &[Command] = &[
-    Command::NewTab,
-    Command::CloseTab,
-    Command::ReopenTab,
-    Command::NextTab,
-    Command::PreviousTab,
-    Command::GoToTab(1),
-    Command::GoToTab(2),
-    Command::GoToTab(3),
-    Command::GoToTab(4),
-    Command::GoToTab(5),
-    Command::GoToTab(6),
-    Command::GoToTab(7),
-    Command::GoToTab(8),
-    Command::LastTab,
-    Command::Palette,
-    Command::Settings,
-    Command::Reload,
-    Command::Manual,
-    Command::Fetch,
-    Command::Pull,
-    Command::Push,
-    Command::Stash,
-    Command::NewBranch,
-    Command::Terminal,
-    Command::StageAll,
-    Command::Commit,
-];
-
 #[test]
 fn no_two_bindings_share_a_key() {
-    let mut seen = HashSet::new();
-    for b in BINDINGS {
-        assert!(seen.insert(normalised(b)), "{:?} is bound twice", b.key);
-    }
+    assert!(
+        config::validate(&Overrides::new()).is_ok(),
+        "all coexisting default bindings must be unambiguous"
+    );
 }
 
 #[test]
 fn no_binding_takes_a_key_a_view_already_uses() {
-    let bound: HashSet<_> = BINDINGS.iter().map(normalised).collect();
     for (group, rows) in crate::manual::SHORTCUTS {
         for (keys, what) in *rows {
             for combo in keys.split(" / ") {
                 if let Some(parsed) = parse(combo) {
-                    assert!(!bound.contains(&parsed), "{combo} ({group}: {what})");
+                    // Repository commands are inactive on Home and Settings pages.
+                    let collisions: Vec<_> = BINDINGS
+                        .iter()
+                        .filter(|binding| {
+                            matches!(binding.command.scope(), Scope::Window | Scope::Repository)
+                                && normalised(binding) == parsed
+                                && (!matches!(
+                                    *group,
+                                    "interaction-manual-group-settings"
+                                        | "interaction-manual-group-start-page"
+                                ) || binding.command.scope() == Scope::Window)
+                        })
+                        .collect();
+                    assert!(collisions.is_empty(), "{combo} ({group}: {what})");
                 }
             }
         }
@@ -81,22 +62,29 @@ fn no_binding_takes_a_key_a_view_already_uses() {
 
 #[test]
 fn every_command_has_one_key_and_finds_its_way_back() {
-    for &command in EVERY_COMMAND {
+    for command in config::commands() {
         let bindings: Vec<_> = BINDINGS.iter().filter(|b| b.command == command).collect();
+        if UNBOUND_COMMANDS.contains(&command) {
+            assert!(bindings.is_empty());
+            assert!(label(&egui::Context::default(), command).is_empty());
+            continue;
+        }
         assert_eq!(bindings.len(), 1, "{command:?}");
         let b = bindings[0];
-        assert_eq!(find(b.key, b.modifiers), Some(command));
-        assert!(!label(command).is_empty());
+        assert_eq!(
+            pressed_with(vec![key(b.key, b.modifiers, false)], command.scope()),
+            [command]
+        );
+        assert!(!label(&egui::Context::default(), command).is_empty());
     }
-    assert_eq!(BINDINGS.len(), EVERY_COMMAND.len());
 }
 
 #[test]
 fn every_command_is_in_the_manual_once() {
-    let rows = WINDOW_ROWS.iter().chain(REPOSITORY_ROWS);
+    let rows = WINDOW_ROWS.iter().chain(REPOSITORY_ROWS).chain(LOCAL_ROWS);
     let listed: Vec<Command> = rows.flat_map(|r| r.commands.iter().copied()).collect();
-    for command in EVERY_COMMAND {
-        let times = listed.iter().filter(|c| *c == command).count();
+    for command in config::commands() {
+        let times = listed.iter().filter(|c| **c == command).count();
         assert_eq!(times, 1, "{command:?}");
     }
     for r in REPOSITORY_ROWS {
@@ -110,16 +98,34 @@ fn every_command_is_in_the_manual_once() {
 #[test]
 fn keys_are_written_for_this_platform() {
     let cmd = crate::manual::command();
-    assert_eq!(label(Command::Fetch), format!("{cmd}+Shift+F"));
-    assert_eq!(label(Command::Commit), format!("{cmd}+Enter"));
-    assert_eq!(label(Command::Settings), format!("{cmd}+,"));
+    assert_eq!(
+        label(&egui::Context::default(), Command::Fetch),
+        format!("{cmd}+Shift+F")
+    );
+    assert_eq!(
+        label(&egui::Context::default(), Command::Commit),
+        format!("{cmd}+Enter")
+    );
+    assert_eq!(
+        label(&egui::Context::default(), Command::Settings),
+        format!("{cmd}+,")
+    );
     // Ctrl, also on macOS.
-    assert_eq!(label(Command::PreviousTab), "Ctrl+Shift+Tab");
-    assert_eq!(label(Command::Reload), "F5");
-    assert_eq!(tip("Push", Command::Push), format!("Push ({cmd}+Shift+K)"));
-    let tabs = row_keys(&WINDOW_ROWS[4]);
+    assert_eq!(
+        label(&egui::Context::default(), Command::PreviousTab),
+        "Ctrl+Shift+Tab"
+    );
+    assert_eq!(label(&egui::Context::default(), Command::Reload), "F5");
+    assert_eq!(
+        tip(&egui::Context::default(), "Push", Command::Push),
+        format!("Push ({cmd}+Shift+K)")
+    );
+    let tabs = row_keys(&egui::Context::default(), &WINDOW_ROWS[4]);
     assert_eq!(tabs, format!("{cmd}+1…8"));
-    assert_eq!(row_keys(&WINDOW_ROWS[3]), "Ctrl+Tab / Ctrl+Shift+Tab");
+    assert_eq!(
+        row_keys(&egui::Context::default(), &WINDOW_ROWS[3]),
+        "Ctrl+Tab / Ctrl+Shift+Tab"
+    );
 }
 
 #[test]
@@ -127,7 +133,7 @@ fn extra_modifiers_make_another_key() {
     let shift = Modifiers::COMMAND | Modifiers::SHIFT;
     assert_eq!(find(Key::T, Modifiers::COMMAND), Some(Command::NewTab));
     assert_eq!(find(Key::T, shift), Some(Command::ReopenTab));
-    assert_eq!(find(Key::F, Modifiers::COMMAND), None);
+    assert_eq!(find(Key::F, Modifiers::COMMAND), Some(Command::Search));
     assert_eq!(find(Key::F, Modifiers::NONE), None);
     assert_eq!(find(Key::B, Modifiers::COMMAND | Modifiers::ALT), None);
     assert_eq!(find(Key::Tab, Modifiers::NONE), None);
@@ -152,9 +158,19 @@ fn pressed_with(events: Vec<Event>, scope: Scope) -> Vec<Command> {
         events,
         ..Default::default()
     };
-    ctx.run_ui(input, |ui| got = ui.input(|i| pressed(i, scope)))
-        .textures_delta
-        .clear();
+    ctx.run_ui(input, |ui| {
+        active(
+            ui.ctx(),
+            if scope == Scope::Settings {
+                vec![Scope::Window, Scope::Settings]
+            } else {
+                vec![Scope::Window, Scope::Repository, scope]
+            },
+        );
+        got = pressed(ui.ctx(), scope);
+    })
+    .textures_delta
+    .clear();
     got
 }
 
@@ -236,4 +252,112 @@ fn tab_digits_go_by_their_place_on_the_keyboard() {
         [Command::Terminal]
     );
     assert!(pressed_with(vec![moved_j], Scope::Window).is_empty());
+}
+
+#[test]
+fn newly_registered_commands_share_effective_labels_manual_and_scoped_chord_dispatch() {
+    let ctx = egui::Context::default();
+    let mut settings = crate::settings::Settings::default();
+    let commands = [
+        Command::Undo,
+        Command::Redo,
+        Command::Timeline,
+        Command::Search,
+        Command::Back,
+        Command::Forward,
+        Command::NextChange,
+        Command::PreviousChange,
+        Command::NextChangeAlt,
+        Command::PreviousChangeAlt,
+    ];
+    for (index, command) in commands.into_iter().enumerate() {
+        // Distinct chords exercise the same persisted registry used by every source surface.
+        settings.key_bindings.insert(
+            command.id().into(),
+            vec![
+                Stroke::new(Key::F12, Modifiers::NONE),
+                Stroke::new(
+                    [
+                        Key::A,
+                        Key::B,
+                        Key::C,
+                        Key::D,
+                        Key::E,
+                        Key::F,
+                        Key::G,
+                        Key::H,
+                        Key::I,
+                        Key::J,
+                    ][index],
+                    Modifiers::COMMAND,
+                ),
+            ],
+        );
+    }
+    assert!(config::validate(&settings.key_bindings).is_ok());
+    settings.put_for_test(&ctx);
+    for (index, command) in commands.into_iter().enumerate() {
+        let effective = label(&ctx, command);
+        assert!(effective.starts_with("F12 → "));
+        let groups = crate::manual::shortcut_groups(&ctx);
+        assert!(
+            groups
+                .iter()
+                .flat_map(|(_, rows)| rows)
+                .any(|(keys, _)| keys == &effective)
+        );
+        for (part, (key, modifiers)) in [
+            (Key::F12, Modifiers::NONE),
+            (
+                [
+                    Key::A,
+                    Key::B,
+                    Key::C,
+                    Key::D,
+                    Key::E,
+                    Key::F,
+                    Key::G,
+                    Key::H,
+                    Key::I,
+                    Key::J,
+                ][index],
+                Modifiers::COMMAND,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut got = Vec::new();
+            ctx.run_ui(
+                RawInput {
+                    time: Some(index as f64 + part as f64 * 0.1),
+                    events: vec![
+                        Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers,
+                        },
+                        Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |_| {
+                    active(&ctx, vec![Scope::Window, Scope::Repository, Scope::Changes]);
+                    for scope in [Scope::Window, Scope::Repository, Scope::Changes] {
+                        got.extend(pressed(&ctx, scope));
+                    }
+                },
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(got, if part == 0 { vec![] } else { vec![command] });
+        }
+    }
 }

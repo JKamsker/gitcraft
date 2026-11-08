@@ -48,11 +48,11 @@ impl Section {
 
     pub(crate) fn title(self) -> &'static str {
         match self {
-            Section::Ignore => "Ignore rules and attributes",
-            Section::Hooks => "Hooks",
-            Section::Health => "Health and maintenance",
-            Section::Config => "Which configuration wins",
-            Section::Flags => "Hidden changes",
+            Section::Ignore => crate::i18n::text("repo-workflows-doctor-title-94ec061c"),
+            Section::Hooks => crate::i18n::text("repo-workflows-doctor-title-d412a062"),
+            Section::Health => crate::i18n::text("repo-workflows-doctor-title-8d6acfc3"),
+            Section::Config => crate::i18n::text("repo-workflows-doctor-title-8b2d57fa"),
+            Section::Flags => crate::i18n::text("repo-workflows-doctor-title-1e6bed5e"),
         }
     }
 
@@ -95,6 +95,7 @@ pub(crate) enum DoctorAct {
 /// A change the doctor asks about before making it.
 #[derive(Clone)]
 pub(crate) struct Confirm {
+    presentation: Option<Box<ConfirmPresentation>>,
     pub(crate) title: String,
     pub(crate) body: String,
     /// The button that makes it.
@@ -177,16 +178,17 @@ impl RepoTab {
     /// Shows the doctor in the big area, at `section`.
     pub(super) fn open_doctor(&mut self, section: Section, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Finish or close the conflict editor or the interactive rebase first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         self.diff = None;
         self.file_view = None;
         self.ci_view = None;
         self.close_pr();
+        self.tour = None;
         let doctor = self.doctor.get_or_insert_with(|| {
             Box::new(DoctorView {
                 section,
@@ -211,7 +213,10 @@ impl RepoTab {
             DoctorAct::Reload => self.load_doctor(ctx),
             DoctorAct::Run { label, ops } => {
                 if self.busy_op.is_some() {
-                    self.status = Some(("Wait for the running operation to end".to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        "Wait for the running operation to end".to_owned(),
+                        true,
+                    )));
                     return;
                 }
                 if let Some(doctor) = &mut self.doctor {
@@ -365,3 +370,134 @@ impl RepoTab {
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Clone)]
+struct ConfirmPresentation {
+    raw: (String, String, String),
+    kind: ConfirmKind,
+}
+#[derive(Clone)]
+enum ConfirmKind {
+    Remove {
+        key: String,
+        value: String,
+        file: String,
+        scope: crate::git::doctor::config::Scope,
+    },
+    Set {
+        key: String,
+        value: String,
+        scope: crate::git::doctor::config::Scope,
+    },
+    Clear {
+        paths: Vec<String>,
+    },
+    Maintenance {
+        commands: String,
+    },
+}
+impl Confirm {
+    fn with_presentation(mut self, kind: ConfirmKind) -> Self {
+        self.presentation = Some(Box::new(ConfirmPresentation {
+            raw: (self.title.clone(), self.body.clone(), self.button.clone()),
+            kind,
+        }));
+        self
+    }
+    fn displayed(&self) -> (String, String, String) {
+        let raw = (self.title.clone(), self.body.clone(), self.button.clone());
+        let Some(receipt) = &self.presentation else {
+            return raw;
+        };
+        if receipt.raw != raw {
+            return raw;
+        }
+        use crate::git::doctor::config::Scope;
+        use crate::i18n::{message, text};
+        match &receipt.kind {
+            ConfirmKind::Remove {
+                key,
+                value,
+                file,
+                scope,
+            } => (
+                message(
+                    "repo-workflows-doctor-remove-confirm-9861b6eb",
+                    &[("origin-key-1", key.as_str().into())],
+                ),
+                message(
+                    "repo-workflows-doctor-remove-setting",
+                    &[
+                        ("key", key.as_str().into()),
+                        ("value", value.as_str().into()),
+                        ("file", file.as_str().into()),
+                        (
+                            "scope",
+                            match scope {
+                                Scope::Global => "global",
+                                Scope::System => "system",
+                                _ => "local",
+                            }
+                            .into(),
+                        ),
+                    ],
+                ),
+                text("repo-workflows-doctor-remove-confirm-c3812fc4").into(),
+            ),
+            ConfirmKind::Set { key, value, scope } => (
+                message(
+                    "repo-workflows-doctor-set-row-a215cc6f",
+                    &[
+                        ("setting-key-1", key.as_str().into()),
+                        (
+                            "scope-choice-scope-to-lowercase-2",
+                            config_section::scope_choice(*scope).to_lowercase().into(),
+                        ),
+                    ],
+                ),
+                message(
+                    "repo-workflows-doctor-set-row-ccc71902",
+                    &[
+                        ("setting-key-1", key.as_str().into()),
+                        ("value", value.as_str().into()),
+                        (
+                            "if-scope-scope-global-your-globa-2",
+                            text(if *scope == Scope::Global {
+                                "repo-workflows-doctor-set-row-e0a790f9"
+                            } else {
+                                "repo-workflows-doctor-set-row-cc3edd84"
+                            })
+                            .into(),
+                        ),
+                    ],
+                ),
+                text("repo-workflows-doctor-set-row-b6f6f3ad").into(),
+            ),
+            ConfirmKind::Clear { paths } => {
+                let what = match paths.as_slice() {
+                    [one] => one.clone(),
+                    _ => message(
+                        "repo-workflows-doctor-clear-ac70d25c",
+                        &[("files-len-1", paths.len().into())],
+                    ),
+                };
+                (
+                    text("repo-workflows-doctor-clear-909d7fba").into(),
+                    message(
+                        "repo-workflows-doctor-clear-ae587a37",
+                        &[("what", what.into())],
+                    ),
+                    text("repo-workflows-doctor-clear-83b12c22").into(),
+                )
+            }
+            ConfirmKind::Maintenance { commands } => (
+                text("repo-workflows-doctor-turn-on-action-3c97132f").into(),
+                message(
+                    "repo-workflows-doctor-turn-on-action-7cde0a5e",
+                    &[("commands-join-1", commands.as_str().into())],
+                ),
+                text("repo-workflows-doctor-turn-on-action-f4830a1d").into(),
+            ),
+        }
+    }
+}

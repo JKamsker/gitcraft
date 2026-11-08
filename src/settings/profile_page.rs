@@ -109,6 +109,7 @@ pub fn badge(ui: &mut Ui, size: f32, profile: &UserProfile) {
 impl Settings {
     /// The profile in use and its own settings, or what a search matches of them.
     pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut SettingsView) {
+        self.profile_connections_ui(ui, f);
         let t = Tokens::get(ui.ctx());
         let current = self.profile();
         let mut request = None;
@@ -117,21 +118,19 @@ impl Settings {
             ui,
             f,
             "Profile",
-            Some(
-                "Each profile has its own tabs, recent repositories, theme, git author and \
-                 commit signing; the other pages are shared. Switching closes this profile's \
-                 tabs and opens the other one's.",
-            ),
+            Some(crate::i18n::text("interaction-accounts-profiles-intro")),
             |card| {
                 card.row("In use", "switch profile new duplicate delete", |ui| {
                     ui.horizontal_wrapped(|ui| {
                         badge(ui, 20.0, &current);
                         egui::ComboBox::from_id_salt("settings-profile-pick")
-                            .selected_text(current.title())
+                            .selected_text(current.display_title())
                             .width(layout::fit(ui, 180.0))
                             .show_ui(ui, |ui| {
                                 for p in &self.user_profiles {
-                                    if ui.selectable_label(p.id == current.id, p.title()).clicked()
+                                    if ui
+                                        .selectable_label(p.id == current.id, p.display_title())
+                                        .clicked()
                                         && p.id != current.id
                                     {
                                         request = Some(ProfileRequest::Switch(p.id));
@@ -139,17 +138,15 @@ impl Settings {
                                 }
                             });
                         if ui
-                            .button("New")
-                            .on_hover_text("A new profile, with no tabs, switched to")
+                            .button(crate::i18n::text("interaction-accounts-new"))
+                            .on_hover_text(crate::i18n::text("interaction-accounts-new-help"))
                             .clicked()
                         {
                             request = Some(ProfileRequest::New);
                         }
                         if ui
-                            .button("Duplicate")
-                            .on_hover_text(
-                                "A copy of this profile's settings (not its tabs), switched to",
-                            )
+                            .button(crate::i18n::text("interaction-accounts-duplicate"))
+                            .on_hover_text(crate::i18n::text("interaction-accounts-duplicate-help"))
                             .clicked()
                         {
                             request = Some(ProfileRequest::Duplicate);
@@ -162,13 +159,13 @@ impl Settings {
                 card.row("Name", "rename title", |ui| {
                     ui.add(
                         layout::field(&mut self.profile_mut().name)
-                            .hint_text("Work")
+                            .hint_text(crate::i18n::text("interaction-accounts-work"))
                             .desired_width(layout::fit(ui, 200.0)),
                     );
                 });
                 card.row_hint(
                     "Theme",
-                    "More on the Appearance page",
+                    crate::i18n::text("interaction-accounts-appearance"),
                     "dark light colours colors appearance",
                     |ui| {
                         egui::ComboBox::from_id_salt("settings-profile-theme")
@@ -194,7 +191,7 @@ impl Settings {
         let own = own_author(ui.ctx());
         let hint = |value: &str, key: &str| {
             if value.is_empty() {
-                format!("{key}, not set")
+                crate::i18n::message("interaction-accounts-unset", &[("key", key.into())])
             } else {
                 value.to_owned()
             }
@@ -203,13 +200,7 @@ impl Settings {
             ui,
             f,
             "Git author",
-            Some(
-                "Commits from gitcraft are by this author. Empty: as in your global git config \
-                 (shown greyed). A repository that sets its own user.name or user.email (git \
-                 config --local, or \"Commit as…\" in its commit box) keeps them: the \
-                 repository's config wins over the profile. A repository in WSL or over SSH \
-                 goes by that machine's git config instead.",
-            ),
+            Some(crate::i18n::text("interaction-accounts-author-intro")),
             |card| {
                 let profile = self.profile_mut();
                 card.row("Name", "user.name author committer", |ui| {
@@ -229,6 +220,77 @@ impl Settings {
             },
         );
 
+        section(
+            ui,
+            f,
+            "Outgoing author per host",
+            Some(crate::i18n::text("interaction-accounts-host-intro")),
+            |card| {
+                let profile = self.profile_mut();
+                let mut remove = None;
+                for (i, rule) in profile.author_hosts.iter_mut().enumerate() {
+                    card.row(
+                        "Host / namespace",
+                        "push preflight identity author host email",
+                        |ui| {
+                            ui.push_id(i, |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.host)
+                                            .hint_text("github.com/team")
+                                            .desired_width(180.)
+                                            .char_limit(512),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.name)
+                                            .hint_text(crate::i18n::text(
+                                                "interaction-accounts-author-name",
+                                            ))
+                                            .desired_width(140.)
+                                            .char_limit(256),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.email)
+                                            .hint_text("author@example.com")
+                                            .desired_width(200.)
+                                            .char_limit(256),
+                                    );
+                                    if ui
+                                        .small_button(crate::i18n::text(
+                                            "interaction-accounts-remove",
+                                        ))
+                                        .clicked()
+                                    {
+                                        remove = Some(i);
+                                    }
+                                });
+                            });
+                        },
+                    );
+                }
+                if let Some(i) = remove {
+                    profile.author_hosts.remove(i);
+                }
+                card.row(
+                    "New expectation",
+                    "push preflight identity author host email",
+                    |ui| {
+                        if ui
+                            .add_enabled(
+                                profile.author_hosts.len() < 64,
+                                egui::Button::new(crate::i18n::text(
+                                    "interaction-accounts-add-rule",
+                                )),
+                            )
+                            .clicked()
+                        {
+                            profile.author_hosts.push(Default::default());
+                        }
+                    },
+                );
+            },
+        );
+
         section(ui, f, "Profile's commit signing", None, |card| {
             let profile = self.profile_mut();
             card.row("Signing", "gpg sign key profile own global", |ui| {
@@ -237,11 +299,14 @@ impl Settings {
                     ui.radio_value(
                         &mut profile.own_signing,
                         false,
-                        "As in your global git config",
+                        crate::i18n::text("interaction-accounts-global"),
                     )
-                    .on_hover_text("Set on the Commit signing page");
-                    let own =
-                        ui.radio_value(&mut profile.own_signing, true, "Just for this profile");
+                    .on_hover_text(crate::i18n::text("interaction-accounts-signing-page"));
+                    let own = ui.radio_value(
+                        &mut profile.own_signing,
+                        true,
+                        crate::i18n::text("interaction-accounts-just-profile"),
+                    );
                     // Starts from how the global config signs, rather than over it with
                     // nothing (openpgp, signing nothing).
                     if own.changed() && profile.signing == signing::Signing::default() {
@@ -259,11 +324,7 @@ impl Settings {
                     profile.signing.program.clear();
                 }
                 card.full("profile signing global override", |ui| {
-                    layout::note(
-                        ui,
-                        "Kept with the profile, over your global git config; empty fields \
-                             leave what it sets. A repository's own config can still override it.",
-                    );
+                    layout::note(ui, crate::i18n::text("interaction-accounts-signing-note"));
                 });
             }
         });
@@ -272,10 +333,9 @@ impl Settings {
             if !profiles::git_reads_profiles(view.git_version) {
                 ui.add_space(10.0);
                 ui.label(
-                    RichText::new(format!(
-                        "This git ({}) is older than 2.32 and ignores what a profile sets for \
-                         git: the author and signing above are not used. Update git to use them.",
-                        view.git_version
+                    RichText::new(crate::i18n::message(
+                        "interaction-accounts-old-git",
+                        &[("version", view.git_version.into())],
                     ))
                     .color(t.warning)
                     .small(),
@@ -299,22 +359,78 @@ fn delete_button(ui: &mut Ui, profile: &UserProfile, count: usize) -> Option<Pro
     let mut request = None;
     if asking {
         if ui
-            .button(RichText::new("Delete it").color(Tokens::get(ui.ctx()).danger))
+            .button(
+                RichText::new(crate::i18n::text("interaction-accounts-delete-it"))
+                    .color(Tokens::get(ui.ctx()).danger),
+            )
             .clicked()
         {
             request = Some(ProfileRequest::Delete(profile.id));
             ui.data_mut(|d| d.remove::<bool>(id));
         }
-        if ui.button("Keep").clicked() {
+        if ui
+            .button(crate::i18n::text("interaction-accounts-keep"))
+            .clicked()
+        {
             ui.data_mut(|d| d.remove::<bool>(id));
         }
     } else if ui
-        .add_enabled(count > 1, egui::Button::new("Delete"))
-        .on_hover_text("Deletes this profile and its list of tabs; gitcraft switches to another")
-        .on_disabled_hover_text("The only profile")
+        .add_enabled(
+            count > 1,
+            egui::Button::new(crate::i18n::text("interaction-accounts-delete")),
+        )
+        .on_hover_text(crate::i18n::text("interaction-accounts-delete-help"))
+        .on_disabled_hover_text(crate::i18n::text("interaction-accounts-only"))
         .clicked()
     {
         ui.data_mut(|d| d.insert_temp(id, true));
     }
     request
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn profile_delete_confirmation_translates_and_keeps_request_id_and_raw_title() {
+        crate::i18n::set_language("de");
+        let profile = UserProfile {
+            id: 17,
+            name: "  ".into(),
+            ..UserProfile::default()
+        };
+        assert_eq!(profile.title(), "Unnamed profile");
+        assert_eq!(profile.display_title(), "Unbenanntes Profil");
+        let config = profiles::config_text(&profile, &[]);
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (UserProfile, Option<ProfileRequest>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if let Some(request) = delete_button(ui, &state.0, 2) {
+                    state.1 = Some(request);
+                }
+            },
+            (profile, None),
+        );
+        h.run();
+        h.get_by_label("Löschen").click();
+        h.run();
+        h.get_by_label("Behalten").click();
+        h.run();
+        assert!(h.state().1.is_none());
+        h.get_by_label("Löschen").click();
+        h.run();
+        h.get_by_label("Löschen bestätigen").click();
+        h.run();
+        assert_eq!(h.state().1, Some(ProfileRequest::Delete(17)));
+        assert_eq!(h.state().0.name, "  ");
+        crate::i18n::set_language("en-US");
+        assert_eq!(h.state().0.display_title(), "Unnamed profile");
+        assert_eq!(profiles::config_text(&h.state().0, &[]), config);
+    }
 }

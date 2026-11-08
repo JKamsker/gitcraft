@@ -26,9 +26,25 @@ pub struct IssueLink {
 
 /// The rule `#12` → the forge's issue 12, for a repository hosted on `hosting`.
 pub fn forge_rule(hosting: &Hosting) -> IssueRule {
+    if hosting.forge == Forge::Azure {
+        let project = hosting
+            .path
+            .split('/')
+            .take(2)
+            .collect::<Vec<_>>()
+            .join("/");
+        return IssueRule {
+            pattern: r"\B#(\d+)\b".into(),
+            url: format!(
+                "{}/{}/_workitems/edit/$1",
+                hosting.web,
+                crate::pr_post::encode_path(&project)
+            ),
+        };
+    }
     let issues = match hosting.forge {
         Forge::GitLab => "-/issues",
-        Forge::GitHub | Forge::Forgejo | Forge::Gitea => "issues",
+        Forge::GitHub | Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => "issues",
     };
     IssueRule {
         pattern: r"\B#(\d+)\b".to_owned(),
@@ -40,20 +56,25 @@ pub fn forge_rule(hosting: &Hosting) -> IssueRule {
 pub fn compile(rule: &IssueRule) -> Result<Regex, String> {
     let pattern = rule.pattern.trim();
     if pattern.is_empty() {
-        return Err("The pattern is empty".to_owned());
+        return Err(crate::i18n::text("repo-core-0957").to_owned());
     }
     if pattern.len() > MAX_PATTERN {
-        return Err(format!(
-            "The pattern is longer than {MAX_PATTERN} characters"
+        return Err(crate::i18n::message(
+            "repo-core-0958",
+            &[("MAX-PATTERN", format!("{}", MAX_PATTERN).into())],
         ));
     }
     regex::RegexBuilder::new(pattern)
         .size_limit(SIZE_LIMIT)
         .build()
         .map_err(|e| match e {
-            regex::Error::Syntax(s) => format!("Not a valid pattern: {}", last_line(&s)),
-            regex::Error::CompiledTooBig(_) => "The pattern is too complex".to_owned(),
-            other => format!("Not a valid pattern: {other}"),
+            regex::Error::Syntax(s) => {
+                crate::i18n::message("repo-core-0959", &[("s", last_line(&s).to_string().into())])
+            }
+            regex::Error::CompiledTooBig(_) => crate::i18n::text("repo-core-0960").to_owned(),
+            other => {
+                crate::i18n::message("repo-core-0961", &[("other", format!("{}", other).into())])
+            }
         })
 }
 
@@ -70,7 +91,7 @@ pub fn check(rule: &IssueRule) -> Result<(), String> {
     compile(rule)?;
     let sample = rule.url.replace(['$', '{', '}'], "");
     if !crate::pull_request::is_web_url(sample.trim()) {
-        return Err("The URL must start with https:// or http://".to_owned());
+        return Err(crate::i18n::text("repo-core-0962").to_owned());
     }
     Ok(())
 }
@@ -159,7 +180,11 @@ pub fn links_row(ui: &mut Ui, message: &str, rules: &[IssueRule]) {
     }
     let t = Tokens::get(ui.ctx());
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Issues").color(t.text_faint).small());
+        ui.label(
+            RichText::new(crate::i18n::text("repo-core-0965"))
+                .color(t.text_faint)
+                .small(),
+        );
         for link in links {
             ui.hyperlink_to(RichText::new(&link.text).small(), &link.url)
                 .on_hover_text(&link.url);

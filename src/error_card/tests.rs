@@ -591,3 +591,99 @@ fn an_undo_is_never_lost() -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
+
+/// Constructs inert state directly: no for_error, worker, Git, process list or native API.
+#[test]
+fn localization_actual_retry_control_keeps_raw_dispatch_identity() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    crate::i18n::set_language("de");
+    let card = ErrorCard {
+        problem: GitProblem::NameTooLong,
+        dir: PathBuf::from("/nicht-geöffnet/日本語"),
+        place: HERE,
+        label: "Reload".to_owned(),
+        said: "raw git error --literal=unchanged".to_owned(),
+        found: Some(Ok(Default::default())),
+        stage: Stage::Idle,
+        rx: None,
+        earlier: None,
+        earlier_undone: None,
+        earlier_rx: None,
+        retried: false,
+    };
+    let fonts = std::cell::Cell::new(false);
+    let mut h = Harness::new_ui_state(
+        move |ui, (card, event): &mut (ErrorCard, Option<super::CardEvent>)| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            if let Some(next) = card.ui(ui, true) {
+                *event = Some(next);
+            }
+        },
+        (card, None),
+    );
+    h.run();
+    h.get_by_label("Ein Pfad ist zu lang");
+    h.get_by_label("Erneut versuchen").click();
+    h.run();
+    assert_eq!(h.state().1, Some(super::CardEvent::Retry));
+    assert_eq!(h.state().0.label(), "Reload");
+    assert_eq!(h.state().0.said, "raw git error --literal=unchanged");
+    assert!(!h.state().0.can_retry());
+    assert!(h.state().0.rx.is_none());
+}
+
+#[test]
+fn localization_explanations_confirmations_paths_plurals_and_durations() {
+    crate::i18n::set_language("de");
+    let fix = Fix::Config {
+        edit: ConfigEdit::add(
+            Scope::Global,
+            "safe.directory",
+            "/srv/日本語 mit Leerzeichen",
+        ),
+        file: "C:/Users/ü/.gitconfig".to_owned(),
+    };
+    assert_eq!(fix.button(), "Diesem Ordner vertrauen");
+    assert_eq!(
+        fix.confirm(),
+        "Fügt safe.directory = /srv/日本語 mit Leerzeichen zu C:/Users/ü/.gitconfig hinzu. Rückgängig auf dieser Karte entfernt den Eintrag wieder."
+    );
+    let files = (0..1004).map(|i| format!("f{i}")).collect();
+    let explanation = text::explanation(
+        &GitProblem::LineEndings {
+            files,
+            to_crlf: true,
+            fatal: true,
+        },
+        HERE,
+    );
+    assert_eq!(explanation[0], "Dateien: f0, f1, f2 und 1.001 weitere.");
+    assert!(explanation.iter().any(|s| s.contains("core.safecrlf")));
+    assert_eq!(text::age(60), "1 Minute");
+    assert_eq!(text::age(120), "2 Minuten");
+    assert_eq!(text::age(7_200), "2 Stunden");
+    for problem in every_problem() {
+        assert!(!text::title(&problem).starts_with("interaction-"));
+        for place in [HERE, WINDOWS, WSL] {
+            assert!(
+                text::explanation(&problem, place)
+                    .iter()
+                    .all(|s| !s.starts_with("interaction-"))
+            );
+        }
+    }
+    let ssh = text::explanation(
+        &GitProblem::SshKeyRefused {
+            login: Some("git@literal-host".into()),
+        },
+        WSL,
+    );
+    assert!(ssh[0].contains("ssh -T git@literal-host"));
+    assert!(ssh[1].contains("anderen Computer"));
+    crate::i18n::set_language("en-US");
+    assert_eq!(fix.button(), "Trust this folder");
+    assert_eq!(text::age(120), "2 minutes");
+}

@@ -216,11 +216,9 @@ impl ConflictEditor {
         if wanted.is_empty() {
             return Ok(Vec::new());
         }
-        let texts = self.resolutions().ok_or_else(|| {
-            "The notes were not kept: the text around the conflicts was edited by hand, so \
-             which part resolves which conflict can't be told"
-                .to_owned()
-        })?;
+        let texts = self
+            .resolutions()
+            .ok_or_else(|| crate::i18n::text("repo-core-0476").to_owned())?;
         let spots = record::spots(&self.segments);
         let same = |a: &str, b: &str| a.replace("\r\n", "\n") == b.replace("\r\n", "\n");
         let mut out = Vec::new();

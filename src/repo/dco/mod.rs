@@ -9,7 +9,6 @@ mod view;
 
 use egui::Context;
 
-use super::state::PendingOp;
 use super::{Action, Dialog, OpKind, Refresh, RepoTab, Undo, UndoEntry};
 use crate::pull_request::CheckState;
 
@@ -33,6 +32,16 @@ pub(crate) struct Dco {
     pr: Option<PrSignoffs>,
     /// The sign-off asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<Plan>,
+    /// Review waits for both timeline GC retention and the separate rewrite-ref writer.
+    review_after: Option<ReviewAfter>,
+}
+
+struct ReviewAfter {
+    label: String,
+    heads: (String, String),
+    timeline_kept: bool,
+    rewrite_kept: bool,
+    then: super::messages::Continuation,
 }
 
 /// The commits of a pull request, with whether each is signed off.
@@ -65,8 +74,14 @@ pub(crate) enum Reason {
 impl Reason {
     pub(crate) fn text(&self) -> String {
         match self {
-            Reason::File(file) => format!("this repository has a {file} file"),
-            Reason::FailingCheck(n) => format!("the DCO check of #{n} fails"),
+            Reason::File(file) => crate::i18n::message(
+                "repo-workflows-dco-text-e5458838",
+                &[("file", (file).clone().into())],
+            ),
+            Reason::FailingCheck(n) => crate::i18n::message(
+                "repo-workflows-dco-text-dc4915c9",
+                &[("n", (n).to_string().into())],
+            ),
         }
     }
 }
@@ -202,14 +217,14 @@ impl RepoTab {
                     },
                     |tab, result, _| {
                         if let Err(e) = result {
-                            tab.status = Some((
+                            tab.status = Some(crate::repo::Notice::plain((
                                 format!(
                                     "Couldn't save Sign off for this repository \
                                      (git config {}): {e}",
                                     signoff::SIGN_OFF_KEY
                                 ),
                                 true,
-                            ));
+                            )));
                         }
                     },
                 );
@@ -229,10 +244,66 @@ impl RepoTab {
                             tab.dialog = Some(fix_dialog(&plan, &who, &email));
                             tab.dco.running = Some(plan);
                         }
-                        Err(e) => tab.status = Some((e, true)),
+                        Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                     },
                 );
             }
+        }
+    }
+
+    /// The timeline worker has completed its own diagnostic receipt and GC retention.
+    /// The separate versions worker must also finish before a push snapshot is captured.
+    pub(super) fn dco_timeline_kept(&mut self, id: u64, kept: bool, ctx: &Context) {
+        let Some(entry) = self.timeline.get(id) else {
+            return;
+        };
+        let Some(heads) = entry.undo.as_ref().and_then(|undo| undo.heads.clone()) else {
+            return;
+        };
+        let label = entry.label.clone();
+        self.dco_retention_done(&label, &heads, false, kept, ctx);
+    }
+
+    /// Called by the actual versions::rewrite_kept completion, including failure/cancel.
+    pub(super) fn dco_rewrite_kept(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        kept: bool,
+        ctx: &Context,
+    ) {
+        self.dco_retention_done(label, heads, true, kept, ctx);
+    }
+
+    fn dco_retention_done(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        rewrite: bool,
+        kept: bool,
+        ctx: &Context,
+    ) {
+        let Some(pending) = &mut self.dco.review_after else {
+            return;
+        };
+        if pending.label != label || &pending.heads != heads {
+            return;
+        }
+        if !kept {
+            self.dco.review_after = None;
+            self.status = Some(crate::repo::Notice::plain(("Local sign-off finished, but its rewrite or timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true)));
+            return;
+        }
+        if rewrite {
+            pending.rewrite_kept = true;
+        } else {
+            pending.timeline_kept = true;
+        }
+        if pending.timeline_kept
+            && pending.rewrite_kept
+            && let Some(pending) = self.dco.review_after.take()
+        {
+            (pending.then)(self, ctx);
         }
     }
 
@@ -241,9 +312,8 @@ impl RepoTab {
         self.dco.signs_off()
     }
 
-    /// Takes in how an operation ended. When the sign-off of a branch failed after rewriting
-    /// it (its push was refused, or needs signing in), the rewrite is made undoable here, and
-    /// signing in pushes it.
+    /// A completed local sign-off opens a separate reviewed push. A stopped local rewrite
+    /// never queues that push; any completed local changes remain undoable here.
     pub(super) fn dco_op_done(
         &mut self,
         label: &str,
@@ -253,8 +323,71 @@ impl RepoTab {
         let Some(plan) = self.dco.running.take_if(|plan| fix_label(plan) == label) else {
             return;
         };
-        let Err(error) = result else { return };
-        let auth = crate::git::is_auth_error(error);
+        // A stopped/new matching local operation cannot reuse a prior continuation.
+        self.dco.review_after = None;
+        if result.is_ok() {
+            // Keep the operation identity unchanged, and mark only its undo presentation.
+            // op_done has already retained the worker's exact post-rewrite ref guards.
+            let signed = match &mut self.timeline.awaiting {
+                super::timeline::Awaiting::Ended {
+                    then:
+                        super::timeline::Ended::New {
+                            label: ended,
+                            undo: Some(undo),
+                        },
+                    ..
+                } if ended == label => {
+                    undo.label = format!("{label} (here only)");
+                    undo.heads.as_ref().map(|(_, after)| after.clone())
+                }
+                _ => None,
+            };
+            if plan.push.is_some() {
+                let Some(signed) = signed else {
+                    self.status = Some(crate::repo::Notice::plain(("The local sign-off finished, but its rewritten commit was not captured. Choose Push again; nothing was sent.".into(), true)));
+                    return;
+                };
+                let repo = self.path.clone();
+                let path = repo.clone();
+                let profile = crate::settings::Settings::get(ctx).profile();
+                let context = crate::connections::current();
+                let generation = self.https_generation;
+                self.dco.review_after = Some(ReviewAfter {
+                    label: label.to_owned(),
+                    heads: (plan.head.clone(), signed.clone()),
+                    timeline_kept: false,
+                    rewrite_kept: false,
+                    then: Box::new(move |tab, ctx| {
+                        tab.then_or(ctx, false, Err, move || {
+                            let snapshot = crate::git::repository_tools::guard::Snapshot::capture(&repo)?;
+                            let prepared = completed_push(&plan, signed, snapshot).ok_or("DCO push target disappeared")?;
+                            prepared.snapshot.check_publication(&repo)?;
+                            Ok(prepared)
+                        }, move |tab, prepared, ctx| {
+                            if tab.path != path || crate::settings::Settings::get(ctx).profile() != profile
+                                || crate::connections::current() != context || tab.connection_context != context
+                                || tab.https_generation != generation || tab.busy_op.is_some()
+                                || tab.dialog.is_some() || tab.echo_push_pending()
+                            {
+                                tab.status = Some(crate::repo::Notice::plain(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true)));
+                                return;
+                            }
+                            match prepared {
+                                Ok(prepared) => {
+                                    let ops = prepared.route.operations();
+                                    tab.preflight_selection = Some(prepared);
+                                    tab.run_ops_ex("Push the signed-off commits", ops, Refresh::All, OpKind::plain(), false, ctx);
+                                    // Busy/offline refusal must not constrain another push.
+                                    tab.preflight_selection = None;
+                                },
+                                Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
+                            }
+                        });
+                    }),
+                });
+            }
+            return;
+        }
         let repo = self.path.clone();
         let local = format!("refs/heads/{}", plan.branch);
         self.then(
@@ -278,7 +411,7 @@ impl RepoTab {
                 );
 
                 let push = plan.push.as_ref().map(signoff::PushTarget::label);
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     format!(
                         "{}'s commits are signed off here, but not pushed{}: Ctrl+Z puts them \
                          back as they were",
@@ -286,23 +419,31 @@ impl RepoTab {
                         push.map(|p| format!(" to {p}")).unwrap_or_default()
                     ),
                     true,
-                ));
-                // Signing in pushes what is signed off now, not the whole rewrite again.
-                if auth
-                    && let Some(op) = &mut tab.last_op
-                    && op.label == fix_label(&plan)
-                {
-                    *op = PendingOp {
-                        label: format!("Push the signed-off commits of {}", plan.branch),
-                        ops: plan.push_steps(),
-                        refresh: Refresh::All,
-                        kind: OpKind::plain(),
-                        quiet: false,
-                    };
-                }
+                )));
             },
         );
     }
+}
+
+/// Constrain normal preflight to the confirmed target and lease, using only the
+/// successfully completed local operation's captured commit. This grants no send.
+fn completed_push(
+    plan: &Plan,
+    signed: String,
+    snapshot: crate::git::repository_tools::guard::Snapshot,
+) -> Option<crate::git::repository_tools::routes::PreparedPush> {
+    let push = plan.push.as_ref()?;
+    Some(crate::git::repository_tools::routes::PreparedPush {
+        snapshot,
+        route: crate::git::repository_tools::routes::PushRoute {
+            branch: plan.branch.clone(),
+            commit: signed,
+            remote: push.remote.clone(),
+            destination: push.remote_ref.clone(),
+            urls: push.urls.clone(),
+            lease: Some(push.seen.clone().unwrap_or_default()),
+        },
+    })
 }
 
 /// What the sign-off of `plan` is called: the operation's label, and the dialog's title.
@@ -313,87 +454,74 @@ fn fix_label(plan: &Plan) -> String {
 /// The dialog that shows what signing off the branch does, and does it.
 fn fix_dialog(plan: &Plan, who: &str, email: &str) -> Dialog {
     let button = if plan.push.is_some() {
-        "Sign off and push"
+        crate::i18n::text("repo-workflows-dco-fix-dialog-1a8aeebd")
     } else {
-        "Sign off"
+        crate::i18n::text("repo-workflows-dco-fix-dialog-6ce6ab1f")
     };
+    let mut local = plan.clone();
+    local.push = None;
     Dialog::confirm(
         &fix_label(plan),
         fix_preview(plan, who, email),
         button,
-        plan.steps(),
+        local.steps(),
         None,
     )
-    .undo(Undo::Custom {
-        undo: plan.undo_steps(),
-        redo: plan.redo_steps(),
-    })
+    .undo(Undo::HeadMove { mode: "--keep" })
     .refresh(Refresh::All)
-}
-
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 /// What [`fix_dialog`] says it will do.
 pub(crate) fn fix_preview(plan: &Plan, who: &str, email: &str) -> String {
     let unsigned = plan.unsigned();
-    let mut text = format!(
-        "Rewrites the {} of {} since {} (rebase --signoff), adding \"Signed-off-by: {who}\" \
-         to each that doesn't have it. {} the DCO check refuses now:\n",
-        plural(plan.commits.len(), "commit", "commits"),
-        plan.branch,
-        super::short(&plan.base),
-        if unsigned.len() == 1 {
-            "1 of them is one".to_owned()
-        } else {
-            format!("{} of them are ones", unsigned.len())
-        },
-    );
-    for c in unsigned.iter().take(8) {
-        text.push_str(&format!("  • {} {}\n", super::short(&c.hash), c.summary));
-    }
-    if unsigned.len() > 8 {
-        text.push_str(&format!("  • and {} more\n", unsigned.len() - 8));
-    }
+    let commits = unsigned
+        .iter()
+        .take(8)
+        .map(|c| format!("  • {} {}\n", super::short(&c.hash), c.summary))
+        .collect::<String>();
     let others = plan.by_others(email);
-    if !others.is_empty() {
-        let mut names: Vec<&str> = Vec::new();
-        for c in &others {
-            if !names.contains(&c.author.as_str()) {
-                names.push(&c.author);
-            }
+    let mut names: Vec<&str> = Vec::new();
+    for c in &others {
+        if !names.contains(&c.author.as_str()) {
+            names.push(&c.author);
         }
-        text.push_str(&format!(
-            "\n{} by {}: you become their committer, and your sign-off certifies them. Only \
-             go ahead if you may.\n",
-            if others.len() == 1 {
-                "1 of them is".to_owned()
-            } else {
-                format!("{} of them are", others.len())
-            },
-            names.join(", "),
-        ));
     }
-    match &plan.push {
-        Some(push) => {
-            let guard = if push.seen.is_some() {
-                "refused if someone pushed there since it was last fetched"
-            } else {
-                "refused if that branch exists there already"
-            };
-            text.push_str(&format!(
-                "\nThen force-pushes it to {} with a lease: {guard}.\n\nCtrl+Z puts the \
-                 commits as they were back, on the remote and here.",
-                push.label()
-            ));
-        }
-        None => text.push_str(
-            "\nThe branch has no remote branch: nothing is pushed. Pushing it later replaces \
-             the old commits there (a force push).\n\nCtrl+Z puts the commits as they were back.",
-        ),
-    }
-    text
+    crate::i18n::message(
+        "repo-workflows-dco-whole-preview",
+        &[
+            ("count", (plan.commits.len()).into()),
+            ("branch", (plan.branch.as_str()).into()),
+            ("base", (super::short(&plan.base)).into()),
+            ("who", (who).into()),
+            ("unsigned", (unsigned.len()).into()),
+            ("commits", (commits).into()),
+            ("more", (unsigned.len().saturating_sub(8)).into()),
+            ("others", (others.len()).into()),
+            ("authors", (names.join(", ")).into()),
+            (
+                "push",
+                (if plan.push.is_some() { "yes" } else { "no" }).into(),
+            ),
+            (
+                "remote",
+                (plan
+                    .push
+                    .as_ref()
+                    .map(signoff::PushTarget::label)
+                    .unwrap_or_default())
+                .into(),
+            ),
+            (
+                "seen",
+                (if plan.push.as_ref().is_some_and(|p| p.seen.is_some()) {
+                    "yes"
+                } else {
+                    "no"
+                })
+                .into(),
+            ),
+        ],
+    )
 }
 
 /// The action that asks to sign off the checked-out branch's commits since `base`, while it is
@@ -403,4 +531,124 @@ pub(crate) fn plan_fix(base: &str, head: &str) -> Action {
         base: base.to_owned(),
         head: head.to_owned(),
     })
+}
+
+#[cfg(test)]
+mod fluent_preview_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_dco_actual_preview_keeps_raw_labels_authors_and_numeric_plan() {
+        let plan = Plan {
+            branch: "feature/ß".into(),
+            head: "abcdef1234567890".into(),
+            base: "12345678abcdef00".into(),
+            commits: (0..1234)
+                .map(|index| Signed {
+                    hash: format!("{index:016x}"),
+                    summary: "Opaque subject 日本語".into(),
+                    author: "Other Author / ß".into(),
+                    email: "other@example.test".into(),
+                    merge: false,
+                    bot: false,
+                    signed: false,
+                })
+                .collect(),
+            push: None,
+        };
+        let raw = plan.clone();
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let body = fix_preview(&plan, "Me <me@example.test>", "me@example.test");
+            assert!(body.contains("feature/ß") && body.contains("12345678"));
+            assert!(body.contains("Signed-off-by: Me <me@example.test>"));
+            assert!(body.contains("Opaque subject 日本語") && body.contains("Other Author / ß"));
+            assert!(body.contains(if language == "de" {
+                "1.234 Commits"
+            } else {
+                "1,234 commits"
+            }));
+            assert!(body.contains(if language == "de" {
+                "1.226 weitere"
+            } else {
+                "1,226 more"
+            }));
+            assert!(body.contains(if language == "de" {
+                "nur fort, wenn Sie dazu berechtigt sind"
+            } else {
+                "Only go ahead if you may"
+            }));
+            assert!(body.contains(if language == "de" {
+                "nichts gepusht"
+            } else {
+                "nothing is pushed"
+            }));
+            assert_eq!(fix_label(&plan), "Sign off the commits of feature/ß");
+            assert_eq!(plan, raw);
+            assert_eq!(plan.unsigned().len(), 1234);
+            assert_eq!(plan.by_others("me@example.test").len(), 1234);
+        }
+        crate::i18n::set_language("en-US");
+    }
+    #[test]
+    fn fluent_dco_reviewed_push_preview_keeps_lease_authority_and_local_undo() {
+        let mut plan = Plan {
+            branch: "topic/opaque-1234".into(),
+            head: "abcdef1234567890".into(),
+            base: "12345678abcdef00".into(),
+            commits: vec![Signed {
+                hash: "abcdef1234567890".into(),
+                summary: "Opaque subject".into(),
+                author: "Me".into(),
+                email: "me@example.test".into(),
+                merge: false,
+                bot: false,
+                signed: false,
+            }],
+            push: None,
+        };
+        for seen in [None, Some("0123456789abcdef".to_owned())] {
+            plan.push = Some(signoff::PushTarget {
+                remote: "origin-1234".into(),
+                urls: vec!["https://example.invalid/opaque-1234".into()],
+                remote_ref: "refs/heads/topic-1234".into(),
+                tracking: Some("refs/remotes/origin-1234/topic-1234".into()),
+                seen: seen.clone(),
+            });
+            let before = plan.clone();
+            for language in ["en-US", "de"] {
+                crate::i18n::set_language(language);
+                let body = fix_preview(&plan, "Me <me@example.test>", "me@example.test");
+                assert!(body.contains("origin-1234/topic-1234"));
+                assert!(body.contains("Signed-off-by: Me <me@example.test>"));
+                assert!(body.contains(if language == "de" {
+                    "Prüfen und genehmigen Sie diesen Push gesondert"
+                } else {
+                    "Review and approve that push separately"
+                }));
+                assert!(body.contains(match (language, seen.is_some()) {
+                    ("de", true) => "seit dem letzten Abruf jemand gepusht",
+                    ("de", false) => "dieser Branch dort bereits existiert",
+                    (_, true) => "someone pushed there since it was last fetched",
+                    (_, false) => "that branch exists there already",
+                }));
+                assert!(body.contains(if language == "de" {
+                    "Strg+Z stellt die lokalen Commits wieder her"
+                } else {
+                    "Ctrl+Z restores the local commits"
+                }));
+                assert!(body.contains(if language == "de" {
+                    "eigenen geprüften Push"
+                } else {
+                    "requires its own reviewed push"
+                }));
+                assert!(!body.contains("https://example.invalid"));
+                assert_eq!(plan, before);
+                assert_eq!(
+                    fix_label(&plan),
+                    "Sign off the commits of topic/opaque-1234"
+                );
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

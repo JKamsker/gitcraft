@@ -549,7 +549,7 @@ fn review12_http_publication_identity_keeps_authority_and_proxy_prefix() {
         }
         assert_eq!(
             same_publication_repository("http://forgejo:3000/reviews/team/repo.git", &hosting),
-            forge != Forge::GitLab
+            !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket)
         );
         let mut default_port = hosting.clone();
         default_port.web = "http://forgejo".into();

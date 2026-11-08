@@ -3,6 +3,8 @@
 //! the worktrees, and checks every linked worktree's changes, untracked and ignored files
 //! against it: the result, not the rule, is what counts.
 
+pub mod display;
+
 mod check;
 mod configs;
 mod pattern;

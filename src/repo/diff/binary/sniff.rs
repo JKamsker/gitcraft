@@ -14,27 +14,36 @@ pub fn describe(path: &str, bytes: &[u8]) -> (String, Vec<Fact>) {
         .map(|(_, e)| e.to_ascii_lowercase())
         .unwrap_or_default();
     if bytes.starts_with(b"%PDF-") {
-        return ("PDF document".to_owned(), pdf_facts(bytes));
+        return (
+            crate::i18n::text("repo-core-1573").to_owned(),
+            pdf_facts(bytes),
+        );
     }
     if zip::is_zip(bytes) {
         let kind = match ext.as_str() {
-            "docx" | "docm" => "Word document",
-            "xlsx" | "xlsm" => "Excel workbook",
-            "pptx" | "ppsx" => "PowerPoint presentation",
-            "odt" => "OpenDocument text",
-            "ods" => "OpenDocument spreadsheet",
-            "odp" => "OpenDocument presentation",
-            "jar" => "Java archive",
-            "apk" => "Android package",
-            "epub" => "EPUB book",
-            "unitypackage" => "Unity package",
-            _ => "ZIP archive",
+            "docx" | "docm" => crate::i18n::text("repo-core-1576"),
+            "xlsx" | "xlsm" => crate::i18n::text("repo-core-1579"),
+            "pptx" | "ppsx" => crate::i18n::text("repo-core-1582"),
+            "odt" => crate::i18n::text("repo-core-1584"),
+            "ods" => crate::i18n::text("repo-core-1586"),
+            "odp" => crate::i18n::text("repo-core-1588"),
+            "jar" => crate::i18n::text("repo-core-1590"),
+            "apk" => crate::i18n::text("repo-core-1592"),
+            "epub" => crate::i18n::text("repo-core-1594"),
+            "unitypackage" => crate::i18n::text("repo-core-1596"),
+            _ => crate::i18n::text("repo-core-1597"),
         };
         let members = zip::members(bytes).unwrap_or_default();
         let unpacked: u64 = members.iter().map(|m| m.size).sum();
         let facts = vec![
-            ("Members".to_owned(), members.len().to_string()),
-            ("Unpacked".to_owned(), crate::git::human_size(unpacked)),
+            (
+                crate::i18n::text("repo-core-1598").to_owned(),
+                members.len().to_string(),
+            ),
+            (
+                crate::i18n::text("repo-core-1599").to_owned(),
+                crate::git::human_size(unpacked),
+            ),
         ];
         return (kind.to_owned(), facts);
     }
@@ -44,71 +53,91 @@ pub fn describe(path: &str, bytes: &[u8]) -> (String, Vec<Fact>) {
     let kind = MAGIC
         .iter()
         .find(|(magic, _)| bytes.starts_with(magic))
-        .map(|(_, kind)| *kind)
-        .unwrap_or("Binary file");
+        .map(|(_, kind)| crate::i18n::text(kind))
+        .unwrap_or(crate::i18n::text("repo-core-1600"));
     (kind.to_owned(), Vec::new())
 }
 
 const MAGIC: &[(&[u8], &str)] = &[
-    (b"\x7fELF", "ELF executable or library"),
-    (b"MZ", "Windows executable or library"),
-    (b"\xcf\xfa\xed\xfe", "Mach-O executable"),
-    (b"\xca\xfe\xba\xbe", "Mach-O universal binary or Java class"),
-    (b"SQLite format 3\0", "SQLite database"),
-    (b"\x1f\x8b", "gzip archive"),
-    (b"BZh", "bzip2 archive"),
-    (b"\xfd7zXZ\0", "xz archive"),
-    (b"7z\xbc\xaf\x27\x1c", "7-Zip archive"),
-    (b"Rar!\x1a\x07", "RAR archive"),
-    (b"\x28\xb5\x2f\xfd", "Zstandard archive"),
-    (b"OggS", "Ogg audio or video"),
-    (b"fLaC", "FLAC audio"),
-    (b"ID3", "MP3 audio"),
-    (b"\0asm", "WebAssembly module"),
-    (
-        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
-        "Office 97–2003 document",
-    ),
-    (b"wOFF", "WOFF font"),
-    (b"wOF2", "WOFF2 font"),
-    (b"\0\x01\0\0", "TrueType font"),
-    (b"OTTO", "OpenType font"),
-    (b"glTF", "glTF binary model"),
-    (b"Kaydara FBX Binary", "FBX model"),
-    (b"8BPS", "Photoshop image"),
-    (b"RIFF", "RIFF media (WAV, AVI…)"),
+    (b"\x7fELF", "repo-core-1602"),
+    (b"MZ", "repo-core-1604"),
+    (b"\xcf\xfa\xed\xfe", "repo-core-1606"),
+    (b"\xca\xfe\xba\xbe", "repo-core-1608"),
+    (b"SQLite format 3\0", "repo-core-1610"),
+    (b"\x1f\x8b", "repo-core-1612"),
+    (b"BZh", "repo-core-1614"),
+    (b"\xfd7zXZ\0", "repo-core-1616"),
+    (b"7z\xbc\xaf\x27\x1c", "repo-core-1618"),
+    (b"Rar!\x1a\x07", "repo-core-1620"),
+    (b"\x28\xb5\x2f\xfd", "repo-core-1622"),
+    (b"OggS", "repo-core-1624"),
+    (b"fLaC", "repo-core-1626"),
+    (b"ID3", "repo-core-1628"),
+    (b"\0asm", "repo-core-1630"),
+    (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "repo-core-1632"),
+    (b"wOFF", "repo-core-1634"),
+    (b"wOF2", "repo-core-1636"),
+    (b"\0\x01\0\0", "repo-core-1638"),
+    (b"OTTO", "repo-core-1640"),
+    (b"glTF", "repo-core-1642"),
+    (b"Kaydara FBX Binary", "repo-core-1644"),
+    (b"8BPS", "repo-core-1646"),
+    (b"RIFF", "repo-core-1648"),
 ];
 
 /// The size of a PNG, GIF, BMP or JPEG, and its colour type where it is in the header.
 fn image_facts(b: &[u8]) -> Option<(String, Vec<Fact>)> {
-    let dims = |w: u32, h: u32| ("Dimensions".to_owned(), format!("{w} × {h}"));
+    let dims = |w: u32, h: u32| {
+        (
+            crate::i18n::text("repo-core-1649").to_owned(),
+            crate::i18n::message(
+                "repo-core-1650",
+                &[
+                    ("w", format!("{}", w).into()),
+                    ("h", format!("{}", h).into()),
+                ],
+            ),
+        )
+    };
     if b.starts_with(b"\x89PNG\r\n\x1a\n") && b.len() >= 26 {
         let w = u32::from_be_bytes(b[16..20].try_into().ok()?);
         let h = u32::from_be_bytes(b[20..24].try_into().ok()?);
         let color = match b[25] {
-            0 => "grey",
-            2 => "RGB",
-            3 => "indexed",
-            4 => "grey with alpha",
-            6 => "RGB with alpha",
-            _ => "unknown",
+            0 => crate::i18n::text("repo-core-1652"),
+            2 => crate::i18n::text("repo-core-1653"),
+            3 => crate::i18n::text("repo-core-1654"),
+            4 => crate::i18n::text("repo-core-1655"),
+            6 => crate::i18n::text("repo-core-1656"),
+            _ => crate::i18n::text("repo-core-1657"),
         };
-        let depth = format!("{} bits, {color}", b[24]);
+        let depth = crate::i18n::message(
+            "repo-core-1658",
+            &[
+                ("b", format!("{}", b[24]).into()),
+                ("color", color.to_string().into()),
+            ],
+        );
         return Some((
-            "PNG image".to_owned(),
-            vec![dims(w, h), ("Colour".to_owned(), depth)],
+            crate::i18n::text("repo-core-1659").to_owned(),
+            vec![
+                dims(w, h),
+                (crate::i18n::text("repo-core-1660").to_owned(), depth),
+            ],
         ));
     }
     if (b.starts_with(b"GIF87a") || b.starts_with(b"GIF89a")) && b.len() >= 10 {
         let w = u16::from_le_bytes([b[6], b[7]]);
         let h = u16::from_le_bytes([b[8], b[9]]);
-        return Some(("GIF image".to_owned(), vec![dims(w.into(), h.into())]));
+        return Some((
+            crate::i18n::text("repo-core-1663").to_owned(),
+            vec![dims(w.into(), h.into())],
+        ));
     }
     if b.starts_with(b"BM") && b.len() >= 26 {
         let w = i32::from_le_bytes(b[18..22].try_into().ok()?);
         let h = i32::from_le_bytes(b[22..26].try_into().ok()?);
         return Some((
-            "BMP image".to_owned(),
+            crate::i18n::text("repo-core-1665").to_owned(),
             vec![dims(w.unsigned_abs(), h.unsigned_abs())],
         ));
     }
@@ -125,11 +154,14 @@ fn image_facts(b: &[u8]) -> Option<(String, Vec<Fact>)> {
             if (0xC0..=0xCF).contains(&marker) && !matches!(marker, 0xC4 | 0xC8 | 0xCC) {
                 let h = u16::from_be_bytes([b[i + 5], b[i + 6]]);
                 let w = u16::from_be_bytes([b[i + 7], b[i + 8]]);
-                return Some(("JPEG image".to_owned(), vec![dims(w.into(), h.into())]));
+                return Some((
+                    crate::i18n::text("repo-core-1666").to_owned(),
+                    vec![dims(w.into(), h.into())],
+                ));
             }
             i += 2 + len;
         }
-        return Some(("JPEG image".to_owned(), Vec::new()));
+        return Some((crate::i18n::text("repo-core-1666").to_owned(), Vec::new()));
     }
     None
 }
@@ -145,18 +177,21 @@ fn pdf_facts(b: &[u8]) -> Vec<Fact> {
         .map(|&c| char::from(c))
         .collect();
     if !version.is_empty() {
-        facts.push(("Version".to_owned(), version));
+        facts.push((crate::i18n::text("repo-core-1667").to_owned(), version));
     }
     if let Some(pages) = page_count(b) {
-        facts.push(("Pages".to_owned(), pages.to_string()));
+        facts.push((
+            crate::i18n::text("repo-core-1668").to_owned(),
+            pages.to_string(),
+        ));
     }
     // The Info dictionary the last trailer names (an incremental update appends a new one),
     // when it is plainly in the file; else the first strings found.
     let info = info_object(b).unwrap_or(b);
     for (key, label) in [
-        ("/Title", "Title"),
-        ("/Author", "Author"),
-        ("/Producer", "Made with"),
+        ("/Title", crate::i18n::text("repo-core-1484")),
+        ("/Author", crate::i18n::text("repo-core-1671")),
+        ("/Producer", crate::i18n::text("repo-core-1673")),
     ] {
         if let Some(value) = info_string(info, key.as_bytes()) {
             facts.push((label.to_owned(), value));

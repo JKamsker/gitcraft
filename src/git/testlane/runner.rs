@@ -136,7 +136,7 @@ impl RunStop {
 pub fn commits_to_test(repo: &Path, range: &str) -> Result<Vec<TestJob>, String> {
     let range = range.trim();
     if range.is_empty() {
-        return Err("Say which commits to test".to_owned());
+        return Err(crate::i18n::text("backend-say-which-commits-to-test-db6380").to_owned());
     }
     let limit = format!("--max-count={}", MAX_COMMITS + 1);
     let mut args = vec!["log", "--format=%H %T", &limit];
@@ -147,8 +147,12 @@ pub fn commits_to_test(repo: &Path, range: &str) -> Result<Vec<TestJob>, String>
     let out = run(Some(repo), &args)?;
     let mut jobs = parse_jobs(&out);
     if jobs.len() > MAX_COMMITS {
-        return Err(format!(
-            "{range} has more than {MAX_COMMITS} commits: test a shorter range"
+        return Err(crate::i18n::message(
+            "backend-range-has-more-than-max-commits-commits-test-a-shorter-range-b12441",
+            &[
+                ("range", (range).to_string().into()),
+                ("max_commits", (MAX_COMMITS).into()),
+            ],
         ));
     }
     jobs.reverse();
@@ -234,7 +238,7 @@ pub fn run_tests(
     events: &(dyn Fn(TestEvent) + Sync),
 ) -> Result<RunSummary, String> {
     if plan.command.trim().is_empty() {
-        return Err("Type the command to test with".to_owned());
+        return Err(crate::i18n::text("backend-type-the-command-to-test-with-4b88f5").to_owned());
     }
     let known = if plan.retest {
         HashMap::new()
@@ -268,7 +272,10 @@ pub fn run_tests(
     }
     // Made empty, at a commit that is there: each test checks its own out.
     let Some(start) = queue.iter().find(|j| is_commit(repo, &j.commit)) else {
-        return Err("None of the commits to test is in the repository".to_owned());
+        return Err(crate::i18n::text(
+            "backend-none-of-the-commits-to-test-is-in-the-repository-c7ce97",
+        )
+        .to_owned());
     };
     let start = start.commit.clone();
     let mut scratches = Vec::new();
@@ -291,7 +298,9 @@ pub fn run_tests(
     std::thread::scope(|s| {
         for scratch in &scratches {
             let shared = &shared;
-            s.spawn(move || work(shared, &scratch.path));
+            s.spawn(crate::connections::inherit(move || {
+                work(shared, &scratch.path)
+            }));
         }
     });
     let mut cleanup = Vec::new();
@@ -303,7 +312,7 @@ pub fn run_tests(
     let mut summary = shared
         .summary
         .into_inner()
-        .map_err(|_| "a test worker failed".to_owned())?;
+        .map_err(|_| crate::i18n::text("backend-a-test-worker-failed-694a9f").to_owned())?;
     summary.stopped = stop.stopped();
     summary.cleanup = cleanup.into_iter().next();
     Ok(summary)
@@ -365,7 +374,13 @@ fn test_one(shared: &Shared, dir: &Path, job: &TestJob) -> Option<(TestEnd, Vec<
         &["checkout", "--detach", "--force", "-q", &job.commit],
     );
     if let Err(e) = checkout {
-        let said = format!("could not check out {}: {e}", short(&job.commit));
+        let said = crate::i18n::message(
+            "backend-could-not-check-out-e-5bd941",
+            &[
+                ("job", (short(&job.commit)).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        );
         return (!shared.stop.stopped()).then_some((TestEnd::Failed(said), Vec::new()));
     }
     let stopper = shared.stop.command_stopper();

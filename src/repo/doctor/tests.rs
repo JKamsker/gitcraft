@@ -112,6 +112,7 @@ fn the_doctor_reads_settings_and_clears_flags_through_the_tab() -> Result<(), St
         // Asked first: nothing runs until the answer, and a no runs nothing.
         let ask = || {
             Action::Doctor(DoctorAct::Confirm(super::Confirm {
+                presentation: None,
                 title: "Clear?".into(),
                 body: String::new(),
                 button: "Clear".into(),
@@ -188,7 +189,7 @@ fn the_doctor_waits_for_an_open_editor() -> Result<(), String> {
     tab.apply(Action::OpenDoctor(Section::Config), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.doctor.is_none());
-    assert!(tab.status.as_ref().is_some_and(|(_, err)| *err));
+    assert!(tab.status.as_deref().is_some_and(|(_, err)| *err));
     Ok(())
 }
 

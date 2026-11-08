@@ -139,7 +139,7 @@ fn storage_in_the_tab() -> Result<(), String> {
     tab.apply(Action::LfsStorage(StorageAct::FetchOnly(folder)), &ctx);
     wait(&mut tab, &ctx, |t| t.status.is_some());
     assert_eq!(
-        tab.status.clone().map(|s| s.0).as_deref(),
+        tab.status.as_deref().cloned().map(|s| s.0).as_deref(),
         Some("LFS now fetches only art dir")
     );
     assert_eq!(git::fetch_filters(&clone)?.include, ["/art dir"]);

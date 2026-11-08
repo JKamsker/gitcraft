@@ -83,9 +83,9 @@ pub fn reflog(
             return Ok(page(entries, limit));
         }
     }
-    Err(format!(
-        "The reflog of {} kept changing while it was read; reload to try again",
-        short_ref(reference)
+    Err(crate::i18n::message(
+        "backend-the-reflog-of-kept-changing-while-it-was-read-reload-to-try-again-936219",
+        &[("short_ref", (short_ref(reference)).to_string().into())],
     ))
 }
 

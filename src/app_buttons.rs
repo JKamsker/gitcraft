@@ -46,22 +46,35 @@ impl AppButton {
         }
     }
 
-    pub fn tooltip(self) -> &'static str {
+    fn command(self) -> Option<crate::keymap::Command> {
+        use crate::keymap::Command;
         match self {
-            AppButton::Settings => "Settings",
-            AppButton::Palette => "Command palette (Ctrl+P)",
-            AppButton::Theme => "Theme",
-            AppButton::Manual => "Manual and keyboard shortcuts (F1)",
+            AppButton::Settings => Some(Command::Settings),
+            AppButton::Palette => Some(Command::Palette),
+            AppButton::Manual => Some(Command::Manual),
+            AppButton::Theme => None,
         }
+    }
+
+    pub fn tooltip(self, ctx: &egui::Context) -> String {
+        let text = if self == AppButton::Manual {
+            crate::i18n::text("interaction-presentation-manual-tip")
+        } else {
+            self.label()
+        };
+        self.command().map_or_else(
+            || text.to_owned(),
+            |command| crate::keymap::tip(ctx, text, command),
+        )
     }
 
     /// Its name in a menu.
     pub fn label(self) -> &'static str {
         match self {
-            AppButton::Settings => "Settings",
-            AppButton::Palette => "Command palette",
-            AppButton::Theme => "Theme",
-            AppButton::Manual => "Manual",
+            AppButton::Settings => crate::i18n::text("interaction-presentation-settings"),
+            AppButton::Palette => crate::i18n::text("interaction-presentation-palette"),
+            AppButton::Theme => crate::i18n::text("interaction-presentation-theme"),
+            AppButton::Manual => crate::i18n::text("interaction-presentation-manual"),
         }
     }
 }
@@ -81,9 +94,9 @@ impl Place {
 
     pub fn label(self) -> &'static str {
         match self {
-            Place::TitleBar => "Title bar",
-            Place::BottomLeft => "Bottom left",
-            Place::BottomRight => "Bottom right",
+            Place::TitleBar => crate::i18n::text("interaction-presentation-title-bar"),
+            Place::BottomLeft => crate::i18n::text("interaction-presentation-bottom-left"),
+            Place::BottomRight => crate::i18n::text("interaction-presentation-bottom-right"),
         }
     }
 }
@@ -491,12 +504,13 @@ pub fn area(ui: &mut Ui, place: Place, look: Look, flow: Flow, fixed: &[AppButto
         // when it leaves, with the drag egui keeps for it.
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::hover());
         let resp = ui.interact(rect, button_id(button), Sense::click_and_drag());
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, button.tooltip(ui.ctx()));
         span = span.union(rect);
         // Where it would be without the opening, which the drop is worked out against.
         let shift = if opening.is_some() { pitch } else { 0.0 };
         slots.push(rect.center() - flow.step(shift));
         let at = animated(&ctx, button, rect.min, slide);
-        let resp = resp.on_hover_text(button.tooltip());
+        let resp = resp.on_hover_text(button.tooltip(ui.ctx()));
         if at.distance(rect.min) < 0.5 {
             // While one is dragged, the others don't light up under it.
             let idle = s.drag.is_none();
@@ -525,7 +539,8 @@ pub fn area(ui: &mut Ui, place: Place, look: Look, flow: Flow, fixed: &[AppButto
     for &button in fixed {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(SIZE), Sense::hover());
         let resp = ui.interact(rect, button_id(button).with("fixed"), Sense::click());
-        let resp = resp.on_hover_text(button.tooltip());
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, button.tooltip(ui.ctx()));
+        let resp = resp.on_hover_text(button.tooltip(ui.ctx()));
         paint(
             ui,
             rect,
@@ -599,11 +614,15 @@ fn handle(ui: &Ui, button: AppButton, resp: &Response) {
     }
     let here = layout(ctx).place_of(button);
     // Its own id: the theme menu opens from the same button.
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .id(resp.id.with("move-to"))
         .style(theme::menu_style)
         .show(|ui| {
-            ui.label(egui::RichText::new("Move to (or drag it)").small().weak());
+            ui.label(
+                egui::RichText::new(crate::i18n::text("interaction-presentation-move"))
+                    .small()
+                    .weak(),
+            );
             for place in Place::ALL {
                 if ui.radio(place == here, place.label()).clicked() && place != here {
                     push(ui.ctx(), Event::Move(button, place));
@@ -656,12 +675,14 @@ pub fn menu_entries(ui: &mut Ui, buttons: &[AppButton]) {
             if let Some(pick) = pick {
                 push(ui.ctx(), Event::Theme(pick));
             }
-        } else if ui
-            .button(button.label())
-            .on_hover_text(button.tooltip())
-            .clicked()
-        {
-            push(ui.ctx(), Event::Clicked(button));
+        } else {
+            let mut item = crate::menu_item::MenuItem::new(button.label()).icon(button.icon());
+            if let Some(command) = button.command() {
+                item = item.keys(command);
+            }
+            if item.show(ui).clicked() {
+                push(ui.ctx(), Event::Clicked(button));
+            }
         }
     }
 }
@@ -679,6 +700,59 @@ mod tests {
             flow,
             slots: slots.iter().map(|&(x, y)| pos2(x, y)).collect(),
         }
+    }
+
+    #[test]
+    fn localized_actual_menu_uses_effective_chord_and_keeps_button_event_identity()
+    -> Result<(), String> {
+        use crate::keymap::{self, Command, Stroke};
+        use egui_kittest::{Harness, kittest::Queryable};
+        crate::i18n::set_language("de");
+        let mut settings = Settings {
+            language: "de".into(),
+            ..Settings::default()
+        };
+        settings.key_bindings.insert(
+            Command::Palette.id().into(),
+            vec![
+                Stroke::new(egui::Key::F8, egui::Modifiers::NONE),
+                Stroke::new(egui::Key::F9, egui::Modifiers::NONE),
+            ],
+        );
+        settings
+            .key_bindings
+            .insert(Command::Manual.id().into(), vec![]);
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, clicked: &mut bool| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                settings.set(ui.ctx());
+                assert_eq!(Palette.tooltip(ui.ctx()), "Befehlspalette (F8 → F9)");
+                assert_eq!(Manual.tooltip(ui.ctx()), "Handbuch und Tastenkürzel");
+                assert_eq!(keymap::label(ui.ctx(), Command::Palette), "F8 → F9");
+                menu_entries(ui, &[Palette, Manual]);
+                *clicked |= take_events(ui.ctx())
+                    .iter()
+                    .any(|event| matches!(event, Event::Clicked(AppButton::Palette)));
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label("Befehlspalette F8 → F9").click();
+        h.run();
+        assert!(*h.state());
+        assert_eq!(Palette.command(), Some(Command::Palette));
+        assert_eq!(
+            serde_json::to_string(&Place::BottomLeft).map_err(|error| format!("{error:?}"))?,
+            "\"BottomLeft\""
+        );
+        crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 
     #[test]

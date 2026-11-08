@@ -255,23 +255,26 @@ pub(super) fn pinned_projection(
 
 /// Shared controls in global settings and the per-repository popover.
 pub(crate) fn edit(ui: &mut egui::Ui, rules: &mut Rules) {
-    ui.checkbox(&mut rules.hide_t3, "Hide T3 Code checkpoint identity")
-        .on_hover_text("Exact author name T3 Code and email t3code@users.noreply.github.com. Co-writer badges never hide commits.");
+    ui.checkbox(
+        &mut rules.hide_t3,
+        crate::i18n::text("dev-baseline-filter-0"),
+    )
+    .on_hover_text(crate::i18n::text("dev-baseline-filter-1"));
     for (label, value, hint) in [
         (
-            "Excluded author names",
+            crate::i18n::text("dev-baseline-filter-2"),
             &mut rules.names,
-            "Exact names, one per line; case-sensitive",
+            crate::i18n::text("dev-baseline-filter-3"),
         ),
         (
-            "Excluded author emails",
+            crate::i18n::text("dev-baseline-filter-4"),
             &mut rules.emails,
-            "Exact emails, one per line; case-insensitive",
+            crate::i18n::text("dev-baseline-filter-5"),
         ),
         (
-            "Hidden ref namespaces",
+            crate::i18n::text("dev-baseline-filter-6"),
             &mut rules.namespaces,
-            "Full refs/ patterns, one per line (e.g. refs/t3/*)",
+            crate::i18n::text("dev-baseline-filter-7"),
         ),
     ] {
         ui.label(label);
@@ -294,15 +297,13 @@ pub(crate) fn edit(ui: &mut egui::Ui, rules: &mut Rules) {
     if !invalid.is_empty() {
         ui.colored_label(
             crate::theme::Tokens::get(ui.ctx()).warning,
-            format!("Ignored invalid ref patterns: {}", invalid.join(", ")),
+            crate::i18n::message(
+                "dev-baseline-filter-invalid",
+                &[("patterns", invalid.join(", ").into())],
+            ),
         );
     }
-    ui.label(
-        egui::RichText::new(
-            "Display only. Tips, selection, search targets and page boundaries remain accessible.",
-        )
-        .small(),
-    );
+    ui.label(egui::RichText::new(crate::i18n::text("dev-baseline-filter-8")).small());
 }
 
 impl RepoTab {
@@ -313,23 +314,55 @@ impl RepoTab {
         let namespaces = self
             .history_filter
             .excluded_total
-            .map_or_else(|| "…".to_owned(), |n| n.to_string());
+            .map_or_else(|| "…".to_owned(), crate::i18n::number);
         ui.horizontal_wrapped(|ui| {
-            ui.menu_button("History filters", |ui| {
+            ui.menu_button(crate::i18n::text("dev-baseline-filter-9"), |ui| {
                 let viewport = ui.ctx().content_rect();
                 ui.set_max_width((viewport.width() - 24.0).clamp(120.0, 380.0));
-                egui::ScrollArea::vertical().id_salt("history-filter-options").max_height((viewport.height() - 60.0).max(80.0)).show(ui, |ui| {
-                ui.label(format!("{} author rows hidden in loaded history", self.history_filter.hidden_loaded));
-                ui.label(format!("{namespaces} commits reachable only from excluded namespaces"));
-                ui.separator();
-                ui.checkbox(&mut prefs.override_global, "Override global history filters")
-                    .on_hover_text("Off: add these rules to Settings → Commit graph. On: use only these rules.");
-                edit(ui, &mut prefs.rules);
-                ui.label(format!("{} matching commits kept: tips, selection, search or page boundaries", self.history_filter.kept_loaded));
-                if ui.button("Reset repository filters").clicked() { prefs = Preferences::default(); }
-                });
-            }).response.on_hover_text(format!("{} author rows hidden in loaded history; {namespaces} namespace-only commits excluded. Open to edit global additions or repository overrides.", self.history_filter.hidden_loaded));
-            ui.checkbox(&mut prefs.reveal, "Show hidden").on_hover_text("Temporarily reveal excluded authors and ref namespaces in this repository. No Git data is changed.");
+                egui::ScrollArea::vertical()
+                    .id_salt("history-filter-options")
+                    .max_height((viewport.height() - 60.0).max(80.0))
+                    .show(ui, |ui| {
+                        ui.label(crate::i18n::message(
+                            "dev-baseline-filter-hidden",
+                            &[("count", self.history_filter.hidden_loaded.into())],
+                        ));
+                        ui.label(crate::i18n::message(
+                            "dev-baseline-filter-namespace",
+                            &[("count", namespaces.as_str().into())],
+                        ));
+                        ui.separator();
+                        ui.checkbox(
+                            &mut prefs.override_global,
+                            crate::i18n::text("dev-baseline-filter-10"),
+                        )
+                        .on_hover_text(crate::i18n::text("dev-baseline-filter-11"));
+                        edit(ui, &mut prefs.rules);
+                        ui.label(crate::i18n::message(
+                            "dev-baseline-filter-kept",
+                            &[("count", self.history_filter.kept_loaded.into())],
+                        ));
+                        if ui
+                            .button(crate::i18n::text("dev-baseline-filter-12"))
+                            .clicked()
+                        {
+                            prefs = Preferences::default();
+                        }
+                    });
+            })
+            .response
+            .on_hover_text(crate::i18n::message(
+                "dev-baseline-filter-summary",
+                &[
+                    ("authors", self.history_filter.hidden_loaded.into()),
+                    ("namespaces", namespaces.as_str().into()),
+                ],
+            ));
+            ui.checkbox(
+                &mut prefs.reveal,
+                crate::i18n::text("dev-baseline-filter-13"),
+            )
+            .on_hover_text(crate::i18n::text("dev-baseline-filter-14"));
         });
         if prefs != previous {
             ctx.data_mut(|d| d.insert_persisted(id(self.repo_key()), prefs));
@@ -348,7 +381,7 @@ impl RepoTab {
             if exclusions_changed {
                 self.backlinks_scope_changed(&ctx);
                 if self.search.open && !self.search.query.trim().is_empty() {
-                    self.search.matches.clear();
+                    self.search.matches = Default::default();
                     self.search.results.clear();
                     self.run_search(&ctx);
                 }

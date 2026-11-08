@@ -538,3 +538,10 @@ fn a_link_from_the_browser_opens_in_its_clone_or_offers_to_clone() -> Result<(),
     );
     Ok(())
 }
+
+#[test]
+fn session_can_be_owned_by_a_deferred_viewport() {
+    fn send<T: Send>() {}
+    send::<crate::repo::RepoTab>();
+    send::<super::App>();
+}

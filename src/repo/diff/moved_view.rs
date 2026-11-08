@@ -36,9 +36,13 @@ pub(in crate::repo) struct Opened {
     reindented: bool,
 }
 
+#[cfg(test)]
+thread_local! { pub(in crate::repo) static PREPARATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 impl Opened {
     /// Block `b` of `data` compared, if it is there.
     pub(in crate::repo) fn new(data: &DiffData, b: usize) -> Option<Self> {
+        #[cfg(test)]
+        PREPARATIONS.with(|n| n.set(n.get() + 1));
         let block = data.moves.blocks.get(b)?;
         let lines = &data.lines;
         let compared = moved::compare(lines, block);
@@ -132,18 +136,23 @@ pub(super) fn panel(
         .show(ui, |ui| {
             header(ui, t, &data.lines, block, open, acts);
             ui.add_space(6.0);
-            let font = theme::mono(12.0);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            egui::ScrollArea::vertical()
-                .id_salt(("diff_moved_rows", open.block))
-                .max_height(MAX_H)
-                .auto_shrink([false, true])
-                .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
-                    for r in &open.rows[range] {
-                        let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
-                        row(ui, t, &font, r.mark, text, r.changed);
-                    }
-                });
+            content(ui, t, data, open);
+        });
+}
+
+/// Read-only moved content, also used by the change-wide source/destination view.
+pub(in crate::repo) fn content(ui: &mut Ui, t: &Tokens, data: &DiffData, open: &Opened) {
+    let font = theme::mono(12.0);
+    ui.spacing_mut().item_spacing.y = 0.0;
+    egui::ScrollArea::vertical()
+        .id_salt(("diff_moved_rows", open.block))
+        .max_height(MAX_H)
+        .auto_shrink([false, true])
+        .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
+            for r in &open.rows[range] {
+                let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
+                row(ui, t, &font, r.mark, text, r.changed);
+            }
         });
 }
 
@@ -165,43 +174,51 @@ fn header(
         };
         let (a, z) = (n(range.start), n(range.end.saturating_sub(1)));
         if a == z {
-            format!("line {a}")
+            crate::i18n::message("repo-core-3949", &[("a", format!("{}", a).into())])
         } else {
-            format!("lines {a}–{z}")
+            crate::i18n::message(
+                "repo-core-3950",
+                &[
+                    ("a", format!("{}", a).into()),
+                    ("z", format!("{}", z).into()),
+                ],
+            )
         }
     };
     let edited = open.edited;
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new(format!(
-                "Moved from {} to {}",
-                span(&block.del, true),
-                span(&block.add, false)
+            egui::RichText::new(crate::i18n::message(
+                "repo-core-3951",
+                &[
+                    ("true", span(&block.del, true).to_string().into()),
+                    ("false", span(&block.add, false).to_string().into()),
+                ],
             ))
             .font(theme::medium(12.5))
             .color(t.text),
         );
         let note = match edited {
-            0 if open.reindented => "only re-indented on the way".to_owned(),
-            0 => "unchanged on the way".to_owned(),
-            1 => "1 line edited on the way".to_owned(),
-            n => format!("{n} lines edited on the way"),
+            0 if open.reindented => crate::i18n::text("repo-core-3952").to_owned(),
+            0 => crate::i18n::text("repo-core-3953").to_owned(),
+            1 => crate::i18n::text("repo-core-3954").to_owned(),
+            n => crate::i18n::message("repo-core-3955", &[("n", (n).into())]),
         };
         ui.label(egui::RichText::new(note).color(t.text_dim));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
                 acts.push(Action::DiffMoved(None));
             }
             if ui
-                .button("Go to where it is now")
-                .on_hover_text("Scroll the diff to the added block")
+                .button(crate::i18n::text("repo-core-3956"))
+                .on_hover_text(crate::i18n::text("repo-core-3957"))
                 .clicked()
             {
                 acts.push(Action::DiffJumpLine(block.add.start));
             }
             if ui
-                .button("Go to where it was")
-                .on_hover_text("Scroll the diff to the removed block")
+                .button(crate::i18n::text("repo-core-3958"))
+                .on_hover_text(crate::i18n::text("repo-core-3959"))
                 .clicked()
             {
                 acts.push(Action::DiffJumpLine(block.del.start));

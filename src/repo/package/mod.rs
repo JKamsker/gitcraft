@@ -14,13 +14,13 @@ use crate::package::{self, Package, Published, Report};
 /// The panel, while it is open.
 pub(crate) struct PackageView {
     /// `None` while they are read.
-    packages: Option<Result<Vec<Package>, String>>,
+    packages: Option<Result<Vec<Package>, package::Failure>>,
     selected: usize,
     /// The report of the package selected; `None` while it is worked out.
-    report: Option<Result<Report, String>>,
+    report: Option<Result<Report, package::Failure>>,
     /// How it compares with the registry's version, asked once the report is in (`None`
     /// meanwhile); `Ok(None)`: never published there.
-    published: Option<Result<Option<Published>, String>>,
+    published: Option<Result<Option<Published>, package::Failure>>,
     /// Numbers the reports asked for: only the latest is shown.
     request: u64,
 }
@@ -65,7 +65,7 @@ impl RepoTab {
                 let repo = self.path.clone();
                 self.then(
                     ctx,
-                    move || package::packages(&repo),
+                    move || package::packages_witnessed(&repo),
                     move |tab, found, ctx| {
                         let Some(view) = &mut tab.package else { return };
                         if view.request != request {
@@ -97,7 +97,7 @@ impl RepoTab {
                 let repo = self.path.clone();
                 self.then(
                     ctx,
-                    move || package::report(&repo, &pkg).map(|r| (r, pkg)),
+                    move || package::report_witnessed(&repo, &pkg).map(|r| (r, pkg)),
                     move |tab, report, ctx| {
                         let Some(view) = current(tab, request) else {
                             return;
@@ -117,7 +117,7 @@ impl RepoTab {
                         let (pkg, files) = report;
                         tab.then(
                             ctx,
-                            move || package::published(&pkg, &files),
+                            move || package::published_witnessed(&pkg, &files),
                             move |tab, published, _| {
                                 if let Some(view) = current(tab, request) {
                                     view.published = Some(published);

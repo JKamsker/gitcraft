@@ -45,22 +45,46 @@ pub(super) fn one(repo: &Path, hosting: &super::Hosting, number: u64) -> Result<
         hosting,
         &["issue", "view", &number.to_string(), "--json", FIELDS],
     )?;
-    let value: Value =
-        serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
-    parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
+    let value: Value = serde_json::from_str(&out).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
+    parse_issue(&value).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-not-an-issue-ae58a9",
+            &[("tool", (TOOL).to_string().into())],
+        )
+    })
 }
 
 fn parse(json: &str) -> Result<Vec<Issue>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
-    let list = value
-        .as_array()
-        .ok_or_else(|| format!("unexpected {TOOL} output: not a list of issues"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
+    let list = value.as_array().ok_or_else(|| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-not-a-list-of-issues-92f726",
+            &[("tool", (TOOL).to_string().into())],
+        )
+    })?;
     Ok(list.iter().filter_map(parse_issue).collect())
 }
 
 fn parse_issue(item: &Value) -> Option<Issue> {
     Some(Issue {
+        tracker: None,
+        acceptance: None,
         number: item.get("number").and_then(Value::as_u64)?,
         title: at(item, "/title").to_owned(),
         body: at(item, "/body").to_owned(),
@@ -90,6 +114,8 @@ mod tests {
         assert_eq!(
             issues[0],
             Issue {
+                tracker: None,
+                acceptance: None,
                 number: 42,
                 title: "Fix login crash".into(),
                 body: "- [ ] no crash".into(),

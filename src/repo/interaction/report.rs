@@ -10,13 +10,8 @@ pub(crate) fn found_line(found: &Found, a: &str, b: &str, budget: usize) -> Stri
             minimal,
             gaps: true,
         } if *minimal => match commits.len() {
-            2 => "These two commits fail together; leaving either out passes or can't be \
-                  tested (it doesn't apply without the other):"
-                .to_owned(),
-            n => format!(
-                "These {n} commits fail together; leaving any one out passes or can't be tested \
-                 (it doesn't apply without the others):"
-            ),
+            2 => crate::i18n::text("repo-core-2812").to_owned(),
+            n => crate::i18n::message("repo-core-2813", &[("n", (n).into())]),
         },
         Found::Together {
             commits, minimal, ..
@@ -26,64 +21,68 @@ pub(crate) fn found_line(found: &Found, a: &str, b: &str, budget: usize) -> Stri
                 commits.iter().any(|c| c.side == Side::B),
             );
             match (commits.len(), minimal, sides) {
-                (_, false, _) => format!(
-                    "Out of tests ({budget}): these {} commits fail together; fewer of them may \
-                     too",
-                    commits.len()
+                (_, false, _) => crate::i18n::message(
+                    "repo-core-2814",
+                    &[
+                        ("budget", format!("{}", budget).into()),
+                        ("count", (commits.len()).into()),
+                    ],
                 ),
-                (1, true, _) => {
-                    "This commit fails on its own, applied where the two diverged:".to_owned()
-                }
-                (2, true, (true, true)) => {
-                    "These two commits fail together; either alone passes:".to_owned()
-                }
-                (n, true, _) => {
-                    format!("These {n} commits fail together; leaving out any one of them passes:")
-                }
+                (1, true, _) => crate::i18n::text("repo-core-2815").to_owned(),
+                (2, true, (true, true)) => crate::i18n::text("repo-core-2816").to_owned(),
+                (n, true, _) => crate::i18n::message("repo-core-2817", &[("n", (n).into())]),
             }
         }
-        Found::PassTogether => format!("{a} and {b} pass together: there is nothing to find."),
+        Found::PassTogether => crate::i18n::message(
+            "repo-core-2818",
+            &[("a", a.to_string().into()), ("b", b.to_string().into())],
+        ),
         Found::FailsAlone(Side::A) => {
-            format!("{a} fails on its own: it isn't the two together. Test its commits instead.")
+            crate::i18n::message("repo-core-2819", &[("a", a.to_string().into())])
         }
         Found::FailsAlone(Side::B) => {
-            format!("{b} fails on its own: it isn't the two together. Test its commits instead.")
+            crate::i18n::message("repo-core-2820", &[("b", b.to_string().into())])
         }
-        Found::DontApply => format!(
-            "The commits of {a} and {b} don't apply together: rehearse the merge to see the \
-             conflicts."
+        Found::DontApply => crate::i18n::message(
+            "repo-core-2821",
+            &[("a", a.to_string().into()), ("b", b.to_string().into())],
         ),
-        Found::Flaky => {
-            "The two together don't give the same result twice: the test is flaky.".to_owned()
-        }
+        Found::Flaky => crate::i18n::text("repo-core-2822").to_owned(),
     }
 }
 
 /// The search's numbers: `12 tests run · 1 flaky result set aside`.
 pub(crate) fn tally_line(i: &Interaction) -> String {
     let mut line = match i.tests {
-        1 => "1 test run".to_owned(),
-        n => format!("{n} tests run"),
+        1 => crate::i18n::text("repo-core-2823").to_owned(),
+        n => crate::i18n::message("repo-core-2824", &[("n", (n).into())]),
     };
     match i.flaky.len() {
         0 => {}
-        1 => line.push_str(" · 1 result didn't repeat and was set aside"),
-        n => line.push_str(&format!(" · {n} results didn't repeat and were set aside")),
+        1 => line.push_str(crate::i18n::text("repo-core-2825")),
+        n => line.push_str(&crate::i18n::message(
+            "repo-core-2826",
+            &[("n", (n).into())],
+        )),
     }
     line
 }
 
 /// Where a search is: `Test 7 of at most 40: 3 commits fail`.
 pub(crate) fn progress_line(p: &SearchProgress) -> String {
-    let said = match p.probe {
+    let probe = match p.probe {
         Probe::Pass => "pass",
         Probe::Fail => "fail",
-        Probe::Unresolved => "can't tell (they don't apply, or it didn't repeat)",
+        Probe::Unresolved => "unresolved",
     };
-    let commits = if p.size == 1 { "commit" } else { "commits" };
-    format!(
-        "Test {} of at most {}: {} {commits} {said}",
-        p.tests, p.budget, p.size
+    crate::i18n::message(
+        "repo-core-2831",
+        &[
+            ("tests", p.tests.into()),
+            ("budget", p.budget.into()),
+            ("size", p.size.into()),
+            ("probe", probe.into()),
+        ],
     )
 }
 

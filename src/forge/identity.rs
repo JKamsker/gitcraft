@@ -14,7 +14,7 @@ impl Hosting {
 
     pub(crate) fn same_repository_path(&self, path: &str) -> bool {
         match self.forge {
-            Forge::GitLab => self.path == path,
+            Forge::GitLab | Forge::Azure | Forge::Bitbucket => self.path == path,
             Forge::GitHub | Forge::Forgejo | Forge::Gitea => self.path.eq_ignore_ascii_case(path),
         }
     }
@@ -47,7 +47,7 @@ impl Hosting {
     pub(crate) fn review_repository_key(&self) -> Option<String> {
         use sha2::{Digest, Sha256};
         let base = web(&self.web)?;
-        let path = if self.forge == Forge::GitLab {
+        let path = if matches!(self.forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket) {
             self.path.clone()
         } else {
             self.path.to_ascii_lowercase()
@@ -113,4 +113,38 @@ fn same_authority(a: &ureq::RequestUrl, b: &ureq::RequestUrl) -> bool {
     a.scheme() == b.scheme()
         && a.host().eq_ignore_ascii_case(b.host())
         && a.as_url().port_or_known_default() == b.as_url().port_or_known_default()
+}
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    #[test]
+    fn added_forges_keep_case_sensitive_paths_and_exact_web_instances() {
+        for forge in [Forge::Azure, Forge::Bitbucket] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "Team/App".into(),
+                web: "https://forge.example/proxy".into(),
+            };
+            assert!(h.same_repository(&h.clone()));
+            assert!(h.matches_git_remote("ssh://git@forge.example/Team/App"));
+            assert!(h.matches_http_repository("https://FORGE.example:443/proxy/Team/App.git"));
+            for url in [
+                "https://forge.example/proxy/team/app",
+                "https://forge.example:8443/proxy/Team/App",
+                "http://forge.example/proxy/Team/App",
+                "https://forge.example/other/Team/App",
+            ] {
+                assert!(!h.matches_http_repository(url), "{forge:?} accepted {url}");
+            }
+            let other = Hosting {
+                path: "team/app".into(),
+                ..h.clone()
+            };
+            assert!(!h.same_repository(&other));
+            assert_ne!(h.review_repository_key(), other.review_repository_key());
+        }
+    }
 }

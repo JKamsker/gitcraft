@@ -18,15 +18,15 @@ impl RepoTab {
         let rows = [
             (
                 "history",
-                "Reflog",
-                "Where HEAD and each branch have been",
+                crate::i18n::text("repo-core-0058"),
+                crate::i18n::text("repo-core-3470"),
                 Source::head(),
                 ReflogAct::Show(Source::head()),
             ),
             (
                 "search",
-                "Find lost commits",
-                "Commits no branch, tag or stash has any more",
+                crate::i18n::text("repo-core-0060"),
+                crate::i18n::text("repo-core-3471"),
                 Source::Lost,
                 ReflogAct::FindLost,
             ),
@@ -42,7 +42,7 @@ impl RepoTab {
             Header {
                 key: "recovery",
                 icon: "history",
-                title: "RECOVERY",
+                title: crate::i18n::text("repo-core-3472"),
                 count: found,
                 default_open: false,
                 button: None,
@@ -51,15 +51,32 @@ impl RepoTab {
         if !open {
             return;
         }
+        if ui
+            .button(crate::i18n::text("repo-core-3473"))
+            .on_hover_text(crate::i18n::text("repo-core-3474"))
+            .clicked()
+        {
+            acts.push(Action::OpenContentRecovery);
+        }
+        if ui.button(crate::i18n::text("repo-core-3475")).clicked() {
+            acts.push(Action::EarlierVersions);
+        }
         let t = Tokens::get(ui.ctx());
+        if ui.button(crate::i18n::text("repo-core-3476")).clicked() {
+            acts.push(Action::OpenSymbolBiography(None));
+        }
+        if ui.button(crate::i18n::text("repo-core-3477")).clicked() {
+            acts.push(Action::OpenLineDossier(None));
+        }
         let shown = self.reflog.as_ref().map(|v| &v.source);
         for (icon, title, about, source, act) in rows {
             let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 36.0));
-            let r = ui.interact(rect, ui.id().with(("recovery-row", title)), Sense::click());
+            let r = ui.interact(rect, ui.id().with(("recovery-row", icon)), Sense::click());
             let on = matches!(
                 (&source, shown),
                 (Source::Lost, Some(Source::Lost)) | (Source::Ref(_), Some(Source::Ref(_)))
             );
+            crate::a11y::a11y_selected(&r, || format!("{title}: {about}"), on);
             if on {
                 ui.painter().rect_filled(rect, 0.0, t.row_selected);
             } else if r.hovered() {

@@ -49,13 +49,18 @@ impl RepoTab {
 
     /// The "View all files" box.
     pub(super) fn all_files_toggle(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        if crate::icons::toggle_button(ui, "folder-tree", "View all files", self.all_files.on)
-            .on_hover_text(if self.all_files.on {
-                "All files in this commit · click to show only changed files"
-            } else {
-                "Changed files only · click to view all files in this commit"
-            })
-            .clicked()
+        if crate::icons::toggle_button(
+            ui,
+            "folder-tree",
+            crate::i18n::text("repo-core-0806"),
+            self.all_files.on,
+        )
+        .on_hover_text(if self.all_files.on {
+            crate::i18n::text("dev-integration-ui-all-files-on")
+        } else {
+            crate::i18n::text("dev-integration-ui-all-files-off")
+        })
+        .clicked()
         {
             acts.push(Action::ViewAllFiles(!self.all_files.on));
         }
@@ -84,7 +89,10 @@ impl RepoTab {
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     ui.add_space(12.0);
-                    ui.colored_label(t.danger, e);
+                    ui.colored_label(
+                        t.danger,
+                        crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                    );
                 });
                 return;
             }
@@ -101,9 +109,10 @@ impl RepoTab {
         let id = egui::Id::new(("file-folder", self.repo_key(), "all"));
         // Rows are known by their path within this commit's files.
         let paths: Vec<&str> = files.iter().map(String::as_str).collect();
+        let mut reveal = None;
         super::horizontal_files(ui, ("all-files-scroll", &detail.hash), &paths, |ui| {
             ui.push_id(("all-files", &detail.hash), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, false),
                     files,
@@ -117,6 +126,14 @@ impl RepoTab {
                         };
                         let code = change.map_or(' ', |f| f.status);
                         let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
+                        self.keyboard_file_row(
+                            egui::Id::new(("all-files", &detail.hash)),
+                            &r.row,
+                            &crate::repo::DiffKey::Commit {
+                                hash: detail.hash.clone(),
+                                path: path.clone(),
+                            },
+                        );
                         // The checkout's files only, and not over a changed file's stats.
                         if change.is_none() && self.is_checkout(Some(&detail.hash)) {
                             self.pointer_mark(ui, &r.row, path, shown(path));
@@ -137,6 +154,7 @@ impl RepoTab {
                             false,
                             None,
                             &links,
+                            r.row.has_focus(),
                             acts,
                             locks,
                         );
@@ -148,8 +166,14 @@ impl RepoTab {
                             });
                         }
                     },
-                );
+                )
+                .or(reveal);
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
     }
 }

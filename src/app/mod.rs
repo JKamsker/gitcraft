@@ -17,10 +17,17 @@ mod my_work;
 mod os_shell;
 mod palette;
 mod panels;
+mod practice;
 mod profiles;
 mod recent_status;
 mod remote_open;
+mod resident;
+pub(crate) use resident::notification_body as resident_notification_body;
 mod repo_scan;
+mod setup;
+mod startup_display;
+mod startup_language;
+pub use startup_language::initialize_language;
 mod tab_strip;
 mod tabs;
 mod teleport;
@@ -28,8 +35,10 @@ mod teleport;
 mod tests;
 pub(crate) mod title_bar;
 mod update_banner;
+mod windows;
 mod workspaces;
 mod worktrees;
+pub use windows::DesktopApp;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -47,6 +56,7 @@ use crate::tab_look::TabLook;
 use crate::theme::{self, ThemeId, Tokens};
 use crate::update;
 use clone::CloneForm;
+use home::AppError;
 use palette::Palette;
 use panels::Toast;
 use remote_open::{Connecting, RemoteForm};
@@ -88,6 +98,7 @@ struct Saved {
     found_repos: Vec<PathBuf>,
     /// What was seen of each pull request (by URL) when it was opened from the inbox.
     inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
+    windows: Vec<windows::SavedWindow>,
 }
 
 enum Tab {
@@ -98,6 +109,8 @@ enum Tab {
 }
 
 pub struct App {
+    windows: windows::Windows,
+    resident: crate::tray::Resident,
     git_version: Result<String, String>,
     tabs: Vec<Tab>,
     /// What is typed in the worktree switcher.
@@ -112,12 +125,16 @@ pub struct App {
     recent: Vec<PathBuf>,
     theme: ThemeId,
     clone_parent: Option<PathBuf>,
-    error: Option<String>,
+    error: Option<AppError>,
     /// What the start page's error is, when it is a git failure gitcraft can explain (see
     /// [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     was_focused: bool,
     clone_form: Option<CloneForm>,
+    practice_open: bool,
+    setup: setup::SetupWindow,
+    practice_jobs: crate::tasks::Scope,
+    practicing: Option<Receiver<Result<PathBuf, String>>>,
     /// A clone running in the background: (destination, result).
     cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.
@@ -129,13 +146,14 @@ pub struct App {
     /// What the taskbar button shows.
     taskbar: crate::os_shell::Taskbar,
     /// The recent repositories the taskbar button's menu was made for.
-    menu_for: Option<Vec<PathBuf>>,
+    menu_for: Option<(u64, Vec<PathBuf>)>,
     /// The dialog that opens a repository in WSL or over SSH.
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
     connecting: Vec<Connecting>,
     /// The teleport dialog, and the teleport it runs.
     teleport: Option<teleport::TeleportForm>,
+    teleport_drag: Option<teleport::DragTargets>,
     /// ssh's question being answered (a password, a new host key).
     askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
@@ -152,6 +170,8 @@ pub struct App {
     update_later: bool,
     /// Why the update didn't go in place.
     update_error: Option<String>,
+    /// Owned source receipt for exactly the raw installation failure above.
+    update_failure: Option<update::Failure>,
     skipped_version: String,
     /// See `Saved::pinned_version`.
     pinned_version: String,
@@ -219,18 +239,31 @@ impl App {
     /// The window, carrying out `cmd` from the command line (`gitcraft log <file>`…): its
     /// relative paths are taken from the current folder.
     pub fn launched(cc: &eframe::CreationContext<'_>, cmd: Option<crate::launch::Command>) -> Self {
+        Self::launched_using(cc, cmd, git::version)
+    }
+
+    fn launched_using(
+        cc: &eframe::CreationContext<'_>,
+        cmd: Option<crate::launch::Command>,
+        version: impl FnOnce() -> Result<String, String>,
+    ) -> Self {
         // The window's thread: it never waits for another machine (see `remote::ui_guard`).
         crate::remote::mark_ui_thread();
         // ssh's questions (passwords, new host keys) come to this window.
         crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
         // So do later starts' requests (see `crate::instance`).
         crate::instance::set_repaint(cc.egui_ctx.clone());
+        let native_ctx = cc.egui_ctx.clone();
+        gitcraft_os::set_native_url_wake(move || native_ctx.request_repaint());
+        let dock_ctx = cc.egui_ctx.clone();
+        gitcraft_os::set_native_dock_wake(move || dock_ctx.request_repaint());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
             .unwrap_or_default();
         let ctx = &cc.egui_ctx;
         egui_extras::install_image_loaders(ctx);
+        crate::svg::install(ctx);
         crate::image_fit::install(ctx);
         crate::image_cache::install(ctx);
         theme::install_fonts(ctx);
@@ -243,7 +276,9 @@ impl App {
         crate::desktop_entry::refresh();
 
         let mut app = Self {
-            git_version: git::version(),
+            windows: Default::default(),
+            resident: Default::default(),
+            git_version: version(),
             tabs: Vec::new(),
             switcher_query: String::new(),
             switcher_focus: false,
@@ -281,6 +316,10 @@ impl App {
             error_card: None,
             was_focused: true,
             clone_form: None,
+            practice_open: false,
+            setup: Default::default(),
+            practice_jobs: crate::tasks::Scope::default(),
+            practicing: None,
             cloning: None,
             cloning_form: None,
             pick_on_start: false,
@@ -290,6 +329,7 @@ impl App {
             remote_form: None,
             connecting: Vec::new(),
             teleport: None,
+            teleport_drag: None,
             askpass: Default::default(),
             update: None,
             update_rx: None,
@@ -298,6 +338,7 @@ impl App {
             update_looked: None,
             update_later: false,
             update_error: None,
+            update_failure: None,
             skipped_version: saved.skipped_version,
             pinned_version: update::settle_pin(&saved.pinned_version, update::CURRENT),
             previous_version: update::previous(),
@@ -330,6 +371,7 @@ impl App {
         if app.tabs.is_empty() {
             app.tabs.push(Tab::Home);
         }
+        app.restore_windows(saved.windows, ctx);
         app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
         if let Some(cmd) = cmd
             && app.git_version.is_ok()
@@ -348,6 +390,9 @@ impl App {
     /// Opens `path` in the active tab if it's a start page, otherwise in a new tab. One on
     /// another machine opens once it is reached, in the background.
     fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
+        if self.focus_elsewhere(path, ctx) {
+            return;
+        }
         if crate::remote::is_remote(path) {
             // Already open: no need to reach it first.
             if let Some(i) = self
@@ -385,15 +430,19 @@ impl App {
 
     /// Says why a repository couldn't be opened: on the start page, and in a toast when
     /// another tab is shown (where the start page's message would go unseen).
-    fn report(&mut self, e: String) {
+    fn report(&mut self, e: impl Into<AppError>) {
+        let e = e.into();
         if !matches!(self.tabs.get(self.active), Some(Tab::Home)) {
-            self.toasts.push(Toast::new(e.clone(), true));
+            self.toasts.push(Toast::from_app_error(&e));
         }
         self.error = Some(e);
     }
 
     /// Opens the repository whose top folder is `root` (see [`Self::open_repo`]).
     fn open_root(&mut self, root: PathBuf, ctx: &egui::Context) {
+        if self.focus_elsewhere(&root, ctx) {
+            return;
+        }
         self.remember(&root);
         self.error = None;
         self.error_card.take_if(|card| !card.fixed());
@@ -551,22 +600,94 @@ impl App {
     /// Keyboard shortcuts, and the reload on coming back to the window. Returns whether the
     /// window has the focus.
     fn shortcuts(&mut self, ctx: &egui::Context) -> bool {
+        keymap::owner(
+            ctx,
+            egui::Id::new((
+                self.active,
+                self.tabs.get(self.active).and_then(|t| {
+                    if let Tab::Repo(r) = t {
+                        Some(&r.path)
+                    } else {
+                        None
+                    }
+                }),
+            )),
+        );
+        keymap::active(
+            ctx,
+            match self.tabs.get(self.active) {
+                Some(Tab::Repo(r)) => r.key_scopes(ctx),
+                Some(Tab::Settings) => vec![keymap::Scope::Window, keymap::Scope::Settings],
+                _ => vec![keymap::Scope::Window],
+            },
+        );
         // A focused text field or the terminal keeps these keys for itself.
-        let modal_open = self.clone_form.is_some()
-            || self.remote_form.is_some()
-            || self.teleport.is_some()
-            || self.my_work.open
+        let modal_open = self.window_has_dialog()
             || self.askpass_open()
             || self.palette.is_some()
+            || self.practice_open
+            || self.setup.open
             || self.manual_open
             || self.repo_scan.is_some()
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
-        let (commands, focused) = ctx.input(|i| {
-            (
-                keymap::pressed(i, keymap::Scope::Window),
-                i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)),
-            )
-        });
+        let focused =
+            ctx.input(|i| i.focused || i.raw.viewports.values().any(|v| v.focused == Some(true)));
+        let capturing = keymap::editor::capturing(ctx);
+        let allowed = if capturing {
+            Some(Vec::new())
+        } else if modal_open {
+            let mut allowed = vec![keymap::Command::Manual, keymap::Command::Palette];
+            if self.palette.is_none()
+                && !self.manual_open
+                && self.clone_form.is_none()
+                && self.remote_form.is_none()
+                && !self.askpass_open()
+                && let Some(Tab::Repo(r)) = self.tabs.get(self.active)
+                && r.composer_has_focus(ctx)
+            {
+                allowed.push(keymap::Command::Commit);
+            }
+            if self.palette.is_none()
+                && !self.manual_open
+                && !self.window_has_dialog()
+                && !self.askpass_open()
+                && let Some(Tab::Repo(repo)) = self.tabs.get(self.active)
+                && repo.search_shortcut_exception(ctx)
+            {
+                allowed.push(keymap::Command::Search);
+                if repo.find_shortcut_exception(ctx) {
+                    allowed.extend([keymap::Command::FindNext, keymap::Command::FindPrevious]);
+                }
+            }
+            if self.palette.is_none()
+                && !self.manual_open
+                && !self.window_has_dialog()
+                && !self.askpass_open()
+                && matches!(self.tabs.get(self.active), Some(Tab::Settings))
+                && Settings::search_has_focus(ctx)
+            {
+                allowed.extend([
+                    keymap::Command::SettingsSearch,
+                    keymap::Command::SettingsPrevious,
+                    keymap::Command::SettingsNext,
+                ]);
+            }
+            Some(allowed)
+        } else {
+            None
+        };
+        keymap::restrict(ctx, allowed);
+        let commands = if capturing {
+            keymap::cancel(ctx, keymap::Scope::Window);
+            Vec::new()
+        } else if modal_open {
+            keymap::pressed(ctx, keymap::Scope::Window)
+                .into_iter()
+                .filter(|c| matches!(c, keymap::Command::Manual | keymap::Command::Palette))
+                .collect()
+        } else {
+            keymap::pressed(ctx, keymap::Scope::Window)
+        };
         let mut refresh = false;
         for command in commands {
             refresh |= self.window_command(command, modal_open, ctx);
@@ -592,11 +713,7 @@ impl App {
     ) -> bool {
         use keymap::Command;
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some()
-            || self.remote_form.is_some()
-            || self.teleport.is_some()
-            || self.my_work.open
-            || self.askpass_open();
+        let asking = self.window_has_dialog() || self.askpass_open();
         match command {
             Command::Manual if !asking && self.palette.is_none() => {
                 self.manual_open = !self.manual_open;
@@ -619,15 +736,8 @@ impl App {
             Command::GoToTab(place) => self.go_to_tab(usize::from(place)),
             Command::LastTab => self.go_to_last_tab(),
             Command::Reload => return true,
-            // A repository tab's keys are its own.
-            Command::Fetch
-            | Command::Pull
-            | Command::Push
-            | Command::Stash
-            | Command::NewBranch
-            | Command::Terminal
-            | Command::StageAll
-            | Command::Commit => {}
+            // Contextual actions are delivered by their owning view.
+            _ => {}
         }
         false
     }
@@ -640,10 +750,13 @@ impl App {
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
+                    || self.practice_open
+                    || self.setup.open
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
                     || self.teleport.is_some()
+                    || self.repo_scan.is_some()
                     || self.my_work.open
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
@@ -672,9 +785,65 @@ impl App {
     }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+impl App {
+    /// Model work only: called by eframe even while the root has no painting pass, and
+    /// by deferred children. Channel draining and service deadlines keep a single owner.
+    fn tick_model(&mut self, ctx: &egui::Context, frame: Option<&eframe::Frame>) {
+        // eframe also accepts Close from logic-only passes of hidden/minimized roots.
+        self.close_root_with_children(ctx);
+        self.wake_askpass_owner(ctx);
+        self.settings = Settings::get(ctx);
+        crate::portable::set_credential_store(self.settings.portable_credential_store);
+        crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
+        crate::network::start_watching(ctx);
+        self.take_handoffs(ctx);
+        self.poll_resident(ctx);
+        if self.git_version.is_err() {
+            return;
+        }
+        self.poll_practice(ctx);
+        self.poll_setup(ctx);
+        self.poll_clone(ctx);
+        self.poll_connecting(ctx);
+        self.poll_launch(ctx);
+        self.poll_window_models(ctx);
+        self.poll_update(ctx);
+        self.poll_inbox_opening(ctx);
+        self.agent_requests(ctx);
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
+            if let Tab::Repo(r) = tab {
+                r.poll(ctx);
+                r.background_tick();
+                r.poll_parked(ctx);
+            }
+        }
+        self.advance_patches(ctx);
+        self.os_shell(ctx, frame);
+        let focused = ctx.input(|i| i.raw.viewports.values().any(|v| v.focused == Some(true)));
+        self.keep_drafts(ctx, focused);
+        self.toast_finished(focused);
+        // A dormant root still services completions/launches, even when every child is
+        // minimized. This schedules logic; it does not force a hidden window to paint.
+        if self.windows.enabled && !self.windows.parked.is_empty() {
+            ctx.request_repaint_after_for(
+                std::time::Duration::from_millis(250),
+                egui::ViewportId::ROOT,
+            );
+        }
+    }
+
+    fn window_ui(&mut self, ui: &mut Ui, frame: Option<&mut eframe::Frame>) {
         let ctx = ui.ctx().clone();
+        if frame.is_none() {
+            self.tick_model(&ctx, None);
+        }
+        if std::mem::take(&mut self.pick_on_start) {
+            self.pick_existing(&ctx);
+        }
         crate::image_cache::maintain(&ctx);
         let t = Tokens::get(&ctx);
         // A button dropped moves in the settings, read just below.
@@ -687,7 +856,10 @@ impl eframe::App for App {
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
         crate::network::start_watching(&ctx);
         title_bar::apply(&ctx, &self.settings, &mut self.decorated);
-        title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        if let Some(frame) = frame {
+            title_bar::sync_border(frame, &self.settings, &mut self.window_border);
+        }
+        self.close_root_with_children(&ctx);
         crate::app_buttons::set_current_theme(&ctx, &self.theme);
 
         // eframe shows the window after the first frame; maximize it on the next one.
@@ -700,41 +872,14 @@ impl eframe::App for App {
             }
         }
 
-        self.take_handoffs(&ctx);
         if let Err(err) = self.git_version.clone() {
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(t.dock))
                 .show(ui, |ui| self.git_missing(ui, &err));
             return;
         }
-        self.poll_clone(&ctx);
-        self.os_shell(&ctx, frame);
-        self.poll_connecting(&ctx);
-        self.poll_launch(&ctx);
-        self.poll_update(&ctx);
-        self.poll_inbox_opening(&ctx);
         self.notice_profile_git(&ctx);
         let focused = self.shortcuts(&ctx);
-        self.agent_requests(&ctx);
-
-        // Background repos still need their results drained. Those restored on start are read
-        // only once shown, and those left alone for a while are suspended (see
-        // `repo::lifecycle`).
-        for (i, tab) in self.tabs.iter_mut().enumerate() {
-            if let Tab::Repo(r) = tab
-                && i != self.active
-            {
-                r.poll(&ctx);
-                r.background_tick();
-            }
-        }
-
-        // Worktrees parked in any tab keep going too.
-        for tab in &mut self.tabs {
-            if let Tab::Repo(r) = tab {
-                r.poll_parked(&ctx);
-            }
-        }
 
         // The caption buttons go up to the window's corner.
         let strip_right = if title_bar::wanted(&self.settings) {
@@ -779,11 +924,25 @@ impl eframe::App for App {
         self.agent_card(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.practice_dialog(&ctx);
+        self.setup_ui(&ctx);
+        crate::glossary::hover(&ctx);
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);
         self.repo_scan_dialog(&ctx);
         self.my_work_ui(&ctx);
         self.poll_diagnostics(&ctx);
+        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
+            for tab in &mut self.tabs {
+                if let Tab::Repo(repo) = tab {
+                    repo.forget_https_memory(&path, &url);
+                }
+            }
+        }
+        if crate::settings::network_page::take_inspection_request(&ctx) {
+            crate::settings::show_page(&ctx, crate::settings::Page::HttpsSignins);
+            self.open_settings();
+        }
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         self.dropped_files(&ctx);
@@ -792,12 +951,31 @@ impl eframe::App for App {
         if title_bar::wanted(&self.settings) {
             title_bar::resize_edges(&ctx);
         }
+        keymap::which_key(&ctx, |command| match self.tabs.get(self.active) {
+            Some(Tab::Repo(r)) => r.command_refusal(command),
+            _ if command.scope() == keymap::Scope::Repository => {
+                Some("Open a repository first".into())
+            }
+            _ => None,
+        });
         crate::a11y::end_frame(&ctx);
+    }
+}
+
+impl eframe::App for App {
+    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.tick_model(ctx, Some(frame));
+    }
+
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+        self.window_ui(ui, Some(frame));
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         // Index of the active tab among the saved (repo) tabs.
-        let (open, active) = self.open_repos();
+        let (mut open, active) = self.open_repos();
+        let detached = self.saved_windows();
+        open.retain(|p| !detached.iter().any(|w| w.open.contains(p)));
         let saved = Saved {
             open,
             active,
@@ -814,12 +992,17 @@ impl eframe::App for App {
             workspaces: self.workspaces.clone(),
             found_repos: self.found_repos.clone(),
             inbox_seen: self.inbox_seen.clone(),
+            windows: detached,
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
 
     fn on_exit(&mut self) {
         self.stop_teleport();
+        let owners = self.windows.parked.keys().copied().collect::<Vec<_>>();
+        for owner in owners {
+            self.in_window(owner, Self::stop_teleport);
+        }
         self.close_drafts();
         crate::instance::closing();
     }
@@ -899,6 +1082,11 @@ pub fn single_instance(
     }
 }
 
+/// Selected-language human presentation; does not execute startup or native actions.
+pub fn display_start_message(message: &str) -> String {
+    panels::display_app_message(message)
+}
+
 /// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
 /// from a terminal.
 /// What the command line asked to be told (`--help`, a mistake in it): on the terminal it was
@@ -906,11 +1094,13 @@ pub fn single_instance(
 /// menu or a file manager starts gitcraft without one).
 pub fn tell(message: &str, error: bool) {
     use std::io::IsTerminal;
+    let display = display_start_message(message);
+    let message = display.as_str();
     let terminal = !cfg!(all(windows, not(debug_assertions))) && std::io::stderr().is_terminal();
     match (terminal, error) {
         (true, true) => eprintln!("gitcraft: {message}"),
         (true, false) => println!("{message}"),
-        (false, true) => report_failed_start(message),
+        (false, true) => report_displayed_start(message),
         (false, false) => {
             let _ = rfd::MessageDialog::new()
                 .set_level(rfd::MessageLevel::Info)
@@ -923,6 +1113,11 @@ pub fn tell(message: &str, error: bool) {
 }
 
 pub fn report_failed_start(message: &str) {
+    let display = display_start_message(message);
+    report_displayed_start(&display);
+}
+
+fn report_displayed_start(message: &str) {
     eprintln!("gitcraft: {message}");
     // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
     // menu would end with nothing shown: a desktop notification says it instead.
@@ -953,8 +1148,11 @@ fn on_path(name: &str) -> bool {
 pub fn after_exit() {
     crate::tasks::shutdown();
     crate::parallel_bisect::shutdown();
+    crate::processes::shutdown_leases();
     crate::processes::shutdown();
     crate::remote::shutdown();
+    crate::processes::shutdown_cleanup();
+    gitcraft_os::retire_process_helpers();
     crate::instance::shut_down();
     update::relaunch();
 }
@@ -978,4 +1176,9 @@ pub(crate) fn strip_verbatim(path: PathBuf) -> PathBuf {
         Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
         _ => path,
     }
+}
+
+/// Installs the persistent local panic log before the application window is created.
+pub fn install_panic_log() {
+    crate::diagnostics::crash::install();
 }

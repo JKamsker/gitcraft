@@ -307,7 +307,7 @@ fn a_rebase_is_refused_when_the_contributor_pushed_commits_not_here() {
         None,
     );
     assert!(checked_out.is_ok());
-    assert!(plan.is_err_and(|e| e.contains("pull them first")));
+    assert!(plan.is_err_and(|e| e.contains("pull it first")));
 }
 
 #[test]
@@ -895,7 +895,7 @@ fn review14_effective_destination_validation_uses_shared_canonical_identity() {
             ("https://forge.example:4000/PROXY/Group/Project.git", false),
             (
                 "https://forge.example:4000/proxy/group/project.git",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             let d = super::guard::Destination {
@@ -918,34 +918,26 @@ fn review14_effective_destination_validation_uses_shared_canonical_identity() {
 }
 
 #[test]
-fn review14_confirmed_owned_rebase_executes_and_cleans_running() {
+fn review14_confirmed_owned_rebase_executes_and_cleans_running()
+-> Result<(), Box<dyn std::error::Error>> {
     let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Metered));
     let w = World::new("confirm-execution");
-    let p = rebase_ready(&w);
     let ctx = egui::Context::default();
-    let mut tab = recorded_tab(&w, &ctx);
-    // This fixture assigns web metadata to owned local transports; no forge is called.
-    tab.remotes = git::remotes(&w.me).unwrap_or_default();
-    tab.forge_remotes.truncate(1);
-    tab.take_forge_selection(true, &ctx);
-    let primary = tab.remotes.iter().find(|r| r.name == "origin").cloned();
-    assert!(primary.is_some());
-    let Some(primary) = primary else { return };
-    assert!(tab.hosting.is_some());
-    let Some(hosting) = tab.hosting.clone() else {
-        return;
-    };
-    let scope = super::guard::Scope::new(tab.forge_generation, hosting, primary);
-    let id = scope.id;
-    tab.forks.scope = Some(scope);
-    let label = "Rebase #7 onto main and push".to_owned();
-    tab.forks.scope_label = Some(label.clone());
-    tab.forks.running = Some((label, p.clone()));
+    let (p, mut tab) = refresh_stable_rebase(&w, &ctx)?;
+    let id = confirmation_id(&tab);
     tab.fork_act(super::ForkAct::ConfirmRebase(id), &ctx);
     assert!(tab.busy_op.is_some());
     drain_until(&mut tab, &ctx, |t| {
         t.busy_op.is_none() && !t.loading && !t.timeline.entries.is_empty()
     });
+    // Rebase is a local operation. Its undo is retained before the distinct push
+    // checklist is approved; a completed rewrite alone must not publish anything.
+    assert_eq!(git::resolve(&w.fork, "fix").unwrap_or_default(), p.seen);
+    assert_ne!(git::head(&w.me), p.head);
+    assert!(tab.timeline.entries.iter().any(|e| e.undo.is_some()));
+    let approved = crate::repo::push_preflight::test_support::approve(&mut tab, &ctx);
+    assert!(approved.is_ok(), "{approved:?}");
+    drain_until(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     assert!(tab.forks.running.is_none());
     assert_eq!(
         git::resolve(&w.fork, "fix").unwrap_or_default(),
@@ -953,6 +945,7 @@ fn review14_confirmed_owned_rebase_executes_and_cleans_running() {
     );
     assert_ne!(git::head(&w.me), p.head);
     assert!(tab.timeline.entries.iter().any(|e| e.undo.is_some()));
+    Ok(())
 }
 
 #[test]
@@ -989,7 +982,7 @@ fn review14_checkout_rejects_other_instance_pushurl_before_fetch_or_config_chang
     assert!(
         tab.status
             .as_ref()
-            .is_some_and(|(s, _)| s.contains("matching push destination")),
+            .is_some_and(|n| n.0.contains("matching push destination")),
         "{:?}",
         tab.status
     );
@@ -1183,6 +1176,65 @@ fn review19_first_checkout_accepts_canonical_https_to_ssh_rewrite() {
     );
     assert_eq!(std::fs::read_to_string(log).unwrap_or_default(), "fetch");
     assert_eq!(git::head(&w.me), w.info().sha);
+}
+
+// A real refresh must rediscover the same forge while these fixtures wait for the
+// separate push checklist. The SSH spelling supplies that identity; this strict
+// helper executes only the owned upstream's upload-pack, never a network client.
+fn refresh_stable_rebase(
+    w: &World,
+    ctx: &egui::Context,
+) -> Result<(plan::Rebase, crate::repo::RepoTab), Box<dyn std::error::Error>> {
+    let _ = rebase_ready(w);
+    let quoted = |p: &Path| format!("'{}'", arg(p).replace('\'', "'\\''"));
+    let ssh = w.root.join("owned upstream ssh");
+    let script = format!(
+        "#!/bin/sh\nhost=no\ncommand=no\nfor arg do\n  [ \"$arg\" = \"git@forge.example\" ] && host=yes\n  [ \"$arg\" = \"git-upload-pack 'origin/app'\" ] && command=yes\ndone\n[ \"$host:$command\" = yes:yes ] || exit 97\nexec git-upload-pack {}\n",
+        quoted(&w.upstream)
+    );
+    assert!(std::fs::write(&ssh, script).is_ok());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert!(std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700)).is_ok());
+    }
+    run(&w.me, &["config", "core.sshCommand", &quoted(&ssh)]);
+    run(&w.me, &["config", "ssh.variant", "ssh"]);
+    run(&w.me, &["config", "gitcraft.forge", "forgejo"]);
+    run(
+        &w.me,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "git@forge.example:origin/app",
+        ],
+    );
+    let remotes = git::remotes(&w.me)?;
+    let primary = remotes.iter().find(|r| r.name == "origin").cloned();
+    assert!(primary.is_some());
+    let primary = primary.ok_or("owned origin is configured above")?;
+    let p = plan::plan_rebase(&w.me, &w.info(), &primary, &w.setup(), None, None, None);
+    assert!(p.is_ok(), "{p:?}");
+    let p = p?;
+    let mut tab = crate::repo::RepoTab::new_deferred(w.me.clone(), ctx);
+    tab.forge_remotes = crate::forge::detect_remotes(&w.me, &remotes);
+    tab.remotes = remotes;
+    tab.take_forge_selection(false, ctx);
+    let hosting = tab.hosting.clone();
+    assert!(hosting.is_some());
+    if let Some(hosting) = hosting {
+        tab.forks.scope = Some(super::guard::Scope::new(
+            tab.forge_generation,
+            hosting,
+            primary,
+        ));
+    }
+    tab.forks.info.insert(7, w.info());
+    let label = "Rebase #7 onto main and push".to_owned();
+    tab.forks.scope_label = Some(label.clone());
+    tab.forks.running = Some((label, p.clone()));
+    Ok((p, tab))
 }
 
 fn execution_tab(w: &World, p: &plan::Rebase, ctx: &egui::Context) -> crate::repo::RepoTab {
@@ -1538,9 +1590,8 @@ fn review19_conflict_continuation_pins_its_tip_and_original_explicit_lease()
         run(&w.ann, &["checkout", "-q", "-B", "up", "origin/main"]);
         edit_base(&w.ann, "upstream version")?;
         run(&w.ann, &["push", "-q", "origin", "up:main"]);
-        let p = rebase_ready(&w);
         let ctx = egui::Context::default();
-        let mut tab = execution_tab(&w, &p, &ctx);
+        let (p, mut tab) = refresh_stable_rebase(&w, &ctx)?;
         let scope = tab.forks.scope.clone().ok_or("missing fork scope")?;
         let result = crate::repo::operations::run_steps_guarded(
             &w.me,
@@ -1594,10 +1645,47 @@ fn review19_conflict_continuation_pins_its_tip_and_original_explicit_lease()
         let expected_local = git::head(&w.me);
         tab.dialog = None;
         tab.fork_act(super::ForkAct::ConfirmPush(scope.id), &ctx);
+        // The conflict confirmation leads to the same deliberate push checklist.
+        // A stale contributor lease may refuse during inspection; a local tip
+        // change must still refuse if its checklist reaches actual dispatch.
+        assert_eq!(
+            git::resolve(&w.fork, "fix")?,
+            if mode == "contributor-moved" {
+                expected_fork.clone()
+            } else {
+                p.seen.clone()
+            }
+        );
+        let approved = crate::repo::push_preflight::test_support::approve(&mut tab, &ctx);
+        if mode == "push" {
+            assert!(approved.is_ok(), "{approved:?}");
+        } else if approved.is_err() {
+            assert!(
+                matches!(
+                    tab.dialog,
+                    Some(
+                        crate::repo::Dialog::PushError(_)
+                            | crate::repo::Dialog::PushPreflight { .. }
+                    )
+                ),
+                "{mode}: {approved:?}; status: {:?}",
+                tab.status
+            );
+            // A declined checklist has no OpDone. Dismissing it and processing
+            // the next ordinary frame retires the pending fork action.
+            tab.dialog = None;
+            tab.forks_frame(&ctx);
+        }
         drain_until(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         assert_eq!(git::head(&w.me), expected_local);
         assert_eq!(git::resolve(&w.fork, "fix")?, expected_fork);
-        assert!(tab.forks.running.is_none());
+        assert!(tab.forks.running.is_none(), "{mode}: {approved:?}");
+        if mode != "push" && approved.is_ok() {
+            assert!(
+                tab.status.as_ref().is_some_and(|notice| notice.1),
+                "{mode}: the dispatched stale-tip guard must report failure"
+            );
+        }
         if mode == "push" {
             assert!(
                 tab.timeline
@@ -2128,7 +2216,7 @@ fn review20_saved_checkout_guard_preserves_authority_prefix_and_gitlab_case()
             ("https://forge.example:4000/PROXY/Group/Repo.git", false),
             (
                 "https://forge.example:4000/proxy/group/repo.git",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             run(&w.me, &["remote", "set-url", "ann", url]);
@@ -2199,5 +2287,44 @@ fn review20_legacy_saved_checkout_without_identity_is_refused_before_replay()
     assert!(git::remotes(&w.me)?.iter().all(|r| r.name != "ann"));
     let result = run_steps(&w.me, &entry.redo.clone(), OpKind::Redo(entry), None).0;
     assert!(result.is_ok(), "{result:?}");
+    Ok(())
+}
+
+#[test]
+fn invalidated_fork_scope_keeps_raw_guard_while_error_paint_tracks_locale() -> Result<(), String> {
+    let hosting = crate::forge::Hosting {
+        forge: crate::forge::Forge::GitHub,
+        host: "github.com".into(),
+        path: "opaque/project".into(),
+        web: "https://github.com".into(),
+    };
+    let scope = super::guard::Scope::new(
+        1234,
+        hosting,
+        git::Remote {
+            name: "opaque 日本語".into(),
+            url: "https://github.com/opaque/project".into(),
+        },
+    );
+    scope.check()?;
+    scope.invalidate();
+    let raw = scope.check().err().ok_or("invalidated scope accepted")?;
+    let expected = "The primary forge changed; plan this fork action again. Any completed local rewrite remains undoable.";
+    assert_eq!(raw, expected);
+    for (language, display) in [
+        ("en-US", expected),
+        (
+            "de",
+            "Die primäre Forge wurde geändert; plane diese Fork-Aktion erneut. Abgeschlossene lokale Umschreibungen bleiben rückgängig machbar.",
+        ),
+        ("en-US", expected),
+    ] {
+        crate::i18n::set_language(language);
+        assert_eq!(git::display_error(&raw), display);
+        assert_eq!(scope.check(), Err(expected.to_owned()));
+        let opaque = format!("provider log: {expected}\ncommand: refs/日本語");
+        assert_eq!(git::display_error(&opaque), opaque);
+    }
+    crate::i18n::set_language("en-US");
     Ok(())
 }

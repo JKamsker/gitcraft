@@ -16,9 +16,12 @@ impl RepoTab {
         };
         let t = Tokens::get(ctx);
         let mut open = true;
-        egui::Window::new(format!(
-            "Find the interaction: {} and {}",
-            search.spec.a, search.spec.b
+        egui::Window::new(crate::i18n::message(
+            "repo-core-2832",
+            &[
+                ("a", search.spec.a.to_string().into()),
+                ("b", search.spec.b.to_string().into()),
+            ],
         ))
         .id(egui::Id::new(("gitcraft-interaction", self.path.clone())))
         .open(&mut open)
@@ -27,10 +30,16 @@ impl RepoTab {
         .show(ctx, |ui| match &search.ended {
             None => going(ui, &t, search, acts),
             Some(Err(e)) if e == "stopped" => {
-                ui.label(RichText::new("Stopped before it found anything.").color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::text("repo-core-2835")).color(t.text_dim));
             }
             Some(Err(e)) => {
-                ui.label(RichText::new(format!("The search failed: {e}")).color(t.danger));
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-core-2836",
+                        &[("e", e.to_string().into())],
+                    ))
+                    .color(t.danger),
+                );
             }
             Some(Ok(found)) => {
                 let spec = &search.spec;
@@ -54,13 +63,19 @@ impl RepoTab {
                             let hash = RichText::new(short(&c.commit)).font(theme::mono(12.0));
                             if ui
                                 .link(hash)
-                                .on_hover_text("Select it in the graph")
+                                .on_hover_text(crate::i18n::text("repo-core-2837"))
                                 .clicked()
                             {
                                 acts.push(Action::SelectHash(c.commit.clone()));
                             }
                             ui.label(&c.summary);
-                            ui.label(RichText::new(format!("on {side}")).color(t.text_faint));
+                            ui.label(
+                                RichText::new(crate::i18n::message(
+                                    "repo-core-2838",
+                                    &[("side", side.to_string().into())],
+                                ))
+                                .color(t.text_faint),
+                            );
                         });
                     }
                 }
@@ -82,20 +97,22 @@ fn going(ui: &mut egui::Ui, t: &Tokens, search: &Search, acts: &mut Vec<Action>)
     ui.horizontal(|ui| {
         ui.add(crate::spinner::Spinner::new());
         let said = match &search.last {
-            None => "Testing the two together…".to_owned(),
+            None => crate::i18n::text("repo-core-2839").to_owned(),
             Some(p) => progress_line(p),
         };
         ui.label(RichText::new(said).color(t.text_dim));
     });
     ui.label(
-        RichText::new(format!(
-            "Each test applies some of the commits where the two diverged and runs `{}`; a \
-             failure is run {} more time(s) to be sure.",
-            search.spec.command, search.spec.reruns
+        RichText::new(crate::i18n::message(
+            "repo-core-2840",
+            &[
+                ("command", search.spec.command.to_string().into()),
+                ("reruns", format!("{}", search.spec.reruns).into()),
+            ],
         ))
         .color(t.text_faint),
     );
-    if ui.button("Stop").clicked() {
+    if ui.button(crate::i18n::text("repo-core-1263")).clicked() {
         acts.push(Action::Interaction(InteractionAct::Stop));
     }
 }

@@ -94,8 +94,6 @@ struct State {
 pub(super) struct Taken<'a> {
     pool: &'a Pool,
     shell: Option<Shell>,
-    /// It ran commands before (it may have gone away since).
-    pub(super) reused: bool,
     /// Given back with this as the time it was last used (see [`Pool::take_idle`]).
     keep_used: Option<Instant>,
 }
@@ -217,17 +215,16 @@ impl Pool {
         }
     }
 
-    fn taken(&self, shell: Shell, reused: bool) -> Taken<'_> {
+    fn taken(&self, shell: Shell, _reused: bool) -> Taken<'_> {
         Taken {
             pool: self,
             shell: Some(shell),
-            reused,
             keep_used: None,
         }
     }
 
     /// For tests: `shell` as if it had been opened by the pool and left idle.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn add_idle(&self, shell: Shell) {
         let mut state = lock(&self.state);
         state.open += 1;
@@ -236,7 +233,7 @@ impl Pool {
 
     /// For tests: how many shells are open, whether a connection was tried and failed, and
     /// when the idle ones were last used.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn looks(&self) -> (usize, bool, Vec<Instant>) {
         let state = lock(&self.state);
         let used = state.idle.iter().map(|s| s.used).collect();
@@ -244,7 +241,7 @@ impl Pool {
     }
 
     /// Test synchronization after transport loss: every pooled client has exited.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn idle_shells_exited(&self) -> std::io::Result<bool> {
         let mut state = lock(&self.state);
         if state.connecting != 0 || state.idle.len() != state.open {
@@ -285,6 +282,52 @@ type Pools = Mutex<HashMap<(Host, Lane, String), Arc<Pool>>>;
 
 static POOLS: OnceLock<Pools> = OnceLock::new();
 
+struct IdleReaper {
+    stop: Arc<(Mutex<bool>, Condvar)>,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+static IDLE_REAPER: OnceLock<Result<IdleReaper, String>> = OnceLock::new();
+impl IdleReaper {
+    fn start() -> Result<Self, String> {
+        let stop = Arc::new((Mutex::new(false), Condvar::new()));
+        let stopped = stop.clone();
+        let thread = std::thread::Builder::new()
+            .name("remote-idle-retirement".into())
+            .spawn(move || {
+                loop {
+                    let (flag, changed) = &*stopped;
+                    let waiting = changed
+                        .wait_timeout_while(lock(flag), Duration::from_secs(30), |stop| !*stop)
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    if *waiting.0 {
+                        break;
+                    }
+                    drop(waiting);
+                    let all: Vec<Arc<Pool>> = POOLS
+                        .get()
+                        .map(|p| lock(p).values().cloned().collect())
+                        .unwrap_or_default();
+                    for pool in all {
+                        pool.close_idle();
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            stop,
+            thread: Mutex::new(Some(thread)),
+        })
+    }
+    fn shutdown(&self) {
+        let (flag, changed) = &*self.stop;
+        *lock(flag) = true;
+        changed.notify_all();
+        if let Some(thread) = lock(&self.thread).take() {
+            let _ = thread.join();
+        }
+    }
+}
+
 /// Whether a shell to `host` is connected, in either lane: a command for it now won't make
 /// a new connection (which may ask for a password).
 pub(super) fn connected(host: &Host) -> bool {
@@ -306,22 +349,10 @@ pub(super) fn connected(host: &Host) -> bool {
 
 /// The pool of `host`'s shells of `lane`.
 pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
-    let pools = POOLS.get_or_init(|| {
-        // Closes idle shells now and then, also of machines no tab shows any more.
-        std::thread::spawn(|| {
-            loop {
-                std::thread::sleep(Duration::from_secs(30));
-                let all: Vec<Arc<Pool>> = POOLS
-                    .get()
-                    .map(|p| lock(p).values().cloned().collect())
-                    .unwrap_or_default();
-                for pool in all {
-                    pool.close_idle();
-                }
-            }
-        });
-        Mutex::default()
-    });
+    let pools = POOLS.get_or_init(Mutex::default);
+    // If this optional maintenance worker cannot start, pool limits and shutdown still
+    // retain/close shells. There is never a detached one-thread-per-pool reaper.
+    IDLE_REAPER.get_or_init(IdleReaper::start);
     let context = super::transport::context(host);
     Arc::clone(
         lock(pools)
@@ -333,6 +364,9 @@ pub(super) fn pool(host: &Host, lane: Lane) -> Arc<Pool> {
 /// Close idle persistent shells at app exit; active jobs own and close their shells once
 /// their cancelled protocol read returns. Then release this instance's SSH transports.
 pub(crate) fn shutdown() {
+    if let Some(Ok(reaper)) = IDLE_REAPER.get() {
+        reaper.shutdown();
+    }
     super::session::wait_for_cleanup();
     if let Some(pools) = POOLS.get() {
         let all: Vec<_> = lock(pools).values().cloned().collect();

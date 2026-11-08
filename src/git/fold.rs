@@ -66,7 +66,10 @@ pub fn rebasing_branch(repo: &Path) -> Result<Option<String>, String> {
     match crate::remote::read_to_string(&path) {
         Ok(name) => Ok(Some(name.trim().to_owned())),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("could not read the rebase's state: {e}")),
+        Err(e) => Err(crate::i18n::message(
+            "backend-could-not-read-the-rebase-s-state-e-367726",
+            &[("detail", (e).to_string().into())],
+        )),
     }
 }
 
@@ -77,7 +80,7 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
     let target = super::resolve(repo, target)?;
     let head = super::head(repo);
     if head.is_empty() {
-        return Err("the branch has no commits yet".to_owned());
+        return Err(crate::i18n::text("backend-the-branch-has-no-commits-yet-0733a9").to_owned());
     }
     // Not `--short`, which says `heads/x` when a tag is called `x` too.
     let branch = run(Some(repo), &["symbolic-ref", "-q", "HEAD"])

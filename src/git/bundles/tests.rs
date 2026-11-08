@@ -367,6 +367,14 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
         preview.verification_error
     );
     assert_eq!(preview.prerequisites[0].oid, base);
+    // The shared runner keeps ordinary verification passive too.
+    assert!(
+        run(
+            Some(&dest),
+            &["bundle", "verify", bundle.to_str().ok_or("bundle path")?],
+        )
+        .is_err()
+    );
     assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
     assert_eq!(refs(&dest)?, refs_before);
     assert!(!marker.exists());
@@ -392,16 +400,39 @@ fn partial_shallow_bundle_preview_never_fetches_missing_prerequisites() -> Resul
     if !supports_no_lazy {
         return Ok(());
     }
-    // Positive control: this same prerequisite is fetchable, and ordinary native verify
-    // really does contact our upload-pack helper and mutate this fixture's object store.
+    // Explicitly fetch this prerequisite from the owned local origin. The helper
+    // serves real objects; subsequent verification must need no further fetch.
     run(
         Some(&dest),
-        &["bundle", "verify", bundle.to_str().ok_or("bundle path")?],
+        &[
+            "fetch",
+            "--no-tags",
+            "--no-write-fetch-head",
+            "origin",
+            &base,
+        ],
     )?;
     assert!(marker.exists());
     assert_ne!(run(Some(&dest), &["count-objects", "-v"])?, object_store);
     let calls = std::fs::read(&marker).map_err(|e| e.to_string())?;
+    run(
+        Some(&dest),
+        &["bundle", "verify", bundle.to_str().ok_or("bundle path")?],
+    )?;
     assert_eq!(std::fs::read(&marker).map_err(|e| e.to_string())?, calls);
+    assert_eq!(refs(&dest)?, refs_before);
+    assert_eq!(
+        std::fs::read(dest.join(".git/config")).map_err(|e| e.to_string())?,
+        config
+    );
+    assert_eq!(
+        std::fs::read(dest.join(".git/shallow")).map_err(|e| e.to_string())?,
+        shallow
+    );
+    assert_eq!(
+        std::fs::read_to_string(dest.join("file")).map_err(|e| e.to_string())?,
+        "tip"
+    );
     assert_eq!(
         std::fs::read(dest.join(".git/index")).map_err(|e| e.to_string())?,
         index
@@ -627,7 +658,12 @@ fn partial_clone_export_never_fetches_promised_blobs() -> Result<(), String> {
     let f = Fixture::new()?;
     let source = f.repo("offline-export-source")?;
     run(Some(&source), &["config", "uploadpack.allowFilter", "true"])?;
+    run(
+        Some(&source),
+        &["config", "uploadpack.allowAnySHA1InWant", "true"],
+    )?;
     f.commit(&source, "promised blob")?;
+    let missing = run(Some(&source), &["rev-parse", "HEAD:file"])?;
     let dest = f.0.join("offline-export-dest");
     run(
         None,
@@ -667,16 +703,33 @@ fn partial_clone_export_never_fetches_promised_blobs() -> Result<(), String> {
     let before = run(Some(&dest), &["count-objects", "-v"])?;
     let selected = head(&dest)?;
     assert!(export_bundle(&dest, std::slice::from_ref(&selected), None).is_err());
+    assert!(run(Some(&dest), &["cat-file", "-e", missing.trim()]).is_err());
     assert!(!marker.exists());
     assert_eq!(run(Some(&dest), &["count-objects", "-v"])?, before);
+    // Only this explicit fetch may invoke the helper serving our local origin.
+    run(
+        Some(&dest),
+        &[
+            "fetch",
+            "--no-tags",
+            "--no-write-fetch-head",
+            "origin",
+            missing.trim(),
+        ],
+    )?;
+    assert!(marker.exists(), "Explicit local fetch must call the helper");
+    assert_ne!(run(Some(&dest), &["count-objects", "-v"])?, before);
+    let calls = std::fs::read(&marker).map_err(|e| e.to_string())?;
+    run(Some(&dest), &["cat-file", "-e", missing.trim()])?;
     let output = f.0.join("positive-control.bundle");
     run(
         Some(&dest),
         &["bundle", "create", output.to_str().ok_or("output")?, "HEAD"],
     )?;
-    assert!(
-        marker.exists(),
-        "ordinary Git must fetch this same promised blob"
-    );
+    run(
+        Some(&dest),
+        &["bundle", "verify", output.to_str().ok_or("output")?],
+    )?;
+    assert_eq!(std::fs::read(&marker).map_err(|e| e.to_string())?, calls);
     Ok(())
 }

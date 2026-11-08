@@ -33,22 +33,22 @@ impl ReflogKind {
     /// How the view names it.
     pub fn label(self) -> &'static str {
         match self {
-            ReflogKind::Initial => "initial commit",
-            ReflogKind::Commit => "commit",
-            ReflogKind::Amend => "amend",
-            ReflogKind::Merge => "merge",
-            ReflogKind::Checkout => "checkout",
-            ReflogKind::Reset => "reset",
-            ReflogKind::Rebase => "rebase",
-            ReflogKind::Pull => "pull",
-            ReflogKind::CherryPick => "cherry-pick",
-            ReflogKind::Revert => "revert",
-            ReflogKind::Branch => "branch",
-            ReflogKind::Clone => "clone",
-            ReflogKind::Fetch => "fetch",
-            ReflogKind::Push => "push",
-            ReflogKind::Am => "am",
-            ReflogKind::Other => "other",
+            ReflogKind::Initial => crate::i18n::text("backend-label-26b0f6a098c9"),
+            ReflogKind::Commit => crate::i18n::text("backend-label-7bb23b81b42f"),
+            ReflogKind::Amend => crate::i18n::text("backend-label-6f142ed59e2f"),
+            ReflogKind::Merge => crate::i18n::text("backend-label-77b906a208f6"),
+            ReflogKind::Checkout => crate::i18n::text("backend-label-0ab6293cc1c6"),
+            ReflogKind::Reset => crate::i18n::text("backend-label-c00eeb7a83f9"),
+            ReflogKind::Rebase => crate::i18n::text("backend-label-fbdffdb4bc95"),
+            ReflogKind::Pull => crate::i18n::text("backend-label-f47369facfc8"),
+            ReflogKind::CherryPick => crate::i18n::text("backend-label-1f58645be51c"),
+            ReflogKind::Revert => crate::i18n::text("backend-label-fcb1a4e33ad1"),
+            ReflogKind::Branch => crate::i18n::text("backend-label-24dedd0dde9e"),
+            ReflogKind::Clone => crate::i18n::text("backend-label-83d8d1e4f39d"),
+            ReflogKind::Fetch => crate::i18n::text("backend-label-cd824ccf7641"),
+            ReflogKind::Push => crate::i18n::text("backend-label-9907bbb323dc"),
+            ReflogKind::Am => crate::i18n::text("backend-label-76215c19f7a9"),
+            ReflogKind::Other => crate::i18n::text("backend-label-25e0b070037f"),
         }
     }
 }

@@ -49,14 +49,14 @@ impl Hint {
     pub(crate) fn text(self) -> String {
         let cmd = crate::manual::command();
         match self {
-            Hint::CompareCommits => {
-                format!("Hint: {cmd}+click another commit to compare the two")
-            }
-            Hint::DoubleClickPill => "Hint: double-click a pill to check that branch out".into(),
-            Hint::SoloBranch => "Hint: “Solo” in a branch's menu shows only that branch".into(),
+            Hint::CompareCommits => crate::i18n::message(
+                "repo-workflows-guide-text-414ed52e",
+                &[("cmd", (cmd).into())],
+            ),
+            Hint::DoubleClickPill => crate::i18n::text("repo-workflows-guide-text-e94f4321").into(),
+            Hint::SoloBranch => crate::i18n::text("repo-workflows-guide-text-aa7b18c5").into(),
             Hint::ChangeNavigation => {
-                "Hint: F7 or Alt+↓ goes to the next change, Shift+F7 or Alt+↑ to the previous one"
-                    .into()
+                crate::i18n::text("repo-workflows-guide-text-c09ad9f4").into()
             }
         }
     }

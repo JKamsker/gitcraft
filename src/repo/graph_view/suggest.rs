@@ -220,7 +220,7 @@ fn operators(word: &str) -> Vec<Item> {
         if op.negatable() && format!("-{name}").starts_with(&lower) {
             out.push(Item {
                 label: format!("-{name}"),
-                detail: "leave merge commits out".to_owned(),
+                detail: crate::i18n::text("repo-core-2729").to_owned(),
                 insert: format!("-{name}"),
                 operator,
             });
@@ -240,15 +240,27 @@ fn ready<'a, T>(
         Source::Ready(items) => Some(items),
         Source::Idle => {
             out.load = Some(kind);
-            out.status = Some(format!("Reading {what}…"));
+            out.status = Some(crate::i18n::message(
+                "repo-core-2730",
+                &[("what", what.to_string().into())],
+            ));
             None
         }
         Source::Loading => {
-            out.status = Some(format!("Reading {what}…"));
+            out.status = Some(crate::i18n::message(
+                "repo-core-2730",
+                &[("what", what.to_string().into())],
+            ));
             None
         }
         Source::Failed(e) => {
-            out.status = Some(format!("Couldn't read the {what}: {e}"));
+            out.status = Some(crate::i18n::message(
+                "repo-core-2731",
+                &[
+                    ("what", what.to_string().into()),
+                    ("e", e.to_string().into()),
+                ],
+            ));
             None
         }
     }
@@ -262,9 +274,9 @@ fn people(
     kind: SourceKind,
 ) {
     let what = if kind == SourceKind::Authors {
-        "authors"
+        crate::i18n::text("repo-core-2732")
     } else {
-        "committers"
+        crate::i18n::text("repo-core-2733")
     };
     let Some(people) = ready(out, source, kind, what) else {
         return;
@@ -297,17 +309,21 @@ fn people(
             } else {
                 p.name.clone()
             },
-            detail: format!(
-                "{} · {} commit{}",
-                p.email,
-                p.commits,
-                if p.commits == 1 { "" } else { "s" }
+            detail: crate::i18n::message(
+                "repo-core-2735",
+                &[
+                    ("email", p.email.to_string().into()),
+                    ("commits", (p.commits).into()),
+                ],
             ),
             operator: false,
         })
         .collect();
     if out.items.is_empty() {
-        out.status = Some(format!("No {what} match"));
+        out.status = Some(crate::i18n::message(
+            "repo-core-2736",
+            &[("what", what.to_string().into())],
+        ));
     }
 }
 
@@ -384,7 +400,7 @@ fn paths(out: &mut Listing, value: &str, source: &Source<PathIndex>) {
         })
         .collect();
     if out.items.is_empty() {
-        out.status = Some("No file or folder matches".to_owned());
+        out.status = Some(crate::i18n::text("repo-core-2740").to_owned());
     }
 }
 

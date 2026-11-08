@@ -11,14 +11,24 @@ use crate::theme::Tokens;
 
 /// Why the network buttons are off, when offline mode is on.
 pub(super) fn refused_text() -> Option<String> {
-    network::refused().map(|p| format!("{}: turn it off to fetch, pull or push", p.why()))
+    network::refused()
+        .map(|p| crate::i18n::message("repo-core-2933", &[("why", p.why().to_string().into())]))
 }
 
 /// The chip's text: "Offline · last fetched 3 h ago" (or "never fetched").
 pub(super) fn chip_text(pause: Pause, since_fetch: Option<std::time::Duration>) -> String {
     match since_fetch {
-        Some(d) => format!("{} · last fetched {} ago", pause.label(), ago(d)),
-        None => format!("{} · never fetched", pause.label()),
+        Some(d) => crate::i18n::message(
+            "repo-core-2934",
+            &[
+                ("label", pause.label().to_string().into()),
+                ("d", ago(d).to_string().into()),
+            ],
+        ),
+        None => crate::i18n::message(
+            "repo-core-2935",
+            &[("label", pause.label().to_string().into())],
+        ),
     }
 }
 
@@ -44,22 +54,28 @@ fn last_fetched(path: &std::path::Path) -> Option<std::time::SystemTime> {
 
 /// What is paused, and how to get it going again, for the chip's hover.
 pub(super) fn chip_tip(pause: Pause) -> String {
-    let what = "The background fetch, avatars, update checks and downloads and the polling of \
-                builds and pull requests are paused.";
+    let what = crate::i18n::text("repo-core-2938");
     match pause {
-        Pause::Switch => format!(
-            "{}. {what} Fetch, Pull, Push and the like don't run.\nClick to go online.",
-            pause.why()
+        Pause::Switch => crate::i18n::message(
+            "repo-core-2939",
+            &[
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
+            ],
         ),
-        Pause::NoConnection => format!(
-            "{}. {what} What you ask for still runs.\nThey start again by themselves once \
-             there is a connection.",
-            pause.why()
+        Pause::NoConnection => crate::i18n::message(
+            "repo-core-2940",
+            &[
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
+            ],
         ),
-        Pause::Metered => format!(
-            "{}. {what} What you ask for still runs.\nSettings → Git can let them run on a \
-             metered connection too.",
-            pause.why()
+        Pause::Metered => crate::i18n::message(
+            "repo-core-2941",
+            &[
+                ("why", pause.why().to_string().into()),
+                ("what", what.to_string().into()),
+            ],
         ),
     }
 }
@@ -67,10 +83,17 @@ pub(super) fn chip_tip(pause: Pause) -> String {
 /// "under a minute", "3 min", "2 h", "4 days" (the chip is repainted every half minute).
 fn ago(d: std::time::Duration) -> String {
     match d.as_secs() {
-        0..60 => "under a minute".to_owned(),
-        s @ 60..3600 => format!("{} min", s / 60),
-        s @ 3600..172_800 => format!("{} h", s / 3600),
-        s => format!("{} days", s / 86_400),
+        0..60 => crate::i18n::text("repo-core-2942").to_owned(),
+        s @ 60..3600 => {
+            crate::i18n::message("repo-core-2943", &[("s", format!("{}", s / 60).into())])
+        }
+        s @ 3600..172_800 => {
+            crate::i18n::message("repo-core-2944", &[("s", format!("{}", s / 3600).into())])
+        }
+        s => crate::i18n::message(
+            "repo-core-2945",
+            &[("value", format!("{}", s / 86_400).into())],
+        ),
     }
 }
 
@@ -114,7 +137,7 @@ impl RepoTab {
         if !self.fetch_time_asked {
             self.fetch_time_asked = true;
             let (path, slot) = (self.path.clone(), std::sync::Arc::clone(&self.fetched_at));
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let at = last_fetched(&path);
                 if let Ok(mut s) = slot.lock() {
                     *s = s.or(at);
@@ -205,7 +228,7 @@ mod tests {
             OpKind::plain(),
             &ctx,
         );
-        let fetch = (tab.busy_op.clone(), tab.status.clone());
+        let fetch = (tab.busy_op.clone(), tab.status.as_deref().cloned());
         tab.run_ops(
             "Tag",
             ops(&[&["tag", "t"]]),

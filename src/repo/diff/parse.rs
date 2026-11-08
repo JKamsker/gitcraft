@@ -14,7 +14,7 @@ pub fn parse(text: &str) -> Vec<DiffLine> {
     // Not `lines()`: a `\r` before the newline belongs to the file's line.
     for line in text.split_terminator('\n') {
         if out.len() >= MAX_LINES {
-            out.push(meta("… diff truncated"));
+            out.push(meta(crate::i18n::text("repo-core-1944")));
             break;
         }
         if line.starts_with("@@") {

@@ -43,14 +43,14 @@ impl RepoTab {
         let open = sections.add(
             ui,
             Header {
-                key: "local",
+                key: crate::i18n::text("repo-core-2601"),
                 icon: "laptop",
-                title: "LOCAL",
+                title: crate::i18n::text("repo-core-3375"),
                 count: local.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "New branch at HEAD…",
+                    tooltip: crate::i18n::text("repo-core-3376"),
                     action: can_branch
                         .then(|| Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD"))),
                 }),
@@ -76,7 +76,11 @@ impl RepoTab {
         }
         let tree = branch_tree::build(local.iter().map(|b| (b.name.as_str(), *b)));
         let view = TreeView::branches(
-            egui::Id::new(("branch-folder", self.repo_key(), "local")),
+            egui::Id::new((
+                "branch-folder",
+                self.repo_key(),
+                crate::i18n::text("repo-core-2601"),
+            )),
             !filter.is_empty(),
             0.0,
         );
@@ -130,29 +134,46 @@ impl RepoTab {
             acts.extend(visibility::eye(ui, &r, &full, shown));
         }
         let mut tip = match (b.upstream.is_empty(), b.upstream_gone()) {
-            (true, _) => "Not tracking a remote branch".to_owned(),
-            (false, true) => format!("{} was deleted on the remote", b.upstream),
-            (false, false) => format!("Tracks {}", b.upstream),
+            (true, _) => crate::i18n::text("repo-core-3379").to_owned(),
+            (false, true) => crate::i18n::message(
+                "repo-core-3380",
+                &[("upstream", b.upstream.to_string().into())],
+            ),
+            (false, false) => crate::i18n::message(
+                "repo-core-3381",
+                &[("upstream", b.upstream.to_string().into())],
+            ),
         };
         if let Some(status) = ci {
-            tip.push_str(&format!("\nCI: {}", ci_status::state_word(status.state)));
+            tip.push_str(&crate::i18n::message(
+                "repo-core-3382",
+                &[(
+                    "state",
+                    ci_status::state_word(status.state).to_string().into(),
+                )],
+            ));
         }
         if pinned {
-            tip.push_str("\nPinned to top");
+            tip.push_str(crate::i18n::text("repo-core-3383"));
         }
         for reason in reasons.iter().filter(|r| **r != Reason::UpstreamGone) {
             tip.push_str(&format!("\n{}", capitalise(&reason.describe())));
         }
         let r = match elsewhere {
-            Some(wt) => r.on_hover_text(format!(
-                "{}\n{tip}\nChecked out in worktree {}\nDouble-click to open it, or drag onto \
-                 a branch or a commit",
-                b.name,
-                wt.path.display()
+            Some(wt) => r.on_hover_text(crate::i18n::message(
+                "repo-core-3384",
+                &[
+                    ("name", b.name.to_string().into()),
+                    ("tip", tip.to_string().into()),
+                    ("wt", format!("{}", wt.path.display()).into()),
+                ],
             )),
-            None => r.on_hover_text(format!(
-                "{}\n{tip}\nDouble-click to check out, or drag onto a branch or a commit",
-                b.name
+            None => r.on_hover_text(crate::i18n::message(
+                "repo-core-3385",
+                &[
+                    ("name", b.name.to_string().into()),
+                    ("tip", tip.to_string().into()),
+                ],
             )),
         };
         if r.double_clicked() && elsewhere.is_some() {
@@ -164,7 +185,7 @@ impl RepoTab {
         } else if r.clicked() {
             acts.push(Action::SelectHash(b.target.clone()));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| self.branch_menu_items(ui, acts, b, idle));
     }
@@ -183,16 +204,14 @@ impl RepoTab {
     }
 
     fn branch_menu_contents(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
-        use crate::menu_item::group;
         self.checkout_items(ui, acts, b, idle);
         if b.is_head
             && b.name.starts_with(&self.hotfix_prefix())
-            && ui
-                .add_enabled(idle, egui::Button::new("Finish hotfix…"))
-                .on_hover_text(
-                    "Tags it, merges it back into the main branch (and the development one), \
-                     deletes it and pushes it all, after showing what it will do",
-                )
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0137"))
+                .icon("package")
+                .enabled(idle)
+                .show(ui)
+                .on_hover_text(crate::i18n::text("repo-core-3386"))
                 .clicked()
         {
             acts.push(Action::Hotfix(crate::repo::hotfix::HotfixAct::OpenFinish));
@@ -201,9 +220,12 @@ impl RepoTab {
             && !b.is_head
         {
             ui.separator();
-            group(ui, "Integrate / Compare", |ui| {
-                self.integrate_items(ui, acts, b, current, idle)
-            });
+            crate::menu_item::group_named(
+                ui,
+                "Integrate / Compare",
+                crate::i18n::text("dev-integration-ui-integrate-compare"),
+                |ui| self.integrate_items(ui, acts, b, current, idle),
+            );
         }
         // The checked-out branch against the one pull requests usually go to.
         if b.is_head
@@ -211,10 +233,17 @@ impl RepoTab {
             && base.name != b.name
         {
             ui.separator();
-            if ui
-                .button(format!("Changes {} adds to {}", b.name, base.name))
-                .on_hover_text("What it changed since the two diverged, as a pull request shows it")
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3387",
+                &[
+                    ("name", b.name.to_string().into()),
+                    ("name2", base.name.to_string().into()),
+                ],
+            ))
+            .icon("command")
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3388"))
+            .clicked()
             {
                 acts.push(compare_branches_action(
                     base.as_ref(),
@@ -223,63 +252,102 @@ impl RepoTab {
                 ));
             }
         }
-        group(ui, "Review / Versions", |ui| {
-            self.review_item(ui, acts, b);
-            self.versions_items(ui, acts, b);
-        });
+        crate::menu_item::group_named(
+            ui,
+            "Review / Versions",
+            crate::i18n::text("dev-integration-ui-review-versions"),
+            |ui| {
+                self.review_item(ui, acts, b);
+                self.versions_items(ui, acts, b);
+            },
+        );
         ui.separator();
-        group(ui, "Publish / Stack", |ui| {
-            self.publish_items(ui, acts, b, idle);
-            self.stack_menu_items(ui, acts, b, idle);
-        });
+        crate::menu_item::group_named(
+            ui,
+            "Publish / Stack",
+            crate::i18n::text("dev-integration-ui-publish-stack"),
+            |ui| {
+                self.publish_items(ui, acts, b, idle);
+                self.stack_menu_items(ui, acts, b, idle);
+            },
+        );
         ui.separator();
-        group(ui, "Branch actions", |ui| {
-            if ui.button("Create branch here…").clicked() {
-                acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
-            }
-            if ui.button("Create tag here…").clicked() {
-                acts.push(Action::Dialog(Dialog::tag(
-                    &b.target,
-                    &b.name,
-                    self.default_remote(),
-                )));
-            }
-            if ui.add_enabled(idle, egui::Button::new("Rename…")).clicked() {
-                acts.push(Action::Dialog(Dialog::rename_branch(&b.name)));
-            }
-        });
-        group(ui, "Links / Copy / History", |ui| {
-            if ui.button("Copy name").clicked() {
-                ui.ctx().copy_text(b.name.clone());
-            }
-            if ui
-                .button("Show reflog")
-                .on_hover_text(
-                    "Where the branch has been: each commit it pointed at, and what moved it",
-                )
-                .clicked()
-            {
-                acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
-            }
-            if let Some((menu, target)) = self.branch_link_menu(&b.name) {
-                menu.items(ui, "branch", &target, acts);
-            }
-        });
-        group(ui, "Visibility / Agents", |ui| {
-            self.pin_item(ui, &b.name);
-            if ui
-                .button("How much agents wrote")
-                .on_hover_text(
-                    "Of the lines this branch added since it left the main branch: how many agents \
-                 wrote (as the commits record it), and how many of those people edited since",
-                )
-                .clicked()
-            {
-                acts.push(Action::BranchAuthorship(b.name.clone()));
-            }
-            ui.separator();
-            self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
-        });
+        crate::menu_item::group_named(
+            ui,
+            "Branch actions",
+            crate::i18n::text("dev-integration-ui-branch-actions"),
+            |ui| {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2641"))
+                    .icon("git-branch-plus")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2642"))
+                    .icon("tag")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::tag(
+                        &b.target,
+                        &b.name,
+                        self.default_remote(),
+                    )));
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3389"))
+                    .icon("wrench")
+                    .enabled(idle)
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::Dialog(Dialog::rename_branch(&b.name)));
+                }
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Links / Copy / History",
+            crate::i18n::text("dev-integration-ui-links-copy-history"),
+            |ui| {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
+                    .icon("copy")
+                    .show(ui)
+                    .clicked()
+                {
+                    ui.ctx().copy_text(b.name.clone());
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3391"))
+                    .icon("history")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("repo-core-3392"))
+                    .clicked()
+                {
+                    acts.push(Action::Reflog(ReflogAct::Show(Source::branch(&b.name))));
+                }
+                if let Some((menu, target)) = self.branch_link_menu(&b.name) {
+                    menu.items(ui, "branch", &target, acts);
+                }
+            },
+        );
+        crate::menu_item::group_named(
+            ui,
+            "Visibility / Agents",
+            crate::i18n::text("dev-integration-ui-visibility-agents"),
+            |ui| {
+                self.pin_item(ui, &b.name);
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3393"))
+                    .icon("bot")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("repo-core-3394"))
+                    .clicked()
+                {
+                    acts.push(Action::BranchAuthorship(b.name.clone()));
+                }
+                ui.separator();
+                self.visibility_items(ui, acts, &local_ref(&b.name), b.is_head);
+            },
+        );
         ui.separator();
         self.delete_items(ui, acts, b, idle);
         crate::repo::custom_commands::menu_items(
@@ -299,16 +367,27 @@ impl RepoTab {
             .filter(|base| *base != b.name)
             .or_else(|| self.refs.current.clone().filter(|c| *c != b.name));
         ui.separator();
-        let button = ui.add_enabled(base.is_some(), egui::Button::new("Review this branch"));
+        let button = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3395"))
+            .icon("git-pull-request")
+            .refused(
+                base.is_none()
+                    .then_some(crate::i18n::text("repo-core-3396")),
+            )
+            .show(ui);
         let Some(base) = base else {
-            button.on_disabled_hover_text("There is no other branch to review it against");
+            button.on_disabled_hover_text(crate::i18n::text("repo-core-3397"));
             return;
         };
         let tip = if Settings::get(ui.ctx()).ai.enabled() {
-            format!("Have your AI tool review what {} adds to {base}", b.name)
+            crate::i18n::message(
+                "repo-core-3398",
+                &[
+                    ("name", b.name.to_string().into()),
+                    ("base", base.to_string().into()),
+                ],
+            )
         } else {
-            "Pick an AI tool first (Settings → AI, or the sparkles button of the commit box)"
-                .to_owned()
+            crate::i18n::text("repo-core-3399").to_owned()
         };
         if button.on_hover_text(tip).clicked() {
             acts.push(Action::ReviewBranch {
@@ -322,13 +401,14 @@ impl RepoTab {
     fn pin_item(&self, ui: &mut Ui, name: &str) {
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
         let label = if order.is_pinned(name) {
-            "Unpin"
+            crate::i18n::text("repo-core-3400")
         } else {
-            "Pin to top"
+            crate::i18n::text("repo-core-3401")
         };
-        if ui
-            .button(label)
-            .on_hover_text("Pinned branches stay at the top of Local")
+        if crate::menu_item::MenuItem::new(label)
+            .icon("pin")
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3403"))
             .clicked()
         {
             order.toggle_pin(name);
@@ -344,26 +424,33 @@ impl RepoTab {
             .find(|w| !w.current && w.branch.as_deref() == Some(b.name.as_str()));
         if let Some(wt) = elsewhere {
             let label = if Settings::get(ui.ctx()).worktrees_in_same_tab {
-                "Open its worktree"
+                crate::i18n::text("repo-core-3404")
             } else {
-                "Open its worktree in a tab"
+                crate::i18n::text("repo-core-3405")
             };
-            if ui.button(label).clicked() {
+            if crate::menu_item::MenuItem::new(label)
+                .icon("folder-git-2")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
             }
             return;
         }
-        if ui
-            .add_enabled(!b.is_head && idle, egui::Button::new("Check out"))
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3406"))
+            .icon("log-in")
+            .enabled(idle)
+            .refused(b.is_head.then_some(crate::i18n::text("repo-core-0796")))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Checkout(b.name.clone()));
         }
-        if ui
-            .add_enabled(
-                !b.is_head && idle,
-                egui::Button::new("Check out in a new worktree…"),
-            )
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3407"))
+            .icon("folder-git-2")
+            .enabled(idle)
+            .refused(b.is_head.then_some(crate::i18n::text("repo-core-0796")))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::add_worktree(
@@ -377,16 +464,28 @@ impl RepoTab {
     /// Push `b` (checked out or not), set what it tracks, and open or create its pull request.
     fn publish_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
         if let Some((to, push)) = self.push_branch(b)
-            && ui
-                .add_enabled(idle, egui::Button::new(format!("Push to {to}")))
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3408",
+                &[("to", to.to_string().into())],
+            ))
+            .icon("arrow-up-from-line")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
         {
             acts.push(push);
         }
+        if ui.button(crate::i18n::text("repo-core-0088")).clicked() {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::Routes(b.name.clone()),
+            ));
+        }
         self.force_push_item(ui, acts, b, idle);
         if let Some(remote) = self.default_remote()
-            && ui
-                .add_enabled(idle, egui::Button::new("Set upstream…"))
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3409"))
+                .icon("git-branch")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
         {
             let (remote, name) = self
@@ -403,29 +502,43 @@ impl RepoTab {
             )));
         }
         if !b.upstream.is_empty()
-            && ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Stop tracking {}", b.upstream)),
-                )
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-0348",
+                &[("upstream", b.upstream.to_string().into())],
+            ))
+            .icon("git-branch")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
         {
             acts.push(self.unset_upstream_action(b));
         }
         let Some(forge) = self.forge() else { return };
         match self.prs.iter().find(|p| p.branch == b.name) {
             Some(pr) => {
-                if ui
-                    .button(format!("Open {} #{}", forge.noun(), pr.number))
-                    .clicked()
+                if crate::menu_item::MenuItem::new(crate::i18n::message(
+                    "repo-core-3410",
+                    &[
+                        ("noun", forge.noun_label().to_string().into()),
+                        ("number", format!("{}", pr.number).into()),
+                    ],
+                ))
+                .icon("external-link")
+                .show(ui)
+                .clicked()
                 {
                     acts.push(Action::OpenUrl(pr.url.clone()));
                 }
             }
             None => {
-                if ui
-                    .add_enabled(idle, egui::Button::new(format!("Create {}…", forge.noun())))
-                    .clicked()
+                if crate::menu_item::MenuItem::new(crate::i18n::message(
+                    "repo-core-3412",
+                    &[("noun", forge.noun_label().to_string().into())],
+                ))
+                .icon("external-link")
+                .enabled(idle)
+                .show(ui)
+                .clicked()
                 {
                     // A branch made for an issue: its title, closing it once merged, and into the
                     // branch it started from.
@@ -439,7 +552,7 @@ impl RepoTab {
                             )
                         });
                     acts.push(Action::Dialog(Dialog::create_pr(
-                        forge.noun(),
+                        forge.noun_label(),
                         &b.name,
                         &base,
                         &title,
@@ -453,58 +566,20 @@ impl RepoTab {
     /// Force push (with lease) of `b` to the branch it tracks, when that has commits `b`
     /// hasn't (a plain push is refused). Hovering it shows what would leave the remote.
     fn force_push_item(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
-        let (_, behind) = b.ahead_behind();
-        if behind == 0 || b.upstream_gone() {
+        if self.remotes.is_empty() {
             return;
         }
-        let Some((remote, name)) = self.split_upstream(&b.upstream) else {
-            return;
-        };
-        let Some(tracked) = self
-            .refs
-            .remotes
-            .iter()
-            .flat_map(|(_, list)| list)
-            .find(|r| r.name == b.upstream)
-        else {
-            return;
-        };
-        let button = ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Force push to {} (with lease)…", b.upstream)),
-            )
-            .on_hover_text(format!(
-                "Replace {} with {}, unless someone pushed to it since it was fetched",
-                b.upstream, b.name
-            ));
+        let button = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3413"))
+            .icon("arrow-up-from-line")
+            .enabled(idle)
+            .show(ui);
         offer(&button, || GhostOp::ForcePush {
             branch: b.name.clone(),
         });
         if button.clicked() {
-            acts.push(Action::Dialog(Dialog::confirm(
-                "Force push",
-                format!(
-                    "Replace “{name}” on {remote} with {}? {} it has that {} hasn't {} it, for \
-                     everyone.",
-                    b.name,
-                    if behind == 1 {
-                        "The commit".to_owned()
-                    } else {
-                        format!("The {behind} commits")
-                    },
-                    b.name,
-                    if behind == 1 { "leaves" } else { "leave" },
-                ),
-                "Force push",
-                ops(&[&[
-                    "push",
-                    &format!("--force-with-lease=refs/heads/{name}:{}", tracked.target),
-                    &remote,
-                    &format!("refs/heads/{}:refs/heads/{name}", b.name),
-                ]]),
-                None,
-            )));
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::ForceBranch(b.name.clone(), b.target.clone()),
+            ));
         }
     }
 
@@ -576,23 +651,40 @@ impl RepoTab {
         current: &str,
         idle: bool,
     ) {
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Fast-forward {current} to {}", b.name)),
-            )
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-0011",
+            &[
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
+            ],
+        ))
+        .icon("arrow-right")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(fast_forward_action(BranchRef::local(&b.name), current));
         }
-        let merge = format!("Merge {} into {current}", b.name);
+        let merge = crate::i18n::message(
+            "repo-core-0006",
+            &[
+                ("name", b.name.to_string().into()),
+                ("current", current.to_string().into()),
+            ],
+        );
         if self
             .conflict_button(ui, merge, idle, Op::Merge, &b.target)
             .clicked()
         {
             acts.push(merge_action(BranchRef::local(&b.name), current));
         }
-        let rebase = format!("Rebase {current} onto {}", b.name);
+        let rebase = crate::i18n::message(
+            "repo-core-0013",
+            &[
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
+            ],
+        );
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
         offer(&rebase, || GhostOp::Rebase {
             onto: BranchRef::local(&b.name).full(),
@@ -601,22 +693,32 @@ impl RepoTab {
         if rebase.clicked() {
             acts.push(rebase_action(BranchRef::local(&b.name), current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Interactive rebase {current} onto {}…", b.name)),
-            )
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-3415",
+            &[
+                ("current", current.to_string().into()),
+                ("name", b.name.to_string().into()),
+            ],
+        ))
+        .icon("git-merge")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(interactive_rebase_action(BranchRef::local(&b.name)));
         }
         ui.separator();
         graph_view::compare_items(ui, acts, BranchRef::local(&b.name), current);
         if Settings::get(ui.ctx()).context_menus.rehearsal {
-            crate::menu_item::group(ui, "Advanced", |ui| {
-                crate::repo::interaction::interaction_item(ui, acts, &b.name);
-                crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
-            });
+            crate::menu_item::group_named(
+                ui,
+                "Advanced",
+                crate::i18n::text("dev-integration-ui-advanced"),
+                |ui| {
+                    crate::repo::interaction::interaction_item(ui, acts, &b.name);
+                    crate::repo::rehearse::rehearse_item(ui, acts, BranchRef::local(&b.name));
+                },
+            );
         }
     }
 }
@@ -690,10 +792,10 @@ fn branch_row(
     widgets::a11y(&resp, egui::WidgetType::Button, || {
         let branch = labels::branch(labels::ref_name(full), is_head, ahead as _, behind as _);
         let notes = [
-            (gone, "upstream gone"),
-            (in_worktree, "checked out in another worktree"),
-            (has_pr, "has a pull request"),
-            (hidden, "hidden from the graph"),
+            (gone, crate::i18n::text("repo-core-3416")),
+            (in_worktree, crate::i18n::text("repo-core-3417")),
+            (has_pr, crate::i18n::text("repo-core-3418")),
+            (hidden, crate::i18n::text("repo-core-3419")),
         ];
         labels::with_notes(&branch, &notes)
     });
@@ -731,7 +833,7 @@ fn branch_row(
         let r = painter.text(
             pos2(right, y),
             Align2::RIGHT_CENTER,
-            "gone",
+            crate::i18n::text("repo-core-3421"),
             theme::medium(10.5),
             t.text_faint,
         );
@@ -739,8 +841,8 @@ fn branch_row(
     }
     if let Some(badge) = badge {
         let (word, color) = match badge {
-            Badge::Merged => ("merged", t.success),
-            Badge::Stale => ("stale", t.warning),
+            Badge::Merged => (crate::i18n::text("repo-core-3422"), t.success),
+            Badge::Stale => (crate::i18n::text("repo-core-3423"), t.warning),
         };
         let r = painter.text(
             pos2(right, y),

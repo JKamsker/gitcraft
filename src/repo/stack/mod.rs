@@ -3,6 +3,7 @@
 //! branch's parent (see [`crate::git::stack`]).
 
 mod dialog;
+mod graph;
 mod model;
 mod publish;
 mod restack;
@@ -61,6 +62,7 @@ pub(crate) struct Stacks {
     pub layers: Vec<Layer>,
     /// Why they couldn't be read, the last time.
     pub error: Option<String>,
+    read_error: Option<ReadError>,
     /// Numbers the reads: only the latest one's answer is taken.
     read: u64,
     pub dialog: Option<BasedOn>,
@@ -92,9 +94,15 @@ impl Stacks {
 /// Why `branch` can't be based on `parent`: that would make a loop.
 fn loop_problem(branch: &str, parent: &str) -> String {
     if branch == parent {
-        format!("{branch} can't be based on itself.")
+        crate::i18n::message(
+            "repo-workflows-stack-loop-problem-27b30746",
+            &[("branch", (branch).into())],
+        )
     } else {
-        format!("{parent} is based on {branch}: {branch} can't be based on it too.")
+        crate::i18n::message(
+            "repo-workflows-stack-loop-problem-bc8dbf35",
+            &[("parent", (parent).into()), ("branch", (branch).into())],
+        )
     }
 }
 
@@ -128,7 +136,7 @@ impl RepoTab {
                         tab.stacks.pending = pending;
                         tab.stacks.error = None;
                     }
-                    Err(e) => tab.stacks.error = Some(format!("Couldn't read the stacks: {e}")),
+                    Err(e) => tab.stacks.remember_read_error(e),
                 }
             },
         );
@@ -177,7 +185,7 @@ impl RepoTab {
     /// first: the last read of the stacks may be older than an operation just run. Undoable.
     fn set_parent(&mut self, branch: String, parent: String, ctx: &egui::Context) {
         if let Some(problem) = self.parent_problem(&branch, &parent) {
-            self.status = Some((problem, true));
+            self.status = Some(crate::repo::Notice::plain((problem, true)));
             return;
         }
         let path = self.path.clone();
@@ -202,7 +210,7 @@ impl RepoTab {
                         ctx,
                     );
                 }
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }
@@ -210,10 +218,16 @@ impl RepoTab {
     /// Why `branch` can't be based on `parent`, if it can't (as far as the last read knows).
     fn parent_problem(&self, branch: &str, parent: &str) -> Option<String> {
         if parent.is_empty() {
-            return Some(format!("Pick the branch {branch} is based on."));
+            return Some(crate::i18n::message(
+                "repo-workflows-stack-parent-problem-61a1cff0",
+                &[("branch", (branch).into())],
+            ));
         }
         if !self.refs.local.iter().any(|b| b.name == parent) {
-            return Some(format!("{parent} is not a local branch."));
+            return Some(crate::i18n::message(
+                "repo-workflows-stack-parent-problem-f7032e38",
+                &[("parent", (parent).into())],
+            ));
         }
         if stack::would_loop(&self.stacks.recorded, branch, parent) {
             return Some(loop_problem(branch, parent));
@@ -236,7 +250,12 @@ impl RepoTab {
                     stack::restore_ops(&branch, before.as_ref()),
                     ctx,
                 ),
-                Err(e) => tab.status = Some((format!("Couldn't read the stacks: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Couldn't read the stacks: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -251,7 +270,10 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("{label}: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{label}: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         self.run_undoable(
@@ -266,12 +288,76 @@ impl RepoTab {
     /// The line a branch's tooltip gets when it is a layer of a stack.
     pub(super) fn stack_line(&self, branch: &str) -> Option<String> {
         let layer = self.stacks.layer(branch)?;
-        let mut line = format!("Stack: {}", chain(&self.stacks.layers, branch).join(" → "));
+        let mut line = crate::i18n::message(
+            "repo-workflows-stack-stack-line-559ed9fe",
+            &[(
+                "chain-self-stacks-layers-branch--1",
+                (chain(&self.stacks.layers, branch).join(" → "))
+                    .clone()
+                    .into(),
+            )],
+        );
         if layer.parent_missing {
-            line.push_str(&format!(" · {} is gone", layer.parent));
+            line.push_str(&crate::i18n::message(
+                "repo-workflows-stack-stack-line-e4355cbd",
+                &[("layer-parent-1", (layer.parent).clone().into())],
+            ));
         } else if layer.needs_restack() {
-            line.push_str(&format!(" · {} moved on: needs restacking", layer.parent));
+            line.push_str(&crate::i18n::message(
+                "repo-workflows-stack-stack-line-c5c1ffb4",
+                &[("layer-parent-1", (layer.parent).clone().into())],
+            ));
         }
         Some(line)
+    }
+}
+
+#[derive(Clone)]
+struct ReadError {
+    raw: String,
+    detail: String,
+}
+impl Stacks {
+    fn remember_read_error(&mut self, detail: String) {
+        let e = &detail;
+        let raw = format!("Couldn't read the stacks: {e}");
+        self.error = Some(raw.clone());
+        self.read_error = Some(ReadError { raw, detail });
+    }
+    fn display_read_error(&self, raw: &str) -> String {
+        match &self.read_error {
+            Some(receipt) if receipt.raw == raw => crate::i18n::message(
+                "repo-workflows-stack-read-stacks-4272623a",
+                &[("e", receipt.detail.as_str().into())],
+            ),
+            _ => raw.to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_read_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_stack_cached_read_error_preserves_raw_detail_and_generation()
+    -> Result<(), String> {
+        let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = Stacks::default();
+        state.remember_read_error(detail.into());
+        let raw = state.error.clone().ok_or("missing test value")?;
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let shown = state.display_read_error(&raw);
+            assert!(shown.contains(detail));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.error.as_ref(), Some(&raw));
+        }
+        state.read_error = None;
+        crate::i18n::set_language("de");
+        assert_eq!(state.display_read_error(&raw), raw);
+        crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

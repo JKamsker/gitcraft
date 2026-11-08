@@ -16,8 +16,26 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(super) fn changes_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-core-0811"),
+            branch_tree::files_toggle,
+        );
 
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .button(crate::i18n::text("repo-core-0812"))
+                .on_hover_text(crate::i18n::text("repo-core-0813"))
+                .clicked()
+            {
+                acts.push(Action::EarlierVersions);
+            }
+            self.review_all_button(
+                ui,
+                crate::repo::review_workflow::ReviewSource::Working,
+                acts,
+            );
+        });
         // Keep both staging and composition reachable after reopening in a short window.
         // Always use the same scroll container, so resizing preserves editor/scroll state.
         let frame = egui::Frame::new()
@@ -46,6 +64,7 @@ impl RepoTab {
                 ui.data_mut(|d| d.insert_temp(content_id, scroll.content_size.y));
             });
 
+        self.keyboard_work_files(ui, acts);
         egui::ScrollArea::vertical()
             .id_salt("changes_scroll")
             .auto_shrink(false)
@@ -63,6 +82,7 @@ impl RepoTab {
                 self.agent_turns(ui, acts);
                 self.unstaged_list(ui, acts);
                 self.staged_list(ui, acts);
+                self.cochange_hints(ui, acts);
             });
     }
 
@@ -84,17 +104,37 @@ impl RepoTab {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
                     // A fold stopped on a conflict says so: its changes are in the rebase.
                     let what = match self.fold_stopped_here(state) {
-                        Some(fold) => format!("{} in progress (rebase)", fold.label),
-                        None => format!("{} in progress", state.label()),
+                        Some(fold) => crate::i18n::message(
+                            "repo-core-0817",
+                            &[(
+                                "label",
+                                crate::repo::messages::display_operation(&fold.label).into(),
+                            )],
+                        ),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", state.label().to_string().into())],
+                        ),
                     };
                     let title = match restack {
-                        Some(p) => format!(
-                            "Restack paused at {} ({} of {})",
-                            p.current().map_or("", |s| s.branch.as_str()),
-                            p.done + 1,
-                            p.steps.len()
+                        Some(p) => crate::i18n::message(
+                            "repo-core-0819",
+                            &[
+                                (
+                                    "p",
+                                    p.current()
+                                        .map_or("", |s| s.branch.as_str())
+                                        .to_string()
+                                        .into(),
+                                ),
+                                ("done", format!("{}", p.done + 1).into()),
+                                ("count", (p.steps.len()).into()),
+                            ],
                         ),
-                        None => format!("{} in progress", state.label()),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", state.label().to_string().into())],
+                        ),
                     };
                     ui.label(
                         RichText::new(if restack.is_some() { title } else { what })
@@ -104,35 +144,53 @@ impl RepoTab {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if restack.is_some() {
                             if ui
-                                .add_enabled(idle, egui::Button::new("Abort restack"))
-                                .on_hover_text("Every branch back where it was before the restack")
+                                .add_enabled(
+                                    idle,
+                                    egui::Button::new(crate::i18n::text("repo-core-0820")),
+                                )
+                                .on_hover_text(crate::i18n::text("repo-core-0821"))
                                 .clicked()
                             {
                                 acts.push(Action::Stack(
                                     crate::repo::stack::StackAct::AbortRestack,
                                 ));
                             }
-                        } else if ui.add_enabled(idle, egui::Button::new("Abort")).clicked() {
+                        } else if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text("repo-core-0018")),
+                            )
+                            .clicked()
+                        {
                             acts.push(self.abort_for(state));
                         }
                     });
                 });
                 let hint = if restack.is_some() {
-                    if self.work.conflicted.is_empty() { "All conflicts resolved: Continue restack to go on." } else { "Fix conflicted files, mark resolved, then Continue restack." }
+                    if self.work.conflicted.is_empty() {
+                        crate::i18n::text("repo-core-0822")
+                    } else {
+                        crate::i18n::text("repo-core-0823")
+                    }
                 } else if self.work.conflicted.is_empty() && state == InProgress::Rebase {
-                    "No conflicts: Continue rebase goes on. At a commit it stopped at to edit, what is staged goes into that commit first."
+                    crate::i18n::text("repo-core-0824")
                 } else if self.work.conflicted.is_empty() {
-                    "All conflicts resolved: commit to finish."
+                    crate::i18n::text("repo-core-0825")
                 } else {
-                    "Fix the conflicted files, mark them resolved, then commit."
+                    crate::i18n::text("repo-core-0826")
                 };
                 ui.label(RichText::new(hint).color(t.text_dim).small());
             });
     }
 
     fn conflicted_list(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        list_header(ui, "CONFLICTED", self.work.conflicted.len(), None);
-        let buttons = [("check", "Mark resolved (stage)")];
+        list_header(
+            ui,
+            crate::i18n::text("repo-core-0827"),
+            self.work.conflicted.len(),
+            None,
+        );
+        let buttons = [("check", crate::i18n::text("repo-core-0829"))];
         self.work_list(
             ui,
             acts,
@@ -142,7 +200,7 @@ impl RepoTab {
             |acts, f, click| match click {
                 RowClick::Open => acts.push(Action::OpenDiff(DiffKey::Work(f.clone()))),
                 RowClick::Button(_) => acts.push(stage_action(
-                    "Mark resolved",
+                    crate::i18n::text("repo-core-0179"),
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
                 RowClick::None | RowClick::Pick => {}
@@ -155,13 +213,19 @@ impl RepoTab {
         let unstaged = &self.work.unstaged;
         if list_header(
             ui,
-            "UNSTAGED",
+            crate::i18n::text("repo-core-0831"),
             unstaged.len(),
-            (!unstaged.is_empty() && idle).then_some("Stage all"),
+            (!unstaged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0832")),
         ) {
-            acts.push(stage_action("Stage all", vec![vec!["add", "-A"]]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0832"),
+                vec![vec!["add", "-A"]],
+            ));
         }
-        let buttons = [("undo-2", "Discard changes…"), ("plus", "Stage")];
+        let buttons = [
+            ("undo-2", crate::i18n::text("repo-core-0834")),
+            ("plus", crate::i18n::text("repo-core-0836")),
+        ];
         self.work_list(
             ui,
             acts,
@@ -172,14 +236,14 @@ impl RepoTab {
                 RowClick::Open => acts.push(Action::OpenDiff(DiffKey::Work(f.clone()))),
                 RowClick::Button(0) => acts.push(Action::Dialog(discard_dialog(f))),
                 RowClick::Button(_) => acts.push(stage_action(
-                    "Stage",
+                    crate::i18n::text("repo-core-0836"),
                     vec![vec!["--literal-pathspecs", "add", "--", &f.path]],
                 )),
                 RowClick::None | RowClick::Pick => {}
             },
         );
         if unstaged.is_empty() {
-            empty_hint(ui, "Nothing to stage");
+            empty_hint(ui, crate::i18n::text("repo-core-0838"));
         }
     }
 
@@ -189,34 +253,45 @@ impl RepoTab {
         let staged = &self.work.staged;
         if list_header_with(
             ui,
-            "STAGED",
+            crate::i18n::text("repo-core-0839"),
             staged.len(),
-            (!staged.is_empty() && idle).then_some("Unstage all"),
+            (!staged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0840")),
             |ui| {
                 let reason = if !idle {
-                    Some("Wait for the operation running to end")
+                    Some(crate::i18n::text("repo-core-1125"))
                 } else if staged.is_empty() {
-                    Some("Stage changes first")
+                    Some(crate::i18n::text("dev-integration-ui-stage-first"))
                 } else if self.work.in_progress.is_some() {
-                    Some("Finish or abort the operation in progress first")
+                    Some(crate::i18n::text("dev-integration-ui-finish-operation"))
                 } else if self.refs.current.is_none() {
-                    Some("HEAD is detached: check out a branch first")
+                    Some(crate::i18n::text("repo-core-0842"))
                 } else {
                     None
                 };
-                let r = ui.add_enabled_ui(reason.is_none(), |ui| icons::small_button(ui, "git-branch-plus", "Distribute staged fixes…"))
-                    .inner.on_hover_text("Put each staged change into the earlier commit of the branch that last changed those lines")
+                let r = ui
+                    .add_enabled_ui(reason.is_none(), |ui| {
+                        icons::small_button(
+                            ui,
+                            "git-branch-plus",
+                            crate::i18n::text("repo-core-0049"),
+                        )
+                    })
+                    .inner
+                    .on_hover_text(crate::i18n::text("repo-core-0841"))
                     .on_disabled_hover_text(reason.unwrap_or_default());
                 if r.clicked() {
                     acts.push(Action::OpenAbsorb);
                 }
             },
         ) {
-            acts.push(stage_action("Unstage all", vec![unstage_all_args(head)]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0840"),
+                vec![unstage_all_args(head)],
+            ));
         }
         let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
-        let buttons = [("minus", "Unstage")];
+        let buttons = [("minus", crate::i18n::text("repo-core-0844"))];
         self.work_list(
             ui,
             acts,
@@ -234,7 +309,7 @@ impl RepoTab {
             },
         );
         if staged.is_empty() {
-            empty_hint(ui, "Stage files to choose what goes in the commit");
+            empty_hint(ui, crate::i18n::text("repo-core-0846"));
         }
     }
 
@@ -253,7 +328,10 @@ impl RepoTab {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
         let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
         let group = folding::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
-        let selected = |f: &&&StatusFile| self.open_key() == Some(&DiffKey::Work((**f).clone()));
+        let selected = |f: &&&StatusFile| {
+            self.open_key() == Some(&DiffKey::Work((**f).clone()))
+                || self.keyboard_file_selected(&DiffKey::Work((**f).clone()))
+        };
         let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>| {
             let click = self.work_row(ui, acts, f, indent, buttons);
             let opened = matches!(click, RowClick::Open);
@@ -269,29 +347,37 @@ impl RepoTab {
         };
         // Rows are known by their path within the list: a file can be both staged and unstaged.
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        let mut reveal = None;
         super::horizontal_files(ui, ("work-files-scroll", tree), &paths, |ui| {
             ui.push_id(("work-list", tree), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, true),
                     &group.shown,
                     |f| &f.path,
                     &selected,
                     &mut |ui, indent, f| row(ui, indent, f, acts),
-                );
+                )
+                .or(reveal);
                 let holds_open = group.folded.iter().any(|f| selected(&f));
                 if group.header(ui, id.with("folded-open"), None, holds_open) {
-                    branch_tree::files(
+                    reveal = branch_tree::files(
                         ui,
                         (id.with("folded"), true),
                         &group.folded,
                         |f| &f.path,
                         &selected,
                         &mut |ui, indent, f| row(ui, indent, f, acts),
-                    );
+                    )
+                    .or(reveal);
                 }
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
         if let Some(first) = files.first() {
             let area = super::super::weakened_marks::area_of(first.area);
             let scope = crate::weakened::Scope::Work(area);
@@ -313,7 +399,7 @@ impl RepoTab {
     ) -> RowClick {
         let key = DiffKey::Work(f.clone());
         let picked = &self.stash_picks.picked;
-        let selected = self.open_key() == Some(&key);
+        let selected = self.open_key() == Some(&key) || self.keyboard_file_selected(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
         let area = super::super::weakened_marks::area_of(f.area);
         let scope = crate::weakened::Scope::Work(area);
@@ -342,6 +428,10 @@ impl RepoTab {
             ui.separator();
             stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
+        self.keyboard_file_row(egui::Id::new("working-files"), &r.row, &key);
+        if r.row.clicked() || r.button.is_some() {
+            self.keyboard_select_file(egui::Id::new("working-files"), key.clone());
+        }
         super::super::weakened_marks::hover(ui, &r, flags);
         self.lock_badge(ui, &r.row, &f.path, (!buttons.is_empty(), selected));
         if f.code != 'D' {
@@ -357,6 +447,7 @@ impl RepoTab {
                 true,
                 Some(&key),
                 &links,
+                self.keyboard_file_selected(&key),
                 acts,
                 |ui, acts| {
                     self.lock_menu_items(ui, &f.path, None, acts);
@@ -366,7 +457,7 @@ impl RepoTab {
             );
         } else {
             // A deleted file has nothing to open, but can be stashed.
-            egui::Popup::context_menu(&r.row)
+            crate::menu_item::context(&r.row)
                 .style(theme::menu_style)
                 .show(|ui| stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts));
         }
@@ -428,11 +519,8 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
     if f.area == Area::Untracked {
         Dialog::confirm(
             "Delete new file",
-            format!(
-                "Delete “{}”? It isn't tracked by git, so this can't be undone.",
-                f.path
-            ),
-            "Delete file",
+            crate::i18n::message("repo-core-0852", &[("path", f.path.to_string().into())]),
+            crate::i18n::text("repo-core-0853"),
             ops(&[&["--literal-pathspecs", "clean", "-f", "-q", "--", &f.path]]),
             None,
         )
@@ -441,15 +529,12 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
             crate::git::PreviewAsk::files(vec![f.path.clone()]),
             String::new(),
         )
-        .files_heading("Deleted")
+        .files_heading(crate::i18n::text("repo-core-0855"))
     } else {
         Dialog::confirm(
             "Discard changes",
-            format!(
-                "Discard the unstaged changes to “{}”? This can't be undone.",
-                f.path
-            ),
-            "Discard",
+            crate::i18n::message("repo-core-0857", &[("path", f.path.to_string().into())]),
+            crate::i18n::text("repo-core-0858"),
             // Not `--literal-pathspecs`: restore runs the post-checkout hook, which would get it.
             ops(&[&["restore", "--", &literal_path(&f.path)]]),
             None,
@@ -459,7 +544,7 @@ pub(in crate::repo) fn discard_dialog(f: &StatusFile) -> Dialog {
             crate::git::PreviewAsk::files(vec![f.path.clone()]),
             String::new(),
         )
-        .files_heading("Unstaged changes lost")
+        .files_heading(crate::i18n::text("repo-core-0860"))
     }
 }
 

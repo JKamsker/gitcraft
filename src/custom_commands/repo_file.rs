@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::CustomCommand;
 
+mod display;
+
 /// Where a repository keeps its commands, relative to its folder.
 pub const FILE: &str = ".gitcraft/commands.json";
 
@@ -42,6 +44,8 @@ struct Contents {
 /// there are none.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RepoFile {
+    /// True only for new(text), never for unreadable(error); presentation provenance.
+    parsed_text: bool,
     pub text: String,
     pub digest: String,
     pub commands: Result<Vec<CustomCommand>, String>,
@@ -52,6 +56,7 @@ impl RepoFile {
         let commands = parse_repo_file(&text);
         let digest = digest(&text);
         Self {
+            parsed_text: true,
             text,
             digest,
             commands,
@@ -61,6 +66,7 @@ impl RepoFile {
     /// A file that couldn't be read, saying why.
     pub fn unreadable(error: String) -> Self {
         Self {
+            parsed_text: false,
             text: String::new(),
             digest: digest(""),
             commands: Err(error),

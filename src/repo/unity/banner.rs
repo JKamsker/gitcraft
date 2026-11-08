@@ -15,23 +15,33 @@ const LISTED: usize = 15;
 /// One `.meta` problem in words, with what follows from it.
 pub(super) fn describe(p: &MetaProblem) -> String {
     match p.kind {
-        MetaKind::AddedWithoutMeta => format!(
-            "{} has no {} staged: others get a new GUID for it and its references break.",
-            p.path, p.partner
+        MetaKind::AddedWithoutMeta => crate::i18n::message(
+            "repo-workflows-unity-describe-0f6c58c7",
+            &[
+                ("p-path-1", (p.path).clone().into()),
+                ("p-partner-2", (p.partner).clone().into()),
+            ],
         ),
-        MetaKind::DeletedWithoutMeta => format!(
-            "{} is deleted but {} stays: Unity will warn about the leftover.",
-            p.path, p.partner
+        MetaKind::DeletedWithoutMeta => crate::i18n::message(
+            "repo-workflows-unity-describe-303d18ef",
+            &[
+                ("p-path-1", (p.path).clone().into()),
+                ("p-partner-2", (p.partner).clone().into()),
+            ],
         ),
-        MetaKind::MetaWithoutAsset => format!(
-            "{} is staged without {}: if that is an empty folder, git keeps no empty folders \
-             (add a file to it, or leave its .meta out); else Unity deletes the .meta.",
-            p.path, p.partner
+        MetaKind::MetaWithoutAsset => crate::i18n::message(
+            "repo-workflows-unity-describe-c35a1fe3",
+            &[
+                ("p-path-1", (p.path).clone().into()),
+                ("p-partner-2", (p.partner).clone().into()),
+            ],
         ),
-        MetaKind::MetaDeletedAssetKept => format!(
-            "{} is deleted but {} stays: Unity makes a new one, with a new GUID, and its \
-             references break.",
-            p.path, p.partner
+        MetaKind::MetaDeletedAssetKept => crate::i18n::message(
+            "repo-workflows-unity-describe-bae58a49",
+            &[
+                ("p-path-1", (p.path).clone().into()),
+                ("p-partner-2", (p.partner).clone().into()),
+            ],
         ),
     }
 }
@@ -46,11 +56,12 @@ impl RepoTab {
         if !state.meta.is_empty() {
             let text = match state.meta.as_slice() {
                 [one] => format!("Unity: {}", describe(one)),
-                many => format!(
-                    "Unity: {} assets and .meta files don't match ({} and more; hover to see \
-                     them all).",
-                    many.len(),
-                    many[0].path
+                many => crate::i18n::message(
+                    "repo-workflows-unity-unity-banners-b610e7b8",
+                    &[
+                        ("many-len-1", (many.len()).into()),
+                        ("many-0-path-2", (many[0].path).clone().into()),
+                    ],
                 ),
             };
             let list: Vec<String> = state.meta.iter().take(LISTED).map(describe).collect();
@@ -70,22 +81,37 @@ impl RepoTab {
                         ui.label(line);
                     }
                     if more > 0 {
-                        ui.label(format!("and {more} more"));
+                        ui.label(crate::i18n::message(
+                            "repo-workflows-unity-unity-banners-e1614a83",
+                            &[("more", (more).into())],
+                        ));
                     }
                 });
             }
         }
         if let Some(problem) = state.hint() {
-            let text = format!("This Unity project isn't fully set up for git: {problem}.");
+            let text = crate::i18n::message(
+                "repo-workflows-unity-unity-banners-3a5a7236",
+                &[("problem", (problem).clone().into())],
+            );
             strip(ui, &t, t.accent, &text, |ui| {
                 if ui
-                    .button("Don't show again")
-                    .on_hover_text("For this repository (gitcraft.unityHint in its config)")
+                    .button(crate::i18n::text(
+                        "repo-workflows-unity-unity-banners-d16d035f",
+                    ))
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-unity-unity-banners-2a61050c",
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Unity(UnityAct::DismissHint));
                 }
-                if ui.button("Unity set-up…").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-unity-unity-banners-8d26b8f8",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::Unity(UnityAct::OpenPanel));
                 }
             });

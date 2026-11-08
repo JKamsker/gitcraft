@@ -20,6 +20,8 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
     Clone,
+    /// Ask an already running resident instance to save and quit. Cold start exits.
+    Quit,
     PickFolder,
     Open(PathBuf),
     Log(PathBuf),
@@ -66,7 +68,13 @@ Usage:
                                   (or gitcraft://open?url=<link>)
   gitcraft -- <folder>            a folder named like a command
   gitcraft --clone | --open     the clone dialog or folder picker
+  gitcraft --quit               save and quit the running instance
   gitcraft --help | --version";
+
+/// Selected-language presentation; raw USAGE remains a compatibility constant.
+pub fn usage() -> &'static str {
+    crate::i18n::text("interaction-startup-usage")
+}
 
 /// The arguments as the system gave them, without what macOS adds on its own (`-psn_…`, the
 /// process serial number of an older Finder launch).
@@ -89,6 +97,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
             };
             Parsed::Run(Some(cmd))
         }
+        [one] if one == "--quit" => Parsed::Run(Some(Command::Quit)),
         [one] if one == "-h" || one == "--help" => Parsed::Print(USAGE.to_owned()),
         [one] if one == "-V" || one == "--version" => {
             Parsed::Print(format!("gitcraft {}", env!("CARGO_PKG_VERSION")))

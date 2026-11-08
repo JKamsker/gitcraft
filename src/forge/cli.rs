@@ -1,9 +1,8 @@
 //! Running a forge's own command-line tool (`gh`, `glab`), which holds the user's login.
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::{Forge, Hosting};
@@ -28,33 +27,29 @@ pub(super) fn run_with_input(
     args: &[&str],
     input: Option<&str>,
 ) -> Result<String, String> {
-    let (mut cmd, not_installed) = prepared(tool, noun, repo, hosting, args)?;
+    if input.is_some_and(|text| text.len() > INPUT_LIMIT) {
+        return Err(crate::i18n::message(
+            "backend-tool-input-exceeds-input-limit-bytes-202e7a",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("input_limit", INPUT_LIMIT.into()),
+            ],
+        ));
+    }
+    let (cmd, start_error) = prepared(tool, noun, repo, hosting, args)?;
     #[cfg(test)]
     if let Some(answer) = recording::answer(&cmd, input) {
         return answer;
     }
-    let out = match input {
-        None => cmd.output().map_err(not_installed)?,
-        Some(input) => {
-            let mut child = cmd
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(not_installed)?;
-            if let Some(mut stdin) = child.stdin.take() {
-                // A tool that stops reading has stopped for a reason, which its exit code and
-                // error output below tell better than the broken pipe would.
-                let _ = stdin.write_all(input.as_bytes());
-            }
-            child.wait_with_output().map_err(|e| e.to_string())?
-        }
-    };
-    answer(tool, &out)
+    let options = bounded_options(TOOL_TIMEOUT, input);
+    finish_run(
+        tool,
+        TOOL_TIMEOUT,
+        dispatch(cmd, options, start_error, crate::processes::run_checked),
+    )
 }
 
-/// [`run`], stopped when it hasn't finished `within` that long: for what nobody waits on (the
-/// inbox), where a tool that hangs would otherwise stay until the app ends.
+/// [`run`], with the caller's deadline (including time queued in the process service).
 pub(super) fn run_within(
     tool: &str,
     noun: &str,
@@ -63,71 +58,87 @@ pub(super) fn run_within(
     args: &[&str],
     within: Duration,
 ) -> Result<String, String> {
-    let (cmd, not_installed) = prepared(tool, noun, repo, hosting, args)?;
-    within_command(tool, cmd, not_installed, within)
+    let (cmd, start_error) = prepared(tool, noun, repo, hosting, args)?;
+    within_command(tool, cmd, start_error, within)
 }
 
 fn within_command(
     tool: &str,
-    mut cmd: Command,
-    not_installed: impl Fn(std::io::Error) -> String,
+    cmd: Command,
+    start_error: impl FnOnce(String) -> String,
     within: Duration,
 ) -> Result<String, String> {
-    use std::io::Read;
     #[cfg(test)]
     if let Some(answer) = recording::answer(&cmd, None) {
         return answer;
     }
-    let mut child = cmd
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(not_installed)?;
-    // Read as it comes, or a long answer would fill the pipe and the tool wait on it forever.
-    let drain = |pipe: Option<Box<dyn Read + Send>>| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            if let Some(mut pipe) = pipe {
-                let _ = pipe.read_to_end(&mut bytes);
-            }
-            bytes
-        })
-    };
-    let stdout = drain(
-        child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let stderr = drain(
-        child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let until = Instant::now() + within;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(50)),
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                // The readers are left: what the tool started may hold its pipes a while yet.
-                return Err(format!(
-                    "{tool} didn't finish within {} seconds",
-                    within.as_secs()
-                ));
-            }
-            Err(e) => return Err(format!("couldn't wait for {tool}: {e}")),
+    finish_run(
+        tool,
+        within,
+        dispatch(
+            cmd,
+            bounded_options(within, None),
+            start_error,
+            crate::processes::run_checked,
+        ),
+    )
+}
+
+// Network commands get two minutes; inbox callers supply their shorter deadline.
+const TOOL_TIMEOUT: Duration = Duration::from_secs(120);
+const INPUT_LIMIT: usize = 16 * 1024 * 1024;
+const OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
+const ERROR_LIMIT: usize = 64 * 1024;
+
+fn bounded_options(within: Duration, input: Option<&str>) -> crate::processes::Options {
+    crate::processes::Options {
+        timeout: Some(within),
+        // Service ignores BrokenPipe while still collecting the tool's exit diagnostics.
+        input: input.map(|text| text.as_bytes().to_vec()),
+        output_limit: OUTPUT_LIMIT,
+        stderr_limit: Some(ERROR_LIMIT),
+        ..Default::default()
+    }
+}
+
+fn dispatch(
+    command: Command,
+    options: crate::processes::Options,
+    start_error: impl FnOnce(String) -> String,
+    run: impl FnOnce(
+        Command,
+        crate::processes::Options,
+    ) -> Result<crate::processes::Output, crate::processes::Failure>,
+) -> Result<crate::processes::Output, String> {
+    run(command, options).map_err(|error| match error {
+        crate::processes::Failure::Failed(message) => start_error(message),
+        other => other.message(),
+    })
+}
+
+fn finish_run(
+    tool: &str,
+    within: Duration,
+    result: Result<crate::processes::Output, String>,
+) -> Result<String, String> {
+    let output = result?;
+    // Only confirmed timeout cleanup gets the familiar deadline wording. Uncertain cleanup
+    // retains its complete() error, even if the direct child exited successfully.
+    let timed_out = output.stop_kind == Some(crate::processes::StopKind::TimedOut);
+    let out = output.complete().map_err(|error| {
+        if timed_out {
+            crate::i18n::message(
+                "backend-tool-didn-t-finish-within-seconds-error-f169ac",
+                &[
+                    ("tool", (tool).to_string().into()),
+                    ("seconds", (within.as_secs()).into()),
+                    ("detail", (error).to_string().into()),
+                ],
+            )
+        } else {
+            error
         }
-    };
-    let out = std::process::Output {
-        status,
-        stdout: stdout.join().unwrap_or_default(),
-        stderr: stderr.join().unwrap_or_default(),
-    };
+    })?;
     answer(tool, &out)
 }
 
@@ -148,12 +159,13 @@ fn prepared(
     repo: &Path,
     hosting: &Hosting,
     args: &[&str],
-) -> Result<(Command, impl Fn(std::io::Error) -> String), String> {
+) -> Result<(Command, impl Fn(String) -> String), String> {
     let mut cmd = tool_command(tool);
     let forge = forge_of(tool)?;
     if forge != hosting.forge || !plain_path(&hosting.path) || !plain_host(&hosting.host) {
-        return Err(format!(
-            "{tool} needs a valid selected forge host and owner/repo path"
+        return Err(crate::i18n::message(
+            "integration-forge-needs-selected",
+            &[("tool", tool.into())],
         ));
     }
     let authority = match forge {
@@ -161,25 +173,28 @@ fn prepared(
         _ => hosting.host.clone(),
     };
     if !plain_host(&authority) || !same_host(&authority, &hosting.host) {
-        return Err("The selected forge has an invalid web host".to_owned());
+        return Err(crate::i18n::text("integration-forge-invalid-web-host").to_owned());
     }
     let remote = crate::remote::parse(repo).is_some();
+    let context = crate::connections::current();
+    if let Some(error) = &context.error {
+        return Err(error.clone());
+    }
+    crate::connections::configure_cli(&mut cmd, tool, &authority)?;
     if remote {
         let remotes = remote_catalog(repo)?;
         validate_remote_target(&remotes, hosting)?;
         // A named target bypasses the CLI's usual known-host filtering. Only an explicitly
         // configured login (never an inherited global token) may authorize an SSH-tab host.
         if !trusted_host(forge, tool, &authority)? {
-            return Err(format!(
-                "{tool} isn't signed in to {authority}: `{tool} auth login --hostname {authority}` to use it"
-            ));
+            return Err(not_signed_in(tool, &authority));
         }
     }
     if named_hosts(args)
         .iter()
         .any(|host| !host.eq_ignore_ascii_case(&authority))
     {
-        return Err("The command names a different host than the selected forge".to_owned());
+        return Err(crate::i18n::text("integration-forge-different-host").to_owned());
     }
     let mut args = args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     let api = args.first().is_some_and(|s| s == "api");
@@ -196,19 +211,13 @@ fn prepared(
             _ => format!("{}/{}", hosting.host, hosting.path),
         };
         if args.iter().any(|s| matches!(s.as_str(), "--repo" | "-R")) {
-            return Err(
-                "Forge commands must use the selected repository, without a repository override"
-                    .to_owned(),
-            );
+            return Err(crate::i18n::text("integration-forge-no-repository-override").to_owned());
         }
         args.splice(at..at, ["--repo".to_owned(), target]);
     }
-    cmd.current_dir(if remote {
-        std::env::temp_dir()
-    } else {
-        repo.to_owned()
-    })
-    .args(args);
+    // Hosting and --repo identify the selected repository explicitly. Running inside
+    // its worktree would let a local .glab-cli/config.yml redirect the CLI anyway.
+    cmd.current_dir(std::env::temp_dir()).args(args);
     match forge {
         Forge::GitLab => {
             cmd.env("GITLAB_HOST", &authority)
@@ -220,13 +229,31 @@ fn prepared(
     }
     let here = remote || repo.is_dir();
     let (tool, noun, shown) = (tool.to_owned(), noun.to_owned(), repo.display().to_string());
-    let not_installed = move |e: std::io::Error| match e.kind() {
-        std::io::ErrorKind::NotFound if here => {
-            format!("{tool} isn't installed: gitcraft uses it for {noun}s")
-        }
-        _ => format!("couldn't run {tool} in {shown}: {e}"),
+    // Service failures are strings, not typed spawn errors. Keep the original cause and an
+    // installation hint for a failed launch, without guessing an OS errno or rebuilding PATH.
+    let start_error = move |error: String| {
+        let id = if here && error.starts_with("could not run process:") {
+            "backend-forge-launch-install"
+        } else {
+            "backend-forge-launch-error"
+        };
+        let purpose = match noun.as_str() {
+            "pull request" => crate::i18n::text("backend-forge-purpose-pull"),
+            "merge request" => crate::i18n::text("backend-forge-purpose-merge"),
+            "issue" => crate::i18n::text("backend-forge-purpose-issue"),
+            other => other,
+        };
+        crate::i18n::message(
+            id,
+            &[
+                ("tool", tool.as_str().into()),
+                ("path", shown.as_str().into()),
+                ("detail", error.into()),
+                ("purpose", purpose.into()),
+            ],
+        )
     };
-    Ok((cmd, not_installed))
+    Ok((cmd, start_error))
 }
 
 /// The forge whose tool `tool` is.
@@ -234,10 +261,17 @@ fn forge_of(tool: &str) -> Result<Forge, String> {
     match tool {
         "gh" => Ok(Forge::GitHub),
         "glab" => Ok(Forge::GitLab),
-        _ => Err(format!(
-            "{tool} can't be run for a repository on another machine"
+        _ => Err(crate::i18n::message(
+            "backend-tool-can-t-be-run-for-a-repository-on-another-machine-966b8b",
+            &[("tool", (tool).to_string().into())],
         )),
     }
+}
+
+/// Whether `glab` with `args` takes `--repo`: every command but `api`.
+#[cfg(test)]
+fn gitlab_takes_repo(args: &[&str]) -> bool {
+    args.first().is_some_and(|sub| *sub != "api")
 }
 
 /// Re-read the SSH repository's catalog before each command; selection is a host AND path,
@@ -257,7 +291,7 @@ fn validate_remote_target(remotes: &[crate::git::Remote], hosting: &Hosting) -> 
     {
         Ok(())
     } else {
-        Err("The selected forge remote changed or was removed: refresh the tab".to_owned())
+        Err(crate::i18n::text("integration-forge-remote-changed").to_owned())
     }
 }
 
@@ -267,6 +301,11 @@ fn plain_host(host: &str) -> bool {
         && host
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
+}
+
+// The inbox's retry policy consumes this protocol identity; translate at display_error.
+fn not_signed_in(tool: &str, host: &str) -> String {
+    format!("{tool} isn't signed in to {host}: `{tool} auth login --hostname {host}` to use it")
 }
 
 /// Whether `path` is a plain `owner/repo` (`group/sub/repo`): never a URL, an `scp`-style
@@ -339,10 +378,26 @@ const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
 /// said is remembered: yes while the app runs, no for [`NOT_SIGNED_IN_FOR`].
 /// An error when the tool can't be run at all (not installed).
 fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
+    let context = crate::connections::current();
+    let account = if tool == "gh" {
+        &context.choices.github
+    } else {
+        &context.choices.gitlab
+    };
+    if account.selected() {
+        account.validate()?;
+        return Ok(account.host.eq_ignore_ascii_case(host));
+    }
+
     use std::sync::{Mutex, OnceLock};
     type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
     static KNOWN: OnceLock<Known> = OnceLock::new();
-    if !plain_host(host) {
+    let plain = !host.is_empty()
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'))
+        && !host.starts_with(['-', '.']);
+    if !plain {
         return Ok(false);
     }
     let own = match forge {
@@ -369,8 +424,8 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
     Ok(signed_in)
 }
 
-/// Whether `tool` says it is signed in to `host`; no when it doesn't say so within
-/// [`AUTH_CHECK_FOR`] (it is stopped).
+/// Whether `tool` reports a login within [`AUTH_CHECK_FOR`]. An incomplete check stays an
+/// error, so cancellation, timeout or uncertain cleanup cannot be cached as signed out.
 fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
     let mut cmd = tool_command(tool);
     for key in [
@@ -386,37 +441,70 @@ fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
         cmd.env_remove(key);
     }
     cmd.args(["auth", "status", "--hostname", host])
-        .current_dir(std::env::temp_dir())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .current_dir(std::env::temp_dir());
     #[cfg(test)]
     if let Some(answer) = recording::answer(&cmd, None) {
         return Ok(answer.is_ok());
     }
-    let mut child = cmd.spawn().map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => format!("{tool} isn't installed"),
-        _ => format!("couldn't run {tool}: {e}"),
-    })?;
-    let until = Instant::now() + AUTH_CHECK_FOR;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status.success()),
-            Ok(None) if Instant::now() < until => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Ok(false);
-            }
-        }
+    let options = auth_options(AUTH_CHECK_FOR, false)?;
+    // No auth output reaches an error message, including partial output on failure.
+    finish_auth(crate::processes::run_checked(cmd, options)).map_err(|error| {
+        crate::i18n::message(
+            "backend-couldn-t-check-tool-login-error-2f36d0",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("detail", (error).to_string().into()),
+            ],
+        )
+    })
+}
+
+fn finish_auth(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+) -> Result<bool, String> {
+    result
+        .map_err(crate::processes::Failure::message)?
+        .complete()
+        .map(|out| out.status.success())
+}
+
+#[cfg(windows)]
+const NULL_SINK: &str = "NUL";
+#[cfg(not(windows))]
+const NULL_SINK: &str = "/dev/null";
+
+fn auth_options(within: Duration, keep: bool) -> Result<crate::processes::Options, String> {
+    auth_options_with(within, keep, |path| {
+        std::fs::OpenOptions::new().write(true).open(path)
+    })
+}
+
+fn auth_options_with(
+    within: Duration,
+    keep: bool,
+    open_sink: impl FnOnce(&str) -> std::io::Result<std::fs::File>,
+) -> Result<crate::processes::Options, String> {
+    let mut options = bounded_options(within, None);
+    options.output_limit = ERROR_LIMIT;
+    // Preserve byte accounting so excessive stderr still stops the command, but never retain
+    // tokens or account details in the captured result (including diagnostics on failure).
+    options.stderr_filter = Some(Box::new(|bytes| vec![0; bytes.len()]));
+    if !keep {
+        // Service overrides Command.stdout: redirect through its file option, so `gh auth
+        // token` goes directly to the OS null device and is never captured in memory.
+        options.stdout_file = Some(open_sink(NULL_SINK).map_err(|error| {
+            crate::i18n::message(
+                "backend-couldn-t-open-the-null-output-sink-error-65c977",
+                &[("detail", (error).to_string().into())],
+            )
+        })?);
     }
+    Ok(options)
 }
 
 /// The forge's tool, set to answer this repository in plain JSON.
 fn tool_command(tool: &str) -> Command {
-    let mut cmd = Command::new(tool);
+    let mut cmd = Command::new(crate::connections::program(tool));
     cmd.env("GH_PROMPT_DISABLED", "1").env("NO_PROMPT", "1");
     // What it prints is read as JSON: `CLICOLOR_FORCE` or `GH_FORCE_TTY` in the user's
     // environment would colour it even into a pipe, escape codes no JSON reader takes.
@@ -456,164 +544,13 @@ fn failure(tool: &str, out: &std::process::Output) -> String {
     if !stdout.is_empty() {
         return stdout;
     }
-    format!("{tool} failed ({})", out.status)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A self-hosted GitLab on a port of its own is reached on it; an SSH port isn't a web one.
-    #[test]
-    fn gitlab_keeps_the_port_of_its_web_pages() {
-        let at = |forge, url| tool_location(forge, url);
-        assert_eq!(
-            at(Forge::GitLab, "https://git.example.org:8443/team/app.git"),
-            Some(("git.example.org:8443".to_owned(), "team/app".to_owned()))
-        );
-        assert_eq!(
-            at(Forge::GitLab, "ssh://git@git.example.org:2222/team/app.git"),
-            Some(("git.example.org".to_owned(), "team/app".to_owned()))
-        );
-        assert_eq!(
-            at(Forge::GitLab, "git@gitlab.com:team/app.git"),
-            Some(("gitlab.com".to_owned(), "team/app".to_owned()))
-        );
-        // `GH_REPO` takes a plain host.
-        assert_eq!(
-            at(Forge::GitHub, "https://ghe.example.org:8443/team/app"),
-            Some(("ghe.example.org".to_owned(), "team/app".to_owned()))
-        );
-    }
-
-    /// A repository's remote names a plain project, never another host by way of its path.
-    #[test]
-    fn only_plain_paths_reach_the_tools() {
-        assert!(plain_path("team/app"));
-        assert!(plain_path("group/sub/my.app"));
-        assert!(plain_path("owner/.github"));
-        for bad in [
-            "https://evil.example/x/y",
-            "git@evil.example:x/y",
-            "other.corp/g/p:1",
-            "-x/y",
-            "app",
-            "a//b",
-            "owner/../project",
-        ] {
-            assert!(!plain_path(bad), "{bad}");
-        }
-        let (_, path) = tool_location(
-            Forge::GitLab,
-            "https://gitlab.com/https://evil.example/x/y.git",
-        )
-        .unwrap_or_default();
-        assert!(!plain_path(&path), "{path}");
-    }
-
-    /// The hosts the arguments send the tool to, which must be the remote's own.
-    #[test]
-    fn the_hosts_arguments_name_are_found() {
-        assert_eq!(
-            named_hosts(&["api", "graphql", "--hostname", "ghe.example.org", "-f", "q"]),
-            ["ghe.example.org"]
-        );
-        assert_eq!(
-            named_hosts(&["run", "list", "-R", "ghe.example.org/o/r"]),
-            ["ghe.example.org"]
-        );
-        assert!(named_hosts(&["run", "list", "-R", "o/r"]).is_empty());
-        assert!(same_host("git.example.org:8443", "git.example.org"));
-        assert!(!same_host("github.evil.example", "github.com"));
-    }
-
-    #[test]
-    fn review13_ssh_catalog_check_keeps_web_authority_prefix_and_forge_case() {
-        for forge in [Forge::GitHub, Forge::GitLab] {
-            let h = Hosting {
-                forge,
-                host: "forge.example".into(),
-                path: "Team/Repo".into(),
-                web: "https://forge.example:4000/reviews".into(),
-            };
-            for (url, expected) in [
-                ("https://forge.example:3000/reviews/Team/Repo.git", false),
-                ("https://forge.example:4000/Team/Repo.git", false),
-                ("https://forge.example:4000/REVIEWS/Team/Repo.git", false),
-                ("https://FORGE.example:4000/reviews/Team/Repo.git", true),
-                ("git@forge.example:Team/Repo.git", true),
-                ("ssh://git@forge.example:2222/Team/Repo.git", true),
-                ("git@forge.example:team/repo.git", forge != Forge::GitLab),
-            ] {
-                let remotes = [crate::git::Remote {
-                    name: "origin".into(),
-                    url: url.into(),
-                }];
-                assert_eq!(
-                    validate_remote_target(&remotes, &h).is_ok(),
-                    expected,
-                    "{forge:?} {url}"
-                );
-            }
-        }
-    }
-
-    /// A tool that hangs is stopped at its time; a long answer still comes whole.
-    #[cfg(unix)]
-    #[test]
-    fn a_tool_given_a_time_is_stopped_at_it() {
-        let run_within = |tool: &str, _: &str, here: &Path, args: &[&str], within| {
-            let mut cmd = tool_command(tool);
-            cmd.current_dir(here).args(args);
-            within_command(tool, cmd, |e| e.to_string(), within)
-        };
-        let here = std::env::temp_dir();
-        let started = Instant::now();
-        let hung = run_within("sleep", "x", &here, &["20"], Duration::from_millis(300));
-        assert!(hung.is_err_and(|e| e.contains("didn't finish within")));
-        assert!(started.elapsed() < Duration::from_secs(10));
-        let script = "head -c 300000 /dev/zero | tr '\\0' x";
-        let long = run_within("sh", "x", &here, &["-c", script], Duration::from_secs(20));
-        assert_eq!(long.map(|out| out.len()), Ok(300_000));
-        let failed = run_within(
-            "sh",
-            "x",
-            &here,
-            &["-c", "echo no >&2; exit 3"],
-            Duration::from_secs(20),
-        );
-        assert_eq!(failed, Err("no".to_owned()));
-    }
-
-    /// The user's environment can't colour the JSON read from the tools, nor point them at
-    /// another repository or host.
-    #[test]
-    fn tools_answer_in_plain_json_about_this_repository() {
-        for tool in ["gh", "glab"] {
-            let cmd = tool_command(tool);
-            let envs: HashMap<String, Option<String>> = cmd
-                .get_envs()
-                .map(|(k, v)| {
-                    let text = |s: &std::ffi::OsStr| s.to_string_lossy().into_owned();
-                    (text(k), v.map(text))
-                })
-                .collect();
-            for removed in [
-                "CLICOLOR_FORCE",
-                "GH_FORCE_TTY",
-                "GH_REPO",
-                "GH_HOST",
-                "GITLAB_HOST",
-                "GITLAB_REPO",
-                "GITLAB_URI",
-                "GL_HOST",
-                "GITLAB_HEAD_REPO",
-            ] {
-                assert_eq!(envs.get(removed), Some(&None), "{removed}");
-            }
-            assert_eq!(envs.get("NO_COLOR"), Some(&Some("1".to_owned())));
-        }
-    }
+    crate::i18n::message(
+        "backend-tool-failed-4a996a",
+        &[
+            ("tool", (tool).to_string().into()),
+            ("status", (out.status).to_string().into()),
+        ],
+    )
 }
 
 /// What diagnostics say about a forge's tool: its version, and whether it has a login (never
@@ -657,37 +594,482 @@ pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
 /// the tool.
 fn report_answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
     let mut cmd = tool_command(tool);
-    cmd.args(args)
-        .current_dir(std::env::temp_dir())
-        .stdin(Stdio::null())
-        .stdout(if keep { Stdio::piped() } else { Stdio::null() })
-        .stderr(Stdio::null());
-    let mut child = cmd.spawn().ok()?;
-    let reader = child.stdout.take().map(|mut out| {
-        std::thread::spawn(move || {
-            let mut text = String::new();
-            let _ = std::io::Read::read_to_string(&mut out, &mut text);
-            text
-        })
-    });
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() < REPORT_TIMEOUT => {
-                std::thread::sleep(Duration::from_millis(30));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    };
-    let text = reader.and_then(|r| r.join().ok()).unwrap_or_default();
-    Some((status.success(), text))
+    cmd.args(args).current_dir(std::env::temp_dir());
+    let options = auth_options(REPORT_TIMEOUT, keep).ok()?;
+    finish_report(crate::processes::run_checked(cmd, options), keep)
 }
 
+fn finish_report(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+    keep: bool,
+) -> Option<(bool, String)> {
+    let out = result.ok()?.complete().ok()?;
+    Some((
+        out.status.success(),
+        if keep {
+            String::from_utf8_lossy(&out.stdout).into_owned()
+        } else {
+            String::new()
+        },
+    ))
+}
+
+pub(super) fn history_api(
+    hosting: &super::Hosting,
+    endpoint: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<serde_json::Value, String> {
+    let (tool, forge) = match hosting.forge {
+        Forge::GitHub => ("gh", Forge::GitHub),
+        Forge::GitLab => ("glab", Forge::GitLab),
+        _ => return Err(crate::i18n::text("backend-this-forge-uses-its-http-api-60dbf1").into()),
+    };
+    let authority = hosting
+        .web
+        .split_once("://")
+        .map(|(_, rest)| rest.trim_end_matches('/'))
+        .ok_or(crate::i18n::text("backend-invalid-forge-address-0f6311"))?;
+    if authority.contains(['/', '@', '\n', '\r'])
+        || authority.starts_with('-')
+        || endpoint.starts_with(['/', '-'])
+        || endpoint.contains("://")
+        || endpoint.chars().any(char::is_control)
+    {
+        return Err(crate::i18n::text("backend-invalid-history-api-address-f52ebe").into());
+    }
+    let actual = super::location(&format!("{}/_history_guard_", hosting.web))
+        .map(|(host, _)| host)
+        .ok_or(crate::i18n::text("backend-invalid-forge-authority-9d9b21"))?;
+    if !actual.eq_ignore_ascii_case(&hosting.host) {
+        return Err(crate::i18n::text(
+            "backend-forge-account-and-api-authority-do-not-match-1393cc",
+        )
+        .into());
+    }
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    let mut command = tool_command(tool);
+    command
+        .current_dir(std::env::temp_dir())
+        .env_remove("GH_DEBUG")
+        .env_remove("GLAB_DEBUG")
+        .env_remove("GH_FORCE_TTY")
+        .env("GH_PROMPT_DISABLED", "1");
+    match forge {
+        Forge::GitHub => {
+            command.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+        }
+        Forge::GitLab => {
+            command.env("GITLAB_HOST", authority);
+        }
+        _ => {}
+    }
+    command.args(["api", "--hostname", authority, endpoint]);
+    let output = crate::processes::run(
+        command,
+        crate::processes::Options {
+            background: true,
+            timeout: Some(Duration::from_secs(15)),
+            output_limit: 2 * 1024 * 1024,
+            stderr_limit: Some(16 * 1024),
+            ..Default::default()
+        },
+    )
+    .and_then(|o| o.complete())
+    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    if !output.status.success() {
+        return Err(crate::i18n::text(
+            "backend-forge-history-lookup-failed-check-the-selected-account-and-server-ff8b19",
+        )
+        .into());
+    }
+    serde_json::from_slice(&output.stdout).map_err(|_| {
+        crate::i18n::text("backend-forge-history-lookup-returned-malformed-json-faed17").into()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn review13_ssh_catalog_check_keeps_web_authority_prefix_and_forge_case() {
+        for forge in [Forge::GitHub, Forge::GitLab] {
+            let h = Hosting {
+                forge,
+                host: "forge.example".into(),
+                path: "Team/Repo".into(),
+                web: "https://forge.example:4000/reviews".into(),
+            };
+            for (url, expected) in [
+                ("https://forge.example:3000/reviews/Team/Repo.git", false),
+                ("https://forge.example:4000/Team/Repo.git", false),
+                ("https://forge.example:4000/REVIEWS/Team/Repo.git", false),
+                ("https://FORGE.example:4000/reviews/Team/Repo.git", true),
+                ("git@forge.example:Team/Repo.git", true),
+                ("ssh://git@forge.example:2222/Team/Repo.git", true),
+                ("git@forge.example:team/repo.git", forge != Forge::GitLab),
+            ] {
+                let remotes = [crate::git::Remote {
+                    name: "origin".into(),
+                    url: url.into(),
+                }];
+                assert_eq!(
+                    validate_remote_target(&remotes, &h).is_ok(),
+                    expected,
+                    "{forge:?} {url}"
+                );
+            }
+        }
+    }
+
+    use super::*;
+
+    /// A self-hosted GitLab on a port of its own is reached on it; an SSH port isn't a web one.
+    #[test]
+    fn gitlab_keeps_the_port_of_its_web_pages() {
+        let at = |forge, url| tool_location(forge, url);
+        assert_eq!(
+            at(Forge::GitLab, "https://git.example.org:8443/team/app.git"),
+            Some(("git.example.org:8443".to_owned(), "team/app".to_owned()))
+        );
+        assert_eq!(
+            at(Forge::GitLab, "ssh://git@git.example.org:2222/team/app.git"),
+            Some(("git.example.org".to_owned(), "team/app".to_owned()))
+        );
+        assert_eq!(
+            at(Forge::GitLab, "git@gitlab.com:team/app.git"),
+            Some(("gitlab.com".to_owned(), "team/app".to_owned()))
+        );
+        // `GH_REPO` takes a plain host.
+        assert_eq!(
+            at(Forge::GitHub, "https://ghe.example.org:8443/team/app"),
+            Some(("ghe.example.org".to_owned(), "team/app".to_owned()))
+        );
+    }
+
+    /// A repository's remote names a plain project, never another host by way of its path.
+    #[test]
+    fn only_plain_paths_reach_the_tools() {
+        assert!(plain_path("team/app"));
+        assert!(plain_path("group/sub/my.app"));
+        for bad in [
+            "https://evil.example/x/y",
+            "git@evil.example:x/y",
+            "other.corp/g/p:1",
+            "-x/y",
+            "app",
+            "a//b",
+        ] {
+            assert!(!plain_path(bad), "{bad}");
+        }
+        let (_, path) = tool_location(
+            Forge::GitLab,
+            "https://gitlab.com/https://evil.example/x/y.git",
+        )
+        .unwrap_or_default();
+        assert!(!plain_path(&path), "{path}");
+    }
+
+    /// The hosts the arguments send the tool to, which must be the remote's own.
+    #[test]
+    fn the_hosts_arguments_name_are_found() {
+        assert_eq!(
+            named_hosts(&["api", "graphql", "--hostname", "ghe.example.org", "-f", "q"]),
+            ["ghe.example.org"]
+        );
+        assert_eq!(
+            named_hosts(&["run", "list", "-R", "ghe.example.org/o/r"]),
+            ["ghe.example.org"]
+        );
+        assert!(named_hosts(&["run", "list", "-R", "o/r"]).is_empty());
+        assert!(same_host("git.example.org:8443", "git.example.org"));
+        assert!(!same_host("github.evil.example", "github.com"));
+    }
+
+    /// A tool that hangs is stopped at its time; a long answer still comes whole.
+    #[cfg(unix)]
+    #[test]
+    fn a_tool_given_a_time_is_stopped_at_it() {
+        let run_within = |tool: &str, _: &str, here: &Path, args: &[&str], within| {
+            let mut cmd = tool_command(tool);
+            cmd.current_dir(here).args(args);
+            within_command(tool, cmd, |e| e, within)
+        };
+        let here = std::env::temp_dir();
+        let started = Instant::now();
+        let hung = run_within("sleep", "x", &here, &["20"], Duration::from_millis(300));
+        assert!(hung.is_err_and(|e| e.contains("didn't finish within")));
+        assert!(started.elapsed() < Duration::from_secs(10));
+        let script = "head -c 300000 /dev/zero | tr '\\0' x";
+        let long = run_within("sh", "x", &here, &["-c", script], Duration::from_secs(20));
+        assert_eq!(long.map(|out| out.len()), Ok(300_000));
+        let failed = run_within(
+            "sh",
+            "x",
+            &here,
+            &["-c", "echo no >&2; exit 3"],
+            Duration::from_secs(20),
+        );
+        assert_eq!(failed, Err("no".to_owned()));
+    }
+
+    /// `glab api` would refuse `--repo`; the commands about a project take it.
+    #[test]
+    fn only_glab_commands_about_a_project_take_repo() {
+        assert!(!gitlab_takes_repo(&[
+            "api",
+            "--hostname",
+            "gitlab.com",
+            "projects/x"
+        ]));
+        assert!(gitlab_takes_repo(&["mr", "list", "-F", "json"]));
+        assert!(!gitlab_takes_repo(&[]));
+    }
+
+    /// The user's environment can't colour the JSON read from the tools, nor point them at
+    /// another repository or host.
+    #[test]
+    fn tools_answer_in_plain_json_about_this_repository() {
+        for tool in ["gh", "glab"] {
+            let cmd = tool_command(tool);
+            let envs: HashMap<String, Option<String>> = cmd
+                .get_envs()
+                .map(|(k, v)| {
+                    let text = |s: &std::ffi::OsStr| s.to_string_lossy().into_owned();
+                    (text(k), v.map(text))
+                })
+                .collect();
+            for removed in [
+                "CLICOLOR_FORCE",
+                "GH_FORCE_TTY",
+                "GH_REPO",
+                "GH_HOST",
+                "GITLAB_HOST",
+                "GITLAB_REPO",
+                "GITLAB_URI",
+                "GL_HOST",
+                "GITLAB_HEAD_REPO",
+            ] {
+                assert_eq!(envs.get(removed), Some(&None), "{removed}");
+            }
+            assert_eq!(envs.get("NO_COLOR"), Some(&Some("1".to_owned())));
+        }
+    }
+
+    #[test]
+    fn bounded_requests_keep_input_deadline_and_ambient_cancellation() -> Result<(), String> {
+        let cancel = crate::tasks::Cancellation::default();
+        crate::tasks::with_cancellation(cancel.clone(), || {
+            let options = bounded_options(Duration::from_secs(7), Some("a body\n"));
+            cancel.cancel();
+            let mut command = Command::new("/recorded/gh");
+            command
+                .args(["api", "endpoint"])
+                .current_dir("/recorded/repo");
+            command.env("GH_HOST", "recorded.example");
+            let result = dispatch(
+                command,
+                options,
+                |error| format!("start: {error}"),
+                |command, options| {
+                    assert_eq!(command.get_program(), "/recorded/gh");
+                    assert_eq!(command.get_args().collect::<Vec<_>>(), ["api", "endpoint"]);
+                    assert_eq!(command.get_current_dir(), Some(Path::new("/recorded/repo")));
+                    assert_eq!(
+                        command.get_envs().collect::<Vec<_>>(),
+                        [(
+                            std::ffi::OsStr::new("GH_HOST"),
+                            Some(std::ffi::OsStr::new("recorded.example"))
+                        )]
+                    );
+                    assert_eq!(options.input.as_deref(), Some(b"a body\n".as_slice()));
+                    assert_eq!(options.timeout, Some(Duration::from_secs(7)));
+                    assert_eq!(options.output_limit, OUTPUT_LIMIT);
+                    assert_eq!(options.stderr_limit, Some(ERROR_LIMIT));
+                    assert!(!options.hold_input);
+                    assert!(options.cancel.is_cancelled());
+                    Err(crate::processes::Failure::CancelledBeforeStart)
+                },
+            );
+            assert!(matches!(result, Err(ref error) if error == "cancelled before execution"));
+        });
+        assert_eq!(TOOL_TIMEOUT, Duration::from_secs(120));
+        Ok(())
+    }
+
+    #[test]
+    fn stopped_or_uncertain_results_never_become_success_or_authentication() {
+        use crate::processes::{StopKind, recording_output};
+        for kind in [
+            StopKind::Cancelled,
+            StopKind::TimedOut,
+            StopKind::Failed,
+            StopKind::Uncertain,
+        ] {
+            let result = finish_run(
+                "gh",
+                Duration::from_secs(3),
+                Ok(recording_output(Some(kind))),
+            );
+            assert!(result.is_err());
+            if kind == StopKind::Uncertain {
+                assert_eq!(result, Err("cleanup proof missing".into()));
+            }
+            if kind == StopKind::TimedOut {
+                assert!(
+                    result.is_err_and(|error| error.contains("didn't finish within 3 seconds"))
+                );
+            }
+            assert!(finish_auth(Ok(recording_output(Some(kind)))).is_err());
+            assert!(finish_report(Ok(recording_output(Some(kind))), true).is_none());
+        }
+        assert_eq!(finish_auth(Ok(recording_output(None))), Ok(true));
+    }
+
+    #[test]
+    fn tool_exit_diagnostics_survive_and_discarded_reports_reveal_no_output() {
+        use crate::processes::recording_output;
+        let mut output = recording_output(None);
+        output.stdout = b"tool response".to_vec();
+        assert_eq!(
+            finish_run("gh", TOOL_TIMEOUT, Ok(output)),
+            Ok("tool response".into())
+        );
+        #[cfg(unix)]
+        let failed_status = {
+            use std::os::unix::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(3 << 8)
+        };
+        #[cfg(windows)]
+        let failed_status = {
+            use std::os::windows::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(3)
+        };
+        let mut failed = recording_output(None);
+        failed.status = failed_status;
+        failed.stderr = b"actual exit diagnostic".to_vec();
+        assert_eq!(
+            finish_run("gh", TOOL_TIMEOUT, Ok(failed)),
+            Err("actual exit diagnostic".into())
+        );
+        for success in [false, true] {
+            let mut output = recording_output(None);
+            if !success {
+                output.status = failed_status;
+            }
+            output.stdout = b"secret token".to_vec();
+            output.stderr = b"secret account".to_vec();
+            assert_eq!(
+                finish_report(Ok(output), false),
+                Some((success, String::new()))
+            );
+        }
+    }
+
+    #[test]
+    fn auth_capture_is_bounded_and_redacts_stderr_before_retention() -> Result<(), String> {
+        // keep=true does not open a sink or launch a program. The production keep=false path
+        // uses stdout_file, since Command.stdout would be overridden by Service.
+        let mut options = auth_options(REPORT_TIMEOUT, true)?;
+        assert_eq!(options.timeout, Some(REPORT_TIMEOUT));
+        assert_eq!(options.output_limit, ERROR_LIMIT);
+        assert_eq!(options.stderr_limit, Some(ERROR_LIMIT));
+        assert!(options.stdout_file.is_none());
+        assert!(options.input.is_none());
+        let filter = options.stderr_filter.as_mut().ok_or("missing redaction")?;
+        assert_eq!(filter(b"secret token"), vec![0; 12]);
+        assert_eq!(filter(b""), Vec::<u8>::new());
+        assert_eq!(filter(&vec![b's'; ERROR_LIMIT + 1]).len(), ERROR_LIMIT + 1);
+        Ok(())
+    }
+
+    #[test]
+    fn secret_discard_requires_null_sink_and_refuses_failed_open() {
+        // Recording opener: never opens a file or starts the service. A sink failure must
+        // refuse construction rather than falling back to captured token stdout.
+        let opened = std::cell::Cell::new(false);
+        let result = auth_options_with(REPORT_TIMEOUT, false, |path| {
+            opened.set(true);
+            assert_eq!(path, NULL_SINK);
+            #[cfg(unix)]
+            assert_eq!(path, "/dev/null");
+            #[cfg(windows)]
+            assert_eq!(path, "NUL");
+            Err(std::io::Error::other("recorded sink refusal"))
+        });
+        assert!(opened.get());
+        assert!(result.is_err_and(|error| error.contains("recorded sink refusal")));
+        assert!(
+            auth_options_with(REPORT_TIMEOUT, true, |_| {
+                opened.set(false);
+                Err(std::io::Error::other("unexpected open"))
+            })
+            .is_ok()
+        );
+        assert!(opened.get());
+    }
+
+    #[test]
+    fn oversized_input_refuses_before_command_preparation() {
+        // An invalid path/tool would reach discovery if preparation ran. The input guard is
+        // first, so this is a pure rejection test with no filesystem or process access.
+        let input = "x".repeat(INPUT_LIMIT + 1);
+        assert_eq!(
+            run_with_input(
+                "/recorded/gh",
+                "review",
+                Path::new("/recorded/repo"),
+                &Hosting {
+                    forge: Forge::GitHub,
+                    host: "github.com".into(),
+                    path: "o/r".into(),
+                    web: "https://github.com".into()
+                },
+                &[],
+                Some(&input)
+            ),
+            Err(format!(
+                "/recorded/gh input exceeds {} bytes",
+                crate::i18n::number(INPUT_LIMIT)
+            )),
+        );
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_signin_keeps_retry_identity() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::not_signed_in("glab", "git.example:8443");
+            assert_eq!(
+                raw,
+                "glab isn't signed in to git.example:8443: `glab auth login --hostname git.example:8443` to use it"
+            );
+            assert!(crate::forge::inbox::gives_up(&raw));
+            let display = crate::forge::inbox::display_error(&raw);
+            if locale == "de" {
+                assert_eq!(
+                    display,
+                    "glab ist nicht bei git.example:8443 angemeldet: zur Verwendung `glab auth login --hostname git.example:8443` ausführen."
+                );
+            } else {
+                assert_eq!(display, raw);
+            }
+            for opaque in [
+                "provider says it isn't signed in to elsewhere",
+                "provider isn't signed in to host: `provider auth login --hostname host` to use it",
+            ] {
+                assert_eq!(crate::forge::inbox::display_error(opaque), opaque);
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
 /// Recording happens after command preparation, at the process boundary. No forge tool runs.
 #[cfg(test)]
 pub(super) mod recording {

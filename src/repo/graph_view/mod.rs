@@ -10,6 +10,7 @@ mod lanes;
 mod layout_tests;
 mod menu;
 pub(super) mod message_tooltip;
+pub(super) mod minimap;
 mod order;
 mod pills;
 mod readability;
@@ -20,7 +21,9 @@ mod search;
 pub(super) mod suggest;
 mod suggest_popup;
 
-use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
+#[cfg(test)]
+use egui::Key;
+use egui::{Align2, FontId, Response, Sense, Ui, vec2};
 
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
@@ -124,6 +127,9 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        if self.timeline_view.is_none() {
+            self.saved_graph_header(ui);
+        }
         self.history_filters_frame(ui);
         let area = ui.available_rect_before_wrap();
         let ghost = self
@@ -155,6 +161,41 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.graph_motion.expire();
+        self.graph_motion.schedule_expiry(ui.ctx());
+        self.celebration_ui(ui);
+        self.graph_walk_header(ui);
+        self.graph_stacks(ui, acts);
+        let map_area = ui.available_rect_before_wrap();
+        let map_rect = egui::Rect::from_min_max(
+            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            map_area.right_bottom(),
+        );
+        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        let graph_rect = egui::Rect::from_min_max(
+            map_area.min,
+            egui::pos2(
+                map_area.right() - if show_map { 84.0 } else { 0.0 },
+                map_area.bottom(),
+            ),
+        );
+        // Earlier full-width strips have already grown the parent UI's minimum width.
+        // A fresh child enforces the reservation for layout, clipping and hit testing.
+        let scroll_geometry = ui
+            .scope_builder(egui::UiBuilder::new().max_rect(graph_rect), |ui| {
+                self.graph_rows_content(ui, acts)
+            })
+            .inner;
+        // The reserved minimap strip is a sibling of the horizontally clipped graph.
+        if show_map
+            && !self.ghost.drawing()
+            && let Some((offset, viewport)) = scroll_geometry
+        {
+            self.history_minimap(ui, map_rect, offset, viewport);
+        }
+    }
+
+    fn graph_rows_content(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) -> Option<(f32, f32)> {
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -163,28 +204,30 @@ impl RepoTab {
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, err);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(err)),
+                );
             });
-            return;
+            return None;
         }
         self.tip_bar(ui);
         let first_steps = self.first_steps();
         if self.commits.is_empty() {
             if let Some(steps) = first_steps {
                 self.first_steps_view(ui, steps, acts);
-                return;
+                return None;
             }
             ui.centered_and_justified(|ui| {
                 if self.loading {
                     ui.add(crate::spinner::Spinner::new());
                 } else {
                     ui.label(
-                        egui::RichText::new("This repository has no commits yet.")
-                            .color(t.text_dim),
+                        egui::RichText::new(crate::i18n::text("repo-core-4137")).color(t.text_dim),
                     );
                 }
             });
-            return;
+            return None;
         }
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
@@ -195,6 +238,7 @@ impl RepoTab {
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
         if !ghost
+            && self.keyboard_graph_active()
             && keys_free
             && self.dialog.is_none()
             && self.package.is_none()
@@ -210,7 +254,7 @@ impl RepoTab {
         let mut prefs = preferred_cols(&settings, lanes);
         let available = ui.available_width();
         let mut cols = prefs.allocated(available, settings.description_space);
-        egui::ScrollArea::horizontal()
+        let scroll_geometry = egui::ScrollArea::horizontal()
             .id_salt("graph-horizontal")
             .auto_shrink(false)
             .show(ui, |ui| {
@@ -237,21 +281,43 @@ impl RepoTab {
                     }
                     _ => {}
                 }
-                if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
+                if let Some(row) = self.take_graph_scroll_row() {
+                    let follow_head = self.graph_motion.take_head_scroll();
                     let view_h = ui.available_height();
                     let top = row as f32 * ROW_PITCH;
                     // Only scroll if the row is outside the visible part.
                     let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
                     if top < offset || top + ROW_PITCH > offset + view_h {
-                        scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                        let target = (top - view_h / 2.0).max(0.0);
+                        let offset = if follow_head {
+                            self.graph_motion.start_scroll(offset, target, ui.ctx())
+                        } else {
+                            self.graph_motion.cancel_scroll();
+                            target
+                        };
+                        scroll = scroll.vertical_scroll_offset(offset);
                     }
                 }
 
+                if ui.input(|i| i.smooth_scroll_delta.y != 0.0 || i.pointer.any_pressed()) {
+                    self.graph_motion.cancel_scroll();
+                }
+                if let Some(offset) = self.graph_motion.scroll_offset(ui.ctx()) {
+                    scroll = scroll.vertical_scroll_offset(offset);
+                }
+                if let Some(offset) = self.history_minimap.offset.take() {
+                    self.graph_motion.cancel_scroll();
+                    scroll = scroll.vertical_scroll_offset(offset);
+                }
                 // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
                 ui.spacing_mut().item_spacing.y = 0.0;
                 let idle = self.busy_op.is_none();
-                let mut hovered_message = None;
-                let total = self.commits.len() + usize::from(self.has_more);
+                let filtered = self.graph_projection_displayed();
+                let total = if filtered {
+                    self.saved_views.len()
+                } else {
+                    self.commits.len() + usize::from(self.has_more)
+                };
                 // The merges shown, for their badges: only those are read.
                 let mut shown_merges = Vec::new();
                 // A new repository's first steps go under its few rows.
@@ -259,24 +325,42 @@ impl RepoTab {
                 if first_steps.is_some() {
                     scroll = scroll.max_height(total as f32 * ROW_PITCH);
                 }
+                self.test_lane_frame(&settings, ui.ctx());
+                let mut hovered_message = None;
                 let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
+                    // show_rows includes overscan and partially clipped rows. Require the text's
+                    // centre to be inside the viewport with enough room for its glyphs: a label on
+                    // a mostly hidden top row would leave the visible lane looking unnamed.
                     let top = ui.max_rect().top();
                     let clip = ui.clip_rect();
                     let mut visible = range.clone().filter(|i| {
-                        let center = top + (i - range.start) as f32 * ROW_PITCH + ROW_PITCH / 2.0;
+                        let y = top + (i - range.start) as f32 * ROW_PITCH;
+                        let center = y + ROW_PITCH / 2.0;
                         center >= clip.top() + 8.0 && center <= clip.bottom() - 8.0
                     });
                     let first = visible.clone().next().unwrap_or(range.start);
                     let end = visible.next_back().map_or(first, |i| i + 1);
-                    let readable = self.readable_viewport(ui, first..end, lanes.shown);
+                    let readable = if filtered {
+                        self.readable_rows(
+                            ui,
+                            (first..end).filter_map(|i| match self.saved_views.row(i) {
+                                Some(super::saved_views::Row::Commit(raw)) => Some(*raw),
+                                _ => None,
+                            }),
+                            lanes.shown,
+                        )
+                    } else {
+                        self.readable_viewport(ui, first..end, lanes.shown)
+                    };
                     if settings.fit_visible_refs() {
                         prefs.refs = readable.refs_width;
-                        cols = prefs.allocated(available, settings.description_space);
                     }
+                    cols = prefs.allocated(available, settings.description_space);
                     ui.set_width(cols.content_width(available));
                     // Near the end: fetch the next page of history.
                     // Not from the ghost graph, whose rows don't grow as pages come in.
-                    if range.end + 40 >= self.commits.len()
+                    if !filtered
+                        && range.end + 40 >= self.commits.len()
                         && self.has_more
                         && !self.loading_more
                         && !ghost
@@ -285,15 +369,49 @@ impl RepoTab {
                     }
                     self.drag_auto_scroll(ui);
                     // Tab reaches the selected row, else the first in view.
+                    let visible_raw = |projected| {
+                        if filtered {
+                            match self.saved_views.row(projected) {
+                                Some(super::saved_views::Row::Commit(raw)) => Some(*raw),
+                                _ => None,
+                            }
+                        } else {
+                            Some(projected)
+                        }
+                    };
                     let stop = self
                         .selected
-                        .filter(|s| range.contains(s))
-                        .unwrap_or(range.start);
+                        .filter(|s| {
+                            let projected = if filtered {
+                                self.saved_views.position(*s)
+                            } else {
+                                Some(*s)
+                            };
+                            projected.is_some_and(|p| range.contains(&p))
+                        })
+                        .or_else(|| range.clone().find_map(visible_raw))
+                        .unwrap_or(0);
                     // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
                     ui.data_mut(|d| d.insert_temp(rows_id, stop));
                     let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
                     let mut menu_drawn = false;
-                    for i in range {
+                    for projected in range {
+                        let i = if filtered {
+                            match self.saved_views.row(projected) {
+                                Some(super::saved_views::Row::Commit(raw)) => *raw,
+                                Some(super::saved_views::Row::Gap { range, top, bottom }) => {
+                                    if connector_row(ui, &t, cols, lanes, range.len(), top, bottom)
+                                        .clicked()
+                                    {
+                                        self.expand_graph_span(range.clone());
+                                    }
+                                    continue;
+                                }
+                                None => continue,
+                            }
+                        } else {
+                            projected
+                        };
                         if i >= self.commits.len() {
                             loading_row(ui, &t);
                             continue;
@@ -310,6 +428,7 @@ impl RepoTab {
                             if i == stop {
                                 crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                             }
+                            self.keyboard_graph_focus(&resp);
                             if resp.clicked() {
                                 // Ctrl+click: compare the selected commit with this one.
                                 let compare = ui
@@ -342,6 +461,7 @@ impl RepoTab {
                 if let Some(steps) = first_steps {
                     self.first_steps_view(ui, steps, acts);
                 }
+                self.want_remerge_badges(&shown_merges, ui.ctx());
                 let graph_label = crate::repo::graph_order::header_label(self.log_order);
                 header::column_headers(ui, &t, header, &cols, &graph_label);
                 #[cfg(test)]
@@ -355,7 +475,6 @@ impl RepoTab {
                         },
                     );
                 });
-                self.test_lane_frame(&settings, ui.ctx());
                 if self.test_lane.visible {
                     self.test_lane_header(ui, header, &cols, acts);
                 }
@@ -369,7 +488,6 @@ impl RepoTab {
                     &settings,
                     acts,
                 );
-
                 self.hover_graph_message(
                     ui.ctx(),
                     if ghost {
@@ -378,8 +496,10 @@ impl RepoTab {
                         hovered_message.as_deref()
                     },
                 );
-                self.want_remerge_badges(&shown_merges, ui.ctx());
-            });
+                (out.state.offset.y, out.inner_rect.height())
+            })
+            .inner;
+        Some(scroll_geometry)
     }
 
     /// A row of the ghost graph, faded as what it is: a commit the operation would make, one
@@ -418,20 +538,82 @@ impl RepoTab {
         self.row_menu(&resp, i, idle, acts);
     }
 
+    /// Every index conversion follows the projection actually being drawn.
+    pub(super) fn graph_projection_displayed(&self) -> bool {
+        self.saved_views.active() && !self.ghost.drawing() && self.timeline_view.is_none()
+    }
+    pub(super) fn take_graph_scroll_row(&mut self) -> Option<usize> {
+        let raw = self.scroll_to.take_if(|_| !self.ghost.drawing())?;
+        Some(if self.graph_projection_displayed() {
+            self.saved_views.position(raw).unwrap_or(raw)
+        } else {
+            raw
+        })
+    }
+
+    /// Same selected-commit value for graph keyboard handling and palette dispatch.
+    pub(in crate::repo) fn graph_copy_text(
+        &self,
+        command: crate::keymap::Command,
+        i: usize,
+    ) -> Option<String> {
+        use crate::keymap::Command;
+        let commit = self.commits.get(i).filter(|c| c.hash != WIP_HASH)?;
+        match command {
+            Command::GraphCopyHash => Some(commit.hash.clone()),
+            Command::GraphCopyMessage => Some(commit.summary.clone()),
+            Command::GraphCopyBranch => self.copy_branch(i),
+            _ => None,
+        }
+    }
+
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
-        // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
-        let below = self.diff_beside_graph(ui.ctx());
-        let (up, down) = ui.input(|i| {
-            let plain = !(below && i.modifiers.alt);
-            (
-                plain && i.key_pressed(Key::ArrowUp),
-                plain && i.key_pressed(Key::ArrowDown),
-            )
-        });
+        use crate::keymap::{self, Command};
+        keymap::active(ui.ctx(), self.key_scopes(ui.ctx()));
+        if let Some(i) = self.selected.or(ringed) {
+            for command in [
+                Command::GraphCopyHash,
+                Command::GraphCopyMessage,
+                Command::GraphCopyBranch,
+            ] {
+                if keymap::take(ui.ctx(), command)
+                    && let Some(text) = self.graph_copy_text(command, i)
+                {
+                    ui.ctx().copy_text(text);
+                }
+            }
+        }
+        let up = keymap::take(ui.ctx(), Command::GraphPrevious);
+        let down = keymap::take(ui.ctx(), Command::GraphNext);
+        let left = keymap::take(ui.ctx(), Command::GraphLeft);
+        let right = keymap::take(ui.ctx(), Command::GraphRight);
+        if Settings::get(ui.ctx()).graph_lane_walk {
+            use crate::repo::graph_walk::Direction;
+            let direction = if down {
+                Some(Direction::Parent)
+            } else if up {
+                Some(Direction::Child)
+            } else if right {
+                Some(Direction::Merge)
+            } else if left {
+                Some(Direction::Tip)
+            } else {
+                None
+            };
+            if let Some(direction) = direction
+                && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
+            {
+                acts.push(Action::Select(next));
+                self.scroll_to = Some(next);
+            }
+            return;
+        }
         let current = self.selected.or(ringed).unwrap_or(0);
-        let next = if up {
+        let next = if self.graph_projection_displayed() && (up || down) {
+            self.saved_views.next(current, down)
+        } else if up {
             Some(current.saturating_sub(1))
         } else if down {
             Some((current + 1).min(self.commits.len().saturating_sub(1)))
@@ -454,7 +636,7 @@ impl RepoTab {
             return;
         }
         if let Some(stash) = self.stash_at(i).and_then(|s| self.stashes.get(s)) {
-            egui::Popup::context_menu(resp)
+            crate::menu_item::context(resp)
                 .style(crate::theme::menu_style)
                 .show(|ui| super::sidebar::stash_menu(ui, acts, stash, idle));
             return;
@@ -482,7 +664,7 @@ impl RepoTab {
         };
         let (base, base_label) = end(old)?;
         let (target, target_label) = if self.is_wip(new) {
-            (None, "working tree".to_owned())
+            (None, crate::i18n::text("repo-core-2651").to_owned())
         } else {
             let (hash, label) = end(new)?;
             (Some(hash), label)
@@ -492,6 +674,7 @@ impl RepoTab {
             base_label,
             target,
             target_label,
+            captions: [None, None],
             since_fork: false,
         })
     }
@@ -539,7 +722,7 @@ fn loading_row(ui: &mut Ui, t: &Tokens) {
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,
-        "Loading older commits…",
+        crate::i18n::text("repo-core-4142"),
         FontId::proportional(12.0),
         t.text_faint,
     );
@@ -547,10 +730,11 @@ fn loading_row(ui: &mut Ui, t: &Tokens) {
 
 /// Right-click menu of the changes row.
 fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
-            if MenuItem::new("Stage all changes")
+            if MenuItem::new(crate::i18n::text("repo-core-0055"))
+                .icon("check")
                 .enabled(idle)
                 .keys(Command::StageAll)
                 .show(ui)
@@ -562,7 +746,8 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                     refresh: Refresh::Status,
                 });
             }
-            if MenuItem::new("Stash changes…")
+            if MenuItem::new(crate::i18n::text("repo-core-0054"))
+                .icon("archive")
                 .enabled(idle)
                 .keys(Command::Stash)
                 .show(ui)
@@ -571,9 +756,11 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 acts.push(Action::Dialog(Dialog::stash()));
             }
             ui.separator();
-            if ui
-                .add_enabled(idle, egui::Button::new("Apply patch…"))
-                .on_hover_text(APPLY_PATCH_TIP)
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2630"))
+                .icon("file-diff")
+                .enabled(idle)
+                .show(ui)
+                .on_hover_text(crate::i18n::text(APPLY_PATCH_TIP))
                 .clicked()
             {
                 acts.push(Action::ApplyPatch);
@@ -582,8 +769,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
 }
 
 /// What "Apply patch…" does.
-const APPLY_PATCH_TIP: &str = "A patch from git format-patch becomes commits (git am), any other diff goes on the working \
-     tree (git apply)";
+const APPLY_PATCH_TIP: &str = "repo-core-4143";
 
 /// Menu entries comparing `branch` with `current`: what it would bring in (since they
 /// diverged, as a pull request shows it), and every difference.
@@ -595,20 +781,102 @@ pub(super) fn compare_items(
 ) {
     let name = branch.name;
     let current_ref = BranchRef::local(current);
-    if ui
-        .button(format!("Changes {name} adds to {current}"))
-        .on_hover_text("What it changed since the two diverged, as a pull request shows it")
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::message(
+        "repo-core-4144",
+        &[
+            ("name", name.to_string().into()),
+            ("current", current.to_string().into()),
+        ],
+    ))
+    .icon("command")
+    .show(ui)
+    .on_hover_text(crate::i18n::text("repo-core-3388"))
+    .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, true));
     }
-    if ui
-        .button(format!("Compare {current} with {name}"))
-        .on_hover_text("Every difference between the two")
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::message(
+        "repo-core-4145",
+        &[
+            ("current", current.to_string().into()),
+            ("name", name.to_string().into()),
+        ],
+    ))
+    .icon("file-diff")
+    .show(ui)
+    .on_hover_text(crate::i18n::text("repo-core-4146"))
+    .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, false));
     }
+}
+
+/// A collapsed run preserves only continuous lanes at its boundaries. Ended/reused lanes
+/// have separate caps; hidden internal merges are deliberately not invented as edges.
+fn connector_row(
+    ui: &mut Ui,
+    t: &Tokens,
+    cols: Cols,
+    lanes: Lanes,
+    count: usize,
+    top: &[Option<usize>; 24],
+    bottom: &[Option<usize>; 24],
+) -> Response {
+    let (rect, response) =
+        ui.allocate_exact_size(vec2(ui.available_width(), ROW_PITCH), Sense::click());
+    let painter = ui.painter_at(rect);
+    let mid = rect.center().y;
+    for col in 0..lanes.shown.min(24) {
+        let x = rect.left() + cols.refs + 6.0 + col as f32 * lanes.width + lanes.width / 2.0;
+        let stroke = egui::Stroke::new(1.3, t.lane(col).gamma_multiply(0.65));
+        let continuous = top[col].is_some() && top[col] == bottom[col];
+        for step in 0..6 {
+            let y = rect.top() + step as f32 * 5.0;
+            let upper = y < mid - 3.0;
+            let lower = y > mid + 1.0;
+            if continuous || (upper && top[col].is_some()) || (lower && bottom[col].is_some()) {
+                painter.line_segment(
+                    [
+                        egui::pos2(x, y),
+                        egui::pos2(x, (y + 3.0).min(rect.bottom())),
+                    ],
+                    stroke,
+                );
+            }
+        }
+        if !continuous {
+            if top[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid - 3.0),
+                        egui::pos2(x + 2.0, mid - 3.0),
+                    ],
+                    stroke,
+                );
+            }
+            if bottom[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid + 3.0),
+                        egui::pos2(x + 2.0, mid + 3.0),
+                    ],
+                    stroke,
+                );
+            }
+        }
+    }
+    painter.text(
+        egui::pos2(rect.left() + cols.refs + cols.graph + 6.0, mid),
+        Align2::LEFT_CENTER,
+        crate::i18n::message("repo-core-4147", &[("count", (count).into())]),
+        FontId::proportional(12.0),
+        if response.hovered() {
+            t.text
+        } else {
+            t.text_dim
+        },
+    );
+    response.on_hover_text(crate::i18n::text("repo-core-4148"))
 }
 
 #[cfg(test)]
@@ -630,6 +898,7 @@ mod tests {
             base_label: "main".into(),
             target: Some("head".into()),
             target_label: "feature".into(),
+            captions: [None, None],
             since_fork: true,
             data: None,
             request: 1,
@@ -827,6 +1096,120 @@ mod tests {
         frame(&mut tab, Vec::new());
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    #[test]
+    fn optional_graph_copy_commands_use_actual_selected_commit() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = Settings::default();
+        let commands = [
+            (Command::GraphCopyHash, Key::F8, "recorded-hash"),
+            (Command::GraphCopyMessage, Key::F9, "recorded message"),
+            (Command::GraphCopyBranch, Key::F10, "main"),
+        ];
+        for (command, key, _) in commands {
+            settings.key_bindings.insert(
+                command.id().into(),
+                vec![Stroke::new(key, egui::Modifiers::NONE)],
+            );
+        }
+        settings.put_for_test(&ctx);
+        let mut tab = RepoTab::new_deferred("/recorded/graph-copy".into(), &ctx);
+        tab.refs.local.push(git::Branch {
+            name: "main".into(),
+            target: "recorded-hash".into(),
+            is_head: true,
+            upstream: String::new(),
+            track: String::new(),
+        });
+        tab.commits = vec![std::sync::Arc::new(git::Commit {
+            hash: "recorded-hash".into(),
+            summary: "recorded message".into(),
+            refs: vec!["main".into()],
+            ..Default::default()
+        })];
+        tab.selected = Some(0);
+        for (_, key, expected) in commands {
+            let mut acts = Vec::new();
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::Key {
+                        key,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    ..Default::default()
+                },
+                |ui| tab.arrow_keys(ui, None, &mut acts),
+            );
+            assert!(acts.is_empty());
+            assert!(
+                out.platform_output
+                    .commands
+                    .iter()
+                    .any(|c| matches!(c, egui::OutputCommand::CopyText(t) if t == expected))
+            );
+            out.drop_without_applying_deltas();
+        }
+    }
+
+    #[test]
+    fn configured_graph_movement_reaches_actual_selection_adapter() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = Settings {
+            graph_lane_walk: false,
+            ..Default::default()
+        };
+        settings.key_bindings.insert(
+            Command::GraphNext.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        let mut tab = RepoTab::new_deferred("/recorded/graph-registry".into(), &ctx);
+        tab.commits = (0..3)
+            .map(|i| {
+                std::sync::Arc::new(git::Commit {
+                    hash: i.to_string(),
+                    ..Default::default()
+                })
+            })
+            .collect();
+        tab.selected = Some(0);
+        for (key, expected) in [(Key::F8, true), (Key::ArrowDown, false)] {
+            let mut acts = Vec::new();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| tab.arrow_keys(ui, None, &mut acts),
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(matches!(acts.as_slice(), [Action::Select(1)]), expected);
+        }
     }
 }
 

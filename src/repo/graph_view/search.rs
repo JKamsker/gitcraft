@@ -4,7 +4,7 @@
 use egui::{Key, Modifiers, Stroke, Ui};
 
 use super::suggest::{self, Listing};
-use crate::git::search_query::{DATE_FORMATS, Operator};
+use crate::git::search_query::{Operator, date_formats};
 use crate::icons;
 use crate::repo::{Action, RepoTab};
 use crate::theme::Tokens;
@@ -38,13 +38,26 @@ impl RepoTab {
                             .small(),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::ToggleSearch);
                         }
-                        if icons::small_button(ui, "chevron-down", "Next (Enter)").clicked() {
+                        if icons::small_button(
+                            ui,
+                            "chevron-down",
+                            crate::i18n::text("repo-core-2712"),
+                        )
+                        .clicked()
+                        {
                             acts.push(Action::SearchStep(1));
                         }
-                        if icons::small_button(ui, "chevron-up", "Previous (Shift+Enter)").clicked()
+                        if icons::small_button(
+                            ui,
+                            "chevron-up",
+                            crate::i18n::text("repo-core-2713"),
+                        )
+                        .clicked()
                         {
                             acts.push(Action::SearchStep(-1));
                         }
@@ -68,9 +81,9 @@ impl RepoTab {
         let out = egui::TextEdit::singleline(&mut self.search.query)
             .id(id)
             .hint_text(if code {
-                "Search code changes, or author:, path:…"
+                crate::i18n::text("repo-core-2715")
             } else {
-                "Search messages, authors, hashes, or author:, path:…"
+                crate::i18n::text("repo-core-2716")
             })
             .desired_width(ui.available_width() - 400.0)
             .margin(egui::Margin::symmetric(8, 4))
@@ -245,15 +258,14 @@ impl RepoTab {
         let code = self.search.code;
         for (label, on, tip) in [
             (
-                "Messages",
+                crate::i18n::text("repo-core-2718"),
                 false,
-                "Search commit messages, authors and hashes",
+                crate::i18n::text("repo-core-2719"),
             ),
             (
-                "Code",
+                crate::i18n::text("repo-core-2720"),
                 true,
-                "Search the commits that added or removed this text in a file \
-                 (git log -S)",
+                crate::i18n::text("repo-core-2721"),
             ),
         ] {
             if ui
@@ -271,13 +283,19 @@ impl RepoTab {
     fn search_summary(&self) -> String {
         let n = self.search.results.len();
         if self.search.running {
-            "searching…".to_owned()
+            crate::i18n::text("repo-core-2722").to_owned()
         } else if self.search.searched.is_empty() {
             String::new()
         } else if n == 0 {
-            "no results".to_owned()
+            crate::i18n::text("repo-core-2723").to_owned()
         } else {
-            format!("{} of {n}", self.search.current + 1)
+            crate::i18n::message(
+                "repo-core-2724",
+                &[
+                    ("current", format!("{}", self.search.current + 1).into()),
+                    ("n", (n).into()),
+                ],
+            )
         }
     }
 }
@@ -294,12 +312,13 @@ fn search_icon(ui: &mut Ui, t: &Tokens) {
 
 /// The field's help: every operator and what it finds.
 fn operators_help() -> String {
-    let mut help = String::from("Operators, combined with each other and with text:\n");
+    let mut help = String::from(crate::i18n::text("repo-core-2725"));
     for op in Operator::ALL {
         help.push_str(&format!("\n{}:  {}", op.name(), op.help()));
     }
-    help.push_str(&format!(
-        "\n\nQuote values with spaces: author:\"Jane Doe\".\nDates: {DATE_FORMATS}."
+    help.push_str(&crate::i18n::message(
+        "repo-core-2726",
+        &[("DATE-FORMATS", date_formats().into())],
     ));
     help
 }

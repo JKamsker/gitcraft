@@ -16,25 +16,23 @@ const LISTED: usize = 8;
 
 pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    let one = plan.staged == 1;
-    let files = if one {
-        "The staged file".to_owned()
+    let heading = if plan.keep_fixup {
+        crate::i18n::text("repo-core-1303")
     } else {
-        format!("The {} staged files", plan.staged)
+        crate::i18n::text("repo-core-1306")
     };
-    let (heading, lead) = match (plan.keep_fixup, one) {
-        (true, true) => (
-            "Commit staged changes as a fixup",
-            "is committed as a fixup of",
+    title(
+        ui,
+        heading,
+        &crate::i18n::message(
+            "repo-core-fold-staged",
+            &[
+                ("count", plan.staged.into()),
+                ("fixup", if plan.keep_fixup { "yes" } else { "no" }.into()),
+            ],
         ),
-        (true, false) => (
-            "Commit staged changes as a fixup",
-            "are committed as a fixup of",
-        ),
-        (false, true) => ("Fold staged changes into a commit", "goes into"),
-        (false, false) => ("Fold staged changes into a commit", "go into"),
-    };
-    title(ui, heading, &format!("{files} {lead} this commit:"), &t);
+        &t,
+    );
     commit_row(
         ui,
         &plan.target,
@@ -43,17 +41,16 @@ pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
     );
     // Before what changes with it, so that ticking it doesn't move it from under the pointer.
     ui.add_space(6.0);
-    ui.checkbox(&mut plan.keep_fixup, "Keep as fixup! commit for later")
-        .on_hover_text(
-            "Commit the staged changes as “fixup! <summary>” on top of the branch, and squash \
-             it later (git rebase -i --autosquash)",
-        );
+    ui.checkbox(&mut plan.keep_fixup, crate::i18n::text("repo-core-1310"))
+        .on_hover_text(crate::i18n::text("repo-core-1311"));
     ui.add_space(8.0);
     if plan.keep_fixup {
-        let line = format!(
-            "A commit “fixup! {}” goes on top of {}; nothing is rewritten. An interactive rebase \
-             with autosquash squashes it later.",
-            plan.target.summary, plan.branch
+        let line = crate::i18n::message(
+            "repo-core-1312",
+            &[
+                ("summary", plan.target.summary.to_string().into()),
+                ("branch", plan.branch.to_string().into()),
+            ],
         );
         ui.add(egui::Label::new(RichText::new(line).color(t.text_dim)).wrap());
     } else {
@@ -66,20 +63,17 @@ pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
     ui.add_space(6.0);
     ui.add(
         egui::Label::new(
-            RichText::new(
-                "The commit keeps its message. Unstaged and untracked changes stay as they are. \
-                 Ctrl+Z undoes it.",
-            )
-            .color(t.text_faint)
-            .small(),
+            RichText::new(crate::i18n::text("repo-core-1313"))
+                .color(t.text_faint)
+                .small(),
         )
         .wrap(),
     );
     ui.add_space(12.0);
     let button = if plan.keep_fixup {
-        "Commit as fixup"
+        crate::i18n::text("repo-core-1314")
     } else {
-        "Fold"
+        crate::i18n::text("repo-core-1315")
     };
     // Rewriting what a remote has takes a click, not a stray Enter.
     let enter = enter && !plan.rewrites_pushed();
@@ -92,11 +86,17 @@ pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
 fn rewritten(ui: &mut Ui, plan: &Plan, t: &Tokens) {
     let n = plan.after.len();
     let line = match n {
-        0 => "It is the latest commit: no other commit is rewritten.".to_owned(),
-        1 => format!("The commit after it on {} is rewritten too:", plan.branch),
-        n => format!(
-            "The {n} commits after it on {} are rewritten too:",
-            plan.branch
+        0 => crate::i18n::text("repo-core-1316").to_owned(),
+        1 => crate::i18n::message(
+            "repo-core-1317",
+            &[("branch", plan.branch.to_string().into())],
+        ),
+        n => crate::i18n::message(
+            "repo-core-1318",
+            &[
+                ("n", (n).into()),
+                ("branch", plan.branch.to_string().into()),
+            ],
         ),
     };
     ui.label(RichText::new(line).color(t.text_dim));
@@ -105,9 +105,12 @@ fn rewritten(ui: &mut Ui, plan: &Plan, t: &Tokens) {
     }
     if n > LISTED {
         ui.label(
-            RichText::new(format!("… and {} older ones", n - LISTED))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "repo-core-1319",
+                &[("LISTED", format!("{}", n - LISTED).into())],
+            ))
+            .color(t.text_faint)
+            .small(),
         );
     }
 }
@@ -117,16 +120,13 @@ fn pushed_warning(plan: &Plan) -> String {
     let total = plan.after.len() + 1;
     let n = plan.pushed.len();
     let what = if total == 1 {
-        "This commit is already pushed".to_owned()
+        crate::i18n::text("repo-core-1320").to_owned()
     } else if n == total {
-        format!("All {total} commits are already pushed")
+        crate::i18n::message("repo-core-1321", &[("total", (total).into())])
     } else {
-        format!(
-            "{n} of these commits {} already pushed",
-            if n == 1 { "is" } else { "are" }
-        )
+        crate::i18n::message("repo-core-1322", &[("n", n.into())])
     };
-    format!("{what}: folding rewrites shared history, and the branch will need a force push.")
+    crate::i18n::message("repo-core-1325", &[("what", what.to_string().into())])
 }
 
 /// A commit's short hash and summary, marked when a remote already has it.
@@ -138,8 +138,12 @@ fn commit_row(ui: &mut Ui, commit: &RebaseCommit, pushed: bool, t: &Tokens) {
                 .color(t.text_faint),
         );
         if pushed {
-            ui.label(RichText::new("pushed").color(t.warning).small())
-                .on_hover_text("A remote branch already has this commit");
+            ui.label(
+                RichText::new(crate::i18n::text("repo-core-1326"))
+                    .color(t.warning)
+                    .small(),
+            )
+            .on_hover_text(crate::i18n::text("repo-core-1327"));
         }
         ui.add(egui::Label::new(RichText::new(&commit.summary).color(t.text)).truncate());
     });

@@ -45,6 +45,24 @@ impl RepoTab {
 }
 
 impl ConflictEditor {
+    pub(crate) fn standalone_ui(&mut self, ui: &mut Ui, editable: bool) {
+        let t = Tokens::get(ui.ctx());
+        ui.label(crate::i18n::message(
+            "repo-core-0705",
+            &[("unresolved", format!("{}", self.unresolved()).into())],
+        ));
+        self.result_panel(ui, &t, editable, (None, false), &mut Vec::new());
+        self.conflict_list(
+            ui,
+            &t,
+            (
+                crate::i18n::text("repo-core-0706"),
+                crate::i18n::text("repo-core-0707"),
+            ),
+            editable,
+        );
+    }
+
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
     /// `smart`: for a Unity YAML file, whether Unity's Smart Merge can solve it.
     fn header(
@@ -66,37 +84,41 @@ impl ConflictEditor {
                     ui.label(RichText::new(&self.path).font(theme::medium(13.0)));
                     widgets::chip(
                         ui,
-                        &format!(
-                            "{} of {total} resolved",
-                            total.saturating_sub(left).min(total)
+                        &crate::i18n::message(
+                            "repo-core-0709",
+                            &[
+                                (
+                                    "total",
+                                    format!("{}", total.saturating_sub(left).min(total)).into(),
+                                ),
+                                ("total2", (total).into()),
+                            ],
                         ),
                         if left == 0 { t.success } else { t.warning },
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
                         if ui
-                            .button("Send to agent")
-                            .on_hover_text(
-                                "Types the conflicts, each with its three sides, into the agent's \
-                                 terminal. The agent then edits the file itself: close this editor \
-                                 then, and don't save over its work",
-                            )
+                            .button(crate::i18n::text("repo-core-0712"))
+                            .on_hover_text(crate::i18n::text("repo-core-0713"))
                             .clicked()
                         {
                             acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
                                 self.for_agent(),
-                                "the conflicts",
+                                crate::i18n::text("repo-core-0714"),
                             )));
                         }
                         if widgets::primary_button(
                             ui,
-                            "Save and mark resolved",
+                            crate::i18n::text("repo-core-0715"),
                             idle && left == 0,
                             0.0,
                         )
-                        .on_disabled_hover_text("Resolve every conflict first")
+                        .on_disabled_hover_text(crate::i18n::text("repo-core-0716"))
                         .clicked()
                         {
                             acts.push(Action::SaveConflict);
@@ -118,15 +140,12 @@ impl ConflictEditor {
             return;
         }
         let r = ui
-            .add_enabled(idle, egui::Button::new("Solve with UnityYAMLMerge"))
-            .on_hover_text(
-                "Let Unity's Smart Merge merge this Unity file by its structure. Nothing is \
-                 saved before you check the result.",
-            )
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0717")))
+            .on_hover_text(crate::i18n::text("repo-core-0718"))
             .on_disabled_hover_text(if found {
-                "Wait for the running operation"
+                crate::i18n::text("repo-core-0719")
             } else {
-                "UnityYAMLMerge wasn't found: choose it in Unity set-up… (Ctrl+P)"
+                crate::i18n::text("repo-core-0720")
             });
         if r.clicked() {
             acts.push(Action::Unity(crate::repo::unity::UnityAct::SolveConflict));
@@ -150,22 +169,22 @@ impl ConflictEditor {
             if self.solving {
                 ui.add(crate::spinner::Spinner::new());
             } else if ui
-                .add_enabled(idle, egui::Button::new("Solve with Mergiraf"))
-                .on_hover_text(
-                    "Let Mergiraf solve the conflicts it can from the syntax \
-                     of the code. Nothing is saved before you check the result.",
-                )
+                .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0723")))
+                .on_hover_text(crate::i18n::text("repo-core-0724"))
                 .clicked()
             {
                 acts.push(Action::SolveWithMergiraf);
             }
         }
         for (label, side, tip) in [
-            ("Use theirs", theirs, "Take their version of the whole file"),
-            ("Use mine", mine, "Keep your version of the whole file"),
+            ("Use theirs", theirs, crate::i18n::text("repo-core-0726")),
+            ("Use mine", mine, crate::i18n::text("repo-core-0728")),
         ] {
             if ui
-                .add_enabled(idle, egui::Button::new(label))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::repo::messages::display_operation(label)),
+                )
                 .on_hover_text(tip)
                 .clicked()
             {
@@ -181,12 +200,8 @@ impl ConflictEditor {
             }
         }
         if ui
-            .add_enabled(idle, egui::Button::new("Resolve in merge tool"))
-            .on_hover_text(
-                "Resolve this file in the merge tool of Settings → Git → External tools \
-                 instead; it is marked resolved when the tool reports success. Choices made \
-                 here and not saved are discarded.",
-            )
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0730")))
+            .on_hover_text(crate::i18n::text("repo-core-0731"))
             .clicked()
         {
             acts.push(Action::ResolveInMergeTool(self.path.clone()));
@@ -218,27 +233,28 @@ impl ConflictEditor {
                 }
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("RESULT")
+                        RichText::new(crate::i18n::text("repo-core-0733"))
                             .font(theme::semibold(10.5))
                             .color(t.text_faint),
                     );
                     if self.manual {
                         let (label, tip) = if self.reused.is_some() {
                             (
-                                "the whole file, as it is",
-                                "It can't be matched conflict by conflict: \"Back to choices\" \
-                                 drops it and brings the conflict markers back",
+                                crate::i18n::text("repo-core-0734"),
+                                crate::i18n::text("repo-core-0735"),
                             )
                         } else {
                             (
-                                "edited by hand",
-                                "Choices no longer change the result: \"Back to choices\" \
-                                 applies them, and drops the edits",
+                                crate::i18n::text("repo-core-0736"),
+                                crate::i18n::text("repo-core-0737"),
                             )
                         };
                         ui.label(RichText::new(label).color(t.warning).small())
                             .on_hover_text(tip);
-                        if ui.small_button("Back to choices").clicked() {
+                        if ui
+                            .small_button(crate::i18n::text("repo-core-0738"))
+                            .clicked()
+                        {
                             self.manual = false;
                             self.result = self.rendered();
                         }
@@ -293,8 +309,14 @@ impl ConflictEditor {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(
-                                    RichText::new(format!("Conflict {} of {total}", k + 1))
-                                        .font(theme::semibold(12.0)),
+                                    RichText::new(crate::i18n::message(
+                                        "repo-core-0741",
+                                        &[
+                                            ("k", format!("{}", k + 1).into()),
+                                            ("total", (total).into()),
+                                        ],
+                                    ))
+                                    .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
                                 let recorded = self.recorded.get(k).is_some_and(Option::is_some);
@@ -381,12 +403,12 @@ fn choice_buttons(
     recorded: bool,
 ) -> Option<Choice> {
     let mut clicked = None;
-    let reused = recorded.then_some((Choice::Recorded, "Reused"));
+    let reused = recorded.then_some((Choice::Recorded, crate::i18n::text("repo-core-0742")));
     for (choice, label) in reused.into_iter().chain([
         (Choice::Ours, ours_name),
         (Choice::Theirs, theirs_name),
-        (Choice::OursThenTheirs, "Both (ours first)"),
-        (Choice::TheirsThenOurs, "Both (theirs first)"),
+        (Choice::OursThenTheirs, crate::i18n::text("repo-core-0743")),
+        (Choice::TheirsThenOurs, crate::i18n::text("repo-core-0744")),
     ]) {
         let on = chosen == Some(choice);
         let text = if on {
@@ -397,9 +419,7 @@ fn choice_buttons(
         let b = egui::Button::new(text).fill(if on { t.accent } else { t.field });
         let response = ui.add(b);
         let response = if choice == Choice::Recorded {
-            response.on_hover_text(
-                "The text git put in place of this conflict, as you resolved it before",
-            )
+            response.on_hover_text(crate::i18n::text("repo-core-0745"))
         } else {
             response
         };
@@ -429,7 +449,7 @@ fn side_box(
             ui.set_width(ui.available_width());
             ui.label(RichText::new(name).color(t.text_faint).small());
             let body = if text.is_empty() {
-                "(nothing)"
+                crate::i18n::text("repo-core-0697")
             } else {
                 text.trim_end_matches(['\r', '\n'])
             };

@@ -46,6 +46,7 @@ pub(super) enum RecentStatus {
 
 impl RecentStatus {
     /// The words the start page shows for it, after the name: the branch, or what is wrong.
+    #[cfg(test)]
     pub(super) fn label(&self) -> String {
         match self {
             RecentStatus::Repo { head, .. } => match head {
@@ -57,6 +58,27 @@ impl RecentStatus {
             RecentStatus::NotRepo => "not a repository any more".to_owned(),
             RecentStatus::TimedOut => "didn't answer in time".to_owned(),
             RecentStatus::Failed(_) => "couldn't read it".to_owned(),
+        }
+    }
+
+    /// Current-locale presentation from typed state; label() remains raw and stable.
+    pub(super) fn display_label(&self) -> String {
+        match self {
+            Self::Repo { head, .. } => match head {
+                Head::Branch(branch) => branch.clone(),
+                Head::Unborn(branch) => crate::i18n::message(
+                    "interaction-recent-status-unborn",
+                    &[("branch", branch.as_str().into())],
+                ),
+                Head::Detached(hash) => crate::i18n::message(
+                    "interaction-recent-status-detached",
+                    &[("hash", hash.as_str().into())],
+                ),
+            },
+            Self::NotFound => crate::i18n::text("interaction-recent-status-missing").to_owned(),
+            Self::NotRepo => crate::i18n::text("interaction-recent-status-not-repo").to_owned(),
+            Self::TimedOut => crate::i18n::text("interaction-recent-status-timeout").to_owned(),
+            Self::Failed(_) => crate::i18n::text("interaction-recent-status-failed").to_owned(),
         }
     }
 
@@ -220,7 +242,7 @@ impl RecentStatuses {
         let (tx, rx) = channel();
         for path in &paths {
             let (tx, ctx, path) = (tx.clone(), ctx.clone(), path.clone());
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let status = read(&path);
                 let _ = tx.send((path, status));
                 ctx.request_repaint();

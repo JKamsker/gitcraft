@@ -21,28 +21,26 @@ pub struct Known {
 enum Has {
     /// As its hosting remote (`origin`, else the first): its pull requests are the link's.
     Hosting,
-    /// As another remote (a fork's `upstream`): its commits and files are there, its pull
-    /// requests are origin's.
+    /// As another remote (a fork's `upstream`).
     Other,
 }
 
 /// Where `link` opens: in the first of `clones` whose hosting remote is its repository, else
-/// in one with it as another remote (not for a pull request, which would be origin's), or,
-/// when none has it, an offer to clone it.
+/// in one with it as another remote, or an offer to clone it when none has it.
 pub(crate) fn resolve_link(link: &ForgeLink, clones: &[Known]) -> Result<Resolved, String> {
-    let mut found: Option<(Has, &Known)> = None;
+    let mut found: Option<(Has, &Known, String)> = None;
     for clone in clones {
-        let Some(has) = has_repo(clone, link) else {
+        let Some((has, remote)) = has_repo(clone, link) else {
             continue;
         };
-        if found.is_none_or(|(best, _)| has < best) {
-            found = Some((has, clone));
+        if found.as_ref().is_none_or(|(best, _, _)| has < *best) {
+            found = Some((has, clone, remote));
         }
         if has == Has::Hosting {
             break;
         }
     }
-    let Some((has, clone)) = found else {
+    let Some((_, clone, remote)) = found else {
         return Ok(Resolved {
             root: PathBuf::new(),
             then: Then::Clone(link.clone_url()),
@@ -51,16 +49,10 @@ pub(crate) fn resolve_link(link: &ForgeLink, clones: &[Known]) -> Result<Resolve
     let root = &clone.path;
     let then = match &link.target {
         Target::Repo => Then::Nothing,
-        Target::PullRequest(n) if has == Has::Other => {
-            return Err(format!(
-                "{} has {} only as another remote than origin, whose pull requests it shows: \
-                 open #{n} on the forge, or clone {} itself",
-                root.display(),
-                link.repo,
-                link.repo
-            ));
-        }
-        Target::PullRequest(n) => Then::PullRequest(*n),
+        Target::PullRequest(number) => Then::PullRequest {
+            number: *number,
+            remote,
+        },
         Target::Commit(sha) => Then::Commit(git::resolve(root, sha).map_err(|_| {
             format!(
                 "Commit {sha} isn't in {}: fetch, then open the link again",
@@ -77,7 +69,7 @@ pub(crate) fn resolve_link(link: &ForgeLink, clones: &[Known]) -> Result<Resolve
 
 /// Whether, and how, `clone` has `link`'s repository among its remotes (a clone that can't be
 /// read hasn't).
-fn has_repo(clone: &Known, link: &ForgeLink) -> Option<Has> {
+fn has_repo(clone: &Known, link: &ForgeLink) -> Option<(Has, String)> {
     let read;
     let remotes = match &clone.remotes {
         Some(remotes) => remotes,
@@ -91,12 +83,12 @@ fn has_repo(clone: &Known, link: &ForgeLink) -> Option<Has> {
         .find(|r| r.name == "origin")
         .or_else(|| remotes.first())?;
     if link.is_remote(&hosting.url) {
-        Some(Has::Hosting)
+        Some((Has::Hosting, hosting.name.clone()))
     } else {
         remotes
             .iter()
-            .any(|r| link.is_remote(&r.url))
-            .then_some(Has::Other)
+            .find(|r| link.is_remote(&r.url))
+            .map(|r| (Has::Other, r.name.clone()))
     }
 }
 
@@ -228,14 +220,24 @@ mod tests {
         // The clone whose origin is o/r, not the fork listed before it.
         let pr = pr?;
         assert_eq!(pr.root, mine);
-        assert!(
-            fork_pr
-                .err()
-                .is_some_and(|e| e.contains("only as another remote than origin"))
+        let fork_pr = fork_pr?;
+        assert_eq!(fork_pr.root, fork);
+        assert_eq!(
+            fork_pr.then,
+            Then::PullRequest {
+                number: 3,
+                remote: "upstream".into(),
+            }
         );
-        // A commit, though, is the same in the fork: opened there.
+        // A commit is also opened in the fork.
         assert_eq!(fork_commit?.then, Then::Commit(fork_head));
-        assert_eq!(pr.then, Then::PullRequest(12));
+        assert_eq!(
+            pr.then,
+            Then::PullRequest {
+                number: 12,
+                remote: "origin".into()
+            }
+        );
         assert_eq!(commit?.then, Then::Commit(head.clone()));
         assert_eq!(
             file?.then,

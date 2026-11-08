@@ -34,8 +34,9 @@ impl Matcher {
             return Ok(None);
         }
         if query.text.chars().count() > MAX_PATTERN {
-            return Err(format!(
-                "The text to find is too long (more than {MAX_PATTERN} characters)"
+            return Err(crate::i18n::message(
+                "repo-core-2513",
+                &[("MAX-PATTERN", format!("{}", MAX_PATTERN).into())],
             ));
         }
         let body = if query.regex {
@@ -61,7 +62,11 @@ impl Matcher {
     /// Where the query is in `line`, as ranges of characters (not bytes), in order, none
     /// overlapping: after a match the search goes on where it ended, as editors do. Empty
     /// matches (`^`, `x*`) are left out, there would be nothing to show.
+    #[cfg(test)]
     pub(crate) fn find(&self, line: &str) -> Vec<Range<usize>> {
+        self.find_limited(line, usize::MAX)
+    }
+    pub(crate) fn find_limited(&self, line: &str, limit: usize) -> Vec<Range<usize>> {
         let mut out = Vec::new();
         // Bytes to characters, counted on from the previous match rather than from the start.
         let (mut byte, mut chars) = (0usize, 0usize);
@@ -77,6 +82,9 @@ impl Matcher {
             let start = to_char(m.start());
             let end = to_char(m.end());
             out.push(start..end);
+            if out.len() >= limit {
+                break;
+            }
         }
         out
     }
@@ -85,9 +93,7 @@ impl Matcher {
 /// A one-line message for a regular expression that doesn't compile.
 fn regex_error(e: &regex::Error) -> String {
     match e {
-        regex::Error::CompiledTooBig(_) => {
-            "The regular expression is too big; try a simpler one".to_owned()
-        }
+        regex::Error::CompiledTooBig(_) => crate::i18n::text("repo-core-4102").to_owned(),
         // The syntax error's own text ends with a line saying what is wrong, below the pattern
         // and a caret.
         _ => {
@@ -97,8 +103,8 @@ fn regex_error(e: &regex::Error) -> String {
                 .rev()
                 .find_map(|l| l.trim().strip_prefix("error:"))
                 .map(str::trim)
-                .unwrap_or("it can't be read");
-            format!("Not a valid regular expression: {why}")
+                .unwrap_or(crate::i18n::text("repo-core-4103"));
+            crate::i18n::message("repo-core-4104", &[("why", why.to_string().into())])
         }
     }
 }

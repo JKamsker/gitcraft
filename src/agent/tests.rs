@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use super::launch::Launch;
-use super::recipe::{EnvVar, Recipe};
+#[cfg(unix)]
+use super::recipe::EnvVar;
+use super::recipe::Recipe;
 use super::tasks::{self, AgentTask};
 use crate::git;
 
@@ -63,6 +65,7 @@ impl Fixture {
         Ok((out.status.code().unwrap_or(-1), text))
     }
 
+    #[cfg(unix)]
     fn launch(&self, recipe: Recipe, agent: Option<&str>) -> Launch {
         Launch {
             label: "setup".to_owned(),

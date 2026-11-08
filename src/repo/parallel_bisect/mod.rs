@@ -43,6 +43,7 @@ pub(crate) enum ParallelAct {
 #[derive(Default)]
 pub(super) struct Parallel {
     handle: Option<Handle>,
+    paint: PresentationState,
     view: Option<View>,
     /// Answers by tree, for as long as the tab is open.
     cache: TreeCache,
@@ -54,7 +55,7 @@ pub(super) struct Parallel {
 
 /// What the banner and the graph show of a parallel bisect.
 pub(super) struct View {
-    machine: String,
+    machine: Machine,
     parallel: usize,
     /// What it is doing, before the rounds (or after them, while clearing up).
     step: Option<String>,
@@ -86,9 +87,16 @@ pub(super) struct Tested {
 }
 
 impl View {
+    fn machine_label(&self) -> String {
+        match &self.machine {
+            Machine::Here => crate::i18n::text("repo-workflows-parallel-machine-here").to_owned(),
+            Machine::There(_) => self.machine.label(),
+        }
+    }
+
     fn new(setup: &pb::Setup) -> Self {
         Self {
-            machine: setup.machine.label(),
+            machine: setup.machine.clone(),
             parallel: setup.parallel,
             step: None,
             round: 0,
@@ -157,6 +165,8 @@ impl View {
             Event::Dropped(hash) => {
                 self.testing.remove(&hash);
             }
+            Event::DoneWithPresentation(outcome, _) => self.take(Event::Done(outcome)),
+            Event::WarningWithPresentation(warning, _) => self.take(Event::Warning(warning)),
             Event::Warning(warning) => self.warning = Some(warning),
             Event::Done(outcome) => {
                 self.step = None;
@@ -227,12 +237,16 @@ impl RepoTab {
                     && view.running()
                 {
                     view.cancelling = true;
-                    view.step = Some("Stopping the tests…".to_owned());
+                    view.step = Some(
+                        crate::i18n::text("repo-workflows-parallel_bisect-parallel-act-b0e5ccdc")
+                            .to_owned(),
+                    );
                 }
             }
             ParallelAct::Close => {
                 if !self.parallel.running() {
                     self.parallel.view = None;
+                    self.parallel.paint = PresentationState::default();
                     self.parallel.handle = None;
                 }
             }
@@ -242,17 +256,18 @@ impl RepoTab {
 
     fn start_parallel(&mut self, setup: pb::Setup, ctx: &egui::Context) {
         if self.parallel.running() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "A parallel bisect is already running in this tab".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         self.status = None;
+        self.parallel.paint = PresentationState::default();
         self.parallel.view = Some(View::new(&setup));
         self.parallel.last = Some(setup.clone());
         let repaint = ctx.clone();
-        let handle = pb::start(setup, self.parallel.cache.clone(), move || {
+        let handle = pb::start_with_presentation(setup, self.parallel.cache.clone(), move || {
             repaint.request_repaint();
         });
         self.parallel.handle = Some(handle);
@@ -269,6 +284,7 @@ impl RepoTab {
         };
         let mut ended = None;
         for event in events {
+            let event = self.parallel.paint.take(event);
             if let Event::Done(outcome) = &event {
                 ended = Some(outcome.clone());
             }
@@ -279,12 +295,12 @@ impl RepoTab {
         };
         self.parallel.handle = None;
         let long = view.started.elapsed() > LONG_RUN;
-        let (message, failed) = outcome_message(&outcome, &view.machine);
+        let notice = completion_notice(&outcome, &view.machine, &self.parallel.paint);
         if long {
             self.finished
-                .push((format!("{} · {message}", self.name), failed));
+                .push(notice.clone().for_repository(&self.name));
         }
-        self.status = Some((message, failed));
+        self.status = Some(notice);
         if let Outcome::FirstBad(hash) = &outcome {
             self.goto(&hash.clone(), ctx);
         }
@@ -306,7 +322,10 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation going on to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let parents = self
@@ -332,10 +351,10 @@ impl RepoTab {
             |tab, result, ctx| {
                 tab.busy_op = None;
                 tab.op_started = None;
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(_) => ("Marked in the bisect".to_owned(), false),
                     Err(e) => (format!("Mark in the bisect failed: {e}"), true),
-                });
+                }));
                 tab.reload(ctx);
             },
         );
@@ -368,8 +387,17 @@ impl RepoTab {
     }
 }
 
+/// Captured before status/finished erase the completed outcome's source context.
+fn completion_notice(
+    outcome: &Outcome,
+    machine: &Machine,
+    paint: &PresentationState,
+) -> super::Notice {
+    super::Notice::parallel(outcome, machine, paint.failed.clone())
+}
+
 /// How a parallel bisect ended, for the status line: the message, and whether it failed.
-fn outcome_message(outcome: &Outcome, machine: &str) -> (String, bool) {
+pub(super) fn outcome_message(outcome: &Outcome, machine: &str) -> (String, bool) {
     match outcome {
         Outcome::FirstBad(hash) => (
             format!("Parallel bisect: {} is the first bad commit", short(hash)),
@@ -424,4 +452,261 @@ pub(super) fn machines(repo: &std::path::Path) -> Vec<Machine> {
         add(Machine::There(crate::remote::Host::Ssh(host)));
     }
     list
+}
+
+#[derive(Default)]
+struct PresentationState {
+    failed: Option<pb::presentation::Presentation>,
+    warning: Option<pb::presentation::CleanupWarning>,
+}
+impl PresentationState {
+    fn take(&mut self, event: Event) -> Event {
+        match event {
+            Event::DoneWithPresentation(outcome, presentation) => {
+                self.failed = match &outcome {
+                    Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
+                    _ => None,
+                };
+                Event::Done(outcome)
+            }
+            Event::WarningWithPresentation(raw, presentation) => {
+                self.warning = Some(presentation);
+                Event::Warning(raw)
+            }
+            Event::Done(outcome) => {
+                self.failed = None;
+                Event::Done(outcome)
+            }
+            Event::Warning(raw) => {
+                self.warning = None;
+                Event::Warning(raw)
+            }
+            other => other,
+        }
+    }
+    fn error(&self, raw: &str) -> String {
+        pb::presentation::error(raw, self.failed.as_ref())
+    }
+    fn warning(&self, raw: &str) -> String {
+        self.warning
+            .as_ref()
+            .map_or_else(|| raw.into(), |p| p.render(raw))
+    }
+}
+
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    #[test]
+    fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_state()
+    -> Result<(), String> {
+        let primary = "provider; transfer cleanup: provider detail; lease release: inner";
+        let cleanup =
+            "cleanup); recovery evidence was retained. (repeated); transfer cleanup: $HOME {raw}";
+        let mut receipt = None;
+        let raw = pb::supplied_transfer(primary, Some(cleanup), &mut receipt)
+            .err()
+            .ok_or("transfer")?;
+        let mut state = PresentationState::default();
+        assert!(
+            matches!(state.take(pb::done_with_presentation(Outcome::Failed(raw.clone()), receipt.clone())), Event::Done(Outcome::Failed(ref value)) if value == &raw)
+        );
+        // Foreign generic caches retain their raw identity. Their typed final-paint
+        // integration remains a root-owned seam; this test exercises banner paint.
+        let cached_status = outcome_message(&Outcome::Failed(raw.clone()), "opaque machine");
+        let mut paints = Vec::new();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            assert_eq!(
+                outcome_message(&Outcome::Failed(raw.clone()), "opaque machine"),
+                cached_status
+            );
+            let painted = state.error(&raw);
+            assert!(painted.contains(primary) && painted.contains(cleanup));
+            if locale == "de" {
+                assert!(painted.contains("Bereinigung der Übertragung"));
+            }
+            let (status, failed) =
+                outcome_message(&Outcome::Failed(painted.clone()), "opaque machine");
+            assert!(failed && status.contains(&painted));
+            paints.push(painted);
+        }
+        assert_eq!(paints[0], paints[2]);
+        assert_ne!(paints[0], paints[1]);
+        state.take(pb::done_with_presentation(
+            Outcome::Failed("unrelated".into()),
+            receipt.clone(),
+        ));
+        assert!(state.failed.is_none());
+        state.take(pb::done_with_presentation(
+            Outcome::Cancelled,
+            receipt.clone(),
+        ));
+        assert!(state.failed.is_none());
+        for unknown in [
+            "provider text; workspace cleanup: provider detail",
+            "provider; owned pack-hash.keep retained",
+        ] {
+            let result = pb::supplied_transfer(unknown, None, &mut receipt);
+            let raw = result.err().ok_or("forwarded")?;
+            assert!(receipt.is_none());
+            state.take(pb::done_with_presentation(
+                Outcome::Failed(raw.clone()),
+                receipt.clone(),
+            ));
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert_eq!(state.error(&raw), unknown);
+            }
+        }
+        let lease = pb::close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
+            .err()
+            .ok_or("lease")?;
+        let Event::Warning(raw_warning) = state.take(pb::cleanup_warning(
+            "opaque host; )".into(),
+            lease.clone(),
+            receipt.clone(),
+            true,
+        )) else {
+            return Err("warning".into());
+        };
+        let mut paints = Vec::new();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            let painted = state.warning(&raw_warning);
+            assert!(
+                painted.contains(primary)
+                    && painted.contains(cleanup)
+                    && painted.contains("opaque host; )")
+            );
+            if locale == "de" {
+                assert!(
+                    painted.contains("Freigabe der Besitzreservierung")
+                        && painted.contains("Wiederherstellungsnachweise")
+                );
+            }
+            paints.push(painted);
+        }
+        assert_eq!(paints[0], paints[2]);
+        assert_ne!(paints[0], paints[1]);
+        assert_eq!(state.warning("stale warning"), "stale warning");
+        state.take(Event::Warning("unrelated".into()));
+        assert!(state.warning.is_none());
+        state.take(Event::Done(Outcome::Cancelled));
+        assert!(state.failed.is_none());
+        let Event::Warning(raw_warning) = state.take(pb::cleanup_warning(
+            "opaque host".into(),
+            "provider; lease release: unknown".into(),
+            None,
+            true,
+        )) else {
+            return Err("warning".into());
+        };
+        crate::i18n::set_language("de");
+        assert!(
+            state
+                .warning(&raw_warning)
+                .contains("provider; lease release: unknown")
+        );
+        crate::i18n::set_language("en-US");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod notice_completion_tests {
+    use super::*;
+
+    #[test]
+    fn completed_failure_receipt_survives_status_queue_and_later_event() -> Result<(), String> {
+        let primary = "provider; transfer cleanup: owned-looking detail";
+        let cleanup = "native cleanup; lease release: opaque $(keep)";
+        let mut receipt = None;
+        let raw = pb::supplied_transfer(primary, Some(cleanup), &mut receipt)
+            .err()
+            .ok_or("expected supplied failure")?;
+        let mut paint = PresentationState::default();
+        let Event::Done(outcome) = paint.take(pb::done_with_presentation(
+            Outcome::Failed(raw.clone()),
+            receipt,
+        )) else {
+            return Err("missing supplied completion".into());
+        };
+        let status = completion_notice(&outcome, &Machine::Here, &paint);
+        let original = outcome_message(&outcome, &Machine::Here.label());
+        assert_eq!(status.raw(), &original);
+        let name = "repo · : $(opaque)";
+        let finished = status.clone().for_repository(name);
+        let queued_raw = (format!("{name} · {}", original.0), original.1);
+        assert_eq!(finished.raw(), &queued_raw);
+        paint.take(Event::Done(Outcome::Cancelled));
+        assert!(paint.failed.is_none());
+        let mut renders = Vec::new();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            let displayed = status.projected().ok_or("lost status receipt")?;
+            let queued = finished.projected().ok_or("lost queued receipt")?;
+            assert!(displayed.contains(primary) && displayed.contains(cleanup));
+            assert_eq!(queued, format!("{name} · {displayed}"));
+            if locale == "de" {
+                assert!(displayed.starts_with("Parallele Bisektion fehlgeschlagen:"));
+                assert!(displayed.contains("Bereinigung der Übertragung"));
+            }
+            assert_eq!(status.raw(), &original);
+            assert_eq!(finished.raw(), &queued_raw);
+            renders.push(displayed);
+        }
+        assert_eq!(renders[0], renders[2]);
+        assert_ne!(renders[0], renders[1]);
+        let plain = crate::repo::Notice::plain(original);
+        assert_eq!(plain.projected(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn all_outcomes_preserve_raw_flags_and_only_source_fields_are_displayed() -> Result<(), String>
+    {
+        let hash = "a".repeat(40);
+        let sentinel = "test output must never be retained in a completion notice";
+        let cases = [
+            Outcome::FirstBad(hash.clone()),
+            Outcome::OneOf(vec![hash.clone(); 1234]),
+            Outcome::GoodEndFails {
+                hash: hash.clone(),
+                output: sentinel.into(),
+            },
+            Outcome::BadEndPasses {
+                hash,
+                output: sentinel.into(),
+            },
+            Outcome::Cancelled,
+            Outcome::Failed(
+                "opaque child; transfer cleanup: unowned sentence\nsecond opaque line".into(),
+            ),
+        ];
+        for outcome in cases {
+            let source = completion_notice(&outcome, &Machine::Here, &PresentationState::default());
+            let raw = outcome_message(&outcome, &Machine::Here.label());
+            assert_eq!(source.raw(), &raw);
+            assert!(!format!("{source:?}").contains(sentinel));
+            let mut renders = Vec::new();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let displayed = source.projected().ok_or("missing supplied projection")?;
+                if matches!(outcome, Outcome::Failed(_)) {
+                    assert!(displayed.contains("opaque child; transfer cleanup: unowned sentence"));
+                    assert!(!displayed.contains("second opaque line"));
+                }
+                if matches!(outcome, Outcome::OneOf(_)) {
+                    assert!(displayed.contains(if locale == "de" { "1.234" } else { "1,234" }));
+                }
+                assert_eq!(source.raw(), &raw);
+                renders.push(displayed);
+            }
+            assert_eq!(renders[0], renders[2]);
+            assert_ne!(renders[0], renders[1]);
+        }
+        Ok(())
+    }
 }

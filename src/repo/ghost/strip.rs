@@ -45,14 +45,22 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     icons::inline(ui, "eye", 14.0, t.accent);
                     ui.label(
-                        RichText::new(format!("Preview: {title}"))
-                            .font(theme::semibold(12.5))
-                            .color(t.text),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-ghost-ghost-strip-c4a8b8f8",
+                            &[(
+                                "title",
+                                crate::repo::messages::display_operation(title).into(),
+                            )],
+                        ))
+                        .font(theme::semibold(12.5))
+                        .color(t.text),
                     );
                     ui.label(
-                        RichText::new("nothing has been done")
-                            .size(11.5)
-                            .color(t.text_faint),
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-ghost-ghost-strip-a81f72de",
+                        ))
+                        .size(11.5)
+                        .color(t.text_faint),
                     );
                     if matches!(state, Strip::Working(_)) {
                         ui.add(crate::spinner::Spinner::new().size(12.0));
@@ -60,25 +68,22 @@ impl RepoTab {
                 });
                 match state {
                     Strip::Working(_) => {
-                        dim(ui, &t, "Working out what it would do…");
-                    }
-                    Strip::Failed(_, why) => {
-                        alert(
+                        dim(
                             ui,
                             &t,
-                            t.danger,
-                            &format!("Can't preview it. {}", sentence(one_line(why))),
+                            crate::i18n::text("repo-workflows-ghost-ghost-strip-d0c20bfd"),
                         );
                     }
+                    Strip::Failed(_, why) => failed_lines(ui, &t, why),
                     Strip::Ready(_, outcome) => outcome_lines(ui, &t, outcome),
                 }
                 if above > 0 {
                     dim(
                         ui,
                         &t,
-                        &format!(
-                            "↑ {} above the rows in view.",
-                            plural(above, "new commit is", "new commits are")
+                        &crate::i18n::message(
+                            "repo-workflows-ghost-new-above",
+                            &[("count", (above).into())],
                         ),
                     );
                 }
@@ -86,28 +91,60 @@ impl RepoTab {
     }
 }
 
+fn failure_text(failure: &super::PreviewFailure) -> String {
+    crate::i18n::message(
+        "repo-workflows-ghost-ghost-strip-f637d899",
+        &[(
+            "sentence-one-line-why-1",
+            sentence(one_line(&failure.display())).into(),
+        )],
+    )
+}
+
+fn failed_lines(ui: &mut Ui, t: &Tokens, failure: &super::PreviewFailure) {
+    alert(ui, t, t.danger, &failure_text(failure));
+}
+
 /// What `outcome` does, a line each.
 fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     if let Some(why) = &o.refused {
-        alert(ui, t, t.danger, &sentence(why));
+        alert(
+            ui,
+            t,
+            t.danger,
+            &sentence(&super::plan::display_preview_text(why)),
+        );
     }
     for warning in &o.warnings {
-        alert(ui, t, t.warning, warning);
+        alert(
+            ui,
+            t,
+            t.warning,
+            &super::plan::display_preview_text(warning),
+        );
     }
     if let Some(c) = &o.conflict {
         let what = match &c.commit {
-            Some(commit) => format!(
-                "Stops at step {} of {} ({})",
-                c.step,
-                c.of,
-                describe(commit)
+            Some(commit) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-7728bdcc",
+                &[
+                    ("c-step-1", (c.step).into()),
+                    ("c-of-2", (c.of).into()),
+                    ("describe-commit-3", (describe(commit)).clone().into()),
+                ],
             ),
-            None => "The merge stops".to_owned(),
+            None => crate::i18n::text("repo-workflows-ghost-outcome-lines-193731dd").to_owned(),
         };
         let why = if c.files.is_empty() {
-            "the commit becomes empty".to_owned()
+            crate::i18n::text("repo-workflows-ghost-outcome-lines-f0e05d95").to_owned()
         } else {
-            format!("conflicts in {}", listed(&c.files, |f| f.clone()))
+            crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-f93fde8f",
+                &[(
+                    "listed-c-files-f-f-clone-1",
+                    (listed(&c.files, |f| f.clone())).clone().into(),
+                )],
+            )
         };
         alert(ui, t, t.danger, &format!("{what}, {why}."));
     }
@@ -115,27 +152,52 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         line(
             ui,
             t.text,
-            &format!("Drops {} — {}", describe(dropped), dropped.author),
+            &crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-b8d8f166",
+                &[
+                    ("describe-dropped-1", (describe(dropped)).clone().into()),
+                    ("dropped-author-2", (dropped.author).clone().into()),
+                ],
+            ),
         );
     }
     let fetched = o.created.len() - o.copies;
     let mut made = Vec::new();
     if o.copies > 0 {
-        made.push(plural(o.copies, "new commit", "new commits"));
+        made.push(crate::i18n::message(
+            "repo-workflows-ghost-new-copies",
+            &[("count", (o.copies).into())],
+        ));
     }
     if fetched > 0 {
-        made.push(format!(
-            "{} from the remote",
-            plural(fetched, "commit", "commits")
+        made.push(crate::i18n::message(
+            "repo-workflows-ghost-fetched-count",
+            &[("count", (fetched).into())],
         ));
     }
     for m in &o.moves {
         let name = m.full.strip_prefix("refs/heads/").unwrap_or(&m.full);
         let name = name.strip_prefix("refs/remotes/").unwrap_or(name);
         made.push(match (&m.from, &m.to) {
-            (_, None) => format!("{name} is deleted"),
-            (Some(from), Some(to)) => format!("{name} moves {} → {}", short(from), shown(to)),
-            (None, Some(to)) => format!("{name} is made at {}", shown(to)),
+            (_, None) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-91af17db",
+                &[("name", (name).into())],
+            ),
+            (Some(from), Some(to)) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-ce73844c",
+                &[
+                    ("name", (name).into()),
+                    ("short-from-1", (short(from)).into()),
+                    ("shown-to-2", (shown(to)).clone().into()),
+                ],
+            ),
+            (None, Some(to)) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-81deb64d",
+                &[
+                    ("name", (name).into()),
+                    ("shown-to-1", (shown(to)).clone().into()),
+                ],
+            ),
         });
     }
     if !made.is_empty() {
@@ -148,23 +210,37 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         Some(files) if !files.is_empty() => line(
             ui,
             t.text_dim,
-            &format!(
-                "Files of the working tree that change ({}): {}",
-                files.len(),
-                listed(files, |f| format!("{} {}", f.status, f.path))
+            &crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-4b54308f",
+                &[
+                    ("files-len-1", (files.len()).into()),
+                    (
+                        "listed-files-f-format-f-status-f-2",
+                        (listed(files, |f| format!("{} {}", f.status, f.path)))
+                            .clone()
+                            .into(),
+                    ),
+                ],
             ),
         ),
-        Some(_) => dim(ui, t, "No file of the working tree changes."),
+        Some(_) => dim(
+            ui,
+            t,
+            crate::i18n::text("repo-workflows-ghost-outcome-lines-02e3b1f7"),
+        ),
         None => {}
     }
     for note in &o.notes {
-        dim(ui, t, note);
+        dim(ui, t, &super::plan::display_preview_text(note));
     }
     if let Some(engine) = o.engine {
         ui.label(
-            RichText::new(format!("Worked out with {}", engine.describe()))
-                .size(10.5)
-                .color(t.text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-820df962",
+                &[("engine-describe-1", (engine.describe()).into())],
+            ))
+            .size(10.5)
+            .color(t.text_faint),
         );
     }
 }
@@ -172,37 +248,54 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// The commits the operation leaves on no ref (or takes off the remote's branch), with who
 /// made them.
 fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
-    let count = if o.lost_more {
-        format!("more than {} commits", o.lost.len())
-    } else {
-        plural(o.lost.len(), "commit", "commits")
-    };
+    let count = ghost_count(o.lost.len(), o.lost_more);
     let names = listed(&o.lost, |c| format!("{} — {}", describe(c), c.author));
     let (color, text) = if o.from_remote {
         (
             t.warning,
-            format!("Leaving the remote's branch ({count}): {names}"),
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-02717c8c",
+                &[
+                    ("count", (count).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
+            ),
         )
     } else if o.replaced == o.lost.len() && !o.lost_more {
-        let originals = if o.replaced == 1 {
-            "the original is"
-        } else {
-            "the originals are"
-        };
         (
             t.text_dim,
-            format!("Replaced by new copies ({count}; {originals} left on no branch): {names}"),
+            crate::i18n::message(
+                "repo-workflows-ghost-replaced-originals",
+                &[
+                    ("count", (count.as_str()).into()),
+                    ("number", (o.replaced).into()),
+                    ("names", (names.as_str()).into()),
+                ],
+            ),
         )
     } else if o.replaced > 0 {
         (
             t.warning,
-            format!(
-                "Left on no branch ({count}, {} of them replaced by new copies): {names}",
-                o.replaced
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-8ccbdaa0",
+                &[
+                    ("count", (count).clone().into()),
+                    ("o-replaced-1", (o.replaced).into()),
+                    ("names", (names).clone().into()),
+                ],
             ),
         )
     } else {
-        (t.warning, format!("Left on no branch ({count}): {names}"))
+        (
+            t.warning,
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-811bd7ca",
+                &[
+                    ("count", (count).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
+            ),
+        )
     };
     line(ui, color, &text);
 }
@@ -210,7 +303,7 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// A commit as the strip names where a ref goes.
 fn shown(hash: &str) -> String {
     if hash == super::plan::GHOST_MERGE {
-        "a merge commit".to_owned()
+        crate::i18n::text("repo-workflows-ghost-shown-4ef6715c").to_owned()
     } else {
         short(hash).to_owned()
     }
@@ -246,15 +339,14 @@ fn one_line(text: &str) -> &str {
     text.lines().next().unwrap_or(text)
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// The first [`LISTED`] of `items`, then how many more.
 fn listed<T>(items: &[T], name: impl Fn(&T) -> String) -> String {
     let mut names: Vec<String> = items.iter().take(LISTED).map(name).collect();
     if items.len() > LISTED {
-        names.push(format!("and {} more", items.len() - LISTED));
+        names.push(crate::i18n::message(
+            "repo-workflows-ghost-listed-683768ab",
+            &[("items-len-listed-1", (items.len() - LISTED).into())],
+        ));
     }
     names.join(", ")
 }
@@ -268,8 +360,229 @@ mod tests {
         let items: Vec<String> = (1..=7).map(|n| n.to_string()).collect();
         assert_eq!(listed(&items, String::clone), "1, 2, 3, 4, 5, and 2 more");
         assert_eq!(listed(&items[..2], String::clone), "1, 2");
-        assert_eq!(plural(1, "file", "files"), "1 file");
-        assert_eq!(plural(3, "file", "files"), "3 files");
+        crate::i18n::set_language("en-US");
+        assert_eq!(ghost_count(1, false), "one commit");
+        assert_eq!(ghost_count(3, false), "3 commits");
+        crate::i18n::set_language("de");
+        assert_eq!(ghost_count(1234, true), "mehr als 1.234 Commits");
         assert_eq!(sentence("x isn't merged"), "X isn't merged");
+    }
+}
+
+fn ghost_count(count: usize, more: bool) -> String {
+    crate::i18n::message(
+        "repo-workflows-ghost-lost-count",
+        &[
+            ("more", (if more { "yes" } else { "no" }).into()),
+            ("count", (count).into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_cached_preview_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_actual_cached_ghost_preview_repaints_raw_notes_without_workers() {
+        let notes = vec![
+            "Uncommitted changes are stashed first and put back after (rebase.autoStash).".into(),
+            "As of the last fetch of fork/ß: what was pushed there since isn't shown.".into(),
+            "1234 commits are dropped: their changes are already there.".into(),
+            "Provider opaque: 日本語\n{message} --argv=raw".into(),
+        ];
+        let warnings = vec![
+            "Uncommitted changes to these files are thrown away, and can't be brought back.".into(),
+        ];
+        let raw_refused =
+            "feature/ß and fork/branch have diverged, so a fast-forward-only pull refuses";
+        let state = Outcome {
+            notes: notes.clone(),
+            warnings: warnings.clone(),
+            refused: Some(raw_refused.into()),
+            ..Default::default()
+        };
+        let mut initialized = false;
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Outcome| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                outcome_lines(ui, &Tokens::get(ui.ctx()), state);
+            },
+            state,
+        );
+        for lang in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            for note in &notes {
+                h.get_by_label(&super::super::plan::display_preview_text(note));
+            }
+            h.get_by_label(&super::super::plan::display_preview_text(&warnings[0]));
+            assert!(
+                super::super::plan::display_preview_text(&notes[2]).contains(if lang == "de" {
+                    "1.234"
+                } else {
+                    "1,234"
+                })
+            );
+            assert_eq!(h.state().notes, notes);
+            assert_eq!(h.state().warnings, warnings);
+            assert_eq!(h.state().refused.as_deref(), Some(raw_refused));
+            assert_eq!(
+                super::super::plan::display_preview_text(&notes[3]),
+                notes[3]
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_witness_cache_tests {
+    use super::super::{Ghost, GhostOp, Key, PreviewFailure, Shown};
+    use super::*;
+    use crate::git::dry_run::{CANCELLED, Failure};
+    use egui_kittest::{Harness, kittest::Queryable};
+    use std::sync::Arc;
+
+    #[test]
+    fn fluent_partition_actual_cached_ghost_failure_repaints_typed_witness_without_jobs()
+    -> Result<(), String> {
+        let ui_errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let ui_errors_0 = ui_errors.clone();
+
+        let detail = "raw/ß; in a scratch clone: 日本語\n{ $detail } --argv=raw";
+        let cases = [
+            PreviewFailure::Backend(Failure::PartialClone),
+            PreviewFailure::Backend(Failure::ReplayFallback {
+                first: Box::new(Failure::ReplayNeedsBranch),
+                scratch: Box::new(Failure::ScratchClone {
+                    detail: detail.into(),
+                }),
+            }),
+            PreviewFailure::Backend(Failure::Opaque(detail.into())),
+            PreviewFailure::Backend(Failure::Opaque("git replay needs a branch".into())),
+            PreviewFailure::RawPlan("Invalid timeline commit ID".into()),
+            PreviewFailure::from(detail.to_owned()),
+        ];
+        for failure in cases {
+            let raw = failure.raw();
+            let result = Arc::new(Err(failure.clone()));
+            let retained = Arc::clone(&result);
+            let key = Key {
+                op: GhostOp::ResetHard {
+                    to: "refs/heads/raw/ß".into(),
+                },
+                refs: 1234,
+            };
+            let mut ghost = Ghost {
+                jobs: 7,
+                ..Default::default()
+            };
+            ghost.shown = Some(Shown {
+                key: key.clone(),
+                history: 29,
+                result,
+                view: None,
+                swapped: false,
+            });
+            let mut installed = false;
+            let mut h = Harness::new_ui_state(
+                |ui, ghost: &mut Ghost| {
+                    let ui_result = (|| -> Result<(), String> {
+                        if !installed {
+                            crate::theme::install_fonts(ui.ctx());
+                            installed = true;
+                            ui.ctx().request_discard("install supplied fonts");
+                            return Ok(());
+                        }
+                        let shown = ghost.shown.as_ref().ok_or("missing test value")?;
+                        let failure = shown
+                            .result
+                            .as_ref()
+                            .as_ref()
+                            .err()
+                            .ok_or("expected an error")?;
+                        failed_lines(ui, &Tokens::get(ui.ctx()), failure);
+
+                        Ok(())
+                    })();
+                    if let Err(error) = ui_result {
+                        ui_errors_0.borrow_mut().push(error);
+                    }
+                },
+                ghost,
+            );
+            for language in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(language);
+                h.run();
+                h.get_by_label(&failure_text(&failure));
+                let ghost = h.state();
+                let shown = ghost.shown.as_ref().ok_or("missing test value")?;
+                assert_eq!(shown.key, key);
+                assert_eq!(shown.history, 29);
+                assert_eq!(ghost.jobs, 7);
+                assert!(ghost.job.is_none());
+                assert!(ghost.cache.is_empty());
+                assert!(Arc::ptr_eq(&shown.result, &retained));
+                assert_eq!(
+                    shown
+                        .result
+                        .as_ref()
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?
+                        .raw(),
+                    raw
+                );
+                assert_eq!(
+                    shown
+                        .result
+                        .as_ref()
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?,
+                    &failure
+                );
+                if matches!(failure, PreviewFailure::Backend(Failure::Opaque(_))) {
+                    assert_eq!(failure.display(), raw);
+                }
+                if let PreviewFailure::Backend(Failure::ReplayFallback { .. }) = &failure {
+                    assert!(failure.display().contains(detail));
+                }
+                if matches!(failure, PreviewFailure::Backend(Failure::PartialClone)) {
+                    assert_eq!(
+                        failure.display(),
+                        if language == "de" {
+                            "Dies ist ein partieller Klon: Die Berechnung würde Dateien vom Remote herunterladen."
+                        } else {
+                            "this is a partial clone: working it out would download files from the remote"
+                        }
+                    );
+                }
+            }
+        }
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            assert!(PreviewFailure::Backend(Failure::Opaque(CANCELLED.into())).is_cancelled());
+            assert!(PreviewFailure::from(CANCELLED.to_owned()).is_cancelled());
+            assert!(!PreviewFailure::from("cancelled: provider detail".to_owned()).is_cancelled());
+            assert!(
+                !PreviewFailure::Backend(Failure::ReplayFallback {
+                    first: Box::new(Failure::Opaque(CANCELLED.into())),
+                    scratch: Box::new(Failure::Opaque("other".into()))
+                })
+                .is_cancelled()
+            );
+        }
+        crate::i18n::set_language("en-US");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
     }
 }

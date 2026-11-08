@@ -86,6 +86,9 @@ pub enum Event {
     /// Something went wrong that doesn't change the answer (the clean-up).
     Warning(String),
     Done(Outcome),
+    /// Opt-in paint receipt beside the unchanged raw outcome.
+    DoneWithPresentation(Outcome, Option<super::presentation::Presentation>),
+    WarningWithPresentation(String, super::presentation::CleanupWarning),
 }
 
 /// How a bisect ended.
@@ -134,7 +137,23 @@ impl Drop for Handle {
 
 /// Starts bisecting as `setup` says, results kept in `cache`; `wake` is called after each
 /// event (to have the window drawn again).
+#[cfg(test)]
 pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'static) -> Handle {
+    start_impl(setup, cache, wake, false)
+}
+pub(crate) fn start_with_presentation(
+    setup: Setup,
+    cache: TreeCache,
+    wake: impl Fn() + Send + Sync + 'static,
+) -> Handle {
+    start_impl(setup, cache, wake, true)
+}
+fn start_impl(
+    setup: Setup,
+    cache: TreeCache,
+    wake: impl Fn() + Send + Sync + 'static,
+    with_presentation: bool,
+) -> Handle {
     let (tx, events) = channel();
     let stop = Arc::new(AtomicBool::new(false));
     let handle = Handle {
@@ -146,12 +165,21 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
         let out = Out {
             tx: Mutex::new(tx),
             wake: Box::new(wake),
+            with_presentation,
         };
+        let mut presentation = None;
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            bisect(&setup, &cache, &out, &stop)
+            bisect(&setup, &cache, &out, &stop, &mut presentation)
         }))
-        .unwrap_or_else(|_| Outcome::Failed("the bisect stopped on an error in gitcraft".into()));
-        out.send(Event::Done(outcome));
+        .unwrap_or_else(|_| {
+            presentation = None;
+            Outcome::Failed("the bisect stopped on an error in gitcraft".into())
+        });
+        out.send(if with_presentation {
+            done_with_presentation(outcome, presentation)
+        } else {
+            Event::Done(outcome)
+        });
     });
     let mut sessions = SESSIONS.lock().unwrap_or_else(PoisonError::into_inner);
     sessions.retain(|(_, thread)| !thread.is_finished());
@@ -163,6 +191,7 @@ pub fn start(setup: Setup, cache: TreeCache, wake: impl Fn() + Send + Sync + 'st
 struct Out {
     tx: Mutex<Sender<Event>>,
     wake: Box<dyn Fn() + Send + Sync>,
+    with_presentation: bool,
 }
 
 impl Out {
@@ -177,15 +206,59 @@ impl Out {
     }
 }
 
-fn bisect(setup: &Setup, cache: &TreeCache, out: &Out, stop: &AtomicBool) -> Outcome {
+fn bisect(
+    setup: &Setup,
+    cache: &TreeCache,
+    out: &Out,
+    stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Outcome {
+    *presentation = None;
     let setup = match resolved(setup).and_then(|s| check(&s).map(|()| s)) {
         Ok(setup) => setup,
         Err(e) => return Outcome::Failed(e),
     };
-    match prepared(&setup, cache, out, stop) {
-        Ok(outcome) => outcome,
-        Err(_) if stop.load(Ordering::Relaxed) => Outcome::Cancelled,
-        Err(e) => Outcome::Failed(e),
+    prepared_outcome(prepared(&setup, cache, out, stop, presentation))
+}
+fn prepared_outcome(result: Result<Outcome, String>) -> Outcome {
+    // Errors can contain unknown ownership/cleanup. A late stop flag cannot prove
+    // confirmed cancellation; that arrives explicitly as Ok(Outcome::Cancelled).
+    result.unwrap_or_else(Outcome::Failed)
+}
+fn record_round_result(
+    ended: &mut Option<Result<Outcome, String>>,
+    result: Result<Ran, String>,
+    cancelled: bool,
+    answer: impl FnOnce(Ran) -> Result<Option<Outcome>, String>,
+) -> Option<String> {
+    let ran = match result {
+        Ok(ran) => ran,
+        Err(error) => {
+            if ended.is_some() {
+                return Some(error);
+            }
+            *ended = Some(Err(error));
+            return None;
+        }
+    };
+    if ended.is_some() || cancelled {
+        return None;
+    }
+    match answer(ran) {
+        Err(error) => *ended = Some(Err(error)),
+        Ok(Some(outcome)) => *ended = Some(Ok(outcome)),
+        Ok(None) => {}
+    }
+    None
+}
+fn finish_round(
+    ended: Option<Result<Outcome, String>>,
+    cancelled: bool,
+) -> Result<Option<Outcome>, String> {
+    match ended {
+        Some(result) => result.map(Some),
+        None if cancelled => Ok(Some(Outcome::Cancelled)),
+        None => Ok(None),
     }
 }
 
@@ -224,18 +297,23 @@ fn prepared(
     cache: &TreeCache,
     out: &Out,
     stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
 ) -> Result<Outcome, String> {
     let label = setup.machine.label();
     out.step(format!("Setting up on {label}…"));
     let mut ws = Workspace::open(&setup.repo, &setup.machine, setup.repo_there.as_deref())?;
-    let result = run_in(&ws, setup, cache, out, stop);
+    let result = run_in(&ws, setup, cache, out, stop, presentation);
     out.step("Removing the worktrees…");
-    if let Err(e) = ws.close() {
-        out.send(Event::Warning(format!(
-            "The worktrees on {label} couldn't all be removed ({e}); the next parallel bisect \
-             there removes them."
-        )));
+    let mut cleanup_presentation = None;
+    if let Err(e) = ws.close_with_presentation(&mut cleanup_presentation) {
+        out.send(cleanup_warning(
+            label,
+            e,
+            cleanup_presentation,
+            out.with_presentation,
+        ));
     }
+    super::presentation::retain_error(&result, presentation);
     result
 }
 
@@ -245,13 +323,15 @@ fn run_in(
     cache: &TreeCache,
     out: &Out,
     stop: &AtomicBool,
+    presentation: &mut Option<super::presentation::Presentation>,
 ) -> Result<Outcome, String> {
     let mut wanted = vec![setup.bad.clone()];
     wanted.extend(setup.good.iter().cloned());
     if !crate::remote::same_dir(&setup.repo, &ws.repo) {
         out.step(format!("Sending the commits to {}…", ws.machine.label()));
     }
-    ws.send(&setup.repo, &wanted)?;
+    ws.send_with_presentation(&setup.repo, &wanted, presentation)?;
+    *presentation = None;
     out.step("Reading the commits to bisect…");
     let dag = load_range(setup)?;
     let mut search = Search::new(dag, &setup.bad)?;
@@ -366,7 +446,7 @@ impl Slot {
                 &self.there,
                 hash,
             ];
-            let exit = ws.adding(|| git::run_for_test(&ws.repo, &add, limit))?;
+            let exit = ws.adding(|| ws.run_git(&ws.repo, &add, limit))?;
             if exit.code != Some(0) {
                 return Err(failed(exit));
             }
@@ -376,7 +456,7 @@ impl Slot {
             &["checkout", "-q", "--detach", "--force", hash][..],
             &["clean", "-q", "-ffd"],
         ] {
-            let exit = git::run_for_test(&self.path, args, limit)?;
+            let exit = ws.run_git(&self.path, args, limit)?;
             if exit.code != Some(0) {
                 return Err(failed(exit));
             }
@@ -399,18 +479,26 @@ impl Slot {
                 output: String::new(),
             });
         }
-        let pid_file = format!("{}/{}.pid", ws.base_there, self.n);
-        let log = format!("{}/{}.log", ws.base_there, self.n);
-        runner::run(
-            &runner::Test {
-                dir: &self.path,
-                control: &ws.repo,
-                pid_file: &pid_file,
-                log: &log,
-                command: &setup.command,
-                limit: setup.timeout,
+        runner::with_prepared_log(
+            || ws.prepare_test_log(self.n),
+            |log| {
+                let authority =
+                    ws.authority(crate::remote::workspace_authority::FenceMode::Dispatch)?;
+                let owner_record = ws.owner_record(&authority)?;
+                runner::run(
+                    &runner::Test {
+                        dir: &self.path,
+                        control: &ws.repo,
+                        owner_record: &owner_record,
+                        authority: &authority,
+                        log,
+                        command: &setup.command,
+                        limit: setup.timeout,
+                    },
+                    stop,
+                )
+                .inspect_err(|_| ws.invalidate())
             },
-            stop,
         )
     }
 }
@@ -535,15 +623,14 @@ impl Run<'_> {
                     Err(RecvTimeoutError::Disconnected) => break,
                 };
                 running.remove(&j);
-                if ended.is_some() || self.stopped() {
-                    continue;
-                }
                 let job = &jobs[j];
-                let answer = result.and_then(|ran| self.answer(job, ran));
-                match answer {
-                    Err(e) => ended = Some(Err(e)),
-                    Ok(Some(outcome)) => ended = Some(Ok(outcome)),
-                    Ok(None) => {}
+                if let Some(error) =
+                    record_round_result(&mut ended, result, self.stopped(), |ran| {
+                        self.answer(job, ran)
+                    })
+                {
+                    self.out
+                        .send(Event::Warning(format!("{}: {error}", short(&job.hash))));
                 }
                 if ended.is_some() {
                     dropped
@@ -565,10 +652,7 @@ impl Run<'_> {
             }
         });
         self.slots = slots;
-        if self.stopped() {
-            return Ok(Some(Outcome::Cancelled));
-        }
-        ended.transpose()
+        finish_round(ended, self.stopped())
     }
 
     /// What a test that came back says: `Some` when it ends the bisect. An exit code of 128 or
@@ -663,5 +747,115 @@ impl Run<'_> {
             )),
             None => Err("the bisect ran out of commits to test before it ended".to_owned()),
         }
+    }
+}
+
+pub(crate) fn done_with_presentation(
+    outcome: Outcome,
+    presentation: Option<super::presentation::Presentation>,
+) -> Event {
+    let presentation = match &outcome {
+        Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
+        _ => None,
+    };
+    Event::DoneWithPresentation(outcome, presentation)
+}
+pub(crate) fn cleanup_warning(
+    label: String,
+    e: String,
+    child: Option<super::presentation::Presentation>,
+    with_presentation: bool,
+) -> Event {
+    let raw = format!(
+        "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
+         Resolve the reported ownership or removal failure before trying again."
+    );
+    if with_presentation {
+        let presentation =
+            super::presentation::CleanupWarning::capture(raw.clone(), label, e, child);
+        Event::WarningWithPresentation(raw, presentation)
+    } else {
+        Event::Warning(raw)
+    }
+}
+
+#[cfg(test)]
+mod recording_outcome_tests {
+    use super::*;
+    #[test]
+    fn cancelled_setup_ownership_error_survives_without_workspace() {
+        let stopped = AtomicBool::new(true);
+        let error = "could not finish owned process: recorded failure";
+        assert!(stopped.load(Ordering::Relaxed));
+        assert_eq!(
+            prepared_outcome(Err(error.into())),
+            Outcome::Failed(error.into())
+        );
+    }
+    #[test]
+    fn cancelled_worker_cleanup_failure_survives_final_normalization() {
+        let mut answered = false;
+        let mut ended = None;
+        assert!(
+            record_round_result(
+                &mut ended,
+                Err("missing cleaned receipt".into()),
+                true,
+                |_| {
+                    answered = true;
+                    Err("failed worker has no answer".into())
+                }
+            )
+            .is_none()
+        );
+        assert_eq!(
+            finish_round(ended, true),
+            Err("missing cleaned receipt".into())
+        );
+        assert!(!answered, "unexpected answer callback");
+    }
+    #[test]
+    fn selected_answer_keeps_late_worker_error_as_concrete_warning() {
+        let mut answered = false;
+        let selected = Outcome::FirstBad("a".repeat(40));
+        let mut ended = Some(Ok(selected.clone()));
+        let warning = record_round_result(
+            &mut ended,
+            Err("owner stop acknowledgement missing".into()),
+            true,
+            |_| {
+                answered = true;
+                Err("late worker cannot replace answer".into())
+            },
+        );
+        assert_eq!(
+            warning.as_deref(),
+            Some("owner stop acknowledgement missing")
+        );
+        assert_eq!(finish_round(ended, true), Ok(Some(selected)));
+        assert!(!answered, "unexpected answer callback");
+    }
+    #[test]
+    fn confirmed_normal_cancellation_remains_cancelled() {
+        let mut answered = false;
+        assert_eq!(prepared_outcome(Ok(Outcome::Cancelled)), Outcome::Cancelled);
+        let mut ended = None;
+        assert!(
+            record_round_result(
+                &mut ended,
+                Ok(Ran {
+                    ended: super::super::verdict::Ended::Stopped,
+                    output: String::new()
+                }),
+                true,
+                |_| {
+                    answered = true;
+                    Err("cancelled successful worker is ignored".into())
+                }
+            )
+            .is_none()
+        );
+        assert_eq!(finish_round(ended, true), Ok(Some(Outcome::Cancelled)));
+        assert!(!answered, "unexpected answer callback");
     }
 }

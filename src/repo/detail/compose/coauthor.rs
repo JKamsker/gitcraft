@@ -33,9 +33,9 @@ impl RepoTab {
     pub(super) fn coauthor_button(&mut self, ui: &mut Ui, enabled: bool) {
         let b = ui
             .add_enabled(enabled, |ui: &mut Ui| {
-                icons::small_button(ui, "circle-user-round", "Add co-author")
+                icons::small_button(ui, "circle-user-round", crate::i18n::text("repo-core-0942"))
             })
-            .on_disabled_hover_text("The commits being replayed keep their own messages");
+            .on_disabled_hover_text(crate::i18n::text("repo-workflows-dco-toggle-9ba5d60e"));
         if b.clicked() && !self.compose.authors_asked {
             self.load_authors(ui.ctx());
         }
@@ -54,7 +54,7 @@ impl RepoTab {
                 }
                 let field = ui.add(
                     egui::TextEdit::singleline(filter)
-                        .hint_text("Name or email; Enter adds the first")
+                        .hint_text(crate::i18n::text("repo-core-0943"))
                         .desired_width(f32::INFINITY),
                 );
                 if b.clicked() {
@@ -70,7 +70,10 @@ impl RepoTab {
                     Some(Ok(all)) => {
                         let shown = filtered(all, filter, &me);
                         if shown.is_empty() {
-                            ui.label(RichText::new("No other author matches").color(t.text_faint));
+                            ui.label(
+                                RichText::new(crate::i18n::text("repo-core-0944"))
+                                    .color(t.text_faint),
+                            );
                         }
                         egui::ScrollArea::vertical()
                             .max_height(260.0)
@@ -79,9 +82,12 @@ impl RepoTab {
                                     let text = format!("{} <{}>", a.name, a.email);
                                     let r =
                                         ui.add_enabled(!busy, egui::Button::new(text).truncate());
-                                    let plural = if a.commits == 1 { "" } else { "s" };
-                                    if r.on_hover_text(format!("{} commit{plural}", a.commits))
-                                        .clicked()
+
+                                    if r.on_hover_text(crate::i18n::message(
+                                        "repo-core-0945",
+                                        &[("commits", (a.commits).into())],
+                                    ))
+                                    .clicked()
                                     {
                                         picked = Some(a.clone());
                                     }
@@ -133,11 +139,8 @@ impl RepoTab {
                         if super::join_message(&tab.commit_summary, &tab.commit_body) == before {
                             tab.set_message(&message);
                         } else {
-                            tab.compose.notice = Some(
-                                "The message changed while the co-author was added: add them \
-                                 again"
-                                    .to_owned(),
-                            );
+                            tab.compose.notice =
+                                Some(crate::i18n::text("repo-core-0946").to_owned());
                         }
                     }
                     Err(e) => tab.compose.notice = Some(e),

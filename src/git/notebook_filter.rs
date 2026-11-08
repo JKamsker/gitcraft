@@ -65,11 +65,10 @@ pub fn strip_command(repo: &Path) -> Result<String, String> {
             return Ok(format!("{python} -c '{PYTHON}'"));
         }
     }
-    Err(
-        "Neither nbstripout nor Python 3 is installed where the repository is: install \
-         nbstripout (pip install nbstripout) or Python 3"
-            .to_owned(),
+    Err(crate::i18n::text(
+        "backend-neither-nbstripout-nor-python-3-is-installed-where-the-repository-c298bb",
     )
+    .to_owned())
 }
 
 /// The repository's own attributes file (`.git/info/attributes`), as a path for `remote`.
@@ -126,7 +125,15 @@ pub fn set_strip_outputs(repo: &Path, on: bool) -> Result<Option<String>, String
     let text = match crate::remote::read_to_string(&file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("Could not read {}: {e}", file.display())),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-e-6dfcf3",
+                &[
+                    ("path", (file.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
     };
     let mut lines: Vec<&str> = text.lines().filter(|l| l.trim() != ATTRIBUTE).collect();
     let key = format!("filter.{FILTER}.clean");
@@ -149,11 +156,25 @@ pub fn set_strip_outputs(repo: &Path, on: bool) -> Result<Option<String>, String
         out.push('\n');
     }
     if let Some(dir) = file.parent() {
-        crate::remote::create_dir_all(dir)
-            .map_err(|e| format!("Could not write {}: {e}", file.display()))?;
+        crate::remote::create_dir_all(dir).map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-write-e-6c22d7",
+                &[
+                    ("path", (file.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
     }
-    crate::remote::write(&file, out.as_bytes())
-        .map_err(|e| format!("Could not write {}: {e}", file.display()))?;
+    crate::remote::write(&file, out.as_bytes()).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-write-e-6c22d7",
+            &[
+                ("path", (file.display()).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(command)
 }
 

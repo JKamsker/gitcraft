@@ -1,7 +1,7 @@
 //! The settings tab, along the window's left edge: its pages listed under a search field, the
 //! chosen page beside them; while searching, what the search matches on every page instead.
 
-use egui::{Align2, Id, Key, Modifiers, RichText, Sense, Stroke, Ui, vec2};
+use egui::{Align2, Id, Key, RichText, Sense, Stroke, Ui, vec2};
 
 use super::layout::Filter;
 use super::preview;
@@ -52,6 +52,10 @@ fn search_id() -> Id {
 }
 
 impl Settings {
+    pub(crate) fn search_has_focus(ctx: &egui::Context) -> bool {
+        ctx.memory(|memory| memory.focused()) == Some(search_id())
+    }
+
     /// The settings tab. Returns true when a setting changed; what the Profile page asks the
     /// app to do is left in `view`.
     pub fn page(&mut self, ui: &mut Ui, app: &mut SettingsView) -> bool {
@@ -81,18 +85,7 @@ impl Settings {
         if ui.available_width() < 760.0 {
             ui.add_space(12.0);
             ui.horizontal_wrapped(|ui| {
-                egui::ComboBox::from_id_salt("settings-page-compact")
-                    .selected_text(view.page.title())
-                    .show_ui(ui, |ui| {
-                        for page in Page::ALL {
-                            if ui
-                                .selectable_value(&mut view.page, page, page.title())
-                                .clicked()
-                            {
-                                view.query.clear();
-                            }
-                        }
-                    });
+                compact_page_picker(ui, &mut view);
                 search_field(ui, &mut view.query);
             });
             let above = counts
@@ -176,12 +169,14 @@ impl Settings {
                     // this ScrollArea could consume all height at high zoom, leaving even
                     // scroll_to_me unable to bring the settings into the viewport.
                     if let Some(shown) = above_preview {
-                        egui::CollapsingHeader::new("Preview").show(ui, |ui| {
-                            egui::ScrollArea::vertical()
-                                .id_salt("settings-preview-above")
-                                .max_height(preview::ABOVE_MAX_H)
-                                .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
-                        });
+                        egui::CollapsingHeader::new(crate::i18n::text("dev-baseline-preview"))
+                            .id_salt("settings-preview-above-header")
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical()
+                                    .id_salt("settings-preview-above")
+                                    .max_height(preview::ABOVE_MAX_H)
+                                    .show(ui, |ui| preview::panel(ui, shown, self, &app.theme));
+                            });
                         ui.add_space(12.0);
                     }
                     if counts.is_empty() {
@@ -206,11 +201,10 @@ impl Settings {
         title(ui, "Search results");
         let total: usize = counts.iter().sum();
         let query = view.query.trim().to_owned();
-        let what = match total {
-            0 => format!("Nothing matches “{query}”."),
-            1 => format!("1 setting matches “{query}”."),
-            n => format!("{n} settings match “{query}”."),
-        };
+        let what = crate::i18n::message(
+            "interaction-settings-search-matches",
+            &[("count", total.into()), ("query", query.as_str().into())],
+        );
         ui.label(RichText::new(what).color(t.text_faint));
         for (&page, &count) in Page::ALL.iter().zip(counts) {
             if count == 0 {
@@ -222,16 +216,19 @@ impl Settings {
                 .horizontal(|ui| {
                     crate::icons::inline(ui, page.icon(), 14.0, t.text_faint);
                     ui.label(
-                        RichText::new(page.title().to_uppercase())
+                        RichText::new(super::labels::display(page.title()).to_uppercase())
                             .font(theme::semibold(11.0))
                             .color(t.text_faint),
                     );
                 })
                 .response
                 .interact(Sense::click())
-                .on_hover_text("Open this page");
+                .on_hover_text(crate::i18n::text("interaction-settings-open-page"));
             crate::repo::widgets::a11y(&resp, egui::WidgetType::Link, || {
-                format!("Open the {} page", page.title())
+                crate::i18n::message(
+                    "interaction-settings-open-page-a11y",
+                    &[("page", super::labels::display(page.title()).into())],
+                )
             });
             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             if resp.clicked() {
@@ -245,7 +242,7 @@ impl Settings {
 
 /// The page's title at the top.
 fn title(ui: &mut Ui, text: &str) {
-    ui.label(RichText::new(text).font(theme::semibold(22.0)));
+    ui.label(RichText::new(super::labels::display(text)).font(theme::semibold(22.0)));
     ui.add_space(4.0);
 }
 
@@ -261,14 +258,12 @@ fn keys(ui: &mut Ui, view: &mut View, dialog_open: bool) {
         return;
     }
     let popup_open = egui::Popup::is_any_open(ui.ctx());
-    let (search, clear, up, down) = ui.input_mut(|i| {
-        (
-            i.consume_key(Modifiers::COMMAND, Key::F),
-            !popup_open && i.key_pressed(Key::Escape),
-            i.consume_key(Modifiers::ALT, Key::ArrowUp),
-            i.consume_key(Modifiers::ALT, Key::ArrowDown),
-        )
-    });
+    use crate::keymap::{self, Command, Scope};
+    keymap::active(ui.ctx(), vec![Scope::Window, Scope::Settings]);
+    let search = keymap::take(ui.ctx(), Command::SettingsSearch);
+    let clear = !popup_open && ui.input(|i| i.key_pressed(Key::Escape));
+    let up = keymap::take(ui.ctx(), Command::SettingsPrevious);
+    let down = keymap::take(ui.ctx(), Command::SettingsNext);
     if search {
         ui.memory_mut(|m| m.request_focus(search_id()));
     }
@@ -303,7 +298,10 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
             &resp,
             || {
                 let matches = count.map(|n| crate::a11y::labels::count(n, "match", "matches"));
-                crate::a11y::labels::join([page.title(), &matches.unwrap_or_default()])
+                crate::a11y::labels::join([
+                    super::labels::display(page.title()),
+                    &matches.unwrap_or_default(),
+                ])
             },
             selected,
         );
@@ -342,7 +340,7 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
         ui.painter().text(
             rect.left_center() + vec2(40.0, 0.0),
             Align2::LEFT_CENTER,
-            page.title(),
+            super::labels::display(page.title()),
             font,
             text,
         );
@@ -350,7 +348,7 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
             ui.painter().text(
                 rect.right_center() - vec2(12.0, 0.0),
                 Align2::RIGHT_CENTER,
-                n.to_string(),
+                crate::i18n::number(n),
                 egui::FontId::proportional(11.5),
                 t.text_faint,
             );
@@ -383,7 +381,13 @@ fn search_field(ui: &mut Ui, query: &mut String) {
                 // The button or shortcut at the right end, the text taking what is left.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if !query.is_empty() {
-                        if crate::icons::small_button(ui, "x", "Clear (Esc)").clicked() {
+                        if crate::icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-settings-clear"),
+                        )
+                        .clicked()
+                        {
                             query.clear();
                         }
                     } else if !focused {
@@ -397,11 +401,109 @@ fn search_field(ui: &mut Ui, query: &mut String) {
                         egui::TextEdit::singleline(query)
                             .id(search_id())
                             .frame(egui::Frame::NONE)
-                            .hint_text("Search")
+                            .hint_text(crate::i18n::text("interaction-settings-search"))
                             .margin(vec2(0.0, 3.0))
                             .desired_width(ui.available_width()),
                     );
                 });
             });
         });
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use crate::keymap::{Command, Stroke as KeyStroke};
+    #[test]
+    fn configured_page_and_search_keys_use_actual_settings_handler() {
+        let ctx = egui::Context::default();
+        let mut settings = Settings::default();
+        settings.key_bindings.insert(
+            Command::SettingsNext.id().into(),
+            vec![KeyStroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.key_bindings.insert(
+            Command::SettingsSearch.id().into(),
+            vec![KeyStroke::new(Key::F9, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        let mut view = View::default();
+        let before = view.page;
+        for key in [Key::F8, Key::F9] {
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| {
+                    keys(ui, &mut view, false);
+                    ui.add(egui::TextEdit::singleline(&mut view.query).id(search_id()));
+                },
+            )
+            .drop_without_applying_deltas();
+        }
+        assert_ne!(view.page, before);
+        assert!(ctx.memory(|memory| memory.has_focus(search_id())));
+    }
+}
+
+/// Paint localized captions while the selected enum and persistent salt stay stable.
+fn compact_page_picker(ui: &mut Ui, view: &mut View) {
+    egui::ComboBox::from_id_salt("settings-page-compact")
+        .selected_text(super::labels::display(view.page.title()))
+        .show_ui(ui, |ui| {
+            for page in Page::ALL {
+                if ui
+                    .selectable_value(&mut view.page, page, super::labels::display(page.title()))
+                    .clicked()
+                {
+                    view.query.clear();
+                }
+            }
+        });
+}
+
+#[cfg(test)]
+mod merge_regressions {
+    use super::*;
+    use egui_kittest::kittest::{NodeT, Queryable};
+
+    #[test]
+    fn compact_page_picker_repaints_both_languages_and_keeps_enum_selection() {
+        let mut h = egui_kittest::Harness::new_ui_state(compact_page_picker, View::default());
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            h.run();
+            let picker = h.get_by_role(egui::accesskit::Role::ComboBox);
+            assert_eq!(
+                picker.accesskit_node().data().value(),
+                Some(super::super::labels::display(Page::General.title()))
+            );
+            picker.click();
+            h.run();
+            h.get_by_label(super::super::labels::display(Page::Appearance.title()))
+                .click();
+            h.run();
+            assert_eq!(h.state().page, Page::Appearance);
+            assert!(h.state().query.is_empty());
+            // Reset only the selection for the next locale, using the same Context and salt.
+            h.state_mut().page = Page::General;
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

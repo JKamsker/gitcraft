@@ -42,9 +42,15 @@ pub(super) fn suggestion_applies(thread: &Thread, comment_pending: bool, open: b
 /// Which lines a suggestion replaces.
 pub(super) fn suggestion_scope(start: u64, end: u64) -> String {
     if start == end {
-        format!("Replaces line {end}")
+        crate::i18n::message(
+            "repo-workflows-pr_review-suggestion-scope-d3d41027",
+            &[("end", (end).into())],
+        )
     } else {
-        format!("Replaces lines {start} to {end}")
+        crate::i18n::message(
+            "repo-workflows-pr_review-suggestion-scope-3e80b4eb",
+            &[("start", (start).into()), ("end", (end).into())],
+        )
     }
 }
 

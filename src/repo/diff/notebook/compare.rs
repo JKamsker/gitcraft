@@ -13,6 +13,17 @@ pub enum Status {
     Modified,
 }
 
+impl Status {
+    pub(super) fn label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Unchanged => "repo-core-change-unchanged",
+            Self::Added => "repo-core-change-added",
+            Self::Removed => "repo-core-change-removed",
+            Self::Modified => "repo-core-change-modified",
+        })
+    }
+}
+
 /// A cell and what happened to it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CellChange {

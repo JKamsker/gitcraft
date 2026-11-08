@@ -269,9 +269,9 @@ fn a_build_leaves_its_exit_status_for_the_grid() -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         assert!(out.status.success());
         let text = std::fs::read_to_string(&status).ok();
-        assert_eq!(read_status(text.as_deref()), expected);
+        assert_eq!(read_status(text.as_deref()), Some(expected));
     }
-    assert_eq!(read_status(None), Built::Running);
+    assert_eq!(read_status(None), None);
     Ok(())
 }
 

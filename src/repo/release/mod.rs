@@ -114,7 +114,9 @@ impl RepoTab {
                     return;
                 };
                 if let Some(files) = rfd::FileDialog::new()
-                    .set_title("Files to attach to the release")
+                    .set_title(crate::i18n::text(
+                        "repo-workflows-release-release-act-2aead8f8",
+                    ))
                     .pick_files()
                 {
                     for f in files {
@@ -214,7 +216,10 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() && view.run.as_ref().is_none_or(|r| !r.running()) {
-            self.status = Some(("Wait for the operation running to end".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation running to end".to_owned(),
+                true,
+            )));
             return;
         }
         if view.run.is_none() {
@@ -237,7 +242,7 @@ impl RepoTab {
         let label = view
             .run
             .as_ref()
-            .map(|r| format!("Cut release {}", r.plan.tag))
+            .map(|r| release_operation_label(&r.plan.tag))
             .unwrap_or_default();
         self.busy_op = Some(label);
         self.op_started = Some(std::time::Instant::now());
@@ -259,7 +264,7 @@ impl RepoTab {
                 Some(why) => {
                     tab.busy_op = None;
                     tab.op_started = None;
-                    tab.status = Some((why, true));
+                    tab.status = Some(crate::repo::Notice::plain((why, true)));
                 }
             },
         );
@@ -305,7 +310,12 @@ impl RepoTab {
                         hosting.as_ref(),
                     )
                 }))
-                .unwrap_or_else(|_| Err("Internal error".to_owned()));
+                .unwrap_or_else(|_| {
+                    Err(
+                        crate::i18n::text("repo-workflows-release-next-release-step-1dac8dea")
+                            .to_owned(),
+                    )
+                });
                 (result, done)
             },
             move |tab, (result, done), ctx| {
@@ -351,7 +361,7 @@ impl RepoTab {
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
             return;
         };
-        let label = format!("Cut release {}", run.plan.tag);
+        let label = release_operation_label(&run.plan.tag);
         let local_done = run.done.bump_commit.is_some() || run.done.tag_object.is_some();
         if local_done {
             let (undo, redo) = undo(&run.plan, &run.done);
@@ -370,11 +380,11 @@ impl RepoTab {
             Status::Failed(e) => Some((*step, e.clone())),
             _ => None,
         });
-        self.status = Some(match failed {
+        self.status = Some(crate::repo::Notice::plain(match failed {
             Some((step, e)) => (format!("{label}: {} failed: {e}", step.label()), true),
             None if run.finished() => (format!("Released {}", run.plan.tag), false),
             None => (format!("{label}: stopped"), false),
-        });
+        }));
         if let Some((entry, replace)) = remember {
             if replace {
                 self.replace_recent_undo(entry, ctx);
@@ -384,10 +394,11 @@ impl RepoTab {
         }
         let long = started.is_some_and(|t| t.elapsed() > std::time::Duration::from_secs(4));
         if long {
-            self.finished.push(match &self.status {
-                Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
-                None => (format!("{} · {label}", self.name), false),
-            });
+            self.finished
+                .push(crate::repo::Notice::plain(match self.status.as_deref() {
+                    Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
+                    None => (format!("{} · {label}", self.name), false),
+                }));
         }
         self.reload(ctx);
     }
@@ -483,10 +494,9 @@ fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<Strin
             .as_ref()
             != Some(commit)
     {
-        return Some(format!(
-            "{} isn't the tag the release made any more (undone?): close this and cut the \
-             release again",
-            plan.tag
+        return Some(crate::i18n::message(
+            "repo-workflows-release-still-there-a632e5ba",
+            &[("plan-tag-1", (plan.tag).clone().into())],
         ));
     }
     if let (Some(bump), Some(commit)) = (&plan.bump, &done.bump_commit)
@@ -501,11 +511,28 @@ fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<Strin
         )
         .is_err()
     {
-        return Some(format!(
-            "The version commit isn't on {} any more (undone?): close this and cut the \
-             release again",
-            bump.branch
+        return Some(crate::i18n::message(
+            "repo-workflows-release-still-there-46993d84",
+            &[("bump-branch-1", (bump.branch).clone().into())],
         ));
     }
     None
+}
+
+fn release_operation_label(tag: &str) -> String {
+    format!("Cut release {tag}")
+}
+
+#[cfg(test)]
+mod fluent_r1_operation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_release_busy_and_undo_label_are_raw_in_both_languages() {
+        let tag = "v1234.5/{$x}:日本語";
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(release_operation_label(tag), format!("Cut release {tag}"));
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

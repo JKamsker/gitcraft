@@ -121,14 +121,15 @@ pub(in crate::repo) fn download_action(paths: &[String]) -> Result<Action, Strin
         many => format!("LFS: Download {} files", many.len()),
     };
     if let Some(bad) = paths.iter().find(|p| p.contains(',')) {
-        return Err(format!(
-            "{bad} has a comma in its name, which git-lfs reads as two patterns: use LFS: Pull to \
-             download it"
+        return Err(crate::i18n::message(
+            "repo-workflows-lfs_storage-download-action-e9f327fc",
+            &[("bad", (bad).clone().into())],
         ));
     }
     if let Some(bad) = paths.iter().find(|p| p.trim() != p.as_str()) {
-        return Err(format!(
-            "“{bad}” starts or ends with a space, which git-lfs drops: use LFS: Pull to download it"
+        return Err(crate::i18n::message(
+            "repo-workflows-lfs_storage-download-action-43432746",
+            &[("bad", (bad).clone().into())],
         ));
     }
     let mut steps = Vec::new();
@@ -194,7 +195,10 @@ fn caught<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
             .map(|s| (*s).to_owned())
             .or_else(|| p.downcast_ref::<String>().cloned())
             .unwrap_or_default();
-        Err(format!("Internal error: {said}"))
+        Err(crate::i18n::message(
+            "repo-workflows-lfs_storage-caught-ff2cd16f",
+            &[("said", (said).clone().into())],
+        ))
     })
 }
 
@@ -284,7 +288,10 @@ impl RepoTab {
                         state.files_error = None;
                     }
                     Err(e) => {
-                        state.files_error = Some(format!("Could not list the LFS files: {e}"));
+                        state.files_error = Some(crate::i18n::message(
+                            "repo-workflows-lfs_storage-list-lfs-files-8d1bad49",
+                            &[("e", (e).clone().into())],
+                        ));
                     }
                 }
                 if std::mem::take(&mut tab.lfs_storage.list_again) {
@@ -367,14 +374,14 @@ impl RepoTab {
                 })
             },
             |tab, result, _| {
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(include) => {
                         let names: Vec<String> =
                             include.iter().map(|p| git::pattern_label(p)).collect();
                         (format!("LFS now fetches only {}", names.join(", ")), false)
                     }
                     Err(e) => (format!("Could not set what LFS fetches: {e}"), true),
-                });
+                }));
                 if let Some(panel) = &mut tab.lfs_storage.panel {
                     panel.usage = None;
                 }
@@ -406,7 +413,12 @@ impl RepoTab {
                             panel.new_include.clear();
                         }
                     }
-                    Err(e) => panel.filter_error = Some(format!("Could not save it: {e}")),
+                    Err(e) => {
+                        panel.filter_error = Some(crate::i18n::message(
+                            "repo-workflows-lfs_storage-set-filter-b41c110a",
+                            &[("e", (e).clone().into())],
+                        ))
+                    }
                 }
             },
         );

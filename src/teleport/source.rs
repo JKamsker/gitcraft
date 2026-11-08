@@ -49,7 +49,7 @@ pub fn inspect(repo: &Path) -> Result<Source, String> {
     if let Some(op) = git::in_progress(&repo)? {
         return Err(format!(
             "A {} is in progress here: finish or abort it first.",
-            op.label().to_lowercase()
+            op.raw_label().to_lowercase()
         ));
     }
     let unmerged = git::run_bytes(Some(&repo), &["ls-files", "-u", "-z"])?;

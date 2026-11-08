@@ -98,7 +98,7 @@ pub(super) fn section(
         id.with("header"),
         Sense::click(),
     );
-    crate::a11y::a11y_selected(&fold, title, open);
+    crate::a11y::expanded(&fold, title, open);
     if fold.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -133,7 +133,7 @@ pub(super) fn output_box(ui: &mut Ui, title: &str, text: &str) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         faint(ui, title);
-        if icons::small_button(ui, "copy", "Copy").clicked() {
+        if icons::small_button(ui, "copy", crate::i18n::text("repo-core-1133")).clicked() {
             ui.ctx().copy_text(text.to_owned());
         }
     });

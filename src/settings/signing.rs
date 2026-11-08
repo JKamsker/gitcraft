@@ -196,13 +196,13 @@ pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bo
     });
 
     let (key_hint, program_hint) = match edit.format() {
-        "ssh" => ("~/.ssh/id_ed25519.pub, or key::ssh-ed25519 …", "ssh-keygen"),
-        "x509" => ("Certificate ID", "gpgsm"),
-        _ => ("Key ID or fingerprint", "gpg"),
+        "ssh" => (crate::i18n::text("interaction-tools-ssh-key"), "ssh-keygen"),
+        "x509" => (crate::i18n::text("interaction-tools-certificate"), "gpgsm"),
+        _ => (crate::i18n::text("interaction-tools-key-id"), "gpg"),
     };
     card.row_hint(
         "Signing key",
-        "Empty: picked from your identity",
+        crate::i18n::text("interaction-tools-identity"),
         "signingkey gpg ssh",
         |ui| {
             let key = ui
@@ -212,14 +212,14 @@ pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bo
                         .hint_text(key_hint)
                         .desired_width(layout::fit(ui, super::FIELD_WIDTH)),
                 )
-                .on_hover_text("user.signingkey; empty lets git pick one from your identity");
+                .on_hover_text(crate::i18n::text("interaction-tools-key-help"));
             commit |= key.lost_focus();
         },
     );
 
     card.row_hint(
         "Program",
-        "Empty: the one on the PATH",
+        crate::i18n::text("interaction-tools-path"),
         "gpg ssh-keygen gpgsm",
         |ui| {
             let program = ui
@@ -229,9 +229,12 @@ pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bo
                         .hint_text(program_hint)
                         .desired_width(layout::fit(ui, super::FIELD_WIDTH)),
                 )
-                .on_hover_text(format!(
-                    "{}; empty runs {program_hint} from the PATH",
-                    program_key(edit.format())
+                .on_hover_text(crate::i18n::message(
+                    "interaction-tools-program",
+                    &[
+                        ("key", program_key(edit.format()).into()),
+                        ("program", program_hint.into()),
+                    ],
                 ));
             commit |= program.lost_focus();
         },
@@ -241,12 +244,18 @@ pub(super) fn fields_rows(card: &mut Card, edit: &mut Signing, salt: &str) -> bo
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
             commit |= ui
-                .checkbox(&mut edit.sign_commits, "Commits")
+                .checkbox(
+                    &mut edit.sign_commits,
+                    crate::i18n::text("interaction-tools-commits"),
+                )
                 .on_hover_text("commit.gpgSign")
                 .changed();
             commit |= ui
-                .checkbox(&mut edit.sign_tags, "Tags")
-                .on_hover_text("tag.gpgSign: annotated tags")
+                .checkbox(
+                    &mut edit.sign_tags,
+                    crate::i18n::text("interaction-tools-tags"),
+                )
+                .on_hover_text(crate::i18n::text("interaction-tools-tag-help"))
                 .changed();
         });
     });
@@ -277,18 +286,14 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter, overridden_by: Option<&st
         ui,
         filter,
         "Commit signing",
-        Some(
-            "Your global git config on this machine; a repository's own config, or a profile \
-             that signs its own way, can override it. Repositories in WSL or over SSH use that \
-             machine's own.",
-        ),
+        Some(crate::i18n::text("interaction-tools-global")),
         |card| {
             if let Some(profile) = overridden_by {
                 card.full("profile own override", |ui| {
                     ui.label(
-                        RichText::new(format!(
-                            "The profile “{profile}” signs its own way (Settings → Profile): \
-                             what is set here doesn't apply while it is in use."
+                        RichText::new(crate::i18n::message(
+                            "interaction-tools-profile-override",
+                            &[("profile", profile.into())],
                         ))
                         .color(t.warning)
                         .small(),
@@ -315,6 +320,44 @@ pub(super) fn signing_ui(ui: &mut Ui, filter: &Filter, overridden_by: Option<&st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actual_signing_fields_translate_without_reading_or_writing_config() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, edit: &mut Signing| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let filter = Filter::new("", "Commit signing", false);
+                section(ui, &filter, "Commit signing", None, |card| {
+                    fields_rows(card, edit, "inert-signing-form");
+                });
+            },
+            Signing {
+                format: "ssh".into(),
+                key: "key::ssh-ed25519 日本語".into(),
+                ..Signing::default()
+            },
+        );
+        h.run();
+        h.get_by_label("Signaturschlüssel");
+        h.get_by_label("Standardmäßig signieren");
+        h.get_by_label("Commits").click();
+        h.run();
+        assert!(h.state().sign_commits);
+        assert_eq!(h.state().format, "ssh");
+        assert_eq!(h.state().key, "key::ssh-ed25519 日本語");
+        assert_eq!(program_key(h.state().format()), "gpg.ssh.program");
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Signing key");
+        assert!(h.state().sign_commits);
+        assert_eq!(h.state().key, "key::ssh-ed25519 日本語");
+    }
 
     #[test]
     fn signing_settings_in_a_config_list() {

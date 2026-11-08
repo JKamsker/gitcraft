@@ -365,7 +365,7 @@ fn undoing_the_empty_commit_after_publishing_it_is_refused() {
     assert!(tab.busy_op.is_none());
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(m, err)| *err && m.contains("main is published"))
     );
     assert!(main);
@@ -514,7 +514,7 @@ fn make_the_first_commit_with_nothing_to_commit_says_so() {
     // A notice, not an error.
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(m, err)| !*err && m.contains("Nothing to commit"))
     );
     assert!(tab.guide.focus_summary.is_none());
@@ -583,7 +583,7 @@ fn turning_tips_off_says_how_to_get_them_back() {
     assert!(!Settings::get(&ctx).tips);
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(m, err)| !*err && m.contains("Settings → General → Tips"))
     );
 }

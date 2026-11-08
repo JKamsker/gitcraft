@@ -22,6 +22,7 @@ pub(in crate::repo) struct AiState {
     suggestion: Option<(String, String)>,
     /// What to say under the message: (text, whether it is an error).
     note: Option<(String, bool)>,
+    note_presentation: Option<(String, MessageNote)>,
     review: Option<review::Review>,
     /// The tools on the repository's machine, looked for when the tool menu first opens.
     tools: Look,
@@ -66,9 +67,18 @@ impl Drop for AiState {
 fn elapsed(since: Instant) -> String {
     let secs = since.elapsed().as_secs();
     if secs < 60 {
-        format!("{secs} s")
+        crate::i18n::message(
+            "repo-workflows-ai-elapsed-127483e6",
+            &[("secs", (secs).into())],
+        )
     } else {
-        format!("{} min {} s", secs / 60, secs % 60)
+        crate::i18n::message(
+            "repo-workflows-ai-elapsed-fba4d59d",
+            &[
+                ("secs-60-1", (secs / 60).into()),
+                ("secs-60-2", (secs % 60).into()),
+            ],
+        )
     }
 }
 
@@ -76,10 +86,83 @@ fn elapsed(since: Instant) -> String {
 fn coverage(files: usize, left_out: usize) -> Option<String> {
     (left_out > 0).then(|| {
         let whole = files.saturating_sub(left_out);
-        format!(
-            "The tool saw {whole} of {files} file{} in full; the rest only in part or by name \
-             (Settings → AI sets how much is sent).",
-            if files == 1 { "" } else { "s" }
+        crate::i18n::message(
+            "repo-workflows-ai-coverage",
+            &[("whole", (whole).into()), ("files", (files).into())],
         )
     })
+}
+
+#[derive(Clone)]
+enum MessageNote {
+    Empty,
+    Coverage { files: usize, left_out: usize },
+}
+impl MessageNote {
+    fn raw(&self) -> String {
+        match self {
+            Self::Empty => "The tool's answer had no summary line.".into(),
+            Self::Coverage { files, left_out } => {
+                let whole = files.saturating_sub(*left_out);
+                format!(
+                    "The tool saw {whole} of {files} file{} in full; the rest only in part or by name (Settings → AI sets how much is sent).",
+                    if *files == 1 { "" } else { "s" }
+                )
+            }
+        }
+    }
+    fn display(&self) -> String {
+        match self {
+            Self::Empty => crate::i18n::text("repo-workflows-ai-message-answered-00f5dcad").into(),
+            Self::Coverage { files, left_out } => coverage(*files, *left_out).unwrap_or_default(),
+        }
+    }
+}
+impl AiState {
+    fn remember_message_note(&mut self, note: MessageNote, error: bool) {
+        let raw = note.raw();
+        self.note = Some((raw.clone(), error));
+        self.note_presentation = Some((raw, note));
+    }
+    fn display_message_note(&self, raw: &str) -> String {
+        match &self.note_presentation {
+            Some((old, note)) if old == raw => note.display(),
+            _ => raw.into(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_note_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_ai_message_note_retains_numeric_coverage_and_raw_failure()
+    -> Result<(), String> {
+        for note in [
+            MessageNote::Empty,
+            MessageNote::Coverage {
+                files: 1234,
+                left_out: 1,
+            },
+        ] {
+            crate::i18n::set_language("de");
+            let mut state = AiState::default();
+            state.remember_message_note(note, true);
+            let raw = state.note.clone().ok_or("missing test value")?.0;
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                if lang == "de" {
+                    assert_ne!(state.display_message_note(&raw), raw);
+                }
+                assert_eq!(state.note.as_ref().ok_or("missing test value")?.0, raw);
+                assert_eq!(state.requests, 0);
+                assert!(state.writing.is_none());
+            }
+            state.note_presentation = None;
+            assert_eq!(state.display_message_note(&raw), raw);
+        }
+        crate::i18n::set_language("en-US");
+
+        Ok(())
+    }
 }

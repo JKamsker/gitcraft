@@ -140,7 +140,10 @@ fn selecting_fork_isolates_pr_numbers_ci_and_all_late_hosting_continuations() {
     let _ = old.send(Msg::CiActed("old CI result".into(), Ok(())));
     let _ = old.send(Msg::Then(Box::new(|tab, _| {
         tab.prs = vec![pr(7, "Vancete")];
-        tab.status = Some(("stale issues/link/detail result".into(), true));
+        tab.status = Some(crate::repo::Notice::plain((
+            "stale issues/link/detail result".into(),
+            true,
+        )));
     })));
     let _ = tab
         .forge_sender()
@@ -151,7 +154,7 @@ fn selecting_fork_isolates_pr_numbers_ci_and_all_late_hosting_continuations() {
     // Going back does not make the first upstream lifetime's messages valid again.
     tab.set_primary_forge(Some("origin".into()), &ctx);
     let _ = old.send(Msg::Then(Box::new(|tab, _| {
-        tab.status = Some(("old A".into(), true))
+        tab.status = Some(crate::repo::Notice::plain(("old A".into(), true)))
     })));
     tab.poll(&ctx);
     assert!(tab.status.is_none());
@@ -282,7 +285,7 @@ fn late_create_completion_releases_busy_slot_without_running_its_old_continuatio
     assert!(
         tab.status
             .as_ref()
-            .is_some_and(|(s, _)| s.contains("previous primary forge"))
+            .is_some_and(|n| n.0.contains("previous primary forge"))
     );
 }
 
@@ -333,7 +336,10 @@ fn adversarial_completed_post_settling_is_released_when_catalog_discards_its_ref
     );
     assert_eq!(tab.pr_drafts[&7].review, "unsent review text");
     let _ = old.send(Msg::Then(Box::new(|tab, _| {
-        tab.status = Some(("discarded refresh".into(), true))
+        tab.status = Some(crate::repo::Notice::plain((
+            "discarded refresh".into(),
+            true,
+        )))
     })));
     tab.poll(&ctx);
     assert!(tab.status.is_none());
@@ -485,7 +491,7 @@ fn review12_canonical_repository_rename_preserves_pending_review_completion() {
         let mut after = before.clone();
         after.host = "FORGEJO.example".into();
         after.web = "HTTPS://FORGEJO.example:443/reviews/".into();
-        if forge != Forge::GitLab {
+        if !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket) {
             after.path = "TEAM/REPO".into();
         }
         let mut tab = review12_tab(&ctx, before.clone(), after);
@@ -508,4 +514,21 @@ fn review12_canonical_repository_rename_preserves_pending_review_completion() {
         assert!(!tab.pr_drafts[&7].posting);
         assert_eq!(tab.finished.len(), 1);
     }
+}
+
+#[test]
+fn linked_forge_selects_the_exact_remote_and_never_falls_back_when_blocked_or_missing() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let ctx = egui::Context::default();
+    let mut tab = tab(&ctx);
+    assert!(tab.select_linked_forge("fork", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("JKamsker")));
+    assert!(tab.select_linked_forge("origin", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
+    assert!(!tab.select_linked_forge("missing", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
+    tab.busy_op = Some("Create pull request".into());
+    assert!(tab.select_linked_forge("origin", &ctx));
+    assert!(!tab.select_linked_forge("fork", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
 }

@@ -73,10 +73,13 @@ pub(crate) fn candidate(entry: &Entry) -> Option<(String, String, String)> {
 /// can't be done.
 pub(crate) fn plan(repo: &Path, entry: &Entry, now: &str) -> Result<Plan, String> {
     let Some((branch, old, new)) = candidate(entry) else {
-        return Err("Only an operation that moved one branch can be removed this way".to_owned());
+        return Err(crate::i18n::text("repo-workflows-timeline-plan-da23e638").to_owned());
     };
     if now.is_empty() {
-        return Err(format!("{branch} doesn't exist any more"));
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-plan-42c2d675",
+            &[("branch", (branch).clone().into())],
+        ));
     }
     for commit in [&old, &new] {
         if git::run(
@@ -85,20 +88,25 @@ pub(crate) fn plan(repo: &Path, entry: &Entry, now: &str) -> Result<Plan, String
         )
         .is_err()
         {
-            return Err(format!(
-                "Commit {} isn't in the repository any more (collected by git gc)",
-                crate::repo::short(commit)
+            return Err(crate::i18n::message(
+                "repo-workflows-timeline-plan-41296321",
+                &[(
+                    "crate-repo-short-commit-1",
+                    (crate::repo::short(commit)).into(),
+                )],
             ));
         }
     }
     if !is_ancestor(repo, &old, &new) {
-        return Err(format!(
-            "It didn't only make commits on {branch} (it rewrote or moved it back): undo it instead"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-plan-09f68a9f",
+            &[("branch", (branch).clone().into())],
         ));
     }
     if !is_ancestor(repo, &new, now) {
-        return Err(format!(
-            "Its commits aren't on {branch} any more (it was rewritten or reset since)"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-plan-4b600f60",
+            &[("branch", (branch).clone().into())],
         ));
     }
     let merges = git::run(
@@ -112,9 +120,9 @@ pub(crate) fn plan(repo: &Path, entry: &Entry, now: &str) -> Result<Plan, String
         ],
     )?;
     if !merges.trim().is_empty() {
-        return Err(format!(
-            "The work on {branch} since has a merge commit: only a straight line of commits can \
-             be played again"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-plan-a4ff5403",
+            &[("branch", (branch).clone().into())],
         ));
     }
     let later: Vec<String> = git::run(
@@ -202,13 +210,16 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
             .ok()
     };
     if tip(&format!("refs/heads/{name}")).is_some() {
-        return Err(format!("A branch {name} exists already: pick another name"));
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-replay-5fa33495",
+            &[("name", (name).into())],
+        ));
     }
     // What was shown is what is played: commits made on the branch since would be left out.
     if tip(&format!("refs/heads/{}", plan.branch)).as_deref() != Some(plan.now.as_str()) {
-        return Err(format!(
-            "{} has moved since this was worked out: ask again to see what would be played",
-            plan.branch
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-replay-abfe0bc2",
+            &[("plan-branch-1", (plan.branch).clone().into())],
         ));
     }
     if let Err(e) = git::run(
@@ -219,8 +230,9 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
         // is left behind. The branch didn't exist before: it is this attempt's.
         let _ = git::run(Some(repo), &["worktree", "remove", "--force", "--", &arg]);
         let _ = git::run(Some(repo), &["branch", "-D", "--", name]);
-        return Err(format!(
-            "The worktree to play the commits in couldn't be made in {arg}: {e}"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-replay-fddf601c",
+            &[("arg", (arg).clone().into()), ("e", (e).clone().into())],
         ));
     }
     let in_worktree = |args: &[&str]| -> Result<String, String> {
@@ -246,7 +258,10 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
                 // Not a conflict: nothing is left behind.
                 let _ = git::run(Some(repo), &["worktree", "remove", "--force", "--", &arg]);
                 let _ = git::run(Some(repo), &["branch", "-D", "--", name]);
-                return Err(format!("Playing the later commits again failed: {e}"));
+                return Err(crate::i18n::message(
+                    "repo-workflows-timeline-replay-d57fcfd1",
+                    &[("e", (e).clone().into())],
+                ));
             };
             let files = in_worktree(&["diff", "--name-only", "-z", "--diff-filter=U"])
                 .unwrap_or_default()
@@ -279,7 +294,14 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
     }
     let tip = in_worktree(&["rev-parse", "HEAD"])?.trim().to_owned();
     git::run(Some(repo), &["worktree", "remove", "--", &arg]).map_err(|e| {
-        format!("{name} is made, but its worktree in {arg} couldn't be removed: {e}")
+        crate::i18n::message(
+            "repo-workflows-timeline-replay-e7c57ae8",
+            &[
+                ("name", (name).into()),
+                ("arg", (arg).clone().into()),
+                ("e", (e).clone().into()),
+            ],
+        )
     })?;
     Ok(Outcome::Done {
         branch: name.to_owned(),
@@ -309,9 +331,9 @@ pub(crate) fn discard(
     .map(|s| s.trim().to_owned())
     .unwrap_or_default();
     if !picking || branch != stopped_at {
-        return Err(format!(
-            "Work was done in {folder_arg} since (the cherry-pick went on, or commits were made): \
-             nothing is thrown away. Remove the worktree and {name} yourself if you don't want them"
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-discard-02af6d89",
+            &[("folder-arg", (folder_arg).into()), ("name", (name).into())],
         ));
     }
     git::run(

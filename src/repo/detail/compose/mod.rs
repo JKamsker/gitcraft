@@ -29,6 +29,7 @@ pub(in crate::repo) struct Compose {
     /// The box is to be started from the template and the hook: the tab was opened, or a
     /// commit was just made.
     prefill_due: bool,
+    editor_ids: Vec<egui::Id>,
     prefilling: bool,
     /// What went wrong reading the template or running the hook (never in the way of
     /// committing).
@@ -64,6 +65,7 @@ impl Default for Compose {
     fn default() -> Self {
         Self {
             prefill_due: true,
+            editor_ids: Vec::new(),
             prefilling: false,
             notice: None,
             template: None,
@@ -279,18 +281,14 @@ impl RepoTab {
                 match result {
                     // Not over what was typed while it ran.
                     Ok(Some(_)) if tab.current_message() != before => {
-                        tab.compose.notice = Some(
-                            "The message changed while prepare-commit-msg ran: run it again"
-                                .to_owned(),
-                        );
+                        tab.compose.notice = Some(crate::i18n::text("repo-core-3805").to_owned());
                     }
                     Ok(Some(message)) => {
                         tab.compose.notice = None;
                         tab.set_message(&message);
                     }
                     Ok(None) => {
-                        tab.compose.notice =
-                            Some("This repository has no prepare-commit-msg hook".to_owned());
+                        tab.compose.notice = Some(crate::i18n::text("repo-core-3806").to_owned());
                     }
                     Err(e) => tab.compose.notice = Some(e),
                 }
@@ -339,6 +337,13 @@ impl RepoTab {
 
     /// The summary and description fields, with completion. `enabled`: whether they can be
     /// typed in.
+    pub(crate) fn composer_has_focus(&self, ctx: &egui::Context) -> bool {
+        ctx.memory(|m| {
+            m.focused()
+                .is_some_and(|id| self.compose.editor_ids.contains(&id))
+        })
+    }
+
     pub(in crate::repo) fn message_fields(
         &mut self,
         ui: &mut Ui,
@@ -353,7 +358,7 @@ impl RepoTab {
                     &mut self.commit_summary,
                     |text| {
                         egui::TextEdit::singleline(text)
-                            .hint_text("Summary")
+                            .hint_text(crate::i18n::text("repo-core-0886"))
                             .desired_width(f32::INFINITY)
                             .margin(egui::Margin::symmetric(8, 6))
                     },
@@ -366,7 +371,7 @@ impl RepoTab {
                     &mut self.commit_body,
                     |text| {
                         egui::TextEdit::multiline(text)
-                            .hint_text("Description (optional)")
+                            .hint_text(crate::i18n::text("repo-core-0887"))
                             .desired_width(f32::INFINITY)
                             .desired_rows(3)
                             .margin(egui::Margin::symmetric(8, 6))
@@ -378,6 +383,7 @@ impl RepoTab {
                 (summary, body)
             })
             .inner;
+        self.compose.editor_ids = vec![summary.id, body.id];
         self.compose.completion = open;
         self.compose.candidates = Some((self.work_read, cands.types, cands));
         (summary, body)
@@ -401,11 +407,13 @@ impl RepoTab {
         if self.compose.replaced.is_some() {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("The message was replaced.")
+                    RichText::new(crate::i18n::text("repo-core-3807"))
                         .color(t.text_faint)
                         .small(),
                 );
-                if ui.small_button("Undo").clicked()
+                if ui
+                    .small_button(crate::i18n::text("repo-core-0051"))
+                    .clicked()
                     && let Some(before) = self.compose.replaced.take()
                 {
                     let (summary, body) = split_message(&before);
@@ -413,7 +421,9 @@ impl RepoTab {
                     self.commit_body = body;
                     self.compose.prefilled = None;
                 }
-                if crate::icons::small_button(ui, "x", "Dismiss").clicked() {
+                if crate::icons::small_button(ui, "x", crate::i18n::text("repo-core-0332"))
+                    .clicked()
+                {
                     self.compose.replaced = None;
                 }
             });
@@ -422,7 +432,7 @@ impl RepoTab {
             return;
         };
         ui.horizontal(|ui| {
-            if crate::icons::small_button(ui, "x", "Dismiss").clicked() {
+            if crate::icons::small_button(ui, "x", crate::i18n::text("repo-core-0332")).clicked() {
                 self.compose.notice = None;
             }
             ui.add(egui::Label::new(RichText::new(notice).color(t.warning).small()).wrap());

@@ -8,13 +8,24 @@
 //! reflog or config of the repository changes, nor does anything of its hooks run. Every git
 //! call goes through [`super::run`], so a repository in WSL or over SSH is simulated there.
 
+mod failure;
 mod picks;
 mod reach;
 mod scratch;
 mod version;
 
-pub use picks::{Replay, Replayed, Stop, rebase_picks, replay};
-pub use reach::{Merge, is_ancestor, leaving, merge, unreachable};
+pub(crate) use failure::Failure;
+#[cfg(test)]
+pub use picks::replay;
+pub(crate) use picks::replay_with_witness;
+pub use picks::{Replay, Replayed, Stop, rebase_picks};
+pub use reach::{Merge, is_ancestor};
+#[cfg(test)]
+pub use reach::{leaving, merge, unreachable};
+pub(crate) use reach::{
+    leaving_with_witness, merge_with_witness, unreachable_bounded_with_witness,
+    unreachable_with_witness,
+};
 pub use version::GitVersion;
 
 /// What a simulation ran on.
@@ -32,9 +43,11 @@ impl Engine {
     /// How the ghost run says what it ran on.
     pub fn describe(self) -> &'static str {
         match self {
-            Engine::Replay => "git replay, in memory",
-            Engine::MergeTree => "git merge-tree, in memory",
-            Engine::Scratch => "a scratch clone in the temporary folder",
+            Engine::Replay => crate::i18n::text("backend-git-replay-in-memory-a8f3e8"),
+            Engine::MergeTree => crate::i18n::text("backend-git-merge-tree-in-memory-565553"),
+            Engine::Scratch => {
+                crate::i18n::text("backend-a-scratch-clone-in-the-temporary-folder-3c56aa")
+            }
         }
     }
 }
@@ -83,30 +96,29 @@ pub fn partial_clone(repo: &std::path::Path) -> bool {
 }
 
 /// Refuses to work in a partial clone (see [`partial_clone`]).
-fn not_partial(repo: &std::path::Path) -> Result<(), String> {
+fn not_partial(repo: &std::path::Path) -> Result<(), Failure> {
     if partial_clone(repo) {
-        Err(
-            "this is a partial clone: working it out would download files from the remote"
-                .to_owned(),
-        )
+        Err(Failure::PartialClone)
     } else {
         Ok(())
     }
 }
 
 /// The full object name `rev` resolves to, as a commit.
-fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, String> {
-    super::resolve(repo, rev)
+fn commit_oid(repo: &std::path::Path, rev: &str) -> Result<String, Failure> {
+    super::resolve(repo, rev).map_err(Failure::Opaque)
 }
 
 /// The tree of the commit `oid`.
-fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, String> {
+fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, Failure> {
     super::run(
         Some(repo),
         &["rev-parse", "--verify", "-q", &format!("{oid}^{{tree}}")],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| format!("{oid} has no tree"))
+    .map_err(|_| Failure::NoTree {
+        oid: oid.to_owned(),
+    })
 }
 
 #[cfg(test)]

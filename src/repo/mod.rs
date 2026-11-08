@@ -1,35 +1,45 @@
 //! One open repository: its state, background git work and the view
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
+mod notice;
+pub(crate) use notice::Notice;
 mod actions;
 mod activity;
 pub(crate) mod agent;
 mod agents;
 mod ai;
 mod apply;
+mod atlas;
 mod authorship_view;
 mod bakeoff;
 mod bisect;
+mod branch_bands;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
 mod branch_tree;
 mod branch_visibility;
 mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
+mod cleanup;
+mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
-mod conflict;
+mod commit_changes;
+pub(crate) mod conflict;
 mod conflict_check;
+mod content_recovery;
 #[cfg(test)]
 mod cpu_benchmarks;
 pub(crate) mod custom_commands;
 mod dco;
 mod detached;
 mod detail;
+mod devcontainer;
 mod dialogs;
 mod diff;
 mod diff_split;
@@ -39,9 +49,11 @@ mod drafts;
 mod drafts_tests;
 mod drag_drop;
 mod drift_view;
+mod email;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
+pub(crate) mod file_comparison;
 mod file_text;
 pub(crate) mod file_view;
 mod find;
@@ -52,30 +64,41 @@ mod forge_selection;
 pub(crate) mod forks;
 mod gerrit;
 mod ghost;
+mod graph_motion;
 mod graph_order;
 pub(crate) mod graph_view;
+mod graph_walk;
+mod growth;
 mod guide;
 pub(crate) mod highlight;
+mod history_activity;
 pub(crate) mod history_filter;
+mod history_reader;
 mod hooks;
 mod hotfix;
+mod https_recovery;
 mod interaction;
-mod issue_work;
+pub(crate) mod issue_work;
 mod keep_submodules;
+pub(crate) mod keyboard;
 mod keys;
 mod layout;
 mod lfs_locks;
 mod lfs_storage;
 mod lifecycle;
+mod line_dossier;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
+mod local_ci;
 mod messages;
+pub(crate) use messages::mutation_key;
 mod nav_history;
 mod navigate;
 mod navigation;
 mod offline;
-mod operations;
+pub(crate) mod operations;
+pub(crate) use operations::run_reviewed_push;
 mod owners;
 mod package;
 mod palette;
@@ -84,42 +107,53 @@ mod partial_stash;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 #[cfg(test)]
 mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
 mod reflog;
 mod rehearse;
 mod release;
 mod remerge;
+mod repository_tools;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
+mod review_workflow;
 mod rewrite;
 mod running;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
+mod sparse;
+mod ssh_setup;
 mod stack;
 mod state;
 mod surgery;
+mod symbol_biography;
 mod terminals;
 mod test_lane;
 #[cfg(test)]
 mod tests;
 mod timeline;
 mod toolbar;
+mod tour;
 mod unity;
 mod versions;
 mod watch;
 mod watch_remote;
 mod weakened_marks;
 pub(crate) mod widgets;
+mod working_drafts;
 pub(crate) mod worktree_tab;
 #[cfg(test)]
 mod worktree_tests;
@@ -166,6 +200,7 @@ pub struct RepoTab {
     pub name: String,
     tx: messages::JobSender,
     _jobs: crate::tasks::Scope,
+    behaviour_cache: crate::parallel_bisect::observe::Cache,
     rx: Receiver<Msg>,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
@@ -177,6 +212,9 @@ pub struct RepoTab {
     reads: u64,
     /// The read the working tree shown comes from.
     work_read: u64,
+    work_pending: u64,
+    work_epoch: u64,
+    keyboard: std::cell::RefCell<keyboard::State>,
     /// The read the submodules shown come from.
     submodules_read: u64,
     /// The watcher came while the first read ran, which may have missed changes made before
@@ -195,6 +233,12 @@ pub struct RepoTab {
     refs: Refs,
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
+    content_recovery: content_recovery::State,
+    working_drafts: working_drafts::State,
+    dossier: line_dossier::State,
+    symbols: symbol_biography::State,
+    cochanges: cochanges::State,
+    saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// Operational lookup into raw history; display filtering must never break ancestry.
     history_index: HashMap<String, usize>,
@@ -232,6 +276,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
@@ -278,6 +325,7 @@ pub struct RepoTab {
     scroll_to: Option<usize>,
     /// The commit the detail pane is about (a graph row or a stash).
     detail_hash: Option<String>,
+    pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     /// The selected commit's signature, containment, notes and backlinks.
@@ -286,11 +334,17 @@ pub struct RepoTab {
     /// One active syntax comparison and at most one latest replacement across diff views.
     structural_running: Option<(u64, u64)>,
     structural_pending: bool,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
+    review_document: review_workflow::ReviewState,
+    review_tools: review_workflow::Tools,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
+    local_ci: local_ci::State,
+    email: email::State,
+    devcontainer: devcontainer::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -298,6 +352,8 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    tour: Option<tour::TourView>,
+    ssh_setup: Option<ssh_setup::State>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -318,6 +374,10 @@ pub struct RepoTab {
     absorb: Option<Box<surgery::AbsorbEditor>>,
     /// Stacked branches: the recorded parents and the layers they make.
     stacks: stack::Stacks,
+    deferred: repository_tools::DeferredCache,
+    prompt_session: prompt_session::State,
+    outbox_last: Option<std::time::Instant>,
+    outbox_reading: bool,
     /// The release being prepared or cut (its dialog).
     release: Option<release::ReleaseView>,
     /// The hotfix flow: the dialog that finishes one, and the push after it.
@@ -329,10 +389,19 @@ pub struct RepoTab {
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
     /// refused push.
     push_flow: push::PushFlow,
+    plain_rebase_request: u64,
+    preflight_pending: Option<PendingOp>,
+    preflight_selection: Option<git::repository_tools::routes::PreparedPush>,
+    preflight_after: Option<(String, PendingOp)>,
+    preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
+    connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    https_generation: u64,
+    https_checking: bool,
+    https_challenge: Option<https_recovery::Ticket>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     /// The forge has been asked for avatars.
@@ -417,11 +486,25 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    graph_motion: graph_motion::State,
+    celebration: celebration::State,
+    topology: std::sync::Arc<graph_walk::Topology>,
+    topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
+    graph_narration: graph_walk::Narration,
+    postcards: postcards::State,
+    growth: Option<growth::State>,
+    cleanup: Option<cleanup::State>,
+    sparse: Option<sparse::State>,
+    atlas: Option<atlas::State>,
+    history_activity: Option<history_activity::Activity>,
+    history_minimap: graph_view::minimap::State,
+    branch_bands: branch_bands::Preferences,
+    band_reader: history_reader::Reader<crate::graph::Graph>,
     /// A network operation failed (taken by `App`, for the taskbar button).
     network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
     update_submodules: bool,
-    status: Option<(String, bool)>,
+    status: Option<Notice>,
     branch_filter: String,
     /// Where a clicked jump mark wants the sidebar scrolled to.
     sidebar_jump: Option<f32>,
@@ -496,7 +579,7 @@ pub struct RepoTab {
     bakeoff: bakeoff::BakeoffState,
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
-    pub finished: Vec<(String, bool)>,
+    pub finished: Vec<Notice>,
     /// The repository's own custom commands, and what the palette offers of them.
     custom: custom_commands::TabCommands,
 }
@@ -524,16 +607,21 @@ impl RepoTab {
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
+        let branch_bands = branch_bands::Preferences::load(_ctx, &path);
         Self {
             path,
             name,
             tx,
             _jobs: jobs,
+            behaviour_cache: Default::default(),
             rx,
             opened: Instant::now(),
             life: lifecycle::Lifecycle::new(Instant::now()),
             reads: 0,
             work_read: 0,
+            work_pending: 0,
+            work_epoch: 0,
+            keyboard: Default::default(),
             submodules_read: 0,
             recheck_after_load: false,
             shown: true,
@@ -544,6 +632,12 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
+            content_recovery: Default::default(),
+            working_drafts: Default::default(),
+            dossier: Default::default(),
+            symbols: Default::default(),
+            cochanges: Default::default(),
+            saved_views: Default::default(),
             history: Vec::new(),
             history_index: HashMap::new(),
             pr_graph_head: None,
@@ -558,7 +652,7 @@ impl RepoTab {
             work: WorkStatus::default(),
             commits: Vec::new(),
             graph: Graph {
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 width: 0,
             },
             graph_labels: HashMap::new(),
@@ -571,6 +665,9 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
             unity: Default::default(),
@@ -599,18 +696,27 @@ impl RepoTab {
             stash_view: None,
             scroll_to: None,
             detail_hash: None,
+            pending_commit_diff: None,
             detail: None,
             detail_error: None,
             extras: Default::default(),
             diff: None,
             structural_running: None,
             structural_pending: false,
+            file_comparison: None,
             compare: None,
             pr_view: None,
+            review_document: Default::default(),
+            review_tools: Default::default(),
             ci_view: None,
+            local_ci: Default::default(),
+            email: Default::default(),
+            devcontainer: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            tour: None,
+            ssh_setup: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
@@ -623,13 +729,26 @@ impl RepoTab {
             split: None,
             absorb: None,
             stacks: Default::default(),
+            deferred: Default::default(),
+            prompt_session: Default::default(),
+            outbox_last: None,
+            outbox_reading: false,
             release: None,
             hotfix: hotfix::Hotfix::default(),
             package: None,
             reword: None,
             push_flow: Default::default(),
+            plain_rebase_request: 0,
+            preflight_pending: None,
+            preflight_selection: None,
+            preflight_after: None,
+            preflight_timeline: None,
             credentials: None,
+            connection_context: crate::connections::current(),
             last_op: None,
+            https_generation: 0,
+            https_checking: false,
+            https_challenge: None,
             error_card: None,
             avatars_hinted: false,
             diff_ignore_ws: false,
@@ -675,6 +794,20 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            graph_motion: Default::default(),
+            celebration: Default::default(),
+            topology: Default::default(),
+            topology_reader: Default::default(),
+            graph_narration: Default::default(),
+            postcards: Default::default(),
+            growth: None,
+            cleanup: None,
+            sparse: None,
+            atlas: None,
+            history_activity: None,
+            history_minimap: Default::default(),
+            branch_bands,
+            band_reader: Default::default(),
             network_failed: false,
             update_submodules: false,
             status: None,
@@ -776,6 +909,13 @@ impl RepoTab {
     pub fn set_credentials(&mut self, creds: git::Credentials) {
         self.credentials = Some(creds);
     }
+
+    #[cfg(test)]
+    pub(crate) fn has_test_credentials(&self, username: &str, password: &str) -> bool {
+        self.credentials
+            .as_ref()
+            .is_some_and(|c| c.username == username && c.password == password)
+    }
 }
 
 /// A hash as the UI shows it: its first 8 characters.
@@ -789,3 +929,5 @@ pub(crate) fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
         .map(|args| args.iter().map(|a| (*a).to_owned()).collect())
         .collect()
 }
+
+mod prompt_session;

@@ -94,10 +94,10 @@ impl Group {
     pub fn label(self) -> &'static str {
         match self {
             Group::Gitcraft => "gitcraft",
-            Group::Dark => "Dark",
-            Group::Light => "Light",
-            Group::Yours => "Your themes",
-            Group::Editor => "Your editor",
+            Group::Dark => crate::i18n::text("interaction-preferences-group-dark"),
+            Group::Light => crate::i18n::text("interaction-preferences-group-light"),
+            Group::Yours => crate::i18n::text("interaction-preferences-group-yours"),
+            Group::Editor => crate::i18n::text("interaction-preferences-group-editor"),
         }
     }
 }
@@ -350,9 +350,9 @@ impl LaneColors {
 
     pub fn label(self) -> &'static str {
         match self {
-            LaneColors::Theme => "The theme's colours",
-            LaneColors::Classic => "Classic",
-            LaneColors::ColorBlind => "Colour-blind safe",
+            LaneColors::Theme => crate::i18n::text("interaction-presentation-lane-theme"),
+            LaneColors::Classic => crate::i18n::text("interaction-presentation-lane-classic"),
+            LaneColors::ColorBlind => crate::i18n::text("interaction-presentation-lane-colorblind"),
         }
     }
 }
@@ -755,4 +755,8 @@ pub fn set_tokens(ctx: &egui::Context, t: Tokens) {
     let style = ctx.global_style();
     ctx.set_style_of(egui::Theme::Light, Arc::clone(&style));
     ctx.set_style_of(egui::Theme::Dark, style);
+}
+
+pub(crate) fn portable_theme(id: &ThemeId) -> bool {
+    catalog::BUILTIN.iter().any(|t| t.id == id.0)
 }

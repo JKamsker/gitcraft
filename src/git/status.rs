@@ -37,11 +37,22 @@ pub enum InProgress {
 impl InProgress {
     pub fn label(self) -> &'static str {
         match self {
-            InProgress::Merge => "Merge",
-            InProgress::CherryPick => "Cherry-pick",
-            InProgress::Revert => "Revert",
-            InProgress::Rebase => "Rebase",
-            InProgress::Am => "Patch",
+            InProgress::Merge => crate::i18n::text("backend-in-progress-merge"),
+            InProgress::CherryPick => crate::i18n::text("backend-in-progress-cherry-pick"),
+            InProgress::Revert => crate::i18n::text("backend-in-progress-revert"),
+            InProgress::Rebase => crate::i18n::text("backend-in-progress-rebase"),
+            InProgress::Am => crate::i18n::text("backend-in-progress-patch"),
+        }
+    }
+
+    /// Stable operation name for raw diagnostics parsed by presentation adapters.
+    pub(crate) fn raw_label(self) -> &'static str {
+        match self {
+            Self::Merge => "Merge",
+            Self::CherryPick => "Cherry-pick",
+            Self::Revert => "Revert",
+            Self::Rebase => "Rebase",
+            Self::Am => "Patch",
         }
     }
 
@@ -110,7 +121,12 @@ pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
     if let Some(target) = crate::remote::parse(repo) {
         return in_progress_there(&target);
     }
-    let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
+    let asked = |e: std::io::Error| {
+        crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-e-f9a978",
+            &[("detail", (e).to_string().into())],
+        )
+    };
     // Ask git once for the private worktree directory. In particular, a linked worktree's
     // operation markers do not live in the shared git directory.
     let directory = super::backend::dispatch(
@@ -184,9 +200,14 @@ fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress
         (0, "CHERRY_PICK_HEAD") => Ok(Some(InProgress::CherryPick)),
         (0, "REVERT_HEAD") => Ok(Some(InProgress::Revert)),
         (0, "none") => Ok(None),
-        _ => Err(format!(
-            "could not read the repository's state: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+        _ => Err(crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-4bd015",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&out.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
         )),
     }
 }

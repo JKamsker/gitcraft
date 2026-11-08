@@ -125,6 +125,11 @@ impl<T> FoldGroup<'_, T> {
         let t = Tokens::get(ui.ctx());
         let (rect, resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+        crate::a11y::expanded(
+            &resp,
+            || crate::i18n::message("repo-core-2543", &[("count", (self.folded.len()).into())]),
+            open,
+        );
         let painter = ui.painter_at(rect);
         if resp.hovered() {
             painter.rect_filled(rect, 0.0, t.hover);
@@ -174,9 +179,9 @@ impl<T> FoldGroup<'_, T> {
             t.text_dim,
         );
         let resp = resp.on_hover_text(if open {
-            "Fold them again"
+            crate::i18n::text("repo-core-2544")
         } else {
-            "Show them (Settings → Git → Diffs turns folding off)"
+            crate::i18n::text("repo-core-2545")
         });
         if resp.clicked() {
             open = !open;
@@ -194,39 +199,42 @@ pub(super) fn group_title(reasons: &[FoldReason]) -> String {
     let what = match same {
         Some(FoldReason::Lockfile) => {
             if one {
-                "lockfile"
+                crate::i18n::text("repo-core-2546")
             } else {
-                "lockfiles"
+                crate::i18n::text("repo-core-2547")
             }
         }
         Some(FoldReason::Generated) => {
             if one {
-                "generated file"
+                crate::i18n::text("repo-core-2548")
             } else {
-                "generated files"
+                crate::i18n::text("repo-core-2549")
             }
         }
         Some(FoldReason::Minified) => {
             if one {
-                "minified file"
+                crate::i18n::text("repo-core-2550")
             } else {
-                "minified files"
+                crate::i18n::text("repo-core-2551")
             }
         }
         Some(FoldReason::NoDiff) => {
             if one {
-                "file marked -diff"
+                crate::i18n::text("repo-core-2552")
             } else {
-                "files marked -diff"
+                crate::i18n::text("repo-core-2553")
             }
         }
         Some(FoldReason::Pattern) | None => {
             if one {
-                "folded file"
+                crate::i18n::text("repo-core-2554")
             } else {
-                "folded files"
+                crate::i18n::text("repo-core-2555")
             }
         }
     };
-    format!("{n} {what}")
+    crate::i18n::message(
+        "repo-core-1911",
+        &[("n", (n).into()), ("what", what.to_string().into())],
+    )
 }

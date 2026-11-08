@@ -67,7 +67,7 @@ fn settle(tab: &mut RepoTab, ctx: &egui::Context) {
 }
 
 #[test]
-fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
+fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() -> Result<(), String> {
     let (dir, bare) = project("flow");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
@@ -102,8 +102,42 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
     let choices = tab.hotfix.finish.as_ref().map(|f| f.choices.clone());
     tab.hotfix_act(HotfixAct::Finish, &ctx);
     settle(&mut tab, &ctx);
-    // Then the push, which follows.
-    settle(&mut tab, &ctx);
+    // Automatic atomic multi-ref publication is deliberately refused by this checklist.
+    // Complete the existing per-ref review flow for each exact resulting object instead.
+    wait(&mut tab, &ctx, |t| {
+        matches!(t.dialog, Some(Dialog::PushError(_)))
+    });
+    assert!(matches!(&tab.dialog, Some(Dialog::PushError(e)) if e.contains("atomic")));
+    assert_eq!(
+        git::resolve(&bare, "refs/heads/main").ok().as_deref(),
+        Some(main_before.as_str())
+    );
+    assert_eq!(
+        git::resolve(&bare, "refs/heads/develop").ok().as_deref(),
+        Some(develop_before.as_str())
+    );
+    assert!(git::resolve(&bare, "refs/tags/v2.3.2").is_err());
+    tab.dialog = None;
+    for reference in ["refs/heads/main", "refs/heads/develop", "refs/tags/v2.3.2"] {
+        tab.run_ops(
+            "Push reviewed hotfix ref",
+            vec![vec![
+                "push".into(),
+                "origin".into(),
+                format!("{reference}:{reference}"),
+            ]],
+            crate::repo::Refresh::All,
+            crate::repo::OpKind::plain(),
+            &ctx,
+        );
+        crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+        assert!(
+            tab.status.as_deref().is_some_and(|(_, failed)| !failed),
+            "{:?}",
+            tab.status
+        );
+    }
     let current = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();
     let tag_at = git::resolve(&dir, "v2.3.2").ok();
     let tag_object = git::run(Some(&dir), &["rev-parse", "refs/tags/v2.3.2"]).unwrap_or_default();
@@ -158,6 +192,7 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() {
     assert_eq!(redone_main, local_main);
     assert_eq!(redone_branch.trim(), "main");
     assert!(redone_gone);
+    Ok(())
 }
 
 #[test]
@@ -200,7 +235,12 @@ fn a_finish_that_stops_part_way_is_undoable() {
     });
     let develop_merged =
         git::resolve(&dir, "refs/heads/develop").ok() != Some(develop_before.clone());
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     tab.undo(&ctx);
     settle(&mut tab, &ctx);
     let branch = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();

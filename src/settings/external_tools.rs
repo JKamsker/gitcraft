@@ -8,10 +8,9 @@ use super::{COMBO_WIDTH, FIELD_WIDTH, Settings};
 use crate::git::external_tool::{Kind, Preset, ToolChoice};
 
 /// What the section says under its title.
-pub(super) const INTRO: &str = "Open in diff tool and Resolve in merge tool (a file's right-click \
-     menu, the conflict editor) start one of these and refresh the view when it closes. In WSL, \
-     a preset is the Windows program, given the files through \\\\wsl.localhost; over SSH, the \
-     tool runs on that machine and has to be installed there.";
+pub(super) fn intro() -> &'static str {
+    crate::i18n::text("interaction-tools-external-intro")
+}
 
 impl Settings {
     pub(super) fn external_tools_ui(&mut self, card: &mut Card) {
@@ -31,7 +30,8 @@ impl Settings {
 /// The tool picker, and the program of a preset.
 fn tool_ui(ui: &mut Ui, choice: &mut ToolChoice, kind: Kind) {
     ui.vertical(|ui| {
-        let git_own = format!("As set in git ({})", kind.key());
+        let git_own =
+            crate::i18n::message("interaction-tools-git-tool", &[("key", kind.key().into())]);
         egui::ComboBox::from_id_salt(("settings-external-tool", kind.noun()))
             .width(layout::fit(ui, COMBO_WIDTH))
             .selected_text(
@@ -48,16 +48,12 @@ fn tool_ui(ui: &mut Ui, choice: &mut ToolChoice, kind: Kind) {
         ui.add_space(4.0);
         match choice.preset {
             None => {
-                let falls_back = match kind {
-                    Kind::Diff => ", or else merge.tool",
-                    Kind::Merge => "",
-                };
                 layout::note(
                     ui,
-                    format!(
-                        "The tool your git config names in {}{falls_back}",
-                        kind.key()
-                    ),
+                    crate::i18n::text(match kind {
+                        Kind::Diff => "interaction-tools-diff-fallback",
+                        Kind::Merge => "interaction-tools-merge-fallback",
+                    }),
                 );
             }
             Some(preset) => {
@@ -66,12 +62,7 @@ fn tool_ui(ui: &mut Ui, choice: &mut ToolChoice, kind: Kind) {
                         .hint_text(program_hint(preset))
                         .desired_width(layout::fit(ui, FIELD_WIDTH)),
                 )
-                .on_hover_text(
-                    "The program of this machine to run, when it isn't found by itself (on the \
-                     PATH, or in Program Files on Windows and for WSL repositories, where it is \
-                     the Windows .exe). Over SSH it isn't used: the tool there is found by git of \
-                     that machine (its mergetool.<tool>.path).",
-                );
+                .on_hover_text(crate::i18n::text("interaction-tools-program-help"));
             }
         }
     });
@@ -88,5 +79,43 @@ fn program_hint(preset: Preset) -> String {
     } else {
         preset.default_program()
     };
-    format!("Found by itself, or the full path of {exe}")
+    crate::i18n::message("interaction-tools-program-hint", &[("program", exe.into())])
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_tool_picker_localizes_whole_fallback_and_preserves_choice_and_config_key() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, choice: &mut ToolChoice| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                tool_ui(ui, choice, Kind::Diff);
+            },
+            ToolChoice::default(),
+        );
+        h.run();
+        h.get_by_value("Wie in Git konfiguriert (diff.tool)");
+        h.get_by_label(
+            "Das Werkzeug aus diff.tool in deiner Git-Konfiguration, ersatzweise aus merge.tool",
+        );
+        assert!(h.state().preset.is_none());
+        assert_eq!(Kind::Diff.key(), "diff.tool");
+        assert!(intro().contains(r"\\wsl.localhost"));
+        assert!(
+            program_hint(Preset::ALL[0])
+                .starts_with("Automatisch gefunden oder vollständiger Pfad zu ")
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_value("As set in git (diff.tool)");
+        assert!(h.state().preset.is_none());
+    }
 }

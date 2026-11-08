@@ -50,7 +50,10 @@ impl DiffTarget {
                     // `difftool` passes revisions on to `diff`; one like an option would be read
                     // as one.
                     if rev.is_empty() || rev.starts_with('-') {
-                        return Err(format!("{rev:?} isn't a revision to compare"));
+                        return Err(crate::i18n::message(
+                            "backend-rev-isn-t-a-revision-to-compare-3dd7e7",
+                            &[("rev", format!("{:?}", rev).into())],
+                        ));
                     }
                     args.push(rev.clone());
                 }

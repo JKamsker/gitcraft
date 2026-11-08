@@ -363,7 +363,7 @@ fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
     assert!(tab.rebase.is_none());
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(s, error)| *error && s.contains("another version"))
     );
 }
@@ -403,6 +403,7 @@ fn sign_ins_typed_in_the_tab_are_never_kept() {
     let ctx = egui::Context::default();
     let mut tab = restored_tab(dir.clone(), &ctx);
     tab.set_credentials(git::Credentials {
+        scope: None,
         username: "me".to_owned(),
         password: "hunter2-token".to_owned(),
     });

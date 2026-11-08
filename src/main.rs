@@ -8,18 +8,94 @@ use eframe::egui_wgpu::{SurfaceConfig, WgpuConfiguration, WgpuSetup, WgpuSetupCr
 use gitcraft::app;
 
 fn main() -> eframe::Result {
+    if let Some(code) = gitcraft::owned_endpoint_helper() {
+        std::process::exit(code);
+    }
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let explicit = args.first().is_some_and(|a| {
+        [
+            "--diff",
+            "--difftool",
+            "--merge",
+            "--mergetool",
+            "--help",
+            "--version",
+            "-h",
+            "-V",
+        ]
+        .iter()
+        .any(|flag| a == flag)
+    });
+    if args.len() == 1 && args.first().is_some_and(|a| a == "--help" || a == "-h") {
+        app::initialize_language();
+        println!(
+            "{}\n{}",
+            gitcraft::launch::args::usage(),
+            gitcraft::standalone::usage()
+        );
+        return Ok(());
+    }
+    if args.len() == 1 && args.first().is_some_and(|a| a == "--version" || a == "-V") {
+        println!("gitcraft {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if !explicit
+        && args.iter().any(|a| a.to_str().is_none())
+        && (std::env::var_os("GITCRAFT_ASKPASS").is_some()
+            || args.first().is_some_and(|a| {
+                a == "--gitcraft-profile-ssh" || a == "--gitcraft-profile-credential"
+            }))
+    {
+        std::process::exit(1);
+    }
+    if !explicit
+        && let Some(code) =
+            gitcraft::connections::credential_helper().or_else(gitcraft::connections::ssh_helper)
+    {
+        std::process::exit(code);
+    }
     // Started by ssh to ask the running app something (see `remote::askpass`): no window.
-    if let Some(code) = app::askpass_helper() {
+    if !explicit && let Some(code) = app::askpass_helper() {
         std::process::exit(code);
     }
     // `gitcraft mcp`: the MCP server for coding agents, on stdin and stdout; no window.
-    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     if args.first().is_some_and(|a| a == "mcp") {
         std::process::exit(gitcraft::mcp::main(&args[1..]));
     }
     // Run by a coding agent's hook after each turn (see `agent::checkpoint`): no window.
     if let Some(code) = app::checkpoint_cli() {
         std::process::exit(code);
+    }
+    // Presentation only. All protocol/helper exits above stay free of settings/locale reads.
+    app::initialize_language();
+    if args
+        .first()
+        .is_some_and(|a| a == "--diff" || a == "--difftool" || a == "--merge" || a == "--mergetool")
+    {
+        let invocation = match gitcraft::standalone::parse(args.clone()) {
+            Ok(invocation) => invocation,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        };
+        let options = eframe::NativeOptions {
+            viewport: app::window_viewport()
+                .with_title(gitcraft::standalone::window_title())
+                .with_inner_size([1400.0, 860.0])
+                .with_icon(app::window_icon()),
+            wgpu_options: wgpu_options(),
+            ..Default::default()
+        };
+        let outcome = gitcraft::standalone::run(invocation, options);
+        app::after_exit();
+        match outcome {
+            Ok(code) => std::process::exit(i32::from(code)),
+            Err(error) => {
+                app::tell(&error, true);
+                std::process::exit(2);
+            }
+        }
     }
     let args = gitcraft::launch::args::from_system(std::env::args_os().skip(1));
     let launch = match gitcraft::launch::parse(args.clone()) {
@@ -42,6 +118,20 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    // --quit is useful without a tray host. With no existing instance there is no window
+    // or background session to create.
+    if matches!(launch, Some(gitcraft::launch::Command::Quit)) {
+        return Ok(());
+    }
+    // LaunchServices delivers cold and warm gitcraft:// events through GetURL. Register
+    // before constructing/running the event loop; retain until it exits. The pinned winit
+    // backend does not install a GetURL handler or replace this Foundation registration.
+    #[cfg(target_os = "macos")]
+    let _native_urls = gitcraft_os::NativeUrlHandler::install().map_err(|message| {
+        eframe::Error::AppCreation(app::display_start_message(&message).into())
+    })?;
+
+    app::install_panic_log();
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: app::window_viewport()
@@ -68,7 +158,11 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| Ok(Box::new(app::App::launched(cc, launch)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DesktopApp::new(app::App::launched(
+                cc, launch,
+            ))))
+        }),
     );
     app::after_exit();
     result

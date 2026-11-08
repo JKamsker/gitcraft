@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use egui::{Event, Key, Modifiers, PointerButton, RawInput};
 
 use super::super::nav_history::NavHistory;
-use super::{View, nav_step, record};
+use super::{View, keyboard_step, nav_step, record};
 use crate::git;
 use crate::repo::file_view::{FileTab, FileView};
 use crate::repo::{Action, DiffKey, DiffView, RepoTab, WIP_HASH};
@@ -244,7 +244,7 @@ fn step_for(events: Vec<Event>, modifiers: Modifiers, keys: bool) -> Option<i32>
         ..Default::default()
     };
     let mut output = ctx.run_ui(input, |ui| {
-        step = ui.ctx().input(|i| nav_step(i, keys));
+        step = keyboard_step(ui.ctx(), keys).or_else(|| ui.ctx().input(nav_step));
     });
     output.textures_delta.clear();
     step
@@ -545,7 +545,7 @@ fn gone_places_are_passed_over_and_said_so() {
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert!(tab.diff.is_none());
     assert_eq!(
-        tab.status,
+        tab.status.as_deref().cloned(),
         Some((format!("{file} has no unstaged changes any more"), false))
     );
     assert_eq!(tab.nav.entries(), &[graph(Some(&head))]);
@@ -563,7 +563,7 @@ fn gone_places_are_passed_over_and_said_so() {
     assert_eq!(tab.nav.current(), Some(&history));
     assert!(tab.file_view.is_some());
     assert_eq!(
-        tab.status,
+        tab.status.as_deref().cloned(),
         Some((format!("{file} has no staged changes any more"), false))
     );
     // Forward goes straight back to the graph.
@@ -577,7 +577,7 @@ fn gone_places_are_passed_over_and_said_so() {
         .visit(diff_at(commit_key(&head, &file), Some(&head)));
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(
-        tab.status,
+        tab.status.as_deref().cloned(),
         Some((
             "Commit 01234567 is no longer in the graph".to_owned(),
             false
@@ -630,7 +630,12 @@ fn going_back_keeps_a_commit_message_being_edited() {
     tab.navigate(-1, &ctx);
     assert_eq!(tab.nav.current(), Some(&View::Pr(3)));
     assert!(tab.reword.is_some());
-    let message = tab.status.clone().map(|(m, _)| m).unwrap_or_default();
+    let message = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(m, _)| m)
+        .unwrap_or_default();
     assert!(message.contains("commit message"), "{message}");
 }
 
@@ -723,7 +728,8 @@ fn the_keys_step_through_the_drawn_tab() {
     frames(&mut harness);
     let (head, base) = head_and_base(&dir);
     assert_eq!(harness.state().selected_hash(), Some(head.clone()));
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowDown);
+    // The graph uses its registered default; Alt+Down belongs to diff stepping.
+    harness.key_press(Key::ArrowDown);
     frames(&mut harness);
     assert_eq!(harness.state().selected_hash(), Some(base));
     harness.key_press(Key::ArrowUp);

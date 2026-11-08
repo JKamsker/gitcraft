@@ -19,7 +19,7 @@ impl RepoTab {
         let others = self.other_branches().next().is_some();
         if others {
             items.push(verb(
-                "Check out a branch…".to_owned(),
+                crate::i18n::text("repo-core-2971").to_owned(),
                 "branch",
                 Pick::Checkout,
             ));
@@ -28,21 +28,51 @@ impl RepoTab {
             && others
         {
             items.extend([
-                verb(format!("Merge into {current}…"), "merge", Pick::Merge),
-                verb(format!("Rebase {current} onto…"), "rebase", Pick::Rebase),
                 verb(
-                    format!("Interactive rebase {current} onto…"),
+                    crate::i18n::message(
+                        "repo-core-2972",
+                        &[("current", current.to_string().into())],
+                    ),
+                    "merge",
+                    Pick::Merge,
+                ),
+                verb(
+                    crate::i18n::message(
+                        "repo-core-2973",
+                        &[("current", current.to_string().into())],
+                    ),
+                    "rebase",
+                    Pick::Rebase,
+                ),
+                verb(
+                    crate::i18n::message(
+                        "repo-core-2974",
+                        &[("current", current.to_string().into())],
+                    ),
                     "rebase",
                     Pick::InteractiveRebase,
                 ),
                 verb(
-                    format!("Changes a branch adds to {current}…"),
+                    crate::i18n::message(
+                        "repo-core-2975",
+                        &[("current", current.to_string().into())],
+                    ),
                     "compare",
                     Pick::ChangesAdded,
                 ),
-                verb(format!("Compare {current} with…"), "compare", Pick::Compare),
                 verb(
-                    format!("Rehearse merge or rebase of {current} with…"),
+                    crate::i18n::message(
+                        "repo-core-2976",
+                        &[("current", current.to_string().into())],
+                    ),
+                    "compare",
+                    Pick::Compare,
+                ),
+                verb(
+                    crate::i18n::message(
+                        "dev-integration-ui-rehearse",
+                        &[("branch", current.to_string().into())],
+                    ),
                     "rehearse",
                     Pick::Rehearse,
                 ),
@@ -53,14 +83,14 @@ impl RepoTab {
             && self.refs.local.iter().any(|b| b.name != *current)
         {
             items.push(verb(
-                format!("Find the interaction of {current} with…"),
+                crate::i18n::message("repo-core-2977", &[("current", current.to_string().into())]),
                 "interaction",
                 Pick::Interaction,
             ));
         }
         if self.pushable().next().is_some() {
             items.push(verb(
-                "Push another branch…".to_owned(),
+                crate::i18n::text("repo-core-2979").to_owned(),
                 "remote",
                 Pick::Push,
             ));
@@ -79,14 +109,23 @@ impl RepoTab {
                         Some(_) => Action::CheckoutRemote(b.name.clone()),
                         None => Action::Checkout(b.name.clone()),
                     };
-                    PaletteItem::action(&b.name, remote.unwrap_or("local"), action)
-                        .key(key(&b.name))
+                    PaletteItem::named_action(
+                        &b.name,
+                        remote.unwrap_or(crate::i18n::text("repo-core-2601")),
+                        action,
+                    )
+                    .key(key(&b.name))
                 })
                 .collect(),
             Pick::Push => self
                 .pushable()
                 .map(|(b, to, push)| {
-                    PaletteItem::action(&b.name, &format!("to {to}"), push).key(key(&b.name))
+                    PaletteItem::named_action(
+                        &b.name,
+                        &crate::i18n::message("repo-core-2981", &[("to", to.to_string().into())]),
+                        push,
+                    )
+                    .key(key(&b.name))
                 })
                 .collect(),
             Pick::Reset(hash) => self.reset_choices(hash),
@@ -110,8 +149,12 @@ impl RepoTab {
                         };
                         let action = branch_action(pick, at, current)?;
                         Some(
-                            PaletteItem::action(&b.name, remote.unwrap_or("local"), action)
-                                .key(key(&b.name)),
+                            PaletteItem::named_action(
+                                &b.name,
+                                remote.unwrap_or(crate::i18n::text("repo-core-2601")),
+                                action,
+                            )
+                            .key(key(&b.name)),
                         )
                     })
                     .collect()
@@ -163,7 +206,11 @@ impl RepoTab {
             .iter()
             .map(|mode| {
                 PaletteItem::action(
-                    format!("{} — {}", mode.label, mode.short),
+                    format!(
+                        "{} — {}",
+                        super::super::messages::display_operation(mode.label),
+                        crate::i18n::text(mode.short)
+                    ),
                     "reset",
                     reset_action(&rewrite, mode),
                 )

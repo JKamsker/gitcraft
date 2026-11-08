@@ -147,7 +147,13 @@ impl RepoTab {
                 if stop {
                     crate::repo::widgets::a11y(&gutter_resp, egui::WidgetType::Button, || {
                         let short = line.hash.get(..7).unwrap_or(&line.hash);
-                        format!("line {}, go to commit {short}", i + 1)
+                        crate::i18n::message(
+                            "repo-core-2477",
+                            &[
+                                ("i", format!("{}", i + 1).into()),
+                                ("short", short.to_string().into()),
+                            ],
+                        )
                     });
                 }
                 if first {
@@ -156,7 +162,7 @@ impl RepoTab {
                         p.text(
                             pos2(gutter.left() + 10.0, mid),
                             Align2::LEFT_CENTER,
-                            "Not committed yet",
+                            crate::i18n::text("repo-core-2478"),
                             small,
                             t.warning,
                         );
@@ -193,11 +199,13 @@ impl RepoTab {
                     }
                 }
                 if !line.uncommitted() {
-                    let gutter_resp = gutter_resp.on_hover_text(format!(
-                        "{} · {}\n{}\nClick to show the commit",
-                        line.author,
-                        git::relative_time(line.time, now),
-                        line.summary
+                    let gutter_resp = gutter_resp.on_hover_text(crate::i18n::message(
+                        "repo-core-2479",
+                        &[
+                            ("author", line.author.to_string().into()),
+                            ("now", git::relative_time(line.time, now).to_string().into()),
+                            ("summary", line.summary.to_string().into()),
+                        ],
                     ));
                     if gutter_resp.clicked() {
                         acts.push(Action::CloseFileView);
@@ -212,6 +220,39 @@ impl RepoTab {
                     t.text_faint,
                 );
                 let x = gutter.right() + NUM_W + 8.0;
+                let text_response = ui.interact(
+                    Rect::from_min_max(pos2(x, rect.top()), rect.right_bottom()),
+                    ui.id().with(("blame-dossier", i)),
+                    Sense::click(),
+                );
+                egui::Popup::context_menu(&text_response)
+                    .style(crate::theme::menu_style)
+                    .show(|ui| {
+                        if !line.uncommitted()
+                            && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
+                            && ui.button(crate::i18n::text("repo-core-2325")).clicked()
+                        {
+                            acts.push(Action::OpenLineDossier(Some(
+                                git::investigations::dossier::Seed {
+                                    commit: line.hash.clone(),
+                                    path,
+                                    line: line.orig as usize,
+                                },
+                            )));
+                        }
+                        if !line.uncommitted()
+                            && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
+                            && ui.button(crate::i18n::text("repo-core-2326")).clicked()
+                        {
+                            acts.push(Action::OpenSymbolBiography(Some(
+                                git::investigations::dossier::Seed {
+                                    commit: line.hash.clone(),
+                                    path,
+                                    line: line.orig as usize,
+                                },
+                            )));
+                        }
+                    });
                 let spans = data.spans.as_ref().and_then(|s| s.get(i));
                 let galley = file_text::line_galley(ui, spans, &line.text, &font, t.text);
                 find::paint_line(&p, (x, mid, LINE_H), galley, found.marks(i), &t);

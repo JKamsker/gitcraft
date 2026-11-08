@@ -263,7 +263,7 @@ pub(crate) fn warm_up() {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn decode_for_tests() -> &'static str {
     DECODE
 }

@@ -1,4 +1,4 @@
-//! "Where's my work?": one panel over every repository gitcraft knows (recent ones of every
+//! crate::i18n::text("interaction-my-work-title"): one panel over every repository gitcraft knows (recent ones of every
 //! profile, the open tabs, the workspaces, and those found on a machine), listing what exists
 //! only there, with Open, and Push where a branch has a place to go. Each repository is looked
 //! at in one round trip, a few at a time and a couple per other machine, in the background
@@ -231,7 +231,7 @@ impl MyWork {
             }
             *running += 1;
             let (tx, ctx) = (tx.clone(), ctx.clone());
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let result = my_work::push_branch(&key.0, &key.1, has_upstream);
                 let _ = tx.send((key, machine, result));
                 ctx.request_repaint();
@@ -272,7 +272,7 @@ impl MyWork {
         self.searches.insert(machine.clone(), None);
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let result = discover::find_repos(&machine);
             let _ = tx.send((machine, result));
             ctx.request_repaint();
@@ -287,7 +287,7 @@ impl MyWork {
         }
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(discover::machines());
             ctx.request_repaint();
         });
@@ -391,12 +391,15 @@ impl App {
         }
     }
 
+    pub(super) fn poll_my_work(&mut self, ctx: &egui::Context) {
+        for (machine, found) in self.my_work.poll(ctx) {
+            self.take_search(&machine, found);
+        }
+    }
+
     pub(super) fn my_work_ui(&mut self, ctx: &egui::Context) {
         if !self.my_work.open {
             return;
-        }
-        for (machine, found) in self.my_work.poll(ctx) {
-            self.take_search(&machine, found);
         }
         let t = Tokens::get(ctx);
         let frame = egui::Frame::new()
@@ -452,28 +455,39 @@ impl App {
 fn panel_header(ui: &mut Ui, w: &MyWork, t: &Tokens) -> Option<Ask> {
     let mut ask = None;
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Where's my work?").font(theme::semibold(16.0)));
+        ui.label(
+            RichText::new(crate::i18n::text("interaction-my-work-title"))
+                .font(theme::semibold(16.0)),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            if icons::small_button(ui, "x", crate::i18n::text("interaction-my-work-close"))
+                .clicked()
+            {
                 ask = Some(Ask::Close);
             }
-            if icons::small_button(ui, "refresh-cw", "Look again").clicked() {
+            if icons::small_button(
+                ui,
+                "refresh-cw",
+                crate::i18n::text("interaction-my-work-look"),
+            )
+            .clicked()
+            {
                 ask = Some(Ask::LookAll);
             }
         });
     });
-    ui.label(
-        RichText::new(
-            "Commits not pushed, stashes, uncommitted changes and branches whose remote branch \
-             is gone, in every repository gitcraft knows.",
-        )
-        .color(t.text_dim),
-    );
+    ui.label(RichText::new(crate::i18n::text("interaction-my-work-intro")).color(t.text_dim));
     if w.busy() {
         let (total, done) = w.round;
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new().size(12.0));
-            ui.label(RichText::new(format!("Looked at {done} of {total}…")).color(t.text_faint));
+            ui.label(
+                RichText::new(crate::i18n::message(
+                    "interaction-my-work-progress",
+                    &[("done", done.into()), ("total", total.into())],
+                ))
+                .color(t.text_faint),
+            );
         });
     }
     ui.add_space(8.0);
@@ -527,20 +541,27 @@ fn results(ui: &mut Ui, w: &MyWork, found: &[PathBuf], t: &Tokens) -> Option<Ask
         }
         ui.add_space(6.0);
         ui.label(
-            RichText::new(machine.to_uppercase())
-                .font(theme::semibold(10.5))
-                .color(t.text_faint),
+            RichText::new(if machine == "This computer" {
+                crate::i18n::text("interaction-my-work-this-computer").to_uppercase()
+            } else {
+                machine.to_uppercase()
+            })
+            .font(theme::semibold(10.5))
+            .color(t.text_faint),
         );
         if !rows.unlooked.is_empty() {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    RichText::new(format!(
-                        "{} not looked at: gitcraft isn't connected there.",
-                        repo_count(rows.unlooked.len())
+                    RichText::new(crate::i18n::message(
+                        "interaction-my-work-unlooked",
+                        &[("count", rows.unlooked.len().into())],
                     ))
                     .color(t.text_dim),
                 );
-                if ui.button("Connect and look").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-my-work-connect-look"))
+                    .clicked()
+                {
                     ask = Some(Ask::LookAt(rows.unlooked.clone()));
                 }
             });
@@ -557,55 +578,59 @@ fn results(ui: &mut Ui, w: &MyWork, found: &[PathBuf], t: &Tokens) -> Option<Ask
         ui.horizontal(|ui| {
             icons::inline(ui, "check", 14.0, t.success);
             if unlooked_in_all == 0 {
-                ui.label(
-                    "Nothing is only here: everything is committed and pushed, and nothing is \
-                     stashed.",
-                );
+                ui.label(crate::i18n::text("interaction-my-work-clean"));
             } else {
-                ui.label(format!(
-                    "Nothing is only here in the {} looked at.",
-                    repo_count(clean)
+                ui.label(crate::i18n::message(
+                    "interaction-my-work-clean-looked",
+                    &[("count", clean.into())],
                 ));
             }
         });
     }
     if w.looked.is_empty() {
-        ui.label(
-            RichText::new(
-                "gitcraft knows no repositories yet: open some, or find them on a machine below.",
-            )
-            .color(t.text_dim),
-        );
+        ui.label(RichText::new(crate::i18n::text("interaction-my-work-empty")).color(t.text_dim));
     }
     if clean > 0 {
         ui.label(
-            RichText::new(format!(
-                "{} with nothing that is only there.",
-                repo_count(clean)
+            RichText::new(crate::i18n::message(
+                "interaction-my-work-clean-count",
+                &[("count", clean.into())],
             ))
             .color(t.text_faint),
         );
     }
     if !failed.is_empty() {
         egui::CollapsingHeader::new(
-            RichText::new(format!("Couldn't look at {}", repo_count(failed.len()))).color(t.danger),
+            RichText::new(crate::i18n::message(
+                "interaction-my-work-failed-look",
+                &[("count", failed.len().into())],
+            ))
+            .color(t.danger),
         )
         .id_salt("my-work-failed")
         .show(ui, |ui| {
             for (path, e) in failed {
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new(format!("{}: {e}", crate::remote::display(path)))
-                            .color(t.text_dim)
-                            .small(),
+                        RichText::new(format!(
+                            "{}: {}",
+                            crate::remote::display(path),
+                            across::display_error(e)
+                        ))
+                        .color(t.text_dim)
+                        .small(),
                     );
                     if found.contains(path)
                         && matches!(
                             across::short_reason(e),
                             "folder not found" | "not a repository"
                         )
-                        && icons::small_button(ui, "x", "Forget it: it was found here once")
-                            .clicked()
+                        && icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-my-work-forget"),
+                        )
+                        .clicked()
                     {
                         ask = Some(Ask::Forget(path.clone()));
                     }
@@ -614,15 +639,6 @@ fn results(ui: &mut Ui, w: &MyWork, found: &[PathBuf], t: &Tokens) -> Option<Ask
         });
     }
     ask
-}
-
-/// "1 repository", "3 repositories".
-fn repo_count(n: usize) -> String {
-    if n == 1 {
-        "1 repository".to_owned()
-    } else {
-        format!("{n} repositories")
-    }
 }
 
 /// One repository: its name, Open, and a row per piece of work.
@@ -644,7 +660,10 @@ fn repo_block(ui: &mut Ui, w: &MyWork, repo: &Path, work: &[Work], t: &Tokens) -
                         .small(),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Open").clicked() {
+                    if ui
+                        .button(crate::i18n::text("interaction-my-work-open"))
+                        .clicked()
+                    {
                         ask = Some(Ask::Open(repo.to_owned()));
                     }
                 });
@@ -659,8 +678,11 @@ fn repo_block(ui: &mut Ui, w: &MyWork, repo: &Path, work: &[Work], t: &Tokens) -
                             ask = Some(a);
                         }
                     } else if let Some(why) = item.why_no_push() {
-                        ui.label(RichText::new("open it to push").color(t.text_faint))
-                            .on_hover_text(why);
+                        ui.label(
+                            RichText::new(crate::i18n::text("interaction-my-work-open-push"))
+                                .color(t.text_faint),
+                        )
+                        .on_hover_text(why);
                     }
                 });
             }
@@ -685,42 +707,47 @@ fn push_button(
         .map(|t| t.host)
         .filter(|h| !crate::remote::is_connected(h));
     let label = if far.is_some() {
-        "Connect and push"
+        crate::i18n::text("interaction-my-work-connect-push")
     } else {
-        "Push"
+        crate::i18n::text("interaction-my-work-push")
     };
     match w.pushes.get(&key) {
         Some(None) => {
             ui.add(crate::spinner::Spinner::new().size(12.0));
             let queued = w.push_queue.iter().any(|(k, _)| k == &key);
             let text = if queued {
-                "waiting to push…"
+                crate::i18n::text("interaction-my-work-waiting")
             } else {
-                "pushing…"
+                crate::i18n::text("interaction-my-work-pushing")
             };
             ui.label(RichText::new(text).color(t.text_faint));
             None
         }
         Some(Some(Err(e))) => {
-            ui.label(RichText::new(format!("push: {}", across::short_reason(e))).color(t.danger))
-                .on_hover_text(e);
+            ui.label(
+                RichText::new(crate::i18n::message(
+                    "interaction-my-work-push-error",
+                    &[("reason", across::display_reason(e).into())],
+                ))
+                .color(t.danger),
+            )
+            .on_hover_text(across::display_error(e));
             ui.button(label)
-                .on_hover_text("Try again")
+                .on_hover_text(crate::i18n::text("interaction-my-work-retry"))
                 .clicked()
                 .then(ask)
         }
         _ => {
-            let to = if has_upstream {
-                "to its upstream"
-            } else {
-                "to origin and track it there"
-            };
+            let tracked = if has_upstream { "yes" } else { "no" };
             let hint = match &far {
-                Some(host) => format!(
-                    "Connect to {} (which may ask for a password) and push it {to}",
-                    host.label()
+                Some(host) => crate::i18n::message(
+                    "interaction-my-work-push-remote",
+                    &[("host", host.label().into()), ("tracked", tracked.into())],
                 ),
-                None => format!("Push it {to} (git asks for no password)"),
+                None => crate::i18n::message(
+                    "interaction-my-work-push-local",
+                    &[("tracked", tracked.into())],
+                ),
             };
             ui.button(label).on_hover_text(hint).clicked().then(ask)
         }
@@ -731,15 +758,14 @@ fn push_button(
 fn machines_line(ui: &mut Ui, w: &MyWork, t: &Tokens) -> Option<Ask> {
     let mut ask = None;
     ui.label(
-        RichText::new("FIND MORE REPOSITORIES")
+        RichText::new(crate::i18n::text("interaction-my-work-find"))
             .font(theme::semibold(10.5))
             .color(t.text_faint),
     );
     ui.label(
-        RichText::new(format!(
-            "Searches a machine's home folder, {} folders deep (hidden ones skipped); what is \
-             found is remembered.",
-            discover::DEPTH
+        RichText::new(crate::i18n::message(
+            "interaction-my-work-search-description",
+            &[("depth", discover::DEPTH.into())],
         ))
         .color(t.text_faint)
         .small(),
@@ -753,20 +779,35 @@ fn machines_line(ui: &mut Ui, w: &MyWork, t: &Tokens) -> Option<Ask> {
             match w.searches.get(machine) {
                 Some(None) => {
                     ui.add(crate::spinner::Spinner::new().size(12.0));
-                    ui.label(RichText::new(format!("{}…", machine.label())).color(t.text_dim));
+                    ui.label(
+                        RichText::new(format!("{}…", machine.display_label())).color(t.text_dim),
+                    );
                 }
                 state => {
                     let label = match state {
-                        Some(Some(Ok((n, true)))) => {
-                            format!("{} (found {n}+, the rest skipped)", machine.label())
-                        }
-                        Some(Some(Ok((n, false)))) => format!("{} (found {n})", machine.label()),
-                        Some(Some(Err(_))) => format!("{} (failed)", machine.label()),
-                        _ => machine.label(),
+                        Some(Some(Ok((n, true)))) => crate::i18n::message(
+                            "interaction-my-work-found-cut",
+                            &[
+                                ("machine", machine.display_label().into()),
+                                ("count", (*n).into()),
+                            ],
+                        ),
+                        Some(Some(Ok((n, false)))) => crate::i18n::message(
+                            "interaction-my-work-found",
+                            &[
+                                ("machine", machine.display_label().into()),
+                                ("count", (*n).into()),
+                            ],
+                        ),
+                        Some(Some(Err(_))) => crate::i18n::message(
+                            "interaction-my-work-search-failed",
+                            &[("machine", machine.display_label().into())],
+                        ),
+                        _ => machine.display_label(),
                     };
                     let mut b = ui.button(label);
                     if let Some(Some(Err(e))) = state {
-                        b = b.on_hover_text(e);
+                        b = b.on_hover_text(across::display_error(e));
                     }
                     if b.clicked() {
                         ask = Some(Ask::Search(machine.clone()));
@@ -781,3 +822,155 @@ fn machines_line(ui: &mut Ui, w: &MyWork, t: &Tokens) -> Option<Ask> {
 #[cfg(test)]
 #[path = "my_work_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_my_work_results_translate_and_only_return_the_original_open_request() {
+        crate::i18n::set_language("de");
+        let path = PathBuf::from("/opaque/repo 日本語");
+        let mut work = MyWork::default();
+        work.looked.push(path.clone());
+        work.seen.insert(
+            path.clone(),
+            Ok(Overview {
+                changed: 1234,
+                ..Default::default()
+            }),
+        );
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, opened: &mut Option<PathBuf>| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                panel_header(ui, &work, &t);
+                if let Some(Ask::Open(path)) = results(ui, &work, &[], &t) {
+                    *opened = Some(path);
+                }
+                assert!(
+                    work.pushes.is_empty() && work.push_queue.is_empty() && work.batches.is_empty()
+                );
+            },
+            None,
+        );
+        h.run();
+        h.get_by_label("Wo ist meine Arbeit?");
+        h.get_by_label("DIESER RECHNER");
+        h.get_by_label("1.234 Dateien mit nicht committeten Änderungen");
+        h.get_by_label("Öffnen").click();
+        h.run();
+        assert_eq!(*h.state(), Some(path));
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Where's my work?");
+        h.get_by_label("1,234 files with uncommitted changes");
+    }
+
+    #[test]
+    fn actual_push_control_returns_original_branch_and_tracking_flag_without_dispatch() {
+        crate::i18n::set_language("de");
+        let work = MyWork::default();
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, requested: &mut bool| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                if let Some(Ask::Push(path, branch, tracked)) = push_button(
+                    ui,
+                    &work,
+                    Path::new("/opaque/repo"),
+                    "feature/日本語",
+                    false,
+                    &t,
+                ) {
+                    assert_eq!(path, Path::new("/opaque/repo"));
+                    assert_eq!(branch, "feature/日本語");
+                    assert!(!tracked);
+                    *requested = true;
+                }
+                assert!(work.pushes.is_empty() && work.push_queue.is_empty());
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label("Pushen").click();
+        h.run();
+        assert!(*h.state());
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Push");
+    }
+
+    #[test]
+    fn work_descriptions_keep_push_classification_raw_and_unknown_errors_opaque()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let item = Work::Unpushed {
+            branch: "feature/日本語".into(),
+            upstream: Some("origin/日本語".into()),
+            commits: 1234,
+            tracks: crate::git::Tracks::SameName,
+        };
+        assert_eq!(
+            item.describe(),
+            "feature/日本語: 1.234 Commits nicht nach origin/日本語 gepusht"
+        );
+        assert_eq!(item.push(), Some(("feature/日本語", true)));
+        let other = Work::Unpushed {
+            branch: "feature/日本語".into(),
+            upstream: Some("origin/日本語".into()),
+            commits: 1234,
+            tracks: crate::git::Tracks::OtherName,
+        };
+        assert!(other.push().is_none());
+        assert!(
+            other
+                .why_no_push()
+                .ok_or("missing test value")?
+                .contains("feature/日本語 folgt origin/日本語")
+        );
+        assert_eq!(
+            Work::Stashes(vec!["wip 日本語".into(), "older".into()]).describe(),
+            "2 Stashes, der neueste: wip 日本語"
+        );
+        let raw = "feature/日本語 has no upstream set any more";
+        assert_eq!(
+            across::display_error(raw),
+            "Für feature/日本語 ist kein Upstream mehr festgelegt"
+        );
+        assert_eq!(raw, "feature/日本語 has no upstream set any more");
+        assert_eq!(
+            across::display_reason("fatal: not a git repository"),
+            "kein Repository"
+        );
+        assert_eq!(
+            across::short_reason("fatal: not a git repository"),
+            "not a repository"
+        );
+        for raw in [
+            "External diagnostic 日本語",
+            "prefix feature has no upstream set any more",
+            "no answer within banana; it may still be running",
+        ] {
+            assert_eq!(across::display_error(raw), raw);
+        }
+        assert_eq!(across::discover::Machine::Here.label(), "This computer");
+        assert_eq!(
+            across::discover::Machine::Here.display_label(),
+            "Dieser Rechner"
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(across::display_error(raw), raw);
+
+        Ok(())
+    }
+}

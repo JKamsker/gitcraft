@@ -83,7 +83,7 @@ fn test_by_hand(tab: &mut RepoTab, ctx: &egui::Context, dir: &Path) -> Result<()
         }
         let mark = if has_bug(dir)? { Mark::Bad } else { Mark::Good };
         act(tab, ctx, BisectAct::Mark { mark, rev: None })?;
-        if let Some((said, true)) = &tab.status {
+        if let Some((said, true)) = tab.status.as_deref() {
             return Err(said.clone());
         }
     }
@@ -188,7 +188,9 @@ fn a_run_from_the_banner_streams_its_output_and_finds_the_culprit() -> Result<()
         let outcome = tab.bisect.state().and_then(|b| b.outcome.clone());
         assert_eq!(outcome, Some(Outcome::FirstBad(hashes[13].clone())));
         assert_eq!(
-            tab.status.as_ref().map(|(s, failed)| (s.as_str(), *failed)),
+            tab.status
+                .as_deref()
+                .map(|(s, failed)| (s.as_str(), *failed)),
             Some(("Bisect run: found the first bad commit", false))
         );
         // The command is offered again.
@@ -220,7 +222,7 @@ fn a_start_with_uncommitted_changes_is_refused_with_why() -> Result<(), String> 
             },
         )?;
         assert!(tab.bisect.state().is_none());
-        let (said, failed) = tab.status.clone().ok_or("nothing said")?;
+        let (said, failed) = tab.status.as_deref().cloned().ok_or("nothing said")?;
         assert!(failed && said.contains("uncommitted changes"), "{said}");
         assert!(git::bisect_state(&dir)?.is_none());
         Ok(())

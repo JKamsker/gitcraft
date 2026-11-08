@@ -125,48 +125,18 @@ impl RepoTab {
             if let super::Dialog::GerritReview { head, .. } = &mut dialog {
                 *head = b.target.clone();
             }
-            return Some(("Gerrit review".to_owned(), Action::Dialog(dialog)));
+            return Some((
+                crate::i18n::text("repo-core-0345").to_owned(),
+                Action::Dialog(dialog),
+            ));
         }
-        let tracked = if b.upstream_gone() {
-            None
-        } else {
-            self.split_upstream(&b.upstream)
-        };
-        // Full refs: a tag of the same name must not be what is pushed.
-        let (to, args) = match tracked {
-            Some((remote, name)) => (
-                b.upstream.clone(),
-                vec![
-                    "push".to_owned(),
-                    remote,
-                    format!("refs/heads/{}:refs/heads/{name}", b.name),
-                ],
-            ),
-            None => {
-                let remote = self.default_remote()?;
-                (
-                    remote.clone(),
-                    vec![
-                        // `simple`: with push.default=upstream, a source alone goes to the
-                        // branch it tracks (`main` for one made from origin/main).
-                        "-c".to_owned(),
-                        "push.default=simple".to_owned(),
-                        "push".to_owned(),
-                        "-u".to_owned(),
-                        remote,
-                        // No `:dst`, which would bypass `remote.<name>.push` (Gerrit's
-                        // refs/for/*); the full source alone is not mistaken for a tag.
-                        format!("refs/heads/{}", b.name),
-                    ],
-                )
-            }
-        };
-        let action = Action::Ops {
-            label: format!("Push {}", b.name),
-            ops: vec![args],
-            refresh: Refresh::All,
-        };
-        Some((to, action))
+        Some((
+            crate::i18n::text("repo-core-0346").into(),
+            Action::RepositoryTools(super::repository_tools::Act::PushBranch(
+                b.name.clone(),
+                b.target.clone(),
+            )),
+        ))
     }
 
     /// Makes `b` track nothing, undoably.
@@ -224,7 +194,10 @@ impl RepoTab {
 
     pub(super) fn commit(&mut self, ctx: &egui::Context) {
         if !self.work.conflicted.is_empty() {
-            self.status = Some(("Resolve the conflicted files first".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0351").to_owned(),
+                true,
+            )));
             return;
         }
         // A restack's rebase goes on as the restack: the layers after it too.
@@ -256,7 +229,10 @@ impl RepoTab {
         }
         let summary = self.commit_summary.trim();
         if summary.is_empty() {
-            self.status = Some(("Write a commit summary first".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0355").to_owned(),
+                true,
+            )));
             return;
         }
         let mut commit = vec!["commit".to_owned()];
@@ -437,13 +413,13 @@ pub(super) fn checkout_pull_undo(
 
 /// Refuses (saying so in `status`) a branch or commit name git would read as an option: one
 /// from a remote or a pull request can be anything a ref name may be.
-pub(super) fn refuse_option_like(name: &str, status: &mut Option<(String, bool)>) -> bool {
+pub(super) fn refuse_option_like(name: &str, status: &mut Option<super::Notice>) -> bool {
     let bad = name.is_empty() || name.starts_with('-');
     if bad {
-        *status = Some((
-            format!("Can't check out \"{name}\": not a usable name"),
+        *status = Some(super::Notice::plain((
+            crate::i18n::message("repo-core-0369", &[("name", name.to_string().into())]),
             true,
-        ));
+        )));
     }
     bad
 }

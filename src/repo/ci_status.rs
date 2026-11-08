@@ -44,6 +44,15 @@ pub(super) struct CiStatuses {
 }
 
 impl CiStatuses {
+    pub(super) fn account_changed(&mut self) {
+        let in_flight = self.loading;
+        *self = CiStatuses {
+            projects: self.projects.clone(),
+            loading: in_flight,
+            superseded: in_flight,
+            ..Default::default()
+        };
+    }
     /// The repository's builds are now read from `projects` (its remotes or upstreams
     /// changed): what was read from a project no longer among them goes, along with the answer
     /// still on its way. That one keeps the slot until it comes, so the two can't land in the
@@ -252,14 +261,20 @@ fn spoken(status: &Status) -> String {
     } else {
         tally
     };
-    crate::a11y::labels::join([format!("builds: {tally}").as_str(), "opens the builds"])
+    crate::a11y::labels::join([
+        crate::i18n::message("repo-core-0283", &[("tally", (tally).into())]).as_str(),
+        crate::i18n::text("repo-core-0284"),
+    ])
 }
 
 /// What a dot's tooltip says: the tally, then the checks that need attention.
 pub(super) fn tooltip(status: &Status) -> String {
     let mut text = match ci::tally_label(&status.checks) {
-        tally if tally.is_empty() => format!("CI: {}", state_word(status.state)),
-        tally => format!("CI: {tally}"),
+        tally if tally.is_empty() => crate::i18n::message(
+            "repo-core-0285",
+            &[("state", state_word(status.state).to_string().into())],
+        ),
+        tally => crate::i18n::message("repo-core-0286", &[("tally", (tally).into())]),
     };
     let mut worst: Vec<_> = status
         .checks
@@ -271,18 +286,21 @@ pub(super) fn tooltip(status: &Status) -> String {
         text.push_str(&format!("\n{}  {}", state_word(check.state), check.name));
     }
     if worst.len() > 8 {
-        text.push_str(&format!("\n… and {} more", worst.len() - 8));
+        text.push_str(&crate::i18n::message(
+            "repo-core-0287",
+            &[("len", format!("{}", worst.len() - 8).into())],
+        ));
     }
-    text.push_str("\nClick for details");
+    text.push_str(crate::i18n::text("repo-core-0288"));
     text
 }
 
 pub(crate) fn state_word(state: CheckState) -> &'static str {
     match state {
-        CheckState::Passed => "passed",
-        CheckState::Failed => "failed",
-        CheckState::Running => "running",
-        CheckState::Skipped => "skipped",
+        CheckState::Passed => crate::i18n::text("repo-core-0289"),
+        CheckState::Failed => crate::i18n::text("repo-core-0290"),
+        CheckState::Running => crate::i18n::text("repo-core-0291"),
+        CheckState::Skipped => crate::i18n::text("repo-core-0292"),
     }
 }
 

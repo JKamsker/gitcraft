@@ -56,7 +56,11 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         if let (Some(server), Some(id)) = (&self.gerrit, &commit.change_id)
-            && ui.button("Open Gerrit change").on_hover_text(id).clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2582"))
+                .icon("eye")
+                .show(ui)
+                .on_hover_text(id)
+                .clicked()
         {
             acts.push(Action::OpenUrl(server.change_url(id)));
         }
@@ -253,7 +257,7 @@ mod flow_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod integration_tests {
     use super::*;
     use crate::git;
@@ -350,7 +354,7 @@ mod integration_tests {
         tab.commit(&ctx);
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), amended);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         std::fs::remove_file(&hook).map_err(|e| e.to_string())?;
         tab.reword_commit(
             amended.clone(),
@@ -379,7 +383,7 @@ mod integration_tests {
         );
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), reworded);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         run(&["checkout", "-qb", "external"])?;
         tab.amend = true;
         tab.commit_summary = "Must not move external".to_owned();
@@ -387,7 +391,7 @@ mod integration_tests {
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), reworded);
         assert_eq!(git::resolve(&path, "main")?, reworded);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         drop(tab);
         let _ = std::fs::remove_dir_all(path);
         Ok(())
@@ -425,11 +429,11 @@ mod integration_tests {
         assert!(tab.busy_op.is_none());
         assert!(tab.last_op.is_none());
         assert!(
-            !tab.additional_palette_items()
+            !tab.additional_palette_items(&ctx)
                 .iter()
                 .any(|(_, _, a)| matches!(a, Action::Sync))
         );
-        assert!(!tab.palette_items().iter().any(|i| matches!(
+        assert!(!tab.palette_items(&ctx).iter().any(|i| matches!(
             i.run,
             crate::repo::palette::PaletteRun::Action(Action::Sync)
         )));

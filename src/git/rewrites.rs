@@ -292,7 +292,10 @@ fn delete_refs(repo: &Path, branch: &str, time: i64) -> Result<(), String> {
     if left.is_empty() {
         Ok(())
     } else {
-        Err(format!("could not delete {}", left.join(", ")))
+        Err(crate::i18n::message(
+            "backend-could-not-delete-d030cd",
+            &[("left", (left.join(", ")).to_string().into())],
+        ))
     }
 }
 

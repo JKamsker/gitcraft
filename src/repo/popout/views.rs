@@ -10,6 +10,25 @@ use crate::repo::{Action, RepoTab, pr_review};
 use crate::theme::Tokens;
 
 impl RepoTab {
+    #[cfg(test)]
+    pub(crate) fn set_test_popout(&mut self, panel: Panel) {
+        self.popouts.pop_out(panel);
+    }
+
+    /// Immutable declarations retained while a native nested event loop prevents
+    /// the coordinator from borrowing this session to draw its immediate panels.
+    pub(crate) fn popout_window_specs(&self) -> Vec<(egui::ViewportId, egui::ViewportBuilder)> {
+        self.popouts
+            .popped()
+            .map(|panel| {
+                (
+                    viewport_id(&self.path, panel),
+                    window::builder(&title(&self.name, &self.popout_subject(panel))),
+                )
+            })
+            .collect()
+    }
+
     /// Draws the windows of the views popped out of this tab, and carries out what is done in
     /// them. Called every frame for every repository tab after the tab shown is drawn (`shown`:
     /// this is that one), so switching tabs leaves the windows open; a tab closed stops calling
@@ -77,30 +96,49 @@ impl RepoTab {
     fn popout_subject(&self, panel: Panel) -> String {
         match panel {
             Panel::Diff => match &self.diff {
-                Some(view) => format!("Diff of {}", view.key.path()),
-                None => "Diff".to_owned(),
+                Some(view) => crate::i18n::message(
+                    "repo-core-4215",
+                    &[("path", view.key.path().to_string().into())],
+                ),
+                None => crate::i18n::text("repo-core-2367").to_owned(),
             },
             Panel::Terminal => match self.terminals.get(self.active_terminal) {
-                Some(term) if self.terminal_open => format!("Terminal ({})", term.shell),
-                _ => "Terminal".to_owned(),
+                Some(term) if self.terminal_open => crate::i18n::message(
+                    "repo-core-4216",
+                    &[("shell", term.shell.to_string().into())],
+                ),
+                _ => crate::i18n::text("repo-core-3669").to_owned(),
             },
             Panel::Pr => match &self.pr_view {
                 Some(view) => match &view.details {
-                    Some(Ok(details)) => {
-                        format!("Pull request #{}: {}", view.number, details.title)
-                    }
-                    _ => format!("Pull request #{}", view.number),
+                    Some(Ok(details)) => crate::i18n::message(
+                        "repo-core-4217",
+                        &[
+                            ("number", format!("{}", view.number).into()),
+                            ("title", details.title.to_string().into()),
+                        ],
+                    ),
+                    _ => crate::i18n::message(
+                        "repo-core-4218",
+                        &[("number", format!("{}", view.number).into())],
+                    ),
                 },
-                None => "Pull request".to_owned(),
+                None => crate::i18n::text("repo-core-4219").to_owned(),
             },
             Panel::Ci => {
                 // As the CI view's header says it.
                 let noun = match self.forge() {
-                    Some(Forge::GitLab) => "Pipelines",
-                    _ => "Workflow runs",
+                    Some(Forge::GitLab) => crate::i18n::text("repo-core-4220"),
+                    _ => crate::i18n::text("repo-core-4221"),
                 };
                 match &self.ci_view {
-                    Some(view) => format!("{noun} of {}", crate::repo::short(&view.sha)),
+                    Some(view) => crate::i18n::message(
+                        "repo-core-4222",
+                        &[
+                            ("noun", noun.to_string().into()),
+                            ("sha", crate::repo::short(&view.sha).to_string().into()),
+                        ],
+                    ),
                     None => noun.to_owned(),
                 }
             }
@@ -116,11 +154,14 @@ impl RepoTab {
         class: ViewportClass,
         acts: &mut Vec<Action>,
     ) {
+        if class != ViewportClass::EmbeddedWindow {
+            self.popout_keys(ui.ctx(), panel, acts);
+        }
         self.popout_status(ui, panel);
         if !self.view_open(panel) {
             placeholder(ui, panel, absent(panel), acts);
         } else if panel == Panel::Diff && self.conflict.is_some() {
-            let why = "The conflict editor is open in the main window.";
+            let why = crate::i18n::text("repo-core-4223");
             placeholder(ui, panel, why, acts);
         } else {
             match panel {
@@ -130,18 +171,16 @@ impl RepoTab {
                 Panel::Ci => self.ci_view_ui(ui, acts),
             }
         }
-        // Inside the main window, its keys are the main window's (see `RepoTab::shortcuts`).
-        if class != ViewportClass::EmbeddedWindow {
-            self.popout_keys(ui.ctx(), panel, acts);
-        }
     }
 
     /// The tab's latest message (an operation that failed, done from this window or not) at
     /// the foot of the window, where the toolbar showing it may be out of sight.
     fn popout_status(&self, ui: &mut Ui, panel: Panel) {
-        let Some((text, failed)) = &self.status else {
+        let Some(notice) = &self.status else {
             return;
         };
+        let (text, failed) = notice.raw();
+        let text = notice.projected().unwrap_or_else(|| text.clone());
         let t = Tokens::get(ui.ctx());
         egui::Panel::bottom(egui::Id::new(("popout-status", &self.path, panel)))
             .frame(
@@ -158,19 +197,66 @@ impl RepoTab {
     /// Esc closes the view in its window as in the main one; in a diff, F7 / Shift+F7 (or
     /// Alt+↓ / Alt+↑) go to the next and previous change. Ctrl+Z / Ctrl+Y undo and redo, F5
     /// reloads. The terminal keeps every key.
-    fn popout_keys(&self, ctx: &egui::Context, panel: Panel, acts: &mut Vec<Action>) {
-        if panel == Panel::Terminal || self.dialog.is_some() || ctx.egui_wants_keyboard_input() {
+    fn popout_keys(&mut self, ctx: &egui::Context, panel: Panel, acts: &mut Vec<Action>) {
+        if panel == Panel::Terminal
+            || self.dialog.is_some()
+            || (crate::a11y::keyboard_taken(ctx) && !self.find_shortcut_exception(ctx))
+        {
             return;
         }
-        let (esc, undo, redo, reload) = ctx.input(|i| {
-            let cmd = i.modifiers.command;
-            (
-                i.key_pressed(Key::Escape),
-                cmd && !i.modifiers.shift && i.key_pressed(Key::Z),
-                cmd && (i.key_pressed(Key::Y) || (i.modifiers.shift && i.key_pressed(Key::Z))),
-                i.key_pressed(Key::F5),
-            )
-        });
+        use crate::keymap::{self, Command, Scope};
+        let mut allowed = vec![
+            Command::Undo,
+            Command::Redo,
+            Command::Timeline,
+            Command::Reload,
+        ];
+        let mut scopes = vec![Scope::Window, Scope::Repository];
+        if panel == Panel::Diff && self.view_open(panel) {
+            scopes.push(Scope::Changes);
+            if self.find_in().is_some() {
+                scopes.push(Scope::Selection);
+                if self.find.open {
+                    scopes.push(Scope::Find);
+                }
+                allowed.extend([
+                    Command::Search,
+                    Command::FindNext,
+                    Command::FindPrevious,
+                    Command::SelectionCopy,
+                    Command::SelectionAll,
+                    Command::SelectionHistory,
+                ]);
+            }
+            allowed.extend([
+                Command::NextChange,
+                Command::PreviousChange,
+                Command::NextChangeAlt,
+                Command::PreviousChangeAlt,
+            ]);
+        }
+        keymap::owner(ctx, egui::Id::new((&self.path, panel)));
+        keymap::active(ctx, scopes);
+        if self.find_shortcut_exception(ctx) {
+            allowed.retain(|c| {
+                matches!(
+                    c,
+                    Command::Search | Command::FindNext | Command::FindPrevious
+                )
+            });
+        }
+        keymap::restrict(ctx, Some(allowed));
+        let window_commands = keymap::pressed(ctx, Scope::Window);
+        if panel == Panel::Diff {
+            self.find_keys(ctx, !crate::a11y::keyboard_taken(ctx));
+        }
+        let esc = !crate::a11y::keyboard_taken(ctx) && ctx.input(|i| i.key_pressed(Key::Escape));
+        let undo = keymap::take(ctx, Command::Undo);
+        let redo = keymap::take(ctx, Command::Redo);
+        let reload = window_commands.contains(&Command::Reload);
+        if keymap::take(ctx, Command::Timeline) {
+            acts.push(Action::ToggleTimeline);
+        }
         let open = self.view_open(panel);
         match panel {
             Panel::Diff if open => {
@@ -179,8 +265,8 @@ impl RepoTab {
                 } else if esc {
                     acts.push(Action::CloseDiff);
                 }
-                if let Some(delta) = ctx.input(crate::repo::layout::change_step) {
-                    acts.push(Action::DiffStep(delta));
+                for command in keymap::pressed(ctx, Scope::Changes) {
+                    acts.push(Action::Key(command));
                 }
             }
             Panel::Pr if esc && open => acts.push(Action::ClosePr),
@@ -196,6 +282,7 @@ impl RepoTab {
         if reload {
             acts.push(Action::Reload);
         }
+        keymap::which_key(ctx, |command| self.command_refusal(command));
     }
 
     /// Carries out a pop-out button, the main window's hint or a palette entry.
@@ -211,7 +298,13 @@ impl RepoTab {
                 if self.view_open(panel) {
                     self.popouts.pop_out(panel);
                 } else {
-                    self.status = Some((format!("There's no {} open", panel.noun()), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::message(
+                            "repo-core-4225",
+                            &[("noun", panel.noun().to_string().into())],
+                        ),
+                        true,
+                    )));
                 }
             }
             Request::Dock(panel) => {
@@ -219,7 +312,10 @@ impl RepoTab {
             }
             Request::DockAll => {
                 if !self.popouts.dock_all() {
-                    self.status = Some(("No view is in a window of its own".to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-4226").to_owned(),
+                        true,
+                    )));
                 }
             }
             // Its pop-out went when the action was noted (see `popout_intercept`).
@@ -234,7 +330,7 @@ impl RepoTab {
                 Ok(panel) => {
                     self.popouts.pop_out(panel);
                 }
-                Err(why) => self.status = Some((why.to_owned(), true)),
+                Err(why) => self.status = Some(crate::repo::Notice::plain((why.to_owned(), true))),
             },
         }
         ctx.request_repaint();
@@ -270,6 +366,7 @@ impl RepoTab {
             }
             Action::Select(_)
             | Action::SelectHash(_)
+            | Action::OpenCommitChanges(_)
             | Action::SelectPr(_)
             | Action::SelectStash(_)
             | Action::OpenPr(_) => {
@@ -300,15 +397,15 @@ impl RepoTab {
     /// none otherwise.
     fn shown_poppable(&self) -> Result<Panel, &'static str> {
         if self.conflict.is_some() {
-            return Err("Nothing to pop out: finish or close the conflict editor first");
+            return Err(crate::i18n::text("repo-core-4227"));
         }
         if self.rebase.is_some() {
-            return Err("Nothing to pop out: finish or close the interactive rebase first");
+            return Err(crate::i18n::text("repo-core-4228"));
         }
         let nothing = if self.popouts.any() {
-            "Nothing else to pop out: open a diff, a pull request or the CI view first"
+            crate::i18n::text("repo-core-4229")
         } else {
-            "Nothing to pop out: open a diff, a pull request or the CI view first"
+            crate::i18n::text("repo-core-4230")
         };
         if self.diff.is_some() && self.docked(Panel::Diff) {
             return Ok(Panel::Diff);
@@ -326,10 +423,10 @@ impl RepoTab {
 /// What a pop-out window says while its view isn't open.
 fn absent(panel: Panel) -> &'static str {
     match panel {
-        Panel::Diff => "No diff open. Click a file in the main window to show its diff here.",
-        Panel::Terminal => "The terminal is hidden; its shells keep running.",
-        Panel::Pr => "No pull request open. Open one in the main window to show it here.",
-        Panel::Ci => "No CI view open. Open the builds of a commit to show them here.",
+        Panel::Diff => crate::i18n::text("repo-core-4231"),
+        Panel::Terminal => crate::i18n::text("repo-core-4232"),
+        Panel::Pr => crate::i18n::text("repo-core-4233"),
+        Panel::Ci => crate::i18n::text("repo-core-4234"),
     }
 }
 
@@ -343,10 +440,11 @@ fn placeholder(ui: &mut Ui, panel: Panel, why: &str, acts: &mut Vec<Action>) {
         ui.label(RichText::new(why).color(t.text_dim));
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if panel == Panel::Terminal && ui.button("Show the terminal").clicked() {
+            if panel == Panel::Terminal && ui.button(crate::i18n::text("repo-core-4235")).clicked()
+            {
                 acts.push(Action::ToggleTerminal);
             }
-            if ui.button("Close this window").clicked() {
+            if ui.button(crate::i18n::text("repo-core-4236")).clicked() {
                 acts.push(Action::Popout(Request::Dock(panel)));
             }
         });
@@ -358,19 +456,25 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
     let (icon, tip, request) = if popped {
         (
             "picture-in-picture",
-            format!("Bring the {} back into the main window", panel.noun()),
+            crate::i18n::message(
+                "repo-core-4238",
+                &[("noun", panel.noun().to_string().into())],
+            ),
             Request::Dock(panel),
         )
     } else {
         (
             "picture-in-picture-2",
-            format!("Pop the {} out into its own window", panel.noun()),
+            crate::i18n::message(
+                "repo-core-4239",
+                &[("noun", panel.noun().to_string().into())],
+            ),
             Request::PopOut(panel),
         )
     };
     let resp = icons::small_button(ui, icon, &tip);
     // Named for screen readers (and tests), as the icon says nothing to them.
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &tip));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &tip);
     if resp.clicked() {
         acts.push(Action::Popout(request));
     }
@@ -378,5 +482,143 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
 
 /// The close button's tooltip in a view's header: a popped-out view closes with its window.
 pub(in crate::repo) fn close_tip(popped: bool, docked_tip: &'static str) -> &'static str {
-    if popped { "Close (Esc)" } else { docked_tip }
+    if popped {
+        crate::i18n::text("repo-core-0711")
+    } else {
+        docked_tip
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use crate::keymap::{self, Command, Scope, Stroke};
+
+    #[test]
+    fn child_prepares_selection_context_and_find_field_keeps_escape() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recorded/panel-selection".into(), &ctx);
+        tab.diff = Some(crate::repo::DiffView::new(crate::repo::DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file".into(),
+        }));
+        let mut settings = crate::settings::Settings::default();
+        settings.key_bindings.insert(
+            Command::SelectionCopy.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        ctx.run_ui(
+            egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key: Key::F8,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+                ..Default::default()
+            },
+            |_| {
+                let mut acts = Vec::new();
+                tab.popout_keys(&ctx, Panel::Diff, &mut acts);
+                assert!(
+                    keymap::take(&ctx, Command::SelectionCopy),
+                    "view gets its configured command after child context setup"
+                );
+                assert!(acts.is_empty());
+            },
+        )
+        .drop_without_applying_deltas();
+        tab.find.show();
+        ctx.run_ui(
+            egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key: Key::Escape,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                }],
+                ..Default::default()
+            },
+            |ui| {
+                // The production find field ID; a text primitive owns Escape before the diff.
+                ui.add(
+                    egui::TextEdit::singleline(&mut String::new())
+                        .id(egui::Id::new("find_in_view_field")),
+                )
+                .request_focus();
+                let mut acts = Vec::new();
+                tab.popout_keys(&ctx, Panel::Diff, &mut acts);
+                assert!(
+                    acts.is_empty(),
+                    "Escape in the find field must not close the entire diff"
+                );
+            },
+        )
+        .drop_without_applying_deltas();
+    }
+
+    #[test]
+    fn actual_child_dispatch_uses_overrides_and_cancels_unrelated_commands() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recorded/panel-keys".into(), &ctx);
+        tab.diff = Some(crate::repo::DiffView::new(crate::repo::DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file".into(),
+        }));
+        let mut settings = crate::settings::Settings::default();
+        settings.key_bindings.insert(
+            Command::Undo.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.key_bindings.insert(
+            Command::NextChange.id().into(),
+            vec![Stroke::new(Key::F9, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        for (key, expected) in [
+            (Key::F8, Some(Command::Undo)),
+            (Key::F9, Some(Command::NextChange)),
+            (Key::F5, Some(Command::Reload)),
+            (Key::F7, None),
+        ] {
+            let mut acts = Vec::new();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |_| tab.popout_keys(&ctx, Panel::Diff, &mut acts),
+            )
+            .drop_without_applying_deltas();
+            match expected {
+                Some(Command::Undo) => assert!(matches!(acts.as_slice(), [Action::Undo])),
+                Some(Command::Reload) => assert!(matches!(acts.as_slice(), [Action::Reload])),
+                Some(command) => {
+                    assert!(matches!(acts.as_slice(), [Action::Key(found)] if *found == command))
+                }
+                None => assert!(acts.is_empty()),
+            }
+        }
+        // A panel cannot consume a reconfigured window or remote-operation shortcut.
+        assert!(!keymap::queued(&ctx, Command::Fetch));
+        keymap::cancel(&ctx, Scope::Window);
+    }
 }

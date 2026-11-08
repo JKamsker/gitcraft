@@ -180,7 +180,7 @@ fn resume_after_an_undo_refuses_and_skip_goes_on() {
     let _ = std::fs::rename(&moved, &bare);
     tab.release_act(ReleaseAct::Run, &ctx);
     wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
-    let refused = tab.status.clone();
+    let refused = tab.status.as_deref().cloned();
     let remote_tag = git::resolve(&bare, "refs/tags/v2.3.2").is_ok();
     tab.release_act(ReleaseAct::Skip, &ctx);
     let after_skip = statuses(&tab);
@@ -434,9 +434,10 @@ fn review10_dialog_preflight_refuses_before_bump_tag_or_push() {
         .as_ref()
         .and_then(|v| v.run.as_ref())
         .map(|r| r.done.clone());
-    let refused = tab.status.as_ref().is_some_and(|(s, error)| {
-        *error && s.contains("does not match the selected forge repository")
-    });
+    let refused = tab
+        .status
+        .as_ref()
+        .is_some_and(|n| n.1 && n.0.contains("does not match the selected forge repository"));
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&receiver);
     assert!(refused);

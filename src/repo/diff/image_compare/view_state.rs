@@ -22,10 +22,10 @@ impl Mode {
 
     pub fn label(self) -> &'static str {
         match self {
-            Mode::TwoUp => "2-up",
-            Mode::Swipe => "Swipe",
-            Mode::Onion => "Onion skin",
-            Mode::Difference => "Difference",
+            Mode::TwoUp => crate::i18n::text("repo-core-1834"),
+            Mode::Swipe => crate::i18n::text("repo-core-1835"),
+            Mode::Onion => crate::i18n::text("repo-core-1836"),
+            Mode::Difference => crate::i18n::text("repo-core-1837"),
         }
     }
 }
@@ -122,7 +122,7 @@ impl ViewState {
     /// point): "Fit", "100%", "250%".
     pub fn zoom_label(&self, ppp: f32) -> String {
         match self.zoom {
-            None => "Fit".to_owned(),
+            None => crate::i18n::text("repo-core-1807").to_owned(),
             Some(z) => format!("{:.0}%", z * ppp * 100.0),
         }
     }

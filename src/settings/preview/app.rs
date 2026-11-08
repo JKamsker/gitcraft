@@ -73,7 +73,7 @@ pub(super) fn window(ui: &mut Ui, t: &Tokens, width: f32, preview: Preview) {
     p.text(
         push.center(),
         Align2::CENTER_CENTER,
-        "Push",
+        crate::i18n::text("interaction-preview-push"),
         theme::semibold(11.0),
         t.accent_text,
     );
@@ -107,7 +107,7 @@ pub(super) fn window(ui: &mut Ui, t: &Tokens, width: f32, preview: Preview) {
     p.text(
         side.left_top() + vec2(10.0, 12.0),
         Align2::LEFT_CENTER,
-        "BRANCHES",
+        crate::i18n::text("interaction-preview-branches"),
         theme::semibold(9.0),
         t.text_faint,
     );
@@ -142,10 +142,10 @@ pub(super) fn window(ui: &mut Ui, t: &Tokens, width: f32, preview: Preview) {
     // The graph: lanes, dots, pills, descriptions.
     let lanes = [0usize, 1, 0, 2, 0];
     let summaries = [
-        "Theme gallery",
-        "Merge fix/tabs",
-        "Previews in the settings",
-        "Tabs scroll",
+        crate::i18n::text("interaction-preview-gallery"),
+        crate::i18n::text("interaction-preview-merge-tab"),
+        crate::i18n::text("interaction-preview-settings-previews"),
+        crate::i18n::text("interaction-preview-tabs-scroll"),
         "Release 0.9",
     ];
     let pitch = ((graph.height() - 8.0) / lanes.len() as f32).min(24.0);
@@ -236,7 +236,7 @@ pub(super) fn window(ui: &mut Ui, t: &Tokens, width: f32, preview: Preview) {
         &p,
         field.left_center() + vec2(6.0, 0.0),
         Align2::LEFT_CENTER,
-        "Commit message",
+        crate::i18n::text("interaction-preview-message"),
         FontId::proportional(10.0),
         t.text_faint,
         field.width() - 10.0,
@@ -247,7 +247,7 @@ pub(super) fn window(ui: &mut Ui, t: &Tokens, width: f32, preview: Preview) {
         p.text(
             commit.center(),
             Align2::CENTER_CENTER,
-            "Commit",
+            crate::i18n::text("interaction-preview-commit"),
             theme::semibold(10.5),
             t.accent_text,
         );
@@ -320,7 +320,7 @@ pub(super) fn corners(ui: &mut Ui, t: &Tokens, width: f32) {
     p.text(
         button.center(),
         Align2::CENTER_CENTER,
-        "Commit",
+        crate::i18n::text("interaction-preview-commit"),
         theme::semibold(16.0),
         t.accent_text,
     );
@@ -339,7 +339,7 @@ pub(super) fn corners(ui: &mut Ui, t: &Tokens, width: f32) {
         &p,
         field.left_center() + vec2(12.0, 0.0),
         Align2::LEFT_CENTER,
-        "Summary",
+        crate::i18n::text("interaction-preview-summary"),
         FontId::proportional(15.0),
         t.text_faint,
         field.width() - 20.0,
@@ -364,9 +364,13 @@ pub(super) fn corners(ui: &mut Ui, t: &Tokens, width: f32) {
     p.text(
         pos2(card.right() - 16.0, y),
         Align2::RIGHT_CENTER,
-        format!(
-            "{:.0} · {:.0} · {:.0} px",
-            t.radius_sm, t.radius, t.radius_lg
+        crate::i18n::message(
+            "interaction-preview-radii",
+            &[
+                ("small", t.radius_sm.round().into()),
+                ("medium", t.radius.round().into()),
+                ("large", t.radius_lg.round().into()),
+            ],
         ),
         FontId::proportional(11.5),
         t.text_faint,

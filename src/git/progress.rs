@@ -85,6 +85,7 @@ pub struct ProgressReader {
 
 impl ProgressReader {
     /// A reader that takes lines starting with `marker` apart (see [`Self::marked`]).
+    #[cfg(test)]
     pub fn with_marker(marker: &'static str) -> Self {
         Self {
             marker: Some(marker),
@@ -161,6 +162,7 @@ impl ProgressReader {
     }
 
     /// What followed the marker on its line, once it came.
+    #[cfg(test)]
     pub fn marked(&self) -> Option<&str> {
         self.marked.as_deref()
     }
@@ -171,7 +173,10 @@ impl ProgressReader {
         let drawn = self.redrawn.take().unwrap_or_default();
         self.push_line(if rest.is_empty() { &drawn } else { &rest });
         if self.cut {
-            format!("(earlier output left out)\n{}", self.text)
+            crate::i18n::message(
+                "backend-earlier-output-left-out-bb1f03",
+                &[("text", (self.text).to_string().into())],
+            )
         } else {
             self.text
         }

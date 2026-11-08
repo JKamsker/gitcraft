@@ -59,43 +59,71 @@ fn card(
             "chevron-down"
         };
         let tip = if folded {
-            format!("Show {what}")
+            crate::i18n::message(
+                "repo-workflows-issue_work-card-5fa29511",
+                &[("what", (what).into())],
+            )
         } else {
-            format!("Hide {what}")
+            crate::i18n::message(
+                "repo-workflows-issue_work-card-1c245f79",
+                &[("what", (what).into())],
+            )
         };
         if icons::small_button(ui, chevron, &tip).clicked() {
             folded = !folded;
         }
         ui.label(
-            RichText::new(format!("#{}", link.number))
+            RichText::new(link.key())
                 .font(theme::mono(12.0))
                 .color(t.accent),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Forget which issue this branch is for").clicked() {
+            if icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("repo-workflows-issue_work-card-fb6318e9"),
+            )
+            .clicked()
+            {
                 acts.push(Action::Issue(IssueAct::Unlink(branch.to_owned())));
             }
             if !link.url.is_empty()
-                && icons::small_button(ui, "external-link", "Open the issue in the browser")
-                    .clicked()
+                && icons::small_button(
+                    ui,
+                    "external-link",
+                    crate::i18n::text("repo-workflows-issue_work-card-7fe3e1e0"),
+                )
+                .clicked()
             {
                 acts.push(Action::OpenUrl(link.url.clone()));
             }
             // What the card shows is the issue as it was read, not as it is.
             let (read, when) = if link.read.is_empty() {
                 (
-                    "as first read".to_owned(),
-                    "when work on it started".to_owned(),
+                    crate::i18n::text("repo-workflows-issue_work-card-1887e67c").to_owned(),
+                    crate::i18n::text("repo-workflows-issue_work-card-6d2189c3").to_owned(),
                 )
             } else {
-                (format!("as of {}", link.read), format!("on {}", link.read))
+                (
+                    crate::i18n::message(
+                        "repo-workflows-issue_work-card-9b1e287d",
+                        &[("link-read-1", (link.read).clone().into())],
+                    ),
+                    crate::i18n::message(
+                        "repo-workflows-issue_work-card-53611908",
+                        &[("link-read-1", (link.read).clone().into())],
+                    ),
+                )
             };
             if refreshing {
                 ui.add(crate::spinner::Spinner::new().size(12.0));
             } else if icons::small_button(
                 ui,
                 "refresh-cw",
-                &format!("Read the issue again: the card shows it as it was {when}"),
+                &crate::i18n::message(
+                    "repo-workflows-issue_work-card-1e7fbd27",
+                    &[("when", (when).clone().into())],
+                ),
             )
             .clicked()
             {
@@ -117,9 +145,13 @@ fn card(
     let lines = criteria::lines(&link.criteria);
     if lines.is_empty() {
         ui.label(
-            RichText::new("The issue says nothing more than its title.")
-                .size(11.5)
-                .color(t.text_faint),
+            RichText::new(if link.kept == criteria::Kept::Criteria {
+                crate::i18n::text("repo-workflows-issue_work-card-57fa7fe2")
+            } else {
+                crate::i18n::text("repo-workflows-issue_work-card-b9210e97")
+            })
+            .size(11.5)
+            .color(t.text_faint),
         );
         return;
     }
