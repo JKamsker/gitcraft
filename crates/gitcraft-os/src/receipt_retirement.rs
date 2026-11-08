@@ -18,8 +18,29 @@ pub fn retire_private_receipt(path: &Path, verify: impl FnOnce(&[u8]) -> bool) -
     retire(&mut Pinned::open(path)?, verify)
 }
 struct Pinned {
-    directory: File,
+    directory: crate::PrivateDirectory,
     terminal: File,
+}
+impl Pinned {
+    fn open(path: &Path) -> io::Result<Self> {
+        let directory = crate::PrivateDirectory::open(path)?;
+        let terminal = directory.open_file("terminal", crate::PrivateFileMode::ReadDelete)?;
+        if terminal.metadata()?.len() > 4096 {
+            return Err(io::Error::other("oversized terminal receipt"));
+        }
+        Ok(Self {
+            directory,
+            terminal,
+        })
+    }
+}
+impl Retirement for Pinned {
+    fn receipt(&mut self) -> io::Result<Vec<u8>> {
+        bounded(&mut self.terminal)
+    }
+    fn remove(&mut self) -> io::Result<()> {
+        self.directory.retire_terminal(&self.terminal)
+    }
 }
 fn bounded(file: &mut File) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
@@ -29,154 +50,8 @@ fn bounded(file: &mut File) -> io::Result<Vec<u8>> {
     }
     Ok(bytes)
 }
-#[cfg(unix)]
-impl Pinned {
-    fn open(path: &Path) -> io::Result<Self> {
-        use std::ffi::CString;
-        use std::os::fd::{AsRawFd, FromRawFd};
-        use std::os::unix::{ffi::OsStrExt, fs::MetadataExt};
-        let path = CString::new(path.as_os_str().as_bytes())?;
-        // SAFETY: terminated path; returned descriptors are immediately uniquely owned.
-        let directory = unsafe {
-            let fd = libc::open(
-                path.as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW,
-            );
-            if fd < 0 {
-                return Err(io::Error::last_os_error());
-            }
-            File::from_raw_fd(fd)
-        };
-        let meta = directory.metadata()?;
-        // SAFETY: geteuid has no inputs or side effects.
-        let uid = unsafe { libc::geteuid() };
-        if !meta.is_dir() || meta.uid() != uid || meta.mode() & 0o777 != 0o700 {
-            return Err(io::Error::other("endpoint directory is not private"));
-        }
-        // SAFETY: fixed single component relative to the held directory descriptor.
-        let terminal = unsafe {
-            let fd = libc::openat(
-                directory.as_raw_fd(),
-                c"terminal".as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK,
-            );
-            if fd < 0 {
-                return Err(io::Error::last_os_error());
-            }
-            File::from_raw_fd(fd)
-        };
-        let meta = terminal.metadata()?;
-        if !meta.is_file() || meta.uid() != uid || meta.mode() & 0o077 != 0 || meta.len() > 4096 {
-            return Err(io::Error::other(
-                "receipt is not a bounded private regular file",
-            ));
-        }
-        Ok(Self {
-            directory,
-            terminal,
-        })
-    }
-}
-#[cfg(unix)]
-impl Retirement for Pinned {
-    fn receipt(&mut self) -> io::Result<Vec<u8>> {
-        bounded(&mut self.terminal)
-    }
-    fn remove(&mut self) -> io::Result<()> {
-        use std::os::fd::AsRawFd;
-        // SAFETY: fixed name; no parent pathname is resolved or symlink followed.
-        if unsafe { libc::unlinkat(self.directory.as_raw_fd(), c"terminal".as_ptr(), 0) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(())
-    }
-}
 #[cfg(windows)]
-impl Pinned {
-    fn open(path: &Path) -> io::Result<Self> {
-        use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
-        use windows::Win32::Storage::FileSystem::{DELETE, FILE_GENERIC_READ};
-        const NO_FOLLOW: u32 = 0x00200000;
-        const FOLDER: u32 = 0x02000000;
-        const REPARSE: u32 = 0x400;
-        let directory = std::fs::OpenOptions::new()
-            .read(true)
-            .share_mode(3)
-            .custom_flags(NO_FOLLOW | FOLDER)
-            .open(path)?;
-        let meta = directory.metadata()?;
-        if !meta.is_dir() || meta.file_attributes() & REPARSE != 0 {
-            return Err(io::Error::other("endpoint directory is not plain"));
-        }
-        private_acl(&directory)?;
-        // Deny writers and replacement until the exact opened receipt is marked deleted.
-        let terminal = std::fs::OpenOptions::new()
-            .access_mode(FILE_GENERIC_READ.0 | DELETE.0)
-            .share_mode(1)
-            .custom_flags(NO_FOLLOW)
-            .open(path.join("terminal"))?;
-        let meta = terminal.metadata()?;
-        if !meta.is_file()
-            || meta.file_attributes() & REPARSE != 0
-            || meta.len() > 4096
-            || final_path(&terminal)?.parent() != Some(final_path(&directory)?.as_path())
-        {
-            return Err(io::Error::other(
-                "receipt is not inside the held endpoint directory",
-            ));
-        }
-        Ok(Self {
-            directory,
-            terminal,
-        })
-    }
-}
-#[cfg(windows)]
-impl Retirement for Pinned {
-    fn receipt(&mut self) -> io::Result<Vec<u8>> {
-        bounded(&mut self.terminal)
-    }
-    fn remove(&mut self) -> io::Result<()> {
-        use std::os::windows::io::AsRawHandle;
-        use windows::Win32::Foundation::HANDLE;
-        use windows::Win32::Storage::FileSystem::{
-            FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle,
-        };
-        let _held_directory = &self.directory;
-        let info = FILE_DISPOSITION_INFO { DeleteFile: true };
-        // SAFETY: live retained file HANDLE, correct information type and size. Directory
-        // remains held against rename; deletion targets this file HANDLE, never its path.
-        unsafe {
-            SetFileInformationByHandle(
-                HANDLE(self.terminal.as_raw_handle()),
-                FileDispositionInfo,
-                (&info as *const FILE_DISPOSITION_INFO).cast(),
-                std::mem::size_of_val(&info) as u32,
-            )
-        }
-        .map_err(|e| io::Error::other(e.to_string()))
-    }
-}
-#[cfg(windows)]
-fn final_path(file: &File) -> io::Result<std::path::PathBuf> {
-    use std::os::windows::{ffi::OsStringExt, io::AsRawHandle};
-    use windows::Win32::{
-        Foundation::HANDLE,
-        Storage::FileSystem::{FILE_NAME_NORMALIZED, GetFinalPathNameByHandleW},
-    };
-    let mut buf = vec![0; 32768];
-    // SAFETY: retained handle and initialized writable UTF-16 output buffer.
-    let n = unsafe {
-        GetFinalPathNameByHandleW(HANDLE(file.as_raw_handle()), &mut buf, FILE_NAME_NORMALIZED)
-    } as usize;
-    if n == 0 || n >= buf.len() {
-        return Err(io::Error::last_os_error());
-    }
-    buf.truncate(n);
-    Ok(std::ffi::OsString::from_wide(&buf).into())
-}
-#[cfg(windows)]
-fn private_acl(file: &File) -> io::Result<()> {
+pub(super) fn private_acl(file: &File) -> io::Result<()> {
     use std::os::windows::io::AsRawHandle;
     use windows::Win32::{
         Foundation::{CloseHandle, HANDLE, HLOCAL, LocalFree},

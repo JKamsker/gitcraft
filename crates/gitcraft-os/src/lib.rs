@@ -25,6 +25,8 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod private_directory;
+pub use private_directory::{PrivateDirectory, PrivateFileMode, file_identity};
 mod receipt_retirement;
 pub use receipt_retirement::retire_private_receipt;
 mod private;
