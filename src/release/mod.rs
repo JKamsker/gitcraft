@@ -5,6 +5,7 @@
 //! it stopped.
 
 pub(crate) mod conventional;
+mod display;
 pub(crate) mod manifest;
 pub(crate) mod notes;
 #[cfg(test)]

@@ -1090,3 +1090,26 @@ interaction-tabs-overflow = { $count ->
        *[other] New tab, and { $count } more tabs
     }
 interaction-tabs-main-window = Main window
+interaction-release-step-bump = Move the version
+interaction-release-step-tag = Tag
+interaction-release-step-push = Push
+interaction-release-step-publish = Make the release on the forge
+interaction-release-step-upload = Attach the files
+interaction-release-changelog = { $file } (the notes on top)
+interaction-release-bump = Commits { $files } on { $branch }: “chore(release): { $tag }”
+interaction-release-push-bump = Pushes the version commit to { $remote }'s { $branch } and the tag to { $remote }, both or neither (git push --atomic)
+interaction-release-push-tag = Pushes the tag to { $remote }
+interaction-release-publish = { $pre ->
+        [yes] Makes the pre-release { $tag } on { $forge } with the notes
+       *[no] Makes the release { $tag } on { $forge } with the notes
+    }
+interaction-release-forge = the forge
+interaction-release-upload = Attaches { $files } to it
+interaction-release-tag-version = { $kind ->
+        [signed] Makes the signed tag { $tag } at that commit, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at that commit, its message the notes (git tag -a { $tag })
+    }
+interaction-release-tag-object = { $kind ->
+        [signed] Makes the signed tag { $tag } at { $commit }, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at { $commit }, its message the notes (git tag -a { $tag })
+    }
