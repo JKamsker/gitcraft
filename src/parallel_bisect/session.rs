@@ -436,22 +436,27 @@ impl Slot {
                 output: String::new(),
             });
         }
-        let authority = ws.authority(crate::remote::workspace_authority::FenceMode::Dispatch)?;
-        let owner_record = ws.owner_record(&authority)?;
-        let log = format!("{}/{}.log", ws.base_there, self.n);
-        runner::run(
-            &runner::Test {
-                dir: &self.path,
-                control: &ws.repo,
-                owner_record: &owner_record,
-                authority: &authority,
-                log: &log,
-                command: &setup.command,
-                limit: setup.timeout,
+        runner::with_prepared_log(
+            || ws.prepare_test_log(self.n),
+            |log| {
+                let authority =
+                    ws.authority(crate::remote::workspace_authority::FenceMode::Dispatch)?;
+                let owner_record = ws.owner_record(&authority)?;
+                runner::run(
+                    &runner::Test {
+                        dir: &self.path,
+                        control: &ws.repo,
+                        owner_record: &owner_record,
+                        authority: &authority,
+                        log,
+                        command: &setup.command,
+                        limit: setup.timeout,
+                    },
+                    stop,
+                )
+                .inspect_err(|_| ws.invalidate())
             },
-            stop,
         )
-        .inspect_err(|_| ws.invalidate())
     }
 }
 

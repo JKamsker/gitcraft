@@ -28,16 +28,14 @@ r=$?
 tail -c 8192 "$1" 2>/dev/null
 exit $r"#;
 
-// A cancelled queued test may never have opened its log. Only absence is empty;
-// a directory, dangling link or failed read must remain a visible failure.
+// Fenced setup creates even a queued test's log before dispatch. Never infer absence
+// from shell predicates: missing files and metadata/read errors all fail this read.
 const STOPPED_LOG: &str = r#"cd "${1%/*}" || exit 1
 log=${1##*/}
 if [ -f "$log" ] && [ ! -L "$log" ]; then
   tail -c 8192 "$log"
-elif [ ! -e "$log" ] && [ ! -L "$log" ]; then
-  :
 else
-  printf 'gitcraft: stopped test log is not a regular file\n' >&2
+  printf 'gitcraft: stopped test log unavailable or not a regular file\n' >&2
   exit 1
 fi"#;
 
@@ -46,6 +44,15 @@ fi"#;
 pub struct Ran {
     pub ended: Ended,
     pub output: String,
+}
+
+/// Queue no test until its fenced setup has successfully created an empty log.
+pub(super) fn with_prepared_log(
+    prepare: impl FnOnce() -> Result<String, String>,
+    dispatch: impl FnOnce(&str) -> Result<Ran, String>,
+) -> Result<Ran, String> {
+    let log = prepare().map_err(|e| format!("could not prepare bisect test log: {e}"))?;
+    dispatch(&log)
 }
 
 /// The arguments that have git run `script` (with `args` as `$1`…) with `sh`, under the
@@ -249,35 +256,77 @@ mod tests {
     }
 
     #[test]
-    fn recording_stopped_log_is_read_only_after_recovery() -> Result<(), String> {
+    fn recording_prepared_empty_log_is_read_only_after_recovery() -> Result<(), String> {
         for ended in [Ended::Stopped, Ended::TimedOut] {
             let order = std::cell::RefCell::new(Vec::new());
-            let ran = recovered_run(
-                git::Exit {
-                    code: Some(125),
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                },
-                Some("cancelled"),
-                Some(ended),
+            let ran = with_prepared_log(
                 || {
-                    order.borrow_mut().push("recovered");
-                    Ok(())
+                    order.borrow_mut().push("fenced empty log prepared");
+                    Ok("/synthetic/1.log".into())
                 },
-                || {
-                    order.borrow_mut().push("absent log");
-                    Ok(String::new())
+                |log| {
+                    assert_eq!(log, "/synthetic/1.log");
+                    order.borrow_mut().push("dispatch queued then cancelled");
+                    recovered_run(
+                        git::Exit {
+                            code: Some(125),
+                            stdout: Vec::new(),
+                            stderr: Vec::new(),
+                        },
+                        Some("cancelled"),
+                        Some(ended),
+                        || {
+                            order.borrow_mut().push("recovered");
+                            Ok(())
+                        },
+                        || {
+                            order.borrow_mut().push("read prepared empty log");
+                            Ok(String::new())
+                        },
+                    )
                 },
             )?;
             assert_eq!(ran.ended, ended);
             assert!(ran.output.is_empty());
-            assert_eq!(*order.borrow(), ["recovered", "absent log"]);
+            assert_eq!(
+                *order.borrow(),
+                [
+                    "fenced empty log prepared",
+                    "dispatch queued then cancelled",
+                    "recovered",
+                    "read prepared empty log"
+                ]
+            );
         }
-        // These are the production shell's only empty-log admission checks.
         assert!(STOPPED_LOG.starts_with("cd \"${1%/*}\" || exit 1"));
-        assert!(STOPPED_LOG.contains("[ ! -e \"$log\" ] && [ ! -L \"$log\" ]"));
+        assert!(!STOPPED_LOG.contains("elif"));
+        assert!(!STOPPED_LOG.contains("[ ! -e"));
         assert!(!STOPPED_LOG.contains("2>/dev/null"));
         Ok(())
+    }
+
+    #[test]
+    fn recording_failed_log_preparation_admits_no_dispatch() {
+        for error in [
+            std::io::Error::from(std::io::ErrorKind::NotFound),
+            std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+            std::io::Error::other("Input/output error"),
+            std::io::Error::other("workspace mutation cleanup unconfirmed"),
+        ] {
+            let message = error.to_string();
+            let mut dispatched = false;
+            let result = with_prepared_log(
+                || Err(message.clone()),
+                |_| {
+                    dispatched = true;
+                    Err("must not queue".into())
+                },
+            );
+            assert!(
+                matches!(result, Err(e) if e.starts_with("could not prepare bisect test log:") && e.contains(&message))
+            );
+            assert!(!dispatched);
+        }
     }
 
     #[test]
@@ -305,7 +354,12 @@ mod tests {
 
     #[test]
     fn recording_stopped_log_errors_survive_and_available_output_is_kept() -> Result<(), String> {
-        for error in ["not a regular file", "Permission denied"] {
+        for error in [
+            "No such file or directory",
+            "not a regular file",
+            "Permission denied",
+            "Input/output error",
+        ] {
             let result = recovered_run(
                 git::Exit {
                     code: Some(125),
