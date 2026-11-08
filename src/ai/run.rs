@@ -368,6 +368,24 @@ fn read_capped(mut pipe: impl Read + Send + 'static) -> Reader {
     rx
 }
 
+/// Whether `child` has ended, and its exit code if it exited, without reaping it: until it is
+/// reaped its process id, and so its process group's, can't be another process's, and
+/// signalling the group reaches only what it started (on Windows the handle `child` holds keeps
+/// its id from being reused).
+pub(crate) fn ended(child: &mut Child) -> std::io::Result<Option<Option<i32>>> {
+    #[cfg(unix)]
+    {
+        use rustix::process::{Pid, WaitId, WaitIdOptions, waitid};
+        let options = WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT;
+        let status = waitid(WaitId::Pid(Pid::from_child(child)), options)?;
+        Ok(status.map(|s| s.exit_status()))
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(child.try_wait()?.map(|s| s.code()))
+    }
+}
+
 /// Stops a tool run here and everything it started: politely, then for good.
 pub(crate) fn stop_here(child: &mut Child) {
     let pid = child.id().to_string();
@@ -392,7 +410,8 @@ pub(crate) fn stop_here(child: &mut Child) {
         };
         signal("-TERM");
         let until = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < until && matches!(child.try_wait(), Ok(None)) {
+        // Not reaped while its group is still signalled: see `ended`.
+        while Instant::now() < until && matches!(ended(child), Ok(None)) {
             std::thread::sleep(TICK);
         }
         signal("-KILL");

@@ -64,9 +64,10 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
 
-# Reading a repository's file without following a link swapped in on the way (safe_read.rs).
+# Reading a repository's file without following a link swapped in on the way (safe_read.rs);
+# telling that an agent ended without reaping it, which keeps its process group's id its own (ai/run.rs).
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs"] }
+rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
