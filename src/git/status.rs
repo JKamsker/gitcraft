@@ -110,7 +110,12 @@ pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
     if let Some(target) = crate::remote::parse(repo) {
         return in_progress_there(&target);
     }
-    let asked = |e: std::io::Error| format!("could not read the repository's state: {e}");
+    let asked = |e: std::io::Error| {
+        crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-e-f9a978",
+            &[("detail", (e).to_string().into())],
+        )
+    };
     // Ask git once for the private worktree directory. In particular, a linked worktree's
     // operation markers do not live in the shared git directory.
     let directory = super::backend::dispatch(
@@ -184,9 +189,14 @@ fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress
         (0, "CHERRY_PICK_HEAD") => Ok(Some(InProgress::CherryPick)),
         (0, "REVERT_HEAD") => Ok(Some(InProgress::Revert)),
         (0, "none") => Ok(None),
-        _ => Err(format!(
-            "could not read the repository's state: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+        _ => Err(crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-4bd015",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&out.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
         )),
     }
 }

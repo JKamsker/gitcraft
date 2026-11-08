@@ -70,8 +70,7 @@ fn passes(q: &SearchQuery, code: bool) -> Result<Vec<Vec<String>>, QueryError> {
     if code {
         if q.contents.is_some() || q.regex.is_some() {
             return Err(QueryError {
-                message: "In Code the free text is already looked for in the changes: \
-                          drop contents: / regex:, or switch to Messages"
+                message: crate::i18n::text("backend-in-code-the-free-text-is-already-looked-for-in-the-changes-drop-c-597d4f")
                     .to_owned(),
                 at: 0,
             });

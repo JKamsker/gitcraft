@@ -37,8 +37,10 @@ impl SubmoduleState {
     pub fn label(self) -> Option<&'static str> {
         match self {
             SubmoduleState::UpToDate => None,
-            SubmoduleState::NotInitialized => Some("not initialised"),
-            SubmoduleState::OutOfDate => Some("out of date"),
+            SubmoduleState::NotInitialized => {
+                Some(crate::i18n::text("backend-not-initialised-29451a"))
+            }
+            SubmoduleState::OutOfDate => Some(crate::i18n::text("backend-out-of-date-30d18d")),
             SubmoduleState::Conflicted => Some("conflict"),
         }
     }
@@ -46,8 +48,12 @@ impl SubmoduleState {
 
 /// The submodules, each with how it stands; none when there is no `.gitmodules`.
 pub fn submodules(repo: &Path) -> Result<Vec<Submodule>, String> {
-    let listed = crate::remote::try_is_file(&repo.join(".gitmodules"))
-        .map_err(|e| format!("could not read .gitmodules: {e}"))?;
+    let listed = crate::remote::try_is_file(&repo.join(".gitmodules")).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-gitmodules-e-79a00a",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     if !listed {
         return Ok(Vec::new());
     }

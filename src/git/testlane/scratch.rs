@@ -52,7 +52,12 @@ impl Scratch {
             &there,
             rev,
         ];
-        run(Some(repo), &args).map_err(|e| format!("could not make a scratch worktree: {e}"))?;
+        run(Some(repo), &args).map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-make-a-scratch-worktree-e-76b327",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         Ok(Scratch {
             repo: repo.to_owned(),
             path,
@@ -69,7 +74,13 @@ impl Scratch {
         .map(|_| ())
         .map_err(|e| {
             let at = rev.get(..8).unwrap_or(rev);
-            format!("could not check out {at} in a scratch worktree: {e}")
+            crate::i18n::message(
+                "backend-could-not-check-out-at-in-a-scratch-worktree-e-e85eed",
+                &[
+                    ("at", (at).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
         })
     }
 
@@ -101,8 +112,12 @@ fn remove_worktree(repo: &Path, path: &Path) -> Result<(), String> {
     match (removed, pruned) {
         (Ok(_), _) => Ok(()),
         (Err(_), Ok(_)) if !is_listed(repo, path) => Ok(()),
-        (Err(e), _) => Err(format!(
-            "could not remove the scratch worktree {there}: {e}"
+        (Err(e), _) => Err(crate::i18n::message(
+            "backend-could-not-remove-the-scratch-worktree-there-e-a9a777",
+            &[
+                ("there", (there).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
         )),
     }
 }
@@ -122,7 +137,10 @@ fn common_dir_there(repo: &Path) -> Result<String, String> {
     let out = run(Some(repo), &["rev-parse", "--git-common-dir"])?;
     let printed = out.trim_end_matches(['\n', '\r']);
     if printed.is_empty() {
-        return Err("git didn't say where the repository's git folder is".to_owned());
+        return Err(crate::i18n::text(
+            "backend-git-didn-t-say-where-the-repository-s-git-folder-is-ecfd5a",
+        )
+        .to_owned());
     }
     Ok(remote::git_path(&remote::resolve(repo, printed)))
 }

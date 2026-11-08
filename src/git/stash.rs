@@ -24,17 +24,32 @@ pub fn parse_version(line: &str) -> Option<(u32, u32)> {
 /// when it can't, as the dialog says it. The outer error: git couldn't be asked (the machine
 /// wasn't reached), which asking again later may get past.
 pub fn staged_stash_support(repo: &Path) -> Result<Result<(), String>, String> {
-    let line = run(Some(repo), &["--version"])
-        .map_err(|e| format!("couldn't ask git for its version: {e}"))?;
+    let line = run(Some(repo), &["--version"]).map_err(|e| {
+        crate::i18n::message(
+            "backend-couldn-t-ask-git-for-its-version-e-ad0d3b",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(match parse_version(&line) {
         Some(v) if v >= STAGED_STASH_SINCE => Ok(()),
-        Some((major, minor)) => Err(format!(
-            "needs git {}.{} or newer; this repository's git is {major}.{minor}",
-            STAGED_STASH_SINCE.0, STAGED_STASH_SINCE.1
+        Some((major, minor)) => Err(crate::i18n::message(
+            "backend-needs-git-or-newer-this-repository-s-git-is-major-minor-99c47d",
+            &[
+                (
+                    "STAGED_STASH_SINCE",
+                    (STAGED_STASH_SINCE.0).to_string().into(),
+                ),
+                (
+                    "STAGED_STASH_SINCE2",
+                    (STAGED_STASH_SINCE.1).to_string().into(),
+                ),
+                ("major", (major).to_string().into()),
+                ("minor", (minor).to_string().into()),
+            ],
         )),
-        None => Err(format!(
-            "couldn't tell which git this is (it says “{}”)",
-            line.trim()
+        None => Err(crate::i18n::message(
+            "backend-couldn-t-tell-which-git-this-is-it-says-2b1bb3",
+            &[("line", (line.trim()).to_string().into())],
         )),
     })
 }
@@ -58,12 +73,19 @@ const ADD_CHUNK_BYTES: usize = 16 * 1024;
 pub fn snapshot(repo: &Path, message: &str, untracked: bool) -> Result<Option<Snapshot>, String> {
     let base = head(repo);
     if base.is_empty() {
-        return Err("there is no commit yet to save a snapshot on; make the first commit".into());
+        return Err(crate::i18n::text(
+            "backend-there-is-no-commit-yet-to-save-a-snapshot-on-make-the-first-commi-b3e33d",
+        )
+        .into());
     }
     let scratch = Scratch::new(repo)?;
     let on = describe_head(repo)?;
-    let tracked = run_with_index(repo, &scratch.copy, &["stash", "create"])
-        .map_err(|e| format!("git couldn't save the changes: {e}"))?;
+    let tracked = run_with_index(repo, &scratch.copy, &["stash", "create"]).map_err(|e| {
+        crate::i18n::message(
+            "backend-git-couldn-t-save-the-changes-e-dffbdf",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let tracked = tracked.trim();
     let untracked = if untracked {
         untracked_commit(repo, &scratch, &on)?
@@ -147,8 +169,12 @@ fn untracked_commit(repo: &Path, scratch: &Scratch, on: &str) -> Result<Option<S
     for chunk in chunks(&files) {
         let mut args = vec!["update-index", "--add", "--"];
         args.extend(chunk);
-        run_with_index(repo, &scratch.untracked, &args)
-            .map_err(|e| format!("git couldn't save the untracked files: {e}"))?;
+        run_with_index(repo, &scratch.untracked, &args).map_err(|e| {
+            crate::i18n::message(
+                "backend-git-couldn-t-save-the-untracked-files-e-af8d82",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
     }
     let tree = run_with_index(repo, &scratch.untracked, &["write-tree"])?;
     commit_tree(repo, tree.trim(), &[], &format!("untracked files on {on}")).map(Some)
@@ -184,13 +210,23 @@ fn commit_tree(repo: &Path, tree: &str, parents: &[&str], message: &str) -> Resu
     args.push(tree);
     run(Some(repo), &args)
         .map(|s| s.trim().to_owned())
-        .map_err(|e| format!("git couldn't make the snapshot's commit: {e}"))
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-git-couldn-t-make-the-snapshot-s-commit-e-942643",
+                &[("detail", (e).to_string().into())],
+            )
+        })
 }
 
 fn rev(repo: &Path, rev: &str) -> Result<String, String> {
     run(Some(repo), &["rev-parse", "--verify", "-q", rev])
         .map(|s| s.trim().to_owned())
-        .map_err(|_| format!("git couldn't read the stash it just made ({rev})"))
+        .map_err(|_| {
+            crate::i18n::message(
+                "backend-git-couldn-t-read-the-stash-it-just-made-rev-9ea99b",
+                &[("rev", (rev).to_string().into())],
+            )
+        })
 }
 
 /// The index files a snapshot works on, in the repository's git folder (where a split index
@@ -223,8 +259,12 @@ impl Scratch {
             copy,
             untracked,
         };
-        crate::remote::copy_keeping_time(&here(&index), &scratch.files[0])
-            .map_err(|e| format!("couldn't copy the index to work on: {e}"))?;
+        crate::remote::copy_keeping_time(&here(&index), &scratch.files[0]).map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-copy-the-index-to-work-on-e-82bbf0",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         Ok(scratch)
     }
 }

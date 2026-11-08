@@ -52,7 +52,15 @@ impl Features {
 
     fn too_old(&self, needed: &str) -> String {
         let (major, minor, patch) = self.version;
-        format!("Conflict check needs git {needed} or newer (this is {major}.{minor}.{patch})")
+        crate::i18n::message(
+            "backend-conflict-check-needs-git-needed-or-newer-this-is-major-minor-patc-7f112b",
+            &[
+                ("needed", (needed).to_string().into()),
+                ("major", (major).to_string().into()),
+                ("minor", (minor).to_string().into()),
+                ("patch", (patch).to_string().into()),
+            ],
+        )
     }
 }
 
@@ -77,9 +85,12 @@ pub fn parse_version(out: &str) -> Option<(u32, u32, u32)> {
 /// What the git of `repo`'s machine can simulate.
 pub fn features(repo: &Path) -> Result<Features, String> {
     let out = run(Some(repo), &["--version"])?;
-    parse_version(&out)
-        .map(Features::of)
-        .ok_or_else(|| format!("Unrecognised git version: {}", out.trim()))
+    parse_version(&out).map(Features::of).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-unrecognised-git-version-98530a",
+            &[("detail", (out.trim()).to_string().into())],
+        )
+    })
 }
 
 /// Whether `repo` is a partial clone (`git clone --filter`): merging there downloads the
@@ -166,7 +177,10 @@ pub fn parse_merge_tree(out: &[u8], clean: bool) -> Result<TreeMerge, String> {
     let mut fields = text.split('\0');
     let tree = fields.next().unwrap_or_default().trim().to_owned();
     if tree.is_empty() || !tree.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("Unexpected answer from git merge-tree: {tree:?}"));
+        return Err(crate::i18n::message(
+            "backend-unexpected-answer-from-git-merge-tree-tree-8d1aa0",
+            &[("tree", format!("{:?}", tree).into())],
+        ));
     }
     if clean {
         return Ok(TreeMerge {
@@ -183,7 +197,10 @@ pub fn parse_merge_tree(out: &[u8], clean: bool) -> Result<TreeMerge, String> {
         })
         .collect();
     if conflicts.is_empty() {
-        return Err("git merge-tree reported conflicts but named no file".to_owned());
+        return Err(crate::i18n::text(
+            "backend-git-merge-tree-reported-conflicts-but-named-no-file-ea5861",
+        )
+        .to_owned());
     }
     read_messages(fields, &mut conflicts);
     Ok(TreeMerge { tree, conflicts })
@@ -316,7 +333,7 @@ fn finish_rebase(
     if rebases_merges(repo) && has_merges(repo, branch, onto)? {
         return Ok(Prediction {
             outcome: Outcome::Unsure(
-                "rebase.rebaseMerges is set, and the merges it would recreate aren't checked"
+                crate::i18n::text("backend-rebase-rebasemerges-is-set-and-the-merges-it-would-recreate-aren-5ad5d3")
                     .to_owned(),
             ),
             commits: picks.len(),
@@ -530,9 +547,12 @@ pub fn replay(
     let mut tree = start;
     for (n, pick) in picks.iter().enumerate() {
         if n == MAX_STEPS {
-            replay.unsure = Some(format!(
-                "Only the first {MAX_STEPS} of {} commits were checked",
-                picks.len()
+            replay.unsure = Some(crate::i18n::message(
+                "backend-only-the-first-max-steps-of-commits-were-checked-797f2a",
+                &[
+                    ("max_steps", (MAX_STEPS).to_string().into()),
+                    ("count", (picks.len()).to_string().into()),
+                ],
             ));
             break;
         }
@@ -540,11 +560,18 @@ pub fn replay(
             Some(parent) => parent.clone(),
             None if features.trees => empty_tree(repo),
             None => {
-                replay.unsure = Some(format!(
-                    "{} is a root commit, which git {}.{} can't check (2.45 can)",
-                    pick.hash.get(..8).unwrap_or(&pick.hash),
-                    features.version.0,
-                    features.version.1
+                replay.unsure = Some(crate::i18n::message(
+                    "backend-is-a-root-commit-which-git-can-t-check-2-45-can-33b417",
+                    &[
+                        (
+                            "pick",
+                            (pick.hash.get(..8).unwrap_or(&pick.hash))
+                                .to_string()
+                                .into(),
+                        ),
+                        ("features", (features.version.0).to_string().into()),
+                        ("features3", (features.version.1).to_string().into()),
+                    ],
                 ));
                 break;
             }

@@ -50,7 +50,10 @@ pub fn author_of(repo: &Path, commit: &str) -> Result<Author, String> {
         date: next(),
     };
     if author.date.is_empty() {
-        return Err(format!("could not read who wrote {commit}"));
+        return Err(crate::i18n::message(
+            "backend-could-not-read-who-wrote-commit-7fd87e",
+            &[("commit", (commit).to_string().into())],
+        ));
     }
     Ok(author)
 }
@@ -62,7 +65,12 @@ pub fn tree_of(repo: &Path, rev: &str) -> Result<String, String> {
         Some(repo),
         &["rev-parse", "--verify", "--quiet", END_OPTS, &spec],
     )
-    .map_err(|_| format!("{rev} has no tree"))?
+    .map_err(|_| {
+        crate::i18n::message(
+            "backend-rev-has-no-tree-7523f4",
+            &[("rev", (rev).to_string().into())],
+        )
+    })?
     .trim()
     .to_owned())
 }
@@ -175,9 +183,18 @@ pub fn tree_after(repo: &Path, base: &str, patches: &[String]) -> Result<String,
             )
             .map_err(|e| {
                 if patches.len() == 1 {
-                    format!("its patch does not apply: {e}")
+                    crate::i18n::message(
+                        "backend-its-patch-does-not-apply-e-6ff735",
+                        &[("detail", (e).to_string().into())],
+                    )
                 } else {
-                    format!("patch {} does not apply: {e}", n + 1)
+                    crate::i18n::message(
+                        "backend-patch-does-not-apply-e-cbf492",
+                        &[
+                            ("count", (n + 1).to_string().into()),
+                            ("detail", (e).to_string().into()),
+                        ],
+                    )
                 }
             })?;
         }

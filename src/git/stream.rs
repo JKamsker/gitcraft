@@ -119,8 +119,10 @@ pub fn stream(
         }
     }
     if overflow.load(Ordering::Acquire) {
-        content_error
-            .get_or_insert_with(|| "stream consumer exceeded the bounded output queue".into());
+        content_error.get_or_insert_with(|| {
+            crate::i18n::text("backend-stream-consumer-exceeded-the-bounded-output-queue-101b12")
+                .into()
+        });
     }
     stream_completion(result, stopper.stopped(), content_error)
 }
@@ -171,7 +173,7 @@ fn feed(pending: &mut Vec<u8>, bytes: &[u8], line: &mut impl FnMut(String)) -> R
         );
     }
     if pending.len() > 1 << 20 {
-        return Err("stream line exceeds 1 MiB".into());
+        return Err(crate::i18n::text("backend-stream-line-exceeds-1-mib-589b21").into());
     }
     Ok(())
 }

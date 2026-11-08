@@ -274,7 +274,13 @@ pub(crate) fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R 
 /// The commit `branch` forks from `parent` at: what it is based on when it is made a layer.
 pub fn fork_point(repo: &Path, branch: &str, parent: &str) -> Result<String, String> {
     merge_base(repo, &local_ref(parent), &local_ref(branch)).map_err(|_| {
-        format!("{branch} and {parent} have no commit in common: {branch} can't be based on it")
+        crate::i18n::message(
+            "backend-branch-and-parent-have-no-commit-in-common-branch-can-t-be-based-b8dcd6",
+            &[
+                ("branch", (branch).to_string().into()),
+                ("parent", (parent).to_string().into()),
+            ],
+        )
     })
 }
 

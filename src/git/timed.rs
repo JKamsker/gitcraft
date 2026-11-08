@@ -47,8 +47,17 @@ pub fn run_timed(
     };
     Err(if said.is_empty() {
         match code {
-            Some(code) => format!("{what} failed (exit status {code})"),
-            None => format!("{what} was stopped by a signal"),
+            Some(code) => crate::i18n::message(
+                "backend-what-failed-exit-status-code-4558d1",
+                &[
+                    ("what", (what).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            ),
+            None => crate::i18n::message(
+                "backend-what-was-stopped-by-a-signal-d75f6c",
+                &[("what", (what).to_string().into())],
+            ),
         }
     } else {
         said
@@ -56,9 +65,12 @@ pub fn run_timed(
 }
 
 fn stopped(what: &str, limit: Duration) -> String {
-    format!(
-        "{what} didn't finish within {} seconds and was stopped",
-        limit.as_secs_f32().ceil()
+    crate::i18n::message(
+        "backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894",
+        &[
+            ("what", (what).to_string().into()),
+            ("seconds", (limit.as_secs_f32().ceil()).to_string().into()),
+        ],
     )
 }
 

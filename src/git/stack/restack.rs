@@ -118,8 +118,15 @@ pub fn prepare(
     let mut out = Vec::new();
     for (branch, parent, base) in layers {
         let old_base = old_base(repo, branch, parent, base.as_deref())?;
-        let new_base = resolve(repo, &local_ref(parent))
-            .map_err(|_| format!("{parent}, which {branch} is based on, is gone"))?;
+        let new_base = resolve(repo, &local_ref(parent)).map_err(|_| {
+            crate::i18n::message(
+                "backend-parent-which-branch-is-based-on-is-gone-d74108",
+                &[
+                    ("parent", (parent).to_string().into()),
+                    ("branch", (branch).to_string().into()),
+                ],
+            )
+        })?;
         let (_, commits) = count_apart(repo, &old_base, &local_ref(branch))?;
         out.push(Preview {
             step: Step {
@@ -154,7 +161,13 @@ fn old_base(repo: &Path, branch: &str, parent: &str, base: Option<&str>) -> Resu
         return Ok(out.trim().to_owned());
     }
     merge_base(repo, &p, &b).map_err(|_| {
-        format!("{branch} and {parent} have no commit in common: it can't be restacked")
+        crate::i18n::message(
+            "backend-branch-and-parent-have-no-commit-in-common-it-can-t-be-restacked-eea573",
+            &[
+                ("branch", (branch).to_string().into()),
+                ("parent", (parent).to_string().into()),
+            ],
+        )
     })
 }
 
@@ -230,18 +243,24 @@ pub fn start(repo: &Path, steps: Vec<Step>) -> Result<Outcome, String> {
         return Ok(Outcome::Done(Vec::new()));
     }
     if pending(repo)?.is_some() {
-        return Err("A restack is already under way: continue or abort it first.".to_owned());
+        return Err(crate::i18n::text(
+            "backend-a-restack-is-already-under-way-continue-or-abort-it-first-1f94ff",
+        )
+        .to_owned());
     }
     if git::status(repo)?.in_progress.is_some() {
-        return Err("Finish or abort the operation in progress first.".to_owned());
+        return Err(crate::i18n::text(
+            "backend-finish-or-abort-the-operation-in-progress-first-dacd5d",
+        )
+        .to_owned());
     }
     let worktrees = git::worktree_list(repo, None)?;
     let here = steps.iter().any(|s| !in_other(&worktrees, &s.branch));
     if here && has_changes(repo)? {
-        return Err(
-            "Commit or stash your changes first: restacking checks the branches out here."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-commit-or-stash-your-changes-first-restacking-checks-the-branches-986892",
+        )
+        .to_owned());
     }
     let head = run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?
         .trim()
@@ -345,9 +364,12 @@ fn run_from(repo: &Path, mut pending: Pending) -> Result<Outcome, String> {
     let worktrees = git::worktree_list(repo, None)?;
     while let Some(step) = pending.current().cloned() {
         let new_base = resolve(repo, &local_ref(&step.parent)).map_err(|_| {
-            format!(
-                "{}, which {} is based on, is gone",
-                step.parent, step.branch
+            crate::i18n::message(
+                "backend-which-is-based-on-is-gone-e39c7a",
+                &[
+                    ("parent", (step.parent).to_string().into()),
+                    ("branch", (step.branch).to_string().into()),
+                ],
             )
         })?;
         let tip = local_ref(&step.branch);
@@ -365,10 +387,12 @@ fn run_from(repo: &Path, mut pending: Pending) -> Result<Outcome, String> {
             if let Some(dir) = &at
                 && let Some(state) = git::status(dir)?.in_progress
             {
-                return Err(format!(
-                    "The worktree at {} has a {} in progress: finish or abort it first",
-                    dir.display(),
-                    state.label().to_lowercase()
+                return Err(crate::i18n::message(
+                    "backend-the-worktree-at-has-a-in-progress-finish-or-abort-it-first-032e5e",
+                    &[
+                        ("path", (dir.display()).to_string().into()),
+                        ("state", (state.label().to_lowercase()).to_string().into()),
+                    ],
                 ));
             }
             keep_at(repo, at.as_deref())?;
@@ -500,7 +524,8 @@ fn moved(repo: &Path, pending: &Pending) -> Result<Vec<Moved>, String> {
 /// Goes on with the restack under way: finishes the rebase it stopped in (`rebase
 /// --continue`), or takes in that it was finished meanwhile, then runs the steps left.
 pub fn resume(repo: &Path) -> Result<Outcome, String> {
-    let pending = pending(repo)?.ok_or("No restack is under way.")?;
+    let pending =
+        pending(repo)?.ok_or(crate::i18n::text("backend-no-restack-is-under-way-d6febc"))?;
     let Some(step) = pending.current().cloned() else {
         return finish(repo, &pending);
     };
@@ -533,7 +558,8 @@ pub fn resume(repo: &Path) -> Result<Outcome, String> {
 /// A branch with commits made on it after it was restacked is left as it is: its name comes
 /// back, and its recorded base stays.
 pub fn abort(repo: &Path) -> Result<Vec<String>, String> {
-    let pending = pending(repo)?.ok_or("No restack is under way.")?;
+    let pending =
+        pending(repo)?.ok_or(crate::i18n::text("backend-no-restack-is-under-way-d6febc"))?;
     if pending.current().is_some() {
         let at = pending.at.as_deref();
         if rebase_stopped(repo, at)? {

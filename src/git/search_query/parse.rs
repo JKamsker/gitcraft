@@ -39,8 +39,9 @@ pub fn parse(query: &str) -> Result<Option<SearchQuery>, QueryError> {
     }
     if query.chars().count() > MAX_QUERY_CHARS {
         return Err(QueryError {
-            message: format!(
-                "This search is too long: at most {MAX_QUERY_CHARS} characters with operators"
+            message: crate::i18n::message(
+                "backend-this-search-is-too-long-at-most-max-query-chars-characters-with-o-aebecb",
+                &[("max_query_chars", (MAX_QUERY_CHARS).to_string().into())],
             ),
             at: 0,
         });
@@ -91,13 +92,15 @@ impl<'a> Parser<'a> {
             Some(TokenProblem::Unclosed) => {
                 return Err(self.error(
                     token.value_start,
-                    "This quote is not closed: add a closing \"".to_owned(),
+                    crate::i18n::text("backend-this-quote-is-not-closed-add-a-closing-95a482")
+                        .to_owned(),
                 ));
             }
             Some(TokenProblem::AfterQuote) => {
                 return Err(self.error(
                     token.value_start,
-                    "Leave a space after the closing quote".to_owned(),
+                    crate::i18n::text("backend-leave-a-space-after-the-closing-quote-b92a22")
+                        .to_owned(),
                 ));
             }
             None => {}
@@ -105,7 +108,8 @@ impl<'a> Parser<'a> {
         if token.value.contains('\0') {
             return Err(self.error(
                 token.value_start,
-                "A NUL character can't be searched for".to_owned(),
+                crate::i18n::text("backend-a-nul-character-can-t-be-searched-for-4079bc")
+                    .to_owned(),
             ));
         }
         match token.op {
@@ -123,7 +127,10 @@ impl<'a> Parser<'a> {
         if token.negated && !op.negatable() {
             return Err(self.error(
                 start,
-                format!("-{name}: isn't supported: only merges: can be turned around with a -"),
+                crate::i18n::message(
+                    "backend-name-isn-t-supported-only-merges-can-be-turned-around-with-a-12e350",
+                    &[("name", (name).to_string().into())],
+                ),
             ));
         }
         if op == Operator::Merges {
@@ -131,16 +138,16 @@ impl<'a> Parser<'a> {
         }
         let value = token.value.clone();
         if value.is_empty() {
-            let quoting = if matches!(op, Operator::After | Operator::Before) {
-                ""
+            let id = if matches!(op, Operator::After | Operator::Before) {
+                "backend-search-value-required"
             } else {
-                " (quote it if it has spaces)"
+                "backend-search-value-required-quoted"
             };
             return Err(self.error(
                 start,
-                format!(
-                    "{name}: needs {} right after the colon{quoting}",
-                    op.needs()
+                crate::i18n::message(
+                    id,
+                    &[("operator", name.into()), ("value", op.needs().into())],
                 ),
             ));
         }
@@ -164,7 +171,7 @@ impl<'a> Parser<'a> {
             _ => {
                 return Err(self.error(
                     start,
-                    "merges: takes no value (or yes / no): merges: for only merges, -merges: for none"
+                    crate::i18n::text("backend-merges-takes-no-value-or-yes-no-merges-for-only-merges-merges-for-2eaff8")
                         .to_owned(),
                 ));
             }
@@ -172,7 +179,10 @@ impl<'a> Parser<'a> {
         match self.out.merges {
             Some(before) if before != only => Err(self.error(
                 start,
-                "merges: and -merges: together leave nothing: keep one of them".to_owned(),
+                crate::i18n::text(
+                    "backend-merges-and-merges-together-leave-nothing-keep-one-of-them-5b3273",
+                )
+                .to_owned(),
             )),
             _ => {
                 self.out.merges = Some(only);
@@ -193,7 +203,13 @@ impl<'a> Parser<'a> {
             (&mut self.out.before, &mut self.before_day)
         };
         if slot.is_some() {
-            return Err(self.error(start, format!("Only one {name}: per search")));
+            return Err(self.error(
+                start,
+                crate::i18n::message(
+                    "backend-only-one-name-per-search-9e42cd",
+                    &[("name", (name).to_string().into())],
+                ),
+            ));
         }
         *slot = Some(arg);
         *day_slot = day;
@@ -204,7 +220,7 @@ impl<'a> Parser<'a> {
         if self.out.contents.is_some() || self.out.regex.is_some() {
             return Err(self.error(
                 token.span.start,
-                "Only one contents: or regex: per search: git looks for one change at a time"
+                crate::i18n::text("backend-only-one-contents-or-regex-per-search-git-looks-for-one-change-at-f6bf19")
                     .to_owned(),
             ));
         }
@@ -223,7 +239,10 @@ impl<'a> Parser<'a> {
         {
             return Err(self.error(
                 self.after_at,
-                "The after: date must be earlier than the before: date".to_owned(),
+                crate::i18n::text(
+                    "backend-the-after-date-must-be-earlier-than-the-before-date-35eda6",
+                )
+                .to_owned(),
             ));
         }
         self.out.text = self.words.join(" ");
