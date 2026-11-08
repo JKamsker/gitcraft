@@ -451,8 +451,10 @@ mod fluent_r1_catalog_tests {
             cause: SourceFailure::Parse(cause),
         };
         let raw = error.raw();
-        let mut state = super::super::State::default();
-        state.errors = vec![error.clone()];
+        let mut state = super::super::State {
+            errors: vec![error.clone()],
+            ..Default::default()
+        };
         state.remember_catalog_failure(error.clone());
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);

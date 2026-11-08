@@ -788,10 +788,12 @@ mod fluent_r1_cache_tests {
     #[test]
     fn fluent_partition_r1_atlas_cached_validation_keeps_inputs_and_page() -> Result<(), String> {
         crate::i18n::set_language("de");
-        let mut state = State::default();
-        state.from = "raw bad date".into();
-        state.through = "2026-01-01".into();
-        state.error = Some(invalid_range_error());
+        let mut state = State {
+            from: "raw bad date".into(),
+            through: "2026-01-01".into(),
+            error: Some(invalid_range_error()),
+            ..Default::default()
+        };
         let raw = state.error.clone().ok_or("missing test value")?;
         state.page = 7;
         for lang in ["de", "en-US", "de"] {

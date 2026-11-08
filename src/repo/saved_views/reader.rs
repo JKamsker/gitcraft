@@ -192,8 +192,10 @@ mod fluent_r1_reader_tests {
             WorkerError::Panicked,
         ] {
             let raw = worker_error(kind).to_owned();
-            let mut state = super::super::State::default();
-            state.error = Some(raw.clone());
+            let state = super::super::State {
+                error: Some(raw.clone()),
+                ..Default::default()
+            };
             for lang in ["de", "en-US", "de"] {
                 crate::i18n::set_language(lang);
                 let shown = crate::repo::activity::display_workflow_error(

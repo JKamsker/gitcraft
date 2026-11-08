@@ -298,13 +298,15 @@ mod fluent_r1_cache_tests {
     #[test]
     fn fluent_partition_r1_dossier_cached_error_summary_and_evidence_keep_raw_source()
     -> Result<(), String> {
-        let mut state = State::default();
-        state.open = true;
-        state.path = "raw: {$x}/日本語".into();
-        state.line = 1234;
-        state.error = Some("History read cancelled".into());
-        state.summary = Some(Err("History worker panicked".into()));
-        state.evidence = Some(Err("History worker stopped".into()));
+        let state = State {
+            open: true,
+            path: "raw: {$x}/日本語".into(),
+            line: 1234,
+            error: Some("History read cancelled".into()),
+            summary: Some(Err("History worker panicked".into())),
+            evidence: Some(Err("History worker stopped".into())),
+            ..Default::default()
+        };
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             for raw in [

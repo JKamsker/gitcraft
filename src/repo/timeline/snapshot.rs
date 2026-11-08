@@ -148,7 +148,7 @@ pub(crate) fn restore_steps(
     if let Some((name, ..)) = moved.iter().find(|(n, ..)| elsewhere.contains(n)) {
         return Err(crate::i18n::message(
             "repo-workflows-timeline-restore-steps-2912ea1a",
-            &[("name", (name).clone().into())],
+            &[("name", (*name).into())],
         ));
     }
     if !target.branch.is_empty() && !target.branches.contains_key(&target.branch) {
