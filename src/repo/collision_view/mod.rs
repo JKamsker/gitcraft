@@ -173,12 +173,7 @@ impl RepoTab {
                 view.run = None;
                 match found {
                     Err(e) if e == collision::STOPPED => {
-                        view.note = Some(
-                            crate::i18n::text(
-                                "repo-workflows-collision_view-check-collisions-96d2bcac",
-                            )
-                            .to_owned(),
-                        );
+                        view.note = Some("Stopped; nothing new to show".to_owned());
                     }
                     found => view.result = Some(found),
                 }
@@ -293,7 +288,11 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
                 run.cancel.store(true, Ordering::Relaxed);
             }
         } else if let Some(note) = &view.note {
-            ui.label(RichText::new(note).size(12.0).color(t.text_faint));
+            ui.label(
+                RichText::new(display_note(note))
+                    .size(12.0)
+                    .color(t.text_faint),
+            );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             close = ui
@@ -315,6 +314,14 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
         None => {}
     }
     (check, close)
+}
+
+fn display_note(raw: &str) -> &str {
+    if raw == "Stopped; nothing new to show" {
+        crate::i18n::text("repo-workflows-collision_view-check-collisions-96d2bcac")
+    } else {
+        raw
+    }
 }
 
 /// The target and the branches to tick.

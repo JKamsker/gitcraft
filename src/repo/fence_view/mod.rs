@@ -34,6 +34,7 @@ pub(crate) struct FenceState {
     pub(crate) found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
     /// Writing the agents' configs into a worktree failed: where, and why.
     pub(crate) write_errors: Vec<String>,
+    write_error_context: Vec<RootFailure>,
     checking: bool,
     /// Checked again once this check is in (the repository was read again meanwhile).
     again: bool,
@@ -92,6 +93,43 @@ struct Checked {
     targets: fence::Targets,
     found: HashMap<PathBuf, Result<Vec<Violation>, String>>,
     write_errors: Vec<String>,
+    write_error_context: Vec<RootFailure>,
+}
+
+#[derive(Clone)]
+struct RootFailure {
+    root: String,
+    detail: String,
+}
+impl RootFailure {
+    fn new(root: &std::path::Path, detail: String) -> Self {
+        Self {
+            root: crate::remote::display(root),
+            detail,
+        }
+    }
+    fn raw(&self) -> String {
+        format!("{}: {}", self.root, self.detail)
+    }
+    fn display(&self) -> String {
+        format!(
+            "{}: {}",
+            self.root,
+            fence::display::diagnostic(&self.detail)
+        )
+    }
+}
+fn display_write_errors(raw: &[String], context: &[RootFailure]) -> String {
+    raw.iter()
+        .enumerate()
+        .map(|(index, error)| {
+            context
+                .get(index)
+                .filter(|source| source.raw() == *error)
+                .map_or_else(|| error.clone(), RootFailure::display)
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl RepoTab {
@@ -124,10 +162,12 @@ impl RepoTab {
                 let targets = fence::read_targets(&repo);
                 let patterns = fence::parse_list(&list);
                 let mut write_errors = Vec::new();
+                let mut write_error_context = Vec::new();
                 if !patterns.is_empty() {
                     for root in &roots {
                         if let Err(e) = fence::write_all(root, &patterns, targets) {
                             write_errors.push(format!("{}: {e}", crate::remote::display(root)));
+                            write_error_context.push(RootFailure::new(root, e));
                         }
                     }
                 }
@@ -146,6 +186,7 @@ impl RepoTab {
                     targets,
                     found,
                     write_errors,
+                    write_error_context,
                 })
             },
             |tab, result, ctx| {
@@ -156,6 +197,7 @@ impl RepoTab {
                         tab.fence.targets = c.targets;
                         tab.fence.found = c.found;
                         tab.fence.write_errors = c.write_errors;
+                        tab.fence.write_error_context = c.write_error_context;
                         tab.fence.loaded = true;
                     }
                     Err(e) => tab.status = Some((e, true)),
