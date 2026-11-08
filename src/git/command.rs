@@ -3253,6 +3253,7 @@ mod backend_fluent_identity_tests {
             let raw = super::missing_folder(&target);
             assert_eq!(raw, "/fixture/de/repo isn't a folder on SSH · fixture-host");
             assert!(raw.to_lowercase().contains("isn't a folder on"));
+            assert_eq!(crate::across::short_reason(&raw), "folder not found");
             assert_eq!(
                 crate::git::display_error(&raw),
                 if locale == "de" {

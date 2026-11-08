@@ -232,7 +232,8 @@ fn a_full_list_says_it_was_cut() {
 }
 
 #[test]
-fn backend_fluent_inbox_presentation_preserves_numeric_counts_and_login_identity() {
+fn backend_fluent_inbox_presentation_preserves_numeric_counts_and_login_identity()
+-> Result<(), String> {
     let protocol = "no Forgejo login known for forge.example: add one with `tea login add`, or open one of its repositories with a login, for gitcraft to know which pull requests are yours";
     for (locale, one, many, grouped, login) in [
         (
@@ -263,9 +264,10 @@ fn backend_fluent_inbox_presentation_preserves_numeric_counts_and_login_identity
             "external provider detail: HTTP 409 /refs/main"
         );
         let json = r#"[{"iid":7,"title":"User title","source_branch":"de/untranslated","target_branch":"main","web_url":"https://git.example/mr/7","author":{"username":"user"}}]"#;
-        let prs = parse_gitlab(json, false).unwrap();
+        let prs = parse_gitlab(json, false)?;
         assert_eq!(prs[0].title, "User title");
         assert_eq!(prs[0].url, "https://git.example/mr/7");
     }
     crate::i18n::set_language("en-US");
+    Ok(())
 }

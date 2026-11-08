@@ -899,14 +899,12 @@ pub fn shelve(
         active,
     )?;
     Ok(crate::i18n::message(
-        "backend-other-lists-retained-evidence-cab32f",
+        if restore {
+            "backend-changelist-unshelved"
+        } else {
+            "backend-changelist-shelved"
+        },
         &[
-            (
-                "if",
-                (if restore { "Unshelved" } else { "Shelved" })
-                    .to_string()
-                    .into(),
-            ),
             ("name", (list.name).to_string().into()),
             ("evidence", (evidence).to_string().into()),
         ],

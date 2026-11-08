@@ -65,7 +65,15 @@ impl Version {
                     "backend-version-bytes"
                 },
                 &[
-                    ("mode", mode.as_str().into()),
+                    (
+                        "mode",
+                        if mode == "unknown" {
+                            crate::i18n::text("backend-version-unknown-mode")
+                        } else {
+                            mode.as_str()
+                        }
+                        .into(),
+                    ),
                     ("count", self.bytes.len().into()),
                 ],
             ),

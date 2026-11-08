@@ -29,9 +29,7 @@ fn remote_read(
                 ("path", (remote::display(path)).to_string().into()),
                 (
                     "from_utf8_lossy",
-                    (String::from_utf8_lossy(&out.stderr).trim())
-                        .to_string()
-                        .into(),
+                    display_helper_error(String::from_utf8_lossy(&out.stderr).trim()).into(),
                 ),
             ],
         ));
@@ -281,5 +279,42 @@ mod bounded_metadata_pure {
         );
         assert_eq!(checks.get(), 2);
         Ok(())
+    }
+}
+
+fn display_helper_error(error: &str) -> String {
+    if error == "not a regular file" {
+        return crate::i18n::text("backend-object-store-metadata-is-not-a-regular-file-aaed30")
+            .into();
+    }
+    if let Some(count) = error
+        .strip_prefix("More than ")
+        .and_then(|s| s.strip_suffix(" packs; use Git in the terminal"))
+        .and_then(|s| s.parse::<usize>().ok())
+    {
+        return crate::i18n::message(
+            "backend-more-than-max-packs-use-git-in-the-terminal-40f8d7",
+            &[("max", count.into())],
+        );
+    }
+    error.into()
+}
+
+#[cfg(test)]
+mod backend_fluent_helper_tests {
+    #[test]
+    fn backend_fluent_object_helper_keeps_unrecognized_diagnostics_opaque() {
+        crate::i18n::set_language("de");
+        assert_eq!(
+            super::display_helper_error("not a regular file"),
+            "Die Objektspeichermetadaten liegen nicht in einer regulären Datei."
+        );
+        assert_eq!(
+            super::display_helper_error("More than 1234 packs; use Git in the terminal"),
+            "Mehr als 1.234 Packs; verwende Git im Terminal."
+        );
+        let unknown = "provider HTTP 409: More than abc packs; use Git in the terminal";
+        assert_eq!(super::display_helper_error(unknown), unknown);
+        crate::i18n::set_language("en-US");
     }
 }

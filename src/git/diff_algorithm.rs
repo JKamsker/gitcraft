@@ -29,9 +29,9 @@ impl DiffAlgorithm {
     /// What the diff header calls it.
     pub fn label(self) -> &'static str {
         match self {
-            DiffAlgorithm::Myers => "Myers",
-            DiffAlgorithm::Minimal => "Minimal",
-            DiffAlgorithm::Patience => "Patience",
+            DiffAlgorithm::Myers => crate::i18n::text("backend-diff-myers"),
+            DiffAlgorithm::Minimal => crate::i18n::text("backend-diff-minimal"),
+            DiffAlgorithm::Patience => crate::i18n::text("backend-diff-patience"),
             DiffAlgorithm::Histogram => crate::i18n::text("backend-diff-histogram"),
         }
     }

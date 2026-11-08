@@ -377,6 +377,22 @@ pub fn display_error(error: &str) -> String {
         "unsupported upstream namespace" => "backend-native-fallback-850e897a1e",
         "local upstream requires Git" => "backend-native-fallback-bd13f61f25",
         "feature disabled" => "backend-native-fallback-3369979818",
+        "Explicit transient sign-in requires HTTPS" => "backend-helper-display-675478fd62",
+        "Use a credential-free remote URL with explicit sign-in" => {
+            "backend-helper-display-24d299539e"
+        }
+        "Selected Git executable was not pinned" => "backend-helper-display-2c92424593",
+        "Explicit transient HTTPS sign-in requires recognized Git 2.46 or newer on the repository machine; use the profile credential manager otherwise." => {
+            "backend-helper-display-2287177378"
+        }
+        "Credential transport needs an absolute original Git exec-path" => {
+            "backend-helper-display-dbf94596ef"
+        }
+        "Scoped sign-in is only available to the designated Git HTTP transport. LFS and credential-fill consumers must use their own explicitly selected account." => {
+            "backend-helper-display-7ed9b0c2ef"
+        }
+        "Bundle output exceeds the size limit" => "backend-helper-display-caef832ec9",
+        "base64 is missing" => "backend-helper-display-15fb4e0da4",
         _ => return error.to_owned(),
     };
     crate::i18n::text(id).to_owned()

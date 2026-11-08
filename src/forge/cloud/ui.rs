@@ -7,7 +7,7 @@ struct State {
 }
 pub(crate) fn show(ui: &mut egui::Ui, profile: u64, s: Service, a: &mut Account) {
     ui.horizontal(|ui| {
-        ui.label("Server");
+        ui.label(crate::i18n::text("backend-label-server"));
         ui.text_edit_singleline(&mut a.server);
     });
     ui.horizontal(|ui| {

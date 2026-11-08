@@ -505,9 +505,7 @@ fn scan_there(t: &crate::remote::Target) -> Result<Option<Vec<Scanned>>, String>
             "backend-could-not-read-the-hooks-folder-1444e9",
             &[(
                 "from_utf8_lossy",
-                (String::from_utf8_lossy(&out.stderr).trim())
-                    .to_string()
-                    .into(),
+                crate::git::display_error(String::from_utf8_lossy(&out.stderr).trim()).into(),
             )],
         )),
     }

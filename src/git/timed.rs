@@ -215,6 +215,7 @@ mod backend_fluent_identity_tests {
                 "git interpret-trailers didn't finish within 3 seconds and was stopped"
             );
             assert!(raw.contains("didn't finish within"));
+            assert_eq!(crate::across::short_reason(&raw), "timed out");
             assert_eq!(
                 crate::git::display_error(&raw),
                 if locale == "de" {

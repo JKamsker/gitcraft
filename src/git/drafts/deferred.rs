@@ -1175,18 +1175,7 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
         }
         let place = acceptance_place(r, &view, id, i, &s.branch)?;
         view.jobs.jobs[j].busy = true;
-        view.jobs.jobs[j].notice = crate::i18n::message(
-            "backend-guarded-of-in-flight-an-interrupted-acknowledgement-requires-insp-fad6bd",
-            &[
-                (
-                    "if",
-                    (if undo { "undo" } else { "acceptance" })
-                        .to_string()
-                        .into(),
-                ),
-                ("branch", (s.branch).to_string().into()),
-            ],
-        );
+        view.jobs.jobs[j].notice = guarded_in_flight(&s.branch, undo);
         save(r.repo, &mut view, &active)?;
         let result = crate::push_preflight::accept_rewrite(
             &place,
@@ -1197,12 +1186,7 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
         if result.is_ok() {
             view.jobs.jobs[j].steps[i].accepted = !undo;
             view.jobs.jobs[j].busy = false;
-            view.jobs.jobs[j].notice = format!(
-                "{} {} as {}",
-                if undo { "Restored" } else { "Accepted" },
-                s.branch,
-                new
-            );
+            view.jobs.jobs[j].notice = accepted_tip(&s.branch, new, undo);
             save(r.repo, &mut view, &active)?;
         } else {
             view.jobs.jobs[j].notice = crate::i18n::text(
@@ -1510,3 +1494,64 @@ pub(crate) mod tests {
 #[cfg(test)]
 #[path = "deferred/runtime_tests.rs"]
 mod runtime_tests;
+
+fn guarded_in_flight(branch: &str, undo: bool) -> String {
+    crate::i18n::message(
+        if undo {
+            "backend-deferred-undo-in-flight"
+        } else {
+            "backend-deferred-acceptance-in-flight"
+        },
+        &[("branch", branch.into())],
+    )
+}
+
+fn accepted_tip(branch: &str, oid: &str, undo: bool) -> String {
+    crate::i18n::message(
+        if undo {
+            "backend-deferred-restored-tip"
+        } else {
+            "backend-deferred-accepted-tip"
+        },
+        &[("branch", branch.into()), ("oid", oid.into())],
+    )
+}
+
+#[cfg(test)]
+mod backend_fluent_notice_tests {
+    #[test]
+    fn backend_fluent_deferred_notices_preserve_branch_and_tip() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            for (undo, english, german) in [
+                (
+                    false,
+                    "Accepted de/feature as abc123",
+                    "de/feature als abc123 übernommen.",
+                ),
+                (
+                    true,
+                    "Restored de/feature as abc123",
+                    "de/feature als abc123 wiederhergestellt.",
+                ),
+            ] {
+                assert_eq!(
+                    super::accepted_tip("de/feature", "abc123", undo),
+                    if locale == "de" { german } else { english }
+                );
+                let notice = super::guarded_in_flight("de/feature", undo);
+                assert!(notice.contains("de/feature"));
+                if locale == "de" {
+                    assert!(notice.contains(if undo {
+                        "Rückgängigmachen"
+                    } else {
+                        "Übernahme"
+                    }));
+                } else {
+                    assert!(notice.contains(if undo { "undo" } else { "acceptance" }));
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

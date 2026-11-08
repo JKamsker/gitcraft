@@ -994,14 +994,12 @@ pub fn toggle(
         active,
     )?;
     Ok(crate::i18n::message(
-        "backend-real-index-unchanged-evidence-ed9d74",
+        if b.active {
+            "backend-virtual-deactivated"
+        } else {
+            "backend-virtual-activated"
+        },
         &[
-            (
-                "if",
-                (if b.active { "Deactivated" } else { "Activated" })
-                    .to_string()
-                    .into(),
-            ),
             ("name", (name).to_string().into()),
             ("evidence", (evidence).to_string().into()),
         ],

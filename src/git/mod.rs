@@ -491,7 +491,7 @@ mod backend_fluent_adapter_tests {
     use super::*;
 
     #[test]
-    fn backend_fluent_operation_labels_keep_commands_and_control_identity() {
+    fn backend_fluent_operation_labels_keep_commands_and_control_identity() -> Result<(), String> {
         let opaque = "provider HTTP 409: /refs/heads/de/main";
         for (locale, merge, cancelled) in [
             ("en-US", "Merge", "Read cancelled"),
@@ -518,7 +518,8 @@ mod backend_fluent_adapter_tests {
                 &[0],
                 &|| false,
             )
-            .unwrap_err();
+            .err()
+            .ok_or("missing cancellation failure")?;
             assert_eq!(raw, "Read cancelled");
             assert!(raw.contains("cancelled"));
             assert_eq!(display_error(&raw), cancelled);
@@ -548,6 +549,7 @@ mod backend_fluent_adapter_tests {
             );
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 
     #[test]
@@ -615,7 +617,7 @@ mod backend_fluent_adapter_tests {
     }
 
     #[test]
-    fn backend_fluent_file_and_line_labels_use_numeric_counts() {
+    fn backend_fluent_file_and_line_labels_use_numeric_counts() -> Result<(), String> {
         use file_comparison::Version;
         for (locale, one, many, binary, lines, size) in [
             (
@@ -646,12 +648,15 @@ mod backend_fluent_adapter_tests {
             assert_eq!(make(vec![1; 1234]).label(), many);
             assert_eq!(make(vec![0, 1]).label(), binary);
             assert_eq!(
-                crate::forge::links::Lines::new(1234, 2345).unwrap().label(),
+                crate::forge::links::Lines::new(1234, 2345)
+                    .ok_or("missing line range")?
+                    .label(),
                 lines
             );
             assert_eq!(human_size(1024), size);
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 }
 

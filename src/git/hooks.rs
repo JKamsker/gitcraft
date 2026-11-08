@@ -509,7 +509,7 @@ mod tests {
 #[cfg(test)]
 mod backend_fluent_identity_tests {
     #[test]
-    fn backend_fluent_hook_keeps_toolbar_header_and_opaque_output() {
+    fn backend_fluent_hook_keeps_toolbar_header_and_opaque_output() -> Result<(), String> {
         let said =
             "provider HTTP 409: the other hook stopped it (exit code 7)\n/refs/heads/de/main";
         for locale in ["en-US", "de"] {
@@ -524,7 +524,7 @@ mod backend_fluent_identity_tests {
                     code: 1234,
                 };
                 let raw = hook.explain(said, &args);
-                let header = raw.lines().next().unwrap();
+                let header = raw.lines().next().ok_or("missing hook header")?;
                 assert!(header.starts_with(prefix) && header.contains(" hook "));
                 assert!(raw.contains("exit code 1234)"));
                 assert!(raw.contains(said));
@@ -541,5 +541,6 @@ mod backend_fluent_identity_tests {
             assert_eq!(crate::git::display_error(opaque), opaque);
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 }
