@@ -186,7 +186,7 @@ fn preview(ui: &mut Ui, plan: &release::Plan, forge: Option<Forge>) {
         ui,
         crate::i18n::text("repo-workflows-release-preview-3d5a5069"),
     );
-    for (i, (_, text)) in plan.preview(forge).iter().enumerate() {
+    for (i, (_, text)) in plan.display_preview(forge).iter().enumerate() {
         ui.add(egui::Label::new(format!("{}. {text}", i + 1)).wrap());
     }
     ui.label(
@@ -213,7 +213,7 @@ fn steps(ui: &mut Ui, run: &Run) {
         };
         ui.horizontal(|ui| {
             ui.label(RichText::new(mark).color(color));
-            ui.label(step.label());
+            ui.label(step.display_label());
             if *status == Status::Skipped {
                 ui.label(
                     RichText::new(crate::i18n::text("repo-workflows-release-steps-389595a4"))
