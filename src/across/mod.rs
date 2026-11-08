@@ -2,6 +2,8 @@
 //! WSL, over SSH). The window's parts that show it are in [`crate::app`].
 
 pub mod discover;
+mod display;
+pub use display::display_error;
 pub mod my_work;
 pub mod runner;
 pub mod workspaces;

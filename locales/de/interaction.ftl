@@ -1173,3 +1173,104 @@ interaction-workspace-name-required = Gib dem Arbeitsbereich einen Namen.
 interaction-workspace-name-controls = Der Name eines Arbeitsbereichs darf keine Zeilenumbrüche oder Tabulatoren enthalten.
 interaction-workspace-name-length = Der Name eines Arbeitsbereichs darf höchstens { $limit } Zeichen lang sein.
 interaction-workspace-name-duplicate = Ein Arbeitsbereich namens „{ $name }“ ist bereits vorhanden.
+interaction-my-work-title = Wo ist meine Arbeit?
+interaction-my-work-close = Schließen (Esc)
+interaction-my-work-look = Erneut prüfen
+interaction-my-work-intro = Nicht gepushte Commits, Stashes, nicht committete Änderungen und Branches ohne ihren Remote-Branch, in allen gitcraft bekannten Repositories.
+interaction-my-work-connect-look = Verbinden und prüfen
+interaction-my-work-clean = Hier gibt es keine ausschließlich lokalen Arbeiten: Alles ist committet und gepusht, und es gibt keine Stashes.
+interaction-my-work-empty = gitcraft kennt noch keine Repositories: Öffne welche oder suche unten auf einem Rechner danach.
+interaction-my-work-forget = Vergessen: Es wurde hier früher gefunden
+interaction-my-work-open = Öffnen
+interaction-my-work-open-push = zum Pushen öffnen
+interaction-my-work-connect-push = Verbinden und pushen
+interaction-my-work-push = Pushen
+interaction-my-work-waiting = wartet auf den Push…
+interaction-my-work-pushing = wird gepusht…
+interaction-my-work-retry = Erneut versuchen
+interaction-my-work-find = WEITERE REPOSITORIES FINDEN
+interaction-my-work-progress = { $done } von { $total } geprüft…
+interaction-my-work-unlooked = { $count ->
+        [one] Ein Repository nicht geprüft: gitcraft ist dort nicht verbunden.
+       *[other] { $count } Repositories nicht geprüft: gitcraft ist dort nicht verbunden.
+    }
+interaction-my-work-clean-looked = { $count ->
+        [one] Im geprüften Repository gibt es keine ausschließlich lokalen Arbeiten.
+       *[other] In den { $count } geprüften Repositories gibt es keine ausschließlich lokalen Arbeiten.
+    }
+interaction-my-work-clean-count = { $count ->
+        [one] Ein Repository ohne ausschließlich lokale Arbeiten.
+       *[other] { $count } Repositories ohne ausschließlich lokale Arbeiten.
+    }
+interaction-my-work-failed-look = { $count ->
+        [one] Ein Repository konnte nicht geprüft werden
+       *[other] { $count } Repositories konnten nicht geprüft werden
+    }
+interaction-my-work-push-error = Push: { $reason }
+interaction-my-work-push-local = { $tracked ->
+        [yes] Zum Upstream pushen (Git fragt nicht nach einem Passwort)
+       *[no] Nach origin pushen und dort einen Upstream einrichten (Git fragt nicht nach einem Passwort)
+    }
+interaction-my-work-push-remote = { $tracked ->
+        [yes] Mit { $host } verbinden (möglicherweise mit Passwortabfrage) und zum Upstream pushen
+       *[no] Mit { $host } verbinden (möglicherweise mit Passwortabfrage), nach origin pushen und dort einen Upstream einrichten
+    }
+interaction-my-work-search-description = Durchsucht den persönlichen Ordner eines Rechners bis zu { $depth } Ordnerebenen tief (versteckte Ordner werden übersprungen); Funde werden gespeichert.
+interaction-my-work-found-cut = { $machine } ({ $count }+ gefunden, Rest übersprungen)
+interaction-my-work-found = { $machine } ({ $count } gefunden)
+interaction-my-work-search-failed = { $machine } (fehlgeschlagen)
+interaction-my-work-this-computer = Dieser Rechner
+interaction-my-work-uncommitted = { $count ->
+        [one] 1 Datei mit nicht committeten Änderungen
+       *[other] { $count } Dateien mit nicht committeten Änderungen
+    }
+interaction-my-work-no-remote = kein Remote: Die Commits sind nur hier vorhanden
+interaction-my-work-unpushed = { $count ->
+        [one] { $branch }: 1 Commit nicht nach { $upstream } gepusht
+       *[other] { $branch }: { $count } Commits nicht nach { $upstream } gepusht
+    }
+interaction-my-work-local-branch = { $count ->
+        [one] { $branch }: 1 Commit auf keinem Remote (der Upstream ist ein Branch dieses Repositories)
+       *[other] { $branch }: { $count } Commits auf keinem Remote (der Upstream ist ein Branch dieses Repositories)
+    }
+interaction-my-work-untracked = { $count ->
+        [one] { $branch }: 1 Commit auf keinem Remote
+       *[other] { $branch }: { $count } Commits auf keinem Remote
+    }
+interaction-my-work-stashes = { $count ->
+        [one] 1 Stash: { $latest }
+       *[other] { $count } Stashes, der neueste: { $latest }
+    }
+interaction-my-work-worktree = { $count ->
+        [one] Worktree { $path }: 1 Datei mit nicht committeten Änderungen
+       *[other] Worktree { $path }: { $count } Dateien mit nicht committeten Änderungen
+    }
+interaction-my-work-gone = { $count ->
+        [one] { $branch }: Der Remote-Branch ist verschwunden, 1 Commit auf keinem Remote
+       *[other] { $branch }: Der Remote-Branch ist verschwunden, { $count } Commits auf keinem Remote
+    }
+interaction-my-work-other-name = einem anders benannten Branch
+interaction-my-work-why-other = { $branch } folgt { $upstream }, einem anders benannten Branch: Öffne das Repository, um an die richtige Stelle zu pushen
+interaction-my-work-why-local = { $branch } folgt einem Branch dieses Repositories: Öffne das Repository, um an die richtige Stelle zu pushen
+interaction-across-home = Der persönliche Ordner konnte nicht ermittelt werden
+interaction-across-stopped = unerwartet beendet
+interaction-across-no-remote = Das Repository hat kein Remote zum Pushen
+interaction-across-no-origin = Es gibt kein origin und mehrere Remotes: Öffne das Repository, um eines auszuwählen
+interaction-across-busy = { $kind ->
+        [look] Die letzte Prüfung läuft noch; versuche es erneut, sobald sie abgeschlossen ist
+        [fetch] Der letzte Abruf läuft noch; versuche es erneut, sobald er abgeschlossen ist
+       *[push] Der letzte Push läuft noch; versuche es erneut, sobald er abgeschlossen ist
+    }
+interaction-across-timeout = { $unit ->
+        [minute] Keine Antwort innerhalb von { $count } Minuten; der Vorgang läuft möglicherweise noch
+       *[second] Keine Antwort innerhalb von { $count } Sekunden; der Vorgang läuft möglicherweise noch
+    }
+interaction-across-timeout-one-minute = Keine Antwort innerhalb von 1 Minute; der Vorgang läuft möglicherweise noch
+interaction-across-timeout-one-second = Keine Antwort innerhalb von 1 Sekunde; der Vorgang läuft möglicherweise noch
+interaction-across-separate = { $branch } verwendet einen eigenen Push-Branch ({ $destination }): Öffne das Repository zum Pushen
+interaction-across-local = { $branch } folgt einem lokalen Branch: Es gibt kein Ziel zum Pushen
+interaction-across-other = { $branch } folgt { $upstream }, einem anders benannten Branch: Öffne das Repository, um an die richtige Stelle zu pushen
+interaction-across-gone = { $branch }: Der Remote-Branch ist verschwunden (dort gelöscht?): Öffne das Repository, um erneut zu pushen
+interaction-across-upstream = Für { $branch } ist kein Upstream mehr festgelegt
+interaction-across-destination = { $branch } soll nach { $destination } statt nach { $remote } gepusht werden: Öffne das Repository zum Pushen
+interaction-across-search = { $machine } konnte nicht durchsucht werden: { $reason }

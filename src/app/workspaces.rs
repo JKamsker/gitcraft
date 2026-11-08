@@ -485,7 +485,7 @@ impl App {
                 if let Some((i, text)) = &self.workspaces_view.notice
                     && *i == index
                 {
-                    ui.colored_label(t.warning, git::display_error(text));
+                    ui.colored_label(t.warning, across::display_error(text));
                 }
                 if repos.is_empty() {
                     ui.label(
@@ -1011,7 +1011,7 @@ fn row_tooltip(path: &Path, state: Option<&RepoState>) -> String {
             tip.push_str("\n\n");
             tip.push_str(&crate::i18n::message(
                 "interaction-workspace-look-error",
-                &[("reason", git::display_error(e).into())],
+                &[("reason", across::display_error(e).into())],
             ));
             failed = true;
         }
@@ -1019,7 +1019,7 @@ fn row_tooltip(path: &Path, state: Option<&RepoState>) -> String {
             tip.push_str("\n\n");
             tip.push_str(&crate::i18n::message(
                 "interaction-workspace-fetch-failed",
-                &[("reason", git::display_error(e).into())],
+                &[("reason", across::display_error(e).into())],
             ));
         }
         if let Some(Ok(o)) = &state.seen

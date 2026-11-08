@@ -163,7 +163,7 @@ pub fn display_error(raw: &str) -> String {
             &[("name", name.into())],
         );
     }
-    crate::git::display_error(raw)
+    super::display_error(raw)
 }
 
 #[cfg(test)]

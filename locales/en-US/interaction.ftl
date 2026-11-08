@@ -1173,3 +1173,104 @@ interaction-workspace-name-required = Give the workspace a name.
 interaction-workspace-name-controls = A workspace's name can't have line breaks or tabs in it.
 interaction-workspace-name-length = A workspace's name can be at most { $limit } characters long.
 interaction-workspace-name-duplicate = There is a workspace called “{ $name }” already.
+interaction-my-work-title = Where's my work?
+interaction-my-work-close = Close (Esc)
+interaction-my-work-look = Look again
+interaction-my-work-intro = Commits not pushed, stashes, uncommitted changes and branches whose remote branch is gone, in every repository gitcraft knows.
+interaction-my-work-connect-look = Connect and look
+interaction-my-work-clean = Nothing is only here: everything is committed and pushed, and nothing is stashed.
+interaction-my-work-empty = gitcraft knows no repositories yet: open some, or find them on a machine below.
+interaction-my-work-forget = Forget it: it was found here once
+interaction-my-work-open = Open
+interaction-my-work-open-push = open it to push
+interaction-my-work-connect-push = Connect and push
+interaction-my-work-push = Push
+interaction-my-work-waiting = waiting to push…
+interaction-my-work-pushing = pushing…
+interaction-my-work-retry = Try again
+interaction-my-work-find = FIND MORE REPOSITORIES
+interaction-my-work-progress = Looked at { $done } of { $total }…
+interaction-my-work-unlooked = { $count ->
+        [one] One repository not looked at: gitcraft isn't connected there.
+       *[other] { $count } repositories not looked at: gitcraft isn't connected there.
+    }
+interaction-my-work-clean-looked = { $count ->
+        [one] Nothing is only here in the repository looked at.
+       *[other] Nothing is only here in the { $count } repositories looked at.
+    }
+interaction-my-work-clean-count = { $count ->
+        [one] One repository with nothing that is only there.
+       *[other] { $count } repositories with nothing that is only there.
+    }
+interaction-my-work-failed-look = { $count ->
+        [one] Couldn't look at one repository
+       *[other] Couldn't look at { $count } repositories
+    }
+interaction-my-work-push-error = push: { $reason }
+interaction-my-work-push-local = { $tracked ->
+        [yes] Push it to its upstream (git asks for no password)
+       *[no] Push it to origin and track it there (git asks for no password)
+    }
+interaction-my-work-push-remote = { $tracked ->
+        [yes] Connect to { $host } (which may ask for a password) and push it to its upstream
+       *[no] Connect to { $host } (which may ask for a password) and push it to origin and track it there
+    }
+interaction-my-work-search-description = Searches a machine's home folder, { $depth } folders deep (hidden ones skipped); what is found is remembered.
+interaction-my-work-found-cut = { $machine } (found { $count }+, the rest skipped)
+interaction-my-work-found = { $machine } (found { $count })
+interaction-my-work-search-failed = { $machine } (failed)
+interaction-my-work-this-computer = This computer
+interaction-my-work-uncommitted = { $count ->
+        [one] 1 file with uncommitted changes
+       *[other] { $count } files with uncommitted changes
+    }
+interaction-my-work-no-remote = no remote: its commits are only here
+interaction-my-work-unpushed = { $count ->
+        [one] { $branch }: 1 commit not pushed to { $upstream }
+       *[other] { $branch }: { $count } commits not pushed to { $upstream }
+    }
+interaction-my-work-local-branch = { $count ->
+        [one] { $branch }: 1 commit on no remote (it tracks a branch of this repository)
+       *[other] { $branch }: { $count } commits on no remote (it tracks a branch of this repository)
+    }
+interaction-my-work-untracked = { $count ->
+        [one] { $branch }: 1 commit on no remote
+       *[other] { $branch }: { $count } commits on no remote
+    }
+interaction-my-work-stashes = { $count ->
+        [one] 1 stash: { $latest }
+       *[other] { $count } stashes, the latest: { $latest }
+    }
+interaction-my-work-worktree = { $count ->
+        [one] worktree { $path }: 1 file with uncommitted changes
+       *[other] worktree { $path }: { $count } files with uncommitted changes
+    }
+interaction-my-work-gone = { $count ->
+        [one] { $branch }: its remote branch is gone, 1 commit on no remote
+       *[other] { $branch }: its remote branch is gone, { $count } commits on no remote
+    }
+interaction-my-work-other-name = a branch of another name
+interaction-my-work-why-other = { $branch } tracks { $upstream }, a branch of another name: open the repository to push it where it belongs
+interaction-my-work-why-local = { $branch } tracks a branch of this repository: open the repository to push it where it belongs
+interaction-across-home = couldn't tell where your home folder is
+interaction-across-stopped = stopped unexpectedly
+interaction-across-no-remote = the repository has no remote to push to
+interaction-across-no-origin = there is no origin, and several remotes: open the repository to choose one
+interaction-across-busy = { $kind ->
+        [look] The last look at it is still running; try again once it ends
+        [fetch] The last fetch of it is still running; try again once it ends
+       *[push] The last push of it is still running; try again once it ends
+    }
+interaction-across-timeout = { $unit ->
+        [minute] No answer within { $count } minutes; it may still be running
+       *[second] No answer within { $count } seconds; it may still be running
+    }
+interaction-across-timeout-one-minute = No answer within 1 minute; it may still be running
+interaction-across-timeout-one-second = No answer within 1 second; it may still be running
+interaction-across-separate = { $branch } uses a separate push branch ({ $destination }): open the repository to push it
+interaction-across-local = { $branch } tracks a local branch: there is nothing to push it to
+interaction-across-other = { $branch } tracks { $upstream }, a branch of another name: open the repository to push it where it belongs
+interaction-across-gone = { $branch }: its remote branch is gone (deleted there?): open the repository to push it again
+interaction-across-upstream = { $branch } has no upstream set any more
+interaction-across-destination = { $branch } is set to be pushed to { $destination }, not { $remote }: open the repository to push it
+interaction-across-search = Couldn't search { $machine }: { $reason }
