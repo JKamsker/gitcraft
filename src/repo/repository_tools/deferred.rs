@@ -413,6 +413,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 base_label: format!("original {}", s.branch),
                                 target: Some(new.clone()),
                                 target_label: format!("candidate {}", s.branch),
+                                captions: [None, None],
                                 since_fork: false,
                             });
                         }

@@ -560,6 +560,7 @@ impl RepoTab {
                 base_label,
                 target,
                 target_label,
+                captions,
                 since_fork,
             } => self.compare(
                 Compare {
@@ -567,6 +568,7 @@ impl RepoTab {
                     base_label,
                     target,
                     target_label,
+                    captions,
                     since_fork,
                     data: None,
                     request: 0,

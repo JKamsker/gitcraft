@@ -432,6 +432,7 @@ pub(crate) enum Action {
         base_label: String,
         target: Option<String>,
         target_label: String,
+        captions: [Option<super::state::CompareCaption>; 2],
         since_fork: bool,
     },
     /// Show only the target's changes since the two diverged, or every difference.
@@ -492,6 +493,7 @@ pub(crate) fn compare_branches_action(
         base_label: base.name.to_owned(),
         target: Some(target.full()),
         target_label: target.name.to_owned(),
+        captions: [None, None],
         since_fork,
     }
 }

@@ -383,6 +383,7 @@ impl RepoTab {
                 base_label: short.to_owned(),
                 target: None,
                 target_label: "working tree".to_owned(),
+                captions: [None, None],
                 since_fork: false,
             });
         }

@@ -226,6 +226,7 @@ fn turn_diff(turn: &Turn, label: &str) -> Action {
         base_label: format!("before turn {}", turn.number),
         target: Some(turn.commit.clone()),
         target_label: format!("turn {}: {label}", turn.number),
+        captions: [None, None],
         since_fork: false,
     }
 }
@@ -287,6 +288,7 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
                     base_label: format!("after turn {}", turn.number),
                     target: None,
                     target_label: "now".to_owned(),
+                    captions: [None, None],
                     since_fork: false,
                 });
             }

@@ -436,6 +436,10 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
                                         base_label: "Original fix".into(),
                                         target: Some(commit.clone()),
                                         target_label: "Adapted fix".into(),
+                                        captions: [
+                                            Some(crate::repo::state::CompareCaption::OriginalFix),
+                                            Some(crate::repo::state::CompareCaption::AdaptedFix),
+                                        ],
                                         since_fork: false,
                                     });
                                 }

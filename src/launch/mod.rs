@@ -67,6 +67,7 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             base_label,
             target: Some(target),
             target_label,
+            captions: [None, None],
             since_fork,
         }],
     }
