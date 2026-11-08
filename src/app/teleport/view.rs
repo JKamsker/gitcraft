@@ -74,7 +74,7 @@ fn fields(ui: &mut Ui, form: &mut TeleportForm, t: &Tokens, asked: bool) -> bool
     }
     if let Some(err) = &form.error {
         ui.add_space(6.0);
-        ui.colored_label(t.danger, err);
+        ui.colored_label(t.danger, crate::teleport::display::diagnostic(err));
     }
     ui.add_space(12.0);
     let mut close = false;
@@ -121,7 +121,7 @@ fn source_line(ui: &mut Ui, form: &TeleportForm, t: &Tokens) {
         }
         Loading::Failed(e) => {
             ui.label(remote::display(&form.source));
-            ui.colored_label(t.danger, e);
+            ui.colored_label(t.danger, crate::teleport::display::diagnostic(e));
         }
         Loading::Ready(info) => {
             let on = match &info.branch {
@@ -397,6 +397,22 @@ fn progress(ui: &mut Ui, form: &TeleportForm, t: &Tokens) {
     }
 }
 
+pub(super) fn completion_message(landed: &crate::teleport::Landed, machine: &Machine) -> String {
+    let mut text = crate::i18n::message(
+        "interaction-teleport-error-complete",
+        &[
+            ("machine", machine.display_label().into()),
+            ("size", crate::teleport::display::size(landed.size).into()),
+            ("path", remote::git_path(&landed.folder).into()),
+        ],
+    );
+    for note in &landed.notes {
+        text.push('\n');
+        text.push_str(&crate::teleport::display::diagnostic(note));
+    }
+    text
+}
+
 #[cfg(test)]
 mod localization_tests {
     use super::*;
@@ -434,7 +450,7 @@ mod localization_tests {
             branch: "literal-branch".into(),
             folder: "~/worktree 日本語".into(),
             folder_edited: true,
-            error: None,
+            error: Some("Teleport failed: Some files have conflicts: resolve them first.".into()),
             running: None,
         }
     }
@@ -451,13 +467,19 @@ mod localization_tests {
                     return;
                 }
                 let t = Tokens::get(ui.ctx());
-                source_line(ui, form, &t);
-                place_fields(ui, form, &t);
+                assert!(!fields(ui, form, &t, true));
             },
             form(),
         );
         h.run();
         h.get_by_label("/opaque/source  ·  losgelöst bei 12345678");
+        h.get_by_label(
+            "Teleportieren fehlgeschlagen: Einige Dateien enthalten Konflikte: Löse diese zuerst.",
+        );
+        assert_eq!(
+            h.state().error.as_deref(),
+            Some("Teleport failed: Some files have conflicts: resolve them first.")
+        );
         h.get_by_label("Neuer Worktree eines anderen Repositorys dort")
             .click();
         h.run();
@@ -477,5 +499,45 @@ mod localization_tests {
         assert_eq!(same.folder, raw_folder);
         assert!(h.state().running.is_none() && h.state().distros.is_none());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod completion_tests {
+    use super::*;
+    #[test]
+    fn actual_completion_text_uses_typed_payload_and_keeps_landed_paths_notes_and_bytes_unchanged()
+    {
+        let raw_lfs = "Files kept in Git LFS arrived as their pointers; the palette's LFS: Pull fetches those that were pushed.";
+        let landed = crate::teleport::Landed {
+            folder: "/opaque/path $() 日本語".into(),
+            size: 1536,
+            notes: vec![
+                raw_lfs.into(),
+                "External detail { $count }\nopaque second line".into(),
+            ],
+        };
+        crate::i18n::set_language("de");
+        let de = completion_message(&landed, &Machine::Here);
+        assert!(
+            de.starts_with(
+                "Teleportiert. Ziel: dieser Rechner (1,5 KB): /opaque/path $() 日本語\n"
+            )
+        );
+        assert!(de.contains("In Git LFS gespeicherte Dateien sind als Zeigerdateien angekommen;"));
+        assert!(de.ends_with("External detail { $count }\nopaque second line"));
+        assert_eq!(landed.notes[0], raw_lfs);
+        assert_eq!(landed.size, 1536);
+        assert_eq!(
+            landed.folder,
+            std::path::PathBuf::from("/opaque/path $() 日本語")
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            completion_message(&landed, &Machine::Here),
+            format!(
+                "Teleported to this machine (1.5 KB): /opaque/path $() 日本語\n{raw_lfs}\nExternal detail {{ $count }}\nopaque second line"
+            )
+        );
     }
 }

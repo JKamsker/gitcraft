@@ -97,7 +97,7 @@ impl DragTargets {
                         ui.label(crate::i18n::text("interaction-teleport-finding"));
                     }
                     if let Some(error) = &self.error {
-                        ui.label(error);
+                        ui.label(crate::teleport::display::diagnostic(error));
                     }
                     if self.ssh.is_empty()
                         && self.wsl.is_empty()
