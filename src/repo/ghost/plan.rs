@@ -175,6 +175,8 @@ impl Ctx<'_> {
     }
 
     fn timeline(&self, state: &crate::repo::timeline::RefState) -> Result<Outcome, String> {
+        let active = || !(self.cancel)();
+        let reader = git::investigations::Reader::new(self.repo, &active);
         let now = crate::repo::timeline::RefState::of(&self.facts.refs);
         let mut out = Outcome::default();
         let names: std::collections::BTreeSet<_> =
@@ -219,13 +221,21 @@ impl Ctx<'_> {
             .map(|m| m.full.clone())
             .chain(std::iter::once("HEAD".into()))
             .collect();
-        self.lose(&mut out, &old, &new, &moved)?;
+        let hashes = dry_run::unreachable_bounded(&reader, &old, &new, &moved, LOST_LIMIT + 1)
+            .map_err(|_| "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects.".to_owned())?;
+        out.lost_more = hashes.len() > LOST_LIMIT;
+        let listed = &hashes[..hashes.len().min(LOST_LIMIT)];
+        out.lost = reader.commits(listed)?;
+        out.vanish = listed.iter().cloned().collect();
         self.check()?;
         if !new.is_empty() {
-            out.created = git::log(self.repo, Some(&new), Default::default(), 0, git::LOG_PAGE)?;
+            out.created = reader.graph_page(&new, git::LOG_PAGE)?;
         }
         if !now.head.is_empty() && !state.head.is_empty() {
-            out.files = Some(git::diff_files(self.repo, &now.head, Some(&state.head))?);
+            match reader.diff_files(&now.head, &state.head) {
+                Ok(files) => out.files = Some(files),
+                Err(_) => out.warnings.push("File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded.".into()),
+            }
         }
         if self.facts.dirty {
             out.warnings.push("Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump.".into());

@@ -1,5 +1,37 @@
 use super::{views::*, *};
 use std::{collections::BTreeSet, path::PathBuf, process::Command};
+
+#[test]
+fn recording_timeline_reads_have_local_only_policy_and_cancel_before_dispatch() {
+    let inactive = || false;
+    let reader = Reader::new(
+        std::path::Path::new("/nonexistent/pure-timeline"),
+        &inactive,
+    );
+    for query in [
+        vec!["diff", "--numstat", "--no-ext-diff", "--no-textconv"],
+        vec!["rev-list", "--max-count=201"],
+        vec!["log", "--no-walk=unsorted"],
+    ] {
+        let command = reader.command(&query);
+        assert!(command.iter().any(|s| s == "--no-lazy-fetch"));
+        assert!(command.iter().any(|s| s == "--no-replace-objects"));
+        assert!(command.iter().any(|s| s == "core.fsmonitor=false"));
+        assert!(command.iter().any(|s| s.starts_with("core.hooksPath=")));
+    }
+    assert!(
+        reader
+            .run(&["status"], vec![], &[0])
+            .unwrap_err()
+            .contains("cancelled")
+    );
+    assert!(
+        reader
+            .diff_files(&"a".repeat(40), &"b".repeat(40))
+            .unwrap_err()
+            .contains("cancelled")
+    );
+}
 pub(crate) struct Repo(pub PathBuf);
 impl Repo {
     pub fn new() -> Result<Self, String> {

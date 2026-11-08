@@ -22,6 +22,19 @@ impl<'a> Reader<'a> {
         (self.active)() && self.began.elapsed() < Duration::from_secs(120)
     }
     pub fn run(&self, args: &[&str], input: Vec<u8>, ok: &[i32]) -> Result<Vec<u8>, String> {
+        let pre = self.command(args);
+        git::draft_bytes(
+            self.repo,
+            &pre.iter().map(String::as_str).collect::<Vec<_>>(),
+            &[],
+            input,
+            ok,
+            &|| self.active(),
+        )
+        .map_err(|e| e.replace("Draft", "History investigation"))
+    }
+    /// The same immutable command policy is inspectable without starting Git.
+    pub fn command(&self, args: &[&str]) -> Vec<String> {
         let hooks = format!(
             "core.hooksPath={}",
             if remote::is_remote(self.repo) || !cfg!(windows) {
@@ -48,8 +61,23 @@ impl<'a> Reader<'a> {
             &hooks,
         ];
         pre.extend_from_slice(args);
-        git::draft_bytes(self.repo, &pre, &[], input, ok, &|| self.active())
-            .map_err(|e| e.replace("Draft", "History investigation"))
+        pre.into_iter().map(str::to_owned).collect()
+    }
+    pub fn commits(&self, hashes: &[String]) -> Result<Vec<git::Commit>, String> {
+        super::commits::investigation_commits_of(self, hashes)
+    }
+    pub fn graph_page(&self, tips: &[String], limit: usize) -> Result<Vec<git::Commit>, String> {
+        if limit > git::LOG_PAGE
+            || tips.is_empty()
+            || tips.len() > 30000
+            || tips.iter().any(|s| !oid(s))
+        {
+            return Err("Invalid pinned graph request".into());
+        }
+        super::commits::investigation_page(self, tips, Default::default(), 0, limit)
+    }
+    pub fn diff_files(&self, from: &str, to: &str) -> Result<Vec<git::ChangedFile>, String> {
+        super::diff::investigation_diff_files(self, from, to)
     }
 }
 pub(crate) fn oid(value: &str) -> bool {
