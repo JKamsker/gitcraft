@@ -146,7 +146,7 @@ mod fluent_r1_word_tests {
         for (verdict, raw, en, de) in [
             (Verdict::Good, "good", "Good", "Gut"),
             (Verdict::Bad, "bad", "Bad", "Schlecht"),
-            (Verdict::Skip, "skipped", "Skip", "Übersprungen"),
+            (Verdict::Skip, "skipped", "Skipped", "Übersprungen"),
             (
                 Verdict::TimedOut,
                 "timed out",

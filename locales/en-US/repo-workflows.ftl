@@ -7649,5 +7649,5 @@ repo-workflows-r1-elsewhere = elsewhere
 repo-workflows-r1-tested = tested
 repo-workflows-r1-verdict-good = Good
 repo-workflows-r1-verdict-bad = Bad
-repo-workflows-r1-verdict-skip = Skip
+repo-workflows-r1-verdict-skip = Skipped
 repo-workflows-r1-verdict-timeout = Timed out
