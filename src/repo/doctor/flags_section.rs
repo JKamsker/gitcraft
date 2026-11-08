@@ -229,7 +229,11 @@ mod fluent_r1_confirmation_tests {
             confirm.button.clone(),
         );
         let mut h = Harness::new_ui_state(
-            |ui, state: &mut (super::super::Confirm, Vec<Action>)| {
+            |ui, state: &mut (super::super::Confirm, Vec<Action>, bool)| {
+                if !std::mem::replace(&mut state.2, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
                 let (t, b, button) = state.0.displayed();
                 super::super::page::ask(
                     ui,
@@ -241,7 +245,7 @@ mod fluent_r1_confirmation_tests {
                     &mut state.1,
                 );
             },
-            (confirm, Vec::new()),
+            (confirm, Vec::new(), false),
         );
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);

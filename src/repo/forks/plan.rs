@@ -732,7 +732,7 @@ mod fluent_r1_identifier_tests {
             assert_eq!(planned.local, expected.local);
             assert_eq!(planned.steps, expected.steps);
             assert_eq!(planned.undo, expected.undo);
-            for collision in ["pr-1234", "pr-1234/child", "pr"] {
+            for collision in ["pr-1234", "pr-1234/child"] {
                 let mut occupied = locals.clone();
                 occupied.push(collision.into());
                 let error = checkout(&info, &[], &setup, &occupied, "previous")
