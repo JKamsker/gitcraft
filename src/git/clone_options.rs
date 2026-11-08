@@ -115,22 +115,25 @@ fn download_scope<T>(f: impl FnOnce() -> T) -> T {
 /// Metadata/explicit network commands keep their compatibility and credential protocols.
 pub(super) fn passive_object_read(args: &[&str]) -> bool {
     let rest = super::command::after_options(args);
-    !matches!(
-        rest.first().copied(),
-        Some(
-            "config"
-                | "init"
-                | "clone"
-                | "fetch"
-                | "pull"
-                | "push"
-                | "credential"
-                | "version"
-                | "help"
-                | "remote"
-                | "lfs"
+    !rest.is_empty()
+        && !matches!(
+            rest.first().copied(),
+            Some(
+                "config"
+                    | "init"
+                    | "clone"
+                    | "fetch"
+                    | "pull"
+                    | "push"
+                    | "credential"
+                    | "version"
+                    | "help"
+                    | "remote"
+                    | "ls-remote"
+                    | "lfs"
+            )
         )
-    ) && !downloads_allowed()
+        && !downloads_allowed()
 }
 
 /// Cone paths are literal repository-relative directories, never patterns or arguments.
@@ -397,6 +400,8 @@ mod tests {
             "HEAD:a"
         ]));
         assert!(!passive_object_read(&["fetch", "origin"]));
+        assert!(!passive_object_read(&["ls-remote", "origin"]));
+        assert!(!passive_object_read(&["--version"]));
         download_scope(|| {
             assert!(!passive_object_read(&["cat-file", "blob", "abc"]));
         });

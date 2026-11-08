@@ -108,6 +108,9 @@ impl RepoTab {
                     tab.busy_op = None;
                     match result {
                         Ok(()) => {
+                            if let Some(state) = &mut tab.sparse {
+                                state.writing = false;
+                            }
                             tab.open_sparse();
                             tab.reload(ctx);
                         }
