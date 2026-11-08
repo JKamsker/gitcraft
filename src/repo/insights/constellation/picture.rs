@@ -310,10 +310,10 @@ pub(super) fn details(
                     .on_hover_text("A new terminal in this worktree's folder")
                     .clicked()
                 {
-                    acts.push(Action::NewTerminal {
+                    acts.push(Action::Terminal(crate::repo::terminals::TerminalAct::New {
                         shell: None,
                         cwd: Some(n.key.clone().into()),
-                    });
+                    }));
                 }
                 if let Some(head) = &n.commit
                     && ui.button("Show its HEAD commit").clicked()

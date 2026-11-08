@@ -149,7 +149,9 @@ pub fn read(repo: &Path, project: &Project) -> Result<Deployments, String> {
                 &["api", "--hostname", &project.host, &endpoint],
             )
         }),
-        Forge::Forgejo | Forge::Gitea => Err(no_deployments(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_deployments(project.forge))
+        }
     }
 }
 
@@ -415,7 +417,9 @@ pub fn artifacts(repo: &Path, project: &Project, run: u64) -> Result<Vec<Artifac
             )?;
             parse_gitlab_artifacts(&text, run)
         }
-        Forge::Forgejo | Forge::Gitea => Err(no_deployments(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_deployments(project.forge))
+        }
     }
 }
 

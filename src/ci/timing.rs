@@ -132,7 +132,9 @@ pub fn timed_run(repo: &Path, project: &Project, run: u64) -> Result<TimedRun, S
             let more = jobs.len() >= MAX_JOBS;
             Ok(TimedRun { info, jobs, more })
         }
-        Forge::Forgejo | Forge::Gitea => Err(super::no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(super::no_builds(project.forge))
+        }
     }
 }
 
@@ -167,7 +169,9 @@ pub fn successful_runs(
             let json = glab_api(repo, project, &rest)?;
             Ok(json_list(&json)?.iter().map(gitlab_pipeline).collect())
         }
-        Forge::Forgejo | Forge::Gitea => Err(super::no_builds(project.forge)),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(super::no_builds(project.forge))
+        }
     }
 }
 
