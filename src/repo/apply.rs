@@ -17,9 +17,14 @@ impl RepoTab {
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        // Any later user action supersedes a pending automatic backlink diff opening.
+        if !matches!(&action, Action::OpenCommitChanges(_)) {
+            self.pending_commit_diff = None;
+        }
         if matches!(
             &action,
             Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
                 | Action::FileView { .. }
                 | Action::ShowActivity(_)
                 | Action::OpenPr(_)
@@ -42,6 +47,7 @@ impl RepoTab {
         if matches!(
             &action,
             Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
                 | Action::OpenPr(_)
                 | Action::OpenCi { .. }
                 | Action::FileView { .. }
@@ -97,6 +103,7 @@ impl RepoTab {
                 self.hint_after_select(row, ctx);
             }
             Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
+            Action::OpenCommitChanges(hash) => self.open_commit_changes(hash, ctx),
             Action::SelectHash(hash) => {
                 self.leave_pages();
                 // Following a link is a step of its own, back and forward.

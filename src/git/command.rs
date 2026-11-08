@@ -26,7 +26,7 @@ fn user_global_config(args: &[&str]) -> bool {
 
 /// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
 /// `--literal-pathspecs`…).
-fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+pub(super) fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
     let mut rest = args;
     loop {
         match rest {
@@ -301,12 +301,17 @@ fn normalize_connection_command(cmd: &mut Command, args: &[&str]) {
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
 pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
-    let words: Vec<String> = extra
-        .pre
-        .iter()
-        .copied()
-        .chain(extra.owned_pre.iter().map(String::as_str))
-        .chain(args.iter().copied())
+    let guard = super::clone_options::passive_object_read(args).then_some("--no-lazy-fetch");
+    let words: Vec<String> = guard
+        .into_iter()
+        .chain(
+            extra
+                .pre
+                .iter()
+                .copied()
+                .chain(extra.owned_pre.iter().map(String::as_str))
+                .chain(args.iter().copied()),
+        )
         .map(remote::sh_quote)
         .collect();
     let credential_transport = extra
@@ -339,6 +344,10 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         env: GIT_ENV
             .iter()
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
+            .chain(std::iter::once((
+                "GIT_NO_LAZY_FETCH".to_owned(),
+                super::clone_options::download_environment(args).to_owned(),
+            )))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
         unset: GIT_ENV_REMOVED
@@ -511,7 +520,10 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
             target.host.label()
         ))
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        Err(download_read_error(
+            args,
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        ))
     })
 }
 
@@ -613,7 +625,10 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     if out.code == Some(0) {
         Ok(out.stdout)
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        Err(download_read_error(
+            args,
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        ))
     }
 }
 
@@ -1202,11 +1217,14 @@ fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
             (true, false) => stdout,
             (false, false) => format!("{stderr}\n{stdout}"),
         };
-        Err(match (&out.failed_hook, said.is_empty()) {
-            (Some(hook), _) => hook.explain(&said, args),
-            (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
-            (None, false) => said,
-        })
+        Err(download_read_error(
+            args,
+            match (&out.failed_hook, said.is_empty()) {
+                (Some(hook), _) => hook.explain(&said, args),
+                (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
+                (None, false) => said,
+            },
+        ))
     }
 }
 
@@ -1531,7 +1549,8 @@ mod tests {
         assert!(req.long);
         assert_eq!(req.timeout, Some(TOOL_FOR));
         assert!(
-            req.script.starts_with("exec git 'mergetool'"),
+            req.script
+                .starts_with("exec git '--no-lazy-fetch' 'mergetool'"),
             "{}",
             req.script
         );
@@ -2568,9 +2587,12 @@ pub(crate) fn tour_read(
 /// All local execution routes, including streaming and watched operations, use this builder.
 pub(super) fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
     if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
-        return practice_command(dir);
+        let mut cmd = practice_command(dir);
+        object_read_policy(&mut cmd, args);
+        return cmd;
     }
     let mut cmd = git_cmd();
+    object_read_policy(&mut cmd, args);
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
@@ -2663,4 +2685,203 @@ pub(crate) fn onboarding_local_config(
     String::from_utf8(value.to_vec())
         .map(Some)
         .map_err(|_| "Local configuration is not UTF-8".into())
+}
+
+fn download_read_error(args: &[&str], error: String) -> String {
+    if super::clone_options::passive_object_read(args)
+        && [
+            "missing blob",
+            "missing object",
+            "bad object",
+            "unable to read",
+            "could not read",
+            "promisor",
+        ]
+        .iter()
+        .any(|text| error.to_lowercase().contains(text))
+    {
+        format!(
+            "{error}\nAutomatic object downloads are disabled. In a partial clone, use Graph tools → Sparse checkout and downloads to explicitly download history objects, then retry this file/diff."
+        )
+    } else {
+        error
+    }
+}
+
+/// Shared by streaming, watched, bounded and ordinary local commands.
+fn object_read_policy(cmd: &mut Command, args: &[&str]) {
+    cmd.env(
+        "GIT_NO_LAZY_FETCH",
+        super::clone_options::download_environment(args),
+    );
+    if super::clone_options::passive_object_read(args) {
+        cmd.arg("--no-lazy-fetch").env("GIT_NO_LAZY_FETCH", "1");
+    }
+}
+#[cfg(test)]
+mod download_policy_recording_tests {
+    use super::*;
+    #[test]
+    fn passive_reads_are_guarded_locally_and_on_the_repository_machine() {
+        for sub in [
+            "show",
+            "diff",
+            "log",
+            "cat-file",
+            "blame",
+            "status",
+            "ls-tree",
+            "sparse-checkout",
+        ] {
+            let args = [sub, "HEAD"];
+            let mut cmd = Command::new("/recorded/git");
+            object_read_policy(&mut cmd, &args);
+            let cmd = apply_command_extras(
+                cmd,
+                Some(Path::new("/recorded/repo")),
+                &Extra::default(),
+                &args,
+            );
+            assert_eq!(
+                cmd.get_args().next(),
+                Some(std::ffi::OsStr::new("--no-lazy-fetch"))
+            );
+            let req = remote_request(
+                &Target {
+                    host: remote::Host::Ssh("recorded".into()),
+                    path: "/repo".into(),
+                },
+                &Extra::default(),
+                &args,
+            );
+            assert!(req.script.starts_with("exec git '--no-lazy-fetch'"));
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod sparse_account_recording_tests {
+    use super::*;
+    #[test]
+    fn consented_sparse_uses_captured_account_and_restores_passive_policy() -> Result<(), String> {
+        let profile = crate::connections::Context {
+            git_config: Some("/recorded/profile-a".into()),
+            ..Default::default()
+        };
+        profile.run(|| {
+            let account = Credentials::for_url(
+                "https://example.invalid/team/repo",
+                "account-A".into(),
+                "SYNTHETIC_A_ONLY".into(),
+            )?;
+            // Same value captured by the Apply worker, even if the tab later signs in as B.
+            let captured = account.clone();
+            for repo in [
+                Path::new("/recorded/repo"),
+                Path::new("ssh://recorded/repo"),
+            ] {
+                for consent in [true, false] {
+                    super::super::clone_options::sparse_mutation(
+                        repo,
+                        Some(&["src".into()]),
+                        consent,
+                        Some(&captured),
+                        |dir, args, credentials| {
+                            assert_eq!(dir, Some(repo));
+                            assert_eq!(
+                                credentials.map(|c| c.username.as_str()),
+                                consent.then_some("account-A")
+                            );
+                            let extra = extra_for(dir, args, credentials, false)?;
+                            let mut cmd = Command::new("/recorded/git");
+                            cmd.env("GITCRAFT_GIT_USERNAME", "ambient-B");
+                            object_read_policy(&mut cmd, args);
+                            with_profile(&mut cmd, args);
+                            // None avoids the filesystem-only practice-repository classifier;
+                            // command discovery/launch is never entered by this recorder.
+                            let cmd = apply_command_extras(cmd, None, &extra, args);
+                            let env: std::collections::BTreeMap<_, _> = cmd
+                                .get_envs()
+                                .map(|(k, v)| {
+                                    (
+                                        k.to_string_lossy().into_owned(),
+                                        v.map(|v| v.to_string_lossy().into_owned()),
+                                    )
+                                })
+                                .collect();
+                            assert_eq!(
+                                env.get("GIT_CONFIG_GLOBAL"),
+                                Some(&Some("/recorded/profile-a".into()))
+                            );
+                            assert_eq!(
+                                env.get("GIT_NO_LAZY_FETCH"),
+                                Some(&Some(if consent { "0" } else { "1" }.into()))
+                            );
+                            if consent {
+                                assert_eq!(
+                                    env.get("GITCRAFT_GIT_USERNAME"),
+                                    Some(&Some("account-A".into()))
+                                );
+                                assert_eq!(
+                                    env.get("GITCRAFT_GIT_PASSWORD"),
+                                    Some(&Some("SYNTHETIC_A_ONLY".into()))
+                                );
+                            } else {
+                                assert!(
+                                    !extra
+                                        .env
+                                        .iter()
+                                        .any(|(key, _)| *key == "GITCRAFT_GIT_PASSWORD")
+                                );
+                            }
+                            let argv: Vec<_> = cmd
+                                .get_args()
+                                .map(|a| a.to_string_lossy().into_owned())
+                                .collect();
+                            assert_eq!(
+                                argv.iter().any(|a| a == "gitcraft-credential-transport"),
+                                consent
+                            );
+                            assert_eq!(argv.iter().any(|a| a == "--no-lazy-fetch"), !consent);
+                            assert!(!argv.join(" ").contains("SYNTHETIC_A_ONLY"));
+                            let req = remote_request(
+                                &Target {
+                                    host: remote::Host::Ssh("recorded".into()),
+                                    path: "/repo".into(),
+                                },
+                                &extra,
+                                args,
+                            );
+                            assert_eq!(
+                                req.env
+                                    .iter()
+                                    .any(|(k, v)| k == "GITCRAFT_GIT_USERNAME" && v == "account-A"),
+                                consent
+                            );
+                            assert_eq!(
+                                req.script.contains("gitcraft-credential-transport"),
+                                consent
+                            );
+                            assert_eq!(req.script.contains("--no-lazy-fetch"), !consent);
+                            assert!(!req.script.contains("SYNTHETIC_A_ONLY"));
+                            Ok(String::new())
+                        },
+                    )?;
+                }
+            }
+            for args in [["rev-parse", "HEAD"], ["show", "HEAD:file"]] {
+                let extra = extra_for(None, &args, None, false)?;
+                assert!(extra.env.is_empty());
+                let mut cmd = Command::new("/recorded/git");
+                object_read_policy(&mut cmd, &args);
+                let cmd = apply_command_extras(cmd, None, &extra, &args);
+                assert_eq!(
+                    cmd.get_args().next(),
+                    Some(std::ffi::OsStr::new("--no-lazy-fetch"))
+                );
+                assert!(!cmd.get_envs().any(|(k, _)| k == "GITCRAFT_GIT_PASSWORD"));
+            }
+            Ok(())
+        })
+    }
 }

@@ -256,6 +256,8 @@ fn script() -> String {
             .join(" ")
     };
     let mut s = String::from(concat!(
+        "GIT_NO_LAZY_FETCH=1; export GIT_NO_LAZY_FETCH\n",
+        "git() { command git --no-lazy-fetch \"$@\"; }\n",
         "d=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-look.XXXXXX\") || exit 1\n",
         "trap 'rm -rf \"$d\"' EXIT HUP INT TERM\n",
         "s() { k=$1; shift\n",

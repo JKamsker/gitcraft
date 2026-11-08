@@ -270,6 +270,7 @@ impl RepoTab {
             }
             Action::Select(_)
             | Action::SelectHash(_)
+            | Action::OpenCommitChanges(_)
             | Action::SelectPr(_)
             | Action::SelectStash(_)
             | Action::OpenPr(_) => {

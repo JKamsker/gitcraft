@@ -21,11 +21,13 @@ mod bundles;
 mod celebration;
 mod ci_status;
 mod ci_view;
+mod cleanup;
 mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
+mod commit_changes;
 pub(crate) mod conflict;
 mod conflict_check;
 mod content_recovery;
@@ -123,6 +125,7 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod sparse;
 mod ssh_setup;
 mod stack;
 mod state;
@@ -301,6 +304,7 @@ pub struct RepoTab {
     scroll_to: Option<usize>,
     /// The commit the detail pane is about (a graph row or a stash).
     detail_hash: Option<String>,
+    pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     /// The selected commit's signature, containment, notes and backlinks.
@@ -462,6 +466,8 @@ pub struct RepoTab {
     graph_narration: graph_walk::Narration,
     postcards: postcards::State,
     growth: Option<growth::State>,
+    cleanup: Option<cleanup::State>,
+    sparse: Option<sparse::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
     history_minimap: graph_view::minimap::State,
@@ -651,6 +657,7 @@ impl RepoTab {
             stash_view: None,
             scroll_to: None,
             detail_hash: None,
+            pending_commit_diff: None,
             detail: None,
             detail_error: None,
             extras: Default::default(),
@@ -749,6 +756,8 @@ impl RepoTab {
             graph_narration: Default::default(),
             postcards: Default::default(),
             growth: None,
+            cleanup: None,
+            sparse: None,
             atlas: None,
             history_activity: None,
             history_minimap: Default::default(),

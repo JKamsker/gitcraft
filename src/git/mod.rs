@@ -10,8 +10,11 @@ mod backlinks;
 mod bisect;
 mod branch_health;
 mod bundles;
+pub(crate) mod cleanup;
+mod clone_options;
 #[cfg(test)]
 mod clone_tests;
+pub use clone_options::*;
 mod command;
 mod credential_scope;
 pub(crate) use command::{WorkspaceCommand, run_workspace_command, transfer_pack};
