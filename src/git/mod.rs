@@ -177,7 +177,10 @@ const LITERAL_PATHS: &str = "--literal-pathspecs";
 /// revision that would be read as an option is refused.
 fn not_an_option(rev: &str) -> Result<&str, String> {
     if rev.starts_with('-') {
-        Err(format!("{rev} is not a revision"))
+        Err(crate::i18n::message(
+            "backend-rev-is-not-a-revision-bf38d4",
+            &[("rev", (rev).to_string().into())],
+        ))
     } else {
         Ok(rev)
     }
@@ -289,7 +292,10 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
         {
             e
         } else {
-            format!("{} is not inside a git repository", path.display())
+            crate::i18n::message(
+                "backend-is-not-inside-a-git-repository-116bc9",
+                &[("path", (path.display()).to_string().into())],
+            )
         }
     })?;
     // Only the line end: a folder's name can end with a space.
@@ -302,7 +308,12 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
 }
 
 pub fn init(path: &Path) -> Result<(), String> {
-    crate::remote::create_dir_all(path).map_err(|e| format!("could not create folder: {e}"))?;
+    crate::remote::create_dir_all(path).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-create-folder-e-3a9f18",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     run(Some(path), &["init"]).map(|_| ())
 }
 
@@ -353,7 +364,7 @@ pub fn identity(repo: &Path) -> Identity {
 pub fn relative_time(time: i64, now: i64) -> String {
     let secs = now.saturating_sub(time).max(0);
     let (n, unit) = match secs {
-        0..60 => return "just now".to_owned(),
+        0..60 => return crate::i18n::text("backend-just-now-7ddb44").to_owned(),
         60..3_600 => (secs / 60, "minute"),
         3_600..86_400 => (secs / 3_600, "hour"),
         86_400..604_800 => (secs / 86_400, "day"),

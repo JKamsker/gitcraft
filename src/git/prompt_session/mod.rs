@@ -92,7 +92,19 @@ fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<Vec<u8>
     .into_iter()
     .chain(args.iter().copied())
     .collect::<Vec<_>>();
-    git::forecast_bytes(repo,&args,&[("GIT_NO_LAZY_FETCH","1".into())],&[0],active).map_err(|_|"Local evidence is unavailable; fetch missing checkpoint objects explicitly. No network read was requested".into())
+    git::forecast_bytes(
+        repo,
+        &args,
+        &[("GIT_NO_LAZY_FETCH", "1".into())],
+        &[0],
+        active,
+    )
+    .map_err(|_| {
+        crate::i18n::text(
+            "backend-local-evidence-is-unavailable-fetch-missing-checkpoint-objects-ex-807de7",
+        )
+        .into()
+    })
 }
 fn object(
     repo: &Path,
@@ -109,22 +121,25 @@ fn object(
             .any(|p| matches!(p, "." | "..") || p.is_empty())
         || path.chars().any(char::is_control)
     {
-        return Err("Invalid evidence object path".into());
+        return Err(crate::i18n::text("backend-invalid-evidence-object-path-a0f96d").into());
     }
     let spec = format!("{rev}:{path}");
     let size = read(repo, &["cat-file", "-s", &spec], active)?;
     let n = std::str::from_utf8(&size)
         .ok()
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .ok_or("Invalid evidence size")?;
+        .ok_or(crate::i18n::text("backend-invalid-evidence-size-68e5c8"))?;
     if n > FILE_LIMIT || n > *budget {
-        return Err(
-            "Evidence exceeds the 4 MiB file or 32 MiB total bound; omitted, not fetched".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-evidence-exceeds-the-4-mib-file-or-32-mib-total-bound-omitted-not-2a16fc",
+        )
+        .into());
     }
     let bytes = read(repo, &["cat-file", "blob", &spec], active)?;
     if bytes.len() != n {
-        return Err("Evidence object size changed unexpectedly".into());
+        return Err(
+            crate::i18n::text("backend-evidence-object-size-changed-unexpectedly-21e176").into(),
+        );
     }
     *budget -= n;
     Ok(bytes)
@@ -141,7 +156,7 @@ pub(crate) fn redact(text: &str) -> String {
         }
         let end = line.contains("END ") && line.contains("PRIVATE KEY");
         let value = if private || re.is_match(line) {
-            "[credential-like content withheld]"
+            crate::i18n::text("backend-credential-like-content-withheld-7e1cf0")
         } else {
             line
         };
@@ -182,7 +197,9 @@ pub(crate) fn checkpoint_publication(
             .any(|(_, oid)| oid == push_oid || oid == head)
 }
 pub(crate) fn entire_automatic_notice(integration: bool, skip_hooks: bool) -> Option<&'static str> {
-    (integration && !skip_hooks).then_some("Entire integration is present. If automatic checkpoint synchronization is enabled, its original pre-push hook may publish prompts, local paths, summaries and tool activity alongside this ordinary code push, possibly to a separate checkpoint remote. Check Entire settings and recipients before approving. Preview does not execute hooks or determine the exact pending checkpoint set.")
+    (integration && !skip_hooks).then_some(crate::i18n::text(
+        "backend-entire-integration-is-present-if-automatic-checkpoint-synchroniza-57f84c",
+    ))
 }
 pub(crate) fn entire_automatic_publication(
     repo: &Path,
@@ -218,7 +235,7 @@ pub(crate) fn entire_automatic_publication(
             active,
         )?;
         let hook = std::str::from_utf8(&hook)
-            .map_err(|_| "Invalid pre-push hook path")?
+            .map_err(|_| crate::i18n::text("backend-invalid-pre-push-hook-path-2d01b5"))?
             .trim_end_matches(['\r', '\n']);
         if let Some(parent) = Path::new(hook).parent()
             && let Some(name) = Path::new(hook).file_name().and_then(|n| n.to_str())
@@ -336,18 +353,27 @@ pub(crate) fn load(
     active: &dyn Fn() -> bool,
 ) -> Result<Evidence, String> {
     if crate::remote::is_remote(repo) {
-        return Err("Prompt/session evidence is local only; open its native worktree to read local transcripts".into());
+        return Err(crate::i18n::text(
+            "backend-prompt-session-evidence-is-local-only-open-its-native-worktree-to-53e1cd",
+        )
+        .into());
     }
     if !git::investigations::oid(commit) {
-        return Err("Select an immutable commit before reading its evidence".into());
+        return Err(crate::i18n::text(
+            "backend-select-an-immutable-commit-before-reading-its-evidence-b3c4cc",
+        )
+        .into());
     }
     let size = read(repo, &["cat-file", "-s", commit], active)?;
     let size = std::str::from_utf8(&size)
         .ok()
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .ok_or("Invalid commit size")?;
+        .ok_or(crate::i18n::text("backend-invalid-commit-size-a0b73a"))?;
     if size > FILE_LIMIT {
-        return Err("Commit evidence metadata exceeds 4 MiB; object was not loaded".into());
+        return Err(crate::i18n::text(
+            "backend-commit-evidence-metadata-exceeds-4-mib-object-was-not-loaded-a6581c",
+        )
+        .into());
     }
     let metadata = read(
         repo,
@@ -361,23 +387,28 @@ pub(crate) fn load(
         active,
     )?;
     if metadata.len() > FILE_LIMIT {
-        return Err("Commit evidence metadata exceeds 4 MiB".into());
+        return Err(
+            crate::i18n::text("backend-commit-evidence-metadata-exceeds-4-mib-ec0c9b").into(),
+        );
     }
     let metadata = std::str::from_utf8(&metadata)
         .map_err(|_| crate::i18n::text("backend-commit-metadata-is-not-utf-8-4e5bf7"))?;
     let fields = metadata.splitn(4, '\0').collect::<Vec<_>>();
     let [oid, time, parents, message] = fields.as_slice() else {
-        return Err("Invalid commit metadata".into());
+        return Err(crate::i18n::text("backend-invalid-commit-metadata-560681").into());
     };
     if *oid != commit {
-        return Err("Commit identity changed".into());
+        return Err(crate::i18n::text("backend-commit-identity-changed-5d2eed").into());
     }
-    let time = time.parse::<i64>().map_err(|_| "Invalid commit time")?;
+    let time = time
+        .parse::<i64>()
+        .map_err(|_| crate::i18n::text("backend-invalid-commit-time-ee5277"))?;
     let root = read(repo, &["rev-parse", "--show-toplevel"], active)?;
     let root = std::str::from_utf8(&root)
         .map_err(|_| "Worktree path must be UTF-8")?
         .trim_end_matches(['\r', '\n']);
-    let root = std::fs::canonicalize(root).map_err(|_| "Native worktree is unavailable")?;
+    let root = std::fs::canonicalize(root)
+        .map_err(|_| crate::i18n::text("backend-native-worktree-is-unavailable-b6ba9e"))?;
     let mut result = Evidence {
         commit: commit.into(),
         ..Default::default()
@@ -400,22 +431,35 @@ pub(crate) fn load(
         .split_once("\n\n")
         .unwrap_or((message.trim_end(), ""));
     let mut embedded = vec![Step::new(
-        "Possible embedded prompt",
+        crate::i18n::text("backend-possible-embedded-prompt-b7c5d0"),
         prompt.into(),
         Some(time),
     )];
     if !summary.is_empty() {
         embedded.push(Step::new(
-            "Recorded message / possible change summary",
+            crate::i18n::text("backend-recorded-message-possible-change-summary-9dfd7d"),
             summary.into(),
             Some(time),
         ));
     }
-    result.sessions.push(Session{source:"Commit message (GitButler-compatible layout)".into(),relation:"Unverified: GitButler simple mode has no marker; a normal subject/body has the same layout. The recorded message is preserved, not inferred agent provenance".into(),steps:embedded});
+    result.sessions.push(Session {
+        source: crate::i18n::text("backend-commit-message-gitbutler-compatible-layout-6004ae")
+            .into(),
+        relation: crate::i18n::text(
+            "backend-unverified-gitbutler-simple-mode-has-no-marker-a-normal-subject-b-b88bea",
+        )
+        .into(),
+        steps: embedded,
+    });
     if options.include_local {
         local::load(&root, time, options, active, &mut budget, &mut result);
     } else {
-        result.notices.push("Local Claude/Codex discovery is off. Opt in and choose roots to match exact worktree and commit-time window".into());
+        result.notices.push(
+            crate::i18n::text(
+                "backend-local-claude-codex-discovery-is-off-opt-in-and-choose-roots-to-ma-bc9a7a",
+            )
+            .into(),
+        );
     }
     let parent = parents.split_whitespace().next().unwrap_or("");
     let mut files = std::collections::BTreeMap::new();
@@ -428,9 +472,10 @@ pub(crate) fn load(
                 continue;
             };
             if files.len() >= 100 && !files.contains_key(path) {
-                result
-                    .notices
-                    .push("Hunk mapping stopped at 100 touched files".into());
+                result.notices.push(
+                    crate::i18n::text("backend-hunk-mapping-stopped-at-100-touched-files-099cf7")
+                        .into(),
+                );
                 continue;
             }
             let contents = files.entry(path.clone()).or_insert_with(|| {
@@ -456,6 +501,11 @@ pub(crate) fn load(
             }
         }
     }
-    result.notices.push("Only prompts, assistant text and allowlisted edit fields are displayed. Tool output, reasoning and command arguments are omitted; credential-like text is withheld. Exact content matches are evidence, not proof that a session authored a commit. Ambiguous or unavailable matches have no line jump".into());
+    result.notices.push(
+        crate::i18n::text(
+            "backend-only-prompts-assistant-text-and-allowlisted-edit-fields-are-displ-01b098",
+        )
+        .into(),
+    );
     Ok(result)
 }

@@ -46,7 +46,7 @@ fn json(
     budget: &mut usize,
 ) -> Result<Value, String> {
     serde_json::from_slice(&object(repo, rev, path, active, budget)?)
-        .map_err(|_| "Checkpoint metadata JSON is invalid".into())
+        .map_err(|_| crate::i18n::text("backend-checkpoint-metadata-json-is-invalid-3b8923").into())
 }
 fn recorded_link(summary: &Value, commit: &str) -> bool {
     summary
@@ -80,7 +80,7 @@ fn discover(
     ) {
         Ok(rows) if rows.len() <= 1024 * 1024 => rows,
         _ => {
-            out.notices.push("Exact-SHA Entire attachment lookup unavailable or over its 1 MiB ref bound; omitted".into());
+            out.notices.push(crate::i18n::text("backend-exact-sha-entire-attachment-lookup-unavailable-or-over-its-1-mib-5e76c8").into());
             return vec![];
         }
     };
@@ -172,7 +172,12 @@ fn discover(
         }
     }
     if omitted {
-        out.notices.push("Exact-SHA Entire attachment lookup was partial: maximum 256 checkpoint roots, 1 MiB enumeration, 4 MiB metadata/file and shared 32 MiB budget; unavailable entries omitted".into());
+        out.notices.push(
+            crate::i18n::text(
+                "backend-exact-sha-entire-attachment-lookup-was-partial-maximum-256-checkp-c9cdc0",
+            )
+            .into(),
+        );
     }
     matches
 }
@@ -250,7 +255,7 @@ pub(super) fn load(
                 .and_then(|b| String::from_utf8(b).ok())
                 .map(|s| s.trim().to_owned());
                 let Some(oid) = legacy else {
-                    out.notices.push(format!("Entire checkpoint {checkpoint} is linked but unavailable locally; fetch it explicitly. No transcript was downloaded"));
+                    out.notices.push(crate::i18n::message("backend-entire-checkpoint-checkpoint-is-linked-but-unavailable-locally-fe-69bccd", &[("checkpoint", (checkpoint).to_string().into())]));
                     continue;
                 };
                 (oid, format!("{}/{}/", &checkpoint[..2], &checkpoint[2..]))
@@ -273,33 +278,46 @@ pub(super) fn load(
             }
         };
         if summary.get("checkpoint_id").and_then(Value::as_str) != Some(&checkpoint) {
-            out.notices
-                .push("Checkpoint root identity does not match its recorded link".into());
+            out.notices.push(
+                crate::i18n::text(
+                    "backend-checkpoint-root-identity-does-not-match-its-recorded-link-028c11",
+                )
+                .into(),
+            );
             continue;
         }
         let Some(sessions) = summary.get("sessions").and_then(Value::as_array) else {
-            out.notices
-                .push("Checkpoint has no supported session-path metadata".into());
+            out.notices.push(
+                crate::i18n::text(
+                    "backend-checkpoint-has-no-supported-session-path-metadata-f08b18",
+                )
+                .into(),
+            );
             continue;
         };
         if sessions.len() > 32 {
-            out.notices
-                .push("Checkpoint read limited to 32 sessions".into());
+            out.notices.push(
+                crate::i18n::text("backend-checkpoint-read-limited-to-32-sessions-27927c").into(),
+            );
         }
         for entry in sessions.iter().take(32) {
             if !active() {
                 return;
             }
             let Some(metadata) = path(entry, "metadata", &prefix) else {
-                out.notices
-                    .push("Invalid checkpoint session metadata path".into());
+                out.notices.push(
+                    crate::i18n::text("backend-invalid-checkpoint-session-metadata-path-e0c0d0")
+                        .into(),
+                );
                 continue;
             };
             // Both paths must remain in this numbered session's own directory.
             let folder = metadata.rsplit_once('/').map_or("", |p| p.0);
             if folder.is_empty() {
-                out.notices
-                    .push("Checkpoint session directory is unavailable".into());
+                out.notices.push(
+                    crate::i18n::text("backend-checkpoint-session-directory-is-unavailable-bc96ec")
+                        .into(),
+                );
                 continue;
             }
             let own = format!("{folder}/");
@@ -311,8 +329,12 @@ pub(super) fn load(
                 }
             };
             if session_meta.get("checkpoint_id").and_then(Value::as_str) != Some(&checkpoint) {
-                out.notices
-                    .push("Session checkpoint identity mismatch; omitted".into());
+                out.notices.push(
+                    crate::i18n::text(
+                        "backend-session-checkpoint-identity-mismatch-omitted-12f86c",
+                    )
+                    .into(),
+                );
                 continue;
             }
             let mut steps = Vec::new();
@@ -320,7 +342,11 @@ pub(super) fn load(
                 .and_then(|p| object(repo, &rev, &p, active, budget).ok())
                 .and_then(|b| String::from_utf8(b).ok())
             {
-                steps.push(Step::new("Checkpoint prompts", prompt, None));
+                steps.push(Step::new(
+                    crate::i18n::text("backend-checkpoint-prompts-556698"),
+                    prompt,
+                    None,
+                ));
             }
             if let Some(summary) = session_meta.get("summary") {
                 let fields = ["intent", "outcome", "learnings", "friction", "open_items"]
@@ -338,7 +364,11 @@ pub(super) fn load(
                     .collect::<Vec<_>>()
                     .join("\n");
                 if !fields.is_empty() {
-                    steps.push(Step::new("Checkpoint summary", fields, None));
+                    steps.push(Step::new(
+                        crate::i18n::text("backend-checkpoint-summary-e42ba2"),
+                        fields,
+                        None,
+                    ));
                 }
             }
             let raw = path(entry, "transcript", &own)
@@ -353,7 +383,7 @@ pub(super) fn load(
                         .unwrap_or(0) as usize,
                 )
             } else {
-                out.notices.push("Raw Entire transcript unavailable or over bounds; trying its recorded compact transcript. Chunked raw transcripts over 4 MiB are not loaded".into());
+                out.notices.push(crate::i18n::text("backend-raw-entire-transcript-unavailable-or-over-bounds-trying-its-recor-98c4c6").into());
                 (
                     path(entry, "compact_transcript", &own)
                         .and_then(|p| object(repo, &rev, &p, active, budget).ok()),
@@ -369,14 +399,14 @@ pub(super) fn load(
                 out.notices.extend(notices);
             } else {
                 out.notices.push(
-                    "No bounded supported transcript available for this checkpoint session".into(),
+                    crate::i18n::text("backend-no-bounded-supported-transcript-available-for-this-checkpoint-ses-a4c187").into(),
                 );
             }
             let id = session_meta
                 .get("session_id")
                 .and_then(Value::as_str)
-                .unwrap_or("unknown session");
-            out.sessions.push(Session{source:format!("Entire {checkpoint} / {}",redact(id)),relation:format!("{}; immutable checkpoint tree {rev}. Recorded evidence is unverified; import-only commit_sha anchors are not treated as authorship", if is_attachment {"Unverified recorded exact-SHA linked_commits attachment"} else {"Recorded Entire-Checkpoint trailer"}),steps});
+                .unwrap_or(crate::i18n::text("backend-unknown-session-52813e"));
+            out.sessions.push(Session{source:format!("Entire {checkpoint} / {}",redact(id)),relation:crate::i18n::message("backend-immutable-checkpoint-tree-rev-recorded-evidence-is-unverified-imp-2b2b29", &[("if", (if is_attachment {"Unverified recorded exact-SHA linked_commits attachment"} else {"Recorded Entire-Checkpoint trailer"}).to_string().into()), ("rev", (rev).to_string().into())]),steps});
         }
     }
 }

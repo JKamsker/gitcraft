@@ -309,9 +309,12 @@ fn count(repo: &Path, walk: &[String], revs: &[String]) -> Result<usize, String>
     args.extend(revs.iter().map(String::as_str));
     args.push("--");
     let out = run(Some(repo), &args)?;
-    out.trim()
-        .parse()
-        .map_err(|_| format!("git counted no commits: {}", out.trim()))
+    out.trim().parse().map_err(|_| {
+        crate::i18n::message(
+            "backend-git-counted-no-commits-e38477",
+            &[("detail", (out.trim()).to_string().into())],
+        )
+    })
 }
 
 /// The first `max` commits of `revs` (after `walk`), newest first.

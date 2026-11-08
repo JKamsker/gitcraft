@@ -65,7 +65,8 @@ fn digest(bytes: &[u8]) -> String {
         .collect()
 }
 fn text(bytes: Vec<u8>) -> Result<String, String> {
-    String::from_utf8(bytes).map_err(|_| "Diagnostic is not UTF-8".into())
+    String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("backend-diagnostic-is-not-utf-8-2fcd9d").into())
 }
 fn read(repo: &Path, no_lazy: &[&str], args: &[&str]) -> Result<Vec<u8>, String> {
     let args: Vec<_> = no_lazy
@@ -89,18 +90,23 @@ pub fn linked_repositories(repo: &Path) -> Result<Vec<PathBuf>, String> {
         }
     }
     if links.len() > 8 {
-        return Err("Link at most eight project copies".into());
+        return Err(crate::i18n::text("backend-link-at-most-eight-project-copies-ad9c7c").into());
     }
     Ok(links)
 }
 fn link_path(path: &str) -> Result<PathBuf, String> {
     let path = path.trim();
     if path.is_empty() || path.len() > 4096 || path.contains(['\n', '\r', '\0']) {
-        return Err("Give a full local, WSL or ssh://host/path repository path".into());
+        return Err(crate::i18n::text(
+            "backend-give-a-full-local-wsl-or-ssh-host-path-repository-path-9bdfe6",
+        )
+        .into());
     }
     let p = PathBuf::from(path);
     if crate::remote::parse(&p).is_none() && !p.is_absolute() {
-        return Err("The linked copy needs an absolute path".into());
+        return Err(
+            crate::i18n::text("backend-the-linked-copy-needs-an-absolute-path-8680e7").into(),
+        );
     }
     Ok(p)
 }
@@ -111,7 +117,7 @@ pub fn link_repository(repo: &Path, path: &str) -> Result<(), String> {
         return Ok(());
     }
     if links.len() >= 8 {
-        return Err("Link at most eight project copies".into());
+        return Err(crate::i18n::text("backend-link-at-most-eight-project-copies-ad9c7c").into());
     }
     // No remote connection is opened by saving a link. Reading/running is a separate click.
     links.push(path.clone());
@@ -123,7 +129,10 @@ pub fn link_repository(repo: &Path, path: &str) -> Result<(), String> {
 }
 pub fn unlink_repository(repo: &Path, path: &Path) -> Result<(), String> {
     if repo == path {
-        return Err("The open repository stays in this comparison".into());
+        return Err(crate::i18n::text(
+            "backend-the-open-repository-stays-in-this-comparison-5e02ae",
+        )
+        .into());
     }
     super::run_ok_codes(
         Some(repo),
@@ -169,7 +178,8 @@ fn collect_facts(
     let mut files = parse_index(&index)?;
     let mut eols = BTreeMap::new();
     for item in endings.split(|b| *b == 0).filter(|b| !b.is_empty()) {
-        let s = std::str::from_utf8(item).map_err(|_| "Tracked paths are not UTF-8")?;
+        let s = std::str::from_utf8(item)
+            .map_err(|_| crate::i18n::text("backend-tracked-paths-are-not-utf-8-3ba029"))?;
         if let Some((fact, path)) = s.split_once('\t') {
             eols.insert(path.to_owned(), fact.trim().to_owned());
         }
@@ -209,7 +219,7 @@ fn collect_facts(
         let tip = text(notes)?;
         let tip = tip.trim();
         if !matches!(tip.len(), 40 | 64) || !tip.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return Err("Invalid test notes ref".into());
+            return Err(crate::i18n::text("backend-invalid-test-notes-ref-ca6706").into());
         }
         let listing = text(query(&["ls-tree", "-r", "-z", tip])?)?;
         if let Some(blob) = super::testlane::parse_notes_tree(&listing).get(&tree) {
@@ -266,23 +276,27 @@ fn collect_facts(
 fn parse_index(bytes: &[u8]) -> Result<Vec<TrackedFact>, String> {
     let mut files = BTreeMap::new();
     for item in bytes.split(|b| *b == 0).filter(|b| !b.is_empty()) {
-        let s = std::str::from_utf8(item).map_err(|_| "Tracked paths are not UTF-8")?;
-        let (metadata, path) = s
-            .split_once('\t')
-            .ok_or("Malformed tracked-file metadata")?;
+        let s = std::str::from_utf8(item)
+            .map_err(|_| crate::i18n::text("backend-tracked-paths-are-not-utf-8-3ba029"))?;
+        let (metadata, path) = s.split_once('\t').ok_or(crate::i18n::text(
+            "backend-malformed-tracked-file-metadata-27f11d",
+        ))?;
         let words: Vec<_> = metadata.split_ascii_whitespace().collect();
         let [mode, oid, stage] = words.as_slice() else {
-            return Err("Malformed index entry".into());
+            return Err(crate::i18n::text("backend-malformed-index-entry-a3e1c4").into());
         };
         if *stage != "0" {
-            return Err("Resolve index conflicts before comparing tracked content".into());
+            return Err(crate::i18n::text(
+                "backend-resolve-index-conflicts-before-comparing-tracked-content-3231c1",
+            )
+            .into());
         }
         if !matches!(oid.len(), 40 | 64)
             || !oid.bytes().all(|b| b.is_ascii_hexdigit())
             || !matches!(*mode, "100644" | "100755" | "120000" | "160000")
             || path.is_empty()
         {
-            return Err("Invalid tracked-file identity".into());
+            return Err(crate::i18n::text("backend-invalid-tracked-file-identity-8be39a").into());
         }
         if files
             .insert(
@@ -296,17 +310,20 @@ fn parse_index(bytes: &[u8]) -> Result<Vec<TrackedFact>, String> {
             )
             .is_some()
         {
-            return Err("Duplicate tracked path".into());
+            return Err(crate::i18n::text("backend-duplicate-tracked-path-2ffeff").into());
         }
         if files.len() > 20000 {
-            return Err("Comparison is limited to 20000 tracked files".into());
+            return Err(crate::i18n::text(
+                "backend-comparison-is-limited-to-20000-tracked-files-438bab",
+            )
+            .into());
         }
     }
     Ok(files.into_values().collect())
 }
 fn setting_value<'a>(key: &str, value: &'a str) -> &'a str {
     if !SETTINGS.contains(&key) {
-        return "nonstandard value (not collected)";
+        return crate::i18n::text("backend-nonstandard-value-not-collected-bd25b0");
     }
     let allowed = match key {
         "core.autocrlf" => matches!(value, "true" | "false" | "input" | "(unset)"),
@@ -317,7 +334,7 @@ fn setting_value<'a>(key: &str, value: &'a str) -> &'a str {
     if allowed {
         value
     } else {
-        "nonstandard value (not collected)"
+        crate::i18n::text("backend-nonstandard-value-not-collected-bd25b0")
     }
 }
 fn parse_versions(input: &str) -> BTreeMap<String, String> {

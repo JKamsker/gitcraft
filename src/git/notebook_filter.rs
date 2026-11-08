@@ -65,11 +65,10 @@ pub fn strip_command(repo: &Path) -> Result<String, String> {
             return Ok(format!("{python} -c '{PYTHON}'"));
         }
     }
-    Err(
-        "Neither nbstripout nor Python 3 is installed where the repository is: install \
-         nbstripout (pip install nbstripout) or Python 3"
-            .to_owned(),
+    Err(crate::i18n::text(
+        "backend-neither-nbstripout-nor-python-3-is-installed-where-the-repository-c298bb",
     )
+    .to_owned())
 }
 
 /// The repository's own attributes file (`.git/info/attributes`), as a path for `remote`.

@@ -133,7 +133,7 @@ fn tool(
         if !body.is_empty() {
             patch(out, root, cwd, body, at, line);
         } else {
-            out.push(Step::new("Tool", format!("apply_patch · transcript line {line} · unmapped: unsupported recorded patch input"),at));
+            out.push(Step::new("Tool", crate::i18n::message("backend-apply-patch-transcript-line-line-unmapped-unsupported-recorded-pa-48a294", &[("line", (line).to_string().into())]),at));
         }
         return;
     }
@@ -160,11 +160,21 @@ fn tool(
             string(&e, "new_string")
         };
         let allowed = matches!(name, "Edit" | "MultiEdit" | "Write");
-        let mut step = Step::new("Tool", format!("{name} · transcript line {line}"), at);
+        let mut step = Step::new(
+            "Tool",
+            crate::i18n::message(
+                "backend-name-transcript-line-line-01cffb",
+                &[
+                    ("name", (name).to_string().into()),
+                    ("line", (line).to_string().into()),
+                ],
+            ),
+            at,
+        );
         if allowed {
             step.path = relative(root, cwd, path);
             if step.path.is_none() {
-                step.text.push_str(if cwd.is_empty() && Path::new(path).is_absolute() { " · unmapped: recorded origin worktree is absent; absolute edit path cannot be assigned to this clone" } else { " · unmapped: recorded path is outside the known worktree or unsupported" });
+                step.text.push_str(if cwd.is_empty() && Path::new(path).is_absolute() { crate::i18n::text("backend-unmapped-recorded-origin-worktree-is-absent-absolute-edit-path-ca-dafb8b") } else { crate::i18n::text("backend-unmapped-recorded-path-is-outside-the-known-worktree-or-unsupport-3d4186") });
             }
             step.before = redact(old);
             step.after = redact(new);
@@ -181,14 +191,21 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
         if path.is_empty() || before.is_empty() && after.is_empty() {
             return;
         }
-        let mut s = Step::new("Tool", format!("apply_patch · transcript line {line}"), at);
+        let mut s = Step::new(
+            "Tool",
+            crate::i18n::message(
+                "backend-apply-patch-transcript-line-line-b3793d",
+                &[("line", (line).to_string().into())],
+            ),
+            at,
+        );
         s.path = relative(root, cwd, path);
         if s.path.is_none() {
             s.text
                 .push_str(if cwd.is_empty() && Path::new(path).is_absolute() {
-                    " · unmapped: recorded origin worktree is absent"
+                    crate::i18n::text("backend-unmapped-recorded-origin-worktree-is-absent-75b8be")
                 } else {
-                    " · unmapped: recorded path is outside the known worktree or unsupported"
+                    crate::i18n::text("backend-unmapped-recorded-path-is-outside-the-known-worktree-or-unsupport-3d4186")
                 });
         }
         s.before = redact(before);
@@ -204,14 +221,17 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
             path.clear();
             let mut step = Step::new(
                 "Tool",
-                format!(
-                    "apply_patch deletion · transcript line {line} · unmapped: removed bytes were not recorded"
+                crate::i18n::message(
+                    "backend-apply-patch-deletion-transcript-line-line-unmapped-removed-bytes-a6920c",
+                    &[("line", (line).to_string().into())],
                 ),
                 at,
             );
             step.path = relative(root, cwd, deleted);
             if step.path.is_none() {
-                step.text.push_str("; origin/path mapping unavailable");
+                step.text.push_str(crate::i18n::text(
+                    "backend-origin-path-mapping-unavailable-7637d4",
+                ));
             }
             out.push(step);
             continue;
@@ -292,9 +312,9 @@ fn records_from(
     let mut at = None;
     for (i, line) in bytes.split(|b| *b == b'\n').enumerate().take(20000) {
         if line.len() > 512 * 1024 {
-            notices.push(format!(
-                "Transcript line {} exceeds 512 KiB; omitted",
-                i + 1
+            notices.push(crate::i18n::message(
+                "backend-transcript-line-exceeds-512-kib-omitted-98947e",
+                &[("index", (i + 1).to_string().into())],
             ));
             continue;
         }
@@ -358,7 +378,7 @@ fn records_from(
                     if role == "user" {
                         "Prompt"
                     } else {
-                        "Agent summary"
+                        crate::i18n::text("backend-agent-summary-8351fe")
                     },
                     redact(&t),
                     at,
@@ -389,7 +409,7 @@ fn records_from(
                     if payload_type == "user_message" {
                         "Prompt"
                     } else {
-                        "Agent summary"
+                        crate::i18n::text("backend-agent-summary-8351fe")
                     },
                     redact(t),
                     at,
@@ -417,18 +437,25 @@ fn records_from(
             }
         }
         if steps.len() >= 2000 {
-            notices.push("Transcript stopped at 2,000 displayed steps".into());
+            notices.push(
+                crate::i18n::text("backend-transcript-stopped-at-2-000-displayed-steps-5ec90c")
+                    .into(),
+            );
             break;
         }
     }
     if offset > bytes.split(|b| *b == b'\n').count() {
         notices.push(
-            "Checkpoint offset exceeds its local transcript; no earlier steps were attributed"
-                .into(),
+            crate::i18n::text(
+                "backend-checkpoint-offset-exceeds-its-local-transcript-no-earlier-steps-w-2c8c4e",
+            )
+            .into(),
         );
     }
     if bytes.split(|b| *b == b'\n').count() > 20000 {
-        notices.push("Transcript stopped at 20,000 JSONL lines".into());
+        notices.push(
+            crate::i18n::text("backend-transcript-stopped-at-20-000-jsonl-lines-4aba31").into(),
+        );
     }
     (steps, notices)
 }

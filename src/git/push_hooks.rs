@@ -30,7 +30,9 @@ impl Hooks {
             &[0],
             &|| true,
         )
-        .map_err(|_| "Could not locate the configured pre-push hook")?;
+        .map_err(|_| {
+            crate::i18n::text("backend-could-not-locate-the-configured-pre-push-hook-b6b2fd")
+        })?;
         let original = original.trim_end();
         let original_dir = original.rsplit_once('/').map(|v| v.0).unwrap_or(original);
         let mut payload =
@@ -73,7 +75,8 @@ impl Hooks {
                 },
                 &|| true,
             )?;
-            let path = String::from_utf8(out.stdout).map_err(|_| "Invalid hook temporary path")?;
+            let path = String::from_utf8(out.stdout)
+                .map_err(|_| crate::i18n::text("backend-invalid-hook-temporary-path-0b8eda"))?;
             if out.code != 0
                 || !path.starts_with('/')
                 || path.contains(['\n', '\r', '\0'])
@@ -82,7 +85,10 @@ impl Hooks {
                     .next()
                     .is_some_and(|n| n.starts_with("gitcraft-push-hooks."))
             {
-                return Err("Could not prepare the pre-push hook".into());
+                return Err(crate::i18n::text(
+                    "backend-could-not-prepare-the-pre-push-hook-1b8014",
+                )
+                .into());
             }
             return Ok(Self {
                 dir: remote::encode(&target.host, &path),
@@ -90,7 +96,7 @@ impl Hooks {
         }
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| "No clock")?
+            .map_err(|_| crate::i18n::text("backend-no-clock-369ad6"))?
             .as_nanos();
         let dir = std::env::temp_dir().join(format!(
             "gitcraft-push-hooks-{}-{stamp}",
@@ -104,15 +110,17 @@ impl Hooks {
         }
         builder
             .create(&dir)
-            .map_err(|_| "Could not prepare the pre-push hook")?;
+            .map_err(|_| crate::i18n::text("backend-could-not-prepare-the-pre-push-hook-1b8014"))?;
         let this = Self { dir };
         let hook = this.dir.join("pre-push");
-        std::fs::write(&hook, wrapper).map_err(|_| "Could not prepare the pre-push hook")?;
+        std::fs::write(&hook, wrapper)
+            .map_err(|_| crate::i18n::text("backend-could-not-prepare-the-pre-push-hook-1b8014"))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(hook, std::fs::Permissions::from_mode(0o700))
-                .map_err(|_| "Could not prepare the pre-push hook")?;
+            std::fs::set_permissions(hook, std::fs::Permissions::from_mode(0o700)).map_err(
+                |_| crate::i18n::text("backend-could-not-prepare-the-pre-push-hook-1b8014"),
+            )?;
         }
         Ok(this)
     }

@@ -102,7 +102,9 @@ fn lfs_error(e: &str) -> String {
         .rev()
         // With `--json` git-lfs still prints JSON (`[]`) on stdout when it fails.
         .find(|l| !l.is_empty() && !l.starts_with("Errors logged to") && !l.starts_with(['[', '{']))
-        .unwrap_or("git-lfs failed without saying why");
+        .unwrap_or(crate::i18n::text(
+            "backend-git-lfs-failed-without-saying-why-a5c01e",
+        ));
     line.strip_prefix("Error: ").unwrap_or(line).to_owned()
 }
 
@@ -136,8 +138,12 @@ pub fn lfs_locks(
 
 /// `git lfs locks --verify --json`: `{"ours": [...], "theirs": [...]}`.
 pub(crate) fn parse_verified(json: &str) -> Result<Vec<LfsLock>, String> {
-    let raw: RawVerified = serde_json::from_str(json.trim())
-        .map_err(|e| format!("git-lfs listed the locks in a way gitcraft can't read: {e}"))?;
+    let raw: RawVerified = serde_json::from_str(json.trim()).map_err(|e| {
+        crate::i18n::message(
+            "backend-git-lfs-listed-the-locks-in-a-way-gitcraft-can-t-read-e-22f03d",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut locks: Vec<LfsLock> = raw
         .ours
         .into_iter()
@@ -154,8 +160,12 @@ pub(crate) fn parse_listed(json: &str) -> Result<Vec<LfsLock>, String> {
     if json.is_empty() {
         return Ok(Vec::new());
     }
-    let raw: Vec<RawLock> = serde_json::from_str(json)
-        .map_err(|e| format!("git-lfs listed the locks in a way gitcraft can't read: {e}"))?;
+    let raw: Vec<RawLock> = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-git-lfs-listed-the-locks-in-a-way-gitcraft-can-t-read-e-22f03d",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut locks: Vec<LfsLock> = raw.into_iter().map(|l| l.into_lock(None)).collect();
     locks.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(locks)
@@ -176,7 +186,15 @@ pub fn lfs_lock(repo: &Path, path: &str, creds: Option<&Credentials>) -> Result<
         .and_then(|v| v.into_iter().next())
         .map(Ok)
         .unwrap_or_else(|| serde_json::from_str(json))
-        .map_err(|e| format!("git-lfs said {path} was locked, but not how: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-git-lfs-said-path-was-locked-but-not-how-e-95d306",
+                &[
+                    ("path", (path).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
     Ok(raw.into_lock(Some(true)))
 }
 
@@ -201,7 +219,13 @@ pub fn lfs_unlock(
     match failed.len() {
         0 => Ok(()),
         1 => Err(failed.remove(0)),
-        n => Err(format!("{n} locks stayed: {}", failed.join("; "))),
+        n => Err(crate::i18n::message(
+            "backend-n-locks-stayed-97c137",
+            &[
+                ("count", (n).to_string().into()),
+                ("failed", (failed.join("; ")).to_string().into()),
+            ],
+        )),
     }
 }
 
@@ -209,7 +233,7 @@ pub fn lfs_unlock(
 /// `.gitattributes`): they are kept in LFS, read-only until locked.
 pub fn track_lockable(repo: &Path, pattern: &str) -> Result<String, String> {
     if pattern.trim().is_empty() {
-        return Err("Type a pattern, such as *.psd".to_owned());
+        return Err(crate::i18n::text("backend-type-a-pattern-such-as-psd-85398a").to_owned());
     }
     super::run(
         Some(repo),
