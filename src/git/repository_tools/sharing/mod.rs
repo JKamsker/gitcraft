@@ -485,7 +485,7 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
     Ok(crate::i18n::message(
         "backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd",
         &[
-            ("count", (required.len()).to_string().into()),
+            ("count", (required.len()).into()),
             ("backup", (backup).to_string().into()),
         ],
     ))

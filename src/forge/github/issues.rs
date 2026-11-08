@@ -43,8 +43,15 @@ pub(super) fn one(repo: &Path, number: u64) -> Result<Issue, String> {
         repo,
         &["issue", "view", &number.to_string(), "--json", FIELDS],
     )?;
-    let value: Value =
-        serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(&out).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     parse_issue(&value).ok_or_else(|| {
         crate::i18n::message(
             "backend-unexpected-tool-output-not-an-issue-ae58a9",
@@ -54,8 +61,15 @@ pub(super) fn one(repo: &Path, number: u64) -> Result<Issue, String> {
 }
 
 fn parse(json: &str) -> Result<Vec<Issue>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let list = value.as_array().ok_or_else(|| {
         crate::i18n::message(
             "backend-unexpected-tool-output-not-a-list-of-issues-92f726",

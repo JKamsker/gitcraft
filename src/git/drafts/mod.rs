@@ -880,7 +880,7 @@ fn read_file_limited(
             "backend-cannot-draft-path-exceeds-remaining-snapshot-allowance-of-limit-b-dc54e5",
             &[
                 ("path", (path).to_string().into()),
-                ("limit", (limit).to_string().into()),
+                ("limit", (limit).into()),
             ],
         ));
     }

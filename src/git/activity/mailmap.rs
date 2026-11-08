@@ -219,7 +219,7 @@ fn apply_mapping(
         remaining = remaining.checked_sub(cost).ok_or_else(|| {
             crate::i18n::message(
                 "backend-expanded-mapped-author-metadata-exceeds-the-max-bytes-byte-alloca-5875de",
-                &[("max_bytes", (max_bytes).to_string().into())],
+                &[("max_bytes", (max_bytes).into())],
             )
         })?;
         record.name = name.clone();

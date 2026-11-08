@@ -320,8 +320,15 @@ impl Pages for GitHub {
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(value
         .as_array()
         .map_or(&[][..], Vec::as_slice)

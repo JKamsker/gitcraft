@@ -360,7 +360,15 @@ pub(super) fn apply(
     if result.is_err() {
         restore(&recovery, &parent, name);
     }
-    result.map_err(|e| format!("{e}. Recovery: {}", recovery.path.display()))
+    result.map_err(|e| {
+        crate::i18n::message(
+            "backend-e-recovery-ce3c52",
+            &[
+                ("detail", (e).to_string().into()),
+                ("path", (recovery.path.display()).to_string().into()),
+            ],
+        )
+    })
 }
 fn same_optional(a: Option<&Snapshot>, b: Option<&Snapshot>) -> bool {
     match (a, b) {

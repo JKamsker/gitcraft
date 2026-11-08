@@ -222,7 +222,7 @@ pub fn lfs_unlock(
         n => Err(crate::i18n::message(
             "backend-n-locks-stayed-97c137",
             &[
-                ("count", (n).to_string().into()),
+                ("count", (n).into()),
                 ("failed", (failed.join("; ")).to_string().into()),
             ],
         )),

@@ -270,17 +270,15 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     let slow = h.status_took.is_some_and(|t| t >= SLOW_STATUS);
     let status_note = match h.status_took {
         Some(t) => crate::i18n::message(
-            "backend-git-status-took-ms-here-58fa96",
-            &[("t", (t.as_millis()).to_string().into())],
+            if h.remote {
+                "backend-health-status-remote"
+            } else {
+                "backend-health-status-local"
+            },
+            &[("milliseconds", (t.as_millis() as u64).into())],
         ),
-        None => crate::i18n::text("backend-git-status-couldn-t-be-timed-6c09ee").to_owned(),
+        None => crate::i18n::text("backend-health-status-unknown").to_owned(),
     };
-    let remote_note = if h.remote {
-        crate::i18n::text("backend-over-the-connection-to-that-machine-69e244")
-    } else {
-        ""
-    };
-    let status_note = format!("{status_note}{remote_note}");
     // A partial clone would fetch every tree it lacks to compute the changed paths.
     let write_graph: &[&str] = if h.partial {
         &["commit-graph", "write", "--reachable"]
@@ -289,7 +287,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     };
     let mut out = vec![
         Suggestion {
-            title: "Commit-graph",
+            title: crate::i18n::text("backend-health-commit-graph"),
             why: if h.shallow {
                 crate::i18n::text("backend-a-file-of-every-commit-s-parents-and-dates-that-makes-walking-his-c7c844")
                     .to_owned()
@@ -319,20 +317,12 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
         Suggestion {
             title: crate::i18n::text("backend-file-system-monitor-bd6322"),
             why: crate::i18n::message(
-                "backend-git-s-own-monitor-watches-the-working-tree-so-status-needn-t-look-371f48",
-                &[
-                    ("status_note", (status_note).to_string().into()),
-                    (
-                        "if",
-                        (if slow {
-                            ", which it would speed up"
-                        } else {
-                            ""
-                        })
-                        .to_string()
-                        .into(),
-                    ),
-                ],
+                if slow {
+                    "backend-health-monitor-slow"
+                } else {
+                    "backend-health-monitor"
+                },
+                &[("status", status_note.as_str().into())],
             ),
             state: h.fsmonitor.unwrap_or(State::Off),
             ops: ops(&[&["config", "--local", "core.fsmonitor", "true"]]),
@@ -340,8 +330,8 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
         Suggestion {
             title: crate::i18n::text("backend-untracked-cache-de0942"),
             why: crate::i18n::message(
-                "backend-git-remembers-which-folders-have-untracked-files-and-only-looks-a-cc81e3",
-                &[("status_note", (status_note).to_string().into())],
+                "backend-health-untracked",
+                &[("status", status_note.as_str().into())],
             ),
             state: on(h.untracked_cache),
             ops: ops(&[
@@ -357,9 +347,9 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             why: crate::i18n::message(
                 "backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c",
                 &[
-                    ("host", (h.objects.loose).to_string().into()),
-                    ("host2", (h.objects.loose_kib).to_string().into()),
-                    ("host3", (h.objects.packs).to_string().into()),
+                    ("host", (h.objects.loose).into()),
+                    ("host2", (h.objects.loose_kib).into()),
+                    ("host3", (h.objects.packs).into()),
                 ],
             ),
             state: State::Off,

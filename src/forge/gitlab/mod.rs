@@ -122,8 +122,15 @@ impl Provider for GitLab {
         let number = number.to_string();
         let args = ["issue", "view", &number, "--output", "json"];
         let out = cli::run(TOOL, "issue", repo, &args)?;
-        let value: Value =
-            serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+        let value: Value = serde_json::from_str(&out).map_err(|e| {
+            crate::i18n::message(
+                "backend-unexpected-tool-output-e-164ff7",
+                &[
+                    ("tool", (TOOL).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
         parse_issue(&value).ok_or_else(|| {
             crate::i18n::message(
                 "backend-unexpected-tool-output-not-an-issue-ae58a9",
@@ -173,8 +180,8 @@ impl Provider for GitLab {
             cut.push(crate::i18n::message(
                 "backend-the-pipelines-and-notes-of-only-of-your-merge-requests-were-read-e52d15",
                 &[
-                    ("inbox", (inbox::MAX_MINE).to_string().into()),
-                    ("count", (mine.len()).to_string().into()),
+                    ("inbox", (inbox::MAX_MINE).into()),
+                    ("count", (mine.len()).into()),
                 ],
             ));
         }
@@ -368,8 +375,15 @@ fn project_id(path: &str) -> Option<String> {
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let text = |v: &Value, pointer: &str| {
         v.pointer(pointer)
             .and_then(Value::as_str)
@@ -396,8 +410,15 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
 
 /// glab's list of issues.
 fn parse_issues(json: &str) -> Result<Vec<Issue>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let list = value.as_array().ok_or_else(|| {
         crate::i18n::message(
             "backend-unexpected-tool-output-not-a-list-of-issues-92f726",

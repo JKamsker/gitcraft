@@ -588,7 +588,7 @@ pub(crate) fn investigate(
     if limited {
         notes.push(crate::i18n::message(
             "backend-loaded-the-newest-depth-first-parent-commits-increase-history-dep-5bb262",
-            &[("depth", (depth).to_string().into())],
+            &[("depth", (depth).into())],
         ));
     }
     let mut at = commits

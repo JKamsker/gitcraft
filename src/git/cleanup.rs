@@ -391,7 +391,7 @@ fn residual_checks(
             Ok((hits, _)) if hits[i] => (false, crate::i18n::text("backend-literal-find-text-remains-in-reachable-text-blobs-inspect-before-dabdf8").into()),
             Ok((_, true)) => (false, crate::i18n::text("backend-unverified-binary-blobs-were-skipped-nul-in-first-8192-bytes-6ac1e7").into()),
             Ok(_) => (true, crate::i18n::text("backend-no-literal-find-text-in-reachable-text-blobs-at-most-20000-object-6fd071").into()),
-            Err(error) => (false, format!("Unverified: {}", config.redact(error))),
+            Err(error) => (false, crate::i18n::message("backend-unverified-79e7cc", &[("config", (config.redact(error)).to_string().into())])),
         };
         Check { label: crate::i18n::message("backend-replacement-residual-search-99ed56", &[("index", (i + 1).to_string().into())]), passed, detail }
     }).collect()

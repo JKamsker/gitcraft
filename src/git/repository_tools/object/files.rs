@@ -117,7 +117,7 @@ pub(super) fn packs(
                         if names.len() >= max {
                             return Err(crate::i18n::message(
                                 "backend-more-than-max-packs-use-git-in-the-terminal-40f8d7",
-                                &[("max", (max).to_string().into())],
+                                &[("max", (max).into())],
                             ));
                         }
                         names.push(name);

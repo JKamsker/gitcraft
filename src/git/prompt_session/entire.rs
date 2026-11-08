@@ -406,7 +406,7 @@ pub(super) fn load(
                 .get("session_id")
                 .and_then(Value::as_str)
                 .unwrap_or(crate::i18n::text("backend-unknown-session-52813e"));
-            out.sessions.push(Session{source:format!("Entire {checkpoint} / {}",redact(id)),relation:crate::i18n::message("backend-immutable-checkpoint-tree-rev-recorded-evidence-is-unverified-imp-2b2b29", &[("if", (if is_attachment {"Unverified recorded exact-SHA linked_commits attachment"} else {"Recorded Entire-Checkpoint trailer"}).to_string().into()), ("rev", (rev).to_string().into())]),steps});
+            out.sessions.push(Session{source:format!("Entire {checkpoint} / {}",redact(id)),relation:crate::i18n::message("backend-immutable-checkpoint-tree-rev-recorded-evidence-is-unverified-imp-2b2b29", &[("if", (if is_attachment {crate::i18n::text("backend-unverified-recorded-exact-sha-linked-commits-attachment-f13490")} else {crate::i18n::text("backend-recorded-entire-checkpoint-trailer-bda053")}).to_string().into()), ("rev", (rev).to_string().into())]),steps});
         }
     }
 }

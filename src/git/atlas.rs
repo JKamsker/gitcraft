@@ -196,7 +196,14 @@ fn build_budget(
             let email: String = record.email.chars().take(96).collect();
             let shortened = name.len() != record.name.len() || email.len() != record.email.len();
             let label = if shortened {
-                format!("{name} <{email}>… [contributor #{}]", id + 1)
+                crate::i18n::message(
+                    "backend-name-email-contributor-325382",
+                    &[
+                        ("name", (name).to_string().into()),
+                        ("email", (email).to_string().into()),
+                        ("id", (id + 1).to_string().into()),
+                    ],
+                )
             } else {
                 format!("{name} <{email}>")
             };

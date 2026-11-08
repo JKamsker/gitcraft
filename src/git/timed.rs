@@ -69,7 +69,7 @@ fn stopped(what: &str, limit: Duration) -> String {
         "backend-what-didn-t-finish-within-seconds-and-was-stopped-ffb894",
         &[
             ("what", (what).to_string().into()),
-            ("seconds", (limit.as_secs_f32().ceil()).to_string().into()),
+            ("seconds", (limit.as_secs_f32().ceil()).into()),
         ],
     )
 }

@@ -177,7 +177,7 @@ fn retain_current_paths(history: &mut History, current: &BTreeSet<String>) {
     if !omitted.is_empty() {
         history.notes.push(crate::i18n::message(
             "backend-historical-paths-are-absent-or-ineligible-at-the-pinned-head-and-20710f",
-            &[("count", (omitted.len()).to_string().into())],
+            &[("count", (omitted.len()).into())],
         ));
     }
 }

@@ -228,7 +228,7 @@ fn save(repo: &Path, view: &mut View, active: &dyn Fn() -> bool) -> Result<(), S
     validate(view)?;
     let ctx = Context::new(repo, active)?;
     if common(&ctx, active)? != view.common {
-        return Err("Repository identity changed".into());
+        return Err(crate::i18n::text("backend-repository-identity-changed-2f0e64").into());
     }
     let bytes = serde_json::to_vec(&view.jobs).map_err(|e| e.to_string())?;
     if bytes.len() > 2 * 1024 * 1024 {
@@ -313,7 +313,7 @@ fn resolve(ctx: &Context, rev: &str, active: &dyn Fn() -> bool) -> Result<String
         active,
     )?)
     .map(|s| s.trim().into())
-    .map_err(|_| "Invalid revision".into())
+    .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa").into())
 }
 fn safe_dir(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {

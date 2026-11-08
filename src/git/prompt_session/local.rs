@@ -96,7 +96,7 @@ pub(super) fn load(
             let (steps, notices) = parse::transcript(&bytes, root, start, end, false);
             out.notices.extend(notices);
             if !steps.is_empty() {
-                out.sessions.push(Session{source:format!("Local {}",redact(&base.join(&rel).display().to_string())),relation:crate::i18n::message("backend-worktree-matched-exactly-records-within-hours-before-commit-throu-f5600a", &[("options", (options.hours.clamp(1,168)).to_string().into())]),steps});
+                out.sessions.push(Session{source:crate::i18n::message("backend-local-6aed87", &[("path", (redact(&base.join(&rel).display().to_string())).to_string().into())]),relation:crate::i18n::message("backend-worktree-matched-exactly-records-within-hours-before-commit-throu-f5600a", &[("options", (options.hours.clamp(1,168)).into())]),steps});
             }
             if out.sessions.len() >= 64 {
                 out.notices

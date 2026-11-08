@@ -114,7 +114,7 @@ pub fn remerge_unavailable(parents: usize) -> Option<String> {
         ),
         n => Some(crate::i18n::message(
             "backend-an-octopus-merge-n-parents-git-can-only-redo-merges-of-two-parent-de1e27",
-            &[("count", (n).to_string().into())],
+            &[("count", (n).into())],
         )),
     }
 }

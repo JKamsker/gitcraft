@@ -106,7 +106,7 @@ fn finish_run(
                 "backend-tool-didn-t-finish-within-seconds-error-f169ac",
                 &[
                     ("tool", (tool).to_string().into()),
-                    ("seconds", (within.as_secs()).to_string().into()),
+                    ("seconds", (within.as_secs()).into()),
                     ("detail", (error).to_string().into()),
                 ],
             )
@@ -189,24 +189,24 @@ fn prepared(
     // Service failures are strings, not typed spawn errors. Keep the original cause and an
     // installation hint for a failed launch, without guessing an OS errno or rebuilding PATH.
     let start_error = move |error: String| {
-        let hint = if here && error.starts_with("could not run process:") {
-            crate::i18n::message(
-                "backend-check-that-tool-is-installed-gitcraft-uses-it-for-noun-s-cffe52",
-                &[
-                    ("tool", (tool).to_string().into()),
-                    ("noun", (noun).to_string().into()),
-                ],
-            )
+        let id = if here && error.starts_with("could not run process:") {
+            "backend-forge-launch-install"
         } else {
-            String::new()
+            "backend-forge-launch-error"
+        };
+        let purpose = match noun.as_str() {
+            "pull request" => crate::i18n::text("backend-forge-purpose-pull"),
+            "merge request" => crate::i18n::text("backend-forge-purpose-merge"),
+            "issue" => crate::i18n::text("backend-forge-purpose-issue"),
+            other => other,
         };
         crate::i18n::message(
-            "backend-couldn-t-run-tool-in-shown-error-hint-a76b18",
+            id,
             &[
-                ("tool", (tool).to_string().into()),
-                ("shown", (shown).to_string().into()),
-                ("detail", (error).to_string().into()),
-                ("hint", (hint).to_string().into()),
+                ("tool", tool.as_str().into()),
+                ("path", shown.as_str().into()),
+                ("detail", error.into()),
+                ("purpose", purpose.into()),
             ],
         )
     };
@@ -487,7 +487,13 @@ fn failure(tool: &str, out: &std::process::Output) -> String {
     if !stdout.is_empty() {
         return stdout;
     }
-    format!("{tool} failed ({})", out.status)
+    crate::i18n::message(
+        "backend-tool-failed-4a996a",
+        &[
+            ("tool", (tool).to_string().into()),
+            ("status", (out.status).to_string().into()),
+        ],
+    )
 }
 
 /// What diagnostics say about a forge's tool: its version, and whether it has a login (never

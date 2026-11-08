@@ -220,8 +220,8 @@ fn changes_of(repo: &Path, base: &str, spec: &InteractionSpec) -> Result<Vec<Cha
         return Err(crate::i18n::message(
             "backend-the-two-branches-have-commits-between-them-at-most-max-changes-ca-ed4e1b",
             &[
-                ("count", (changes.len()).to_string().into()),
-                ("max_changes", (MAX_CHANGES).to_string().into()),
+                ("count", (changes.len()).into()),
+                ("max_changes", (MAX_CHANGES).into()),
             ],
         ));
     }

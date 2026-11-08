@@ -183,8 +183,15 @@ fn parse_merged(
     pointers: [&str; 4],
     tool: &str,
 ) -> Result<Vec<MergedPullRequest>, String> {
-    let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {tool} output: {e}"))?;
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-50db44",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(merged_items(
         value.as_array().map_or(&[][..], Vec::as_slice),
         pointers,

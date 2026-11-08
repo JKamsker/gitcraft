@@ -550,8 +550,8 @@ pub fn replay(
             replay.unsure = Some(crate::i18n::message(
                 "backend-only-the-first-max-steps-of-commits-were-checked-797f2a",
                 &[
-                    ("max_steps", (MAX_STEPS).to_string().into()),
-                    ("count", (picks.len()).to_string().into()),
+                    ("max_steps", (MAX_STEPS).into()),
+                    ("count", (picks.len()).into()),
                 ],
             ));
             break;

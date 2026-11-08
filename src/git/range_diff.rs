@@ -116,8 +116,8 @@ pub fn range_diff(repo: &Path, old: &Series, new: &Series) -> Result<RangeDiff, 
                 "backend-the-side-version-has-n-commits-more-than-the-max-series-gitcraft-a7d6fa",
                 &[
                     ("side", (side).to_string().into()),
-                    ("count", (n).to_string().into()),
-                    ("max_series", (MAX_SERIES).to_string().into()),
+                    ("count", (n).into()),
+                    ("max_series", (MAX_SERIES).into()),
                 ],
             ));
         }

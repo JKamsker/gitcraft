@@ -151,7 +151,7 @@ pub fn commits_to_test(repo: &Path, range: &str) -> Result<Vec<TestJob>, String>
             "backend-range-has-more-than-max-commits-commits-test-a-shorter-range-b12441",
             &[
                 ("range", (range).to_string().into()),
-                ("max_commits", (MAX_COMMITS).to_string().into()),
+                ("max_commits", (MAX_COMMITS).into()),
             ],
         ));
     }

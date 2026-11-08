@@ -634,7 +634,13 @@ pub fn run_env(
     } else {
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         Err(if stderr.is_empty() {
-            format!("git {} failed ({})", args.join(" "), out.status)
+            crate::i18n::message(
+                "backend-git-failed-da095f",
+                &[
+                    ("args", (args.join(" ")).to_string().into()),
+                    ("status", (out.status).to_string().into()),
+                ],
+            )
         } else {
             stderr
         })
@@ -822,7 +828,13 @@ pub fn run_code(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<(i32, V
         _ => {
             let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
             Err(if stderr.is_empty() {
-                format!("git {} failed ({})", args.join(" "), out.status)
+                crate::i18n::message(
+                    "backend-git-failed-da095f",
+                    &[
+                        ("args", (args.join(" ")).to_string().into()),
+                        ("status", (out.status).to_string().into()),
+                    ],
+                )
             } else {
                 stderr
             })
@@ -893,7 +905,13 @@ pub fn run_call(dir: Option<&Path>, args: &[&str], call: Call) -> Result<Vec<u8>
     }
     let said = String::from_utf8_lossy(&out.stderr).trim().to_owned();
     Err(if said.is_empty() {
-        format!("git {} failed ({})", args.join(" "), out.status)
+        crate::i18n::message(
+            "backend-git-failed-da095f",
+            &[
+                ("args", (args.join(" ")).to_string().into()),
+                ("status", (out.status).to_string().into()),
+            ],
+        )
     } else {
         said
     })
@@ -1200,7 +1218,13 @@ fn failure_message(args: &[&str], status: &str, stdout: &str, stderr: &str) -> S
     // Merges and pulls report conflicts on stdout and the summary on stderr.
     let (stderr, stdout) = (stderr.trim(), stdout.trim());
     match (stderr.is_empty(), stdout.is_empty()) {
-        (true, true) => format!("git {} failed ({status})", args.join(" ")),
+        (true, true) => crate::i18n::message(
+            "backend-git-failed-status-db85b2",
+            &[
+                ("args", (args.join(" ")).to_string().into()),
+                ("status", (status).to_string().into()),
+            ],
+        ),
         (false, true) => stderr.to_owned(),
         (true, false) => stdout.to_owned(),
         (false, false) => format!("{stderr}\n{stdout}"),
@@ -1270,7 +1294,13 @@ fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
             args,
             match (&out.failed_hook, said.is_empty()) {
                 (Some(hook), _) => hook.explain(&said, args),
-                (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
+                (None, true) => crate::i18n::message(
+                    "backend-git-failed-da095f",
+                    &[
+                        ("args", (args.join(" ")).to_string().into()),
+                        ("status", (out.status).to_string().into()),
+                    ],
+                ),
                 (None, false) => said,
             },
         ))

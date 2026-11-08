@@ -227,7 +227,10 @@ pub(crate) fn preview(repo: &Path, mut editor: Editor) -> Result<Editor, String>
     let mut mappings = Vec::new();
     for src in &sources {
         if excluded(src) {
-            mappings.push(format!("{src} excluded"));
+            mappings.push(crate::i18n::message(
+                "backend-src-excluded-90f08f",
+                &[("src", (src).to_string().into())],
+            ));
             continue;
         }
         for spec in specs.iter().filter(|s| !s.negative) {
@@ -269,7 +272,13 @@ pub(crate) fn preview(repo: &Path, mut editor: Editor) -> Result<Editor, String>
                 spec.destination.as_deref().unwrap_or_default(),
                 src,
             ) {
-                mappings.push(format!("Push: {src} → {dst}"));
+                mappings.push(crate::i18n::message(
+                    "backend-push-src-dst-330d40",
+                    &[
+                        ("src", (src).to_string().into()),
+                        ("dst", (dst).to_string().into()),
+                    ],
+                ));
             }
         }
     }

@@ -405,7 +405,13 @@ fn run_from(repo: &Path, mut pending: Pending) -> Result<Outcome, String> {
                         message: e,
                     });
                 }
-                return Err(format!("Restacking {} failed: {e}", step.branch));
+                return Err(crate::i18n::message(
+                    "backend-restacking-failed-e-27d710",
+                    &[
+                        ("branch", (step.branch).to_string().into()),
+                        ("detail", (e).to_string().into()),
+                    ],
+                ));
             }
         }
         finish_step(repo, &mut pending, &new_base)?;

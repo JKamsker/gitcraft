@@ -374,9 +374,11 @@ pub(crate) fn inspect(
                         ("path", (remote::display(&s.path)).to_string().into()),
                         (
                             "status",
-                            (s.error.as_deref().unwrap_or("missing donor"))
-                                .to_string()
-                                .into(),
+                            (s.error
+                                .as_deref()
+                                .unwrap_or(crate::i18n::text("backend-missing-donor-5cbabd")))
+                            .to_string()
+                            .into(),
                         ),
                     ],
                 )

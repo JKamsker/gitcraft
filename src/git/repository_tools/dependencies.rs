@@ -282,9 +282,9 @@ impl Advertisement {
                 &[
                     (
                         "fetch",
-                        (fetch
-                            .err()
-                            .unwrap_or_else(|| "Dependency fetch completed".into()))
+                        (fetch.err().unwrap_or_else(|| {
+                            crate::i18n::text("backend-dependency-fetch-completed-0cc4ca").into()
+                        }))
                         .to_string()
                         .into(),
                     ),

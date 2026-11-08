@@ -41,7 +41,7 @@ pub fn parse(query: &str) -> Result<Option<SearchQuery>, QueryError> {
         return Err(QueryError {
             message: crate::i18n::message(
                 "backend-this-search-is-too-long-at-most-max-query-chars-characters-with-o-aebecb",
-                &[("max_query_chars", (MAX_QUERY_CHARS).to_string().into())],
+                &[("max_query_chars", (MAX_QUERY_CHARS).into())],
             ),
             at: 0,
         });
