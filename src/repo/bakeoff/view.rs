@@ -240,7 +240,7 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
                 ui.label(if c.uncommitted {
                     crate::i18n::text("repo-workflows-bakeoff-grid-1f19288a")
                 } else {
-                    "no"
+                    crate::i18n::text("repo-workflows-paint-no")
                 });
             }
             ui.end_row();

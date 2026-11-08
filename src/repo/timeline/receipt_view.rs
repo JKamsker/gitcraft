@@ -80,8 +80,8 @@ fn pair_row(ui: &mut Ui, pair: &Pair) {
         ui.label(
             RichText::new(format!(
                 "{}  →  {}",
-                side(&pair.old, "(new)"),
-                side(&pair.new, "(dropped)")
+                side(&pair.old, crate::i18n::text("repo-workflows-paint-new")),
+                side(&pair.new, crate::i18n::text("repo-workflows-paint-dropped"))
             ))
             .font(theme::mono(12.0))
             .color(t.text_dim),

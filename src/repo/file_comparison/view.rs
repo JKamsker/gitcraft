@@ -575,7 +575,7 @@ fn lens(
             .head
             .as_deref()
             .map(|h| &h[..8])
-            .unwrap_or("unborn")
+            .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-unborn"))
     ));
     if let Some(previous) = &snapshot.spec.previous {
         ui.label(crate::i18n::message(

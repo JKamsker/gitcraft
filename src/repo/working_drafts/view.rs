@@ -116,7 +116,9 @@ pub(in crate::repo) fn history(
                                 .metadata
                                 .branch
                                 .as_deref()
-                                .unwrap_or("detached/unborn"),
+                                .unwrap_or_else(|| crate::i18n::text(
+                                    "repo-workflows-paint-detached-unborn"
+                                )),
                             draft
                                 .metadata
                                 .head

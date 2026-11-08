@@ -352,16 +352,7 @@ impl State {
                         ui.add(
                             egui::Label::new(egui::RichText::new(snippet).monospace()).truncate(),
                         );
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "line {} · {} matches{} · {} bytes",
-                                hit.line,
-                                hit.occurrences.min(1000),
-                                if hit.occurrences > 1000 { "+" } else { "" },
-                                hit.size
-                            ))
-                            .small(),
-                        );
+                        ui.label(egui::RichText::new(hit_summary(hit)).small());
                     }
                 });
         }
@@ -384,4 +375,54 @@ fn origin(origin: &Origin) -> &'static str {
 
 fn done(action: Action) -> Outcome {
     Outcome::Done(Box::new(action))
+}
+
+fn hit_summary(hit: &engine::Hit) -> String {
+    crate::i18n::message(
+        "repo-workflows-recovery-hit-summary",
+        &[
+            ("line", hit.line.into()),
+            ("count", hit.occurrences.min(1000).into()),
+            (
+                "capped",
+                (if hit.occurrences > 1000 { "yes" } else { "no" }).into(),
+            ),
+            ("bytes", hit.size.into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_hit_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_recovery_hit_summary_keeps_count_cap_numeric() {
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let mut hit = engine::Hit {
+                blob: "opaque-oid-1234".into(),
+                size: 1234,
+                line: 1234,
+                excerpt: "User text".into(),
+                occurrences: 1,
+                provenance: vec![],
+            };
+            let one = hit_summary(&hit);
+            assert!(one.contains(if lang == "de" {
+                "ein Treffer"
+            } else {
+                "one match"
+            }));
+            assert!(one.contains(if lang == "de" { "1.234" } else { "1,234" }));
+            hit.occurrences = 1234;
+            let many = hit_summary(&hit);
+            assert!(many.contains(if lang == "de" {
+                "1.000 Treffer+"
+            } else {
+                "1,000 matches+"
+            }));
+            assert_eq!(hit.occurrences, 1234);
+            assert_eq!(hit.blob, "opaque-oid-1234");
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

@@ -7596,3 +7596,22 @@ repo-workflows-paint-branch-kind = Branch
 
 repo-workflows-paint-running = läuft
 
+repo-workflows-paint-no = nein
+
+repo-workflows-paint-new = (neu)
+
+repo-workflows-paint-dropped = (entfallen)
+
+repo-workflows-paint-detached-unborn = ohne Branch oder ersten Commit
+
+repo-workflows-recovery-hit-summary = Zeile { $line } · { $count ->
+        [one] ein Treffer
+       *[other] { $count } Treffer
+    }{ $capped ->
+        [yes] +
+       *[no] { "" }
+    } · { $bytes ->
+        [one] ein Byte
+       *[other] { $bytes } Bytes
+    }
+
