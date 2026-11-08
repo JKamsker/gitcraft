@@ -116,6 +116,9 @@ struct Lineage {
     newest: String,
     /// Its name before the commits seen so far (walking back).
     now: String,
+    /// It wasn't there before the commits seen so far: its name was another file's, renamed
+    /// away (`git mv a b`, then a new `a`).
+    gone: bool,
     names: Vec<Option<String>>,
     churn: Vec<u64>,
     changes: Vec<Vec<(usize, String)>>,
@@ -169,12 +172,16 @@ pub fn plan(history: &History, options: &Options) -> Plan {
             next_sample -= 1;
             if points[next_sample] == p {
                 for l in &mut lineages {
-                    l.names[next_sample] = Some(l.now.clone());
+                    // No path for one not there yet: nothing is read for it at that sample.
+                    let name = if l.gone { String::new() } else { l.now.clone() };
+                    l.names[next_sample] = Some(name);
                 }
             }
         }
         let c = order[p];
         let window = window_of[p];
+        // The sample at this very commit, whose names were taken before its changes were.
+        let sample_here = (next_sample < n && points[next_sample] == p).then_some(next_sample);
         for file in &history.commits[c].files {
             let id = match by_name.get(&file.path) {
                 Some(&id) => id,
@@ -182,6 +189,7 @@ pub fn plan(history: &History, options: &Options) -> Plan {
                     lineages.push(Lineage {
                         newest: file.path.clone(),
                         now: file.path.clone(),
+                        gone: false,
                         names: vec![None; n],
                         churn: vec![0; n],
                         changes: vec![Vec::new(); n],
@@ -194,9 +202,18 @@ pub fn plan(history: &History, options: &Options) -> Plan {
             l.churn[window] += u64::from(file.lines());
             l.changes[window].push((c, file.path.clone()));
             if let Some(old) = &file.old_path {
-                by_name.remove(&file.path);
-                by_name.insert(old.clone(), id);
                 l.now = old.clone();
+                by_name.remove(&file.path);
+                // A file of the old name newer than the rename is another file, made after.
+                if let Some(other) = by_name.insert(old.clone(), id)
+                    && other != id
+                {
+                    lineages[other].gone = true;
+                    // Nor was it there just after the rename.
+                    if let Some(k) = sample_here {
+                        lineages[other].names[k] = Some(String::new());
+                    }
+                }
             }
         }
     }

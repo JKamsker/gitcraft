@@ -85,6 +85,39 @@ fn window_churn_follows_a_file_through_its_rename() {
     assert_eq!(p.rows[1].churn, [0, 3, 2]);
 }
 
+/// `git mv a b`, then a new `a`: before the rename, the name `a` was the file now `b`, and the
+/// new `a` wasn't there.
+#[test]
+fn a_name_reused_after_a_rename_is_another_file_before_it() {
+    let mut rename = change("b.rs", 0, 0);
+    rename.old_path = Some("a.rs".to_owned());
+    let history = History {
+        rev: "HEAD".to_owned(),
+        tip: "c4".to_owned(),
+        limit: 10,
+        commits: vec![
+            commit("c4", vec![change("a.rs", 2, 0)]),
+            commit("c3", vec![change("a.rs", 1, 0)]),
+            commit("c2", vec![rename]),
+            commit("c1", vec![change("a.rs", 5, 0)]),
+        ],
+        truncated: false,
+    };
+    let p = plan(&history, &opts(4));
+    let row = |name: &str| p.rows.iter().find(|r| r.name == name);
+    let new_a = row("a.rs").map(|r| r.paths.clone());
+    let b = row("b.rs").map(|r| r.paths.clone());
+    // Samples c1 to c4: the new a.rs is there from c3 only; b.rs was a.rs at c1.
+    assert_eq!(
+        new_a,
+        Some(["", "", "a.rs", "a.rs"].map(str::to_owned).to_vec())
+    );
+    assert_eq!(
+        b,
+        Some(["a.rs", "b.rs", "b.rs", "b.rs"].map(str::to_owned).to_vec())
+    );
+}
+
 #[test]
 fn folders_add_up_their_files_and_the_filter_and_limit_cut_rows() {
     let p = plan(
