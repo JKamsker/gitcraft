@@ -614,7 +614,7 @@ mod tests {
                         .map(|id| format!("{id} blob {SCAN_BLOB}\n"))
                         .collect(),
                     _ => {
-                        return Err("Blob content must not be requested after budget refusal".into());
+                        return Err("Unexpected blob download after budget refusal".into());
                     }
                 };
                 assert!(data.len() <= limit);
