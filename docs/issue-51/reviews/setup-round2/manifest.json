@@ -1,0 +1,196 @@
+{
+  "review": "setup F1-F6 R2 static",
+  "candidate": "adca6abfcf961b31f8b799ed4d32e907910d8ffb",
+  "snapshot": "/private/tmp/gitcraft-setup-review-r2-adca6abf",
+  "prior_candidate": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+  "independent_tests_executed": 0,
+  "independent_programs_under_test_executed": 0,
+  "writer_evidence": {
+    "gitcraft-51-setup-review-r1.md": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-review-r1.md",
+      "sha256": "0a0243da9bc26ad185731c6685d7467d755ea82f5712b7ea6368c201229058e3"
+    },
+    "gitcraft-51-setup-r2-validation.json": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-validation.json",
+      "sha256": "0f75e5d15dae9b9442b833c11481bd13d44ae1a039882c70ad55badefccd5a02"
+    },
+    "gitcraft-51-setup-r2-check-f6.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-check-f6.log",
+      "sha256": "29389350005e2bfe1b18c2a842c1ab19a522627fc04ecf4add42b000f63db694"
+    },
+    "gitcraft-51-setup-r2-f1-connections.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-f1-connections.log",
+      "sha256": "168695d7815b7e67fcca98347db3392e0205e41b04c9c774a24f53874a375299"
+    },
+    "gitcraft-51-setup-r2-f1-synthetic.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-f1-synthetic.log",
+      "sha256": "dcbc9b85af1fdc1f0a3fa93e0105100cd0d0b53f8efbc6ea55313f5d86cd1a9a"
+    },
+    "gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "e5d2072a7b7010b476c9e4e4234419863f3bad695dfce19e54b2a751ccfb40fe"
+    },
+    "gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "036c5305c10fc0c0f4159c151e31482707dd677ba275a0659196d55104d3e32f"
+    },
+    "gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+      "sha256": "62d8813b31f6c2637436625fcbb8212c9073250db53c44db98e6fb39c1dd8a60"
+    },
+    "gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "20dedb2a9380f335ce9885d6b17c81016f1957d18c3f02c2f103ff1ca003c8f8"
+    }
+  },
+  "writer_validation_observed": {
+    "sha": "adca6abfcf961b31f8b799ed4d32e907910d8ffb",
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "CARGO_BUILD_JOBS": "2"
+    },
+    "path_prefix": "/tmp/gitcraft-integration-tools",
+    "results": [
+      {
+        "filter": "reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 47.17,
+        "log": "/tmp/gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 46.05s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3316 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.26,
+        "log": "/tmp/gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3316 filtered out; finished in 0.01s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "connection_or_operation_changes_discard_old_rejection_completion_and_retry",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "connection_or_operation_changes_discard_old_rejection_completion_and_retry",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.25,
+        "log": "/tmp/gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3316 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "collecting_diagnostics_cannot_open_a_browser_before_local_review",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "collecting_diagnostics_cannot_open_a_browser_before_local_review",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 101,
+        "seconds": 0.25,
+        "log": "/tmp/gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3316 filtered out; finished in 0.01s"
+        ]
+      }
+    ]
+  },
+  "source_sha256": {
+    "src/connections.rs": "7d12f5bfe0c9e370c68c4ed610634ec9c3216f60d9319b6f42818144eb9b325a",
+    "src/connections/tests.rs": "219e28ae0776ae869720f139ae514aa486ca64596deece8815508489fe323bcb",
+    "src/diagnostics.rs": "be5e82849b5b7159d074323d47c2b72997f47a00d74a71a72896b48de3d3eb27",
+    "src/app/diagnostics.rs": "a9266d4264633f4f2f75edd748ec7c8a3f7820b46201f8b3cef1093653489293",
+    "src/repo/operations.rs": "b2b890fbd4823894f9ae0c03b1aacef288af2c0780ee204c38036835417420b5",
+    "src/repo/load.rs": "2298e04eb6c0189ef1c43ad06470de784822504a6396243050626418837628a6",
+    "src/repo/https_recovery.rs": "fefb2cf8e59b1cbafedb30d1db23be016e771ff2935675c42b9a4ca90da4514a",
+    "src/git/refs.rs": "7ac2144d4309c204fdea4fa685b2f117d15003d6447c3751f76179a03ebead59",
+    "src/git/backend.rs": "ef00b1ff1dd3773433f01683ec5fd330eedc49590c5d4b8371a3f6b32683161d",
+    "src/git/command/endpoints.rs": "46daa3f0dfaebe305d99df3df7300ad496fb865259c29894494b589fe7290e9e",
+    "src/git/command/connection.rs": "8d98d78be4b4882b49cb9bc1337d894abbea539720ecc06aba3f5f2657fb5f38",
+    "src/connection_doctor.rs": "dad61596b9964f8f31055080444b87175bc6e7dc22b9f32a977acc84cafe4d90",
+    "src/settings/network_page.rs": "fa56ec5c618cf142590c8b72d850f403ce414dbd305075199d1f5af7c2baac99",
+    "src/repo/dialogs/remote.rs": "a827d17516602caa9e3d9b73664616901d370a7eeaa589473ba30bfe335628fe",
+    "src/repo/dialogs/mod.rs": "469ad6c0ce796863a58f0711aea29f9aa66fceba01a73e6f16bc9898f606c45e",
+    "src/git/command/watched.rs": "6aab7fa69d1b537944b8082b6e611f2d3d2aefbf6ad44db114af52b2c1868523",
+    "src/git/command.rs": "6dd3939f6fd87d9aba4e1d262e59b66bbfba971d8083bf5b57eefebc9988088e",
+    "src/settings/profiles.rs": "a5acec0841717d21b51ade77dd366c046c72e9d955446215f8eade017850e0ed",
+    "src/app/mod.rs": "e4ee79cde6021ee6f77ed06f2f07b4ea1fc7e9927f856b973938537ede26273e",
+    "src/tasks.rs": "37123aebd12bc6f0362c939a85f84dc31eba42ca941b34a70a88a38133a919c5",
+    "src/git/credential_scope.rs": "9ec9732c4effc5c8a91237bba4cc2e5bbf78a669c7b68dee8abd8fcc50e6c27c"
+  },
+  "dispositions": {
+    "F1": "STATIC PASS; no new mux/runtime proof",
+    "F2": "STATIC PASS; writer regression gate FAILED and remains pending",
+    "F3": "STATIC PASS; shared scope-matcher dependency separately blocked",
+    "F4": "FAIL: push-only routing edits do not invalidate retry ticket; original profile callback corrected",
+    "F5": "STATIC PASS; new source fixtures not rerun",
+    "F6": "FAIL: incidental earlier URL treated as confirmed authentication endpoint"
+  },
+  "shared_api_scope": "Not cleared: trailing-slash normalization, helper account precedence, redirects and LFS under independent platform review.",
+  "static_repro_not_executed": {
+    "F6": {
+      "error": "remote: See https://docs.fixture.invalid/auth for help.\nfatal: Authentication failed for 'https://push.fixture.invalid/team/repo'",
+      "attempted": [
+        "https://push.fixture.invalid/team/repo"
+      ],
+      "source_derived_selected": [
+        "https://docs.fixture.invalid/auth"
+      ],
+      "source_derived_confirmed": true
+    },
+    "F4": {
+      "before": {
+        "fetch": "https://fetch.fixture.invalid/team/repo",
+        "push": "https://old-push.fixture.invalid/team/repo"
+      },
+      "after": {
+        "fetch": "https://fetch.fixture.invalid/team/repo",
+        "push": "https://new-push.fixture.invalid/team/repo"
+      },
+      "source_derived_Remote_before_and_after": {
+        "name": "origin",
+        "url": "https://fetch.fixture.invalid/team/repo"
+      },
+      "note": "No production/test function was executed for these examples."
+    }
+  },
+  "restrictions": "No runtime Git, credential-fill/reject, application/test executable, SSH probe/mux, helper, signals/cancellation/selector, CI, external writes, full suite, or subagent. Only source/archive/metadata reads and report artifact creation."
+}

@@ -1,0 +1,60 @@
+[
+  {
+    "source": "/tmp/gitcraft-51-setup-review-r2.md",
+    "archive": "review.md",
+    "sha256": "9f1482767ebe97cb646349ce98c2e6497de94be9ba1fbbc49b6c8fc27b9b592c"
+  },
+  {
+    "source": "/tmp/gitcraft-51-setup-review-r2-manifest.json",
+    "archive": "manifest.json",
+    "sha256": "845b1ac13c8c39a074b7bcdd4e72b5f11937b0dd80390007ff146b2f6cef7ee9"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-check-f6.log",
+    "archive": "00-gitcraft-51-setup-r2-check-f6.log.gz",
+    "sha256": "29389350005e2bfe1b18c2a842c1ab19a522627fc04ecf4add42b000f63db694",
+    "compressed_sha256": "5952e70eb9fa10920b0e7cb8df318a1a3b147ef310ae9789ea7fab2e70f190d4"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-f1-connections.log",
+    "archive": "01-gitcraft-51-setup-r2-f1-connections.log.gz",
+    "sha256": "168695d7815b7e67fcca98347db3392e0205e41b04c9c774a24f53874a375299",
+    "compressed_sha256": "03282790b3aacb6369ba19f3d1c65079d11afe46dd65210f5c9540af9a8cf49d"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-f1-synthetic.log",
+    "archive": "02-gitcraft-51-setup-r2-f1-synthetic.log.gz",
+    "sha256": "dcbc9b85af1fdc1f0a3fa93e0105100cd0d0b53f8efbc6ea55313f5d86cd1a9a",
+    "compressed_sha256": "db95c587233096893074810fc8d7ef60c2b0ad817140143bea23d7a4fb12dc45"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+    "archive": "03-gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log.gz",
+    "sha256": "20dedb2a9380f335ce9885d6b17c81016f1957d18c3f02c2f103ff1ca003c8f8",
+    "compressed_sha256": "cc40faac1d2d0943e49db0531064389d24404e8dfe49e5dd2668768479672b99"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+    "archive": "04-gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log.gz",
+    "sha256": "62d8813b31f6c2637436625fcbb8212c9073250db53c44db98e6fb39c1dd8a60",
+    "compressed_sha256": "a68c63383679a9471238cfe9f558e6091104deff1af4f321f803acf468060348"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+    "archive": "05-gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log.gz",
+    "sha256": "036c5305c10fc0c0f4159c151e31482707dd677ba275a0659196d55104d3e32f",
+    "compressed_sha256": "17d750cc45b4e8ae6f20e076da182decf3263beae61273b25a6d8fa5676cc700"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+    "archive": "06-gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log.gz",
+    "sha256": "e5d2072a7b7010b476c9e4e4234419863f3bad695dfce19e54b2a751ccfb40fe",
+    "compressed_sha256": "616399bbc0ac95468a8fa884525569d212f06aa2a68a70912f2ddecd17dc968e"
+  },
+  {
+    "source": "/private/tmp/gitcraft-setup-review-r2-adca6abf/review-evidence/gitcraft-51-setup-r2-validation.json",
+    "archive": "07-gitcraft-51-setup-r2-validation.json.gz",
+    "sha256": "0f75e5d15dae9b9442b833c11481bd13d44ae1a039882c70ad55badefccd5a02",
+    "compressed_sha256": "85dd173efebfc82536aa67c31d37d54dc4515800d7d1e9cedfbb28afc98aee9a"
+  }
+]
