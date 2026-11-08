@@ -28,8 +28,7 @@ impl RepoTab {
     ) {
         let Some(bisect) = self.bisect.state() else {
             let blocker = self.bisect_blocker();
-            let resp = ui
-                .add_enabled(blocker.is_none(), egui::Button::new("Start bisect here…"))
+            let resp = crate::menu_item::MenuItem::new("Start bisect here…").icon("command").refused(blocker.as_deref()).show(ui)
                 .on_hover_text("Find the commit that brought a change in, by testing commits between a good and a bad one");
             let resp = match &blocker {
                 Some(why) => resp.on_disabled_hover_text(why.as_str()),
@@ -58,8 +57,10 @@ impl RepoTab {
             } else {
                 super::banner::BUSY
             };
-            if ui
-                .add_enabled(idle && !running, egui::Button::new(label))
+            if crate::menu_item::MenuItem::new(label)
+                .icon("command")
+                .refused((!idle || running).then_some(wait))
+                .show(ui)
                 .on_disabled_hover_text(wait)
                 .clicked()
             {

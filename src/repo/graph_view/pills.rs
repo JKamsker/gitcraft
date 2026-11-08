@@ -344,7 +344,7 @@ impl RepoTab {
         }
         // The same menu as right-clicking the row's own pill.
         let branch = (b.kind == BadgeKind::Branch).then(|| b.git_ref());
-        egui::Popup::context_menu(&resp)
+        crate::menu_item::context(&resp)
             .style(crate::theme::menu_style)
             .show(|ui| self.commit_menu_items(ui, i, branch, self.busy_op.is_none(), acts));
     }

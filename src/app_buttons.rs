@@ -601,7 +601,7 @@ fn handle(ui: &Ui, button: AppButton, resp: &Response) {
     }
     let here = layout(ctx).place_of(button);
     // Its own id: the theme menu opens from the same button.
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .id(resp.id.with("move-to"))
         .style(theme::menu_style)
         .show(|ui| {

@@ -79,8 +79,9 @@ impl Rehearsing {
 
 /// The menu entry that opens the dialog to rehearse with `other`.
 pub(crate) fn rehearse_item(ui: &mut egui::Ui, acts: &mut Vec<Action>, other: BranchRef<'_>) {
-    if ui
-        .button("Rehearse merge or rebase…")
+    if crate::menu_item::MenuItem::new("Rehearse merge or rebase…")
+        .icon("git-merge")
+        .show(ui)
         .on_hover_text(
             "Plays it through in a scratch worktree first: where it stops, which files \
              conflict, whether the tests pass. Nothing of yours changes.",

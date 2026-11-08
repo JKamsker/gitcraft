@@ -85,23 +85,29 @@ impl RepoTab {
         if state.only_pointer(path) {
             match download_action(&[path.to_owned()]) {
                 Ok(action) => {
-                    let r = ui
-                        .add_enabled(idle, egui::Button::new("LFS: Download"))
+                    let r = crate::menu_item::MenuItem::new("LFS: Download")
+                        .icon("cloud-download")
+                        .enabled(idle)
+                        .show(ui)
                         .on_hover_text("Download this file's LFS object and check it out");
                     if r.clicked() {
                         acts.push(action);
                     }
                 }
                 Err(e) => {
-                    ui.add_enabled(false, egui::Button::new("LFS: Download"))
+                    crate::menu_item::MenuItem::new("LFS: Download")
+                        .icon("cloud-download")
+                        .refused(Some(&e))
+                        .show(ui)
                         .on_disabled_hover_text(e);
                 }
             }
         }
         if in_lfs
             && let Some((dir, pattern)) = folder
-            && ui
-                .button(format!("LFS: Fetch only {dir}"))
+            && crate::menu_item::MenuItem::new(format!("LFS: Fetch only {dir}"))
+                .icon("cloud-download")
+                .show(ui)
                 .on_hover_text(
                     "From now on git-lfs downloads only this folder (and any others set in LFS: \
                      Storage…) on fetch, pull and checkout; other files stay pointers. Set in \
@@ -117,8 +123,10 @@ impl RepoTab {
             } else {
                 format!("Track {path} in LFS")
             };
-            let r = ui
-                .add_enabled(idle, egui::Button::new(label))
+            let r = crate::menu_item::MenuItem::new(label)
+                .icon("command")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(
                     "git lfs track: writes the pattern to .gitattributes. Files already committed \
                  stay ordinary git files until changed and staged again; commit .gitattributes \

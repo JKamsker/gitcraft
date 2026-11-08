@@ -82,7 +82,7 @@ impl RepoTab {
             if r.clicked() {
                 acts.push(Action::SelectStash(i));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| stash_menu(ui, acts, stash, idle));
         }
@@ -135,8 +135,10 @@ fn menu(
     idle: bool,
     steps: impl Fn(StashOp) -> Vec<Vec<String>>,
 ) {
-    if ui
-        .add_enabled(idle, egui::Button::new("Apply"))
+    if crate::menu_item::MenuItem::new("Apply")
+        .icon("check")
+        .enabled(idle)
+        .show(ui)
         .on_hover_text("Bring the changes back and keep the stash")
         .clicked()
     {
@@ -146,8 +148,10 @@ fn menu(
             refresh: Refresh::All,
         });
     }
-    if ui
-        .add_enabled(idle, egui::Button::new("Pop"))
+    if crate::menu_item::MenuItem::new("Pop")
+        .icon("check")
+        .enabled(idle)
+        .show(ui)
         .on_hover_text("Bring the changes back and drop the stash")
         .clicked()
     {
@@ -158,7 +162,12 @@ fn menu(
         });
     }
     ui.separator();
-    if ui.add_enabled(idle, egui::Button::new("Drop…")).clicked() {
+    if crate::menu_item::MenuItem::new("Drop…")
+        .icon("minus")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::confirm(
             "Drop stash",
             format!("Delete {name}? Its changes are gone for good."),

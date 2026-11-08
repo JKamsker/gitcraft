@@ -321,7 +321,7 @@ fn lines_menu(
     asked: &mut Option<(u32, u32)>,
     links: &mut Option<LineMenu<'_>>,
 ) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(theme::menu_style)
         .show(|ui| {
             let (start, end) = picked.numbers();
@@ -330,7 +330,11 @@ fn lines_menu(
             } else {
                 format!("lines {start}–{end}")
             };
-            if ui.button("Copy").clicked() {
+            if crate::menu_item::MenuItem::new("Copy")
+                .icon("copy")
+                .show(ui)
+                .clicked()
+            {
                 ui.ctx().copy_text(picked_text(data, picked));
             }
             if let (Some(menu), Some(lines)) = (links.as_deref_mut(), Lines::new(start, end)) {
@@ -338,16 +342,22 @@ fn lines_menu(
             }
             match history {
                 Ok(()) => {
-                    let b = ui.button("History of these lines").on_hover_text(format!(
-                        "Every commit up to this version that changed {which}, followed back \
+                    let b = crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .show(ui)
+                        .on_hover_text(format!(
+                            "Every commit up to this version that changed {which}, followed back \
                          through earlier edits and renames"
-                    ));
+                        ));
                     if b.clicked() {
                         *asked = Some((start, end));
                     }
                 }
                 Err(why) => {
-                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                    crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .refused(Some(why))
+                        .show(ui)
                         .on_disabled_hover_text(why);
                 }
             }

@@ -464,7 +464,7 @@ impl RepoTab {
             return;
         }
         if let Some(stash) = self.stash_at(i).and_then(|s| self.stashes.get(s)) {
-            egui::Popup::context_menu(resp)
+            crate::menu_item::context(resp)
                 .style(crate::theme::menu_style)
                 .show(|ui| super::sidebar::stash_menu(ui, acts, stash, idle));
             return;
@@ -556,10 +556,11 @@ fn loading_row(ui: &mut Ui, t: &Tokens) {
 
 /// Right-click menu of the changes row.
 fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             if MenuItem::new("Stage all changes")
+                .icon("check")
                 .enabled(idle)
                 .keys(Command::StageAll)
                 .show(ui)
@@ -572,6 +573,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 });
             }
             if MenuItem::new("Stash changes…")
+                .icon("archive")
                 .enabled(idle)
                 .keys(Command::Stash)
                 .show(ui)
@@ -580,8 +582,10 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 acts.push(Action::Dialog(Dialog::stash()));
             }
             ui.separator();
-            if ui
-                .add_enabled(idle, egui::Button::new("Apply patch…"))
+            if crate::menu_item::MenuItem::new("Apply patch…")
+                .icon("file-diff")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(APPLY_PATCH_TIP)
                 .clicked()
             {
@@ -604,15 +608,17 @@ pub(super) fn compare_items(
 ) {
     let name = branch.name;
     let current_ref = BranchRef::local(current);
-    if ui
-        .button(format!("Changes {name} adds to {current}"))
+    if crate::menu_item::MenuItem::new(format!("Changes {name} adds to {current}"))
+        .icon("command")
+        .show(ui)
         .on_hover_text("What it changed since the two diverged, as a pull request shows it")
         .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, true));
     }
-    if ui
-        .button(format!("Compare {current} with {name}"))
+    if crate::menu_item::MenuItem::new(format!("Compare {current} with {name}"))
+        .icon("file-diff")
+        .show(ui)
         .on_hover_text("Every difference between the two")
         .clicked()
     {

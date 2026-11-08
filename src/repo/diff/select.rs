@@ -169,12 +169,18 @@ fn lines_menu(
     acts: &mut Vec<crate::repo::Action>,
     more: &mut dyn FnMut(&mut Ui, &mut Vec<crate::repo::Action>),
 ) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             let selected_text = selected_text();
-            if ui
-                .add_enabled(selected_text.is_some(), egui::Button::new("Copy"))
+            if crate::menu_item::MenuItem::new("Copy")
+                .icon("copy")
+                .refused(
+                    selected_text
+                        .is_none()
+                        .then_some("Select text to copy first"),
+                )
+                .show(ui)
                 .clicked()
                 && let Some(text) = &selected_text
             {
@@ -183,16 +189,22 @@ fn lines_menu(
             more(ui, acts);
             match history() {
                 Ok(action) => {
-                    let b = ui.button("History of these lines").on_hover_text(
-                        "Every commit up to this version that changed the selected lines, \
+                    let b = crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .show(ui)
+                        .on_hover_text(
+                            "Every commit up to this version that changed the selected lines, \
                          followed back through earlier edits and renames",
-                    );
+                        );
                     if b.clicked() {
                         acts.push(action);
                     }
                 }
                 Err(why) => {
-                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                    crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .refused(Some(why))
+                        .show(ui)
                         .on_disabled_hover_text(why);
                 }
             }

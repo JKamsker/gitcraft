@@ -39,40 +39,64 @@ pub fn file_menu_with(
     more: impl FnOnce(&mut Ui, &mut Vec<Action>),
 ) {
     let revert = matches!(diff, Some(DiffKey::Commit { hash, .. }) if rev == Some(hash.as_str()));
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             let rel = std::path::PathBuf::from(path);
-            if ui.button("Open file").clicked() {
+            if crate::menu_item::MenuItem::new("Open file")
+                .icon("eye")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::OpenPath(rel.clone()));
             }
-            if ui.button("Open in editor").clicked() {
+            if crate::menu_item::MenuItem::new("Open in editor")
+                .icon("code")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::OpenInEditor(rel.clone()));
             }
             if let Some(key) = diff {
                 tool_items(ui, key, acts);
             }
-            if ui.button(crate::repo::reveal_label()).clicked() {
+            if crate::menu_item::MenuItem::new(crate::repo::reveal_label())
+                .icon("folder-open")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::OpenPath(
                     rel.parent().map(|p| p.to_path_buf()).unwrap_or_default(),
                 ));
             }
             ui.separator();
-            if ui.button("View file").clicked() {
+            if crate::menu_item::MenuItem::new("View file")
+                .icon("eye")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::FileView {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
                     tab: FileTab::File,
                 });
             }
-            if ui.button("File history").clicked() {
+            if crate::menu_item::MenuItem::new("File history")
+                .icon("history")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::FileView {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
                     tab: FileTab::History,
                 });
             }
-            if ui.button("Blame").clicked() {
+            if crate::menu_item::MenuItem::new("Blame")
+                .icon("history")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::FileView {
                     path: path.to_owned(),
                     rev: rev.map(str::to_owned),
@@ -81,10 +105,13 @@ pub fn file_menu_with(
             }
             if revert && let Some(hash) = rev {
                 ui.separator();
-                let b = ui.button("Revert changes to this file").on_hover_text(
-                    "Undo this commit's changes to the file in the working tree, to look over \
+                let b = crate::menu_item::MenuItem::new("Revert changes to this file")
+                    .icon("undo-2")
+                    .show(ui)
+                    .on_hover_text(
+                        "Undo this commit's changes to the file in the working tree, to look over \
                      before committing",
-                );
+                    );
                 if b.clicked() {
                     acts.push(Action::RevertFile {
                         hash: hash.to_owned(),
@@ -94,8 +121,9 @@ pub fn file_menu_with(
             }
             // Of the working tree: its rules and attributes, not a commit's.
             if rev.is_none()
-                && ui
-                    .button("Ignore rules and attributes")
+                && crate::menu_item::MenuItem::new("Ignore rules and attributes")
+                    .icon("eye-off")
+                    .show(ui)
                     .on_hover_text("Why it is ignored or not, and how git treats it")
                     .clicked()
             {
@@ -104,19 +132,29 @@ pub fn file_menu_with(
                 )));
             }
             if ignorable {
-                ui.menu_button("Ignore", |ui| {
-                    for (label, pattern, untrack) in ignore_patterns(path) {
-                        if ui.button(label).clicked() {
-                            acts.push(Action::Ignore {
-                                pattern,
-                                path: untrack,
-                            });
+                crate::menu_item::MenuItem::new("Ignore")
+                    .icon("eye-off")
+                    .submenu(ui, |ui| {
+                        for (label, pattern, untrack) in ignore_patterns(path) {
+                            if crate::menu_item::MenuItem::new(label)
+                                .icon("command")
+                                .show(ui)
+                                .clicked()
+                            {
+                                acts.push(Action::Ignore {
+                                    pattern,
+                                    path: untrack,
+                                });
+                            }
                         }
-                    }
-                });
+                    });
             }
             ui.separator();
-            if ui.button("Copy path").clicked() {
+            if crate::menu_item::MenuItem::new("Copy path")
+                .icon("copy")
+                .show(ui)
+                .clicked()
+            {
                 ui.ctx().copy_text(path.to_owned());
             }
             let scope = crate::custom_commands::Scope {
@@ -146,8 +184,9 @@ pub fn file_menu_with(
 fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
     match tool_item(key) {
         ToolItem::OpenInDiffTool => {
-            if ui
-                .button("Open in diff tool")
+            if crate::menu_item::MenuItem::new("Open in diff tool")
+                .icon("file-diff")
+                .show(ui)
                 .on_hover_text(
                     "Shows this diff in the diff tool of Settings → Git → External tools",
                 )
@@ -157,8 +196,9 @@ fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
             }
         }
         ToolItem::ResolveInMergeTool => {
-            if ui
-                .button("Resolve in merge tool")
+            if crate::menu_item::MenuItem::new("Resolve in merge tool")
+                .icon("git-merge")
+                .show(ui)
                 .on_hover_text(
                     "Opens the conflict in the merge tool of Settings → Git → External tools; \
                      the file is marked resolved when the tool reports success",

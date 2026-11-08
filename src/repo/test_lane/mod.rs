@@ -433,8 +433,10 @@ impl RepoTab {
     /// The commit menu's entry: test the commits up to `hash`.
     pub(super) fn test_menu_items(&self, ui: &mut egui::Ui, hash: &str, acts: &mut Vec<Action>) {
         let running = self.test_lane.running();
-        if ui
-            .add_enabled(!running, egui::Button::new("Test commits up to here…"))
+        if crate::menu_item::MenuItem::new("Test commits up to here…")
+            .icon("command")
+            .refused(running.then_some("Tests are running: stop them first"))
+            .show(ui)
             .on_hover_text(
                 "Runs a test command at each commit from the base branch to this one (just this \
                  one when it is on the base branch), in scratch worktrees, and shows a pass / \

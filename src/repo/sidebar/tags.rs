@@ -54,22 +54,25 @@ impl RepoTab {
             if r.clicked() {
                 acts.push(Action::SelectHash(tag.target.clone()));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| self.tag_menu_items(ui, acts, tag, idle));
         }
     }
 
     fn tag_menu_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, tag: &Branch, idle: bool) {
-        if ui.button("Copy name").clicked() {
+        if crate::menu_item::MenuItem::new("Copy name")
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(tag.name.clone());
         }
         if crate::release::version::Version::parse(&tag.name).is_some()
-            && ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Start hotfix from {}…", tag.name)),
-                )
+            && crate::menu_item::MenuItem::new(format!("Start hotfix from {}…", tag.name))
+                .icon("tag")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text("A hotfix branch made here (the next patch version), checked out")
                 .clicked()
         {
@@ -79,8 +82,10 @@ impl RepoTab {
             }));
         }
         if let Some(remote) = self.default_remote() {
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Push to {remote}")))
+            if crate::menu_item::MenuItem::new(format!("Push to {remote}"))
+                .icon("arrow-up-from-line")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
             {
                 acts.push(Action::Ops {
@@ -89,8 +94,10 @@ impl RepoTab {
                     refresh: Refresh::All,
                 });
             }
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Delete from {remote}…")))
+            if crate::menu_item::MenuItem::new(format!("Delete from {remote}…"))
+                .icon("minus")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
             {
                 acts.push(Action::Dialog(Dialog::confirm(
@@ -108,8 +115,10 @@ impl RepoTab {
             }
         }
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Delete tag…"))
+        if crate::menu_item::MenuItem::new("Delete tag…")
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::DeleteTag {

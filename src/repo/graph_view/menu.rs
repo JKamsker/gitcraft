@@ -38,7 +38,7 @@ impl RepoTab {
             .ctx
             .data(|d| d.get_temp::<Option<String>>(pill_menu_id(&commit.hash)))
             .flatten();
-        egui::Popup::context_menu(resp)
+        crate::menu_item::context(resp)
             .style(crate::theme::menu_style)
             .show(|ui| self.commit_menu_items(ui, i, pill, idle, acts));
     }
@@ -109,6 +109,7 @@ impl RepoTab {
         ui.separator();
         let merge = commit.parents.len() > 1;
         if MenuItem::new("Create patch from commit…")
+            .icon("file-diff")
             .refused(merge.then_some("A merge commit makes no patch"))
             .show(ui)
             .on_hover_text("Save it as a file for git am (git format-patch)")
@@ -120,8 +121,10 @@ impl RepoTab {
             });
         }
         if is_head
-            && ui
-                .add_enabled(idle, egui::Button::new("Apply patch…"))
+            && crate::menu_item::MenuItem::new("Apply patch…")
+                .icon("file-diff")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(super::APPLY_PATCH_TIP)
                 .clicked()
         {
@@ -190,8 +193,10 @@ impl RepoTab {
             name: branch,
             remote: !local,
         };
-        if ui
-            .add_enabled(idle, egui::Button::new(format!("Check out {branch}")))
+        if crate::menu_item::MenuItem::new(format!("Check out {branch}"))
+            .icon("log-in")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(if local {
@@ -203,11 +208,10 @@ impl RepoTab {
         let Some(current) = self.refs.current.as_deref() else {
             return;
         };
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Fast-forward {current} to {branch}")),
-            )
+        if crate::menu_item::MenuItem::new(format!("Fast-forward {current} to {branch}"))
+            .icon("arrow-right")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(fast_forward_action(git_ref, current));
@@ -228,11 +232,10 @@ impl RepoTab {
         if rebase.clicked() {
             acts.push(rebase_action(git_ref, current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Interactive rebase {current} onto {branch}…")),
-            )
+        if crate::menu_item::MenuItem::new(format!("Interactive rebase {current} onto {branch}…"))
+            .icon("git-merge")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(interactive_rebase_action(git_ref));
@@ -264,30 +267,38 @@ impl RepoTab {
             .filter(|b| b.target == hash)
             .collect();
         for b in &here {
-            ui.menu_button(format!("Branch {}", b.name), |ui| {
-                self.branch_menu_items(ui, acts, b, idle);
-            });
+            crate::menu_item::MenuItem::new(format!("Branch {}", b.name))
+                .icon("git-branch-plus")
+                .submenu(ui, |ui| {
+                    self.branch_menu_items(ui, acts, b, idle);
+                });
         }
         if !here.is_empty() {
             ui.separator();
         }
         // At HEAD, the new-branch key does the same.
-        let mut create = MenuItem::new("Create branch here…");
+        let mut create = MenuItem::new("Create branch here…").icon("git-branch-plus");
         if is_head {
             create = create.keys(crate::keymap::Command::NewBranch);
         }
         if create.show(ui).clicked() {
             acts.push(Action::Dialog(Dialog::create_branch(hash, short)));
         }
-        if ui.button("Create tag here…").clicked() {
+        if crate::menu_item::MenuItem::new("Create tag here…")
+            .icon("tag")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::tag(
                 hash,
                 short,
                 self.default_remote(),
             )));
         }
-        if ui
-            .add_enabled(idle, egui::Button::new("Cut release…"))
+        if crate::menu_item::MenuItem::new("Cut release…")
+            .icon("package")
+            .enabled(idle)
+            .show(ui)
             .on_hover_text(
                 "The next version, notes from the commits since the last tag, a tag, the push \
                  and the forge's release, shown before it runs",
@@ -298,18 +309,19 @@ impl RepoTab {
                 hash.to_owned(),
             )));
         }
-        if ui
-            .button("Create worktree from this commit…")
+        if crate::menu_item::MenuItem::new("Create worktree from this commit…")
+            .icon("folder-git-2")
+            .show(ui)
             .on_hover_text("A second working folder on a new branch starting here")
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::worktree_at(&self.path, hash)));
         }
-        if ui
-            .add_enabled(
-                idle && !is_head,
-                egui::Button::new("Check out this commit (detached)"),
-            )
+        if crate::menu_item::MenuItem::new("Check out this commit (detached)")
+            .icon("log-in")
+            .enabled(idle)
+            .refused(is_head.then_some("This commit is already checked out"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Checkout(hash.to_owned()));
@@ -341,15 +353,20 @@ impl RepoTab {
                     }
                 })
                 .unwrap_or_default();
-            if ui
-                .button(format!("Compare with {other}"))
+            if crate::menu_item::MenuItem::new(format!("Compare with {other}"))
+                .icon("file-diff")
+                .show(ui)
                 .on_hover_text("Also Ctrl+click on a commit")
                 .clicked()
             {
                 acts.push(compare);
             }
         }
-        if ui.button("Compare with the working tree").clicked() {
+        if crate::menu_item::MenuItem::new("Compare with the working tree")
+            .icon("file-diff")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Compare {
                 base: hash.to_owned(),
                 base_label: short.to_owned(),
@@ -387,11 +404,11 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         target,
         ..
     } = *r;
-    if ui
-        .add_enabled(
-            idle && !is_head,
-            egui::Button::new(format!("Interactive rebase {target} onto this commit…")),
-        )
+    if crate::menu_item::MenuItem::new(format!("Interactive rebase {target} onto this commit…"))
+        .icon("git-merge")
+        .enabled(idle)
+        .refused(is_head.then_some("This commit is already checked out"))
+        .show(ui)
         .on_hover_text("Reorder, reword, squash or drop the commits after this one")
         .clicked()
     {
@@ -402,7 +419,11 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     }
     let cherry_pick = "Cherry-pick onto current branch".to_owned();
     let picked = if r.merge {
-        ui.add_enabled(idle && !is_head, egui::Button::new(cherry_pick))
+        crate::menu_item::MenuItem::new(cherry_pick)
+            .icon("command")
+            .enabled(idle)
+            .refused(is_head.then_some("This commit is already checked out"))
+            .show(ui)
     } else {
         r.tab
             .conflict_button(ui, cherry_pick, idle && !is_head, Op::CherryPick, hash)
@@ -410,17 +431,23 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     if picked.clicked() {
         acts.push(cherry_pick_action(hash));
     }
-    if ui
-        .add_enabled(idle, egui::Button::new("Revert commit"))
+    if crate::menu_item::MenuItem::new("Revert commit")
+        .icon("undo-2")
+        .enabled(idle)
+        .show(ui)
         .clicked()
     {
         acts.push(revert_action(hash, short));
     }
-    ui.add_enabled_ui(idle && !is_head, |ui| {
-        ui.menu_button(format!("Reset {target} to here"), |ui| {
-            reset_items(ui, r, acts);
-        });
-    });
+    {
+        crate::menu_item::MenuItem::new(format!("Reset {target} to here"))
+            .icon("undo-2")
+            .enabled(idle)
+            .refused(is_head.then_some("This commit is already checked out"))
+            .submenu(ui, |ui| {
+                reset_items(ui, r, acts);
+            });
+    }
 }
 
 /// The reset modes, each asking before it moves `target` to the commit.
@@ -458,7 +485,9 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         ),
     ] {
         let first = explain.split('.').next().unwrap_or(explain);
-        let button = ui.button(format!("{label} — {first}"));
+        let button = crate::menu_item::MenuItem::new(format!("{label} — {first}"))
+            .icon("command")
+            .show(ui);
         if mode == "--hard" {
             offer(&button, || GhostOp::ResetHard {
                 to: hash.to_owned(),
@@ -515,14 +544,25 @@ fn reset_steps(mode: &str, hash: &str, target: &str, head: &str) -> Vec<Vec<Stri
 
 /// Copying the commit's hash, message, and `branch` when there is one.
 fn copy_items(ui: &mut Ui, hash: &str, summary: &str, branch: Option<&str>) {
-    if ui.button("Copy commit hash").clicked() {
+    if crate::menu_item::MenuItem::new("Copy commit hash")
+        .icon("copy")
+        .show(ui)
+        .clicked()
+    {
         ui.ctx().copy_text(hash.to_owned());
     }
-    if ui.button("Copy message").clicked() {
+    if crate::menu_item::MenuItem::new("Copy message")
+        .icon("copy")
+        .show(ui)
+        .clicked()
+    {
         ui.ctx().copy_text(summary.to_owned());
     }
     if let Some(name) = branch
-        && ui.button(format!("Copy branch name ({name})")).clicked()
+        && crate::menu_item::MenuItem::new(format!("Copy branch name ({name})"))
+            .icon("copy")
+            .show(ui)
+            .clicked()
     {
         ui.ctx().copy_text(name.to_owned());
     }

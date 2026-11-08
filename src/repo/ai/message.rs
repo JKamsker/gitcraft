@@ -52,7 +52,7 @@ impl RepoTab {
             self.start_message(ui.ctx());
         }
         let popup = if settings.enabled() {
-            egui::Popup::context_menu(&resp)
+            crate::menu_item::context(&resp)
         } else {
             egui::Popup::menu(&resp)
         };
@@ -93,9 +93,18 @@ impl RepoTab {
                 None if matches!(self.ai.tools, Look::Failed(_)) => tool.label().to_owned(),
                 None => format!("{} — looking…", tool.label()),
             };
-            let can = found != Some(false) && !no_command;
-            if ui
-                .add_enabled(can, egui::Button::selectable(current == tool, text))
+            let refused = if no_command {
+                Some("Set a custom command in Settings → AI first")
+            } else if found == Some(false) {
+                Some("This tool was not found on the repository's machine")
+            } else {
+                None
+            };
+            if crate::menu_item::MenuItem::new(text)
+                .icon("sparkles")
+                .selected(current == tool)
+                .refused(refused)
+                .show(ui)
                 .clicked()
             {
                 chosen = Some(tool);
@@ -105,15 +114,21 @@ impl RepoTab {
             ui.label(RichText::new(e).color(t.danger).small());
         }
         if matches!(self.ai.tools, Look::Found(_) | Look::Failed(_))
-            && ui
-                .button("Look again")
+            && crate::menu_item::MenuItem::new("Look again")
+                .icon("refresh-cw")
+                .show(ui)
                 .on_hover_text("Look for the tools again, after installing one")
                 .clicked()
         {
             self.ai.tools = Look::NotYet;
         }
         ui.separator();
-        if current != AiTool::Off && ui.button("Turn off").clicked() {
+        if current != AiTool::Off
+            && crate::menu_item::MenuItem::new("Turn off")
+                .icon("x")
+                .show(ui)
+                .clicked()
+        {
             chosen = Some(AiTool::Off);
         }
         ui.label(

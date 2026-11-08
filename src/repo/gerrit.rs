@@ -56,7 +56,11 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         if let (Some(server), Some(id)) = (&self.gerrit, &commit.change_id)
-            && ui.button("Open Gerrit change").on_hover_text(id).clicked()
+            && crate::menu_item::MenuItem::new("Open Gerrit change")
+                .icon("eye")
+                .show(ui)
+                .on_hover_text(id)
+                .clicked()
         {
             acts.push(Action::OpenUrl(server.change_url(id)));
         }

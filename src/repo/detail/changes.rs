@@ -354,7 +354,7 @@ impl RepoTab {
             );
         } else {
             // A deleted file has nothing to open, but can be stashed.
-            egui::Popup::context_menu(&r.row)
+            crate::menu_item::context(&r.row)
                 .style(theme::menu_style)
                 .show(|ui| stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts));
         }

@@ -54,7 +54,7 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
 /// The header's right-click menu: which columns show, a compact graph column, and the widths
 /// back as they were at first.
 pub(super) fn header_menu(resp: &Response, settings: &Settings) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(theme::menu_style)
         .show(|ui| {
             let mut next = settings.clone();
@@ -83,19 +83,21 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             {
                 next.set_compact_graph(compact);
             }
-            if ui
-                .add_enabled(
-                    next.graph_width > 0.0,
-                    egui::Button::new("Fit graph column to its lanes"),
+            if crate::menu_item::MenuItem::new("Fit graph column to its lanes")
+                .icon("command")
+                .refused(
+                    (next.graph_width <= 0.0).then_some("The graph column already fits its lanes"),
                 )
+                .show(ui)
                 .on_hover_text("As double-clicking its border does")
                 .clicked()
             {
                 next.graph_width = 0.0;
             }
             ui.separator();
-            if ui
-                .button("Reset columns")
+            if crate::menu_item::MenuItem::new("Reset columns")
+                .icon("undo-2")
+                .show(ui)
                 .on_hover_text("Every column back to its first width")
                 .clicked()
             {

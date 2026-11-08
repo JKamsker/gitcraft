@@ -84,11 +84,12 @@ fn subcommand_at(step: &[String]) -> Option<usize> {
 
 /// The Push button's right-click menu: push once without the `pre-push` hook.
 pub(super) fn push_menu(push: &Response, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(push)
+    crate::menu_item::context(push)
         .style(crate::theme::menu_style)
         .show(|ui: &mut Ui| {
-            if ui
-                .button("Push, skipping hooks")
+            if crate::menu_item::MenuItem::new("Push, skipping hooks")
+                .icon("arrow-up-from-line")
+                .show(ui)
                 .on_hover_text(
                     "Pushes once without running the pre-push hook (git push --no-verify)",
                 )

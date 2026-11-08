@@ -98,7 +98,7 @@ impl RepoTab {
             if r.clicked() && row.openable() {
                 acts.push(Action::OpenWorktree(std::path::PathBuf::from(&task.path)));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(theme::menu_style)
                 .show(|ui| menu(ui, &row, acts));
         }
@@ -183,15 +183,21 @@ fn tip(row: &Row) -> String {
 
 fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
     let path = std::path::PathBuf::from(&row.task.path);
-    if ui
-        .add_enabled(row.openable(), egui::Button::new("Open and review changes"))
+    if crate::menu_item::MenuItem::new("Open and review changes")
+        .icon("eye")
+        .refused(
+            (!row.openable()).then_some("This agent worktree is missing or still being prepared"),
+        )
+        .show(ui)
         .clicked()
     {
         acts.push(Action::OpenWorktree(path.clone()));
     }
     let there = row.worktree.is_some_and(|w| w.prunable.is_none());
-    if ui
-        .add_enabled(there, egui::Button::new("Start the agent again"))
+    if crate::menu_item::MenuItem::new("Start the agent again")
+        .icon("command")
+        .refused((!there).then_some("This agent worktree is missing"))
+        .show(ui)
         .on_hover_text(
             "In a new terminal of its worktree, without the setup recipe and without the task \
              as its first message",
@@ -200,8 +206,10 @@ fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
     {
         acts.push(Action::Agent(AgentAct::Restart(row.task.clone())));
     }
-    if ui
-        .add_enabled(there, egui::Button::new("Open a terminal there"))
+    if crate::menu_item::MenuItem::new("Open a terminal there")
+        .icon("square-terminal")
+        .refused((!there).then_some("This agent worktree is missing"))
+        .show(ui)
         .clicked()
     {
         acts.push(Action::NewTerminal {
@@ -210,8 +218,9 @@ fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
         });
     }
     ui.separator();
-    if ui
-        .button("Take off the list")
+    if crate::menu_item::MenuItem::new("Take off the list")
+        .icon("minus")
+        .show(ui)
         .on_hover_text("The worktree and its branch stay; remove them in WORKTREES")
         .clicked()
     {

@@ -186,7 +186,11 @@ pub fn menu(ui: &mut Ui, look: &TabLook) -> Option<TabLook> {
 
     if *look != TabLook::default() {
         ui.separator();
-        if ui.button("Reset to the default look").clicked() {
+        if crate::menu_item::MenuItem::new("Reset to the default look")
+            .icon("undo-2")
+            .show(ui)
+            .clicked()
+        {
             picked = Some(TabLook::default());
         }
     }

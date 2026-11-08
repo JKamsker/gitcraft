@@ -61,7 +61,7 @@ impl RepoTab {
             } else if r.clicked() && !wt.head.is_empty() {
                 acts.push(Action::SelectHash(wt.head.clone()));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| {
                     worktree_menu_items(ui, acts, wt, idle, same_tab, can_open, any_prunable);
@@ -195,8 +195,14 @@ fn worktree_menu_items(
     // As git (and a shell) on the worktree's machine names it.
     let path = crate::remote::git_path(&wt.path);
     if same_tab
-        && ui
-            .add_enabled(can_open, egui::Button::new("Open"))
+        && crate::menu_item::MenuItem::new("Open")
+            .icon("eye")
+            .refused((!can_open).then_some(if wt.current {
+                "This worktree is already open here"
+            } else {
+                "This worktree is missing"
+            }))
+            .show(ui)
             .clicked()
     {
         acts.push(Action::OpenWorktree(wt.path.clone()));
@@ -206,30 +212,47 @@ fn worktree_menu_items(
     } else {
         "Open in a tab"
     };
-    if ui
-        .add_enabled(can_open, egui::Button::new(new_tab))
+    if crate::menu_item::MenuItem::new(new_tab)
+        .icon("command")
+        .refused((!can_open).then_some(if wt.current {
+            "This worktree is already open here"
+        } else {
+            "This worktree is missing"
+        }))
+        .show(ui)
         .clicked()
     {
         acts.push(Action::OpenTab(wt.path.clone()));
     }
-    if ui.button("Open terminal here").clicked() {
+    if crate::menu_item::MenuItem::new("Open terminal here")
+        .icon("square-terminal")
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::NewTerminal {
             shell: None,
             cwd: Some(wt.path.clone()),
         });
     }
     let openable = crate::remote::openable_here(&wt.path).is_ok();
-    if ui
-        .add_enabled(openable, egui::Button::new(crate::repo::reveal_label()))
+    if crate::menu_item::MenuItem::new(crate::repo::reveal_label())
+        .icon("folder-open")
+        .refused((!openable).then_some("This worktree cannot be opened from this machine"))
+        .show(ui)
         .clicked()
     {
         let _ = crate::remote::open_here(wt.path.clone());
     }
-    if ui.button("Copy path").clicked() {
+    if crate::menu_item::MenuItem::new("Copy path")
+        .icon("copy")
+        .show(ui)
+        .clicked()
+    {
         ui.ctx().copy_text(path.clone());
     }
-    if ui
-        .button("Collision matrix…")
+    if crate::menu_item::MenuItem::new("Collision matrix…")
+        .icon("command")
+        .show(ui)
         .on_hover_text(
             "Which worktree branches would conflict when merged, and the order to land them in",
         )
@@ -237,16 +260,23 @@ fn worktree_menu_items(
     {
         acts.push(Action::OpenCollisions);
     }
-    if ui
-        .button("Agent fence…")
+    if crate::menu_item::MenuItem::new("Agent fence…")
+        .icon("command")
+        .show(ui)
         .on_hover_text("Paths agents must stay out of, written into their configs and checked")
         .clicked()
     {
         acts.push(Action::OpenFence);
     }
     if !wt.main
-        && ui
-            .add_enabled(!wt.head.is_empty(), egui::Button::new("Scope drift…"))
+        && crate::menu_item::MenuItem::new("Scope drift…")
+            .icon("command")
+            .refused(
+                wt.head
+                    .is_empty()
+                    .then_some("This worktree has no commit yet"),
+            )
+            .show(ui)
             .on_hover_text(
                 "What it changed beyond its task: folders, dependencies, signatures, formatting",
             )
@@ -261,7 +291,12 @@ fn worktree_menu_items(
         } else {
             ("Lock", vec!["worktree", "lock", path.as_str()])
         };
-        if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
+        if crate::menu_item::MenuItem::new(label)
+            .icon("command")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Ops {
                 label: format!("{label} worktree {}", wt.name()),
                 ops: ops(&[&args]),
@@ -269,6 +304,7 @@ fn worktree_menu_items(
             });
         }
         if MenuItem::new("Remove…")
+            .icon("minus")
             .enabled(idle)
             .refused(
                 wt.current
@@ -291,8 +327,10 @@ fn worktree_menu_items(
     }
     if any_prunable {
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Prune missing worktrees"))
+        if crate::menu_item::MenuItem::new("Prune missing worktrees")
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Ops {

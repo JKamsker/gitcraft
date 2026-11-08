@@ -90,8 +90,9 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
             Source::Global => "Custom command (Settings)",
             Source::Repository => "Custom command of this repository",
         };
-        if ui
-            .button(offered.command.entry_label())
+        if crate::menu_item::MenuItem::new(offered.command.entry_label())
+            .icon("command")
+            .show(ui)
             .on_hover_text(tip)
             .clicked()
         {
@@ -99,8 +100,9 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
         }
     }
     if published.review
-        && ui
-            .button("Review repository commands…")
+        && crate::menu_item::MenuItem::new("Review repository commands…")
+            .icon("eye")
+            .show(ui)
             .on_hover_text(format!(
                 "{} has commands not trusted yet (or can't be read): see them first",
                 cc::REPO_FILE

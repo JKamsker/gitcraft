@@ -57,8 +57,9 @@ impl Interactions {
 
 /// The menu entry that opens the dialog for the checked-out branch and `other`.
 pub(crate) fn interaction_item(ui: &mut egui::Ui, acts: &mut Vec<Action>, other: &str) {
-    if ui
-        .button("Find the interaction…")
+    if crate::menu_item::MenuItem::new("Find the interaction…")
+        .icon("command")
+        .show(ui)
         .on_hover_text(
             "When this branch and the checked-out one pass alone but fail together: tests \
              subsets of their commits until it finds those that fail together",

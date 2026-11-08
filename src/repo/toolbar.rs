@@ -182,7 +182,7 @@ impl RepoTab {
         if pull.clicked() {
             acts.push(Action::Pull);
         }
-        egui::Popup::context_menu(&pull)
+        crate::menu_item::context(&pull)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
         let more = ui.add_enabled_ui(has_remote, |ui| {
@@ -329,6 +329,7 @@ impl RepoTab {
             .style(crate::theme::menu_style)
             .show(|ui| {
                 let browser = MenuItem::new("Open in browser")
+                    .icon("external-link")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);
                 if let Some(url) = &page {
@@ -341,6 +342,7 @@ impl RepoTab {
                 let here = crate::remote::openable_here(&self.path);
                 let why = here.as_ref().err().map(String::as_str);
                 if MenuItem::new(reveal_label())
+                    .icon("folder-open")
                     .refused(why)
                     .explained_below(true)
                     .show(ui)
@@ -349,6 +351,7 @@ impl RepoTab {
                     acts.push(Action::OpenPath(PathBuf::new()));
                 }
                 if MenuItem::new("Open in editor")
+                    .icon("code")
                     .refused(why)
                     .show(ui)
                     .clicked()

@@ -160,6 +160,7 @@ impl RepoTab {
         let below = same_reason_below(&refusals);
         for ((edit, refused), below) in Edit::ALL.into_iter().zip(&refusals).zip(below) {
             let button = MenuItem::new(edit.label())
+                .icon("wrench")
                 .enabled(idle)
                 .refused(refused.as_deref())
                 .explained_below(below)

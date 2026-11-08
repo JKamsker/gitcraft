@@ -142,18 +142,18 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         });
         env.actions.select = Some(i);
     }
-    egui::Popup::context_menu(&resp)
+    crate::menu_item::context(&resp)
         .style(theme::menu_style)
         .show(|ui| {
-            if MenuItem::new("Close tab")
-                .keys(Command::CloseTab)
+            if MenuItem::new("Close tab").icon("x")
+                .keys_when(Command::CloseTab, active)
                 .show(ui)
                 .on_hover_text("Or middle-click the tab")
                 .clicked()
             {
                 env.actions.close = Some(i);
             }
-            if MenuItem::new("Reopen closed tab")
+            if MenuItem::new("Reopen closed tab").icon("eye")
                 .keys(Command::ReopenTab)
                 .refused((!env.can_reopen).then_some("No tab closed yet"))
                 .show(ui)
@@ -163,8 +163,7 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
             }
             if let Tab::Repo(r) = tab {
                 ui.separator();
-                if ui
-                    .button("Teleport to…")
+                if crate::menu_item::MenuItem::new("Teleport to…").icon("command").show(ui)
                     .on_hover_text(
                         "Carry the branch and its uncommitted work to another machine, in a new worktree",
                     )

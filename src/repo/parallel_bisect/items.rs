@@ -18,8 +18,10 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let running = self.parallel.running();
-        let resp = ui
-            .add_enabled(!running, egui::Button::new("Bisect in parallel from here…"))
+        let resp = crate::menu_item::MenuItem::new("Bisect in parallel from here…")
+            .icon("command")
+            .refused(running.then_some(RUNNING))
+            .show(ui)
             .on_hover_text(
                 "Tests several commits at once, each in a worktree of its own (here, in WSL or \
                  over SSH), to find the first bad commit; the checkout isn't touched",

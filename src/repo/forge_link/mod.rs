@@ -53,15 +53,17 @@ impl LinkMenu {
                     one.remote, one.place
                 ),
             };
-            if ui
-                .button(format!("Copy link to {what}"))
+            if crate::menu_item::MenuItem::new(format!("Copy link to {what}"))
+                .icon("copy")
+                .show(ui)
                 .on_hover_text(&tip)
                 .clicked()
             {
                 acts.push(ask(&one.remote, false));
             }
-            if ui
-                .button(format!("Open {what} on {}", one.forge))
+            if crate::menu_item::MenuItem::new(format!("Open {what} on {}", one.forge))
+                .icon("external-link")
+                .show(ui)
                 .on_hover_text(&tip)
                 .clicked()
             {
@@ -75,20 +77,25 @@ impl LinkMenu {
             } else {
                 format!("Copy link to {what}")
             };
-            ui.menu_button(label, |ui| {
-                for c in &self.choices {
-                    let text = format!("{} ({})", c.remote, c.place);
-                    let tip = format!(
-                        "On {}. The branch tracks no remote and there is no origin: pick one",
-                        c.forge
-                    );
-                    let b = ui.button(text).on_hover_text(tip);
-                    if b.clicked() {
-                        acts.push(ask(&c.remote, open));
-                        ui.close();
+            crate::menu_item::MenuItem::new(label)
+                .icon("command")
+                .submenu(ui, |ui| {
+                    for c in &self.choices {
+                        let text = format!("{} ({})", c.remote, c.place);
+                        let tip = format!(
+                            "On {}. The branch tracks no remote and there is no origin: pick one",
+                            c.forge
+                        );
+                        let b = crate::menu_item::MenuItem::new(text)
+                            .icon("command")
+                            .show(ui)
+                            .on_hover_text(tip);
+                        if b.clicked() {
+                            acts.push(ask(&c.remote, open));
+                            ui.close();
+                        }
                     }
-                }
-            });
+                });
         }
     }
 }

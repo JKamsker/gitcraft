@@ -341,7 +341,7 @@ impl RepoTab {
         if resp.double_clicked() {
             acts.push(super::menu::create_branch(pick));
         }
-        egui::Popup::context_menu(resp)
+        crate::menu_item::context(resp)
             .style(theme::menu_style)
             .show(|ui| self.reflog_menu_items(ui, pick, acts));
     }
