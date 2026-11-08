@@ -98,11 +98,17 @@ impl App {
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(460.0);
-                ui.label(RichText::new("Clone repository").font(theme::semibold(15.0)));
+                ui.label(
+                    RichText::new(crate::i18n::text("interaction-forms-clone-title"))
+                        .font(theme::semibold(15.0)),
+                );
                 ui.add_space(10.0);
                 form_fields(ui, form, &t);
                 if let Some(err) = &form.error {
-                    ui.colored_label(t.danger, err);
+                    ui.colored_label(
+                        t.danger,
+                        display_message(err).unwrap_or_else(|| git::display_error(err)),
+                    );
                 }
                 ui.add_space(12.0);
                 let valid = !form.url.trim().is_empty()
@@ -110,13 +116,22 @@ impl App {
                     && !form.name.trim().is_empty();
                 ui.horizontal(|ui| {
                     let enter = ui.input(|i| i.key_pressed(Key::Enter));
-                    if crate::repo::primary_button(ui, "Clone", valid, 90.0).clicked()
+                    if crate::repo::primary_button(
+                        ui,
+                        crate::i18n::text("interaction-forms-clone"),
+                        valid,
+                        90.0,
+                    )
+                    .clicked()
                         || (enter && valid)
                     {
                         submit = true;
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text("interaction-forms-cancel"))
+                                .min_size(vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         cancel = true;
@@ -340,15 +355,27 @@ pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
         let cancelled = cloning.control.is_cancelled();
         let progress = cloning.control.progress();
         let text = match &progress {
-            _ if cancelled => format!("Cancelling the clone into {}…", cloning.dest.display()),
-            Some(p) => format!("Cloning into {}… {}", cloning.dest.display(), p.label()),
-            None => format!("Cloning into {}…", cloning.dest.display()),
+            _ if cancelled => crate::i18n::message(
+                "interaction-forms-cancel-progress",
+                &[("destination", cloning.dest.display().to_string().into())],
+            ),
+            Some(p) => crate::i18n::message(
+                "interaction-forms-clone-progress",
+                &[
+                    ("destination", cloning.dest.display().to_string().into()),
+                    ("progress", p.label().into()),
+                ],
+            ),
+            None => crate::i18n::message(
+                "interaction-forms-cloning",
+                &[("destination", cloning.dest.display().to_string().into())],
+            ),
         };
         ui.label(text);
         if !cancelled
             && ui
-                .button("Cancel")
-                .on_hover_text("Stop the clone and remove what it cloned so far")
+                .button(crate::i18n::text("interaction-forms-cancel"))
+                .on_hover_text(crate::i18n::text("interaction-forms-cancel-tip"))
                 .clicked()
         {
             cloning.control.cancel();
@@ -367,7 +394,11 @@ pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
 
 /// URL, folder and name, where that puts the clone, and the credentials once asked for.
 fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
-    ui.label(RichText::new("URL").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-url"))
+            .color(t.text_dim)
+            .small(),
+    );
     let url = ui.add(
         egui::TextEdit::singleline(&mut form.url)
             .hint_text("https://github.com/user/repo.git")
@@ -382,7 +413,11 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
         form.name = git::clone_dir_name(&form.url);
     }
     ui.add_space(6.0);
-    ui.label(RichText::new("Into folder").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-parent"))
+            .color(t.text_dim)
+            .small(),
+    );
     ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut form.parent)
@@ -390,15 +425,24 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
                 .margin(egui::Margin::symmetric(8, 6)),
         );
         if ui
-            .add(egui::Button::new("Browse…").min_size(vec2(80.0, 28.0)))
+            .add(
+                egui::Button::new(crate::i18n::text("interaction-forms-browse"))
+                    .min_size(vec2(80.0, 28.0)),
+            )
             .clicked()
-            && let Some(dir) = rfd::FileDialog::new().set_title("Clone into").pick_folder()
+            && let Some(dir) = rfd::FileDialog::new()
+                .set_title(crate::i18n::text("interaction-forms-clone-into"))
+                .pick_folder()
         {
             form.parent = dir.display().to_string();
         }
     });
     ui.add_space(6.0);
-    ui.label(RichText::new("Name").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-name"))
+            .color(t.text_dim)
+            .small(),
+    );
     if ui
         .add(
             egui::TextEdit::singleline(&mut form.name)
@@ -415,34 +459,48 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .color(t.text_faint)
             .small(),
     );
-    ui.collapsing("Clone options", |ui| {
-        ui.horizontal(|ui| { ui.label("Depth (empty = full history)"); ui.text_edit_singleline(&mut form.depth); });
-        ui.checkbox(&mut form.options.blobless, "Blobless: download file contents on demand");
-        let mut sparse = form.options.folders.is_some();
-        if ui.checkbox(&mut sparse, "Check out selected folders (cone mode)").changed() {
-            form.options.folders = sparse.then(Vec::new);
-        }
-        if sparse { ui.label("Repository-relative folders, one per line. Root files are always included."); ui.text_edit_multiline(&mut form.sparse_folders); }
-        ui.label("Clone downloads the selected checkout. Later history reads never download automatically; use Graph tools → Sparse checkout and downloads for consent. Passive object reads require Git with --no-lazy-fetch support.");
-    });
+    egui::CollapsingHeader::new(crate::i18n::text("interaction-forms-options"))
+        .id_salt("Clone options")
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::text("interaction-forms-depth"));
+                ui.text_edit_singleline(&mut form.depth);
+            });
+            ui.checkbox(
+                &mut form.options.blobless,
+                crate::i18n::text("interaction-forms-blobless"),
+            );
+            let mut sparse = form.options.folders.is_some();
+            if ui
+                .checkbox(&mut sparse, crate::i18n::text("interaction-forms-cone"))
+                .changed()
+            {
+                form.options.folders = sparse.then(Vec::new);
+            }
+            if sparse {
+                ui.label(crate::i18n::text("interaction-forms-folders"));
+                ui.text_edit_multiline(&mut form.sparse_folders);
+            }
+            ui.label(crate::i18n::text("interaction-forms-download-policy"));
+        });
     if form.auth {
         ui.add_space(6.0);
         ui.label(
-            RichText::new("The remote wants to know who you are. Most hosts take a personal access token as the password.")
+            RichText::new(crate::i18n::text("interaction-forms-credentials"))
                 .color(t.text_dim)
                 .small(),
         );
         ui.add_space(4.0);
         ui.add(
             egui::TextEdit::singleline(&mut form.username)
-                .hint_text("Username")
+                .hint_text(crate::i18n::text("interaction-forms-username"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
         ui.add(
             egui::TextEdit::singleline(&mut form.password)
                 .password(true)
-                .hint_text("Password or token")
+                .hint_text(crate::i18n::text("interaction-forms-password"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
@@ -453,4 +511,158 @@ fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
         .or_else(|| std::env::var_os("HOME"))
         .map(PathBuf::from)
+}
+
+/// Known clone presentation only; credential/error classification still reads the raw value.
+pub(super) fn display_message(raw: &str) -> Option<String> {
+    use crate::i18n::{message, text};
+    let id = match raw {
+        "Depth must be a positive number, or empty for full history" => {
+            Some("interaction-forms-depth-error")
+        }
+        "Those credentials were refused." => Some("interaction-forms-refused"),
+        "This repository needs you to sign in." => Some("interaction-forms-signin"),
+        _ => None,
+    };
+    if let Some(id) = id {
+        return Some(text(id).to_owned());
+    }
+    if let Some(destination) = raw
+        .strip_prefix("Wait for the clone into ")
+        .and_then(|s| s.strip_suffix(" to finish, or cancel it on the start page"))
+    {
+        return Some(message(
+            "interaction-forms-wait",
+            &[("destination", destination.into())],
+        ));
+    }
+    if let Some(destination) = raw.strip_suffix(" already exists and isn't empty") {
+        return Some(message(
+            "interaction-forms-occupied",
+            &[("destination", destination.into())],
+        ));
+    }
+    if let Some(destination) = raw
+        .strip_prefix("Clone into ")
+        .and_then(|s| s.strip_suffix(": cancelled"))
+    {
+        return Some(message(
+            "interaction-forms-cancelled",
+            &[("destination", destination.into())],
+        ));
+    }
+    raw.strip_prefix("Clone failed: ").map(|reason| {
+        message(
+            "interaction-forms-failed",
+            &[("reason", git::display_error(reason).into())],
+        )
+    })
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials() {
+        crate::i18n::set_language("de");
+        let form = CloneForm {
+            options: Default::default(),
+            depth: "0010".into(),
+            sparse_folders: "src/日本語\ndocs".into(),
+            url: "https://example.invalid/user/repo.git".into(),
+            parent: "/opaque/日本語".into(),
+            name: "repo".into(),
+            name_edited: true,
+            error: None,
+            focus: false,
+            auth: true,
+            username: "literal-user".into(),
+            password: "inert-secret".into(),
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, form: &mut CloneForm| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                form_fields(ui, form, &Tokens::get(ui.ctx()));
+            },
+            form,
+        );
+        h.run();
+        h.get_by_label("Im Ordner");
+        h.get_by_label("Klonoptionen").click();
+        h.run();
+        h.get_by_label("Ohne Blobs: Dateiinhalte bei Bedarf herunterladen")
+            .click();
+        h.run();
+        assert!(h.state().options.blobless);
+        h.get_by_label("Ausgewählte Ordner auschecken (Cone-Modus)")
+            .click();
+        h.run();
+        assert_eq!(h.state().options.folders, Some(vec![]));
+        h.get_by_label("Ordner relativ zum Repository, einer pro Zeile. Dateien im Stammverzeichnis sind immer enthalten.");
+        assert_eq!(h.state().url, "https://example.invalid/user/repo.git");
+        assert_eq!(h.state().parent, "/opaque/日本語");
+        assert_eq!(h.state().depth, "0010");
+        assert_eq!(h.state().sparse_folders, "src/日本語\ndocs");
+        assert_eq!(h.state().username, "literal-user");
+        assert_eq!(h.state().password, "inert-secret");
+        crate::i18n::set_language("en-US");
+        h.run();
+        // The same expanded section retains its original persistent identity across locale changes.
+        h.get_by_label("Depth (empty = full history)");
+        h.get_by_label("Check out selected folders (cone mode)");
+        assert!(h.state().options.blobless && h.state().options.folders.is_some());
+    }
+
+    #[test]
+    fn clone_messages_keep_raw_auth_and_cancellation_identities_and_opaque_details() {
+        crate::i18n::set_language("de");
+        for (raw, expected) in [
+            (
+                "Those credentials were refused.",
+                "Diese Zugangsdaten wurden abgelehnt.",
+            ),
+            (
+                "This repository needs you to sign in.",
+                "Für dieses Repository musst du dich anmelden.",
+            ),
+            (
+                "Depth must be a positive number, or empty for full history",
+                "Die Tiefe muss eine positive Zahl sein oder für die vollständige Historie leer bleiben",
+            ),
+            (
+                "Wait for the clone into /opaque/日本語 to finish, or cancel it on the start page",
+                "Warte, bis das Klonen nach /opaque/日本語 abgeschlossen ist, oder brich es auf der Startseite ab",
+            ),
+            (
+                "/opaque/日本語 already exists and isn't empty",
+                "/opaque/日本語 existiert bereits und ist nicht leer",
+            ),
+            (
+                "Clone into /opaque/日本語: cancelled",
+                "Klonen nach /opaque/日本語: abgebrochen",
+            ),
+            (
+                "Clone failed: External Git diagnostic 日本語",
+                "Klonen fehlgeschlagen: External Git diagnostic 日本語",
+            ),
+        ] {
+            assert_eq!(display_message(raw).as_deref(), Some(expected));
+        }
+        assert!(display_message("External Git diagnostic 日本語").is_none());
+        assert_eq!(
+            super::super::panels::display_app_message("External Git diagnostic 日本語"),
+            "External Git diagnostic 日本語"
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            display_message("Clone into /opaque/日本語: cancelled").as_deref(),
+            Some("Clone into /opaque/日本語: cancelled")
+        );
+    }
 }

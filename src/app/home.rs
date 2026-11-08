@@ -149,7 +149,7 @@ impl App {
                     // The card has git's words itself.
                     if let Some(err) = self.error.as_ref().filter(|_| self.error_card.is_none()) {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, err);
+                        ui.colored_label(t.danger, super::panels::display_app_message(err));
                     }
                     self.error_card_ui(ui);
                     if let Some(cloning) = &self.cloning {

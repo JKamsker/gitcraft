@@ -217,7 +217,7 @@ impl App {
                                     16.0,
                                     if toast.error { t.danger } else { t.success },
                                 );
-                                ui.add(egui::Label::new(&toast.text).wrap());
+                                ui.add(egui::Label::new(display_app_message(&toast.text)).wrap());
                             });
                         });
                     ui.add_space(6.0);
@@ -267,4 +267,11 @@ mod tests {
             assert!(body.contains("<a href"));
         }
     }
+}
+
+/// App-owned status/error paint; all classification and stored values remain raw.
+pub(super) fn display_app_message(raw: &str) -> String {
+    super::clone::display_message(raw)
+        .or_else(|| super::remote_open::display_message(raw))
+        .unwrap_or_else(|| crate::git::display_error(raw))
 }
