@@ -5810,9 +5810,119 @@ repo-workflows-surgery-why-whole-fa288625 = too long to pick lines from
 
 repo-workflows-surgery-why-whole-fcedacb9 = a submodule
 
+repo-workflows-test_lane--1238d9b6 = A pass / fail square by each commit for the test command; Test commits… fills it in
+
+repo-workflows-test_lane-dot-tip-10d4cd00 = { "\u000A" }A stored result (kept by tree in refs/notes/tests/default, shared with git-test); tested before this session, so there is no output to show
+
+repo-workflows-test_lane-dot-tip-3ebdbb8b = { "\u000A" }Click to see why
+
+repo-workflows-test_lane-dot-tip-4d352018 = Passed { $cmd }
+
+repo-workflows-test_lane-dot-tip-4db748be = Couldn't be tested
+
+repo-workflows-test_lane-dot-tip-5830cb10 = Waiting to be tested
+
+repo-workflows-test_lane-dot-tip-992c6c78 = Running { $cmd }…
+
+repo-workflows-test_lane-dot-tip-ad6afd6e = the test
+
+repo-workflows-test_lane-dot-tip-bc50fea6 = Failed { $cmd }
+
+repo-workflows-test_lane-dot-tip-c91f64ce = { "\u000A" }Click to see what it printed
+
+repo-workflows-test_lane-dot-tip-f9f1c77d = { $what } · tree { $short-tree-1 }{ $how }
+
+repo-workflows-test_lane-end-text-07f51b84 = Failed with exit code { $code }
+
+repo-workflows-test_lane-end-text-70fd8e5f = Failed: ended by a signal
+
+repo-workflows-test_lane-end-text-83ee6541 = Couldn't be tested: { $e }
+
+repo-workflows-test_lane-end-text-b971f3eb = Failed (a stored result)
+
+repo-workflows-test_lane-end-text-e1c45645 = Passed (exit code 0)
+
+repo-workflows-test_lane-ended-message-1516ec62 = { $s-bad-1 } failed
+
+repo-workflows-test_lane-ended-message-190f5f35 = { $s-failed-len-1 } couldn't be tested
+
+repo-workflows-test_lane-ended-message-49ed2846 = . Couldn't remove a scratch worktree: { $e }
+
+repo-workflows-test_lane-ended-message-7afdd0b0 = { " " }({ $s-known-1 } had a result already)
+
+repo-workflows-test_lane-ended-message-939ee5d9 = { $s-good-1 } passed
+
+repo-workflows-test_lane-ended-message-b4c579e3 = Couldn't test { $range }: { $e }
+
+repo-workflows-test_lane-progress-text-030be8be = { $run-running-len-1 } running
+
+repo-workflows-test_lane-progress-text-1516ec62 = { $run-bad-1 } failed
+
+repo-workflows-test_lane-progress-text-190f5f35 = { $run-failed-1 } couldn't be tested
+
+repo-workflows-test_lane-progress-text-1df05863 = { $done } of { $total } done
+
+repo-workflows-test_lane-progress-text-3142ee46 = listing the commits…
+
+repo-workflows-test_lane-progress-text-6a3a9451 = { $done } done
+
+repo-workflows-test_lane-progress-text-939ee5d9 = { $run-good-1 } passed
+
+repo-workflows-test_lane-progress-text-acf9e372 = Tested
+
+repo-workflows-test_lane-progress-text-cb2cef89 = { $verb } { $run-range-1 } with `{ $run-command-2 }`: { $parts-join-3 }
+
+repo-workflows-test_lane-progress-text-e806a291 = Testing
+
+repo-workflows-test_lane-progress-text-f3a06976 = Stopped testing
+
+repo-workflows-test_lane-read-test-lane-46a9cf6f = Couldn't read the test results: { $e }
+
+repo-workflows-test_lane-run-status-514e35e8 = Select the oldest commit that failed
+
+repo-workflows-test_lane-run-status-71902fb1 = First failure: { $short-commit-1 }
+
+repo-workflows-test_lane-run-status-8db20e37 = Couldn't test { $run-range-1 }: { $e }
+
+repo-workflows-test_lane-start-tests-4b88f5c5 = Type the command to test with
+
+repo-workflows-test_lane-start-tests-aa89f17f = Tests are running already: stop them first
+
+repo-workflows-test_lane-start-tests-da24c844 = Internal error: the test run stopped
+
+repo-workflows-test_lane-test-banner-195bb39a = Stops the tests: those that finished keep their result, those part way through are dropped
+
 repo-workflows-test_lane-test-banner-7d9eb7ac = Close
 
+repo-workflows-test_lane-test-banner-cae7d57b = Stop
+
+repo-workflows-test_lane-test-banner-e5c9d703 = Tests
+
+repo-workflows-test_lane-test-lane-header-9b3f6adb = Tests: `{ $command }` (test.default.command)
+    Click to test commits
+
+repo-workflows-test_lane-test-lane-header-f4c5a803 = Tests: no test command yet
+    Click to test commits with one
+
+repo-workflows-test_lane-test-menu-items-8bbd923c = Test commits up to here…
+
+repo-workflows-test_lane-test-menu-items-d589fd6f = Tests are running: stop them first
+
+repo-workflows-test_lane-test-menu-items-fff40573 = Runs a test command at each commit from the base branch to this one (just this one when it is on the base branch), in scratch worktrees, and shows a pass / fail square by each
+
+repo-workflows-test_lane-test-output-window-0e95604a = Its last { $crate-git-kept-lines-1 } lines:
+
+repo-workflows-test_lane-test-output-window-3dddddc9 = Test of { $short-kept-commit-1 }
+
+repo-workflows-test_lane-test-output-window-8497354d = It printed nothing.
+
 repo-workflows-test_lane-test-output-window-e21f935f = Copy
+
+repo-workflows-test_lane-test-palette-items-8e8e56f9 = Test commits…
+
+repo-workflows-test_lane-test-palette-items-a7530fc4 = tests test lane
+
+repo-workflows-test_lane-test-palette-items-e30e705a = Stop testing
 
 repo-workflows-timeline-close-button-7d9eb7ac = Close
 
@@ -6165,4 +6275,21 @@ repo-workflows-surgery-checked-absorb = Checked. Absorbing rewrites the branch f
     }; Ctrl+Z undoes it
 
 repo-workflows-surgery-binary-preview = (binary contents)
+
+repo-workflows-test-lane-ended-head = { $stopped ->
+        [yes] Testing { $range } stopped after { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        }
+       *[no] Tested { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        } of { $range }
+    }
+
+repo-workflows-test-lane-progress-head = { $state ->
+        [running] Testing { $range } with `{ $command }`: { $details }
+        [stopped] Stopped testing { $range } with `{ $command }`: { $details }
+       *[done] Tested { $range } with `{ $command }`: { $details }
+    }
 

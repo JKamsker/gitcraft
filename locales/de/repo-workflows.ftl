@@ -5810,9 +5810,119 @@ repo-workflows-surgery-why-whole-fa288625 = zu lang, um einzelne Zeilen auszuwä
 
 repo-workflows-surgery-why-whole-fcedacb9 = ein Submodul
 
+repo-workflows-test_lane--1238d9b6 = Ein Quadrat für bestanden/fehlgeschlagen neben jedem Commit für den Testbefehl; „Commits testen…“ füllt es aus
+
+repo-workflows-test_lane-dot-tip-10d4cd00 = { "\u000A" }Ein gespeichertes Ergebnis (nach Baum in refs/notes/tests/default gespeichert und mit git-test geteilt); vor dieser Sitzung getestet, daher ist keine Ausgabe verfügbar
+
+repo-workflows-test_lane-dot-tip-3ebdbb8b = { "\u000A" }Klicken, um die Ursache zu sehen
+
+repo-workflows-test_lane-dot-tip-4d352018 = { $cmd } bestanden
+
+repo-workflows-test_lane-dot-tip-4db748be = Konnte nicht getestet werden
+
+repo-workflows-test_lane-dot-tip-5830cb10 = Wartet auf Test
+
+repo-workflows-test_lane-dot-tip-992c6c78 = { $cmd } läuft…
+
+repo-workflows-test_lane-dot-tip-ad6afd6e = den Test
+
+repo-workflows-test_lane-dot-tip-bc50fea6 = { $cmd } fehlgeschlagen
+
+repo-workflows-test_lane-dot-tip-c91f64ce = { "\u000A" }Klicken, um die Ausgabe zu sehen
+
+repo-workflows-test_lane-dot-tip-f9f1c77d = { $what } · Baum { $short-tree-1 }{ $how }
+
+repo-workflows-test_lane-end-text-07f51b84 = Fehlgeschlagen mit Exit-Code { $code }
+
+repo-workflows-test_lane-end-text-70fd8e5f = Fehlgeschlagen: durch ein Signal beendet
+
+repo-workflows-test_lane-end-text-83ee6541 = Konnte nicht getestet werden: { $e }
+
+repo-workflows-test_lane-end-text-b971f3eb = Fehlgeschlagen (gespeichertes Ergebnis)
+
+repo-workflows-test_lane-end-text-e1c45645 = Bestanden (Exit-Code 0)
+
+repo-workflows-test_lane-ended-message-1516ec62 = { $s-bad-1 } fehlgeschlagen
+
+repo-workflows-test_lane-ended-message-190f5f35 = { $s-failed-len-1 } konnten nicht getestet werden
+
+repo-workflows-test_lane-ended-message-49ed2846 = . Ein temporäres Arbeitsverzeichnis konnte nicht entfernt werden: { $e }
+
+repo-workflows-test_lane-ended-message-7afdd0b0 = { " " }({ $s-known-1 } hatten bereits ein Ergebnis)
+
+repo-workflows-test_lane-ended-message-939ee5d9 = { $s-good-1 } bestanden
+
+repo-workflows-test_lane-ended-message-b4c579e3 = { $range } konnte nicht getestet werden: { $e }
+
+repo-workflows-test_lane-progress-text-030be8be = { $run-running-len-1 } laufen
+
+repo-workflows-test_lane-progress-text-1516ec62 = { $run-bad-1 } fehlgeschlagen
+
+repo-workflows-test_lane-progress-text-190f5f35 = { $run-failed-1 } konnten nicht getestet werden
+
+repo-workflows-test_lane-progress-text-1df05863 = { $done } von { $total } abgeschlossen
+
+repo-workflows-test_lane-progress-text-3142ee46 = Commits werden aufgelistet…
+
+repo-workflows-test_lane-progress-text-6a3a9451 = { $done } abgeschlossen
+
+repo-workflows-test_lane-progress-text-939ee5d9 = { $run-good-1 } bestanden
+
+repo-workflows-test_lane-progress-text-acf9e372 = Getestet:
+
+repo-workflows-test_lane-progress-text-cb2cef89 = { $verb } { $run-range-1 } mit `{ $run-command-2 }`: { $parts-join-3 }
+
+repo-workflows-test_lane-progress-text-e806a291 = Testen von
+
+repo-workflows-test_lane-progress-text-f3a06976 = Testen gestoppt für
+
+repo-workflows-test_lane-read-test-lane-46a9cf6f = Testergebnisse konnten nicht gelesen werden: { $e }
+
+repo-workflows-test_lane-run-status-514e35e8 = Den ältesten fehlgeschlagenen Commit auswählen
+
+repo-workflows-test_lane-run-status-71902fb1 = Erster Fehler: { $short-commit-1 }
+
+repo-workflows-test_lane-run-status-8db20e37 = { $run-range-1 } konnte nicht getestet werden: { $e }
+
+repo-workflows-test_lane-start-tests-4b88f5c5 = Geben Sie den Testbefehl ein
+
+repo-workflows-test_lane-start-tests-aa89f17f = Tests laufen bereits: zunächst stoppen
+
+repo-workflows-test_lane-start-tests-da24c844 = Interner Fehler: Der Testlauf wurde angehalten
+
+repo-workflows-test_lane-test-banner-195bb39a = Tests stoppen: Abgeschlossene Tests behalten ihr Ergebnis; noch laufende Tests werden verworfen
+
 repo-workflows-test_lane-test-banner-7d9eb7ac = Schließen
 
+repo-workflows-test_lane-test-banner-cae7d57b = Stoppen
+
+repo-workflows-test_lane-test-banner-e5c9d703 = Tests
+
+repo-workflows-test_lane-test-lane-header-9b3f6adb = Tests: `{ $command }` (test.default.command)
+    Klicken, um Commits zu testen
+
+repo-workflows-test_lane-test-lane-header-f4c5a803 = Tests: noch kein Testbefehl
+    Klicken, um Commits mit einem Befehl zu testen
+
+repo-workflows-test_lane-test-menu-items-8bbd923c = Commits bis hierher testen…
+
+repo-workflows-test_lane-test-menu-items-d589fd6f = Tests laufen: zunächst stoppen
+
+repo-workflows-test_lane-test-menu-items-fff40573 = Führt einen Testbefehl für jeden Commit vom Basis-Branch bis zu diesem aus (nur für diesen, wenn er auf dem Basis-Branch liegt), in temporären Arbeitsverzeichnissen. Zeigt neben jedem Commit ein Quadrat für bestanden/fehlgeschlagen an.
+
+repo-workflows-test_lane-test-output-window-0e95604a = Die letzten { $crate-git-kept-lines-1 } Ausgabezeilen:
+
+repo-workflows-test_lane-test-output-window-3dddddc9 = Test von { $short-kept-commit-1 }
+
+repo-workflows-test_lane-test-output-window-8497354d = Keine Ausgabe.
+
 repo-workflows-test_lane-test-output-window-e21f935f = Kopieren
+
+repo-workflows-test_lane-test-palette-items-8e8e56f9 = Commits testen…
+
+repo-workflows-test_lane-test-palette-items-a7530fc4 = tests teststrecke
+
+repo-workflows-test_lane-test-palette-items-e30e705a = Testen stoppen
 
 repo-workflows-timeline-close-button-7d9eb7ac = Schließen
 
@@ -6163,4 +6273,21 @@ repo-workflows-surgery-checked-absorb = Geprüft. Das Einarbeiten schreibt den B
     } Strg+Z macht dies rückgängig.
 
 repo-workflows-surgery-binary-preview = (Binärinhalt)
+
+repo-workflows-test-lane-ended-head = { $stopped ->
+        [yes] Testen von { $range } nach { $count ->
+            [one] einem Commit
+           *[other] { $count } Commits
+        } gestoppt
+       *[no] { $count ->
+            [one] Ein Commit
+           *[other] { $count } Commits
+        } von { $range } getestet
+    }
+
+repo-workflows-test-lane-progress-head = { $state ->
+        [running] Tests für { $range } mit `{ $command }`: { $details }
+        [stopped] Tests für { $range } mit `{ $command }` gestoppt: { $details }
+       *[done] { $range } mit `{ $command }` getestet: { $details }
+    }
 
