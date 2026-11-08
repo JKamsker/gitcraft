@@ -1,4 +1,12 @@
+mod deferred;
+mod lists;
+mod receipts;
+pub(super) use deferred::Cache as DeferredCache;
+mod outbox;
 mod sharing;
+mod subtrees;
+mod turns;
+mod virtuals;
 use crate::git::repository_tools::sharing as borrowing;
 mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
@@ -17,6 +25,8 @@ use crate::git::repository_tools::{
 use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tool {
+    StateReceipts,
+    Subtrees,
     Refs,
     Object,
     Reftable,
@@ -28,10 +38,68 @@ enum Tool {
     SubmoduleConflict,
     Dependencies,
     Sharing,
+    Outbox,
+    Turn,
+    AggregateTurn,
+    Lists,
+    Virtuals,
+    Deferred,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    StateReceipts,
+    Subtrees(String),
+    SubtreeJob(
+        Box<crate::git::repository_tools::subtrees::View>,
+        subtrees::Job,
+    ),
+    SubtreePreparePush(
+        Box<crate::git::repository_tools::subtrees::View>,
+        String,
+        bool,
+    ),
+    SubtreeSend(Box<crate::git::repository_tools::subtrees::Prepared>),
+    Deferred,
+    IsolatedStack(Vec<crate::git::stack::restack::Preview>),
+    StartDeferred(
+        Box<crate::git::drafts::deferred::View>,
+        String,
+        Vec<crate::git::drafts::deferred::Spec>,
+    ),
+    ContinueDeferred(Box<crate::git::drafts::deferred::View>, String),
+    AcceptDeferred(Box<crate::git::drafts::deferred::View>, String, bool),
+    CloseDeferred(Box<crate::git::drafts::deferred::View>, String),
+    ReconcileDeferred(Box<crate::git::drafts::deferred::View>, String),
+    Virtuals,
+    EditVirtual(
+        Box<crate::git::drafts::virtuals::View>,
+        crate::git::drafts::virtuals::Edit,
+    ),
+    ToggleVirtual(Box<crate::git::drafts::virtuals::View>, String),
+    UndoVirtual(Box<crate::git::drafts::virtuals::View>),
+    PrepareVirtual(Box<crate::git::drafts::virtuals::View>, String),
+    CommitVirtual(Box<crate::git::drafts::virtuals::Prepared>),
+    Lists,
+    EditList(
+        Box<crate::git::drafts::lists::View>,
+        crate::git::drafts::lists::Edit,
+    ),
+    CommitList(Box<crate::git::drafts::lists::View>, String),
+    ShelveList(Box<crate::git::drafts::lists::View>, String, bool),
+    Turn(String, String, String),
+    AggregateTurn(String, String),
+    FinishAggregate(Box<crate::git::drafts::turn::Review>),
+    MarkTurn(Box<crate::git::drafts::turn::Review>, Vec<usize>),
+    PreviewInverse(Box<crate::git::drafts::turn::Review>),
+    RevertTurn(Box<crate::git::drafts::turn::Inverse>),
+    Outbox,
+    QueuePush(Box<crate::git::repository_tools::outbox::View>, bool),
+    PrepareOutbox(String),
+    ReviewOutbox(String),
+    SendOutbox(Box<crate::git::repository_tools::outbox::Prepared>),
+    AutoOutbox(String),
+    RemoveOutbox(Box<crate::git::repository_tools::outbox::View>, String),
     Sharing,
     MakeIndependent(Box<borrowing::Plan>),
     AllRefs(String),
@@ -61,6 +129,21 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Subtrees(crate::git::repository_tools::subtrees::View),
+    SubtreePush(Box<crate::git::repository_tools::subtrees::Prepared>),
+    StateReceipts(Vec<crate::git::drafts::publication::Report>),
+    Deferred(crate::git::drafts::deferred::View),
+    DeferredStack(
+        crate::git::drafts::deferred::View,
+        Vec<crate::git::drafts::deferred::Spec>,
+    ),
+    Virtual(crate::git::drafts::virtuals::View),
+    VirtualCommit(Box<crate::git::drafts::virtuals::Prepared>),
+    Lists(crate::git::drafts::lists::View),
+    Turn(crate::git::drafts::turn::Review),
+    Inverse(Box<crate::git::drafts::turn::Inverse>),
+    Outbox(crate::git::repository_tools::outbox::View),
+    PreparedOutbox(Box<crate::git::repository_tools::outbox::Prepared>),
     Sharing(borrowing::Sharing),
     Refs(all_refs::Browser),
     Object(object::Inspection),
@@ -86,6 +169,30 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match subtrees::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
+        let act = match deferred::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
+        let act = match virtuals::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
+        let act = match lists::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
+        let act = match turns::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
+        let act = match outbox::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match act {
             Act::MakeIndependent(plan) => {
                 self.repository_tool_mutation(
@@ -193,6 +300,39 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::StateReceipts => (String::new(), Tool::StateReceipts),
+            Act::Subtrees(q) => (q, Tool::Subtrees),
+            Act::SubtreeJob(..) | Act::SubtreePreparePush(..) | Act::SubtreeSend(..) => return,
+            Act::Deferred => (String::new(), Tool::Deferred),
+            Act::IsolatedStack(..)
+            | Act::StartDeferred(..)
+            | Act::ContinueDeferred(..)
+            | Act::AcceptDeferred(..)
+            | Act::CloseDeferred(..)
+            | Act::ReconcileDeferred(..) => return,
+            Act::Virtuals => (String::new(), Tool::Virtuals),
+            Act::EditVirtual(..)
+            | Act::ToggleVirtual(..)
+            | Act::UndoVirtual(..)
+            | Act::PrepareVirtual(..)
+            | Act::CommitVirtual(..) => return,
+            Act::Lists => (String::new(), Tool::Lists),
+            Act::EditList(..) | Act::CommitList(..) | Act::ShelveList(..) => return,
+            Act::AggregateTurn(session, endpoint) => {
+                (format!("{endpoint}\0{session}"), Tool::AggregateTurn)
+            }
+            Act::FinishAggregate(..) => return,
+            Act::Turn(parent, turn, session) => {
+                (format!("{parent}\0{turn}\0{session}"), Tool::Turn)
+            }
+            Act::MarkTurn(..) | Act::PreviewInverse(..) | Act::RevertTurn(..) => return,
+            Act::Outbox => (String::new(), Tool::Outbox),
+            Act::ReviewOutbox(..)
+            | Act::QueuePush(..)
+            | Act::PrepareOutbox(..)
+            | Act::SendOutbox(..)
+            | Act::RemoveOutbox(..)
+            | Act::AutoOutbox(..) => return,
             Act::Sharing => (String::new(), Tool::Sharing),
             Act::MakeIndependent(..) => return,
             Act::AllRefs(q) => (q, Tool::Refs),
@@ -236,10 +376,49 @@ impl RepoTab {
             false,
             Err,
             move || match tool {
+                Tool::Subtrees => {
+                    crate::git::repository_tools::subtrees::read(&path, &query).map(Data::Subtrees)
+                }
+                Tool::StateReceipts => crate::git::drafts::publication::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::StateReceipts),
                 Tool::Object => object::inspect(&path, &query, &|| {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Deferred => crate::git::drafts::deferred::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Deferred),
+                Tool::Virtuals => crate::git::drafts::virtuals::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Virtual),
+                Tool::Lists => crate::git::drafts::lists::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Lists),
+                Tool::AggregateTurn => {
+                    let (endpoint, session) = query
+                        .split_once('\0')
+                        .ok_or("Missing aggregate endpoint/session")?;
+                    crate::git::drafts::turn::aggregate_review(&path, session, endpoint, &|| {
+                        !crate::tasks::cancellation().is_cancelled()
+                    })
+                    .map(Data::Turn)
+                }
+                Tool::Turn => {
+                    let parts = query.splitn(3, '\0').collect::<Vec<_>>();
+                    if parts.len() != 3 {
+                        return Err("Missing saved turn".into());
+                    }
+                    crate::git::drafts::turn::review(&path, parts[0], parts[1], parts[2], &|| {
+                        !crate::tasks::cancellation().is_cancelled()
+                    })
+                    .map(Data::Turn)
+                }
+                Tool::Outbox => crate::git::repository_tools::outbox::read(&path).map(Data::Outbox),
                 Tool::Sharing => borrowing::inspect(&path).map(Data::Sharing),
                 Tool::Refs => all_refs::read(&path, &query).map(Data::Refs),
                 Tool::Reftable => reftable::inspect(&path).map(Data::Reftable),
@@ -263,6 +442,12 @@ impl RepoTab {
                 if let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
                     && state.id == id
                 {
+                    if let Ok(Data::Deferred(view)) = &result {
+                        tab.deferred.observe(id, view);
+                    }
+                    if state.tool == Tool::Subtrees {
+                        state.query.clear();
+                    }
                     state.result = Some(result);
                 }
             },
@@ -330,6 +515,34 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Subtrees {
+        subtrees::show(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::StateReceipts {
+        receipts::show(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Deferred {
+        deferred::show(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Virtuals {
+        virtuals::show(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Lists {
+        lists::show(ui, state, acts);
+        return;
+    }
+    if matches!(state.tool, Tool::Turn | Tool::AggregateTurn) {
+        turns::show(ui, state, acts);
+        return;
+    }
+    if state.tool == Tool::Outbox {
+        outbox::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Sharing {
         sharing::show(ui, state, acts);
         return;

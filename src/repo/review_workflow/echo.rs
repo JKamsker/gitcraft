@@ -53,7 +53,11 @@ pub(crate) struct State {
     checking_push: bool,
     active_source: Option<std::sync::Arc<git::CommandSource>>,
 }
+type Continuation = Box<
+    dyn FnOnce(&mut RepoTab, Option<std::sync::Arc<git::CommandSource>>, &egui::Context) + Send,
+>;
 struct Waiting {
+    continuation: Option<Continuation>,
     op: PendingOp,
     stamp: String,
     source: Option<std::sync::Arc<git::CommandSource>>,
@@ -330,6 +334,86 @@ impl RepoTab {
         op: PendingOp,
         ctx: &egui::Context,
     ) -> bool {
+        self.echo_before_operation_with(op, ctx, &mut None)
+    }
+    /// Exact-plan feature sends retain their own durable receipt handling. Preflight
+    /// findings/consent belong to the caller; this gates its continuation on the same
+    /// personal rulebook and source guard as ordinary APPROVED operations.
+    pub(crate) fn reviewed_send(
+        &mut self,
+        plan: &crate::push_preflight::Plan,
+        ctx: &egui::Context,
+        send: impl FnOnce(&mut RepoTab, crate::push_preflight::ReviewedSend, &egui::Context)
+        + Send
+        + 'static,
+    ) {
+        if self.is_busy() || self.echo_push_pending() {
+            self.status = Some((
+                "Wait for the current operation or reviewer echo before sending".into(),
+                true,
+            ));
+            return;
+        }
+        if Settings::get(ctx).profile() != plan.profile {
+            self.status = Some((
+                "The prepared profile or identity policy changed; reopen push preflight".into(),
+                true,
+            ));
+            return;
+        }
+        let original = match crate::push_preflight::push_args(plan) {
+            Ok(args) => args,
+            Err(error) => {
+                self.status = Some((error, true));
+                return;
+            }
+        };
+        let (path, profile, context, generation) = (
+            self.path.clone(),
+            Settings::get(ctx).profile(),
+            crate::connections::current(),
+            self.https_generation,
+        );
+        let mut continuation: Option<Continuation> = Some(Box::new(move |tab, source, ctx| {
+            if tab.path != path
+                || Settings::get(ctx).profile() != profile
+                || crate::connections::current() != context
+                || tab.connection_context != context
+                || tab.https_generation != generation
+            {
+                tab.status = Some((
+                    "Reviewed send profile, sign-in or repository changed; prepare again".into(),
+                    true,
+                ));
+                return;
+            }
+            send(
+                tab,
+                crate::push_preflight::ReviewedSend::from_echo(original, source),
+                ctx,
+            );
+        }));
+        let intercepted = self.echo_before_operation_with(
+            PendingOp {
+                label: "Send reviewed exact commit".into(),
+                ops: crate::push_preflight::approved_ops(plan.clone()),
+                refresh: crate::repo::Refresh::All,
+                kind: crate::repo::OpKind::plain(),
+                quiet: false,
+            },
+            ctx,
+            &mut continuation,
+        );
+        if !intercepted && let Some(send) = continuation.take() {
+            send(self, None, ctx);
+        }
+    }
+    fn echo_before_operation_with(
+        &mut self,
+        op: PendingOp,
+        ctx: &egui::Context,
+        continuation: &mut Option<Continuation>,
+    ) -> bool {
         if !echo_push::contains_push(&op.ops) {
             return false;
         }
@@ -368,6 +452,7 @@ impl RepoTab {
             return true;
         }
         let repo = self.path.clone();
+        let continuation = continuation.take();
         self.review_tools.echo.checking_push = true;
         self.then_or(ctx,false,Err,move|| {
             let before=push_stamp(&repo)?;
@@ -387,7 +472,7 @@ impl RepoTab {
                     Ok(())
                 })?;
             }
-            Ok((Waiting{op,stamp:before,source},book,result))
+            Ok((Waiting{op,stamp:before,source,continuation},book,result))
         },|tab,result,ctx|{
             tab.review_tools.echo.checking_push=false;
             match result {
@@ -419,6 +504,10 @@ impl RepoTab {
             tab.review_tools.echo.checking_push=false;
             match result {
                 Ok(waiting)=>{
+                    if let Some(send) = waiting.continuation {
+                        send(tab, waiting.source, ctx);
+                        return;
+                    }
                     let op = waiting.op;
                     // Retain the context through execution and sign-in retry. A new push
                     // replaces last_op and this owner together; expired markers refuse.

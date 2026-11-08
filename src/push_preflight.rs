@@ -28,6 +28,7 @@ pub(crate) enum Kind {
     Secret,
     Large,
     RemoteHistory,
+    Transcript,
 }
 
 #[derive(Clone, Debug)]
@@ -178,6 +179,7 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
                 "-u" | "--set-upstream" => tracking = true,
                 "-f" | "--force" | "--force-with-lease" => force = true,
                 "--no-follow-tags" | "--porcelain" | "--no-verify" => {},
+                "--recurse-submodules=check" => extras.push(word.clone()),
                 "--delete" | "-d" => deleting = true,
                 _ if word.starts_with("--force-with-lease=") => force = true,
                 _ if word.starts_with("--push-option=") => extras.push(word.clone()),
@@ -676,6 +678,44 @@ pub(crate) fn scan(
         || config(repo, "commit.gpgSign", active)?.eq_ignore_ascii_case("true");
     let mut commits = Vec::new();
     let mut findings = Vec::new();
+    if !deleting {
+        let names = read(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+                "refs/heads/entire/checkpoints/",
+                "refs/entire/checkpoints/",
+                "refs/gitcraft/agent/",
+            ],
+            active,
+        )?;
+        if names.len() > 1024 * 1024 {
+            return Err(
+                "Checkpoint reference list exceeds 1 MiB; narrow publication before pushing".into(),
+            );
+        }
+        if let Some(detail) = crate::git::prompt_session::entire_automatic_publication(
+            repo, &names, skip_hooks, active,
+        )? {
+            findings.push(Finding {
+                kind: Kind::Transcript,
+                commit: push_oid.clone(),
+                path: String::new(),
+                detail: detail.into(),
+            });
+        }
+        if crate::git::prompt_session::checkpoint_publication(
+            &source,
+            &destination,
+            &push_oid,
+            &head,
+            &names,
+        ) {
+            findings.push(Finding { kind: Kind::Transcript, commit: push_oid.clone(), path: String::new(), detail: "Checkpoint publication may disclose prompts, local paths, assistant summaries and tool activity. This exact object or route contains agent checkpoint history. Review its contents and recipients explicitly before sending; local prompt/session viewing itself never publishes transcripts.".into() });
+        }
+    }
+
     if !deleting && push_oid != head {
         let tag = read(repo, &["cat-file", "tag", &push_oid], active)?;
         if secret_lines(tag.split_once("\n\n").map_or("", |x| x.1))
@@ -1267,7 +1307,15 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
         "push".into(),
         "--porcelain".into(),
         "--no-follow-tags".into(),
-        "--recurse-submodules=no".into(),
+        if plan
+            .extras
+            .iter()
+            .any(|s| s == "--recurse-submodules=check")
+        {
+            "--recurse-submodules=check".into()
+        } else {
+            "--recurse-submodules=no".into()
+        },
     ];
     if !plan.destination.starts_with("refs/for/") {
         if !plan.deleting
@@ -1284,7 +1332,12 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
             plan.base.as_deref().unwrap_or_default()
         ));
     }
-    args.extend(plan.extras.clone());
+    args.extend(
+        plan.extras
+            .iter()
+            .filter(|s| s.as_str() != "--recurse-submodules=check")
+            .cloned(),
+    );
     args.extend([
         "--".into(),
         plan.remote.clone(),
@@ -1319,6 +1372,60 @@ pub(crate) fn execute(
 ) -> Result<String, String> {
     execute_controlled(repo, plan, creds, None)
 }
+/// Source evidence returned by RepoTab::reviewed_send after the user's personal
+/// rulebook gate. It is bound to the exact preflight argv, never a generic approval.
+#[derive(Clone)]
+pub(crate) struct ReviewedSend {
+    original: Vec<String>,
+    source: Option<Arc<git::CommandSource>>,
+}
+impl ReviewedSend {
+    pub(crate) fn from_echo(
+        original: Vec<String>,
+        source: Option<Arc<git::CommandSource>>,
+    ) -> Self {
+        Self { original, source }
+    }
+    pub(crate) fn check_plan(&self, plan: &Plan) -> Result<(), String> {
+        if self.original != push_args(plan)? {
+            return Err("Reviewer echo belongs to a different exact push; prepare again".into());
+        }
+        Ok(())
+    }
+}
+/// Execute only after caller preflight/consent and RepoTab::reviewed_send. Retain
+/// original-route typed auth receipts and repeat route/source proof per endpoint.
+pub(crate) fn execute_bound_controlled(
+    repo: &Path,
+    plan: &Plan,
+    reviewed: &ReviewedSend,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    reviewed.check_plan(plan)?;
+    let captured = std::cell::RefCell::new(None);
+    crate::repo::run_reviewed_push(
+        &reviewed.original,
+        |args| {
+            let binding = git::RouteBinding::capture(repo, args)?;
+            captured.replace(Some(binding.clone()));
+            Ok(binding)
+        },
+        || {
+            let route = captured.borrow();
+            let route = route.as_ref().ok_or("Reviewed route was not captured")?;
+            execute_controlled_with_guard(repo, plan, creds, control, || {
+                route.verify(repo)?;
+                if let Some(source) = &reviewed.source {
+                    source.check_execution()?;
+                }
+                Ok(())
+            })
+        },
+        control,
+    )
+}
+
 pub(crate) fn execute_controlled(
     repo: &Path,
     plan: &Plan,
@@ -1627,3 +1734,9 @@ pub(crate) mod selected_continuation_recording {
         Ok(())
     }
 }
+/// Credential-free routing/identity stamp for durable outbox endpoint identity.
+pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
+    config_stamp(repo, &|| !crate::tasks::cancellation().is_cancelled())
+}
+
+pub(crate) use fix::accept_rewrite;

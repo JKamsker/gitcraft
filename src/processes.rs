@@ -20,21 +20,31 @@ const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
 const POLL: Duration = Duration::from_millis(20);
 
+pub(crate) type Filter = Box<dyn FnMut(&[u8]) -> Vec<u8> + Send>;
 pub(crate) type Chunk = Box<dyn FnMut(&[u8]) + Send>;
 pub(crate) struct Options {
+    /// Only the packaged native endpoint uses direct-child controller ownership.
+    pub native_controller: bool,
     pub input: Option<Vec<u8>>,
+    /// Keep the control channel open after flushing a remote request.
+    pub hold_input: bool,
     pub background: bool,
     pub timeout: Option<Duration>,
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stderr: Option<Chunk>,
+    pub stderr_filter: Option<Filter>,
     pub stdout: Option<Chunk>,
     pub ready: Option<Box<dyn FnOnce() + Send>>,
     /// Stream stdout directly to a file instead of capturing it in memory.
     pub stdout_file: Option<std::fs::File>,
     /// Cleanup on the other machine, before returning a cancelled/timed-out operation.
     /// This is a blocking protocol API, isolated from the I/O loop on bounded workers.
-    pub stop_remote: Option<Box<dyn FnOnce() + Send>>,
+    pub stop_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
+    /// Best-effort removal of private artifacts, authenticated by a terminal receipt.
+    pub retire_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
+    /// Require delivery proof independently of target cleanup before reporting success.
+    pub complete_remote: Option<Box<dyn FnOnce() -> Result<(), String> + Send>>,
     pub stop_ready: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stdout_ready: Option<&'static str>,
     pub output_limit: usize,
@@ -45,16 +55,21 @@ pub(crate) struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            native_controller: false,
             input: None,
+            hold_input: false,
             background: false,
             timeout: None,
             cancel: crate::tasks::cancellation(),
             cancelled: None,
             stderr: None,
+            stderr_filter: None,
             stdout: None,
             ready: None,
             stdout_file: None,
             stop_remote: None,
+            retire_remote: None,
+            complete_remote: None,
             stop_ready: None,
             stdout_ready: None,
             output_limit: OUTPUT_LIMIT,
@@ -70,6 +85,185 @@ pub(crate) struct Output {
     pub stderr: Vec<u8>,
     /// Partial output is retained on cancellation, timeout, I/O failure or overflow.
     pub stopped: Option<String>,
+    pub stop_kind: Option<StopKind>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StopKind {
+    Cancelled,
+    TimedOut,
+    Failed,
+    Uncertain,
+}
+fn stop_kind(reason: Option<&str>, confirmed: bool) -> Option<StopKind> {
+    reason.map(|reason| {
+        if !confirmed {
+            StopKind::Uncertain
+        } else {
+            match reason {
+                "cancelled" => StopKind::Cancelled,
+                "process timed out and was stopped" => StopKind::TimedOut,
+                _ => StopKind::Failed,
+            }
+        }
+    })
+}
+fn record_stop_confirmation(
+    stopped: &mut Option<String>,
+    confirmed: &mut bool,
+    result: Result<(), String>,
+) {
+    match result {
+        Ok(()) => *confirmed = true,
+        Err(why) => {
+            *confirmed = false;
+            *stopped = Some(format!(
+                "{}; remote cleanup unconfirmed: {why}",
+                stopped.as_deref().unwrap_or("cleanup failed")
+            ));
+        }
+    }
+}
+#[cfg(test)]
+mod recording_outcomes {
+    use super::*;
+    #[test]
+    fn shared_predispatch_guard_keeps_ancestor_cancellation_sticky() -> Result<(), String> {
+        let lease = Cancellation::default();
+        let target = lease.child();
+        assert_eq!(before_start(target.is_cancelled(), false), None);
+        lease.cancel();
+        for _ in 0..3 {
+            assert_eq!(
+                before_start(target.is_cancelled(), false),
+                Some("cancelled")
+            );
+        }
+        assert!(matches!(
+            checked(Err(before_start(target.is_cancelled(), false)
+                .ok_or("missing sticky cancellation")?
+                .into())),
+            Err(Failure::CancelledBeforeStart)
+        ));
+        assert_eq!(
+            before_start(false, true),
+            Some("process timed out and was stopped")
+        );
+        Ok(())
+    }
+    #[test]
+    fn failed_ack_or_unavailable_cleanup_worker_always_surfaces_uncertainty() {
+        for why in ["capacity closed", "worker lost", "wrong receipt"] {
+            let mut stopped = Some("cancelled".into());
+            let mut confirmed = true;
+            record_stop_confirmation(&mut stopped, &mut confirmed, Err(why.into()));
+            assert_eq!(
+                stop_kind(stopped.as_deref(), confirmed),
+                Some(StopKind::Uncertain)
+            );
+            assert!(
+                stopped
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("cleanup unconfirmed")
+            );
+        }
+        let mut stopped = Some("cancelled".into());
+        let mut confirmed = false;
+        record_stop_confirmation(&mut stopped, &mut confirmed, Ok(()));
+        assert_eq!(
+            stop_kind(stopped.as_deref(), confirmed),
+            Some(StopKind::Cancelled)
+        );
+    }
+    #[test]
+    fn cancellation_requires_no_dispatch_or_confirmed_cleanup() {
+        assert!(matches!(
+            checked(Err("cancelled".into())),
+            Err(Failure::CancelledBeforeStart)
+        ));
+        assert!(matches!(
+            checked(Err("process timed out and was stopped".into())),
+            Err(Failure::TimedOutBeforeStart)
+        ));
+        assert!(matches!(
+            checked(Err("could not finish owned process".into())),
+            Err(Failure::Failed(_))
+        ));
+        assert!(matches!(
+            checked(Err(
+                "Process service stopped before returning a result".into()
+            )),
+            Err(Failure::Failed(_))
+        ));
+        assert_eq!(
+            stop_kind(Some("cancelled"), false),
+            Some(StopKind::Uncertain)
+        );
+        assert_eq!(
+            stop_kind(Some("cancelled"), true),
+            Some(StopKind::Cancelled)
+        );
+        assert_eq!(
+            stop_kind(Some("output delivery incomplete"), false),
+            Some(StopKind::Uncertain)
+        );
+    }
+}
+#[derive(Debug)]
+pub(crate) enum Failure {
+    CancelledBeforeStart,
+    TimedOutBeforeStart,
+    Failed(String),
+}
+impl Failure {
+    pub(crate) fn message(self) -> String {
+        match self {
+            Self::CancelledBeforeStart => "cancelled before execution".into(),
+            Self::TimedOutBeforeStart => "timed out before execution".into(),
+            Self::Failed(message) => message,
+        }
+    }
+}
+pub(crate) fn checked(result: ResultOutput) -> Result<Output, Failure> {
+    // These exact Err values originate only before Service dispatch. Dispatched stop or
+    // timeout returns Output with typed stop_kind; arbitrary cleanup errors stay failures.
+    result.map_err(|message| {
+        if message == "cancelled" {
+            Failure::CancelledBeforeStart
+        } else if message == "process timed out and was stopped" {
+            Failure::TimedOutBeforeStart
+        } else {
+            Failure::Failed(message)
+        }
+    })
+}
+#[cfg(test)]
+pub(crate) fn recording_output(kind: Option<StopKind>) -> Output {
+    #[cfg(unix)]
+    let status = {
+        use std::os::unix::process::ExitStatusExt;
+        ExitStatus::from_raw(0)
+    };
+    #[cfg(windows)]
+    let status = {
+        use std::os::windows::process::ExitStatusExt;
+        ExitStatus::from_raw(0)
+    };
+    Output {
+        status,
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+        stop_kind: kind,
+        stopped: kind.map(|kind| {
+            match kind {
+                StopKind::Cancelled => "cancelled",
+                StopKind::TimedOut => "process timed out and was stopped",
+                StopKind::Failed => "content failure",
+                StopKind::Uncertain => "cleanup proof missing",
+            }
+            .to_owned()
+        }),
+    }
 }
 impl Output {
     pub(crate) fn complete(self) -> Result<std::process::Output, String> {
@@ -119,7 +313,15 @@ impl Ticket {
             .recv()
             .map_err(|_| "Process service stopped before returning a result".to_owned())?
     }
-    #[cfg(test)]
+    pub(crate) fn try_result(&self) -> Option<ResultOutput> {
+        match self.reply.try_recv() {
+            Ok(result) => Some(result),
+            Err(mpsc::TryRecvError::Empty) => None,
+            Err(mpsc::TryRecvError::Disconnected) => Some(Err(
+                "Process service stopped before returning a result".into(),
+            )),
+        }
+    }
     pub(crate) fn cancel(&self) {
         self.cancel.cancel();
     }
@@ -187,14 +389,9 @@ impl Service {
                                 || request.options.cancel.is_cancelled()
                                 || request.options.cancelled.as_ref().is_some_and(|f| f());
                             let expired = request.deadline.is_some_and(|at| Instant::now() >= at);
-                            if cancelled || expired {
+                            if let Some(reason) = before_start(cancelled, expired) {
                                 metrics.queued.fetch_sub(1, Ordering::Relaxed);
-                                let _ = request.reply.send(Err(if cancelled {
-                                    "cancelled"
-                                } else {
-                                    "process timed out and was stopped"
-                                }
-                                .into()));
+                                let _ = request.reply.send(Err(reason.into()));
                             }
                             !cancelled && !expired
                         });
@@ -341,6 +538,8 @@ impl Drop for Service {
 }
 
 static SERVICE: OnceLock<Result<Service, String>> = OnceLock::new();
+static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
+static LEASES: OnceLock<Result<Service, String>> = OnceLock::new();
 pub(crate) fn service() -> Result<&'static Service, String> {
     SERVICE
         .get_or_init(|| {
@@ -374,6 +573,35 @@ pub(crate) fn run_while(
         }
     }
 }
+pub(crate) fn run_checked(command: Command, options: Options) -> Result<Output, Failure> {
+    checked(run(command, options))
+}
+/// Dedicated bounded cleanup capacity cannot deadlock behind the transports whose
+/// owners are waiting for this acknowledgement. It never inherits caller cancellation.
+pub(crate) fn run_cleanup(command: Command, mut options: Options) -> ResultOutput {
+    options.cancel = Cancellation::default();
+    let service = CLEANUP.get_or_init(|| Service::new(2, 32).map_err(|e| e.to_string()));
+    service
+        .as_ref()
+        .map_err(Clone::clone)?
+        .submit(command, options)?
+        .wait()
+}
+
+/// Claim-only helpers have independent bounded capacity; they never run repository code.
+pub(crate) fn submit_lease(command: Command, options: Options) -> Result<Ticket, String> {
+    LEASES
+        .get_or_init(|| Service::new(16, 64).map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(Clone::clone)?
+        .submit(command, options)
+}
+pub(crate) fn shutdown_leases() {
+    if let Some(Ok(service)) = LEASES.get() {
+        service.shutdown();
+    }
+}
+
 pub(crate) fn counts() -> Option<Counts> {
     SERVICE
         .get()
@@ -386,10 +614,26 @@ pub(crate) fn shutdown() {
     }
 }
 
+pub(crate) fn shutdown_cleanup() {
+    if let Some(Ok(service)) = CLEANUP.get() {
+        service.shutdown();
+    }
+}
+
+fn before_start(cancelled: bool, expired: bool) -> Option<&'static str> {
+    if cancelled {
+        Some("cancelled")
+    } else if expired {
+        Some("process timed out and was stopped")
+    } else {
+        None
+    }
+}
+
 // The eighth argument only exists in opt-in libtest diagnostics.
 #[cfg_attr(test, allow(clippy::too_many_arguments))]
 async fn execute(
-    command: Command,
+    mut command: Command,
     mut options: Options,
     deadline: Option<Instant>,
     ticket: &Cancellation,
@@ -404,67 +648,58 @@ async fn execute(
             || shutdown.is_cancelled()
             || options.cancelled.as_ref().is_some_and(|f| f())
     };
-    if cancelled() {
-        return Err("cancelled".into());
+    if let Some(reason) = before_start(cancelled(), deadline.is_some_and(|at| Instant::now() >= at))
+    {
+        return Err(reason.into());
     }
-    if deadline.is_some_and(|at| Instant::now() >= at) {
-        return Err("process timed out and was stopped".into());
-    }
-    let mut cmd = tokio::process::Command::from(command);
-    cmd.stdin(if options.input.is_some() {
-        Stdio::piped()
-    } else {
-        Stdio::null()
-    })
-    .stdout(
-        options
-            .stdout_file
-            .take()
-            .map_or_else(Stdio::piped, Stdio::from),
-    )
-    .stderr(Stdio::piped())
-    .kill_on_drop(true);
-    // Ordinary hooks/helpers inherit this group. Deliberate setsid escapes require stronger
-    // OS containment; see docs/process-orchestration.md.
-    #[cfg(unix)]
-    cmd.process_group(0);
-    #[cfg(windows)]
-    cmd.creation_flags(0x0800_0004); // CREATE_NO_WINDOW | CREATE_SUSPENDED
+    command
+        .stdin(if options.input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(
+            options
+                .stdout_file
+                .take()
+                .map_or_else(Stdio::piped, Stdio::from),
+        )
+        .stderr(Stdio::piped());
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Spawning);
     }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("could not run process: {e}"))?;
+    let mut child = if options.native_controller {
+        gitcraft_os::OwnedChild::spawn_controller(command)
+    } else {
+        gitcraft_os::OwnedChild::spawn(command)
+    }
+    .map_err(|e| format!("could not run process: {e}"))?;
     #[cfg(test)]
     if let Some(trace) = trace {
-        trace.spawned(child.id());
+        trace.spawned(Some(child.id()));
         trace.stage(trace::Stage::Supervising);
     }
-    #[cfg(windows)]
-    let mut process_job = match child
-        .id()
-        .ok_or_else(|| "child has no process ID".to_owned())
-        .and_then(gitcraft_os::supervise_suspended_process)
-    {
-        Ok(job) => Some(job),
-        Err(error) => {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-            return Err(format!("could not supervise process tree: {error}"));
-        }
-    };
     stats.spawned.fetch_add(1, Ordering::Relaxed);
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Running);
     }
-    #[cfg(unix)]
-    let pid = child.id();
-    let mut input = child.stdin.take();
-    let mut out = child.stdout.take();
-    let mut err = child.stderr.take();
+    let mut input = child
+        .stdin()
+        .map(tokio::process::ChildStdin::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    let mut out = child
+        .stdout()
+        .map(tokio::process::ChildStdout::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    let mut err = child
+        .stderr()
+        .map(tokio::process::ChildStderr::from_std)
+        .transpose()
+        .map_err(|e| e.to_string())?;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut preamble = Vec::new();
@@ -532,36 +767,39 @@ async fn execute(
                 match result {
                     Ok(0) => err = None,
                     Ok(n) => {
+                        let filtered = options.stderr_filter.as_mut().map(|filter| filter(&ebuf[..n]));
+                        let bytes = filtered.as_deref().unwrap_or(&ebuf[..n]);
                         if let Some(consume) = &mut options.stderr
-                            && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n]))).is_err() {
+                            && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(bytes))).is_err() {
                             stopped = Some("process progress callback panicked".into());
                         }
-                        append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
+                        append(&mut stderr, bytes, options.stderr_limit.unwrap_or(options.output_limit), &mut stopped);
                     }
                     Err(e) => stopped = Some(format!("could not read process errors: {e}")),
                 }
             }
             result = async {
                 match &mut input {
+                    Some(_) if options.hold_input && written == usize::MAX => std::future::pending().await,
                     Some(pipe) => write_input(pipe, options.input.as_deref().unwrap_or_default(), &mut written).await,
                     None => std::future::pending().await,
                 }
             } => {
                 match result {
-                    Ok(true) => input = None,
+                    Ok(true) => { if options.hold_input { written = usize::MAX; } else { input = None; } },
                     Ok(false) => {},
                     Err(e) if e.kind() == io::ErrorKind::BrokenPipe => input = None,
                     Err(e) => stopped = Some(format!("could not pass process its input: {e}")),
                 }
             }
-            result = child.wait(), if status.is_none() => {
-                match result {
-                    // Preserve early-reader semantics: an exited child need not consume all input.
-                    Ok(s) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
-                    Err(e) => stopped = Some(format!("could not wait for process: {e}")),
-                }
-            }
             _ = tick.tick() => {
+                if status.is_none() {
+                    match child.observe() {
+                        Ok(Some(s)) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
+                        Ok(None) => {},
+                        Err(e) => stopped = Some(format!("could not observe process: {e}")),
+                    }
+                }
                 if cancelled() && status.is_none() { stop_requested.get_or_insert_with(|| ("cancelled".into(), Instant::now())); }
                 else if status.is_none() && deadline.is_some_and(|at| Instant::now() >= at) {
                     stop_requested.get_or_insert_with(|| ("process timed out and was stopped".into(), Instant::now()));
@@ -580,67 +818,76 @@ async fn execute(
             break;
         }
     }
+    let mut remote_confirmed = stopped.is_none() || options.stop_remote.is_none();
     if stopped.is_some() {
+        // A native helper owns another group/Job. Deliver controller EOF before control
+        // recovery; an unconfirmed helper is retained for reaping, never killed here.
+        if options.native_controller {
+            drop(input.take());
+        }
         #[cfg(test)]
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Stopping);
         }
-        // Remote cleanup may need its PID marker. The stderr callback has consumed every
-        // chunk read so far. Run the legacy protocol off the event loop, before killing SSH.
-        if let Some(stop) = options.stop_remote.take()
-            && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
-        {
-            let _ = tokio::task::spawn_blocking(stop).await;
+        // The stderr filter has consumed every ownership handshake chunk read so far.
+        // Authenticate stop/reap off the event loop, before ending the local transport.
+        if let Some(stop) = options.stop_remote.take() {
+            let result = match Arc::clone(blocking).acquire_owned().await {
+                Ok(_permit) => match tokio::task::spawn_blocking(stop).await {
+                    Ok(result) => result,
+                    Err(error) => Err(format!("cleanup worker failed: {error}")),
+                },
+                Err(error) => Err(format!("cleanup worker capacity unavailable: {error}")),
+            };
+            record_stop_confirmation(&mut stopped, &mut remote_confirmed, result);
         }
-        // The remote stop can also end the local loopback/SSH child. Reap it before
-        // signaling its group: Darwin rejects SIGKILL on a group containing only zombies.
-        if status.is_none() {
-            #[cfg(test)]
-            if let Some(trace) = trace {
-                trace.stage(trace::Stage::Reaping);
+        // finish signals while the Unix leader is unreaped, then reaps exactly once;
+        // Windows holds its Job through the final signal. No delayed numeric kills.
+        #[cfg(test)]
+        if let Some(trace) = trace {
+            trace.stage(trace::Stage::Reaping);
+        }
+        if !options.native_controller {
+            match child.finish() {
+                Ok(s) => {
+                    if status.is_none() {
+                        status = Some(s);
+                    }
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "{}; could not finish owned process: {e}",
+                        stopped.as_deref().unwrap_or("cleanup failed")
+                    ));
+                }
             }
-            status = child
-                .try_wait()
-                .map_err(|e| format!("could not reap process: {e}"))?;
         }
-        #[cfg(unix)]
-        if let Some(pid) = pid
-            && let Err(error) = gitcraft_os::kill_process_group(pid)
-        {
-            stopped = Some(format!(
-                "{}; could not stop process group: {error}",
-                stopped.as_deref().unwrap_or_default()
-            ));
-        }
-        #[cfg(windows)]
-        if let Some(job) = &process_job
-            && let Err(error) = job.terminate()
-        {
-            stopped = Some(format!(
-                "{}; could not stop process job: {error}",
-                stopped.as_deref().unwrap_or_default()
-            ));
-        }
-        let _ = child.start_kill();
-        if status.is_none() {
-            status = Some(
-                child
-                    .wait()
-                    .await
-                    .map_err(|e| format!("could not reap process: {e}"))?,
-            );
-        }
-        #[cfg(windows)]
-        drop(process_job.take());
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
-        let until = tokio::time::Instant::now() + options.drain_for;
+        // A native helper may still be delivering its terminal output. Keep consuming
+        // while it exits on EOF; never mark the sole owner expendable or kill it.
+        let until = tokio::time::Instant::now()
+            + if options.native_controller {
+                Duration::from_secs(5)
+            } else {
+                options.drain_for
+            };
         #[cfg(test)]
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Draining);
         }
         let mut overflow = None;
-        while out.is_some() || err.is_some() {
+        while out.is_some() || err.is_some() || (options.native_controller && status.is_none()) {
+            if options.native_controller && status.is_none() {
+                match child.observe() {
+                    Ok(Some(s)) => status = Some(s),
+                    Ok(None) => {}
+                    Err(_) => break,
+                }
+            }
+            if out.is_none() && err.is_none() && status.is_some() {
+                break;
+            }
             tokio::select! {
                 result = async { match &mut out { Some(p) => p.read(&mut obuf).await, None => std::future::pending().await } } => {
                     match result {
@@ -655,16 +902,56 @@ async fn execute(
                     match result {
                         Ok(0) | Err(_) => err = None,
                         Ok(n) => {
+                            let filtered = options.stderr_filter.as_mut().map(|filter| filter(&ebuf[..n]));
+                            let bytes = filtered.as_deref().unwrap_or(&ebuf[..n]);
                             if let Some(consume) = &mut options.stderr {
-                                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(&ebuf[..n])));
+                                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| consume(bytes)));
                             }
-                            append(&mut stderr, &ebuf[..n], options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
+                            append(&mut stderr, bytes, options.stderr_limit.unwrap_or(options.output_limit), &mut overflow);
                         }
                     }
                 }
                 _ = tokio::time::sleep_until(until) => break,
+                _ = tokio::time::sleep(POLL), if options.native_controller && status.is_none() => {},
             }
         }
+    }
+    // Also retire successful owners: descendants with closed output remain in the group.
+    // This is idempotent when cancellation already finished it above.
+    child.finish().map_err(|e| {
+        format!(
+            "{}; could not finish owned process: {e}",
+            stopped.as_deref().unwrap_or("process completion failed")
+        )
+    })?;
+    if stopped.is_none()
+        && let Some(confirm) = options.complete_remote.take()
+    {
+        match Arc::clone(blocking).acquire_owned().await {
+            Ok(_permit) => match tokio::task::spawn_blocking(confirm).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    stopped = Some(error);
+                    remote_confirmed = false;
+                }
+                Err(error) => {
+                    stopped = Some(format!("output delivery confirmation failed: {error}"));
+                    remote_confirmed = false;
+                }
+            },
+            Err(error) => {
+                stopped = Some(format!("output delivery confirmation unavailable: {error}"));
+                remote_confirmed = false;
+            }
+        }
+    }
+    if remote_confirmed
+        && let Some(retire) = options.retire_remote.take()
+        && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
+    {
+        // The endpoint itself requires its atomic receipt before unlinking anything.
+        // Failed retirement leaves private evidence; it never authorizes further signals.
+        let _ = tokio::task::spawn_blocking(retire).await;
     }
     if !ready && stopped.is_none() {
         let said = String::from_utf8_lossy(&stderr);
@@ -678,6 +965,7 @@ async fn execute(
         status: status.ok_or("process ended without an exit status")?,
         stdout,
         stderr,
+        stop_kind: stop_kind(stopped.as_deref(), remote_confirmed),
         stopped,
     })
 }

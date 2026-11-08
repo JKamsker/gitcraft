@@ -1,0 +1,7 @@
+# Local ownership foundation (WIP prerequisite)
+
+This change replaces the service's public numeric group-kill call with `gitcraft_os::OwnedChild`, constructed only by spawning its own child. Unix observation uses `waitid(WNOWAIT)`; final group signaling precedes the only reaping wait. Windows keeps suspended/Job/primary-thread-resume ordering. Finish is idempotent, including errors, and cannot issue a delayed signal after a reaping attempt. The service can consume stdout chunks as well as stderr.
+
+Pure recording gate: `CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked -p gitcraft-os recording_tests -- --nocapture`: 1 passed, no child execution. Both successful and refused signals assert signal-before-reap and no signal after retirement. `CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets` passed (existing native dead-code warnings). Formatting passed.
+
+No runtime process tests, inherited cancellation tests, full suite, SSH/WSL, Windows execution or CI were run. This is a WIP foundation, not a completed process-safety prerequisite. Remote legacy selectors and other local runners still require migration; all inherited unsafe test routes remain held. An independent static review and the full synthetic protocol gates are still needed before runtime validation. Darwin zombie-only EPERM is reported as uncertain cleanup, not ignored; native behavior remains to be validated. Deliberate setsid escape and supervisor death require stronger containment and remain explicit limitations.

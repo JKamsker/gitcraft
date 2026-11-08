@@ -681,6 +681,16 @@ pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
     )
 }
 
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    Api::new(
+        "Gitea / Forgejo",
+        &hosting.web,
+        &hosting.host,
+        find_login(&hosting.web),
+    )
+    .on_refused_key(forget_login, &login_key(&hosting.web))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -755,14 +765,14 @@ mod tests {
             logins,
             [
                 TeaLogin {
-                    name: String::new(),
+                    name: "codeberg".into(),
                     user: String::new(),
                     url: "https://codeberg.org".into(),
                     token: "abc123".into()
                 },
                 TeaLogin {
-                    name: String::new(),
-                    user: String::new(),
+                    name: "home".into(),
+                    user: "me".into(),
                     url: "https://git.home.example:3000/".into(),
                     token: "def".into()
                 },
@@ -787,14 +797,4 @@ mod tests {
         assert!(!same_server("http://codeberg.org", "https://codeberg.org"));
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
     }
-}
-
-pub(super) fn history_api(hosting: &Hosting) -> Api {
-    Api::new(
-        "Gitea / Forgejo",
-        &hosting.web,
-        &hosting.host,
-        find_login(&hosting.web),
-    )
-    .on_refused_key(forget_login, &login_key(&hosting.web))
 }

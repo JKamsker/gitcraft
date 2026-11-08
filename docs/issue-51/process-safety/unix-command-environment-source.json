@@ -1,0 +1,67 @@
+{
+  "base": "dec969b52f09e6f6b1765ccd3054f9810a0224e5",
+  "status": "source correction; independent source review and parent owned runtime gate pending",
+  "runtime_hold": true,
+  "sources": [
+    {
+      "path": "crates/gitcraft-os/src/group_anchor.c",
+      "sha256": "4ab6741986745b3eae051047390d70613cc609a83c9eb141ff0adea8a0c6f7af",
+      "git_blob": "c21a0c4a05c740533a262940cf9fba77d9cfdc1b"
+    },
+    {
+      "path": "crates/gitcraft-os/src/owned_child.rs",
+      "sha256": "bf4d6d49dc26976502d8812128788dd0b07473148b2bde372f4cbd2fd855904f",
+      "git_blob": "34fdf7c2ad2fce4e7646de285d876778cc8110c6"
+    },
+    {
+      "path": "crates/gitcraft-os/src/unix_anchor.rs",
+      "sha256": "13db14aec44bdeddd5cd7d852adf2d0fb1f8dfa936e628717115350b11284841",
+      "git_blob": "fba2410b29530ace921bed0c54fc4d921e679d6b"
+    }
+  ],
+  "stdlib_source": {
+    "toolchain": "1.95.0-aarch64-apple-darwin",
+    "path": "/Users/jonas/.rustup/toolchains/1.95.0-aarch64-apple-darwin/lib/rustlib/src/rust/library/std/src/sys/process/unix/unix.rs",
+    "sha256": "cabba94153bcdae7674f5743886d518db848710aee0ee20abfecf8bb159d3c4b",
+    "pre_exec_callbacks": [
+      385,
+      387
+    ],
+    "captured_envp_install": [
+      393,
+      405
+    ],
+    "normal_execvp": 408
+  },
+  "gates": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked -p gitcraft-os unix_anchor::recording_tests",
+      "result": "3 passed; 14 filtered; no helper/child launched; ten opaque Command construction cases"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked -p gitcraft-os owned_child::recording_tests",
+      "result": "3 passed; 14 filtered; recording stop/reap/controller only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "result": "pass; 14 existing lib/9 lib-test warnings"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked",
+      "result": "pass; 14 existing lib warnings"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked -p gitcraft-os --all-targets --target x86_64-pc-windows-gnu",
+      "result": "pass; cross-compilation only, no Windows runtime"
+    },
+    {
+      "command": "cargo +1.95.0 fmt --all -- --check; git diff --check",
+      "result": "pass"
+    }
+  ],
+  "limits": [
+    "Recording preserves opaque std Command identity and construction intent; actual environment/PATH outcomes not executed",
+    "Parent may mechanically rename private f37 fixture process.status assertion to process.anchor; fixture body unchanged",
+    "No bundle implementation, CI, PR, owned runtime fixture, shell/SSH/WSL execution or generated binary evidence in this unit"
+  ]
+}

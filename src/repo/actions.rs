@@ -15,7 +15,8 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
-    RepositoryTools(super::repository_tools::Act),
+    LoadPromptSession(String),
+    ShowPromptHunk(super::prompt_session::Hunk),
     OpenLineDossier(Option<git::investigations::dossier::Seed>),
     CloseLineDossier,
     OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
@@ -39,6 +40,7 @@ pub(crate) enum Action {
     ContentInspect(usize, Option<usize>),
     ContentPrepare(crate::git::recovery::Target),
     ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
+    RepositoryTools(super::repository_tools::Act),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.
@@ -73,6 +75,8 @@ pub(crate) enum Action {
     },
     ComparisonNormalPatch,
     SelectHash(String),
+    /// Follow a backlink directly to changed files and the first file diff.
+    OpenCommitChanges(String),
     ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),
@@ -104,6 +108,8 @@ pub(crate) enum Action {
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
     LocalCi(super::local_ci::Act),
+    Email(super::email::Act),
+    Devcontainer(super::devcontainer::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
@@ -753,6 +759,36 @@ impl RepoTab {
                 "Select stale or merged branches…".into(),
                 "branch".into(),
                 Action::SelectStaleBranches,
+            ),
+            (
+                "Conflicts that can wait: isolated rebase and restack…".into(),
+                "Deferred rewrites".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Deferred),
+            ),
+            (
+                "Parallel branches in this folder: hunk ownership…".into(),
+                "Virtual branches".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Virtuals),
+            ),
+            (
+                "Inspect state publication receipts…".into(),
+                "Working-state transaction recovery".into(),
+                Action::RepositoryTools(super::repository_tools::Act::StateReceipts),
+            ),
+            (
+                "Named changelists: messages, commit and shelve…".into(),
+                "Working changes".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Lists),
+            ),
+            (
+                "Push outbox: queue exact commit or send selected entries…".into(),
+                "Offline publication".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Outbox),
+            ),
+            (
+                "Subtrees: register, update, inspect and publish vendored folders…".into(),
+                "Vendored source history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Subtrees(String::new())),
             ),
             (
                 "Shared and borrowed objects".into(),

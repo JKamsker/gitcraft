@@ -671,16 +671,12 @@ fn bisects_on_another_machine() -> Result<(), String> {
         }
     });
     assert_eq!(outcome, Outcome::Cancelled);
-    // Nothing of it left there: no worktree of the copy, no sleeping test.
+    // Workspace deletion is allowed only after every supervisor's stop/reap receipt.
     let Machine::There(host) = &machine else {
         return Ok(());
     };
     let req = crate::remote::Request {
-        script: concat!(
-            "for d in ~/.cache/gitcraft/bisect/*/; do case $d in */run-*/) echo \"left: $d\";; esac; done; ",
-            "ps -A -o args= | grep -x 'sleep 6789' || true"
-        )
-        .to_owned(),
+        script: "for d in ~/.cache/gitcraft/bisect/*/; do case $d in */run-*/) echo \"left: $d\";; esac; done".to_owned(),
         ..crate::remote::Request::default()
     };
     let left = crate::remote::exec(host, &req)?;

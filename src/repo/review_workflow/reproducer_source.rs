@@ -361,7 +361,7 @@ mod tests {
                 match args[0] {
                     "ls-tree" => Ok(format!("100644 blob {oid} 3\t.gitattributes\0").into_bytes()),
                     "cat-file" => Ok(b"raw".to_vec()),
-                    _ => panic!("host helper requested"),
+                    _ => Err("host helper requested".into()),
                 }
             }
         }

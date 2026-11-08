@@ -216,6 +216,7 @@ impl Drop for TraceFile {
 /// always absolute, removed with the shell however it ends), then passes them back after its
 /// error output, behind [`MARK`]. Without that folder, git just runs. Its first line names the
 /// command, for messages about it (`Request::what`).
+#[cfg(all(test, unix))]
 pub(super) fn traced_script(words: &str) -> String {
     traced_script_with_program(words, "git")
 }

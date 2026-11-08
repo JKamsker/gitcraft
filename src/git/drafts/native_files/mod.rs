@@ -398,3 +398,122 @@ mod tests {
         // filesystem interleavings remain held for independent validation.
     }
 }
+
+/// A durable ref acknowledgement can be unknown. Callers must retain installed
+/// files/index and recovery evidence on Unknown instead of running rollback.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum CommitOutcome {
+    Committed,
+    Unknown(String),
+}
+impl CommitOutcome {
+    pub(super) fn confirmed(self) -> Result<(), String> {
+        match self {
+            Self::Committed => Ok(()),
+            Self::Unknown(message) => Err(message),
+        }
+    }
+}
+
+pub(super) fn capture_policies(
+    repo: &Path,
+    contents: &super::working_transaction::Contents,
+    active: &dyn Fn() -> bool,
+) -> Result<Policies, String> {
+    if crate::remote::is_remote(repo) || !cfg!(any(target_os = "macos", target_os = "linux")) {
+        return Ok(Policies::new());
+    }
+    #[cfg(unix)]
+    {
+        let identity = crate::git::recovery::pinned_worktree(repo, active)?;
+        let pin = identity
+            .root_pin
+            .as_ref()
+            .ok_or("Missing working directory identity")?;
+        let mut policies = Policies::new();
+        for (path, expected) in contents {
+            if let Some((mode, bytes)) = expected {
+                let (held, name) = crate::git::recovery::pinned_parent(
+                    Path::new(&pin.physical),
+                    Path::new(&identity.common),
+                    path,
+                    pin,
+                )?;
+                let parent = Path::new(&pin.physical)
+                    .join(path)
+                    .parent()
+                    .ok_or("Missing parent")?
+                    .to_owned();
+                let dir = Directory::from_file(parent, held).map_err(|e| e.to_string())?;
+                let snapshot =
+                    Snapshot::read(&dir, &name, bytes.len())?.ok_or("Working file disappeared")?;
+                if snapshot.bytes != *bytes
+                    || (snapshot.policy.mode() & 0o111 != 0) != (mode == "100755")
+                {
+                    return Err(format!("{path} changed while capturing full access policy"));
+                }
+                policies.insert(path.clone(), snapshot.policy);
+            }
+        }
+        Ok(policies)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (contents, active);
+        Err("Native working access policy unavailable".into())
+    }
+}
+
+#[cfg(test)]
+mod saved_policy_tests {
+    use super::*;
+    #[test]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn pure_native_full_policy_roundtrip_keeps_owner_group_native_attributes_and_acl() {
+        let mut access = serde_json::json!({"entries": [[[117,115,101,114,46,97],[1,2,3]]]});
+        #[cfg(target_os = "macos")]
+        {
+            access["acl"] = serde_json::json!([{"kind":"user","name":"501","perms":["read"],"flags":[],"allow":false}]);
+        }
+        let policy: Policy = serde_json::from_value(serde_json::json!({
+            "platform":std::env::consts::OS,"mode":416,"uid":501,"gid":20,"access":access
+        }))
+        .unwrap();
+        let bytes = serde_json::to_vec(&policy).unwrap();
+        assert_eq!(serde_json::from_slice::<Policy>(&bytes).unwrap(), policy);
+        let mut tightened = policy.clone();
+        tightened.mode = 0o600;
+        assert_ne!(tightened, policy);
+        tightened = policy.clone();
+        tightened.gid += 1;
+        assert_ne!(tightened, policy);
+        let mut changed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        changed["access"]["entries"][0][1] = serde_json::json!([9]);
+        assert_ne!(serde_json::from_value::<Policy>(changed).unwrap(), policy);
+        assert!(serde_json::from_str::<Policy>("416").is_err());
+        #[cfg(target_os = "macos")]
+        {
+            let mut changed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            changed["access"]["acl"][0]["allow"] = serde_json::json!(true);
+            assert_ne!(serde_json::from_value::<Policy>(changed).unwrap(), policy);
+        }
+        assert!(policy.validate().is_ok());
+        tightened.platform = "foreign platform".into();
+        assert!(tightened.validate().is_err());
+        let saved: Policies = [("f".into(), policy.clone())].into();
+        assert_eq!(
+            serde_json::from_slice::<Policies>(&serde_json::to_vec(&saved).unwrap()).unwrap()["f"],
+            policy
+        );
+    }
+    #[test]
+    fn pure_native_unknown_receipt_cannot_be_confirmed() {
+        assert!(CommitOutcome::Committed.confirmed().is_ok());
+        assert!(
+            CommitOutcome::Unknown("operation-1: receipt unavailable".into())
+                .confirmed()
+                .unwrap_err()
+                .contains("operation-1")
+        );
+    }
+}

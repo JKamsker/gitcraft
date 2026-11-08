@@ -26,7 +26,7 @@ fn user_global_config(args: &[&str]) -> bool {
 
 /// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
 /// `--literal-pathspecs`…).
-fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+pub(super) fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
     let mut rest = args;
     loop {
         match rest {
@@ -315,12 +315,17 @@ fn normalize_connection_command(cmd: &mut Command, args: &[&str]) {
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
 pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> remote::Request {
-    let words: Vec<String> = extra
-        .pre
-        .iter()
-        .copied()
-        .chain(extra.owned_pre.iter().map(String::as_str))
-        .chain(args.iter().copied())
+    let guard = super::clone_options::passive_object_read(args).then_some("--no-lazy-fetch");
+    let words: Vec<String> = guard
+        .into_iter()
+        .chain(
+            extra
+                .pre
+                .iter()
+                .copied()
+                .chain(extra.owned_pre.iter().map(String::as_str))
+                .chain(args.iter().copied()),
+        )
         .map(remote::sh_quote)
         .collect();
     let credential_transport = extra
@@ -353,6 +358,10 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         env: GIT_ENV
             .iter()
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
+            .chain(std::iter::once((
+                "GIT_NO_LAZY_FETCH".to_owned(),
+                super::clone_options::download_environment(args).to_owned(),
+            )))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
         unset: GIT_ENV_REMOVED
@@ -525,7 +534,10 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
             target.host.label()
         ))
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        Err(download_read_error(
+            args,
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        ))
     })
 }
 
@@ -627,7 +639,10 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
     if out.code == Some(0) {
         Ok(out.stdout)
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        Err(download_read_error(
+            args,
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        ))
     }
 }
 
@@ -702,6 +717,52 @@ mod r2_inert_tests {
         }
         Ok(())
     }
+}
+/// Read-only pack generation for a bisect transfer. Standalone remote supervision keeps
+/// the requested bounded binary capture independent of the pooled shell's 64 MiB frames.
+/// Nonzero Git exits stay distinct from uncertain transport/cancellation errors.
+pub(crate) fn transfer_pack(
+    dir: &Path,
+    revisions: Vec<u8>,
+    thin: bool,
+    limit: usize,
+) -> Result<Exit, String> {
+    let extra = Extra {
+        stdin: Some(revisions),
+        env: vec![("GIT_NO_LAZY_FETCH", "1".into())],
+        timeout: Some(std::time::Duration::from_secs(1800)),
+        ..Default::default()
+    };
+    let mut args = vec![
+        "pack-objects",
+        "--stdout",
+        "--revs",
+        "--delta-base-offset",
+        "--missing=error",
+    ];
+    if thin {
+        args.push("--thin");
+    }
+    let mut options = crate::processes::Options {
+        input: extra.stdin.clone(),
+        background: true,
+        timeout: extra.timeout,
+        output_limit: limit,
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let request = remote_request(&target, &extra, &args);
+        remote::streaming_command_bounded(&target.host, &request, None, None, false, limit)?
+            .configure(&mut options)
+    } else {
+        local_command(Some(dir), &extra, &args)
+    };
+    let out = crate::processes::run(command, options)?.complete()?;
+    Ok(Exit {
+        code: out.status.code(),
+        stdout: out.stdout,
+        stderr: out.stderr,
+    })
 }
 
 /// Save a command's stdout without capturing a local export in memory. Remote exports
@@ -780,22 +841,6 @@ pub(super) fn run_coded(dir: &Path, args: &[&str]) -> Result<(i32, Vec<u8>), Str
     }
 }
 
-/// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
-pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
-    if let Some(target) = remote::parse(dir) {
-        return remote::spawn(
-            &target.host,
-            &remote_request(&target, &Extra::default(), args),
-        );
-    }
-    let mut cmd = repository_command(Some(dir), args);
-    cmd.args(args);
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    cmd.spawn().map_err(|e| format!("could not run git: {e}"))
-}
-
 /// What a [`run_call`] is run with besides its arguments.
 #[derive(Default)]
 pub struct Call {
@@ -842,8 +887,18 @@ pub struct Exit {
 /// once) and is stopped there after `limit`; here it runs as long as it takes, and the caller
 /// stops it (see `parallel_bisect::runner`).
 pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Result<Exit, String> {
+    run_for_test_input(dir, args, limit, None)
+}
+
+pub(crate) fn run_for_test_input(
+    dir: &Path,
+    args: &[&str],
+    limit: std::time::Duration,
+    stdin: Option<Vec<u8>>,
+) -> Result<Exit, String> {
     let extra = Extra {
         test: Some(limit),
+        stdin,
         ..Extra::default()
     };
     let out = execute(Some(dir), &extra, args)?;
@@ -852,6 +907,94 @@ pub fn run_for_test(dir: &Path, args: &[&str], limit: std::time::Duration) -> Re
         stdout: out.stdout,
         stderr: out.stderr,
     })
+}
+
+/// Immutable actual-machine authority for one durable workspace operation.
+pub(crate) struct WorkspaceCommand<'a> {
+    pub authority: &'a remote::workspace_authority::WorkspaceAuthority,
+    pub input: Option<Vec<u8>>,
+    pub cleanup: bool,
+    pub directory: Option<&'a Path>,
+}
+impl<'a> WorkspaceCommand<'a> {
+    pub fn new(authority: &'a remote::workspace_authority::WorkspaceAuthority) -> Self {
+        Self {
+            authority,
+            input: None,
+            cleanup: false,
+            directory: None,
+        }
+    }
+}
+pub(crate) fn run_owned_test(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+    authority: &remote::workspace_authority::WorkspaceAuthority,
+) -> Result<crate::processes::Output, String> {
+    run_workspace_command(
+        dir,
+        args,
+        record,
+        limit,
+        cancel,
+        WorkspaceCommand::new(authority),
+    )
+}
+pub(crate) fn run_workspace_command(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+    owned: WorkspaceCommand<'_>,
+) -> Result<crate::processes::Output, String> {
+    let extra = Extra {
+        test: Some(limit),
+        stdin: owned.input.clone(),
+        ..Default::default()
+    };
+    let mut options = crate::processes::Options {
+        cancel,
+        background: true,
+        timeout: Some(limit),
+        ..Default::default()
+    };
+    let command = if let Some(target) = remote::parse(dir) {
+        let record =
+            remote::parse(record).ok_or("remote owner record is on a different machine")?;
+        if record.host != target.host {
+            return Err("remote owner record is on a different machine".into());
+        }
+        if owned.directory.is_some() {
+            return Err("remote private directories use their fenced shell operation".into());
+        }
+        let request = remote_request(&target, &extra, args);
+        remote::streaming_command_authority(
+            &target.host,
+            &request,
+            Some(&record.path),
+            Some(owned.authority),
+            owned.cleanup,
+        )?
+        .configure(&mut options)
+    } else {
+        if remote::parse(record).is_some() {
+            return Err("native owner record is on a different machine".into());
+        }
+        remote::native_owner::command_with_authority(
+            local_command(Some(dir), &extra, args),
+            record,
+            limit,
+            Some(owned.authority.clone()),
+        )?
+        .with_input(owned.input.as_deref(), owned.cleanup)?
+        .with_directory(owned.directory)?
+        .configure(&mut options)
+    };
+    crate::processes::run(command, options)
 }
 
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
@@ -886,12 +1029,6 @@ pub struct Credentials {
     /// None is legacy/unbound state and is refused by all transient helpers.
     pub scope: Option<super::CredentialScope>,
 }
-
-/// A designated HTTP transport helper; explicit transient accounts replace ambient
-/// helpers and are never automatically stored. Secret values stay out of argv.
-/// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
-/// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
-const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
 
 /// [`run`], answering a credential request with `creds` when given.
 pub fn run_with(
@@ -1094,11 +1231,14 @@ fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
             (true, false) => stdout,
             (false, false) => format!("{stderr}\n{stdout}"),
         };
-        Err(match (&out.failed_hook, said.is_empty()) {
-            (Some(hook), _) => hook.explain(&said, args),
-            (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
-            (None, false) => said,
-        })
+        Err(download_read_error(
+            args,
+            match (&out.failed_hook, said.is_empty()) {
+                (Some(hook), _) => hook.explain(&said, args),
+                (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
+                (None, false) => said,
+            },
+        ))
     }
 }
 
@@ -1423,7 +1563,8 @@ mod tests {
         assert!(req.long);
         assert_eq!(req.timeout, Some(TOOL_FOR));
         assert!(
-            req.script.starts_with("exec git 'mergetool'"),
+            req.script
+                .starts_with("exec git '--no-lazy-fetch' 'mergetool'"),
             "{}",
             req.script
         );
@@ -2249,12 +2390,16 @@ mod reviewed_push_tests {
         );
         let configs = (0..10)
             .map(|i| {
-                (
-                    env[&format!("GIT_CONFIG_KEY_{i}")].clone().unwrap(),
-                    env[&format!("GIT_CONFIG_VALUE_{i}")].clone().unwrap(),
-                )
+                let value = |prefix| {
+                    let key = format!("{prefix}_{i}");
+                    env.get(&key)
+                        .and_then(Option::as_ref)
+                        .cloned()
+                        .ok_or_else(|| format!("missing {key}"))
+                };
+                Ok((value("GIT_CONFIG_KEY")?, value("GIT_CONFIG_VALUE")?))
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, String>>()?;
         let placeholder = format!("gitcraft-preflight-address://{alias}");
         for remote in [alias, "origin"] {
             for field in ["url", "pushurl"] {
@@ -2423,21 +2568,24 @@ mod reviewed_push_tests {
         Ok(())
     }
     #[test]
-    fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() {
+    fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() -> Result<(), String> {
         let source = "a".repeat(40);
         let destination = "refs/heads/main";
         let good = format!(
             "server secret should disappear\n!\t{source}:{destination}\t[rejected] (stale info)\n"
         );
-        let safe = reviewed_refusal(good.as_bytes(), &source, destination).unwrap();
+        let safe = reviewed_refusal(good.as_bytes(), &source, destination)
+            .ok_or("missing good refusal")?;
         assert!(!safe.contains("secret"));
         assert!(safe.ends_with("[rejected] (stale info)"));
         let hook =
             format!("!\t{source}:{destination}\t[remote rejected] (password=hidden-secret)\n");
-        let safe = reviewed_refusal(hook.as_bytes(), &source, destination).unwrap();
+        let safe = reviewed_refusal(hook.as_bytes(), &source, destination)
+            .ok_or("missing hook refusal")?;
         assert!(!safe.contains("hidden-secret"));
         assert!(safe.contains("[remote rejected]"));
         assert!(reviewed_refusal(good.as_bytes(), &source, "refs/heads/other").is_none());
+        Ok(())
     }
 }
 
@@ -2453,9 +2601,12 @@ pub(crate) fn tour_read(
 /// All local execution routes, including streaming and watched operations, use this builder.
 pub(super) fn repository_command(dir: Option<&Path>, args: &[&str]) -> Command {
     if let Some(dir) = dir.filter(|dir| crate::practice::is_repository(dir)) {
-        return practice_command(dir);
+        let mut cmd = practice_command(dir);
+        object_read_policy(&mut cmd, args);
+        return cmd;
     }
     let mut cmd = git_cmd();
+    object_read_policy(&mut cmd, args);
     with_profile(&mut cmd, args);
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
@@ -2548,6 +2699,205 @@ pub(crate) fn onboarding_local_config(
     String::from_utf8(value.to_vec())
         .map(Some)
         .map_err(|_| "Local configuration is not UTF-8".into())
+}
+
+fn download_read_error(args: &[&str], error: String) -> String {
+    if super::clone_options::passive_object_read(args)
+        && [
+            "missing blob",
+            "missing object",
+            "bad object",
+            "unable to read",
+            "could not read",
+            "promisor",
+        ]
+        .iter()
+        .any(|text| error.to_lowercase().contains(text))
+    {
+        format!(
+            "{error}\nAutomatic object downloads are disabled. In a partial clone, use Graph tools → Sparse checkout and downloads to explicitly download history objects, then retry this file/diff."
+        )
+    } else {
+        error
+    }
+}
+
+/// Shared by streaming, watched, bounded and ordinary local commands.
+fn object_read_policy(cmd: &mut Command, args: &[&str]) {
+    cmd.env(
+        "GIT_NO_LAZY_FETCH",
+        super::clone_options::download_environment(args),
+    );
+    if super::clone_options::passive_object_read(args) {
+        cmd.arg("--no-lazy-fetch").env("GIT_NO_LAZY_FETCH", "1");
+    }
+}
+#[cfg(test)]
+mod download_policy_recording_tests {
+    use super::*;
+    #[test]
+    fn passive_reads_are_guarded_locally_and_on_the_repository_machine() {
+        for sub in [
+            "show",
+            "diff",
+            "log",
+            "cat-file",
+            "blame",
+            "status",
+            "ls-tree",
+            "sparse-checkout",
+        ] {
+            let args = [sub, "HEAD"];
+            let mut cmd = Command::new("/recorded/git");
+            object_read_policy(&mut cmd, &args);
+            let cmd = apply_command_extras(
+                cmd,
+                Some(Path::new("/recorded/repo")),
+                &Extra::default(),
+                &args,
+            );
+            assert_eq!(
+                cmd.get_args().next(),
+                Some(std::ffi::OsStr::new("--no-lazy-fetch"))
+            );
+            let req = remote_request(
+                &Target {
+                    host: remote::Host::Ssh("recorded".into()),
+                    path: "/repo".into(),
+                },
+                &Extra::default(),
+                &args,
+            );
+            assert!(req.script.starts_with("exec git '--no-lazy-fetch'"));
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod sparse_account_recording_tests {
+    use super::*;
+    #[test]
+    fn consented_sparse_uses_captured_account_and_restores_passive_policy() -> Result<(), String> {
+        let profile = crate::connections::Context {
+            git_config: Some("/recorded/profile-a".into()),
+            ..Default::default()
+        };
+        profile.run(|| {
+            let account = Credentials::for_url(
+                "https://example.invalid/team/repo",
+                "account-A".into(),
+                "SYNTHETIC_A_ONLY".into(),
+            )?;
+            // Same value captured by the Apply worker, even if the tab later signs in as B.
+            let captured = account.clone();
+            for repo in [
+                Path::new("/recorded/repo"),
+                Path::new("ssh://recorded/repo"),
+            ] {
+                for consent in [true, false] {
+                    super::super::clone_options::sparse_mutation(
+                        repo,
+                        Some(&["src".into()]),
+                        consent,
+                        Some(&captured),
+                        |dir, args, credentials| {
+                            assert_eq!(dir, Some(repo));
+                            assert_eq!(
+                                credentials.map(|c| c.username.as_str()),
+                                consent.then_some("account-A")
+                            );
+                            let extra = extra_for(dir, args, credentials, false)?;
+                            let mut cmd = Command::new("/recorded/git");
+                            cmd.env("GITCRAFT_GIT_USERNAME", "ambient-B");
+                            object_read_policy(&mut cmd, args);
+                            with_profile(&mut cmd, args);
+                            // None avoids the filesystem-only practice-repository classifier;
+                            // command discovery/launch is never entered by this recorder.
+                            let cmd = apply_command_extras(cmd, None, &extra, args);
+                            let env: std::collections::BTreeMap<_, _> = cmd
+                                .get_envs()
+                                .map(|(k, v)| {
+                                    (
+                                        k.to_string_lossy().into_owned(),
+                                        v.map(|v| v.to_string_lossy().into_owned()),
+                                    )
+                                })
+                                .collect();
+                            assert_eq!(
+                                env.get("GIT_CONFIG_GLOBAL"),
+                                Some(&Some("/recorded/profile-a".into()))
+                            );
+                            assert_eq!(
+                                env.get("GIT_NO_LAZY_FETCH"),
+                                Some(&Some(if consent { "0" } else { "1" }.into()))
+                            );
+                            if consent {
+                                assert_eq!(
+                                    env.get("GITCRAFT_GIT_USERNAME"),
+                                    Some(&Some("account-A".into()))
+                                );
+                                assert_eq!(
+                                    env.get("GITCRAFT_GIT_PASSWORD"),
+                                    Some(&Some("SYNTHETIC_A_ONLY".into()))
+                                );
+                            } else {
+                                assert!(
+                                    !extra
+                                        .env
+                                        .iter()
+                                        .any(|(key, _)| *key == "GITCRAFT_GIT_PASSWORD")
+                                );
+                            }
+                            let argv: Vec<_> = cmd
+                                .get_args()
+                                .map(|a| a.to_string_lossy().into_owned())
+                                .collect();
+                            assert_eq!(
+                                argv.iter().any(|a| a == "gitcraft-credential-transport"),
+                                consent
+                            );
+                            assert_eq!(argv.iter().any(|a| a == "--no-lazy-fetch"), !consent);
+                            assert!(!argv.join(" ").contains("SYNTHETIC_A_ONLY"));
+                            let req = remote_request(
+                                &Target {
+                                    host: remote::Host::Ssh("recorded".into()),
+                                    path: "/repo".into(),
+                                },
+                                &extra,
+                                args,
+                            );
+                            assert_eq!(
+                                req.env
+                                    .iter()
+                                    .any(|(k, v)| k == "GITCRAFT_GIT_USERNAME" && v == "account-A"),
+                                consent
+                            );
+                            assert_eq!(
+                                req.script.contains("gitcraft-credential-transport"),
+                                consent
+                            );
+                            assert_eq!(req.script.contains("--no-lazy-fetch"), !consent);
+                            assert!(!req.script.contains("SYNTHETIC_A_ONLY"));
+                            Ok(String::new())
+                        },
+                    )?;
+                }
+            }
+            for args in [["rev-parse", "HEAD"], ["show", "HEAD:file"]] {
+                let extra = extra_for(None, &args, None, false)?;
+                assert!(extra.env.is_empty());
+                let mut cmd = Command::new("/recorded/git");
+                object_read_policy(&mut cmd, &args);
+                let cmd = apply_command_extras(cmd, None, &extra, &args);
+                assert_eq!(
+                    cmd.get_args().next(),
+                    Some(std::ffi::OsStr::new("--no-lazy-fetch"))
+                );
+                assert!(!cmd.get_envs().any(|(k, _)| k == "GITCRAFT_GIT_PASSWORD"));
+            }
+            Ok(())
+        })
+    }
 }
 
 /// Pin an already reviewed effective endpoint using a private remote. Git expands

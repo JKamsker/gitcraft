@@ -513,3 +513,51 @@ fn git_version(
 
 #[cfg(test)]
 mod tests;
+
+/// The existing ghost planner rendered inside an MCP approval card as ref moves/losses.
+pub(in crate::repo) fn approval_preview(
+    repo: &std::path::Path,
+    op: &GhostOp,
+    facts: &op::Facts,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<crate::repo::agent::preview::Preview, String> {
+    let outcome = plan::plan(repo, op, facts, GitVersion::of(repo)?, cancelled)?;
+    let mut notes = outcome.notes;
+    notes.extend(outcome.warnings);
+    notes.extend(outcome.refused);
+    if outcome.discards_work {
+        notes.push("Discards uncommitted working changes".into());
+    }
+    if let Some(files) = outcome.files {
+        notes.push(format!("{} working files change", files.len()));
+    }
+    if let Some(conflict) = outcome.conflict {
+        notes.push(format!(
+            "Stops at step {}: {}",
+            conflict.step,
+            conflict.files.join(", ")
+        ));
+    }
+    if outcome.lost_more {
+        notes.push("Leaving-commit list is truncated at 200".into());
+    }
+    Ok(crate::repo::agent::preview::Preview {
+        moves: outcome
+            .moves
+            .into_iter()
+            .map(|m| {
+                (
+                    m.full,
+                    m.from.unwrap_or_else(|| "absent".into()),
+                    m.to.unwrap_or_else(|| "absent".into()),
+                )
+            })
+            .collect(),
+        leaving: outcome
+            .lost
+            .into_iter()
+            .map(|c| format!("{} {}", c.hash, c.summary))
+            .collect(),
+        notes,
+    })
+}

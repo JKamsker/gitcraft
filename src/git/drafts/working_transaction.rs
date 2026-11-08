@@ -1,0 +1,269 @@
+//! Working changes use retained parents, capture/inspect and create-only install or
+//! restore. All recovery entries remain addressable; Drop never mutates a public name.
+use super::native_files::{self, CommitOutcome, Policies};
+use super::*;
+pub(super) type Contents = BTreeMap<String, Option<(String, Vec<u8>)>>;
+
+// Resolve saved policy before the content no-op decision. Equal bytes can still
+// require a full-policy restore, and a legacy snapshot must not clear its metadata.
+fn intended_policy(
+    path: &str,
+    target: &Option<(String, Vec<u8>)>,
+    current: &Policies,
+    restored: Option<&Policies>,
+) -> Result<Option<native_files::Policy>, String> {
+    let policy = if target.is_some() && restored.is_some() {
+        let saved=restored.and_then(|saved|saved.get(path)).ok_or_else(||format!("{path} has no saved full access policy; legacy mode-only undo is unavailable; no file changed"))?;
+        saved.validate()?;
+        if let Some((mode, _)) = target
+            && (saved.mode() & 0o111 != 0) != (mode == "100755")
+        {
+            return Err(format!(
+                "{path} saved full policy conflicts with its Git mode; snapshot retained"
+            ));
+        }
+        Some(saved.clone())
+    } else {
+        current.get(path).map(|policy| {
+            target.as_ref().map_or_else(
+                || policy.clone(),
+                |(mode, _)| {
+                    if (policy.mode() & 0o111 != 0) == (mode == "100755") {
+                        policy.clone()
+                    } else {
+                        policy.with_git_mode(mode)
+                    }
+                },
+            )
+        })
+    };
+    if let Some(policy) = &policy {
+        policy.validate()?;
+    }
+    Ok(policy)
+}
+fn replacement_needed(
+    expected: &Option<(String, Vec<u8>)>,
+    target: &Option<(String, Vec<u8>)>,
+    current: Option<&native_files::Policy>,
+    intended: Option<&native_files::Policy>,
+) -> bool {
+    expected != target || current != intended
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn native_apply(
+    repo: &Path,
+    before: &Contents,
+    after: &Contents,
+    policies: &Policies,
+    check: &dyn Fn() -> Result<(), String>,
+    commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
+    restored_policy: Option<&Policies>,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    use native_files::{Directory, Replacement, Snapshot};
+    use std::sync::Arc;
+    let identity = crate::git::recovery::pinned_worktree(repo, active)?;
+    if identity.host.is_some() {
+        return Err("Working-folder publication requires a native macOS/Linux checkout; no remote file changed".into());
+    }
+    let pin = identity.root_pin.as_ref().ok_or("Missing root identity")?;
+    let mut items = Vec::new();
+    for (path, target) in after {
+        valid_path(path)?;
+        let expected = before.get(path).ok_or("Missing before-file snapshot")?;
+        let policy = intended_policy(path, target, policies, restored_policy)?;
+        if restored_policy.is_none()
+            && !replacement_needed(expected, target, policies.get(path), policy.as_ref())
+        {
+            continue;
+        }
+        let (held, name) = crate::git::recovery::pinned_parent(
+            Path::new(&pin.physical),
+            Path::new(&identity.common),
+            path,
+            pin,
+        )?;
+        let parent = Path::new(&pin.physical)
+            .join(path)
+            .parent()
+            .ok_or("Missing parent")?
+            .to_owned();
+        let directory = Arc::new(Directory::from_file(parent, held).map_err(|e| e.to_string())?);
+        let old = Snapshot::read(&directory, &name, FILE_LIMIT)?;
+        if old.as_ref().map(|s| &s.bytes) != expected.as_ref().map(|(_, bytes)| bytes)
+            || old.as_ref().map(|s| &s.policy) != policies.get(path)
+        {
+            return Err(format!(
+                "{path} contents or full access policy changed since preview"
+            ));
+        }
+        if !replacement_needed(
+            expected,
+            target,
+            old.as_ref().map(|snapshot| &snapshot.policy),
+            policy.as_ref(),
+        ) {
+            continue;
+        }
+        items.push(Replacement::prepare(
+            directory,
+            name,
+            old,
+            target.as_ref().map(|(_, bytes)| bytes.as_slice()),
+            policy.as_ref(),
+            // A supplied full policy is already exact. Only a new file without
+            // policy needs the candidate's default mode adjusted to its Git mode.
+            if policy.is_none() {
+                target.as_ref().map(|(mode, _)| mode.as_str())
+            } else {
+                None
+            },
+        )?);
+    }
+    let evidence = items
+        .iter()
+        .map(Replacement::evidence)
+        .collect::<Vec<_>>()
+        .join("; ");
+    let result = (|| {
+        check()?;
+        for item in &mut items {
+            if !active() {
+                return Err("Working-folder publication cancelled".into());
+            }
+            check()?;
+            item.publish()?;
+        }
+        check()?;
+        for item in &items {
+            item.verify_installed()?;
+        }
+        commit(&evidence)
+    })();
+    match result {
+        Ok(CommitOutcome::Committed) => Ok(format!("Native recovery entries retained: {evidence}")),
+        Ok(CommitOutcome::Unknown(message)) => Err(format!(
+            "{message}. Publication is uncertain: current materialization and all original/candidate entries retained; no rollback attempted. Recovery: {evidence}"
+        )),
+        Err(error) => {
+            let failures = items
+                .iter_mut()
+                .rev()
+                .filter_map(|item| item.rollback().err())
+                .collect::<Vec<_>>();
+            if failures.is_empty() {
+                Err(format!(
+                    "{error}. Owned changes restored create-only. Recovery entries retained: {evidence}"
+                ))
+            } else {
+                Err(format!(
+                    "{error}. Attention required: {}. All recovery entries retained: {evidence}",
+                    failures.join("; ")
+                ))
+            }
+        }
+    }
+}
+pub(super) fn apply(
+    repo: &Path,
+    before: &Contents,
+    after: &Contents,
+    policies: &Policies,
+    check: &dyn Fn() -> Result<(), String>,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    apply_with_commit(
+        repo,
+        before,
+        after,
+        policies,
+        check,
+        &|_| Ok(CommitOutcome::Committed),
+        None,
+        active,
+    )
+}
+pub(super) fn apply_with_commit(
+    repo: &Path,
+    before: &Contents,
+    after: &Contents,
+    policies: &Policies,
+    check: &dyn Fn() -> Result<(), String>,
+    commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
+    restored_policy: Option<&Policies>,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        native_apply(
+            repo,
+            before,
+            after,
+            policies,
+            check,
+            commit,
+            restored_policy,
+            active,
+        )
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (
+            repo,
+            before,
+            after,
+            policies,
+            check,
+            commit,
+            restored_policy,
+            active,
+        );
+        Err("Native working-folder publication is unavailable; no files changed".into())
+    }
+}
+
+#[cfg(test)]
+mod policy_noop_tests {
+    use super::*;
+    fn policy(platform: &str, gid: u32) -> native_files::Policy {
+        let mut value = serde_json::json!({"platform":platform,"mode":384,"uid":1,"gid":gid,"access":{"entries":[]}});
+        #[cfg(target_os = "macos")]
+        {
+            value["access"]["acl"] = serde_json::json!([]);
+        }
+        serde_json::from_value(value).unwrap()
+    }
+    #[test]
+    fn pure_native_equal_contents_still_require_supported_saved_policy_and_restore_policy_changes()
+    {
+        let target = Some(("100644".into(), b"same bytes".to_vec()));
+        let current: Policies = [("f".into(), policy(std::env::consts::OS, 10))].into();
+        let saved: Policies = [("f".into(), policy(std::env::consts::OS, 20))].into();
+        let desired = intended_policy("f", &target, &current, Some(&saved)).unwrap();
+        assert!(replacement_needed(
+            &target,
+            &target,
+            current.get("f"),
+            desired.as_ref()
+        ));
+        let equal = intended_policy("f", &target, &current, Some(&current)).unwrap();
+        assert!(!replacement_needed(
+            &target,
+            &target,
+            current.get("f"),
+            equal.as_ref()
+        ));
+        let missing = Policies::new();
+        assert!(
+            intended_policy("f", &target, &current, Some(&missing))
+                .unwrap_err()
+                .contains("no saved full access policy")
+        );
+        let unsupported: Policies = [("f".into(), policy("unsupported", 20))].into();
+        assert!(intended_policy("f", &target, &current, Some(&unsupported)).is_err());
+        // Metadata publication happens only after this required policy planning.
+        // No filesystem/Git adapter is called by these equal-content regressions.
+    }
+}

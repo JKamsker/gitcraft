@@ -6,6 +6,9 @@ pub(super) struct Pin {
     mode: u32,
 }
 impl Pin {
+    pub(super) fn bits(&self) -> u32 {
+        self.mode
+    }
     pub fn capture(repo: &Path, path: &str, active: &dyn Fn() -> bool) -> Result<Self, String> {
         let identity = crate::git::recovery::pinned_worktree(repo, active)?;
         let mode = if identity.host.is_some() {

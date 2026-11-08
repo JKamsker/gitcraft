@@ -166,7 +166,7 @@ fn selecting_a_commit_reads_its_sections_and_notes_round_trip() {
             ],
         ]
     );
-    assert!(matches!(acts.last(), Some(Action::SelectHash(h)) if *h == fix));
+    assert!(matches!(acts.last(), Some(Action::OpenCommitChanges(h)) if *h == fix));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

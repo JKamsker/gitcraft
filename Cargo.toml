@@ -84,7 +84,8 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
-# Reviewed internals private index and verified object-pack staging.
+mailparse = "0.18"
+# Private, atomically created staging repositories for verified independent object packs.
 tempfile = "3"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
@@ -92,14 +93,14 @@ tempfile = "3"
 rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# Read native ACLs through a safe API before replacing merge output.
+# Read native ACLs for publication and serialize durable shelf/undo policy.
 exacl = { version = "=0.13.0", default-features = false, features = ["serde"] }
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }
 
 [target.'cfg(windows)'.dependencies]
-# Reviewed alternates publication compares retained Windows file identities.
+# Compare retained Windows file identities when detaching an alternate; already used transitively.
 winapi-util = "0.1"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
@@ -117,8 +118,7 @@ members = [".", "crates/gitcraft-os"]
 default-members = [".", "crates/gitcraft-os"]
 
 [lints.rust]
-# Denied everywhere; the exceptions, asking Windows where an open file really is (safe_read.rs)
-# and setting the window's border colour (app/title_bar.rs), allow it on that function alone.
+# Denied everywhere; narrowly documented Windows API adapters allow it on that function alone.
 unsafe_code = "deny"
 
 [lints.clippy]

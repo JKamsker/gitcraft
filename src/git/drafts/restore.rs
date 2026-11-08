@@ -309,7 +309,7 @@ pub fn restore(
     Ok(backup.id)
 }
 
-fn included(
+pub(super) fn included(
     ctx: &Context,
     now: &Source,
     path: &str,
@@ -511,7 +511,7 @@ fn parse_hunks(text: &str, before: &[u8], saved: &[u8]) -> Result<Vec<RestoreHun
     Ok(hunks)
 }
 
-fn raw_attributes(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(), String> {
+pub(super) fn raw_attributes(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(), String> {
     let bytes = b"* -text -filter -ident -working-tree-encoding -eol\n";
     let dir = ctx.path.join("info");
     let file = dir.join("attributes");

@@ -1,0 +1,5 @@
+# Capability marker confidentiality
+
+WIP static correction: local/native and SSH/WSL streams now share one bounded marker framer. It recognizes the ownership marker after a login banner without a trailing newline, consumes complete or oversized capability frames privately, retains split marker prefixes across bounded preamble flushes, and passes ordinary command output unchanged once the first exact-nonce owner is accepted. Invalid capabilities are replaced with a generic message, never emitted to progress callbacks/capture.
+
+`CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib recording -- --nocapture`: 10 application + 4 OS recording tests passed, including every input split and oversized/invalid private frames. No user command or signal was executed by these tests. Independent static review and all runtime gates remain held. Parent-reported Shell writer, Windows completion/thread identity, and cross-process workspace claim issues are next; this checkpoint does not claim their disposition.

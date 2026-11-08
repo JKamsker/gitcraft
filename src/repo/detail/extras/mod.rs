@@ -412,7 +412,7 @@ impl RepoTab {
             ExtrasCmd::DeleteNote => self.write_note(None, ctx),
             ExtrasCmd::FetchNotes(remote) => self.notes_op(&remote, true, acts),
             ExtrasCmd::PushNotes(remote) => self.notes_op(&remote, false, acts),
-            ExtrasCmd::Open(hash) => acts.push(Action::SelectHash(hash)),
+            ExtrasCmd::Open(hash) => acts.push(Action::OpenCommitChanges(hash)),
         }
     }
 

@@ -271,6 +271,15 @@ impl RepoTab {
                 }
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(can, egui::Button::new("Replay in isolated worktrees…"))
+                        .clicked()
+                        && let Some(Ok(previews)) = &preview.previews
+                    {
+                        acts.push(Action::RepositoryTools(
+                            crate::repo::repository_tools::Act::IsolatedStack(previews.clone()),
+                        ));
+                    }
                     if widgets::primary_button(ui, "Restack", can, 90.0).clicked() {
                         acts.push(Action::Stack(StackAct::StartRestack));
                     }

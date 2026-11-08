@@ -37,7 +37,6 @@ use super::{Action, Refresh, RepoTab, Undo};
 use crate::theme::{self, Tokens};
 
 pub enum Dialog {
-    RepositoryTools(Box<super::repository_tools::State>),
     PushLoading {
         id: u64,
         token: std::sync::Arc<()>,
@@ -59,6 +58,7 @@ pub enum Dialog {
         selected: std::collections::BTreeSet<usize>,
     },
     ContentRecovery,
+    RepositoryTools(Box<super::repository_tools::State>),
     GerritReview {
         remote: String,
         head: String,
@@ -458,6 +458,8 @@ impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
         self.history_activity_window(ctx, acts);
         self.atlas_window(ctx);
+        self.sparse_window(ctx, acts);
+        self.cleanup_window(ctx);
         self.growth_window(ctx);
         self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
