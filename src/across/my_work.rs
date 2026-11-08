@@ -32,39 +32,70 @@ pub enum Work {
 impl Work {
     /// What the row says.
     pub fn describe(&self) -> String {
+        use crate::i18n::{message, text};
         match self {
-            Work::Uncommitted(n) => format!("{} with uncommitted changes", files(*n)),
-            Work::NoRemote => "no remote: its commits are only here".to_owned(),
+            Work::Uncommitted(count) => message(
+                "interaction-my-work-uncommitted",
+                &[("count", (*count).into())],
+            ),
+            Work::NoRemote => text("interaction-my-work-no-remote").to_owned(),
             Work::Unpushed {
                 branch,
                 upstream: Some(up),
                 commits,
                 ..
-            } => format!("{branch}: {} not pushed to {up}", commits_text(*commits)),
+            } => message(
+                "interaction-my-work-unpushed",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("upstream", up.as_str().into()),
+                    ("count", (*commits).into()),
+                ],
+            ),
             Work::Unpushed {
                 branch,
                 commits,
                 tracks: Tracks::Local,
                 ..
-            } => format!(
-                "{branch}: {} on no remote (it tracks a branch of this repository)",
-                commits_text(*commits)
+            } => message(
+                "interaction-my-work-local-branch",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("count", (*commits).into()),
+                ],
             ),
             Work::Unpushed {
                 branch, commits, ..
-            } => format!("{branch}: {} on no remote", commits_text(*commits)),
-            Work::Stashes(list) => match list.as_slice() {
-                [one] => format!("1 stash: {one}"),
-                more => format!("{} stashes, the latest: {}", more.len(), more[0]),
-            },
-            Work::Worktree { path, changes } => format!(
-                "worktree {}: {} with uncommitted changes",
-                crate::remote::display(path),
-                files(*changes)
+            } => message(
+                "interaction-my-work-untracked",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("count", (*commits).into()),
+                ],
             ),
-            Work::Gone { branch, commits } => format!(
-                "{branch}: its remote branch is gone, {} on no remote",
-                commits_text(*commits)
+            Work::Stashes(list) => message(
+                "interaction-my-work-stashes",
+                &[
+                    ("count", list.len().into()),
+                    (
+                        "latest",
+                        list.first().map(String::as_str).unwrap_or_default().into(),
+                    ),
+                ],
+            ),
+            Work::Worktree { path, changes } => message(
+                "interaction-my-work-worktree",
+                &[
+                    ("path", crate::remote::display(path).into()),
+                    ("count", (*changes).into()),
+                ],
+            ),
+            Work::Gone { branch, commits } => message(
+                "interaction-my-work-gone",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("count", (*commits).into()),
+                ],
             ),
         }
     }
@@ -106,37 +137,29 @@ impl Work {
                 upstream,
                 tracks: Tracks::OtherName,
                 ..
-            } => Some(format!(
-                "{branch} tracks {}, a branch of another name: open the repository to push it \
-                 where it belongs",
-                upstream.as_deref().unwrap_or("a branch of another name")
+            } => Some(crate::i18n::message(
+                "interaction-my-work-why-other",
+                &[
+                    ("branch", branch.as_str().into()),
+                    (
+                        "upstream",
+                        upstream
+                            .as_deref()
+                            .unwrap_or(crate::i18n::text("interaction-my-work-other-name"))
+                            .into(),
+                    ),
+                ],
             )),
             Work::Unpushed {
                 branch,
                 tracks: Tracks::Local,
                 ..
-            } => Some(format!(
-                "{branch} tracks a branch of this repository: open the repository to push it \
-                 where it belongs"
+            } => Some(crate::i18n::message(
+                "interaction-my-work-why-local",
+                &[("branch", branch.as_str().into())],
             )),
             _ => None,
         }
-    }
-}
-
-fn files(n: usize) -> String {
-    if n == 1 {
-        "1 file".to_owned()
-    } else {
-        format!("{n} files")
-    }
-}
-
-fn commits_text(n: u32) -> String {
-    if n == 1 {
-        "1 commit".to_owned()
-    } else {
-        format!("{n} commits")
     }
 }
 

@@ -18,7 +18,7 @@ const CARD_TEXT_MARGIN: f32 = 12.0;
 impl App {
     pub(super) fn pick_existing(&mut self, ctx: &egui::Context) {
         if let Some(dir) = rfd::FileDialog::new()
-            .set_title("Open a git repository")
+            .set_title(crate::i18n::text("interaction-home-pick-existing"))
             .pick_folder()
         {
             self.open_repo(&dir, ctx);
@@ -27,7 +27,7 @@ impl App {
 
     pub(super) fn pick_new(&mut self, ctx: &egui::Context) {
         let Some(dir) = rfd::FileDialog::new()
-            .set_title("Choose a folder for the new repository")
+            .set_title(crate::i18n::text("interaction-home-pick-new"))
             .pick_folder()
         else {
             return;
@@ -37,7 +37,12 @@ impl App {
             let label = crate::remote::display(&dir);
             self.connect_with(label, None, ctx, move || {
                 if !git::toplevel(&dir).is_ok_and(|root| same_path(&root, &dir)) {
-                    git::init(&dir).map_err(|e| format!("git init failed: {e}"))?;
+                    git::init(&dir).map_err(|e| {
+                        crate::i18n::message(
+                            "interaction-home-init-error",
+                            &[("error", e.as_str().into())],
+                        )
+                    })?;
                 }
                 super::repo_root(&dir)
             });
@@ -52,7 +57,12 @@ impl App {
         }
         match git::init(&dir) {
             Ok(()) => self.open_repo(&dir, ctx),
-            Err(e) => self.error = Some(format!("git init failed: {e}")),
+            Err(e) => {
+                self.error = Some(crate::i18n::message(
+                    "interaction-home-init-error",
+                    &[("error", e.as_str().into())],
+                ))
+            }
         }
     }
 
@@ -76,10 +86,26 @@ impl App {
                         ui.spacing_mut().item_spacing.x = 12.0;
                         let w = (ui.available_width() - 36.0) / 4.0;
                         for (i, (icon, title, sub)) in [
-                            ("folder-open", "Open", "An existing local repository"),
-                            ("folder-plus", "Create", "A new, empty repository"),
-                            ("log-in", "Clone", "Copy a remote repository"),
-                            ("server", "Remote", "In WSL or over SSH"),
+                            (
+                                "folder-open",
+                                crate::i18n::text("interaction-home-open"),
+                                crate::i18n::text("interaction-home-open-description"),
+                            ),
+                            (
+                                "folder-plus",
+                                crate::i18n::text("interaction-home-create"),
+                                crate::i18n::text("interaction-home-create-description"),
+                            ),
+                            (
+                                "log-in",
+                                crate::i18n::text("interaction-home-clone"),
+                                crate::i18n::text("interaction-home-clone-description"),
+                            ),
+                            (
+                                "server",
+                                crate::i18n::text("interaction-home-remote"),
+                                crate::i18n::text("interaction-home-remote-description"),
+                            ),
                         ]
                         .into_iter()
                         .enumerate()
@@ -90,22 +116,31 @@ impl App {
                         }
                     });
                     ui.add_space(10.0);
-                    if ui.link("Scan a folder for repositories…").clicked() {
+                    if ui
+                        .link(crate::i18n::text("interaction-home-scan"))
+                        .clicked()
+                    {
                         action = Some(4);
                     }
 
                     if ui
-                        .button("Practice git…")
-                        .on_hover_text("Real throwaway repositories with goals and checks")
+                        .button(crate::i18n::text("interaction-home-practice"))
+                        .on_hover_text(crate::i18n::text("interaction-home-practice-tip"))
                         .clicked()
                     {
                         self.practice_open = true;
                     }
                     ui.horizontal(|ui| {
-                        if ui.button("Export setup…").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-home-export-setup"))
+                            .clicked()
+                        {
                             self.show_setup(false, ui.ctx());
                         }
-                        if ui.button("Import setup…").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-home-import-setup"))
+                            .clicked()
+                        {
                             self.show_setup(true, ui.ctx());
                         }
                     });
@@ -114,7 +149,7 @@ impl App {
                     // The card has git's words itself.
                     if let Some(err) = self.error.as_ref().filter(|_| self.error_card.is_none()) {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, err);
+                        ui.colored_label(t.danger, super::panels::display_app_message(err));
                     }
                     self.error_card_ui(ui);
                     if let Some(cloning) = &self.cloning {
@@ -125,7 +160,10 @@ impl App {
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());
-                            ui.label(format!("Connecting to {}…", connecting.label));
+                            ui.label(crate::i18n::message(
+                                "interaction-home-connecting",
+                                &[("place", connecting.label.as_str().into())],
+                            ));
                         });
                     }
 
@@ -182,7 +220,7 @@ impl App {
         {
             ui.add_space(4.0);
             let link = ui
-                .link("Add gitcraft to the applications menu")
+                .link(crate::i18n::text("interaction-home-app-menu"))
                 .on_hover_text(appimage.display().to_string());
             if link.clicked() {
                 self.error = crate::desktop_entry::install(&appimage).err();
@@ -196,17 +234,30 @@ impl App {
             ui.add_space(ui.available_height() * 0.25);
             icons::inline(ui, "circle-alert", 40.0, t.warning);
             ui.add_space(8.0);
-            ui.label(RichText::new("Git was not found").font(theme::semibold(24.0)));
+            ui.label(
+                RichText::new(crate::i18n::text("interaction-home-git-missing"))
+                    .font(theme::semibold(24.0)),
+            );
             ui.add_space(8.0);
-            ui.label("gitcraft uses the git command line. Install git and make sure `git` is on your PATH.");
+            ui.label(crate::i18n::text("interaction-home-git-install"));
             ui.add_space(4.0);
             ui.label(RichText::new(err).color(t.text_faint).small());
             ui.add_space(16.0);
-            if crate::repo::primary_button(ui, "Check again", true, 140.0).clicked() {
+            if crate::repo::primary_button(
+                ui,
+                crate::i18n::text("interaction-home-git-recheck"),
+                true,
+                140.0,
+            )
+            .clicked()
+            {
                 self.git_version = git::version();
             }
             ui.add_space(8.0);
-            ui.hyperlink_to("Download git", "https://git-scm.com/downloads");
+            ui.hyperlink_to(
+                crate::i18n::text("interaction-home-git-download"),
+                "https://git-scm.com/downloads",
+            );
         });
     }
 }

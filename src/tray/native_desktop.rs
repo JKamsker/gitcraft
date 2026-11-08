@@ -58,7 +58,9 @@ pub(in crate::tray) fn start(rows: Vec<Entry>, events: Events) {
             .with_id("gitcraft-resident")
             .with_icon(icon)
             .with_menu(Box::new(menu))
-            .with_tooltip("gitcraft — repository watcher")
+            .with_tooltip(crate::i18n::text(
+                "interaction-control-gitcraft-repository-watcher",
+            ))
             .build()
             .map_err(|e| e.to_string())?;
         NATIVE.with(|slot| *slot.borrow_mut() = Some(icon));
@@ -75,6 +77,9 @@ pub(in crate::tray) fn update(rows: Vec<Entry>) {
             NATIVE.with(|slot| {
                 if let Some(icon) = slot.borrow().as_ref() {
                     icon.set_menu(Some(Box::new(menu)));
+                    let _ = icon.set_tooltip(Some(crate::i18n::text(
+                        "interaction-control-gitcraft-repository-watcher",
+                    )));
                 }
             });
         }

@@ -206,9 +206,3 @@ fn another_machine_isnt_reached_unasked() {
     let far = PathBuf::from("ssh://gitcraft-test-never-connected/x");
     assert_eq!(reachable(&[here.clone(), far]), vec![here]);
 }
-
-#[test]
-fn counts_read_in_words() {
-    assert_eq!(repo_count(1), "1 repository");
-    assert_eq!(repo_count(4), "4 repositories");
-}

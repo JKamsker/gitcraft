@@ -14,24 +14,14 @@ pub(super) fn page(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
         ui,
         f,
         "Custom commands",
-        Some(
-            "Commands of your own in a commit's, a branch's or a file's menu, or in the palette. \
-             They run with sh on the repository's machine (here, in WSL or over SSH), in its \
-             folder. With the output in a toast a command runs unattended: nothing can answer \
-             it (no editor, no password prompt), so pick Terminal for one that asks something \
-             or runs for long.",
-        ),
+        Some(crate::i18n::text("interaction-preferences-commands-intro")),
         |card| commands(card, &mut settings.custom_commands),
     );
     section(
         ui,
         f,
         "Variables",
-        Some(
-            "Set for every command. Write them as shell \
-             variables, in double quotes: \"$FILE\". Their values are never pasted into the \
-             command line, so a name with spaces, quotes or $(…) stays one word.",
-        ),
+        Some(crate::i18n::text("interaction-preferences-variables-intro")),
         |card| {
             card.compact();
             for (name, what) in custom_commands::BUILT_IN {
@@ -42,7 +32,7 @@ pub(super) fn page(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
                         ui.label(RichText::new(format!("${name}")).font(crate::theme::mono(12.5)));
                         let used = ui.cursor().left() - start;
                         ui.add_space((width + 8.0 - used).max(8.0));
-                        layout::note(ui, what);
+                        layout::note(ui, custom_commands::variable_description(name, what));
                     });
                 });
             }
@@ -52,10 +42,7 @@ pub(super) fn page(settings: &mut Settings, ui: &mut Ui, f: &Filter) {
         ui,
         f,
         "Repository commands",
-        Some(
-            "A repository can bring its own in .gitcraft/commands.json. They are offered once \
-             you have read that file and trusted it, and asked about again whenever it changes.",
-        ),
+        Some(crate::i18n::text("interaction-preferences-repo-intro")),
         |card| trusted(card, &mut settings.trusted_command_files),
     );
 }
@@ -80,11 +67,14 @@ fn commands(card: &mut Card, list: &mut Vec<CustomCommand>) {
     }
     card.full("add new custom command script", |ui| {
         ui.horizontal(|ui| {
-            if ui.button("Add command").clicked() {
+            if ui
+                .button(crate::i18n::text("interaction-preferences-add-command"))
+                .clicked()
+            {
                 list.push(CustomCommand::default());
             }
             if list.is_empty() {
-                layout::note(ui, "None yet");
+                layout::note(ui, crate::i18n::text("interaction-preferences-none"));
             }
         });
     });
@@ -105,7 +95,7 @@ fn command_ui(ui: &mut Ui, i: usize, c: &mut CustomCommand) -> Edit {
         let room = ui.available_width() - 60.0;
         ui.add(
             layout::field(&mut c.name)
-                .hint_text("Name")
+                .hint_text(crate::i18n::text("interaction-preferences-name"))
                 .desired_width((room * 0.4).min(220.0)),
         );
         egui::ComboBox::from_id_salt(("custom-where", i))
@@ -118,17 +108,33 @@ fn command_ui(ui: &mut Ui, i: usize, c: &mut CustomCommand) -> Edit {
             });
         egui::ComboBox::from_id_salt(("custom-output", i))
             .width(layout::fit(ui, 110.0))
-            .selected_text(format!("Output: {}", c.output.label()))
+            .selected_text(crate::i18n::message(
+                "interaction-preferences-output",
+                &[("destination", c.output.label().into())],
+            ))
             .show_ui(ui, |ui| {
                 for o in OutputTo::ALL {
                     ui.selectable_value(&mut c.output, o, o.label());
                 }
             });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if crate::icons::small_button(ui, "x", "Remove").clicked() {
+            if crate::icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("interaction-preferences-remove"),
+            )
+            .clicked()
+            {
                 edit = Edit::Remove;
             }
-            if i > 0 && crate::icons::small_button(ui, "chevron-up", "Move up").clicked() {
+            if i > 0
+                && crate::icons::small_button(
+                    ui,
+                    "chevron-up",
+                    crate::i18n::text("interaction-preferences-up"),
+                )
+                .clicked()
+            {
                 edit = Edit::Up;
             }
         });
@@ -141,8 +147,14 @@ fn command_ui(ui: &mut Ui, i: usize, c: &mut CustomCommand) -> Edit {
             .desired_width(f32::INFINITY),
     );
     ui.horizontal(|ui| {
-        ui.checkbox(&mut c.confirm, "Ask before running");
-        if ui.button("Add prompt").clicked() {
+        ui.checkbox(
+            &mut c.confirm,
+            crate::i18n::text("interaction-preferences-confirm"),
+        );
+        if ui
+            .button(crate::i18n::text("interaction-preferences-add-prompt"))
+            .clicked()
+        {
             c.prompts.push(Prompt {
                 variable: format!("INPUT{}", c.prompts.len() + 1),
                 ..Prompt::default()
@@ -153,9 +165,12 @@ fn command_ui(ui: &mut Ui, i: usize, c: &mut CustomCommand) -> Edit {
     let fresh = c.name.trim().is_empty() && c.command.trim().is_empty();
     if let Some(problem) = c.problem().filter(|_| !fresh) {
         ui.label(
-            RichText::new(format!("Not offered until fixed: {problem}"))
-                .color(t.danger)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "interaction-preferences-problem",
+                &[("problem", custom_commands::display_problem(&problem).into())],
+            ))
+            .color(t.danger)
+            .small(),
         );
     }
     edit
@@ -176,7 +191,7 @@ fn prompts_ui(ui: &mut Ui, i: usize, prompts: &mut Vec<Prompt>) {
             );
             ui.add(
                 layout::field(&mut p.label)
-                    .hint_text("Question")
+                    .hint_text(crate::i18n::text("interaction-preferences-question"))
                     .desired_width((room * 0.4).min(200.0)),
             );
             egui::ComboBox::from_id_salt(("custom-prompt", i, j))
@@ -190,10 +205,16 @@ fn prompts_ui(ui: &mut Ui, i: usize, prompts: &mut Vec<Prompt>) {
             let rest = (ui.available_width() - 32.0).max(60.0);
             ui.add(
                 layout::field(&mut p.default)
-                    .hint_text("Default")
+                    .hint_text(crate::i18n::text("interaction-preferences-default"))
                     .desired_width(rest),
             );
-            if crate::icons::small_button(ui, "x", "Remove prompt").clicked() {
+            if crate::icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("interaction-preferences-remove-prompt"),
+            )
+            .clicked()
+            {
                 remove = Some(j);
             }
         });
@@ -212,8 +233,8 @@ fn trusted(card: &mut Card, list: &mut Vec<custom_commands::TrustedFile>) {
                 ui.label(crate::remote::display(std::path::Path::new(&file.repo)));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .button("Forget")
-                        .on_hover_text("Its commands are no longer offered until trusted again")
+                        .button(crate::i18n::text("interaction-preferences-forget"))
+                        .on_hover_text(crate::i18n::text("interaction-preferences-forget-help"))
                         .clicked()
                     {
                         forget = Some(i);
@@ -227,7 +248,54 @@ fn trusted(card: &mut Card, list: &mut Vec<custom_commands::TrustedFile>) {
     }
     if list.is_empty() {
         card.full("trusted repository none", |ui| {
-            layout::note(ui, "No repository's commands are trusted");
+            layout::note(
+                ui,
+                crate::i18n::text("interaction-preferences-none-trusted"),
+            );
         });
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_command_editor_translates_controls_and_preserves_command_and_prompt_variables() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, command: &mut CustomCommand| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                command_ui(ui, 0, command);
+            },
+            CustomCommand {
+                name: "User 日本語".into(),
+                command: "git show \"$SHA\"".into(),
+                ..CustomCommand::default()
+            },
+        );
+        h.run();
+        h.get_by_value("Commit-Menü");
+        h.get_by_value("Ausgabe: Kurzmeldung");
+        h.get_by_label("Vor dem Ausführen nachfragen").click();
+        h.run();
+        assert!(!h.state().confirm);
+        h.get_by_label("Abfrage hinzufügen").click();
+        h.run();
+        assert_eq!(h.state().prompts[0].variable, "INPUT1");
+        assert_eq!(h.state().command, "git show \"$SHA\"");
+        assert_eq!(h.state().name, "User 日本語");
+        assert_eq!(h.state().placement, Placement::Commit);
+        assert_eq!(serde_json::to_value(h.state()).unwrap()["where"], "commit");
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Ask before running");
+        h.get_by_value("Output: Toast");
+        assert_eq!(h.state().prompts[0].variable, "INPUT1");
     }
 }

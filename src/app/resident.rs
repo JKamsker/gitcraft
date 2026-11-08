@@ -46,7 +46,12 @@ impl App {
         );
         let text = crate::network::background_paused().map_or_else(
             || self.resident.watcher.status.clone(),
-            |pause| format!("{} — background checks paused", pause.label()),
+            |pause| {
+                crate::i18n::message(
+                    "interaction-watch-network-paused",
+                    &[("reason", pause.label().into())],
+                )
+            },
         );
         for action in self.resident.sync(
             self.settings.keep_running_in_tray && !self.windows.quit_requested,

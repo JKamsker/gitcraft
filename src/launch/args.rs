@@ -71,6 +71,11 @@ Usage:
   gitcraft --quit               save and quit the running instance
   gitcraft --help | --version";
 
+/// Selected-language presentation; raw USAGE remains a compatibility constant.
+pub fn usage() -> &'static str {
+    crate::i18n::text("interaction-startup-usage")
+}
+
 /// The arguments as the system gave them, without what macOS adds on its own (`-psn_…`, the
 /// process serial number of an older Finder launch).
 pub fn from_system(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {

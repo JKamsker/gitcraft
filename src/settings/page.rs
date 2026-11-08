@@ -188,11 +188,10 @@ impl Settings {
         title(ui, "Search results");
         let total: usize = counts.iter().sum();
         let query = view.query.trim().to_owned();
-        let what = match total {
-            0 => format!("Nothing matches “{query}”."),
-            1 => format!("1 setting matches “{query}”."),
-            n => format!("{n} settings match “{query}”."),
-        };
+        let what = crate::i18n::message(
+            "interaction-settings-search-matches",
+            &[("count", total.into()), ("query", query.as_str().into())],
+        );
         ui.label(RichText::new(what).color(t.text_faint));
         for (&page, &count) in Page::ALL.iter().zip(counts) {
             if count == 0 {
@@ -204,16 +203,19 @@ impl Settings {
                 .horizontal(|ui| {
                     crate::icons::inline(ui, page.icon(), 14.0, t.text_faint);
                     ui.label(
-                        RichText::new(page.title().to_uppercase())
+                        RichText::new(super::labels::display(page.title()).to_uppercase())
                             .font(theme::semibold(11.0))
                             .color(t.text_faint),
                     );
                 })
                 .response
                 .interact(Sense::click())
-                .on_hover_text("Open this page");
+                .on_hover_text(crate::i18n::text("interaction-settings-open-page"));
             crate::repo::widgets::a11y(&resp, egui::WidgetType::Link, || {
-                format!("Open the {} page", page.title())
+                crate::i18n::message(
+                    "interaction-settings-open-page-a11y",
+                    &[("page", super::labels::display(page.title()).into())],
+                )
             });
             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             if resp.clicked() {
@@ -227,7 +229,7 @@ impl Settings {
 
 /// The page's title at the top.
 fn title(ui: &mut Ui, text: &str) {
-    ui.label(RichText::new(text).font(theme::semibold(22.0)));
+    ui.label(RichText::new(super::labels::display(text)).font(theme::semibold(22.0)));
     ui.add_space(4.0);
 }
 
@@ -283,7 +285,10 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
             &resp,
             || {
                 let matches = count.map(|n| crate::a11y::labels::count(n, "match", "matches"));
-                crate::a11y::labels::join([page.title(), &matches.unwrap_or_default()])
+                crate::a11y::labels::join([
+                    super::labels::display(page.title()),
+                    &matches.unwrap_or_default(),
+                ])
             },
             selected,
         );
@@ -322,7 +327,7 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
         ui.painter().text(
             rect.left_center() + vec2(40.0, 0.0),
             Align2::LEFT_CENTER,
-            page.title(),
+            super::labels::display(page.title()),
             font,
             text,
         );
@@ -330,7 +335,7 @@ fn nav(ui: &mut Ui, view: &mut View, counts: &[usize]) {
             ui.painter().text(
                 rect.right_center() - vec2(12.0, 0.0),
                 Align2::RIGHT_CENTER,
-                n.to_string(),
+                crate::i18n::number(n),
                 egui::FontId::proportional(11.5),
                 t.text_faint,
             );
@@ -363,7 +368,13 @@ fn search_field(ui: &mut Ui, query: &mut String) {
                 // The button or shortcut at the right end, the text taking what is left.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if !query.is_empty() {
-                        if crate::icons::small_button(ui, "x", "Clear (Esc)").clicked() {
+                        if crate::icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-settings-clear"),
+                        )
+                        .clicked()
+                        {
                             query.clear();
                         }
                     } else if !focused {
@@ -377,7 +388,7 @@ fn search_field(ui: &mut Ui, query: &mut String) {
                         egui::TextEdit::singleline(query)
                             .id(search_id())
                             .frame(egui::Frame::NONE)
-                            .hint_text("Search")
+                            .hint_text(crate::i18n::text("interaction-settings-search"))
                             .margin(vec2(0.0, 3.0))
                             .desired_width(ui.available_width()),
                     );

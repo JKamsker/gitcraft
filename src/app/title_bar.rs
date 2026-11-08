@@ -282,7 +282,7 @@ pub(super) fn drag_area(ui: &mut Ui, rect: Rect, name: &str) {
     crate::a11y::a11y(
         &resp,
         egui::WidgetType::Button,
-        "Window grip. Enter to maximize or restore; drag to move",
+        crate::i18n::text("interaction-home-window-grip"),
     );
     moves_window(ui.ctx(), &resp);
 }
@@ -301,7 +301,7 @@ pub(super) fn handle(ui: &mut Ui, t: &Tokens) {
             Sense::click_and_drag(),
         )
         .on_hover_cursor(CursorIcon::Grab)
-        .on_hover_text("Drag to move the window, double-click to maximize it");
+        .on_hover_text(crate::i18n::text("interaction-home-window-drag"));
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius, t.pressed);
     }
@@ -310,7 +310,7 @@ pub(super) fn handle(ui: &mut Ui, t: &Tokens) {
     crate::a11y::a11y(
         &resp,
         egui::WidgetType::Button,
-        "Window grip. Enter to maximize or restore; drag to move",
+        crate::i18n::text("interaction-home-window-grip"),
     );
     moves_window(ui.ctx(), &resp);
 }
@@ -340,10 +340,10 @@ enum Caption {
 impl Caption {
     fn tooltip(self) -> &'static str {
         match self {
-            Caption::Minimize => "Minimize",
-            Caption::Maximize => "Maximize",
-            Caption::Restore => "Restore down",
-            Caption::Close => "Close",
+            Caption::Minimize => crate::i18n::text("interaction-home-minimize"),
+            Caption::Maximize => crate::i18n::text("interaction-home-maximize"),
+            Caption::Restore => crate::i18n::text("interaction-home-restore"),
+            Caption::Close => crate::i18n::text("interaction-home-close"),
         }
     }
 }

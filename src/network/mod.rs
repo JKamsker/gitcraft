@@ -30,21 +30,21 @@ pub enum Pause {
 }
 
 impl Pause {
-    /// What the toolbar says: "Offline".
+    /// What the toolbar says: crate::i18n::text("interaction-network-label-1").
     pub fn label(self) -> &'static str {
         match self {
-            Pause::Switch => "Offline",
-            Pause::NoConnection => "No connection",
-            Pause::Metered => "Metered network",
+            Pause::Switch => crate::i18n::text("interaction-network-label-1"),
+            Pause::NoConnection => crate::i18n::text("interaction-network-label-2"),
+            Pause::Metered => crate::i18n::text("interaction-network-label-3"),
         }
     }
 
     /// Why, in a sentence.
     pub fn why(self) -> &'static str {
         match self {
-            Pause::Switch => "Offline mode is on",
-            Pause::NoConnection => "The system reports no network connection",
-            Pause::Metered => "The network connection is metered",
+            Pause::Switch => crate::i18n::text("interaction-network-label-4"),
+            Pause::NoConnection => crate::i18n::text("interaction-network-label-5"),
+            Pause::Metered => crate::i18n::text("interaction-network-label-6"),
         }
     }
 }

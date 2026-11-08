@@ -35,40 +35,40 @@ const HISTORY: [Mock; 7] = [
     Mock {
         hash: "a",
         parents: &["c"],
-        summary: "Preview the settings beside them",
+        summary: "interaction-preview-mock-summary-1",
         author: "Ada Lovelace",
         hash7: "3f9a2c1",
-        when: "5 minutes ago",
+        when: "interaction-preview-mock-when-1",
         date: "2026-11-06 14:02",
         refs: &[("feature/settings-previews", RefKind::Head)],
     },
     Mock {
         hash: "b",
         parents: &["d", "e"],
-        summary: "Merge pull request #212 from fix/tab-overflow",
+        summary: "interaction-preview-mock-summary-2",
         author: "Grace Hopper",
         hash7: "b81e07d",
-        when: "2 hours ago",
+        when: "interaction-preview-mock-when-2",
         date: "2026-11-06 12:20",
         refs: &[("main", RefKind::Local), ("origin/main", RefKind::Remote)],
     },
     Mock {
         hash: "c",
         parents: &["d"],
-        summary: "Theme gallery with live thumbnails",
+        summary: "interaction-preview-mock-summary-3",
         author: "Ada Lovelace",
         hash7: "77c4e90",
-        when: "yesterday",
+        when: "interaction-preview-mock-when-3",
         date: "2026-11-05 18:44",
         refs: &[],
     },
     Mock {
         hash: "e",
         parents: &["d"],
-        summary: "Tabs scroll when there are too many",
+        summary: "interaction-preview-mock-summary-4",
         author: "Linus Torvalds",
         hash7: "0d5be33",
-        when: "2 days ago",
+        when: "interaction-preview-mock-when-4",
         date: "2026-11-04 09:13",
         refs: &[(
             "origin/fix/tab-strip-overflows-in-small-windows",
@@ -78,30 +78,30 @@ const HISTORY: [Mock; 7] = [
     Mock {
         hash: "d",
         parents: &["f"],
-        summary: "Release 0.9.0",
+        summary: "interaction-preview-mock-summary-5",
         author: "Grace Hopper",
         hash7: "e2a9f41",
-        when: "last week",
+        when: "interaction-preview-mock-when-5",
         date: "2026-10-30 16:00",
         refs: &[("v0.9.0", RefKind::Tag)],
     },
     Mock {
         hash: "f",
         parents: &["g"],
-        summary: "Read Base16 colour schemes",
+        summary: "interaction-preview-mock-summary-6",
         author: "Linus Torvalds",
         hash7: "5c0d8b2",
-        when: "2 weeks ago",
+        when: "interaction-preview-mock-when-6",
         date: "2026-10-22 11:31",
         refs: &[],
     },
     Mock {
         hash: "g",
         parents: &[],
-        summary: "Initial commit",
+        summary: "interaction-preview-mock-summary-7",
         author: "Ada Lovelace",
         hash7: "9b7f3aa",
-        when: "a month ago",
+        when: "interaction-preview-mock-when-7",
         date: "2026-10-01 08:00",
         refs: &[],
     },
@@ -171,10 +171,13 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
     let desc_x = l.gx() + l.graph + 6.0;
     let mut labels = Vec::new();
     if l.refs > 0.0 {
-        labels.push((l.left + 10.0, "BRANCH / TAG"));
+        labels.push((
+            l.left + 10.0,
+            crate::i18n::text("interaction-preview-refs-header"),
+        ));
     }
-    labels.push((l.gx() + 8.0, "GRAPH"));
-    labels.push((desc_x, "DESCRIPTION"));
+    labels.push((l.gx() + 8.0, crate::i18n::text("interaction-preview-graph")));
+    labels.push((desc_x, crate::i18n::text("interaction-preview-description")));
     let mut x = right - l.trailing_w();
     for (name, w, _) in &l.trailing {
         labels.push((x, name));
@@ -293,7 +296,7 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
             p,
             pos2(desc_x + 2.0, mid),
             Align2::LEFT_CENTER,
-            m.summary,
+            crate::i18n::text(m.summary),
             FontId::proportional(12.5),
             t.text,
             trailing_left - desc_x - 12.0,
@@ -339,7 +342,7 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
                         p,
                         pos2(x, mid),
                         Align2::LEFT_CENTER,
-                        m.when,
+                        crate::i18n::text(m.when),
                         small.clone(),
                         t.text_dim,
                         room,
@@ -350,7 +353,7 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
                         p,
                         pos2(x, mid),
                         Align2::LEFT_CENTER,
-                        m.date,
+                        &mock_date(m.date),
                         theme::mono(11.0),
                         t.text_faint,
                         room,
@@ -434,7 +437,10 @@ pub(super) fn refs(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         l.left + 1.0,
         l.gx() - 1.0,
         rect.top() + MEASURE_H / 2.0,
-        &format!("{refs_true:.0} px"),
+        &crate::i18n::message(
+            "interaction-preview-refs-width",
+            &[("width", refs_true.round().into())],
+        ),
     );
 }
 
@@ -445,10 +451,30 @@ pub(super) fn columns(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     let p = ui.painter_at(rect);
     let mut trailing = Vec::new();
     for (shown, name, w, what) in [
-        (s.show_hash, "COMMIT", s.hash_width, Trailing::Hash),
-        (s.show_author, "AUTHOR", s.author_width, Trailing::Author),
-        (s.show_when, "WHEN", s.when_width, Trailing::When),
-        (s.show_date, "DATE", s.date_width, Trailing::Date),
+        (
+            s.show_hash,
+            crate::i18n::text("interaction-preview-commit-header"),
+            s.hash_width,
+            Trailing::Hash,
+        ),
+        (
+            s.show_author,
+            crate::i18n::text("interaction-preview-author"),
+            s.author_width,
+            Trailing::Author,
+        ),
+        (
+            s.show_when,
+            crate::i18n::text("interaction-preview-when"),
+            s.when_width,
+            Trailing::When,
+        ),
+        (
+            s.show_date,
+            crate::i18n::text("interaction-preview-date"),
+            s.date_width,
+            Trailing::Date,
+        ),
     ] {
         if shown {
             trailing.push((name, w.max(50.0), what));
@@ -478,7 +504,7 @@ pub(super) fn columns(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         p.text(
             pos2(rect.center().x, rect.top() + MEASURE_H / 2.0),
             Align2::CENTER_CENTER,
-            "No columns: the descriptions take the whole width",
+            crate::i18n::text("interaction-preview-no-columns"),
             FontId::proportional(11.5),
             t.text_faint,
         );
@@ -493,7 +519,7 @@ pub(super) fn columns(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
             x + 2.0,
             x + w - 2.0,
             rect.top() + MEASURE_H / 2.0,
-            &format!("{real:.0}"),
+            &crate::i18n::number(real.round()),
         );
         x += w;
     }
@@ -508,8 +534,16 @@ pub(super) fn lanes(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     let rect = area(ui, width, h + 24.0);
     let p = ui.painter_at(rect);
     for (i, (name, lane_w, chosen)) in [
-        ("Standard", LANE_W, !s.compact_graph),
-        ("Compact", COMPACT_LANE_W, s.compact_graph),
+        (
+            crate::i18n::text("interaction-preview-standard"),
+            LANE_W,
+            !s.compact_graph,
+        ),
+        (
+            crate::i18n::text("interaction-preview-compact"),
+            COMPACT_LANE_W,
+            s.compact_graph,
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -537,13 +571,16 @@ pub(super) fn lanes(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
             l.lane_x(0),
             l.lane_x(1),
             r.top() + MEASURE_H / 2.0,
-            &format!("{lane_w:.0}"),
+            &crate::i18n::number(lane_w.round()),
         );
         draw::choice(
             &p,
             t,
             body,
-            &format!("{name} · {lane_w:.0} px apart"),
+            &crate::i18n::message(
+                "interaction-preview-lane-distance",
+                &[("name", name.into()), ("width", lane_w.round().into())],
+            ),
             chosen,
         );
     }
@@ -625,4 +662,18 @@ pub(super) fn lane_colors(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32, cur
         }
         ui.add_space(2.0);
     }
+}
+
+/// A civil-date display for the inert example; its literal time and source record stay unchanged.
+fn mock_date(raw: &str) -> String {
+    let Some((date, time)) = raw.split_once(' ') else {
+        return raw.to_owned();
+    };
+    crate::i18n::message(
+        "interaction-preview-mock-date",
+        &[
+            ("date", crate::i18n::date_iso(date).into()),
+            ("time", time.into()),
+        ],
+    )
 }

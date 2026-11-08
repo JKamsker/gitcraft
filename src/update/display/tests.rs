@@ -43,8 +43,15 @@ fn actual_previous_and_channel_values_resolve_at_paint_without_changing_raw_labe
         assert!(shown.contains(kept));
         assert!(shown.ends_with("No previous version of gitcraft is kept"));
         assert_eq!(unknown.label(), "the version kept");
-        assert_eq!(Channel::Main.label(), "Main (releases)");
-        assert_eq!(Channel::Dev.label(), "Dev (a build of every change)");
+        assert_eq!(Channel::Main.label(), main);
+        assert_eq!(
+            Channel::Dev.label(),
+            if locale == "de" {
+                "Dev (ein Build jeder Änderung)"
+            } else {
+                "Dev (a build of every change)"
+            }
+        );
         assert_eq!(unknown, unknown_before);
         assert_eq!(known, known_before);
         assert_eq!(super::super::PIN_THIS, "this version");

@@ -1,6 +1,8 @@
 //! One versioned, allowlisted setup file. Credentials, executable commands, raw Git config,
 //! auth folders, private/signing key values and old machine paths never become active config.
 mod config;
+mod display;
+pub(crate) use display::message as display_message;
 mod repository;
 mod restore;
 #[cfg(test)]

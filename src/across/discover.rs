@@ -42,6 +42,14 @@ impl Machine {
         }
     }
 
+    /// Selected-language prose only; `label` remains the grouping/control identity.
+    pub fn display_label(&self) -> String {
+        match self {
+            Self::Here => crate::i18n::text("interaction-my-work-this-computer").to_owned(),
+            Self::There(host) => host.label(),
+        }
+    }
+
     /// The machine `repo` (in the form the app gives paths) is on.
     pub fn of(repo: &Path) -> Machine {
         remote::parse(repo).map_or(Machine::Here, |t| Machine::There(t.host))

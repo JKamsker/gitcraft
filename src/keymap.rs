@@ -292,7 +292,10 @@ impl Command {
             .chain(REPOSITORY_ROWS)
             .chain(LOCAL_ROWS)
             .find(|r| r.commands.contains(&self))
-            .map_or("Action", |r| r.what)
+            .map_or_else(
+                || crate::i18n::text("interaction-key-action"),
+                |r| crate::i18n::text(r.what),
+            )
     }
 
     /// Whether holding the key down does it again: going through the tabs does, an operation
@@ -524,12 +527,18 @@ const fn row(commands: &'static [Command], what: &'static str) -> Row {
 
 /// The manual's rows for the window's keys.
 pub(crate) const WINDOW_ROWS: &[Row] = &[
-    row(&[Command::NewTab], "New tab"),
-    row(&[Command::CloseTab], "Close the tab (or middle-click it)"),
-    row(&[Command::ReopenTab], "Reopen the tab closed last"),
+    row(&[Command::NewTab], "interaction-key-row-new-tab"),
+    row(
+        &[Command::CloseTab],
+        "interaction-key-row-close-the-tab-or-middle-click-it",
+    ),
+    row(
+        &[Command::ReopenTab],
+        "interaction-key-row-reopen-the-tab-closed-last",
+    ),
     row(
         &[Command::NextTab, Command::PreviousTab],
-        "Next / previous tab, wrapping around (Ctrl on macOS too)",
+        "interaction-key-row-next-previous-tab-wrapping-around-ctrl-on-macos-too",
     ),
     Row {
         commands: &[
@@ -543,113 +552,224 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
             Command::GoToTab(8),
         ],
         range: true,
-        what: "Go to tab 1 to 8",
+        what: "interaction-key-row-go-to-tab-1-to-8",
     },
-    row(&[Command::LastTab], "Go to the last tab"),
+    row(
+        &[Command::LastTab],
+        "interaction-key-row-go-to-the-last-tab",
+    ),
     row(
         &[Command::Palette],
-        "Command palette: every action and branch",
+        "interaction-key-row-command-palette-every-action-and-branch",
     ),
-    row(&[Command::Settings], "Settings"),
-    row(&[Command::Reload], "Reload the repository"),
-    row(&[Command::Manual], "This manual"),
+    row(&[Command::Settings], "interaction-key-row-settings"),
+    row(
+        &[Command::Reload],
+        "interaction-key-row-reload-the-repository",
+    ),
+    row(&[Command::Manual], "interaction-key-row-this-manual"),
 ];
 
 /// The manual's rows for a repository tab's keys. None works while a text field or the
 /// terminal has the keyboard.
 pub(crate) const REPOSITORY_ROWS: &[Row] = &[
-    row(&[Command::Undo], "Undo"),
-    row(&[Command::Redo], "Redo"),
-    row(&[Command::Timeline], "Timeline and undo tree"),
+    row(&[Command::Undo], "interaction-key-row-undo"),
+    row(&[Command::Redo], "interaction-key-row-redo"),
+    row(
+        &[Command::Timeline],
+        "interaction-key-row-timeline-and-undo-tree",
+    ),
     row(
         &[Command::Search],
-        "Search the shown diff, file, blame or commits",
+        "interaction-key-row-search-the-shown-diff-file-blame-or-commits",
     ),
-    row(&[Command::Back], "Back through recent views"),
-    row(&[Command::Forward], "Forward through recent views"),
-    row(&[Command::FocusSidebar], "Focus the sidebar"),
-    row(&[Command::FocusGraph], "Focus the graph or diff"),
+    row(
+        &[Command::Back],
+        "interaction-key-row-back-through-recent-views",
+    ),
+    row(
+        &[Command::Forward],
+        "interaction-key-row-forward-through-recent-views",
+    ),
+    row(
+        &[Command::FocusSidebar],
+        "interaction-key-row-focus-the-sidebar",
+    ),
+    row(
+        &[Command::FocusGraph],
+        "interaction-key-row-focus-the-graph-or-diff",
+    ),
     row(
         &[Command::FocusDetail],
-        "Focus the right pane and its files",
+        "interaction-key-row-focus-the-right-pane-and-its-files",
     ),
-    row(&[Command::Fetch], "Fetch all remotes"),
-    row(&[Command::Pull], "Pull the current branch"),
-    row(&[Command::Push], "Push the current branch"),
-    row(&[Command::Stash], "Stash all changes…"),
-    row(&[Command::NewBranch], "Create a branch at HEAD"),
+    row(&[Command::Fetch], "interaction-key-row-fetch-all-remotes"),
+    row(
+        &[Command::Pull],
+        "interaction-key-row-pull-the-current-branch",
+    ),
+    row(
+        &[Command::Push],
+        "interaction-key-row-push-the-current-branch",
+    ),
+    row(&[Command::Stash], "interaction-key-row-stash-all-changes"),
+    row(
+        &[Command::NewBranch],
+        "interaction-key-row-create-a-branch-at-head",
+    ),
     row(
         &[Command::Terminal],
-        "Show or hide the terminal (to hide it from inside, click outside it first)",
+        "interaction-key-row-show-or-hide-the-terminal-to-hide-it-from-inside-click-outside-it-first",
     ),
-    row(&[Command::StageAll], "Stage all changes"),
+    row(
+        &[Command::StageAll],
+        "interaction-key-row-stage-all-changes",
+    ),
     row(
         &[Command::Commit],
-        "Commit; with nothing staged, everything; with no summary yet, go to the message. In a note editor, save the note",
+        "interaction-key-row-commit-with-nothing-staged-everything-with-no-summary-yet-go-to-the-message",
     ),
 ];
 
 pub(crate) const LOCAL_ROWS: &[Row] = &[
     row(
         &[Command::GraphCopyHash],
-        "Graph: copy selected commit hash",
+        "interaction-key-row-graph-copy-selected-commit-hash",
     ),
     row(
         &[Command::GraphCopyMessage],
-        "Graph: copy selected commit message",
+        "interaction-key-row-graph-copy-selected-commit-message",
     ),
     row(
         &[Command::GraphCopyBranch],
-        "Graph: copy selected commit's first branch",
+        "interaction-key-row-graph-copy-selected-commit-s-first-branch",
     ),
-    row(&[Command::FileHistory], "Files: history of selected file"),
-    row(&[Command::FileBlame], "Files: blame selected file"),
-    row(&[Command::FileContents], "Files: view selected file"),
-    row(&[Command::FileCopyPath], "Files: copy selected path"),
-    row(&[Command::FindNext], "Find: next match"),
-    row(&[Command::FindPrevious], "Find: previous match"),
-    row(&[Command::SelectionCopy], "Copy selected lines"),
-    row(&[Command::SelectionAll], "Select all shown lines"),
-    row(&[Command::SelectionHistory], "History of selected lines"),
-    row(&[Command::GraphPrevious], "Graph: previous commit"),
-    row(&[Command::GraphNext], "Graph: next commit"),
-    row(&[Command::GraphLeft], "Graph lane walk: jump to tip"),
+    row(
+        &[Command::FileHistory],
+        "interaction-key-row-files-history-of-selected-file",
+    ),
+    row(
+        &[Command::FileBlame],
+        "interaction-key-row-files-blame-selected-file",
+    ),
+    row(
+        &[Command::FileContents],
+        "interaction-key-row-files-view-selected-file",
+    ),
+    row(
+        &[Command::FileCopyPath],
+        "interaction-key-row-files-copy-selected-path",
+    ),
+    row(&[Command::FindNext], "interaction-key-row-find-next-match"),
+    row(
+        &[Command::FindPrevious],
+        "interaction-key-row-find-previous-match",
+    ),
+    row(
+        &[Command::SelectionCopy],
+        "interaction-key-row-copy-selected-lines",
+    ),
+    row(
+        &[Command::SelectionAll],
+        "interaction-key-row-select-all-shown-lines",
+    ),
+    row(
+        &[Command::SelectionHistory],
+        "interaction-key-row-history-of-selected-lines",
+    ),
+    row(
+        &[Command::GraphPrevious],
+        "interaction-key-row-graph-previous-commit",
+    ),
+    row(
+        &[Command::GraphNext],
+        "interaction-key-row-graph-next-commit",
+    ),
+    row(
+        &[Command::GraphLeft],
+        "interaction-key-row-graph-lane-walk-jump-to-tip",
+    ),
     row(
         &[Command::GraphRight],
-        "Graph lane walk: cycle merge parent",
+        "interaction-key-row-graph-lane-walk-cycle-merge-parent",
     ),
-    row(&[Command::RebasePrevious], "Rebase: previous row"),
-    row(&[Command::RebaseNext], "Rebase: next row"),
-    row(&[Command::RebaseMoveUp], "Rebase: move commit up"),
-    row(&[Command::RebaseMoveDown], "Rebase: move commit down"),
-    row(&[Command::RebasePick], "Rebase: pick"),
-    row(&[Command::RebaseReword], "Rebase: reword"),
-    row(&[Command::RebaseEdit], "Rebase: edit"),
-    row(&[Command::RebaseSquash], "Rebase: squash"),
-    row(&[Command::RebaseFixup], "Rebase: fix up"),
-    row(&[Command::RebaseDrop], "Rebase: drop"),
-    row(&[Command::SettingsSearch], "Settings: focus search"),
-    row(&[Command::SettingsPrevious], "Settings: previous page"),
-    row(&[Command::SettingsNext], "Settings: next page"),
-    row(&[Command::NextChange], "Next change"),
-    row(&[Command::PreviousChange], "Previous change"),
-    row(&[Command::NextChangeAlt], "Next change (alternate binding)"),
+    row(
+        &[Command::RebasePrevious],
+        "interaction-key-row-rebase-previous-row",
+    ),
+    row(
+        &[Command::RebaseNext],
+        "interaction-key-row-rebase-next-row",
+    ),
+    row(
+        &[Command::RebaseMoveUp],
+        "interaction-key-row-rebase-move-commit-up",
+    ),
+    row(
+        &[Command::RebaseMoveDown],
+        "interaction-key-row-rebase-move-commit-down",
+    ),
+    row(&[Command::RebasePick], "interaction-key-row-rebase-pick"),
+    row(
+        &[Command::RebaseReword],
+        "interaction-key-row-rebase-reword",
+    ),
+    row(&[Command::RebaseEdit], "interaction-key-row-rebase-edit"),
+    row(
+        &[Command::RebaseSquash],
+        "interaction-key-row-rebase-squash",
+    ),
+    row(&[Command::RebaseFixup], "interaction-key-row-rebase-fix-up"),
+    row(&[Command::RebaseDrop], "interaction-key-row-rebase-drop"),
+    row(
+        &[Command::SettingsSearch],
+        "interaction-key-row-settings-focus-search",
+    ),
+    row(
+        &[Command::SettingsPrevious],
+        "interaction-key-row-settings-previous-page",
+    ),
+    row(
+        &[Command::SettingsNext],
+        "interaction-key-row-settings-next-page",
+    ),
+    row(&[Command::NextChange], "interaction-key-row-next-change"),
+    row(
+        &[Command::PreviousChange],
+        "interaction-key-row-previous-change",
+    ),
+    row(
+        &[Command::NextChangeAlt],
+        "interaction-key-row-next-change-alternate-binding",
+    ),
     row(
         &[Command::PreviousChangeAlt],
-        "Previous change (alternate binding)",
+        "interaction-key-row-previous-change-alternate-binding",
     ),
-    row(&[Command::FileNext], "Next file"),
-    row(&[Command::FilePrevious], "Previous file"),
+    row(&[Command::FileNext], "interaction-key-row-next-file"),
+    row(
+        &[Command::FilePrevious],
+        "interaction-key-row-previous-file",
+    ),
     row(
         &[Command::FileToggleStage],
-        "Stage or unstage selected file",
+        "interaction-key-row-stage-or-unstage-selected-file",
     ),
-    row(&[Command::FileOpen], "Open selected file diff"),
-    row(&[Command::HunkStage], "Stage current hunk"),
-    row(&[Command::HunkUnstage], "Unstage current hunk"),
+    row(
+        &[Command::FileOpen],
+        "interaction-key-row-open-selected-file-diff",
+    ),
+    row(
+        &[Command::HunkStage],
+        "interaction-key-row-stage-current-hunk",
+    ),
+    row(
+        &[Command::HunkUnstage],
+        "interaction-key-row-unstage-current-hunk",
+    ),
     row(
         &[Command::HunkDiscard],
-        "Discard current hunk (confirmation)",
+        "interaction-key-row-discard-current-hunk-confirmation",
     ),
 ];
 

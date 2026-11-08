@@ -24,7 +24,7 @@ impl App {
             let name = name.branch.unwrap_or(name.repo);
             self.active = i;
             self.toasts.push(Toast::new(
-                format!("{name} still has work going on, so the tab now shows it"),
+                crate::i18n::message("interaction-tabs-successor", &[("name", name.into())]),
                 false,
             ));
             return;

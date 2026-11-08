@@ -467,16 +467,7 @@ impl App {
 
     /// Says where the work arrived, and opens it.
     fn landed(&mut self, landed: Landed, machine: &Machine, ctx: &egui::Context) {
-        let mut text = format!(
-            "Teleported to {} ({}): {}",
-            machine.label(),
-            crate::git::human_size(landed.size),
-            remote::git_path(&landed.folder)
-        );
-        for note in &landed.notes {
-            text.push('\n');
-            text.push_str(note);
-        }
+        let text = view::completion_message(&landed, machine);
         self.toasts.push(Toast::new(text, false));
         self.open_repo(&landed.folder, ctx);
     }

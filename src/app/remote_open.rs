@@ -279,7 +279,10 @@ impl App {
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(520.0);
-                ui.label(RichText::new("Open remote repository").font(theme::semibold(15.0)));
+                ui.label(
+                    RichText::new(crate::i18n::text("interaction-forms-remote-title"))
+                        .font(theme::semibold(15.0)),
+                );
                 if form.browser.is_some() {
                     ui.add_space(8.0);
                     form.browser_ui(ui);
@@ -287,7 +290,7 @@ impl App {
                 }
                 ui.add_space(4.0);
                 ui.label(
-                    RichText::new("git runs on that machine; this window shows what it reports.")
+                    RichText::new(crate::i18n::text("interaction-forms-remote-explanation"))
                         .color(t.text_dim)
                         .small(),
                 );
@@ -297,7 +300,10 @@ impl App {
                 }
                 if let Some(err) = &form.error {
                     ui.add_space(4.0);
-                    ui.colored_label(t.danger, err);
+                    ui.colored_label(
+                        t.danger,
+                        display_message(err).unwrap_or_else(|| git::display_error(err)),
+                    );
                 }
                 ui.add_space(12.0);
                 let valid = !form.path.trim().is_empty()
@@ -307,13 +313,22 @@ impl App {
                     };
                 ui.horizontal(|ui| {
                     let enter = !asked && ui.input(|i| i.key_pressed(Key::Enter));
-                    if crate::repo::primary_button(ui, "Open", valid, 90.0).clicked()
+                    if crate::repo::primary_button(
+                        ui,
+                        crate::i18n::text("interaction-forms-open"),
+                        valid,
+                        90.0,
+                    )
+                    .clicked()
                         || (enter && valid)
                     {
                         submit = true;
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text("interaction-forms-cancel"))
+                                .min_size(vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         cancel = true;
@@ -381,12 +396,16 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
         Kind::Ssh => host_field(ui, form, t),
     }
     ui.add_space(8.0);
-    ui.label(RichText::new("Folder there").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-folder"))
+            .color(t.text_dim)
+            .small(),
+    );
     let mut browse = false;
     ui.horizontal(|ui| {
         let path = ui.add(
             egui::TextEdit::singleline(&mut form.path)
-                .hint_text("/home/me/repo or ~/repo")
+                .hint_text(crate::i18n::text("interaction-forms-path-hint"))
                 .desired_width(ui.available_width() - 90.0)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
@@ -397,20 +416,27 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
             form.error = None;
         }
         browse = ui
-            .add(egui::Button::new("Browse…").min_size(vec2(80.0, 28.0)))
-            .on_hover_text("Pick the folder among that machine's")
+            .add(
+                egui::Button::new(crate::i18n::text("interaction-forms-browse"))
+                    .min_size(vec2(80.0, 28.0)),
+            )
+            .on_hover_text(crate::i18n::text("interaction-forms-browse-tip"))
             .clicked();
     });
     browse
 }
 
 fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
-    ui.label(RichText::new("Distribution").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-distro"))
+            .color(t.text_dim)
+            .small(),
+    );
     if form.distros_rx.is_some() {
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
             ui.label(
-                RichText::new("Looking for distributions…")
+                RichText::new(crate::i18n::text("interaction-forms-looking-distros"))
                     .color(t.text_faint)
                     .small(),
             );
@@ -419,7 +445,7 @@ fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
     }
     if form.distros.is_empty() {
         ui.label(
-            RichText::new("No WSL distribution is installed.")
+            RichText::new(crate::i18n::text("interaction-forms-no-distros"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -436,12 +462,16 @@ fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
 }
 
 fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
-    ui.label(RichText::new("Host").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-forms-host"))
+            .color(t.text_dim)
+            .small(),
+    );
     ui.horizontal(|ui| {
         let combo_w = if form.hosts.is_empty() { 0.0 } else { 40.0 };
         ui.add(
             egui::TextEdit::singleline(&mut form.host)
-                .hint_text("an alias of ~/.ssh/config, or user@host")
+                .hint_text(crate::i18n::text("interaction-forms-host-hint"))
                 .desired_width(ui.available_width() - combo_w)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
@@ -457,14 +487,49 @@ fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
                     }
                 })
                 .response
-                .on_hover_text("Hosts of ~/.ssh/config");
+                .on_hover_text(crate::i18n::text("interaction-forms-hosts-tip"));
         }
     });
     ui.label(
-        RichText::new("Keys and an agent are used; a password or passphrase is asked for here.")
+        RichText::new(crate::i18n::text("interaction-forms-keys"))
             .color(t.text_faint)
             .small(),
     );
+}
+
+/// Known connection presentation only; host/path validation and raw errors stay stable.
+pub(super) fn display_message(raw: &str) -> Option<String> {
+    use crate::i18n::{message, text};
+    let id = match raw {
+        "The folder is a path on that machine: /home/me/repo or ~/repo." => {
+            Some("interaction-forms-remote-path")
+        }
+        "Pick a WSL distribution." => Some("interaction-forms-remote-distro"),
+        "The host is what ssh takes: an alias of ~/.ssh/config or user@host." => {
+            Some("interaction-forms-remote-host")
+        }
+        "Connecting failed unexpectedly." => Some("interaction-forms-remote-failed"),
+        _ => None,
+    };
+    if let Some(id) = id {
+        return Some(text(id).to_owned());
+    }
+    if let Some(place) = raw
+        .strip_prefix("Connecting to ")
+        .and_then(|s| s.strip_suffix('…'))
+    {
+        return Some(message(
+            "interaction-forms-connecting",
+            &[("place", place.into())],
+        ));
+    }
+    raw.strip_prefix("could not find the home folder on ")
+        .map(|machine| {
+            message(
+                "interaction-forms-remote-home",
+                &[("machine", machine.into())],
+            )
+        })
 }
 
 #[cfg(test)]
@@ -509,5 +574,97 @@ mod tests {
             form(Kind::Wsl, "/home/me/repo").target(),
             Ok((Host::Wsl("Ubuntu".to_owned()), "/home/me/repo".to_owned()))
         );
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_remote_fields_switch_kind_with_opaque_targets_and_no_discovery() {
+        crate::i18n::set_language("de");
+        let form = RemoteForm {
+            kind: Kind::Ssh,
+            distros: vec!["Ubuntu-24.04".into()],
+            distro: "Ubuntu-24.04".into(),
+            distros_rx: None,
+            hosts: vec![],
+            host: "me@example.invalid".into(),
+            path: "~/repo 日本語".into(),
+            error: None,
+            focus: false,
+            browser: None,
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, form: &mut RemoteForm| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                assert!(!form_fields(ui, form, &Tokens::get(ui.ctx())));
+            },
+            form,
+        );
+        h.run();
+        h.get_by_label("Ordner dort");
+        h.get_by_label("Es werden Schlüssel und ein Agent verwendet; ein Passwort oder eine Passphrase wird hier abgefragt.");
+        h.get_by_label("WSL").click();
+        h.run();
+        assert_eq!(h.state().kind, Kind::Wsl);
+        assert_eq!(
+            h.state().target(),
+            Ok((Host::Wsl("Ubuntu-24.04".into()), "~/repo 日本語".into()))
+        );
+        h.get_by_label("SSH").click();
+        h.run();
+        assert_eq!(
+            h.state().target(),
+            Ok((
+                Host::Ssh("me@example.invalid".into()),
+                "~/repo 日本語".into()
+            ))
+        );
+        assert!(h.state().distros_rx.is_none() && h.state().browser.is_none());
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Folder there");
+    }
+
+    #[test]
+    fn remote_validation_and_status_are_display_only_and_keep_raw_machine_path_values() {
+        crate::i18n::set_language("de");
+        for (raw, expected) in [
+            (
+                "Pick a WSL distribution.",
+                "Wähle eine WSL-Distribution aus.",
+            ),
+            (
+                "The folder is a path on that machine: /home/me/repo or ~/repo.",
+                "Der Ordner muss als Pfad auf dem anderen Rechner angegeben werden: /home/me/repo oder ~/repo.",
+            ),
+            (
+                "The host is what ssh takes: an alias of ~/.ssh/config or user@host.",
+                "Der Host wird wie bei ssh angegeben: ein Alias aus ~/.ssh/config oder user@host.",
+            ),
+            (
+                "Connecting failed unexpectedly.",
+                "Die Verbindung ist unerwartet fehlgeschlagen.",
+            ),
+            (
+                "Connecting to ssh://me@example.invalid/日本語…",
+                "Verbindung mit ssh://me@example.invalid/日本語 wird hergestellt…",
+            ),
+            (
+                "could not find the home folder on SSH · me@example.invalid",
+                "Der persönliche Ordner auf SSH · me@example.invalid konnte nicht ermittelt werden",
+            ),
+        ] {
+            assert_eq!(display_message(raw).as_deref(), Some(expected));
+        }
+        assert!(display_message("External SSH diagnostic 日本語").is_none());
+        crate::i18n::set_language("en-US");
     }
 }

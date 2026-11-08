@@ -364,107 +364,147 @@ const FEATURES: &[(&str, &[&str])] = &[
 /// The "Did you know" tips under the graph: features above, each said in one short line of its
 /// own (`Ctrl` as written in them). Keep them in step with [`FEATURES`].
 const TIPS: &[&str] = &[
-    "Double-click a branch pill to check that branch out.",
-    "Ctrl+click a second commit to list the files that differ between the two.",
-    "A branch's menu has “Changes x adds to main”: what it changed, like a pull request.",
-    "Hover a branch and click its eye to hide it from the graph; Solo shows only that one.",
-    "Right-click a commit or a pill for merge, rebase, cherry-pick, revert, reset and more.",
-    "Search can look in the code: switch it to Code to find the commits that added some text.",
-    "Right-click the graph's column header to pick its columns or make the graph compact.",
-    "In a diff, click the lines you want to stage, unstage or discard only those.",
-    "F7 and Alt+↓ go to the next change of a diff; Shift+F7 and Alt+↑ to the previous one.",
-    "Double-click a commit's message in the right pane to edit it.",
-    "Ctrl+Z undoes commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
-    "Ctrl+P opens the command palette: every action, and every branch to check out.",
-    "Right-click a file for its history, its blame or the whole file at that commit.",
-    "Switch a diff from Diff to File to read the whole file.",
-    "Conflicts open in a three-pane editor with Ours, Theirs and Both for each one.",
-    "Profiles each have their own tabs, theme, git author and commit signing.",
-    "Right-click a tab to give it its own icon and highlight colour.",
-    "Ctrl+Shift+T reopens the tab closed last.",
-    "Remote on the start page opens a repository in WSL or over SSH.",
-    "A pull request's menu has Open in worktree, to work on it in a folder of its own.",
-    "Interactive rebase reorders, rewords, squashes or drops commits.",
+    "interaction-manual-tip-1",
+    "interaction-manual-tip-2",
+    "interaction-manual-tip-3",
+    "interaction-manual-tip-4",
+    "interaction-manual-tip-5",
+    "interaction-manual-tip-6",
+    "interaction-manual-tip-7",
+    "interaction-manual-tip-8",
+    "interaction-manual-tip-9",
+    "interaction-manual-tip-10",
+    "interaction-manual-tip-11",
+    "interaction-manual-tip-12",
+    "interaction-manual-tip-13",
+    "interaction-manual-tip-14",
+    "interaction-manual-tip-15",
+    "interaction-manual-tip-16",
+    "interaction-manual-tip-17",
+    "interaction-manual-tip-18",
+    "interaction-manual-tip-19",
+    "interaction-manual-tip-20",
+    "interaction-manual-tip-21",
 ];
 
 /// The "Did you know" tips, as written (with `Ctrl`).
 pub(crate) fn tips() -> &'static [&'static str] {
-    TIPS
+    use std::sync::OnceLock;
+    static ENGLISH: OnceLock<Vec<&'static str>> = OnceLock::new();
+    static GERMAN: OnceLock<Vec<&'static str>> = OnceLock::new();
+    let cache = match crate::i18n::language() {
+        crate::i18n::Language::English => &ENGLISH,
+        crate::i18n::Language::German => &GERMAN,
+    };
+    cache.get_or_init(|| TIPS.iter().map(|&id| crate::i18n::text(id)).collect())
 }
 
 /// Keyboard and mouse shortcuts of the views, besides the main actions' keys in
 /// [`crate::keymap`]: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
 pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
-        "Keyboard navigation",
+        "interaction-manual-group-keyboard-navigation",
         &[
             (
-                "Mouse back / forward",
-                "Back / forward through recent views",
+                "interaction-manual-shortcut-mouse-back-forward",
+                "interaction-manual-shortcut-back-forward-through-recent-views",
             ),
-            ("Tab / Shift+Tab", "Next / previous button, row or field"),
-            ("Enter / Space", "Click the focused button or row"),
+            (
+                "Tab / Shift+Tab",
+                "interaction-manual-shortcut-next-previous-button-row-or-field",
+            ),
+            (
+                "Enter / Space",
+                "interaction-manual-shortcut-click-the-focused-button-or-row",
+            ),
         ],
     ),
     (
-        "Start page",
+        "interaction-manual-group-start-page",
         &[
-            ("Type", "Filter the recent repositories"),
-            ("↑ / ↓", "Pick a recent repository"),
-            ("Enter", "Open the one picked"),
-            ("Esc", "Clear the filter"),
+            (
+                "interaction-manual-shortcut-type",
+                "interaction-manual-shortcut-filter-the-recent-repositories",
+            ),
+            (
+                "↑ / ↓",
+                "interaction-manual-shortcut-pick-a-recent-repository",
+            ),
+            ("Enter", "interaction-manual-shortcut-open-the-one-picked"),
+            ("Esc", "interaction-manual-shortcut-clear-the-filter"),
         ],
     ),
     (
-        "Graph",
-        &[
-            ("Enter / Shift+Enter", "Next / previous search result"),
-            ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
-            ("Cmd+click", "Compare with the selected commit"),
-            ("Double-click a pill", "Check out that branch or tag"),
-            (
-                "Alt over Rebase, Reset hard, Pull…",
-                "Preview the result in the graph (ghost run)",
-            ),
-            (
-                "Drag a pill or a commit",
-                "Merge, rebase, fast-forward, cherry-pick, move or squash",
-            ),
-            ("Esc", "Close the find bar, diff, comparison or search"),
-        ],
-    ),
-    (
-        "Changes",
-        &[
-            (
-                "Click / Shift+click",
-                "Pick lines in a diff or a file, or a range of them",
-            ),
-            (
-                "Click / Shift+click",
-                "Pick lines of a file to link to (View file, or File in a commit's diff)",
-            ),
-            ("Cmd+click a file", "Pick it to stash (or unpick it)"),
-        ],
-    ),
-    (
-        "Find in a diff, file or blame",
+        "interaction-manual-group-graph",
         &[
             (
                 "Enter / Shift+Enter",
-                "Next / previous match (while the find bar is open)",
+                "interaction-manual-shortcut-next-previous-search-result",
             ),
-            ("Esc", "Close the find bar"),
+            (
+                "interaction-manual-shortcut-then-tab-or-enter",
+                "interaction-manual-shortcut-pick-a-search-suggestion",
+            ),
+            (
+                "interaction-manual-shortcut-cmd-click",
+                "interaction-manual-shortcut-compare-with-the-selected-commit",
+            ),
+            (
+                "interaction-manual-shortcut-double-click-a-pill",
+                "interaction-manual-shortcut-check-out-that-branch-or-tag",
+            ),
+            (
+                "interaction-manual-shortcut-alt-over-rebase-reset-hard-pull",
+                "interaction-manual-shortcut-preview-the-result-in-the-graph-ghost-run",
+            ),
+            (
+                "interaction-manual-shortcut-drag-a-pill-or-a-commit",
+                "interaction-manual-shortcut-merge-rebase-fast-forward-cherry-pick-move-or-squash",
+            ),
+            (
+                "Esc",
+                "interaction-manual-shortcut-close-the-find-bar-diff-comparison-or-search",
+            ),
         ],
     ),
     (
-        "Terminal",
+        "interaction-manual-group-changes",
+        &[
+            (
+                "interaction-manual-shortcut-click-shift-click",
+                "interaction-manual-shortcut-pick-lines-in-a-diff-or-a-file-or-a-range-of-them",
+            ),
+            (
+                "interaction-manual-shortcut-click-shift-click",
+                "interaction-manual-shortcut-pick-lines-of-a-file-to-link-to-view-file-or-file-in-a-commit-s-diff",
+            ),
+            (
+                "interaction-manual-shortcut-cmd-click-a-file",
+                "interaction-manual-shortcut-pick-it-to-stash-or-unpick-it",
+            ),
+        ],
+    ),
+    (
+        "interaction-manual-group-find-in-a-diff-file-or-blame",
+        &[
+            (
+                "Enter / Shift+Enter",
+                "interaction-manual-shortcut-next-previous-match-while-the-find-bar-is-open",
+            ),
+            ("Esc", "interaction-manual-shortcut-close-the-find-bar"),
+        ],
+    ),
+    (
+        "interaction-manual-group-terminal",
         &[
             (
                 "Cmd+C",
-                "Copy the selection (without one, it goes to the shell)",
+                "interaction-manual-shortcut-copy-the-selection-without-one-it-goes-to-the-shell",
             ),
-            ("Cmd+Shift+C", "Copy the selection"),
+            (
+                "Cmd+Shift+C",
+                "interaction-manual-shortcut-copy-the-selection",
+            ),
         ],
     ),
 ];
@@ -477,20 +517,38 @@ pub(crate) fn shortcut_groups(
 ) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
     let from_keymap = |rows: &[keymap::Row]| {
         rows.iter()
-            .map(|r| (keymap::row_keys(ctx, r), r.what))
+            .map(|r| (keymap::row_keys(ctx, r), crate::i18n::text(r.what)))
             .collect::<Vec<_>>()
     };
     let mut groups = vec![
-        ("Window", from_keymap(keymap::WINDOW_ROWS)),
-        ("Repository", from_keymap(keymap::REPOSITORY_ROWS)),
-        ("Contextual actions", from_keymap(keymap::LOCAL_ROWS)),
+        (
+            crate::i18n::text("interaction-manual-group-window"),
+            from_keymap(keymap::WINDOW_ROWS),
+        ),
+        (
+            crate::i18n::text("interaction-manual-group-repository"),
+            from_keymap(keymap::REPOSITORY_ROWS),
+        ),
+        (
+            crate::i18n::text("interaction-manual-group-contextual-actions"),
+            from_keymap(keymap::LOCAL_ROWS),
+        ),
     ];
     groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
         let keys = keys
             .iter()
-            .map(|(combo, what)| (keymap::written(combo), *what))
+            .map(|(combo, what)| {
+                (
+                    keymap::written(if combo.starts_with("interaction-manual-") {
+                        crate::i18n::text(combo)
+                    } else {
+                        combo
+                    }),
+                    crate::i18n::text(what),
+                )
+            })
             .collect();
-        (*title, keys)
+        (crate::i18n::text(title), keys)
     }));
     groups
 }
@@ -528,9 +586,30 @@ pub fn ui(ui: &mut Ui) {
 
     ui.add_space(8.0);
     ui.separator();
-    for (title, keys) in shortcut_groups(ui.ctx()) {
-        heading(ui, &format!("{title} shortcuts"));
-        egui::Grid::new(("manual_keys", title))
+    shortcut_ui(ui);
+}
+
+/// The same translated tables shown by the manual, isolated from its long feature prose.
+fn shortcut_ui(ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let heading = |ui: &mut Ui, text: &str| {
+        ui.add_space(10.0);
+        ui.label(
+            RichText::new(text.to_uppercase())
+                .font(theme::semibold(10.5))
+                .color(t.text_faint),
+        );
+        ui.add_space(2.0);
+    };
+    for (group_index, (title, keys)) in shortcut_groups(ui.ctx()).into_iter().enumerate() {
+        heading(
+            ui,
+            &crate::i18n::message(
+                "interaction-manual-shortcut-heading",
+                &[("group", title.into())],
+            ),
+        );
+        egui::Grid::new(("manual_keys", group_index))
             .num_columns(2)
             .spacing([16.0, 6.0])
             .min_col_width(170.0)
@@ -696,6 +775,59 @@ mod feature_localization_tests {
         assert!(
             h.query_by_label("Ein Terminalbereich mit Tabs im Ordner des Repositorys.")
                 .is_none()
+        );
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_manual_tables_and_all_tips_follow_language_with_unchanged_main_keys() {
+        let ctx = egui::Context::default();
+        crate::i18n::set_language("en-US");
+        let english: Vec<_> = shortcut_groups(&ctx)
+            .into_iter()
+            .take(3)
+            .flat_map(|(_, rows)| rows.into_iter().map(|(key, _)| key))
+            .collect();
+        assert_eq!(
+            tips()[0],
+            "Double-click a branch pill to check that branch out."
+        );
+        crate::i18n::set_language("de");
+        let groups = shortcut_groups(&ctx);
+        let german_keys: Vec<_> = groups
+            .iter()
+            .take(3)
+            .flat_map(|(_, rows)| rows.iter().map(|(key, _)| key.clone()))
+            .collect();
+        assert_eq!(german_keys, english);
+        assert_eq!(groups[0].0, "Fenster");
+        assert_eq!(groups[0].1[0].1, "Neuer Tab");
+        assert_eq!(tips().len(), 21);
+        for tip in tips() {
+            assert!(!tip.starts_with("interaction-"));
+            assert!(tip.chars().count() <= 95, "tip no longer fits: {tip}");
+        }
+        assert!(tips()[10].contains("Tags"));
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui(|ui| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            shortcut_ui(ui);
+        });
+        h.run();
+        h.get_by_label("TASTENKÜRZEL FÜR FENSTER");
+        h.get_by_label("Neuer Tab");
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            tips()[0],
+            "Double-click a branch pill to check that branch out."
         );
     }
 }

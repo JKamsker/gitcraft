@@ -1,4 +1,7 @@
 //! Connection inventory and evidence from Git's real transport, without retaining trace secrets.
+mod display;
+pub(crate) use display::line as display_line;
+
 use crate::git;
 use std::path::Path;
 

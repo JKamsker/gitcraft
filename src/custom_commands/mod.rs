@@ -45,10 +45,10 @@ impl Placement {
 
     pub fn label(self) -> &'static str {
         match self {
-            Placement::Commit => "Commit menu",
-            Placement::Branch => "Branch menu",
-            Placement::File => "File menu",
-            Placement::Palette => "Command palette",
+            Placement::Commit => crate::i18n::text("interaction-preferences-commit-menu"),
+            Placement::Branch => crate::i18n::text("interaction-preferences-branch-menu"),
+            Placement::File => crate::i18n::text("interaction-preferences-file-menu"),
+            Placement::Palette => crate::i18n::text("interaction-preferences-palette"),
         }
     }
 }
@@ -69,8 +69,8 @@ impl OutputTo {
 
     pub fn label(self) -> &'static str {
         match self {
-            OutputTo::Toast => "Toast",
-            OutputTo::Terminal => "Terminal",
+            OutputTo::Toast => crate::i18n::text("interaction-preferences-toast"),
+            OutputTo::Terminal => crate::i18n::text("interaction-preferences-terminal"),
         }
     }
 }
@@ -91,8 +91,8 @@ impl PromptKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            PromptKind::Text => "Text",
-            PromptKind::Branch => "Branch",
+            PromptKind::Text => crate::i18n::text("interaction-preferences-text"),
+            PromptKind::Branch => crate::i18n::text("interaction-preferences-branch"),
         }
     }
 }
@@ -160,6 +160,19 @@ pub const BUILT_IN: [(&str, &str); 6] = [
     ),
     ("REPO", "the repository's folder, on its machine"),
 ];
+
+/// The built-in variable's prose, resolved at paint time. The variable itself stays literal.
+pub fn variable_description<'a>(name: &str, original: &'a str) -> &'a str {
+    match name {
+        "SHA" => crate::i18n::text("interaction-preferences-variable-sha"),
+        "SHORT_SHA" => crate::i18n::text("interaction-preferences-variable-short_sha"),
+        "BRANCH" => crate::i18n::text("interaction-preferences-variable-branch"),
+        "REMOTE" => crate::i18n::text("interaction-preferences-variable-remote"),
+        "FILE" => crate::i18n::text("interaction-preferences-variable-file"),
+        "REPO" => crate::i18n::text("interaction-preferences-variable-repo"),
+        _ => original,
+    }
+}
 
 /// Localize only our finite validation messages. Raw validation/error identities stay unchanged.
 pub fn display_problem(raw: &str) -> String {

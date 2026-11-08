@@ -13,6 +13,12 @@ pub(super) struct Toast {
     text: String,
     error: bool,
     until: Instant,
+    update_go_back: Option<UpdateGoBack>,
+}
+
+/// Created only from the failed go_back_witnessed result; never inferred from toast text.
+struct UpdateGoBack {
+    failure: update::Failure,
 }
 
 impl Toast {
@@ -27,7 +33,34 @@ impl Toast {
             text,
             error,
             until: Instant::now() + Duration::from_secs(secs),
+            update_go_back: None,
         }
+    }
+
+    pub(super) fn from_go_back_failure(failure: update::Failure) -> Self {
+        let mut toast = Self::new(format!("Couldn't go back: {}", failure.raw()), true);
+        toast.update_go_back = Some(UpdateGoBack { failure });
+        toast
+    }
+
+    fn display_text(&self) -> String {
+        match &self.update_go_back {
+            Some(source)
+                if self.error
+                    && self.text == format!("Couldn't go back: {}", source.failure.raw()) =>
+            {
+                crate::i18n::message(
+                    "interaction-dialogs-go-back",
+                    &[("error", source.failure.display().into())],
+                )
+            }
+            Some(_) => self.text.clone(),
+            None => display_app_message(&self.text),
+        }
+    }
+
+    fn label(&self, ui: &mut Ui) {
+        ui.add(egui::Label::new(self.display_text()).wrap());
     }
 }
 
@@ -124,21 +157,33 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_width(640.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Manual").font(theme::semibold(16.0)));
+                    ui.label(
+                        RichText::new(crate::i18n::text("interaction-palette-manual-caption"))
+                            .font(theme::semibold(16.0)),
+                    );
                     ui.label(
                         RichText::new(format!("gitcraft {}", update::CURRENT)).color(t.text_faint),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-palette-close"),
+                        )
+                        .clicked()
+                        {
                             close = true;
                         }
-                        let tip = "Copies diagnostics and opens a prefilled issue for review: versions, system, graphics, \
-                                   git, gh, glab and tea (signed in or not, never a token), and \
-                                   the git settings in effect (no name or email)";
+                        let tip = crate::i18n::text("interaction-palette-diagnostic-hint");
                         if ui
-                            .add_enabled(!collecting, egui::Button::new("Copy diagnostics"))
+                            .add_enabled(
+                                !collecting,
+                                egui::Button::new(crate::i18n::text("interaction-palette-copy")),
+                            )
                             .on_hover_text(tip)
-                            .on_disabled_hover_text("Collecting…")
+                            .on_disabled_hover_text(crate::i18n::text(
+                                "interaction-palette-collecting",
+                            ))
                             .clicked()
                         {
                             copy = true;
@@ -208,7 +253,7 @@ impl App {
                                     16.0,
                                     if toast.error { t.danger } else { t.success },
                                 );
-                                ui.add(egui::Label::new(&toast.text).wrap());
+                                toast.label(ui);
                             });
                         });
                     ui.add_space(6.0);
@@ -257,5 +302,121 @@ mod tests {
         } else {
             assert!(body.contains("<a href"));
         }
+    }
+}
+
+/// App-owned status/error paint; all classification and stored values remain raw.
+pub(super) fn display_app_message(raw: &str) -> String {
+    super::clone::display_message(raw)
+        .or_else(|| super::remote_open::display_message(raw))
+        .or_else(|| super::repo_scan::display_error(raw))
+        .or_else(|| super::draft_saving::display_notice(raw))
+        .or_else(|| crate::launch::display_message(raw))
+        .or_else(|| super::startup_display::message(raw))
+        .or_else(|| crate::portable::display_message(raw))
+        .unwrap_or_else(|| {
+            let remote = crate::remote::display::diagnostic(raw);
+            if remote == raw {
+                crate::git::display_error(raw)
+            } else {
+                remote
+            }
+        })
+}
+
+#[cfg(test)]
+mod remote_display_tests {
+    #[test]
+    fn actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers() {
+        crate::i18n::set_language("de");
+        let raw = "it is a symbolic link";
+        assert_eq!(
+            super::display_app_message(raw),
+            "Dies ist ein symbolischer Link."
+        );
+        assert_eq!(raw, "it is a symbolic link");
+        assert_eq!(
+            super::display_app_message("gitcraft isn't allowed to look in /opaque/日本語."),
+            "gitcraft darf /opaque/日本語 nicht durchsuchen."
+        );
+        let unknown = "opaque external 日本語\n: unchanged";
+        assert_eq!(super::display_app_message(unknown), unknown);
+        // No command/Host provenance is available at this generic paint boundary.
+        let command = "opaque command on SSH · opaque: invalid native request";
+        assert_eq!(super::display_app_message(command), command);
+        crate::i18n::set_language("en-US");
+        assert_eq!(super::display_app_message(raw), raw);
+    }
+}
+
+#[cfg(test)]
+mod updater_toast_display_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline() {
+        let failure = update::Failure::NoPrevious {
+            raw: "No previous version of gitcraft is kept".into(),
+        };
+        let toast = Toast::from_go_back_failure(failure.clone());
+        let raw = toast.text.clone();
+        let until = toast.until;
+        assert_eq!(
+            raw,
+            "Couldn't go back: No previous version of gitcraft is kept"
+        );
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, toast: &mut Toast| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                toast.label(ui);
+            },
+            toast,
+        );
+        h.run();
+        h.get_by_label(&raw);
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("Zurückwechseln fehlgeschlagen: Es wurde keine vorherige Version von gitcraft aufbewahrt");
+        assert_eq!(h.state().text, raw);
+        assert!(h.state().error);
+        assert_eq!(h.state().until, until);
+        assert_eq!(
+            h.state().update_go_back.as_ref().map(|s| &s.failure),
+            Some(&failure)
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(&raw);
+        assert_eq!(h.state().text, raw);
+        assert_eq!(h.state().until, until);
+    }
+
+    #[test]
+    fn go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling() {
+        crate::i18n::set_language("de");
+        let raw = "No previous version of gitcraft is kept";
+        let opaque = Toast::from_go_back_failure(update::Failure::Opaque(raw.into()));
+        assert_eq!(
+            opaque.display_text(),
+            format!("Zurückwechseln fehlgeschlagen: {raw}")
+        );
+        let ordinary = Toast::new(opaque.text.clone(), true);
+        assert!(ordinary.update_go_back.is_none());
+        assert_eq!(ordinary.display_text(), ordinary.text);
+        let ordinary_secs = Toast::for_secs("unrelated".into(), false, 10);
+        assert!(ordinary_secs.update_go_back.is_none());
+        let mut mismatched =
+            Toast::from_go_back_failure(update::Failure::NoPrevious { raw: raw.into() });
+        mismatched.text = "Couldn't go back: unrelated raw".into();
+        assert_eq!(mismatched.display_text(), mismatched.text);
+        mismatched.text = format!("Couldn't go back: {raw}");
+        mismatched.error = false;
+        assert_eq!(mismatched.display_text(), mismatched.text);
     }
 }

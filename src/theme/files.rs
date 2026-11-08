@@ -15,6 +15,9 @@ use serde_json::{Map, Value, json};
 use super::catalog::BUILTIN;
 use super::palette::{self, KEYS, Palette, luminance, over, parse_hex, to_hex};
 
+mod display;
+pub(crate) use display::{credit as display_credit, diagnostic as display_diagnostic};
+
 /// gitcraft's themes folder.
 pub fn dir() -> Option<PathBuf> {
     eframe::storage_dir("gitcraft").map(|d| d.join("themes"))

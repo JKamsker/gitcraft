@@ -528,13 +528,13 @@ impl App {
             .iter()
             .map(|(&id, w)| {
                 let label = if id == ViewportId::ROOT {
-                    "Main window".into()
+                    crate::i18n::text("interaction-tabs-main-window").into()
                 } else {
                     w.tabs
                         .get(w.active)
                         .and_then(repo_path)
                         .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "New tab".into())
+                        .unwrap_or_else(|| crate::i18n::text("interaction-tabs-new-tab").into())
                 };
                 (id, label)
             })
@@ -542,7 +542,10 @@ impl App {
         if self.windows.current != ViewportId::ROOT
             && !targets.iter().any(|(id, _)| *id == ViewportId::ROOT)
         {
-            targets.push((ViewportId::ROOT, "Main window".into()));
+            targets.push((
+                ViewportId::ROOT,
+                crate::i18n::text("interaction-tabs-main-window").into(),
+            ));
         }
         targets
     }

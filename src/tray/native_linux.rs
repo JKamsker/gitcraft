@@ -46,9 +46,11 @@ impl ksni::Tray for Item {
         self.events.available(Availability::Ready);
     }
     fn watcher_offline(&self, reason: ksni::OfflineReason) -> bool {
-        self.events.available(Availability::Fallback(format!(
-            "No StatusNotifierWatcher: {reason:?}"
-        )));
+        self.events
+            .available(Availability::Fallback(crate::i18n::message(
+                "interaction-watch-no-host",
+                &[("detail", format!("{reason:?}").into())],
+            )));
         true // remain registered so a later tray host can restore the item
     }
 }

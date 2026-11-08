@@ -107,10 +107,19 @@ impl App {
         }
         let entries = self.palette_entries(ctx);
         let choices = palette.step.as_ref().map(|s| self.palette_choices(&s.pick));
+        let step_title = palette.step.as_ref().and_then(|step| {
+            entries
+                .iter()
+                .find(|item| item.key == step.key)
+                .map(|item| item.label.clone())
+        });
         if let Some(palette) = &mut self.palette {
             palette.entries = Some((key.clone(), entries));
             if let (Some(step), Some(choices)) = (&mut palette.step, choices) {
                 step.choices = choices;
+                if let Some(title) = step_title {
+                    step.title = title;
+                }
             }
         }
     }
@@ -286,7 +295,13 @@ impl Palette {
                 match &link {
                     Some(Ok(link)) => {
                         let what = super::links::describe(link);
-                        if ui.button(format!("Open link: {what}")).clicked() {
+                        if ui
+                            .button(crate::i18n::message(
+                                "interaction-palette-link",
+                                &[("target", what.into())],
+                            ))
+                            .clicked()
+                        {
                             open_link = true;
                         }
                     }
@@ -336,7 +351,7 @@ impl Palette {
                 ui.add_space(4.0);
                 step.pick.placeholder()
             }
-            None => "Type a command or a branch, or paste a forge link…",
+            None => crate::i18n::text("interaction-palette-query"),
         };
         let edit = ui.add(
             egui::TextEdit::singleline(&mut self.query)
@@ -367,9 +382,9 @@ impl Palette {
     ) -> Option<usize> {
         if count == 0 {
             let text = if self.step.is_some() && self.query.is_empty() {
-                "Nothing to pick"
+                crate::i18n::text("interaction-palette-nothing-pick")
             } else {
-                "Nothing matches"
+                crate::i18n::text("interaction-palette-nothing-match")
             };
             ui.label(RichText::new(text).color(t.text_faint));
             return None;

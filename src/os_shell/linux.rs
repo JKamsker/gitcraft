@@ -56,9 +56,9 @@ pub fn set_progress(state: TaskbarState) {
 pub(super) fn set_menu(items: &[MenuItem]) {
     let mut items = items.to_vec();
     items.push(MenuItem {
-        title: "Quit gitcraft".into(),
+        title: crate::i18n::text("interaction-control-quit-gitcraft").into(),
         args: vec!["--quit".into()],
-        tooltip: "Save and quit the running instance".into(),
+        tooltip: crate::i18n::text("interaction-control-save-and-quit-the-running-instance").into(),
         recent: false,
     });
     crate::desktop_entry::set_actions(&items);

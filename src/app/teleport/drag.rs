@@ -64,14 +64,16 @@ impl DragTargets {
             .anchor(egui::Align2::CENTER_TOP, [0., 56.])
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label("Drop the tab onto a machine to teleport its work");
+                    ui.label(crate::i18n::text("interaction-teleport-drop"));
                     ui.label(
-                        egui::RichText::new("Review the destination before starting.").small(),
+                        egui::RichText::new(crate::i18n::text("interaction-teleport-review"))
+                            .small(),
                     );
                     ui.horizontal_wrapped(|ui| {
                         for machine in machines {
                             let response = ui.add(
-                                egui::Button::new(machine.label()).min_size(egui::vec2(120., 42.)),
+                                egui::Button::new(machine.display_label())
+                                    .min_size(egui::vec2(120., 42.)),
                             );
                             let pointer = ctx.pointer_interact_pos();
                             if drop_hit(
@@ -92,10 +94,10 @@ impl DragTargets {
                         }
                     });
                     if self.listed.is_some() {
-                        ui.label("Finding WSL machines…");
+                        ui.label(crate::i18n::text("interaction-teleport-finding"));
                     }
                     if let Some(error) = &self.error {
-                        ui.label(error);
+                        ui.label(crate::teleport::display::diagnostic(error));
                     }
                     if self.ssh.is_empty()
                         && self.wsl.is_empty()
@@ -104,7 +106,7 @@ impl DragTargets {
                             .iter()
                             .all(|p| Machine::of(p) == Machine::of(&self.source))
                     {
-                        ui.label("Use the tab's Teleport menu to type another SSH host.");
+                        ui.label(crate::i18n::text("interaction-teleport-other-host"));
                     }
                 });
             });
