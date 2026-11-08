@@ -7565,3 +7565,13 @@ repo-workflows-operation-ssh-14038 = Ausgewählten SSH-Schlüssel dort testen
 
 repo-workflows-operation-ssh-14048 = Öffentlichen SSH-Schlüssel dort registrieren
 
+repo-workflows-forks-tidy-complete-body = Entfernt die von gitcraft für Forks hinzugefügten Remotes, von denen kein Branch mehr pullt oder zu denen er pusht: { $unused }, samt Remote-Tracking-Branches. Strg+Z fügt sie wieder hinzu (für ihre Branches erneut abrufen).{ $kept ->
+        [yes] { "\u000A\u000ABehalten: " }{ $names }, deren Branches Commits enthalten, die hier auf keinem Branch liegen.
+       *[no] { "" }
+    }
+
+repo-workflows-status-forks-none-to-remove = Kein Fork-Remote kann entfernt werden.{ $kept ->
+        [yes] { "\u000A\u000ABehalten: " }{ $names }, deren Branches Commits enthalten, die hier auf keinem Branch liegen.
+       *[no] { "" }
+    }
+
