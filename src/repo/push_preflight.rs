@@ -1083,7 +1083,11 @@ pub(in crate::repo) mod core_guard_paint_tests {
         text(&frame(ctx, vec![], &mut draw))
     }
 
-    pub(in crate::repo) fn click(ctx: &Context, label: &str, mut draw: impl FnMut(&mut egui::Ui)) {
+    pub(in crate::repo) fn click(
+        ctx: &Context,
+        label: &str,
+        mut draw: impl FnMut(&mut egui::Ui),
+    ) -> Result<(), String> {
         let _ = frame(ctx, vec![], &mut draw);
         let output = frame(ctx, vec![], &mut draw);
         let position = output
@@ -1093,7 +1097,7 @@ pub(in crate::repo) mod core_guard_paint_tests {
                 Shape::Text(t) if t.galley.text() == label => Some(t.pos + t.galley.size() / 2.),
                 _ => None,
             })
-            .unwrap_or_else(|| panic!("Missing button {label}: {}", text(&output)));
+            .ok_or_else(|| format!("Missing button {label}: {}", text(&output)))?;
         for pressed in [true, false] {
             let _ = frame(
                 ctx,
@@ -1109,10 +1113,13 @@ pub(in crate::repo) mod core_guard_paint_tests {
                 &mut draw,
             );
         }
+
+        Ok(())
     }
 
     #[test]
-    fn core_guard_paint_checklist_keeps_supplied_plan_and_reload_action_raw() {
+    fn core_guard_paint_checklist_keeps_supplied_plan_and_reload_action_raw() -> Result<(), String>
+    {
         use crate::git::repository_tools::routes::PushRoute;
         let route = PushRoute {
             branch: "topic-12345".into(),
@@ -1142,7 +1149,7 @@ pub(in crate::repo) mod core_guard_paint_tests {
             detail: "Likely secret at line 12345; value withheld.".into(),
         });
         let original_ops = plan.again();
-        let original_args = check::push_args(&plan).unwrap();
+        let original_args = check::push_args(&plan).map_err(|error| format!("{error:?}"))?;
         let targets = plan.targets.clone();
         let findings = plan
             .findings
@@ -1177,18 +1184,24 @@ pub(in crate::repo) mod core_guard_paint_tests {
             let mut outcome = Outcome::Open;
             click(&ctx, crate::i18n::text("repo-core-3171"), |ui| {
                 outcome = dialog(ui, &mut plan, &mut acknowledge);
-            });
+            })?;
             let Outcome::Done(action) = outcome else {
-                panic!("reload action missing")
+                return Err("reload action missing".into());
             };
             let Action::ReloadPreflight(reload) = *action else {
-                panic!("unexpected action")
+                return Err("unexpected action".into());
             };
             assert_eq!(reload.again(), original_ops);
-            assert_eq!(check::push_args(&reload).unwrap(), original_args);
+            assert_eq!(
+                check::push_args(&reload).map_err(|error| format!("{error:?}"))?,
+                original_args
+            );
             assert_eq!(reload.targets, targets);
             assert_eq!(plan.again(), original_ops);
-            assert_eq!(check::push_args(&plan).unwrap(), original_args);
+            assert_eq!(
+                check::push_args(&plan).map_err(|error| format!("{error:?}"))?,
+                original_args
+            );
             assert_eq!(
                 plan.findings
                     .iter()
@@ -1199,6 +1212,8 @@ pub(in crate::repo) mod core_guard_paint_tests {
             assert!(!acknowledge);
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }
 

@@ -33,8 +33,8 @@ impl RepoTab {
             &crate::i18n::message(
                 "repo-workflows-ci_view-ci-view-ui-b431c0d7",
                 &[
-                    ("noun", (noun).clone().into()),
-                    ("short-view-sha-1", (short(&view.sha)).clone().into()),
+                    ("noun", (noun).into()),
+                    ("short-view-sha-1", (short(&view.sha)).into()),
                 ],
             ),
             popped,
@@ -281,7 +281,7 @@ fn run_header(ui: &mut Ui, run: &Run, now: i64, acts: &mut Vec<Action>) {
                 ui,
                 &crate::i18n::message(
                     "repo-workflows-ci_view-run-header-396f73af",
-                    &[("run-attempt-1", (run.attempt).clone().into())],
+                    &[("run-attempt-1", (run.attempt).into())],
                 ),
                 t.text_dim,
             );

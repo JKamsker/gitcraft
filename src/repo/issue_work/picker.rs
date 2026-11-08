@@ -251,7 +251,7 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
         ) => Some(why.clone()),
         (Some(_), Some(busy)) => Some(crate::i18n::message(
             "repo-workflows-issue_work-show-b37705f6",
-            &[("busy", (busy).clone().into())],
+            &[("busy", (busy).into())],
         )),
         (Some(_), None) => None,
     };
@@ -375,7 +375,7 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-issue_work-choose-561b5212",
-                &[("ISSUES-MAX", (ISSUES_MAX).clone().into())],
+                &[("ISSUES-MAX", (ISSUES_MAX).into())],
             ))
             .size(11.5)
             .color(t.text_faint),

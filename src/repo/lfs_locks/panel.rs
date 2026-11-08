@@ -242,12 +242,12 @@ fn unlock_buttons(
                             ));
                         crate::i18n::message(
                             "repo-workflows-lfs_locks-unlock-buttons-b57b0be8",
-                            &[("owner", (owner).clone().into())],
+                            &[("owner", (owner).into())],
                         )
                     }
                     (Some(_), _) => crate::i18n::message(
                         "repo-workflows-lfs_locks-unlock-buttons-9971cec2",
-                        &[("n", (n).clone().into())],
+                        &[("n", (n).into())],
                     ),
                     (None, _) if n == 0 => {
                         crate::i18n::text("repo-workflows-lfs_locks-unlock-buttons-f16646da")
@@ -255,7 +255,7 @@ fn unlock_buttons(
                     }
                     (None, _) => crate::i18n::message(
                         "repo-workflows-lfs_locks-unlock-buttons-6021bccb",
-                        &[("n", (n).clone().into())],
+                        &[("n", (n).into())],
                     ),
                 };
                 let force = ui
@@ -280,7 +280,7 @@ fn unlock_buttons(
                 }
                 n => crate::i18n::message(
                     "repo-workflows-lfs_locks-unlock-buttons-24110cc4",
-                    &[("n", (n).clone().into())],
+                    &[("n", (n).into())],
                 ),
             };
             if ui

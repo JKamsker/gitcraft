@@ -109,7 +109,7 @@ fn have_head(repo: &Path, pr: &PrHead, creds: Option<&Credentials>) -> Result<()
     } else {
         Err(crate::i18n::message(
             "repo-workflows-versions-have-head-36c411a3",
-            &[("short-pr-head-1", (short(&pr.head)).clone().into())],
+            &[("short-pr-head-1", (short(&pr.head)).into())],
         ))
     }
 }

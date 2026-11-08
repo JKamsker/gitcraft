@@ -47,7 +47,6 @@ fn display_headline(r: &Rejection) -> String {
 }
 
 /// `one` for a single commit, `many` for several.
-
 /// How the branch stands, after the headline.
 pub(super) fn explanation(r: &Rejection) -> String {
     crate::i18n::message(
@@ -220,7 +219,7 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-push-rejected-683768ab",
-                &[("r-behind-named-1", (r.behind - named).clone().into())],
+                &[("r-behind-named-1", (r.behind - named).into())],
             ))
             .size(11.5)
             .color(t.text_faint),
@@ -245,7 +244,7 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
                 );
                 let tip = crate::i18n::message(
                     "repo-workflows-push-rejected-0db0e893",
-                    &[("mode-label-1", (mode.label()).clone().into())],
+                    &[("mode-label-1", (mode.label()).into())],
                 );
                 primary(ui, &label, &tip, idle, || {
                     acts.push(Action::PushFlow(PushAct::Pull))
@@ -308,7 +307,7 @@ fn pull_buttons(ui: &mut Ui, mode: PullMode, first: bool, idle: bool, acts: &mut
             None,
             crate::i18n::message(
                 "repo-workflows-push-pull-buttons-43992a40",
-                &[("mode-label-1", (mode.label()).clone().into())],
+                &[("mode-label-1", (mode.label()).into())],
             ),
         )]
     };
@@ -334,7 +333,7 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
         ui,
         &crate::i18n::message(
             "repo-workflows-push-refused-ff02e2eb",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         ),
         true,
     );
@@ -374,7 +373,7 @@ fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: 
         ui,
         &crate::i18n::message(
             "repo-workflows-push-no-upstream-9ab92941",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         ),
         true,
     );
@@ -382,7 +381,7 @@ fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: 
         ui,
         &crate::i18n::message(
             "repo-workflows-push-no-upstream-86cb1261",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         ),
         false,
     );

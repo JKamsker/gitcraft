@@ -152,7 +152,7 @@ fn usage(ui: &mut Ui, t: &Tokens, panel: &Panel) {
                     "repo-workflows-lfs_storage-usage-a5b8a0cd",
                     &[
                         ("human-size-u-bytes-1", (human_size(u.bytes)).clone().into()),
-                        ("n", (n).clone().into()),
+                        ("n", (n).into()),
                     ],
                 ),
             };
@@ -192,7 +192,7 @@ fn checkout(ui: &mut Ui, t: &Tokens, state: &StorageState, idle: bool, acts: &mu
                     idle,
                     egui::Button::new(crate::i18n::message(
                         "repo-workflows-lfs_storage-checkout-5f0a6ba0",
-                        &[("paths-len-1", (paths.len()).clone().into())],
+                        &[("paths-len-1", (paths.len()).into())],
                     )),
                 )
                 .on_hover_text(crate::i18n::text(
@@ -223,7 +223,7 @@ fn checkout(ui: &mut Ui, t: &Tokens, state: &StorageState, idle: bool, acts: &mu
     }
     egui::CollapsingHeader::new(crate::i18n::message(
         "repo-workflows-lfs_storage-checkout-1716d186",
-        &[("missing-len-1", (missing.len()).clone().into())],
+        &[("missing-len-1", (missing.len()).into())],
     ))
     .id_salt("lfs-missing")
     .show(ui, |ui| {
@@ -268,10 +268,7 @@ fn checkout(ui: &mut Ui, t: &Tokens, state: &StorageState, idle: bool, acts: &mu
         if missing.len() > LISTED {
             let more = crate::i18n::message(
                 "repo-workflows-lfs_storage-checkout-683768ab",
-                &[(
-                    "missing-len-listed-1",
-                    (missing.len() - LISTED).clone().into(),
-                )],
+                &[("missing-len-listed-1", (missing.len() - LISTED).into())],
             );
             ui.label(RichText::new(more).color(t.text_faint).small());
         }
@@ -445,7 +442,7 @@ fn prune(ui: &mut Ui, t: &Tokens, panel: &mut Panel, idle: bool, acts: &mut Vec<
                 } else {
                     crate::i18n::message(
                         "repo-workflows-lfs_storage-prune-8f8978b1",
-                        &[("plan-objects-1", (plan.objects).clone().into())],
+                        &[("plan-objects-1", (plan.objects).into())],
                     )
                 };
                 let label = if panel.confirm_prune {

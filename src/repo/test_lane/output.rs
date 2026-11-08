@@ -19,7 +19,7 @@ impl RepoTab {
         let mut open = true;
         egui::Window::new(crate::i18n::message(
             "repo-workflows-test_lane-test-output-window-3dddddc9",
-            &[("short-kept-commit-1", (short(&kept.commit)).clone().into())],
+            &[("short-kept-commit-1", (short(&kept.commit)).into())],
         ))
         .id(egui::Id::new(("gitcraft-test-output", self.path.clone())))
         .open(&mut open)
@@ -44,10 +44,7 @@ impl RepoTab {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-test_lane-test-output-window-0e95604a",
-                        &[(
-                            "crate-git-kept-lines-1",
-                            (crate::git::KEPT_LINES).clone().into(),
-                        )],
+                        &[("crate-git-kept-lines-1", (crate::git::KEPT_LINES).into())],
                     ))
                     .color(t.text_dim),
                 );
@@ -110,7 +107,7 @@ pub(super) fn end_text(end: &TestEnd) -> (String, Tone) {
         } => (
             crate::i18n::message(
                 "repo-workflows-test_lane-end-text-07f51b84",
-                &[("code", (code).clone().into())],
+                &[("code", (*(code)).into())],
             ),
             Tone::Bad,
         ),

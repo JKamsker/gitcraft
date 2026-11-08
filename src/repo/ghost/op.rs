@@ -37,22 +37,22 @@ impl GhostOp {
             GhostOp::Rebase { label, .. } => crate::i18n::message(
                 "repo-workflows-ghost-title-2d281f6b",
                 &[
-                    ("current", (current).clone().into()),
+                    ("current", (current).into()),
                     ("label", (label).clone().into()),
                 ],
             ),
             GhostOp::ResetHard { to } => crate::i18n::message(
                 "repo-workflows-ghost-title-ae583650",
                 &[
-                    ("current", (current).clone().into()),
-                    ("short-to-1", (short(to)).clone().into()),
+                    ("current", (current).into()),
+                    ("short-to-1", (short(to)).into()),
                 ],
             ),
             GhostOp::Pull(mode) => crate::i18n::message(
                 "repo-workflows-ghost-title-baaedb85",
                 &[
-                    ("mode-label-1", (mode.label()).clone().into()),
-                    ("current", (current).clone().into()),
+                    ("mode-label-1", (mode.label()).into()),
+                    ("current", (current).into()),
                 ],
             ),
             GhostOp::ForcePush { branch } => crate::i18n::message(
@@ -72,7 +72,7 @@ impl GhostOp {
             ),
             GhostOp::DropCommit { hash } => crate::i18n::message(
                 "repo-workflows-ghost-title-fc4198eb",
-                &[("short-hash-1", (short(hash)).clone().into())],
+                &[("short-hash-1", (short(hash)).into())],
             ),
         }
     }

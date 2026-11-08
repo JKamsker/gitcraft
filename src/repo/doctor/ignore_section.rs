@@ -211,14 +211,8 @@ fn attributes(ui: &mut Ui, e: &Explained) {
             crate::i18n::message(
                 "repo-workflows-doctor-attributes-68cb5f93",
                 &[
-                    (
-                        "eol-word-eol-index-1",
-                        (eol_word(&eol.index)).clone().into(),
-                    ),
-                    (
-                        "eol-word-eol-worktree-2",
-                        (eol_word(&eol.worktree)).clone().into(),
-                    ),
+                    ("eol-word-eol-index-1", (eol_word(&eol.index)).into()),
+                    ("eol-word-eol-worktree-2", (eol_word(&eol.worktree)).into()),
                     (
                         "if-eol-attr-is-empty-else-eol-at-3",
                         (if eol.attr.is_empty() {
@@ -226,7 +220,6 @@ fn attributes(ui: &mut Ui, e: &Explained) {
                         } else {
                             &eol.attr
                         })
-                        .clone()
                         .into(),
                     ),
                 ],
@@ -253,17 +246,17 @@ fn attributes(ui: &mut Ui, e: &Explained) {
             }
             ("filter", name) if d.required => crate::i18n::message(
                 "repo-workflows-doctor-attributes-ec97a4d2",
-                &[("name", (name).clone().into())],
+                &[("name", (name).into())],
             ),
             ("filter", name) => crate::i18n::message(
                 "repo-workflows-doctor-attributes-4af8906f",
-                &[("name", (name).clone().into())],
+                &[("name", (name).into())],
             ),
             (attr, name) => crate::i18n::message(
                 "repo-workflows-doctor-attributes-c6b25148",
                 &[
-                    ("attr", (attr).clone().into()),
-                    ("name", (name).clone().into()),
+                    ("attr", (attr).into()),
+                    ("name", (name).into()),
                     (
                         "if-attr-merge-merges-it-else-dif-1",
                         (if attr == "merge" {
@@ -271,7 +264,6 @@ fn attributes(ui: &mut Ui, e: &Explained) {
                         } else {
                             crate::i18n::text("repo-workflows-doctor-attributes-2176c800")
                         })
-                        .clone()
                         .into(),
                     ),
                 ],
@@ -320,7 +312,7 @@ fn ignored_card(ui: &mut Ui, state: &IgnoreState, acts: &mut Vec<Action>) {
     let title = match &state.ignored {
         Some(Ok((_, total))) => crate::i18n::message(
             "repo-workflows-doctor-ignored-card-37abda7f",
-            &[("total", (total).clone().into())],
+            &[("total", (*(total)).into())],
         ),
         _ => crate::i18n::text("repo-workflows-doctor-ignored-card-0384b20e").to_owned(),
     };
@@ -352,7 +344,7 @@ fn ignored_card(ui: &mut Ui, state: &IgnoreState, acts: &mut Vec<Action>) {
                 ui,
                 crate::i18n::message(
                     "repo-workflows-doctor-ignored-card-683768ab",
-                    &[("total-list-len-1", (total - list.len()).clone().into())],
+                    &[("total-list-len-1", (total - list.len()).into())],
                 ),
             );
         }
@@ -544,7 +536,7 @@ fn preview(ui: &mut Ui, p: &Preview) {
                     "repo-workflows-doctor-preview-683768ab",
                     &[(
                         "paths-len-preview-shown-1",
-                        (paths.len() - PREVIEW_SHOWN).clone().into(),
+                        (paths.len() - PREVIEW_SHOWN).into(),
                     )],
                 ),
             );

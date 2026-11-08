@@ -143,17 +143,14 @@ pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<Strin
     if paths.is_empty() {
         return Some(crate::i18n::message(
             "repo-workflows-partial_stash-files-problem-bdb546dd",
-            &[(
-                "crate-manual-command-1",
-                (crate::manual::command()).clone().into(),
-            )],
+            &[("crate-manual-command-1", (crate::manual::command()).into())],
         ));
     }
     let bytes: usize = paths.iter().map(|p| p.len() + 12).sum();
     if bytes > PATHS_BUDGET {
         return Some(crate::i18n::message(
             "repo-workflows-partial_stash-files-problem-0a39f709",
-            &[("paths-len-1", (paths.len()).clone().into())],
+            &[("paths-len-1", (paths.len()).into())],
         ));
     }
     for path in paths {
@@ -381,7 +378,7 @@ fn after_failed_push(path: &Path, before: Option<&str>, e: &str, roll_back_stage
         return crate::i18n::message(
             "repo-workflows-partial_stash-after-failed-push-8f99c6b0",
             &[
-                ("why", (why).clone().into()),
+                ("why", (why).into()),
                 ("one-line-e-1", (one_line(e)).clone().into()),
             ],
         );
@@ -389,7 +386,7 @@ fn after_failed_push(path: &Path, before: Option<&str>, e: &str, roll_back_stage
     crate::i18n::message(
         "repo-workflows-partial_stash-after-failed-push-493b498c",
         &[
-            ("super-short-now-1", (super::short(&now)).clone().into()),
+            ("super-short-now-1", (super::short(&now)).into()),
             ("one-line-e-2", (one_line(e)).clone().into()),
         ],
     )

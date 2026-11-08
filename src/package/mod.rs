@@ -190,8 +190,10 @@ mod witness_tests {
     use super::*;
 
     #[test]
-    fn actual_source_guards_capture_owned_witnesses_without_discovery() {
-        let missing = require_manifests(false, false).expect_err("no manifests");
+    fn actual_source_guards_capture_owned_witnesses_without_discovery() -> Result<(), String> {
+        let missing = require_manifests(false, false)
+            .err()
+            .ok_or("no manifests")?;
         assert!(require_manifests(true, false).is_ok());
         assert!(require_manifests(false, true).is_ok());
         let pkg = Package {
@@ -201,7 +203,7 @@ mod witness_tests {
             dir: "ref/main".into(),
             registry: Some("https://example/1234.5; ;".into()),
         };
-        let registry = check_registry(&pkg).expect_err("custom registry");
+        let registry = check_registry(&pkg).err().ok_or("custom registry")?;
         let raw = "published to https://example/1234.5; ;, not crates.io: not compared";
         assert_eq!(registry.raw(), raw);
         for locale in ["en-US", "de", "en-US"] {
@@ -211,5 +213,7 @@ mod witness_tests {
             assert!(registry.display().contains("https://example/1234.5; ;"));
             assert_eq!(registry.clone().into_raw(), raw);
         }
+
+        Ok(())
     }
 }

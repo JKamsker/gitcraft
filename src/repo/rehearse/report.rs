@@ -9,17 +9,11 @@ pub(crate) fn heading(kind: RehearseKind, branch: &str, other: &str) -> String {
     match kind {
         RehearseKind::Rebase => crate::i18n::message(
             "repo-workflows-rehearse-heading-52968e32",
-            &[
-                ("branch", (branch).clone().into()),
-                ("other", (other).clone().into()),
-            ],
+            &[("branch", (branch).into()), ("other", (other).into())],
         ),
         RehearseKind::Merge => crate::i18n::message(
             "repo-workflows-rehearse-heading-e812253e",
-            &[
-                ("other", (other).clone().into()),
-                ("branch", (branch).clone().into()),
-            ],
+            &[("other", (other).into()), ("branch", (branch).into())],
         ),
     }
 }
@@ -32,13 +26,13 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
         }
         Played::FastForward { tip, .. } => crate::i18n::message(
             "repo-workflows-rehearse-played-line-78e91cc7",
-            &[("short-tip-1", (short(tip)).clone().into())],
+            &[("short-tip-1", (short(tip)).into())],
         ),
         Played::Clean { commits, .. } if kind == RehearseKind::Merge => match commits {
             1 => crate::i18n::text("repo-workflows-rehearse-played-line-6b8c28e6").to_owned(),
             n => crate::i18n::message(
                 "repo-workflows-rehearse-played-line-cc3a8109",
-                &[("n", (n).clone().into())],
+                &[("n", (*(n)).into())],
             ),
         },
         Played::Clean { commits, .. } => match commits {
@@ -46,7 +40,7 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
             1 => crate::i18n::text("repo-workflows-rehearse-played-line-31877584").to_owned(),
             n => crate::i18n::message(
                 "repo-workflows-rehearse-played-line-e270e3ca",
-                &[("n", (n).clone().into())],
+                &[("n", (*(n)).into())],
             ),
         },
         Played::Stopped {
@@ -60,7 +54,7 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
                 1 => crate::i18n::text("repo-workflows-rehearse-played-line-2704eda1").to_owned(),
                 n => crate::i18n::message(
                     "repo-workflows-rehearse-played-line-3fb21e29",
-                    &[("n", (n).clone().into())],
+                    &[("n", (n).into())],
                 ),
             };
             match commit {
@@ -73,8 +67,8 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
                     crate::i18n::message(
                         "repo-workflows-rehearse-played-line-9a2020a6",
                         &[
-                            ("step", (step).clone().into()),
-                            ("of", (of).clone().into()),
+                            ("step", (*(step)).into()),
+                            ("of", (*(of)).into()),
                             ("what", (what).clone().into()),
                             ("files", (files).clone().into()),
                         ],
@@ -101,7 +95,7 @@ pub(crate) fn tested_line(tested: &Tested, command: &str) -> String {
             ..
         } => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-4deabe28",
-            &[("command", (command).clone().into())],
+            &[("command", (command).into())],
         ),
         Tested::Ran {
             verdict: Verdict::Bad,
@@ -109,10 +103,7 @@ pub(crate) fn tested_line(tested: &Tested, command: &str) -> String {
             ..
         } => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-437947b9",
-            &[
-                ("command", (command).clone().into()),
-                ("code", (code).clone().into()),
-            ],
+            &[("command", (command).into()), ("code", (*(code)).into())],
         ),
         Tested::Ran {
             verdict: Verdict::Bad,
@@ -120,22 +111,19 @@ pub(crate) fn tested_line(tested: &Tested, command: &str) -> String {
             ..
         } => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-ebe78b3a",
-            &[("command", (command).clone().into())],
+            &[("command", (command).into())],
         ),
         Tested::Known(Verdict::Good) => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-ff964b6a",
-            &[("command", (command).clone().into())],
+            &[("command", (command).into())],
         ),
         Tested::Known(Verdict::Bad) => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-26bf178a",
-            &[("command", (command).clone().into())],
+            &[("command", (command).into())],
         ),
         Tested::NotRun(why) => crate::i18n::message(
             "repo-workflows-rehearse-tested-line-246783da",
-            &[
-                ("command", (command).clone().into()),
-                ("why", (why).clone().into()),
-            ],
+            &[("command", (command).into()), ("why", (why).clone().into())],
         ),
     }
 }

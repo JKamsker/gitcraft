@@ -257,7 +257,7 @@ impl RepoTab {
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-agents-tray-panel-1b67e032",
-                            &[("tray-notes-len-1", (tray.notes.len()).clone().into())],
+                            &[("tray-notes-len-1", (tray.notes.len()).into())],
                         ))
                         .font(theme::semibold(10.5))
                         .color(t.text_faint),
@@ -286,7 +286,7 @@ impl RepoTab {
                         let clear = if tray.confirm_clear {
                             crate::i18n::message(
                                 "repo-workflows-agents-tray-panel-ae4eaa14",
-                                &[("tray-notes-len-1", (tray.notes.len()).clone().into())],
+                                &[("tray-notes-len-1", (tray.notes.len()).into())],
                             )
                         } else {
                             crate::i18n::text("repo-workflows-agents-tray-panel-83b12c22")
@@ -338,7 +338,7 @@ impl RepoTab {
         egui::ComboBox::from_id_salt("handoff-terminal")
             .selected_text(crate::i18n::message(
                 "repo-workflows-agents-terminal-choice-c0d8980e",
-                &[("shown", (shown).clone().into())],
+                &[("shown", (shown).into())],
             ))
             .show_ui(ui, |ui| {
                 for (i, label) in labels.iter().enumerate() {

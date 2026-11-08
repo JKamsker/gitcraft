@@ -217,7 +217,6 @@ impl RepoTab {
                             } else {
                                 &one.owner
                             })
-                            .clone()
                             .into(),
                         ),
                         ("one-path-2", (one.path).clone().into()),
@@ -254,7 +253,7 @@ impl RepoTab {
                 ),
                 many => crate::i18n::message(
                     "repo-workflows-lfs_locks-lock-banners-96ed4625",
-                    &[("many-len-1", (many.len()).clone().into())],
+                    &[("many-len-1", (many.len()).into())],
                 ),
             };
             let paths = d.unlocked.clone();
@@ -279,7 +278,7 @@ impl RepoTab {
                 ),
                 many => crate::i18n::message(
                     "repo-workflows-lfs_locks-lock-banners-4caac7c4",
-                    &[("many-len-1", (many.len()).clone().into())],
+                    &[("many-len-1", (many.len()).into())],
                 ),
             };
             let buttons = Box::new(|ui: &mut Ui| {
@@ -325,7 +324,7 @@ fn list(names: &[String]) -> String {
             &[
                 ("a", (a).clone().into()),
                 ("b", (b).clone().into()),
-                ("rest-len-1", (rest.len()).clone().into()),
+                ("rest-len-1", (rest.len()).into()),
             ],
         ),
     }

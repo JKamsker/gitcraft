@@ -169,7 +169,7 @@ impl RepoTab {
                 let status = crate::i18n::message(
                     "repo-workflows-timeline-remove-done-cd7d7755",
                     &[
-                        ("label", (label).clone().into()),
+                        ("label", (label).into()),
                         ("branch", (branch).clone().into()),
                     ],
                 );
@@ -184,7 +184,7 @@ impl RepoTab {
             Ok(outcome @ Outcome::Conflict { .. }) => {
                 let status = crate::i18n::message(
                     "repo-workflows-timeline-remove-done-ff66751a",
-                    &[("label", (label).clone().into())],
+                    &[("label", (label).into())],
                 );
                 let state = RemoveState::Finished {
                     id,
@@ -196,10 +196,7 @@ impl RepoTab {
             Err(error) => {
                 let status = crate::i18n::message(
                     "repo-workflows-timeline-remove-done-0457f228",
-                    &[
-                        ("label", (label).clone().into()),
-                        ("error", (error).clone().into()),
-                    ],
+                    &[("label", (label).into()), ("error", (error).clone().into())],
                 );
                 (None, RemoveState::Failed { id, error }, (status, true))
             }
@@ -215,7 +212,7 @@ impl RepoTab {
         let entry_label = if stopped {
             crate::i18n::message(
                 "repo-workflows-timeline-remove-done-7da61c9b",
-                &[("label", (label).clone().into())],
+                &[("label", (label).into())],
             )
         } else {
             label.to_owned()

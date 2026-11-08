@@ -160,7 +160,7 @@ fn outcome(
                     "repo-workflows-rehearse-outcome-687392eb",
                     &[(
                         "conflicts-len-max-files-1",
-                        (conflicts.len() - MAX_FILES).clone().into(),
+                        (conflicts.len() - MAX_FILES).into(),
                     )],
                 ))
                 .color(t.text_dim),

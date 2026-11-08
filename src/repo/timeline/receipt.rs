@@ -164,7 +164,7 @@ impl Receipt {
         if old != new {
             parts.push(crate::i18n::message(
                 "repo-workflows-timeline-sentence-b5ea0271",
-                &[("old", (old).clone().into()), ("new", (new).clone().into())],
+                &[("old", (old).into()), ("new", (new).into())],
             ));
         }
         capitalised(&parts.join(", "))
@@ -186,11 +186,11 @@ fn signatures(c: &Counts) -> Option<String> {
         )),
         (b, a) if a < b => Some(crate::i18n::message(
             "repo-workflows-timeline-signatures-b59d95ba",
-            &[("b-a-1", (b - a).clone().into())],
+            &[("b-a-1", (b - a).into())],
         )),
         (b, a) if a > b => Some(crate::i18n::message(
             "repo-workflows-timeline-signatures-33c87627",
-            &[("a-b-1", (a - b).clone().into())],
+            &[("a-b-1", (a - b).into())],
         )),
         _ => Some(crate::i18n::text("repo-workflows-timeline-signatures-aa14a1ba").to_owned()),
     }

@@ -174,7 +174,7 @@ fn cell_tip(a: &str, b: &str, cell: &Cell) -> String {
     match cell {
         Ok(pair) if pair.clean() => crate::i18n::message(
             "repo-workflows-collision_view-cell-tip-b3f28cca",
-            &[("a", (a).clone().into()), ("b", (b).clone().into())],
+            &[("a", (a).into()), ("b", (b).into())],
         ),
         Ok(pair) => {
             let n = pair.files.len();
@@ -188,7 +188,7 @@ fn cell_tip(a: &str, b: &str, cell: &Cell) -> String {
             if n > LISTED {
                 tip.push_str(&crate::i18n::message(
                     "repo-workflows-collision_view-cell-tip-81bf5184",
-                    &[("n-listed-1", (n - LISTED).clone().into())],
+                    &[("n-listed-1", (n - LISTED).into())],
                 ));
             }
             tip.push_str(crate::i18n::text(

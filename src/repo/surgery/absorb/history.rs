@@ -86,7 +86,7 @@ pub(crate) fn absorbed(
         let Some(mut tree) = merge(repo, &parent, &state, &commit)? else {
             return Err(crate::i18n::message(
                 "repo-workflows-surgery-absorbed-4b7f1a77",
-                &[("short-commit-1", (short(&commit)).clone().into())],
+                &[("short-commit-1", (short(&commit)).into())],
             ));
         };
         if let Some(fixed) = fixes.get(&commit) {
@@ -96,7 +96,7 @@ pub(crate) fn absorbed(
             tree = merge(repo, head, &ours, &fix)?.ok_or_else(|| {
                 crate::i18n::message(
                     "repo-workflows-surgery-absorbed-0ecdae65",
-                    &[("short-commit-1", (short(&commit)).clone().into())],
+                    &[("short-commit-1", (short(&commit)).into())],
                 )
             })?;
         }

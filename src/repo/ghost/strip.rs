@@ -128,8 +128,8 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
             Some(commit) => crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-7728bdcc",
                 &[
-                    ("c-step-1", (c.step).clone().into()),
-                    ("c-of-2", (c.of).clone().into()),
+                    ("c-step-1", (c.step).into()),
+                    ("c-of-2", (c.of).into()),
                     ("describe-commit-3", (describe(commit)).clone().into()),
                 ],
             ),
@@ -181,20 +181,20 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         made.push(match (&m.from, &m.to) {
             (_, None) => crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-91af17db",
-                &[("name", (name).clone().into())],
+                &[("name", (name).into())],
             ),
             (Some(from), Some(to)) => crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-ce73844c",
                 &[
-                    ("name", (name).clone().into()),
-                    ("short-from-1", (short(from)).clone().into()),
+                    ("name", (name).into()),
+                    ("short-from-1", (short(from)).into()),
                     ("shown-to-2", (shown(to)).clone().into()),
                 ],
             ),
             (None, Some(to)) => crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-81deb64d",
                 &[
-                    ("name", (name).clone().into()),
+                    ("name", (name).into()),
                     ("shown-to-1", (shown(to)).clone().into()),
                 ],
             ),
@@ -213,7 +213,7 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
             &crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-4b54308f",
                 &[
-                    ("files-len-1", (files.len()).clone().into()),
+                    ("files-len-1", (files.len()).into()),
                     (
                         "listed-files-f-format-f-status-f-2",
                         (listed(files, |f| format!("{} {}", f.status, f.path)))
@@ -237,7 +237,7 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-ghost-outcome-lines-820df962",
-                &[("engine-describe-1", (engine.describe()).clone().into())],
+                &[("engine-describe-1", (engine.describe()).into())],
             ))
             .size(10.5)
             .color(t.text_faint),
@@ -280,7 +280,7 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
                 "repo-workflows-ghost-lost-line-8ccbdaa0",
                 &[
                     ("count", (count).clone().into()),
-                    ("o-replaced-1", (o.replaced).clone().into()),
+                    ("o-replaced-1", (o.replaced).into()),
                     ("names", (names).clone().into()),
                 ],
             ),
@@ -345,7 +345,7 @@ fn listed<T>(items: &[T], name: impl Fn(&T) -> String) -> String {
     if items.len() > LISTED {
         names.push(crate::i18n::message(
             "repo-workflows-ghost-listed-683768ab",
-            &[("items-len-listed-1", (items.len() - LISTED).clone().into())],
+            &[("items-len-listed-1", (items.len() - LISTED).into())],
         ));
     }
     names.join(", ")
@@ -448,7 +448,11 @@ mod fluent_witness_cache_tests {
     use std::sync::Arc;
 
     #[test]
-    fn fluent_partition_actual_cached_ghost_failure_repaints_typed_witness_without_jobs() {
+    fn fluent_partition_actual_cached_ghost_failure_repaints_typed_witness_without_jobs()
+    -> Result<(), String> {
+        let ui_errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let ui_errors_0 = ui_errors.clone();
+
         let detail = "raw/ß; in a scratch clone: 日本語\n{ $detail } --argv=raw";
         let cases = [
             PreviewFailure::Backend(Failure::PartialClone),
@@ -487,15 +491,27 @@ mod fluent_witness_cache_tests {
             let mut installed = false;
             let mut h = Harness::new_ui_state(
                 |ui, ghost: &mut Ghost| {
-                    if !installed {
-                        crate::theme::install_fonts(ui.ctx());
-                        installed = true;
-                        ui.ctx().request_discard("install supplied fonts");
-                        return;
+                    let ui_result = (|| -> Result<(), String> {
+                        if !installed {
+                            crate::theme::install_fonts(ui.ctx());
+                            installed = true;
+                            ui.ctx().request_discard("install supplied fonts");
+                            return Ok(());
+                        }
+                        let shown = ghost.shown.as_ref().ok_or("missing test value")?;
+                        let failure = shown
+                            .result
+                            .as_ref()
+                            .as_ref()
+                            .err()
+                            .ok_or("expected an error")?;
+                        failed_lines(ui, &Tokens::get(ui.ctx()), failure);
+
+                        Ok(())
+                    })();
+                    if let Err(error) = ui_result {
+                        ui_errors_0.borrow_mut().push(error);
                     }
-                    let shown = ghost.shown.as_ref().unwrap();
-                    let failure = shown.result.as_ref().as_ref().unwrap_err();
-                    failed_lines(ui, &Tokens::get(ui.ctx()), failure);
                 },
                 ghost,
             );
@@ -504,15 +520,32 @@ mod fluent_witness_cache_tests {
                 h.run();
                 h.get_by_label(&failure_text(&failure));
                 let ghost = h.state();
-                let shown = ghost.shown.as_ref().unwrap();
+                let shown = ghost.shown.as_ref().ok_or("missing test value")?;
                 assert_eq!(shown.key, key);
                 assert_eq!(shown.history, 29);
                 assert_eq!(ghost.jobs, 7);
                 assert!(ghost.job.is_none());
                 assert!(ghost.cache.is_empty());
                 assert!(Arc::ptr_eq(&shown.result, &retained));
-                assert_eq!(shown.result.as_ref().as_ref().unwrap_err().raw(), raw);
-                assert_eq!(shown.result.as_ref().as_ref().unwrap_err(), &failure);
+                assert_eq!(
+                    shown
+                        .result
+                        .as_ref()
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?
+                        .raw(),
+                    raw
+                );
+                assert_eq!(
+                    shown
+                        .result
+                        .as_ref()
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?,
+                    &failure
+                );
                 if matches!(failure, PreviewFailure::Backend(Failure::Opaque(_))) {
                     assert_eq!(failure.display(), raw);
                 }
@@ -545,5 +578,11 @@ mod fluent_witness_cache_tests {
             );
         }
         crate::i18n::set_language("en-US");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
     }
 }

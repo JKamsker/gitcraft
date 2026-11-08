@@ -60,7 +60,7 @@ fn parts(
                         "mail-ctype-mimetype-1",
                         (mail.ctype.mimetype).clone().into(),
                     ),
-                    ("raw-len-2", (raw.len()).clone().into()),
+                    ("raw-len-2", (raw.len()).into()),
                 ],
             ));
         }

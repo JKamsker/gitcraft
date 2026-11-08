@@ -129,7 +129,7 @@ impl RepoTab {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-parallel_bisect-parallel-outcome-25230d8d",
-                        &[("hashes-len-1", (hashes.len()).clone().into())],
+                        &[("hashes-len-1", (hashes.len()).into())],
                     ))
                     .color(t.text),
                 );
@@ -140,10 +140,7 @@ impl RepoTab {
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-parallel_bisect-parallel-outcome-683768ab",
-                            &[(
-                                "hashes-len-max-named-1",
-                                (hashes.len() - MAX_NAMED).clone().into(),
-                            )],
+                            &[("hashes-len-max-named-1", (hashes.len() - MAX_NAMED).into())],
                         ))
                         .color(t.text_dim),
                     );
@@ -153,8 +150,8 @@ impl RepoTab {
                 let text = crate::i18n::message(
                     "repo-workflows-parallel_bisect-parallel-outcome-7997ad5c",
                     &[
-                        ("short-hash-1", (short(hash)).clone().into()),
-                        ("machine", (machine).clone().into()),
+                        ("short-hash-1", (short(hash)).into()),
+                        ("machine", (machine).into()),
                     ],
                 );
                 warning(ui, &text, output, &t);
@@ -163,8 +160,8 @@ impl RepoTab {
                 let text = crate::i18n::message(
                     "repo-workflows-parallel_bisect-parallel-outcome-a804fbac",
                     &[
-                        ("short-hash-1", (short(hash)).clone().into()),
-                        ("machine", (machine).clone().into()),
+                        ("short-hash-1", (short(hash)).into()),
+                        ("machine", (machine).into()),
                     ],
                 );
                 warning(ui, &text, output, &t);
@@ -247,10 +244,7 @@ fn warning(ui: &mut Ui, text: &str, output: &str, t: &Tokens) {
     } else {
         resp.on_hover_text(crate::i18n::message(
             "repo-workflows-parallel_bisect-warning-4e969ad3",
-            &[
-                ("text", (text).clone().into()),
-                ("shown", (shown).clone().into()),
-            ],
+            &[("text", (text).into()), ("shown", (shown).clone().into())],
         ));
     }
 }

@@ -111,7 +111,7 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
         .show(ui)
         .on_hover_text(crate::i18n::message(
             "repo-workflows-custom_commands-menu-items-7bbc1546",
-            &[("cc-repo-file-1", (cc::REPO_FILE).clone().into())],
+            &[("cc-repo-file-1", (cc::REPO_FILE).into())],
         ))
         .clicked()
     {
@@ -321,7 +321,7 @@ impl RepoTab {
                         "repo-workflows-custom_commands-custom-act-5bd548f5",
                         &[
                             ("self-name-1", (self.name).clone().into()),
-                            ("commands", (commands).clone().into()),
+                            ("commands", (commands).into()),
                         ],
                     ),
                     false,
@@ -362,7 +362,7 @@ impl RepoTab {
                     "repo-workflows-custom_commands-custom-file-read-cbe7f164",
                     &[
                         ("self-name-1", (self.name).clone().into()),
-                        ("cc-repo-file-2", (cc::REPO_FILE).clone().into()),
+                        ("cc-repo-file-2", (cc::REPO_FILE).into()),
                     ],
                 )
             } else {
@@ -398,7 +398,7 @@ fn read_file(repo: &std::path::Path) -> Result<Option<String>, String> {
         crate::i18n::message(
             "repo-workflows-custom_commands-read-file-851cebee",
             &[
-                ("cc-repo-file-1", (cc::REPO_FILE).clone().into()),
+                ("cc-repo-file-1", (cc::REPO_FILE).into()),
                 ("e", (e).to_string().into()),
             ],
         )
@@ -412,7 +412,7 @@ fn read_file(repo: &std::path::Path) -> Result<Option<String>, String> {
             String::from_utf8(b).map_err(|_| {
                 crate::i18n::message(
                     "repo-workflows-custom_commands-read-file-55a45ca4",
-                    &[("cc-repo-file-1", (cc::REPO_FILE).clone().into())],
+                    &[("cc-repo-file-1", (cc::REPO_FILE).into())],
                 )
             })
         })
@@ -440,7 +440,7 @@ fn read_here(path: &std::path::Path, max: u64) -> std::io::Result<Option<Vec<u8>
     if meta.len() > max {
         return Err(Error::other(crate::i18n::message(
             "repo-workflows-custom_commands-read-here-28b7ef24",
-            &[("max-1024-1", (max / 1024).clone().into())],
+            &[("max-1024-1", (max / 1024).into())],
         )));
     }
     std::fs::read(path).map(Some)

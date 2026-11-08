@@ -63,7 +63,7 @@ pub(crate) fn summary_text(owners: &[String], unowned: usize, files: usize) -> O
         } else {
             crate::i18n::message(
                 "repo-workflows-owners-summary-text-3ff108bf",
-                &[("unowned", (unowned).clone().into())],
+                &[("unowned", (unowned).into())],
             )
         });
     }
@@ -74,10 +74,7 @@ fn rules(n: usize) -> String {
     if n == 1 {
         crate::i18n::text("repo-workflows-owners-rules-343bb384").to_owned()
     } else {
-        crate::i18n::message(
-            "repo-workflows-owners-rules-4d726f4a",
-            &[("n", (n).clone().into())],
-        )
+        crate::i18n::message("repo-workflows-owners-rules-4d726f4a", &[("n", (n).into())])
     }
 }
 

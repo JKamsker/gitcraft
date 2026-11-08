@@ -15,13 +15,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not read who wrote the commits: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-authorship-read-all",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -78,13 +78,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" is not a commit"))
     {
-        let rendered = (|| {
+        let rendered = {
             let oid = text;
             Some(message(
                 "interaction-guards-authorship-not-commit",
                 &[("oid", oid.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }

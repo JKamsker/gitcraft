@@ -188,7 +188,8 @@ fn unknown_note_hint_and_external_error_lookalikes_remain_opaque() {
 }
 
 #[test]
-fn actual_parser_errors_and_finite_diagnostic_composition_preserve_external_details() {
+fn actual_parser_errors_and_finite_diagnostic_composition_preserve_external_details()
+-> Result<(), String> {
     // Invoke only pure JSON parsers. Retain their known branch, never parse their strings.
     for (locale, answer, no_package) in [
         ("en-US", "npm pack's answer: ", "npm said no package"),
@@ -200,9 +201,12 @@ fn actual_parser_errors_and_finite_diagnostic_composition_preserve_external_deta
     ] {
         crate::i18n::set_language(locale);
         let invalid = "[broken";
-        let raw = crate::package::tools::parse_npm_pack(invalid).expect_err("invalid JSON");
+        let raw = crate::package::tools::parse_npm_pack(invalid)
+            .err()
+            .ok_or("invalid JSON")?;
         let detail = serde_json::from_str::<serde_json::Value>(invalid)
-            .expect_err("invalid JSON")
+            .err()
+            .ok_or("invalid JSON")?
             .to_string();
         assert_eq!(raw, format!("npm pack's answer: {detail}"));
         assert_eq!(
@@ -210,15 +214,19 @@ fn actual_parser_errors_and_finite_diagnostic_composition_preserve_external_deta
             format!("{answer}{detail}")
         );
         assert_eq!(
-            crate::package::tools::parse_npm_pack("no JSON").expect_err("no JSON"),
+            crate::package::tools::parse_npm_pack("no JSON")
+                .err()
+                .ok_or("no JSON")?,
             "npm said no package"
         );
         assert_eq!(Diagnostic::NpmNoPackage.display(), no_package);
         let detail = serde_json::from_str::<serde_json::Value>("{")
-            .expect_err("invalid JSON")
+            .err()
+            .ok_or("invalid JSON")?
             .to_string();
-        let raw =
-            crate::package::tools::parse_cargo_metadata("{", "").expect_err("invalid metadata");
+        let raw = crate::package::tools::parse_cargo_metadata("{", "")
+            .err()
+            .ok_or("invalid metadata")?;
         assert_eq!(Diagnostic::CargoMetadata { detail: &detail }.display(), raw);
         // App-owned child translates only when explicitly marked Tool, external lookalike stays raw.
         let known = Diagnostic::Packages {
@@ -274,4 +282,6 @@ fn actual_parser_errors_and_finite_diagnostic_composition_preserve_external_deta
         "tool-1234.5 benötigte länger als 1.234 Minuten (wartet es auf eine Sperre oder das Netzwerk?): gestoppt"
     );
     crate::i18n::set_language("en-US");
+
+    Ok(())
 }

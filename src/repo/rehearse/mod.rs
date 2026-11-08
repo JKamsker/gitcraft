@@ -112,7 +112,7 @@ impl RepoTab {
             crate::i18n::message(
                 "repo-workflows-rehearse-rehearse-palette-items-d8875572",
                 &[
-                    ("current", (current).clone().into()),
+                    ("current", (current).into()),
                     ("base", (base).clone().into()),
                 ],
             ),

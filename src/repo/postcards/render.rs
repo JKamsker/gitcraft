@@ -69,10 +69,7 @@ pub(super) fn render(
                     "repo-workflows-postcards-render-ebb961b0",
                     &[
                         ("snapshot-date-1", (snapshot.date).clone().into()),
-                        (
-                            "snapshot-commits-len-2",
-                            (snapshot.commits.len()).clone().into(),
-                        ),
+                        ("snapshot-commits-len-2", (snapshot.commits.len()).into()),
                     ],
                 ),
                 17.0,
@@ -248,7 +245,7 @@ fn bounded_graph(
         remaining = remaining.checked_sub(commit.parents.len()).ok_or_else(|| {
             crate::i18n::message(
                 "repo-workflows-postcards-bounded-graph-b345a27f",
-                &[("edge-limit", (edge_limit).clone().into())],
+                &[("edge-limit", (edge_limit).into())],
             )
         })?;
     }

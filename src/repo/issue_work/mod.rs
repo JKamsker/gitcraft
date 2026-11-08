@@ -276,7 +276,7 @@ impl RepoTab {
         if branch == base.name {
             return refuse(crate::i18n::message(
                 "repo-workflows-issue_work-issue-plan-0dd9c97f",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ));
         }
         let mut warnings = Vec::new();
@@ -286,7 +286,7 @@ impl RepoTab {
             warnings.push(crate::i18n::message(
                 "repo-workflows-issue_work-issue-plan-8dbd7c09",
                 &[
-                    ("branch", (branch).clone().into()),
+                    ("branch", (branch).into()),
                     ("other-key-1", (other.key()).clone().into()),
                     ("key", (key).clone().into()),
                 ],
@@ -313,7 +313,7 @@ impl RepoTab {
         if checkout_here && changes.iter().any(|files| !files.is_empty()) {
             warnings.push(crate::i18n::message(
                 "repo-workflows-issue_work-issue-plan-c9fafe01",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ));
         }
         let where_ = match &place {
@@ -330,15 +330,12 @@ impl RepoTab {
             let note = match &place {
                 Place::Here if !checkout_here => crate::i18n::message(
                     "repo-workflows-issue_work-issue-plan-952a7458",
-                    &[
-                        ("branch", (branch).clone().into()),
-                        ("key", (key).clone().into()),
-                    ],
+                    &[("branch", (branch).into()), ("key", (key).clone().into())],
                 ),
                 Place::Worktree => crate::i18n::message(
                     "repo-workflows-issue_work-issue-plan-b341ef66",
                     &[
-                        ("branch", (branch).clone().into()),
+                        ("branch", (branch).into()),
                         ("folder-open-1", (folder(&open)).clone().into()),
                         ("key", (key).clone().into()),
                     ],
@@ -346,7 +343,7 @@ impl RepoTab {
                 _ => crate::i18n::message(
                     "repo-workflows-issue_work-issue-plan-cf90f159",
                     &[
-                        ("branch", (branch).clone().into()),
+                        ("branch", (branch).into()),
                         ("where-", (where_).clone().into()),
                     ],
                 ),
@@ -495,7 +492,7 @@ impl RepoTab {
             &[
                 (
                     "super-short-self-refs-head-1",
-                    (super::short(&self.refs.head)).clone().into(),
+                    (super::short(&self.refs.head)).into(),
                 ),
                 ("name", (name).clone().into()),
             ],

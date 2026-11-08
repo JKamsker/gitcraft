@@ -15,10 +15,13 @@ mod scratch;
 mod version;
 
 pub(crate) use failure::Failure;
+#[cfg(test)]
+pub use picks::replay;
 pub(crate) use picks::replay_with_witness;
-pub use picks::{Replay, Replayed, Stop, rebase_picks, replay};
-pub(crate) use reach::unreachable_bounded;
-pub use reach::{Merge, is_ancestor, leaving, merge, unreachable};
+pub use picks::{Replay, Replayed, Stop, rebase_picks};
+pub use reach::{Merge, is_ancestor};
+#[cfg(test)]
+pub use reach::{leaving, merge, unreachable};
 pub(crate) use reach::{
     leaving_with_witness, merge_with_witness, unreachable_bounded_with_witness,
     unreachable_with_witness,

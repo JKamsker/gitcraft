@@ -262,7 +262,8 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
-    fn actual_command_editor_translates_controls_and_preserves_command_and_prompt_variables() {
+    fn actual_command_editor_translates_controls_and_preserves_command_and_prompt_variables()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(
@@ -291,11 +292,16 @@ mod localization_tests {
         assert_eq!(h.state().command, "git show \"$SHA\"");
         assert_eq!(h.state().name, "User 日本語");
         assert_eq!(h.state().placement, Placement::Commit);
-        assert_eq!(serde_json::to_value(h.state()).unwrap()["where"], "commit");
+        assert_eq!(
+            serde_json::to_value(h.state()).map_err(|error| format!("{error:?}"))?["where"],
+            "commit"
+        );
         crate::i18n::set_language("en-US");
         h.step();
         h.get_by_label("Ask before running");
         h.get_by_value("Output: Toast");
         assert_eq!(h.state().prompts[0].variable, "INPUT1");
+
+        Ok(())
     }
 }

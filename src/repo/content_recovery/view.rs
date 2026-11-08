@@ -46,9 +46,7 @@ impl State {
                     "repo-workflows-content_recovery-show-5ec718b0",
                     &[(
                         "self-began-map-or-0-at-at-elapse-1",
-                        (self.began.map_or(0, |at| at.elapsed().as_secs()))
-                            .clone()
-                            .into(),
+                        (self.began.map_or(0, |at| at.elapsed().as_secs())).into(),
                     )],
                 ));
                 if ui
@@ -87,8 +85,8 @@ impl State {
             ui.label(crate::i18n::message(
                 "repo-workflows-content_recovery-show-c006906c",
                 &[
-                    ("preview-bytes-len-1", (preview.bytes.len()).clone().into()),
-                    ("preview-blob-12-2", (&preview.blob[..12]).clone().into()),
+                    ("preview-bytes-len-1", (preview.bytes.len()).into()),
+                    ("preview-blob-12-2", (&preview.blob[..12]).into()),
                 ],
             ));
             if let Some(source) = &preview.source {
@@ -109,10 +107,7 @@ impl State {
             {
                 egui::CollapsingHeader::new(crate::i18n::message(
                     "repo-workflows-content_recovery-show-34ac4d52",
-                    &[(
-                        "hit-provenance-len-1",
-                        (hit.provenance.len()).clone().into(),
-                    )],
+                    &[("hit-provenance-len-1", (hit.provenance.len()).into())],
                 ))
                 .id_salt("recovery-provenance")
                 .show(ui, |ui| {
@@ -231,13 +226,12 @@ impl State {
                                             .unwrap_or(crate::i18n::text(
                                                 "repo-workflows-content_recovery-show-fbdaf564",
                                             )))
-                                        .clone()
                                         .into(),
                                     ),
                                     ("path", (path).clone().into()),
                                     (
                                         "prepared-preview-bytes-len-2",
-                                        (prepared.preview.bytes.len()).clone().into(),
+                                        (prepared.preview.bytes.len()).into(),
                                     ),
                                 ],
                             ));
@@ -283,12 +277,12 @@ impl State {
             ui.label(crate::i18n::message(
                 "repo-workflows-content_recovery-show-52545e10",
                 &[
-                    ("report-hits-len-1", (report.hits.len()).clone().into()),
-                    ("report-scanned-2", (report.scanned).clone().into()),
-                    ("report-bytes-3", (report.bytes).clone().into()),
-                    ("report-binary-4", (report.binary).clone().into()),
-                    ("report-large-5", (report.large).clone().into()),
-                    ("report-missing-6", (report.missing).clone().into()),
+                    ("report-hits-len-1", (report.hits.len()).into()),
+                    ("report-scanned-2", (report.scanned).into()),
+                    ("report-bytes-3", (report.bytes).into()),
+                    ("report-binary-4", (report.binary).into()),
+                    ("report-large-5", (report.large).into()),
+                    ("report-missing-6", (report.missing).into()),
                 ],
             ));
             if report.limited {

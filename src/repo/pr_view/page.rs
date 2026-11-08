@@ -28,7 +28,7 @@ impl RepoTab {
         if let Some(relocated) = view.relocations().filter(|m| !m.is_empty()) {
             egui::CollapsingHeader::new(crate::i18n::message(
                 "repo-workflows-pr_view-pr-view-ui-c6f6b4c5",
-                &[("relocated-len-1", (relocated.len()).clone().into())],
+                &[("relocated-len-1", (relocated.len()).into())],
             ))
             .id_salt("pr-relocations")
             .show(ui, |ui| {
@@ -39,7 +39,7 @@ impl RepoTab {
                                 "repo-workflows-pr_view-pr-view-ui-13197fd2",
                                 &[
                                     ("target-path-1", (target.path).clone().into()),
-                                    ("target-line-2", (target.line).clone().into()),
+                                    ("target-line-2", (target.line).into()),
                                 ],
                             ))
                             .clicked()
@@ -168,7 +168,7 @@ impl RepoTab {
                                 "repo-workflows-pr_view-pr-files-panel-846bc938",
                                 &[(
                                     "e-lines-next-unwrap-or-default-1",
-                                    (e.lines().next().unwrap_or_default()).clone().into(),
+                                    (e.lines().next().unwrap_or_default()).into(),
                                 )],
                             ))
                             .color(t.text_faint)
@@ -357,10 +357,7 @@ fn page(
         ui,
         &crate::i18n::message(
             "repo-workflows-pr_view-page-607d89a5",
-            &[(
-                "details-timeline-len-1",
-                (details.timeline.len()).clone().into(),
-            )],
+            &[("details-timeline-len-1", (details.timeline.len()).into())],
         ),
     );
     // Lines are shown in the changes of the commit the page names, not in those of an earlier
@@ -389,10 +386,7 @@ fn page(
         ui,
         &crate::i18n::message(
             "repo-workflows-pr_view-page-878ee775",
-            &[(
-                "details-commits-len-1",
-                (details.commits.len()).clone().into(),
-            )],
+            &[("details-commits-len-1", (details.commits.len()).into())],
         ),
     );
     let signoffs = dco::pr_shows(dco.state, details)

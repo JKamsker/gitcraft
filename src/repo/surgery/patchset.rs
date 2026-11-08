@@ -131,8 +131,8 @@ pub(crate) fn files_of(patch: &[u8], paths: Vec<String>) -> Result<Vec<FilePatch
         return Err(crate::i18n::message(
             "repo-workflows-surgery-files-of-758821ec",
             &[
-                ("paths-len-1", (paths.len()).clone().into()),
-                ("sections-len-2", (sections.len()).clone().into()),
+                ("paths-len-1", (paths.len()).into()),
+                ("sections-len-2", (sections.len()).into()),
             ],
         ));
     }

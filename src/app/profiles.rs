@@ -439,7 +439,8 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
-    fn actual_profile_row_keeps_identity_selection_and_opaque_author_across_languages() {
+    fn actual_profile_row_keeps_identity_selection_and_opaque_author_across_languages()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let profile = settings::UserProfile {
             name: "Arbeitsprofil 日本語".into(),
@@ -447,7 +448,7 @@ mod localization_tests {
             author_email: "jonas@example.invalid".into(),
             ..Default::default()
         };
-        let before = serde_json::to_string(&profile).unwrap();
+        let before = serde_json::to_string(&profile).map_err(|error| format!("{error:?}"))?;
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(
             move |ui, state: &mut (settings::UserProfile, bool, Option<egui::Id>)| {
@@ -472,11 +473,19 @@ mod localization_tests {
             author_line(&h.state().0),
             " · Jonas 日本語 <jonas@example.invalid>"
         );
-        assert_eq!(serde_json::to_string(&h.state().0).unwrap(), before);
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|error| format!("{error:?}"))?,
+            before
+        );
         crate::i18n::set_language("en-US");
         h.run();
         h.get_by_label("profile Arbeitsprofil 日本語");
-        assert_eq!(serde_json::to_string(&h.state().0).unwrap(), before);
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|error| format!("{error:?}"))?,
+            before
+        );
+
+        Ok(())
     }
 
     #[test]

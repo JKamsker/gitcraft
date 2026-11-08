@@ -30,7 +30,7 @@ impl Tree {
                 "repo-workflows-stack-title-6bb263ae",
                 &[
                     ("self-root-1", (self.root).clone().into()),
-                    ("self-rows-len-2", (self.rows.len()).clone().into()),
+                    ("self-rows-len-2", (self.rows.len()).into()),
                 ],
             )
         }

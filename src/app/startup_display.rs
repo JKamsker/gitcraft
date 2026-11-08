@@ -109,16 +109,14 @@ fn inner(raw: &str, depth: usize) -> Option<String> {
     if let Some((version, other)) = raw
         .strip_prefix("this gitcraft speaks version ")
         .and_then(|s| s.split_once(", not "))
-    {
-        if [version, other]
+        && [version, other]
             .iter()
             .all(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
-        {
-            return Some(crate::i18n::message(
-                "interaction-start-error-wire-version",
-                &[("version", version.into()), ("other", other.into())],
-            ));
-        }
+    {
+        return Some(crate::i18n::message(
+            "interaction-start-error-wire-version",
+            &[("version", version.into()), ("other", other.into())],
+        ));
     }
     raw.strip_prefix("this gitcraft can't do \"")
         .and_then(|s| s.strip_suffix('"'))

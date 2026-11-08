@@ -171,7 +171,7 @@ impl RepoTab {
         let back = match state.and_then(Bisect::start_branch) {
             Some(branch) => crate::i18n::message(
                 "repo-workflows-bisect-reset-bisect-fd58b76b",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ),
             None => crate::i18n::text("repo-workflows-bisect-reset-bisect-b63b6486").to_owned(),
         };
@@ -461,7 +461,7 @@ fn run_message(
                 |c| {
                     crate::i18n::message(
                         "repo-workflows-bisect-run-message-b1d63bd2",
-                        &[("c", (c).clone().into())],
+                        &[("c", (c).into())],
                     )
                 },
             );
@@ -470,7 +470,7 @@ fn run_message(
                     "repo-workflows-bisect-run-message-b4eba258",
                     &[
                         ("code", (code).clone().into()),
-                        ("last-line", (last_line).clone().into()),
+                        ("last-line", (last_line).into()),
                     ],
                 ),
                 true,

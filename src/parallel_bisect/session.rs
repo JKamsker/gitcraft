@@ -749,6 +749,35 @@ impl Run<'_> {
     }
 }
 
+pub(crate) fn done_with_presentation(
+    outcome: Outcome,
+    presentation: Option<super::presentation::Presentation>,
+) -> Event {
+    let presentation = match &outcome {
+        Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
+        _ => None,
+    };
+    Event::DoneWithPresentation(outcome, presentation)
+}
+pub(crate) fn cleanup_warning(
+    label: String,
+    e: String,
+    child: Option<super::presentation::Presentation>,
+    with_presentation: bool,
+) -> Event {
+    let raw = format!(
+        "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
+         Resolve the reported ownership or removal failure before trying again."
+    );
+    if with_presentation {
+        let presentation =
+            super::presentation::CleanupWarning::capture(raw.clone(), label, e, child);
+        Event::WarningWithPresentation(raw, presentation)
+    } else {
+        Event::Warning(raw)
+    }
+}
+
 #[cfg(test)]
 mod recording_outcome_tests {
     use super::*;
@@ -827,34 +856,5 @@ mod recording_outcome_tests {
         );
         assert_eq!(finish_round(ended, true), Ok(Some(Outcome::Cancelled)));
         assert!(!answered, "unexpected answer callback");
-    }
-}
-
-pub(crate) fn done_with_presentation(
-    outcome: Outcome,
-    presentation: Option<super::presentation::Presentation>,
-) -> Event {
-    let presentation = match &outcome {
-        Outcome::Failed(raw) => presentation.and_then(|p| p.matching(raw)),
-        _ => None,
-    };
-    Event::DoneWithPresentation(outcome, presentation)
-}
-pub(crate) fn cleanup_warning(
-    label: String,
-    e: String,
-    child: Option<super::presentation::Presentation>,
-    with_presentation: bool,
-) -> Event {
-    let raw = format!(
-        "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
-         Resolve the reported ownership or removal failure before trying again."
-    );
-    if with_presentation {
-        let presentation =
-            super::presentation::CleanupWarning::capture(raw.clone(), label, e, child);
-        Event::WarningWithPresentation(raw, presentation)
-    } else {
-        Event::Warning(raw)
     }
 }

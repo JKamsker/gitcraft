@@ -290,7 +290,7 @@ impl RepoTab {
         self.unity.busy = Some(doing.to_owned());
         let failed = crate::i18n::message(
             "repo-workflows-unity-unity-job-bdc09466",
-            &[("doing", (doing).clone().into())],
+            &[("doing", (doing).into())],
         );
         let path = self.path.clone();
         self.then_or(
@@ -325,7 +325,7 @@ impl RepoTab {
         let block = git::attributes_block(&missing);
         let done = crate::i18n::message(
             "repo-workflows-unity-add-attributes-ec651afe",
-            &[("missing-len-1", (missing.len()).clone().into())],
+            &[("missing-len-1", (missing.len()).into())],
         );
         self.unity_job(("Adding lines to .gitattributes", done), ctx, move |repo| {
             git::append_block(repo, ".gitattributes", &block)

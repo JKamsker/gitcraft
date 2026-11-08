@@ -637,7 +637,7 @@ impl RepoTab {
                         "repo-workflows-timeline-changed-refs-92e3b324",
                         &[
                             ("change-name-1", (change.name).clone().into()),
-                            ("short-change-old-2", (short(&change.old)).clone().into()),
+                            ("short-change-old-2", (short(&change.old)).into()),
                         ],
                     );
                     if ui
@@ -646,7 +646,7 @@ impl RepoTab {
                             "repo-workflows-timeline-changed-refs-312c661d",
                             &[
                                 ("change-name-1", (change.name).clone().into()),
-                                ("short-change-old-2", (short(&change.old)).clone().into()),
+                                ("short-change-old-2", (short(&change.old)).into()),
                             ],
                         ))
                         .clicked()
@@ -677,7 +677,7 @@ impl RepoTab {
                                     .clone()
                                     .into(),
                                 ),
-                                ("short-change-old-2", (short(&change.old)).clone().into()),
+                                ("short-change-old-2", (short(&change.old)).into()),
                                 ("change-name-3", (change.name).clone().into()),
                             ],
                         ))
@@ -732,7 +732,7 @@ fn changed_files(ui: &mut Ui, entry: &Entry) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-timeline-changed-files-e1614a83",
-                &[("more", (more).clone().into())],
+                &[("more", (more).into())],
             ))
             .color(t.text_faint),
         );

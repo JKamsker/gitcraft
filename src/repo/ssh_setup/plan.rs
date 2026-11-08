@@ -345,7 +345,7 @@ pub(super) fn text(value: &str, label: &str) -> Result<(), String> {
     if value.chars().any(char::is_control) || value.len() > 512 {
         Err(crate::i18n::message(
             "repo-workflows-ssh_setup-text-c18fcabe",
-            &[("label", (label).clone().into())],
+            &[("label", (label).into())],
         ))
     } else {
         Ok(())

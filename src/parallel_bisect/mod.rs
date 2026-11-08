@@ -27,7 +27,9 @@ mod tests;
 
 pub use cache::TreeCache;
 pub use machine::Machine;
-pub use session::{Event, Handle, Outcome, Setup, start};
+#[cfg(test)]
+pub use session::start;
+pub use session::{Event, Handle, Outcome, Setup};
 #[cfg(test)]
 pub(crate) use session::{cleanup_warning, done_with_presentation};
 pub(crate) use session::{shutdown, start_with_presentation};

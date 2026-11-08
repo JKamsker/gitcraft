@@ -13,7 +13,7 @@ mod token;
 mod tests;
 
 pub use self::args::{Plan, prepare};
-pub use self::dates::{DATE_FORMATS, date_formats, date_suggestions};
+pub use self::dates::{date_formats, date_suggestions};
 pub use self::operator::Operator;
 #[cfg(test)]
 pub use self::run::run;

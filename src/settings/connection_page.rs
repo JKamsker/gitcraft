@@ -286,29 +286,43 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
-    fn recorded_account_error_is_translated_only_at_actual_paint() {
+    fn recorded_account_error_is_translated_only_at_actual_paint() -> Result<(), String> {
+        let ui_errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let ui_errors_0 = ui_errors.clone();
+
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(
             move |ui, account: &mut Account| {
-                if !fonts.replace(true) {
-                    crate::theme::install_fonts(ui.ctx());
-                    return;
+                let ui_result = (|| -> Result<(), String> {
+                    if !fonts.replace(true) {
+                        crate::theme::install_fonts(ui.ctx());
+                        return Ok(());
+                    }
+                    let id =
+                        egui::Id::new(("profile-account-check", 17_u64, "glab", account.clone()));
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(
+                            id,
+                            Check {
+                                result: Some(Err("Account check cancelled.".into())),
+                                ..Check::default()
+                            },
+                        )
+                    });
+                    account_check(ui, 17, "glab", account);
+                    let raw = ui
+                        .ctx()
+                        .data(|d| d.get_temp::<Check>(id))
+                        .ok_or("missing test value")?;
+                    assert_eq!(raw.result, Some(Err("Account check cancelled.".into())));
+                    assert!(!raw.running);
+
+                    Ok(())
+                })();
+                if let Err(error) = ui_result {
+                    ui_errors_0.borrow_mut().push(error);
                 }
-                let id = egui::Id::new(("profile-account-check", 17_u64, "glab", account.clone()));
-                ui.ctx().data_mut(|d| {
-                    d.insert_temp(
-                        id,
-                        Check {
-                            result: Some(Err("Account check cancelled.".into())),
-                            ..Check::default()
-                        },
-                    )
-                });
-                account_check(ui, 17, "glab", account);
-                let raw = ui.ctx().data(|d| d.get_temp::<Check>(id)).unwrap();
-                assert_eq!(raw.result, Some(Err("Account check cancelled.".into())));
-                assert!(!raw.running);
             },
             Account::default(),
         );
@@ -317,6 +331,12 @@ mod localization_tests {
         crate::i18n::set_language("en-US");
         h.step();
         h.get_by_label("Account check cancelled.");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
     }
 
     #[test]

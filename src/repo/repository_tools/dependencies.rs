@@ -90,7 +90,6 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                             "repo-workflows-repository_tools-show-88db1c04",
                                         )
                                     })
-                                    .clone()
                                     .into(),
                                 ),
                             ],

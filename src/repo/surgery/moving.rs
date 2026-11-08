@@ -385,7 +385,7 @@ impl SplitEditor {
         }
         editor.groups[0].subject = crate::i18n::message(
             "repo-workflows-surgery-moving-4c6a80bb",
-            &[("short-editor-hash-1", (short(&editor.hash)).clone().into())],
+            &[("short-editor-hash-1", (short(&editor.hash)).into())],
         );
         editor.groups[0].body.clear();
         editor.groups[1].subject =
@@ -414,7 +414,7 @@ impl SplitEditor {
             Some(t) => crate::i18n::message(
                 "repo-workflows-surgery-set-dest-556c2e6e",
                 &[
-                    ("short-t-hash-1", (short(&t.hash)).clone().into()),
+                    ("short-t-hash-1", (short(&t.hash)).into()),
                     ("t-summary-2", (t.summary).clone().into()),
                 ],
             ),

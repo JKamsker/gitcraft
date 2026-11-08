@@ -77,7 +77,7 @@ impl RepoTab {
         if let Some(error) = &self.dossier.error {
             ui.colored_label(
                 t.danger,
-                clip(&crate::repo::activity::display_workflow_error(&error), 2000),
+                clip(&crate::repo::activity::display_workflow_error(error), 2000),
             );
         }
         ui.horizontal(|ui| {
@@ -123,7 +123,7 @@ impl RepoTab {
                 Err(error) => {
                     ui.colored_label(
                         t.warning,
-                        crate::repo::activity::display_workflow_error(&error),
+                        crate::repo::activity::display_workflow_error(error),
                     );
                 }
             }
@@ -138,14 +138,14 @@ impl RepoTab {
                 &[
                     (
                         "super-super-short-result-start-c-1",
-                        (super::super::short(&result.start.commit)).clone().into(),
+                        (super::super::short(&result.start.commit)).into(),
                     ),
                     (
                         "clip-result-start-path-120-2",
                         (clip(&result.start.path, 120)).clone().into(),
                     ),
-                    ("result-start-line-3", (result.start.line).clone().into()),
-                    ("result-cards-len-4", (result.cards.len()).clone().into()),
+                    ("result-start-line-3", (result.start.line).into()),
+                    ("result-cards-len-4", (result.cards.len()).into()),
                 ],
             ));
             ui.horizontal_wrapped(|ui| {
@@ -168,10 +168,10 @@ impl RepoTab {
                             egui::Button::new(crate::i18n::message(
                                 "repo-workflows-line_dossier-line-dossier-view-ab2f98d8",
                                 &[
-                                    ("i-1-1", (i + 1).clone().into()),
+                                    ("i-1-1", (i + 1).into()),
                                     (
                                         "super-super-short-seed-commit-2",
-                                        (super::super::short(&seed.commit)).clone().into(),
+                                        (super::super::short(&seed.commit)).into(),
                                     ),
                                 ],
                             )),
@@ -238,18 +238,13 @@ impl RepoTab {
                         &[
                             (
                                 "super-super-short-card-attributi-1",
-                                (super::super::short(&card.attribution.commit))
-                                    .clone()
-                                    .into(),
+                                (super::super::short(&card.attribution.commit)).into(),
                             ),
                             (
                                 "clip-card-attribution-path-200-2",
                                 (clip(&card.attribution.path, 200)).clone().into(),
                             ),
-                            (
-                                "card-attribution-line-3",
-                                (card.attribution.line).clone().into(),
-                            ),
+                            ("card-attribution-line-3", (card.attribution.line).into()),
                         ],
                     ));
                     if card.whitespace_only {
@@ -329,7 +324,7 @@ impl RepoTab {
                             ui.label(&pull.association);
                             for (label,url) in &pull.issues{ui.hyperlink_to(crate::i18n::message("repo-workflows-line_dossier-line-dossier-view-afd58bc7", &[("label", (label).clone().into())]),url);}
                             for comment in &pull.comments{ui.label(format!("{}: {}",comment.author,comment.body));ui.small(&comment.proof);if !comment.url.is_empty(){ui.hyperlink_to(crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-6104eb29"),&comment.url);}}
-                            ui.small(crate::i18n::message("repo-workflows-line_dossier-line-dossier-view-ad6fe29b", &[("pull-checked-1", (pull.checked).clone().into()), ("pull-unmapped-2", (pull.unmapped).clone().into())]));
+                            ui.small(crate::i18n::message("repo-workflows-line_dossier-line-dossier-view-ad6fe29b", &[("pull-checked-1", (pull.checked).into()), ("pull-unmapped-2", (pull.unmapped).into())]));
                             for note in &pull.notes{ui.label(note);}if pull.limited||evidence.limited{ui.label(crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-a17a38a1"));}
                         });}
                     });

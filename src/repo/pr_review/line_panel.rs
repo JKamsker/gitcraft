@@ -257,7 +257,7 @@ fn threads(
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-pr_review-threads-98aa61f2",
-                            &[("forge", (forge).clone().into())],
+                            &[("forge", (forge).into())],
                         ))
                         .color(t.text_faint)
                         .small(),

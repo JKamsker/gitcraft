@@ -165,7 +165,7 @@ fn body(
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-workflows-fence_view-body-d1953461",
-            &[("fence-claude-1", (fence::CLAUDE).clone().into())],
+            &[("fence-claude-1", (fence::CLAUDE).into())],
         ))
         .size(12.0)
         .color(t.text_dim),
@@ -185,7 +185,7 @@ fn body(
             &mut editor.targets.cursor,
             crate::i18n::message(
                 "repo-workflows-fence_view-body-c408ae8c",
-                &[("fence-cursor-1", (fence::CURSOR).clone().into())],
+                &[("fence-cursor-1", (fence::CURSOR).into())],
             ),
         )
         .on_hover_text(crate::i18n::text("repo-workflows-fence_view-body-d10df00e"));
@@ -193,7 +193,7 @@ fn body(
             &mut editor.targets.agents_md,
             crate::i18n::message(
                 "repo-workflows-fence_view-body-98912c89",
-                &[("fence-agents-1", (fence::AGENTS).clone().into())],
+                &[("fence-agents-1", (fence::AGENTS).into())],
             ),
         )
         .on_hover_text(crate::i18n::text("repo-workflows-fence_view-body-b31ba75f"));

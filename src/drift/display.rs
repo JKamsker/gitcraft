@@ -18,13 +18,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not measure the worktree's changes: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-drift-measure-error",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -33,13 +33,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" is not a revision"))
     {
-        let rendered = (|| {
+        let rendered = {
             let reference = text;
             Some(message(
                 "interaction-guards-drift-not-revision",
                 &[("reference", reference.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -48,13 +48,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not find the worktree's git folder: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-drift-git-folder",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -63,13 +63,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not read the worktree's task: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-drift-read-task",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -78,13 +78,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not save the worktree's task: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-drift-save-task",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -93,13 +93,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Issues of ")
         .and_then(|s| s.strip_suffix(" aren't read yet"))
     {
-        let rendered = (|| {
+        let rendered = {
             let forge = text;
             Some(message(
                 "interaction-guards-drift-unsupported-forge",
                 &[("forge", forge.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -124,13 +124,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("No coding agent's command line is installed (")
         .and_then(|s| s.strip_suffix("): the figures above are the exact part"))
     {
-        let rendered = (|| {
+        let rendered = {
             let tools = text;
             Some(message(
                 "interaction-guards-drift-missing-tools",
                 &[("tools", tools.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }

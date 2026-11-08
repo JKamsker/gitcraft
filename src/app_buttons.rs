@@ -703,7 +703,8 @@ mod tests {
     }
 
     #[test]
-    fn localized_actual_menu_uses_effective_chord_and_keeps_button_event_identity() {
+    fn localized_actual_menu_uses_effective_chord_and_keeps_button_event_identity()
+    -> Result<(), String> {
         use crate::keymap::{self, Command, Stroke};
         use egui_kittest::{Harness, kittest::Queryable};
         crate::i18n::set_language("de");
@@ -746,10 +747,12 @@ mod tests {
         assert!(*h.state());
         assert_eq!(Palette.command(), Some(Command::Palette));
         assert_eq!(
-            serde_json::to_string(&Place::BottomLeft).unwrap(),
+            serde_json::to_string(&Place::BottomLeft).map_err(|error| format!("{error:?}"))?,
             "\"BottomLeft\""
         );
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 
     #[test]

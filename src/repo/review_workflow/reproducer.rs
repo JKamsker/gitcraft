@@ -304,10 +304,9 @@ impl RepoTab {
     }
 }
 fn exit_code(code: Option<i32>) -> String {
-    code.map(|code| crate::i18n::number(code))
-        .unwrap_or_else(|| {
-            crate::i18n::text("repo-workflows-review-label-unknown-b23a6a").to_owned()
-        })
+    code.map(crate::i18n::number).unwrap_or_else(|| {
+        crate::i18n::text("repo-workflows-review-label-unknown-b23a6a").to_owned()
+    })
 }
 fn show_report(ui: &mut egui::Ui, r: &Report) {
     ui.label(crate::i18n::message(

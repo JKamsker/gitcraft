@@ -86,10 +86,7 @@ fn contents(
         RichText::new(crate::i18n::message(
             "repo-workflows-release-contents-1effa1c5",
             &[
-                (
-                    "short-draft-commit-1",
-                    (short(&draft.commit)).clone().into(),
-                ),
+                ("short-draft-commit-1", (short(&draft.commit)).into()),
                 ("since", (since).clone().into()),
             ],
         ))
@@ -345,11 +342,11 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, forge: Option<Forge>, acts:
         (None, _) => crate::i18n::text("repo-workflows-release-form-4ffa3ce1").to_owned(),
         (Some(f), false) => crate::i18n::message(
             "repo-workflows-release-form-2f3dc697",
-            &[("f-name-1", (f.name()).clone().into())],
+            &[("f-name-1", (f.name()).into())],
         ),
         (Some(f), true) => crate::i18n::message(
             "repo-workflows-release-form-e81f07e0",
-            &[("f-name-1", (f.name()).clone().into())],
+            &[("f-name-1", (f.name()).into())],
         ),
     };
     ui.add_enabled(

@@ -351,7 +351,10 @@ mod core_guard_paint_tests {
     use crate::repo::push_preflight::core_guard_paint_tests::{frame, text};
 
     #[test]
-    fn core_guard_paint_file_badge_hover_and_errors_keep_supplied_scan_raw() {
+    fn core_guard_paint_file_badge_hover_and_errors_keep_supplied_scan_raw() -> Result<(), String> {
+        let ui_errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let ui_errors_0 = ui_errors.clone();
+
         let path = "tests/opaque12345.rs";
         let flags = FileFlags {
             path: path.into(),
@@ -379,12 +382,20 @@ mod core_guard_paint_tests {
         ] {
             crate::i18n::set_language(locale);
             let mut draw = |ui: &mut Ui| {
-                let original = RowExtra::Stats(Some(1), Some(0));
-                let (extra, shown) = extra(Some(&found), path, &original);
-                let row = super::super::widgets::file_row(ui, 'M', path, None, None, false, extra);
-                at = row.badge.expect("badge").center();
-                hover(ui, &row, shown);
-                error_note(ui, Some(&failed));
+                let ui_result = (|| -> Result<(), String> {
+                    let original = RowExtra::Stats(Some(1), Some(0));
+                    let (extra, shown) = extra(Some(&found), path, &original);
+                    let row =
+                        super::super::widgets::file_row(ui, 'M', path, None, None, false, extra);
+                    at = row.badge.ok_or("badge")?.center();
+                    hover(ui, &row, shown);
+                    error_note(ui, Some(&failed));
+
+                    Ok(())
+                })();
+                if let Err(error) = ui_result {
+                    ui_errors_0.borrow_mut().push(error);
+                }
             };
             let _ = frame(&ctx, vec![], &mut draw);
             // Release the closure's mutable borrow before supplying pointer coordinates.
@@ -410,13 +421,25 @@ mod core_guard_paint_tests {
             ] {
                 assert!(shown.contains(expected), "missing {expected}: {shown}");
             }
-            assert_eq!(found.as_ref().as_ref().unwrap()[path], flags);
+            assert_eq!(
+                found
+                    .as_ref()
+                    .as_ref()
+                    .map_err(|error| format!("{error:?}"))?[path],
+                flags
+            );
             assert_eq!(flags.summary(), raw);
             assert_eq!(
-                failed.as_ref().as_ref().unwrap_err(),
+                failed.as_ref().as_ref().err().ok_or("expected an error")?,
                 "Could not read the changes to look for weakened checks: provider: opaque12345\nEXPECT raw"
             );
         }
         crate::i18n::set_language("en-US");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
     }
 }

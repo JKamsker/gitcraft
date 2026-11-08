@@ -214,7 +214,8 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
-    fn actual_icon_and_highlight_menu_preserves_persisted_icon_and_color_values() {
+    fn actual_icon_and_highlight_menu_preserves_persisted_icon_and_color_values()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(
@@ -236,12 +237,17 @@ mod localization_tests {
         h.get_by_label("Hervorhebung Rot").click();
         h.run();
         assert!(h.state().color == TabColor::Red);
-        let saved = serde_json::to_string(h.state()).unwrap();
+        let saved = serde_json::to_string(h.state()).map_err(|error| format!("{error:?}"))?;
         assert_eq!(saved, r#"{"icon":"package","color":"Red"}"#);
         crate::i18n::set_language("en-US");
         h.run();
         h.get_by_label("Icon Library");
         h.get_by_label("Highlight Red");
-        assert_eq!(serde_json::to_string(h.state()).unwrap(), saved);
+        assert_eq!(
+            serde_json::to_string(h.state()).map_err(|error| format!("{error:?}"))?,
+            saved
+        );
+
+        Ok(())
     }
 }

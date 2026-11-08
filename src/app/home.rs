@@ -661,24 +661,37 @@ mod retained_error_tests {
     }
 
     #[test]
-    fn plain_replacement_clearing_and_mismatch_never_recover_source_from_text() {
+    fn plain_replacement_clearing_and_mismatch_never_recover_source_from_text() -> Result<(), String>
+    {
         crate::i18n::set_language("de");
         let original = AppError::init("fixture native error".into());
         let raw = original.raw.clone();
         let mut retained = Some(original);
         assert_eq!(
-            retained.as_ref().unwrap().display(),
+            retained.as_ref().ok_or("missing test value")?.display(),
             "git init fehlgeschlagen: fixture native error"
         );
         // Identical raw text from an unrelated write has no provenance.
         retained = Some(raw.clone().into());
-        assert!(retained.as_ref().unwrap().presentation.is_none());
-        assert_eq!(retained.as_ref().unwrap().display(), raw);
+        assert!(
+            retained
+                .as_ref()
+                .ok_or("missing test value")?
+                .presentation
+                .is_none()
+        );
+        assert_eq!(
+            retained.as_ref().ok_or("missing test value")?.display(),
+            raw
+        );
         retained = None;
         assert!(retained.is_none());
         retained = Some(raw.clone().into());
         assert_eq!(retained.as_deref(), Some(raw.as_str()));
-        assert_eq!(retained.as_ref().unwrap().display(), raw);
+        assert_eq!(
+            retained.as_ref().ok_or("missing test value")?.display(),
+            raw
+        );
         for lookalike in [
             "git init fehlgeschlagen: fixture native error",
             "Could not open y: fixture native error",
@@ -703,5 +716,7 @@ mod retained_error_tests {
         assert_eq!(mismatched.display(), "it is a symbolic link");
         assert_eq!(mismatched.delivery_text(), "it is a symbolic link");
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

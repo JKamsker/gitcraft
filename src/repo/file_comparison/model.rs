@@ -312,7 +312,8 @@ fn align(
 mod fluent_r1_boundary_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_binary_boundary_keeps_raw_reason_and_provider_lookalike_opaque() {
+    fn fluent_partition_r1_binary_boundary_keeps_raw_reason_and_provider_lookalike_opaque()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let before = Version {
             mode: Some("100644".into()),
@@ -324,13 +325,15 @@ mod fluent_r1_boundary_tests {
             bytes: vec![0, 1],
             ..before.clone()
         };
-        let bound = boundary("raw/1234.bin", &before, &after, &|| true).unwrap();
-        let raw = bound.reason.clone().unwrap();
+        let bound = boundary("raw/1234.bin", &before, &after, &|| true)
+            .map_err(|error| format!("{error:?}"))?;
+        let raw = bound.reason.clone().ok_or("missing test value")?;
         let provider = Version {
             warning: Some(raw.clone()),
             ..before.clone()
         };
-        let external = boundary("raw/1234.bin", &provider, &after, &|| true).unwrap();
+        let external = boundary("raw/1234.bin", &provider, &after, &|| true)
+            .map_err(|error| format!("{error:?}"))?;
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             assert_eq!(
@@ -343,5 +346,7 @@ mod fluent_r1_boundary_tests {
             assert_eq!(bound.old_mode.as_deref(), Some("100644"));
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

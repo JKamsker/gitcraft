@@ -332,7 +332,8 @@ mod localization_tests {
     }
 
     #[test]
-    fn actual_inert_previews_paint_german_and_keep_sample_refs_commands_and_settings() {
+    fn actual_inert_previews_paint_german_and_keep_sample_refs_commands_and_settings()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let settings = Settings {
             refs_width: 2000.0,
@@ -343,7 +344,7 @@ mod localization_tests {
             branch_names_keep_end: true,
             ..Settings::default()
         };
-        let saved = serde_json::to_value(&settings).unwrap();
+        let saved = serde_json::to_value(&settings).map_err(|error| format!("{error:?}"))?;
         let ctx = egui::Context::default();
         ctx.run_ui(egui::RawInput::default(), |ui| {
             crate::theme::install_fonts(ui.ctx());
@@ -402,9 +403,14 @@ mod localization_tests {
                 .explain(&settings)
                 .contains("ihr Ende (…xyz)")
         );
-        assert_eq!(serde_json::to_value(&settings).unwrap(), saved);
+        assert_eq!(
+            serde_json::to_value(&settings).map_err(|error| format!("{error:?}"))?,
+            saved
+        );
         crate::i18n::set_language("en-US");
         assert!(Preview::GraphRefs.explain(&settings).contains("2,000 px"));
         assert_eq!(Preview::DiffLayout.title(), "Diff layout");
+
+        Ok(())
     }
 }

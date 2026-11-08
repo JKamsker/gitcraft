@@ -459,7 +459,7 @@ pub(crate) fn plan_rebase(
             "repo-workflows-forks-plan-rebase-6ccf1bc5",
             &[
                 ("local", (local).clone().into()),
-                ("upstream", (upstream).clone().into()),
+                ("upstream", (upstream).into()),
                 ("info-base-1", (info.base).clone().into()),
             ],
         ));
@@ -712,7 +712,8 @@ mod tests {
 mod fluent_r1_identifier_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_collision_names_preserve_decimal_pr_identity_and_planned_argv() {
+    fn fluent_partition_r1_collision_names_preserve_decimal_pr_identity_and_planned_argv()
+    -> Result<(), String> {
         let info = ForkInfo {
             number: 1234,
             cross: true,
@@ -724,11 +725,13 @@ mod fluent_r1_identifier_tests {
         };
         let setup = Setup::default();
         let locals = vec!["fix".into(), "ann/fix".into()];
-        let expected = checkout(&info, &[], &setup, &locals, "previous").unwrap();
+        let expected = checkout(&info, &[], &setup, &locals, "previous")
+            .map_err(|error| format!("{error:?}"))?;
         assert_eq!(expected.local, "pr-1234");
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
-            let planned = checkout(&info, &[], &setup, &locals, "previous").unwrap();
+            let planned = checkout(&info, &[], &setup, &locals, "previous")
+                .map_err(|error| format!("{error:?}"))?;
             assert_eq!(planned.local, expected.local);
             assert_eq!(planned.steps, expected.steps);
             assert_eq!(planned.undo, expected.undo);
@@ -737,11 +740,13 @@ mod fluent_r1_identifier_tests {
                 occupied.push(collision.into());
                 let error = checkout(&info, &[], &setup, &occupied, "previous")
                     .err()
-                    .unwrap();
+                    .ok_or("missing test value")?;
                 assert!(error.contains("pr-1234"), "{error}");
                 assert!(!error.contains("1.234") && !error.contains("1,234"));
             }
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

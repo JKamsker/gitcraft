@@ -59,7 +59,7 @@ impl RepoTab {
                 many => crate::i18n::message(
                     "repo-workflows-unity-unity-banners-b610e7b8",
                     &[
-                        ("many-len-1", (many.len()).clone().into()),
+                        ("many-len-1", (many.len()).into()),
                         ("many-0-path-2", (many[0].path).clone().into()),
                     ],
                 ),
@@ -83,7 +83,7 @@ impl RepoTab {
                     if more > 0 {
                         ui.label(crate::i18n::message(
                             "repo-workflows-unity-unity-banners-e1614a83",
-                            &[("more", (more).clone().into())],
+                            &[("more", (more).into())],
                         ));
                     }
                 });

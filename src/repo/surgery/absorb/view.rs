@@ -399,7 +399,7 @@ fn card(
                             ui.label(
                                 RichText::new(crate::i18n::message(
                                     "repo-workflows-surgery-card-204fd472",
-                                    &[("at", (at).clone().into())],
+                                    &[("at", (at).into())],
                                 ))
                                 .color(t.text_faint),
                             );
@@ -416,10 +416,7 @@ fn card(
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-surgery-card-f5133568",
-                            &[(
-                                "hunk-lines-len-shown-1",
-                                (hunk.lines.len() - SHOWN).clone().into(),
-                            )],
+                            &[("hunk-lines-len-shown-1", (hunk.lines.len() - SHOWN).into())],
                         ))
                         .color(t.text_faint)
                         .small(),
@@ -458,7 +455,7 @@ fn preview(ui: &mut Ui, t: &Tokens, editor: &AbsorbEditor) {
                 crate::i18n::message(
                     "repo-workflows-surgery-preview-a1b3c4c7",
                     &[
-                        ("short-c-hash-1", (short(&c.hash)).clone().into()),
+                        ("short-c-hash-1", (short(&c.hash)).into()),
                         ("c-summary-2", (c.summary).clone().into()),
                     ],
                 )

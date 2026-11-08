@@ -1,10 +1,13 @@
 use super::*;
 
 #[test]
-fn actual_download_guard_and_copy_status_combinator_capture_before_placement_wrapping() {
+fn actual_download_guard_and_copy_status_combinator_capture_before_placement_wrapping()
+-> Result<(), String> {
     let url = "https://example/1234.5/ref/main; ;";
     assert!(check_download_size(url, MAX_DOWNLOAD).is_ok());
-    let large = check_download_size(url, MAX_DOWNLOAD + 1).expect_err("size guard");
+    let large = check_download_size(url, MAX_DOWNLOAD + 1)
+        .err()
+        .ok_or("size guard")?;
     let lookalike = download_failure(url, DownloadFailure::Opaque("bigger than expected".into()));
     assert_eq!(large.raw(), lookalike.raw());
     assert!(matches!(
@@ -17,7 +20,9 @@ fn actual_download_guard_and_copy_status_combinator_capture_before_placement_wra
     let mut calls = 0;
     assert!(check_copy_status(true, || calls += 1).is_ok());
     assert_eq!(calls, 0);
-    let copy = check_copy_status(false, || calls += 1).expect_err("copy status");
+    let copy = check_copy_status(false, || calls += 1)
+        .err()
+        .ok_or("copy status")?;
     assert_eq!(calls, 1);
     let raw = copy.raw().to_owned();
     let placed = previous::placement_failure(copy);
@@ -41,6 +46,8 @@ fn actual_download_guard_and_copy_status_combinator_capture_before_placement_wra
         assert_eq!(placed, before);
         assert_eq!(placed.clone().into_raw(), before.raw());
     }
+
+    Ok(())
 }
 
 #[test]

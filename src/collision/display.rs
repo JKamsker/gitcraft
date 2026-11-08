@@ -20,13 +20,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" is not a branch"))
     {
-        let rendered = (|| {
+        let rendered = {
             let reference = text;
             Some(message(
                 "interaction-guards-collision-not-branch",
                 &[("reference", reference.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }

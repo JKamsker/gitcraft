@@ -209,7 +209,7 @@ impl RepoTab {
                     RichText::new(crate::i18n::message(
                         "repo-workflows-stack-publish-dialog-e512538a",
                         &[
-                            ("noun", (noun).clone().into()),
+                            ("noun", (noun).into()),
                             ("preview-root-1", (preview.root).clone().into()),
                         ],
                     ))
@@ -219,7 +219,7 @@ impl RepoTab {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-stack-publish-dialog-55798dde",
-                        &[("noun", (noun).clone().into())],
+                        &[("noun", (noun).into())],
                     ))
                     .color(t.text_dim),
                 );
@@ -234,7 +234,7 @@ impl RepoTab {
                             ui.label(
                                 RichText::new(crate::i18n::message(
                                     "repo-workflows-stack-publish-dialog-64d68875",
-                                    &[("noun", (noun).clone().into())],
+                                    &[("noun", (noun).into())],
                                 ))
                                 .color(t.text_faint),
                             );
@@ -267,7 +267,7 @@ impl RepoTab {
                                 &mut draft,
                                 crate::i18n::message(
                                     "repo-workflows-stack-publish-dialog-d530df80",
-                                    &[("noun", (noun).clone().into())],
+                                    &[("noun", (noun).into())],
                                 ),
                             );
                         }
@@ -333,7 +333,7 @@ fn plan_row(
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-512a4ebf",
                 &[
-                    ("noun", (noun).clone().into()),
+                    ("noun", (noun).into()),
                     ("plan-base-1", (plan.base).clone().into()),
                 ],
             ),
@@ -343,7 +343,7 @@ fn plan_row(
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-3c8950f2",
                 &[
-                    ("noun", (noun).clone().into()),
+                    ("noun", (noun).into()),
                     ("plan-base-1", (plan.base).clone().into()),
                     ("n", (n).to_string().into()),
                 ],
@@ -378,7 +378,7 @@ fn plan_row(
         Step::Empty => (
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-25b842ca",
-                &[("noun", (noun).clone().into())],
+                &[("noun", (noun).into())],
             ),
             t.text_faint,
         ),
@@ -427,7 +427,7 @@ fn plan_row(
                 "repo-workflows-stack-plan-row-96f34b27",
                 &[
                     ("from", (from).clone().into()),
-                    ("noun", (noun).clone().into()),
+                    ("noun", (noun).into()),
                     ("plan-branch-1", (plan.branch).clone().into()),
                     ("plan-base-2", (plan.base).clone().into()),
                 ],
@@ -454,7 +454,7 @@ fn plan_row(
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-stack-plan-row-140261ea",
-                    &[("n-4-1", (n - 4).clone().into())],
+                    &[("n-4-1", (n - 4).into())],
                 ))
                 .color(t.text_faint)
                 .small(),

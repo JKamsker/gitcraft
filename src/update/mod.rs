@@ -5,7 +5,9 @@ pub(crate) mod display;
 mod install;
 mod previous;
 mod witness;
-pub use witness::{DownloadFailure, Failure, PlacementFailure};
+pub use witness::Failure;
+#[cfg(test)]
+pub use witness::PlacementFailure;
 
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -14,8 +16,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 pub use install::{
-    clean_up, go_back, go_back_witnessed, install, install_witnessed, previous, relaunch,
-    relaunch_after_exit,
+    clean_up, go_back_witnessed, install_witnessed, previous, relaunch, relaunch_after_exit,
 };
 pub use previous::{PIN_THIS, Previous, settle_pin};
 

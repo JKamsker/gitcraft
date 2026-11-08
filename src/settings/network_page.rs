@@ -270,7 +270,8 @@ fn display_line(raw: &str) -> String {
 mod tests {
     use super::*;
     #[test]
-    fn actual_idle_network_page_translates_status_at_paint_and_keeps_raw_state() {
+    fn actual_idle_network_page_translates_status_at_paint_and_keeps_raw_state()
+    -> Result<(), String> {
         use egui_kittest::{Harness, kittest::Queryable};
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
@@ -303,8 +304,17 @@ mod tests {
         h.get_by_label("external diagnostic 日本語");
         h.get_by_label("TLS-Zertifikatskette: NICHT geprüft — die Zertifikatsprüfung ist in der Git-Konfiguration oder -Umgebung deaktiviert");
         h.get_by_label("ls-remote: nach 2,34 s fehlgeschlagen");
-        assert_eq!(recorded.lock().unwrap().lines[0], "Check cancelled");
-        assert!(recorded.lock().unwrap().job.is_none());
+        assert_eq!(
+            recorded.lock().map_err(|error| format!("{error:?}"))?.lines[0],
+            "Check cancelled"
+        );
+        assert!(
+            recorded
+                .lock()
+                .map_err(|error| format!("{error:?}"))?
+                .job
+                .is_none()
+        );
         let raw_helpers = helper_lines("manager\n!echo secret");
         assert_eq!(raw_helpers[0], "Last URL-matched configured helper:");
         assert_eq!(
@@ -317,13 +327,18 @@ mod tests {
         crate::i18n::set_language("en-US");
         h.step();
         h.get_by_label("Check cancelled");
-        assert_eq!(recorded.lock().unwrap().lines[0], "Check cancelled");
+        assert_eq!(
+            recorded.lock().map_err(|error| format!("{error:?}"))?.lines[0],
+            "Check cancelled"
+        );
         h.get_by_label("TLS chain: NOT verified — certificate verification is disabled in Git's configuration or environment");
         h.get_by_label("ls-remote: failed in 2.34 s");
         assert_eq!(
-            recorded.lock().unwrap().lines[3],
+            recorded.lock().map_err(|error| format!("{error:?}"))?.lines[3],
             "ls-remote: failed in 2.34 s"
         );
+
+        Ok(())
     }
 
     #[test]

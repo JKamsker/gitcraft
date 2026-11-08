@@ -141,7 +141,7 @@ fn setting_row(
                         ui.label(
                             RichText::new(crate::i18n::message(
                                 "repo-workflows-doctor-setting-row-8f8c7445",
-                                &[("values-len-1-1", (values.len() - 1).clone().into())],
+                                &[("values-len-1-1", (values.len() - 1).into())],
                             ))
                             .size(11.5)
                             .color(t.warning),
@@ -602,7 +602,8 @@ mod fluent_r1_confirmation_tests {
         }
     }
     #[test]
-    fn fluent_partition_r1_actual_remove_confirmation_keeps_opaque_value_path_and_argv() {
+    fn fluent_partition_r1_actual_remove_confirmation_keeps_opaque_value_path_and_argv()
+    -> Result<(), String> {
         for scope in [Scope::Local, Scope::Global, Scope::System] {
             let origin = Origin {
                 scope,
@@ -613,21 +614,21 @@ mod fluent_r1_confirmation_tests {
             let op = vec![
                 "config".into(),
                 "--file".into(),
-                origin.file.clone().unwrap(),
+                origin.file.clone().ok_or("missing test value")?,
                 "--unset-all".into(),
                 origin.key.clone(),
             ];
             crate::i18n::set_language("de");
             let Action::Doctor(DoctorAct::Confirm(confirm)) = remove_confirm(&origin, op.clone())
             else {
-                panic!("remove must confirm")
+                return Err("remove must confirm".into());
             };
             assert_eq!(confirm.ops, vec![op]);
             check_cache(
                 &confirm,
                 &[
                     origin.shown_value(),
-                    origin.file.as_deref().unwrap(),
+                    origin.file.as_deref().ok_or("missing test value")?,
                     &origin.key,
                 ],
             );
@@ -644,9 +645,12 @@ mod fluent_r1_confirmation_tests {
             );
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
     #[test]
-    fn fluent_partition_r1_actual_set_click_caches_raw_confirmation_and_projects_scope_at_paint() {
+    fn fluent_partition_r1_actual_set_click_caches_raw_confirmation_and_projects_scope_at_paint()
+    -> Result<(), String> {
         for scope in [Scope::Global, Scope::System] {
             crate::i18n::set_language("de");
             let state = ConfigState {
@@ -654,7 +658,7 @@ mod fluent_r1_confirmation_tests {
                 value: "Opaque; {$x}".into(),
                 ..Default::default()
             };
-            let setting = config::find("user.name").unwrap();
+            let setting = config::find("user.name").ok_or("missing test value")?;
             let mut h = Harness::new_ui_state(
                 |ui, state: &mut (ConfigState, Vec<Action>, bool)| {
                     if !std::mem::replace(&mut state.2, true) {
@@ -677,8 +681,10 @@ mod fluent_r1_confirmation_tests {
             h.run();
             let actions = std::mem::take(&mut h.state_mut().1);
             let mut iter = actions.into_iter();
-            let Action::Doctor(DoctorAct::Confirm(confirm)) = iter.next().unwrap() else {
-                panic!("global/system must confirm")
+            let Action::Doctor(DoctorAct::Confirm(confirm)) =
+                iter.next().ok_or("missing test value")?
+            else {
+                return Err("global/system must confirm".into());
             };
             assert!(iter.next().is_none());
             assert!(confirm.ops[0].contains(&"Opaque; {$x}".into()));
@@ -687,5 +693,7 @@ mod fluent_r1_confirmation_tests {
             assert_eq!(h.state().0.value, "Opaque; {$x}");
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

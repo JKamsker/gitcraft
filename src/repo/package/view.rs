@@ -98,10 +98,7 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
         RichText::new(crate::i18n::message(
             "repo-workflows-package-contents-a2e9d64e",
             &[
-                (
-                    "pkg-ecosystem-tool-1",
-                    (pkg.ecosystem.tool()).clone().into(),
-                ),
+                ("pkg-ecosystem-tool-1", (pkg.ecosystem.tool()).into()),
                 (
                     "if-pkg-dir-is-empty-the-reposito-2",
                     (if pkg.dir.is_empty() {
@@ -109,7 +106,6 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
                     } else {
                         &pkg.dir
                     })
-                    .clone()
                     .into(),
                 ),
             ],
@@ -124,10 +120,7 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-package-contents-b32a9827",
-                    &[(
-                        "pkg-ecosystem-tool-1",
-                        (pkg.ecosystem.tool()).clone().into(),
-                    )],
+                    &[("pkg-ecosystem-tool-1", (pkg.ecosystem.tool()).into())],
                 ))
                 .color(t.text_faint)
                 .small(),
@@ -201,7 +194,7 @@ fn report_ui(
                     ui,
                     &crate::i18n::message(
                         "repo-workflows-package-report-ui-b413d4db",
-                        &[("registry", (registry).clone().into())],
+                        &[("registry", (registry).into())],
                     ),
                 );
             });
@@ -210,7 +203,7 @@ fn report_ui(
             ui,
             &crate::i18n::message(
                 "repo-workflows-package-report-ui-b47c6e02",
-                &[("registry", (registry).clone().into())],
+                &[("registry", (registry).into())],
             ),
         ),
         Some(Err(e)) => faint(
@@ -228,7 +221,7 @@ fn report_ui(
                         "repo-workflows-package-report-ui-ef333981",
                         &[
                             ("p-version-1", (p.version).clone().into()),
-                            ("registry", (registry).clone().into()),
+                            ("registry", (registry).into()),
                         ],
                     ),
                 );
@@ -255,7 +248,7 @@ fn report_ui(
         ui,
         &crate::i18n::message(
             "repo-workflows-package-report-ui-d4826304",
-            &[("report-files-len-1", (report.files.len()).clone().into())],
+            &[("report-files-len-1", (report.files.len()).into())],
         ),
     );
     for (f, size) in report.files.iter().take(SHOWN) {
@@ -297,7 +290,7 @@ fn more(ui: &mut Ui, len: usize) {
             ui,
             &crate::i18n::message(
                 "repo-workflows-package-more-683768ab",
-                &[("len-shown-1", (len - SHOWN).clone().into())],
+                &[("len-shown-1", (len - SHOWN).into())],
             ),
         );
     }
@@ -419,7 +412,7 @@ mod fluent_package_witness_tests {
 
     #[test]
     fn fluent_partition_actual_package_three_cached_failure_slots_repaint_without_request_or_action_changes()
-     {
+    -> Result<(), String> {
         let detail = "provider: No Cargo.toml or package.json at the top of the repository; ;\n{$raw} 日本語";
         let failures = [
             Failure::NoManifest {
@@ -483,23 +476,47 @@ mod fluent_package_witness_tests {
                 assert_eq!(h.state().0.selected, 0);
                 assert!(h.state().1.is_empty());
                 let retained = match slot {
-                    0 => h.state().0.packages.as_ref().unwrap().as_ref().unwrap_err(),
-                    1 => h.state().0.report.as_ref().unwrap().as_ref().unwrap_err(),
+                    0 => h
+                        .state()
+                        .0
+                        .packages
+                        .as_ref()
+                        .ok_or("missing test value")?
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?,
+                    1 => h
+                        .state()
+                        .0
+                        .report
+                        .as_ref()
+                        .ok_or("missing test value")?
+                        .as_ref()
+                        .err()
+                        .ok_or("expected an error")?,
                     _ => h
                         .state()
                         .0
                         .published
                         .as_ref()
-                        .unwrap()
+                        .ok_or("missing test value")?
                         .as_ref()
-                        .unwrap_err(),
+                        .err()
+                        .ok_or("expected an error")?,
                 };
                 assert_eq!(retained, &failure);
                 assert_eq!(retained.clone().into_raw(), failure.raw());
                 if slot == 2 {
-                    let r = h.state().0.report.as_ref().unwrap().as_ref().unwrap();
+                    let r = h
+                        .state()
+                        .0
+                        .report
+                        .as_ref()
+                        .ok_or("missing test value")?
+                        .as_ref()
+                        .map_err(|error| format!("{error:?}"))?;
                     h.get_by_label(&format!("raw.env — {}", r.display_why(&r.accidental[0])));
-                    h.get_by_label(&r.display_hint().unwrap());
+                    h.get_by_label(&r.display_hint().ok_or("missing test value")?);
                     assert_eq!(r, &original);
                 }
             }
@@ -519,5 +536,7 @@ mod fluent_package_witness_tests {
             assert_eq!(opaque.display(), opaque.raw());
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

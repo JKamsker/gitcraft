@@ -413,13 +413,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Author email differs from the profile policy for ")
         .and_then(|s| s.strip_suffix("."))
     {
-        let rendered = (|| {
+        let rendered = {
             let target = target_label(text);
             Some(message(
                 "interaction-guards-push-identity",
                 &[("target", target.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -428,13 +428,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" Git blob; consider Git LFS."))
     {
-        let rendered = (|| {
+        let rendered = {
             let size = text;
             Some(message(
                 "interaction-guards-push-large",
                 &[("size", size.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -484,31 +484,31 @@ fn dynamic(raw: &str) -> Option<String> {
         }
     }
     if let Some(text) = raw.strip_prefix("The local repair did not establish complete owned acknowledgement. Preserve concurrent edits; inspect recovery.txt and saved index/dependency in ").and_then(|s| s.strip_suffix(". No automatic rollback overwrote later work.")) {
-        let rendered = (|| {
+        let rendered = {
             let directory = text;
             Some(message("interaction-guards-push-local-uncertain", &[("directory", directory.into())]))
-        })();
+        };
         if rendered.is_some() { return rendered; }
     }
     if let Some(text) = raw.strip_prefix("A previous remote repair has no confirmed terminal outcome. Recheck after the host finishes, or inspect recovery in ").and_then(|s| s.strip_suffix(". No replacement repair was dispatched.")) {
-        let rendered = (|| {
+        let rendered = {
             let directory = text;
             Some(message("interaction-guards-push-remote-held", &[("directory", directory.into())]))
-        })();
+        };
         if rendered.is_some() { return rendered; }
     }
     if let Some(text) = raw.strip_prefix("The remote repair outcome is unknown. It may still be running; its owned guard and recovery remain in ").and_then(|s| s.strip_suffix(". Recheck after the host finishes; no replacement or cleanup was dispatched.")) {
-        let rendered = (|| {
+        let rendered = {
             let directory = text;
             Some(message("interaction-guards-push-remote-uncertain", &[("directory", directory.into())]))
-        })();
+        };
         if rendered.is_some() { return rendered; }
     }
     if let Some(text) = raw.strip_prefix("Remote repair did not establish complete success. Inspect actual HEAD and concurrent edits, plus recovery in ").and_then(|s| s.strip_suffix("; no rollback overwrote later work.")) {
-        let rendered = (|| {
+        let rendered = {
             let directory = text;
             Some(message("interaction-guards-push-remote-incomplete", &[("directory", directory.into())]))
-        })();
+        };
         if rendered.is_some() { return rendered; }
     }
     None

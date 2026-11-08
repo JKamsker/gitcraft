@@ -138,10 +138,10 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             ui.label(crate::i18n::message(
                 "repo-workflows-repository_tools-show-5673c401",
                 &[
-                    ("review-hunks-len-1", (review.hunks.len()).clone().into()),
+                    ("review-hunks-len-1", (review.hunks.len()).into()),
                     (
                         "review-hunks-len-unreviewed-len-2",
-                        (review.hunks.len() - unreviewed.len()).clone().into(),
+                        (review.hunks.len() - unreviewed.len()).into(),
                     ),
                 ],
             ));
@@ -167,10 +167,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     "repo-workflows-repository_tools-show-181a4047",
                     &[
                         ("aggregate-session-1", (aggregate.session).clone().into()),
-                        (
-                            "aggregate-saved-turns-2",
-                            (aggregate.saved_turns).clone().into(),
-                        ),
+                        ("aggregate-saved-turns-2", (aggregate.saved_turns).into()),
                         ("review-parent-3", (review.parent).clone().into()),
                         ("review-turn-4", (review.turn).clone().into()),
                     ],
@@ -185,7 +182,6 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             .unwrap_or(crate::i18n::text(
                                 "repo-workflows-repository_tools-show-9e8617f1",
                             )))
-                        .clone()
                         .into(),
                     )],
                 ));
@@ -274,7 +270,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 &[
                     ("p-parent-1", (p.parent).clone().into()),
                     ("p-turn-2", (p.turn).clone().into()),
-                    ("p-paths-len-3", (p.paths.len()).clone().into()),
+                    ("p-paths-len-3", (p.paths.len()).into()),
                 ],
             ));
             egui::ScrollArea::vertical()

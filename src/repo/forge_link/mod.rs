@@ -61,7 +61,7 @@ impl LinkMenu {
             };
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-workflows-forge_link-items-a5232678",
-                &[("what", (what).clone().into())],
+                &[("what", (what).into())],
             ))
             .icon("copy")
             .show(ui)
@@ -73,7 +73,7 @@ impl LinkMenu {
             if crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-workflows-forge_link-items-78bef62f",
                 &[
-                    ("what", (what).clone().into()),
+                    ("what", (what).into()),
                     ("one-forge-1", (one.forge).clone().into()),
                 ],
             ))
@@ -90,12 +90,12 @@ impl LinkMenu {
             let label = if open {
                 crate::i18n::message(
                     "repo-workflows-forge_link-items-44c5ece2",
-                    &[("what", (what).clone().into())],
+                    &[("what", (what).into())],
                 )
             } else {
                 crate::i18n::message(
                     "repo-workflows-forge_link-items-a5232678",
-                    &[("what", (what).clone().into())],
+                    &[("what", (what).into())],
                 )
             };
             crate::menu_item::MenuItem::new(label)
@@ -263,7 +263,7 @@ fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (St
             crate::i18n::message(
                 "repo-workflows-forge_link-deliver-c5e2849f",
                 &[
-                    ("done", (done).clone().into()),
+                    ("done", (done).into()),
                     ("warning", (warning).clone().into()),
                     ("link-url-1", (link.url).clone().into()),
                 ],

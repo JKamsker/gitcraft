@@ -120,8 +120,8 @@ pub(crate) fn line(raw: &str) -> String {
             &[("value", display_value(value).into())],
         );
     }
-    if let Some((key, value)) = raw.split_once(": ") {
-        if [
+    if let Some((key, value)) = raw.split_once(": ")
+        && ([
             "http.sslCAInfo",
             "http.sslCAPath",
             "http.sslBackend",
@@ -139,24 +139,24 @@ pub(crate) fn line(raw: &str) -> String {
                 "Git no_proxy",
                 "Git NO_PROXY",
             ]
-            .contains(&key)
-        {
-            return crate::i18n::message(
-                "interaction-doctor-key-value",
-                &[("key", key.into()), ("value", display_value(value).into())],
-            );
-        }
+            .contains(&key))
+    {
+        return crate::i18n::message(
+            "interaction-doctor-key-value",
+            &[("key", key.into()), ("value", display_value(value).into())],
+        );
     }
     for (prefix, id) in [
         ("ls-remote: completed in ", "interaction-doctor-elapsed-ok"),
         ("ls-remote: failed in ", "interaction-doctor-elapsed-failed"),
     ] {
-        if let Some(number) = raw.strip_prefix(prefix).and_then(|s| s.strip_suffix(" s")) {
-            if let Ok(seconds) = number.parse::<f64>() {
-                if seconds.is_finite() && seconds >= 0.0 && format!("{seconds:.2}") == number {
-                    return crate::i18n::message(id, &[("seconds", seconds.into())]);
-                }
-            }
+        if let Some(number) = raw.strip_prefix(prefix).and_then(|s| s.strip_suffix(" s"))
+            && let Ok(seconds) = number.parse::<f64>()
+            && seconds.is_finite()
+            && seconds >= 0.0
+            && format!("{seconds:.2}") == number
+        {
+            return crate::i18n::message(id, &[("seconds", seconds.into())]);
         }
     }
     let remote = crate::remote::display::diagnostic(raw);

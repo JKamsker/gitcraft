@@ -179,7 +179,7 @@ fn run_for(cmd: &mut Command, limit: std::time::Duration) -> Result<std::process
                 let _ = child.wait();
                 return Err(crate::i18n::message(
                     "repo-workflows-unity-run-for-ca1ae15d",
-                    &[("limit-as-secs-1", (limit.as_secs()).clone().into())],
+                    &[("limit-as-secs-1", (limit.as_secs()).into())],
                 ));
             }
             Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
@@ -201,19 +201,13 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
     let ours = stage(2).map_err(|e| {
         crate::i18n::message(
             "repo-workflows-unity-solve-6ee66918",
-            &[
-                ("path", (path).clone().into()),
-                ("e", (e).to_string().into()),
-            ],
+            &[("path", (path).into()), ("e", (e).to_string().into())],
         )
     })?;
     let theirs = stage(3).map_err(|e| {
         crate::i18n::message(
             "repo-workflows-unity-solve-ac6f5e99",
-            &[
-                ("path", (path).clone().into()),
-                ("e", (e).to_string().into()),
-            ],
+            &[("path", (path).into()), ("e", (e).to_string().into())],
         )
     })?;
     // Added on both sides: no common version, an empty one.
@@ -226,10 +220,7 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
     std::fs::create_dir_all(&dir).map_err(|e| {
         crate::i18n::message(
             "repo-workflows-unity-solve-8c26b794",
-            &[
-                ("path", (path).clone().into()),
-                ("e", (e).to_string().into()),
-            ],
+            &[("path", (path).into()), ("e", (e).to_string().into())],
         )
     })?;
     let result = (|| {
@@ -240,10 +231,7 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
             std::fs::write(file, bytes).map_err(|e| {
                 crate::i18n::message(
                     "repo-workflows-unity-solve-8c26b794",
-                    &[
-                        ("path", (path).clone().into()),
-                        ("e", (e).to_string().into()),
-                    ],
+                    &[("path", (path).into()), ("e", (e).to_string().into())],
                 )
             })?;
         }
@@ -274,12 +262,12 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
             Err(match said {
                 Some(line) => crate::i18n::message(
                     "repo-workflows-unity-solve-183ec676",
-                    &[("line", (line).clone().into())],
+                    &[("line", (line).into())],
                 ),
                 None => crate::i18n::message(
                     "repo-workflows-unity-solve-ac1127b1",
                     &[
-                        ("path", (path).clone().into()),
+                        ("path", (path).into()),
                         ("out-status-1", (out.status).to_string().into()),
                     ],
                 ),

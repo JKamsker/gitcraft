@@ -113,7 +113,7 @@ impl RepoTab {
                     "repo-workflows-history_activity-activity-view-e23552d7",
                     &[(
                         "view-progress-load-ordering-rela-1",
-                        (view.progress.load(Ordering::Relaxed)).clone().into(),
+                        (view.progress.load(Ordering::Relaxed)).into(),
                     )],
                 ));
             });
@@ -135,12 +135,9 @@ impl RepoTab {
             ui.label(crate::i18n::message(
                 "repo-workflows-history_activity-activity-view-e136531e",
                 &[
-                    ("coverage", (coverage).clone().into()),
-                    (
-                        "history-commits-len-1",
-                        (history.commits.len()).clone().into(),
-                    ),
-                    ("history-tips-2", (history.tips).clone().into()),
+                    ("coverage", (coverage).into()),
+                    ("history-commits-len-1", (history.commits.len()).into()),
+                    ("history-tips-2", (history.tips).into()),
                     (
                         "if-history-shallow-shallow-clone-3",
                         (if history.shallow {
@@ -150,7 +147,6 @@ impl RepoTab {
                         } else {
                             ""
                         })
-                        .clone()
                         .into(),
                     ),
                 ],
@@ -321,7 +317,7 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
                                     (format!("{:04}", month.year)).clone().into(),
                                 ),
                                 ("m", (format!("{:02}", m)).clone().into()),
-                                ("n", (n).clone().into()),
+                                ("n", (n).into()),
                             ],
                         ))
                         .clicked()
@@ -491,7 +487,7 @@ fn commits(ui: &mut egui::Ui, view: &Activity, summary: &Summary, acts: &mut Vec
         .collect();
     ui.strong(crate::i18n::message(
         "repo-workflows-history_activity-commits-640e56ec",
-        &[("selected-len-1", (selected.len()).clone().into())],
+        &[("selected-len-1", (selected.len()).into())],
     ));
     let range = page(ui, "commits", selected.len());
     for commit in &selected[range] {
@@ -535,10 +531,10 @@ fn page(ui: &mut egui::Ui, name: &str, len: usize) -> std::ops::Range<usize> {
             ui.label(crate::i18n::message(
                 "repo-workflows-history_activity-page-dbaceb71",
                 &[
-                    ("page-1-1", (page + 1).clone().into()),
+                    ("page-1-1", (page + 1).into()),
                     (
                         "len-div-ceil-100-max-1-2",
-                        (len.div_ceil(100).max(1)).clone().into(),
+                        (len.div_ceil(100).max(1)).into(),
                     ),
                 ],
             ));

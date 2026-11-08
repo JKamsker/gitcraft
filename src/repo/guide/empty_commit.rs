@@ -67,7 +67,7 @@ pub(crate) fn undo_refusal(entry: &UndoEntry, refs: &Refs) -> Option<String> {
     (!branch.upstream.is_empty() || on_remote).then(|| {
         crate::i18n::message(
             "repo-workflows-guide-undo-refusal-6cb7f998",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         )
     })
 }
@@ -113,11 +113,8 @@ fn confirm_dialog(branch: &str) -> Dialog {
         crate::i18n::message(
             "repo-workflows-guide-confirm-dialog-91b6a6f9",
             &[
-                (
-                    "EMPTY-COMMIT-MESSAGE",
-                    (EMPTY_COMMIT_MESSAGE).clone().into(),
-                ),
-                ("name", (name).clone().into()),
+                ("EMPTY-COMMIT-MESSAGE", (EMPTY_COMMIT_MESSAGE).into()),
+                ("name", (name).into()),
             ],
         ),
         crate::i18n::text("repo-workflows-guide-confirm-dialog-82a9c46f"),

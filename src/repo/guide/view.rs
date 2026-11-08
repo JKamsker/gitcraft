@@ -128,10 +128,7 @@ fn first_commit_step(ui: &mut Ui, steps: FirstSteps, idle: bool, acts: &mut Vec<
                     )
                     .on_hover_text(crate::i18n::message(
                         "repo-workflows-guide-first-commit-step-6221ab4e",
-                        &[(
-                            "EMPTY-COMMIT-MESSAGE",
-                            (EMPTY_COMMIT_MESSAGE).clone().into(),
-                        )],
+                        &[("EMPTY-COMMIT-MESSAGE", (EMPTY_COMMIT_MESSAGE).into())],
                     ))
                     .clicked()
                 {
@@ -203,7 +200,7 @@ fn publish_step(
     let todo = match branch {
         Some(b) => crate::i18n::message(
             "repo-workflows-guide-publish-step-93d6376b",
-            &[("b", (b).clone().into())],
+            &[("b", (b).into())],
         ),
         None => crate::i18n::text("repo-workflows-guide-publish-step-2ce79937").into(),
     };

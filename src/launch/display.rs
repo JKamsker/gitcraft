@@ -67,13 +67,14 @@ pub fn message(raw: &str) -> Option<String> {
     ) {
         return Some(crate::i18n::message("interaction-launch-web-5", &[("url", url.into())]));
     }
-    if let Some(value) = raw.strip_suffix(" is not a line number (the first line is 1)") {
-        if value.bytes().all(|b| b.is_ascii_digit()) && !value.is_empty() {
-            return Some(crate::i18n::message(
-                "interaction-launch-line",
-                &[("value", value.into())],
-            ));
-        }
+    if let Some(value) = raw.strip_suffix(" is not a line number (the first line is 1)")
+        && value.bytes().all(|b| b.is_ascii_digit())
+        && !value.is_empty()
+    {
+        return Some(crate::i18n::message(
+            "interaction-launch-line",
+            &[("value", value.into())],
+        ));
     }
     if let Some(value) = raw.strip_prefix("Name the two commits as a..b (or a...b), not ") {
         return Some(crate::i18n::message(
@@ -81,13 +82,13 @@ pub fn message(raw: &str) -> Option<String> {
             &[("value", value.into())],
         ));
     }
-    if let Some(value) = raw.strip_suffix(" is not a commit: it starts with -") {
-        if value.starts_with('-') {
-            return Some(crate::i18n::message(
-                "interaction-launch-rev-option",
-                &[("value", value.into())],
-            ));
-        }
+    if let Some(value) = raw.strip_suffix(" is not a commit: it starts with -")
+        && value.starts_with('-')
+    {
+        return Some(crate::i18n::message(
+            "interaction-launch-rev-option",
+            &[("value", value.into())],
+        ));
     }
     if let Some(value) = raw.strip_suffix(" is not a commit name") {
         return Some(crate::i18n::message(
@@ -125,24 +126,23 @@ pub fn message(raw: &str) -> Option<String> {
             ));
         }
     }
-    if let Some(body) = raw.strip_suffix(": fetch, then open the link again") {
-        if body.matches(" isn't in ").count() == 1
-            && let Some((item, root)) = body.split_once(" isn't in ")
+    if let Some(body) = raw.strip_suffix(": fetch, then open the link again")
+        && body.matches(" isn't in ").count() == 1
+        && let Some((item, root)) = body.split_once(" isn't in ")
+    {
+        if let Some(hash) = item
+            .strip_prefix("Commit ")
+            .filter(|h| !h.is_empty() && h.bytes().all(|b| b.is_ascii_hexdigit()))
         {
-            if let Some(hash) = item
-                .strip_prefix("Commit ")
-                .filter(|h| !h.is_empty() && h.bytes().all(|b| b.is_ascii_hexdigit()))
-            {
-                return Some(crate::i18n::message(
-                    "interaction-launch-missing-linked-commit",
-                    &[("hash", hash.into()), ("root", root.into())],
-                ));
-            }
             return Some(crate::i18n::message(
-                "interaction-launch-missing-linked-file",
-                &[("path", item.into()), ("root", root.into())],
+                "interaction-launch-missing-linked-commit",
+                &[("hash", hash.into()), ("root", root.into())],
             ));
         }
+        return Some(crate::i18n::message(
+            "interaction-launch-missing-linked-file",
+            &[("path", item.into()), ("root", root.into())],
+        ));
     }
     linked_pull_request(raw)
 }

@@ -192,10 +192,7 @@ impl StartForm {
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-agents-ui-44e1cc2b",
-                    &[(
-                        "crate-manual-command-1",
-                        (crate::manual::command()).clone().into(),
-                    )],
+                    &[("crate-manual-command-1", (crate::manual::command()).into())],
                 ))
                 .small()
                 .color(t.text_faint),
@@ -216,7 +213,7 @@ impl StartForm {
         if self.branches.iter().any(|b| b == branch) {
             return Some(crate::i18n::message(
                 "repo-workflows-agents-problem-80f33652",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ));
         }
         let base = self.base.trim();
@@ -294,7 +291,7 @@ impl StartForm {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-agents-agent-choice-2b8f8124",
-                        &[("cli-label-1", (cli.label).clone().into())],
+                        &[("cli-label-1", (cli.label).into())],
                     ))
                     .small()
                     .color(t.text_faint),

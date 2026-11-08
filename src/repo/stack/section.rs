@@ -72,7 +72,7 @@ impl RepoTab {
                     .show(|ui| {
                         if crate::menu_item::MenuItem::new(crate::i18n::message(
                             "repo-workflows-stack-stack-section-c5c6049a",
-                            &[("forge-noun-1", (forge.noun_label()).clone().into())],
+                            &[("forge-noun-1", (forge.noun_label()).into())],
                         ))
                         .icon("external-link")
                         .enabled(idle)
@@ -119,9 +119,9 @@ impl RepoTab {
                         egui::RichText::new(crate::i18n::message(
                             "repo-workflows-stack-restack-banner-41ffaa88",
                             &[
-                                ("branch", (branch).clone().into()),
-                                ("pending-done-1-1", (pending.done + 1).clone().into()),
-                                ("pending-steps-len-2", (pending.steps.len()).clone().into()),
+                                ("branch", (branch).into()),
+                                ("pending-done-1-1", (pending.done + 1).into()),
+                                ("pending-steps-len-2", (pending.steps.len()).into()),
                             ],
                         ))
                         .color(t.warning)
@@ -192,7 +192,7 @@ impl RepoTab {
                     } else {
                         crate::i18n::message(
                             "repo-workflows-stack-restack-banner-253f5c4b",
-                            &[("n", (n).clone().into())],
+                            &[("n", (n).into())],
                         )
                     })
                     .color(t.text),
@@ -433,7 +433,7 @@ impl RepoTab {
             } else {
                 crate::i18n::message(
                     "repo-workflows-stack-stack-menu-items-f7763ef9",
-                    &[("on-it", (on_it).clone().into())],
+                    &[("on-it", (on_it).into())],
                 )
             })
             .icon("git-branch-plus")
@@ -456,7 +456,7 @@ impl RepoTab {
             && self.stacks.layer(&b.name).is_some()
             && crate::menu_item::MenuItem::new(crate::i18n::message(
                 "repo-workflows-stack-stack-menu-items-e5c65f7a",
-                &[("forge-noun-1", (forge.noun_label()).clone().into())],
+                &[("forge-noun-1", (forge.noun_label()).into())],
             ))
             .icon("external-link")
             .enabled(idle)
@@ -495,7 +495,7 @@ fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
         (0, 0) => None,
         (n, 0) => Some(crate::i18n::message(
             "repo-workflows-stack-title-row-3f1c7b21",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         )),
         (0, g) => Some(crate::i18n::message(
             "repo-workflows-stack-gone-parents",
@@ -503,7 +503,7 @@ fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
         )),
         (n, g) => Some(crate::i18n::message(
             "repo-workflows-stack-title-row-f3da38c2",
-            &[("n", (n).clone().into()), ("g", (g).clone().into())],
+            &[("n", (n).into()), ("g", (g).into())],
         )),
     };
     if let Some(note) = note {
@@ -529,10 +529,7 @@ fn title_row(ui: &mut Ui, tree: &Tree, noun: Option<&str>) -> Response {
     match noun {
         Some(noun) => resp.on_hover_text(crate::i18n::message(
             "repo-workflows-stack-title-row-569c1ff8",
-            &[
-                ("title", (title).clone().into()),
-                ("noun", (noun).clone().into()),
-            ],
+            &[("title", (title).clone().into()), ("noun", (noun).into())],
         )),
         None => resp.on_hover_text(title),
     }

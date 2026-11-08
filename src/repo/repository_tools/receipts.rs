@@ -72,7 +72,6 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             .branch
                             .as_deref()
                             .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-detached")))
-                        .clone()
                         .into(),
                     ),
                     (
@@ -82,7 +81,6 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             .expected_head
                             .as_deref()
                             .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-unborn")))
-                        .clone()
                         .into(),
                     ),
                     (

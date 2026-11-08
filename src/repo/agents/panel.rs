@@ -30,10 +30,9 @@ impl Row<'_> {
             Some(w) => match w.changes {
                 Some(0) => crate::i18n::text("repo-workflows-agents-sub-b2c35ddf").to_owned(),
                 Some(1) => crate::i18n::text("repo-workflows-agents-sub-32dfcdbc").to_owned(),
-                Some(n) => crate::i18n::message(
-                    "repo-workflows-agents-sub-a7109ae6",
-                    &[("n", (n).clone().into())],
-                ),
+                Some(n) => {
+                    crate::i18n::message("repo-workflows-agents-sub-a7109ae6", &[("n", (n).into())])
+                }
                 None => crate::i18n::text("repo-workflows-agents-sub-308560dc").to_owned(),
             },
         };

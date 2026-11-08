@@ -174,10 +174,10 @@ impl Preview {
     pub(super) fn for_display(&self) -> Self {
         let mut shown = self.clone();
         for (index, note) in &self.note_receipts {
-            if let Some(raw) = shown.notes.get_mut(*index) {
-                if *raw == note.raw() {
-                    *raw = note.display();
-                }
+            if let Some(raw) = shown.notes.get_mut(*index)
+                && *raw == note.raw()
+            {
+                *raw = note.display();
             }
         }
         shown
@@ -237,7 +237,10 @@ mod fluent_approval_note_tests {
 
     #[test]
     fn fluent_partition_actual_approval_card_projection_repaints_receipts_without_changing_snapshot()
-     {
+    -> Result<(), String> {
+        let ui_errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+        let ui_errors_0 = ui_errors.clone();
+
         let opaque = "git replay needs a branch; 日本語\n{ $detail } | --literal-pathspecs";
         let mut preview = Preview::from_outcome(ghost::Outcome {
             notes: vec![
@@ -294,15 +297,22 @@ mod fluent_approval_note_tests {
         let mut installed = false;
         let mut h = Harness::new_ui_state(
             |ui, cached: &mut CardView| {
-                if !installed {
-                    crate::theme::install_fonts(ui.ctx());
-                    installed = true;
-                    ui.ctx().request_discard("install supplied fonts");
-                    return;
-                }
-                let shown = cached.clone().for_display();
-                for note in &shown.preview.as_ref().unwrap().notes {
-                    ui.label(note);
+                let ui_result = (|| -> Result<(), String> {
+                    if !installed {
+                        crate::theme::install_fonts(ui.ctx());
+                        installed = true;
+                        ui.ctx().request_discard("install supplied fonts");
+                        return Ok(());
+                    }
+                    let shown = cached.clone().for_display();
+                    for note in &shown.preview.as_ref().ok_or("missing test value")?.notes {
+                        ui.label(note);
+                    }
+
+                    Ok(())
+                })();
+                if let Err(error) = ui_result {
+                    ui_errors_0.borrow_mut().push(error);
                 }
             },
             card,
@@ -311,7 +321,7 @@ mod fluent_approval_note_tests {
             crate::i18n::set_language(language);
             h.run();
             let shown = h.state().clone().for_display();
-            let painted = shown.preview.as_ref().unwrap();
+            let painted = shown.preview.as_ref().ok_or("missing test value")?;
             for note in &painted.notes {
                 assert_eq!(
                     h.get_all_by_label(note).count(),
@@ -329,7 +339,7 @@ mod fluent_approval_note_tests {
             assert_eq!(painted.leaving, raw.leaving);
             assert_eq!(painted.notes[1], opaque);
             assert_eq!(
-                painted.notes.last().unwrap(),
+                painted.notes.last().ok_or("missing test value")?,
                 "Discards uncommitted working changes"
             );
             assert!(painted.notes.iter().any(|note| note.contains(opaque)));
@@ -367,5 +377,11 @@ mod fluent_approval_note_tests {
             }
         }
         crate::i18n::set_language("en-US");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
     }
 }

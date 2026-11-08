@@ -218,10 +218,9 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         (Some(true), Some(m)) if m.contains("Visible Meta Files") => {
             crate::i18n::text("repo-workflows-unity-checks-b10c6093").to_owned()
         }
-        (Some(true), Some(m)) => crate::i18n::message(
-            "repo-workflows-unity-checks-a5316b9c",
-            &[("m", (m).clone().into())],
-        ),
+        (Some(true), Some(m)) => {
+            crate::i18n::message("repo-workflows-unity-checks-a5316b9c", &[("m", (m).into())])
+        }
         (Some(false), _) => crate::i18n::text("repo-workflows-unity-checks-36e9ce17").to_owned(),
         _ => crate::i18n::text("repo-workflows-unity-checks-905615a3").to_owned(),
     };
@@ -235,7 +234,7 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         crate::i18n::message(
             "repo-workflows-unity-checks-1c43ea2f",
             &[
-                ("yaml-len-1", (yaml.len()).clone().into()),
+                ("yaml-len-1", (yaml.len()).into()),
                 ("some-of-yaml-2", (some_of(yaml)).clone().into()),
             ],
         )
@@ -260,7 +259,7 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         crate::i18n::message(
             "repo-workflows-unity-checks-d4bedd88",
             &[
-                ("bins-len-1", (bins.len()).clone().into()),
+                ("bins-len-1", (bins.len()).into()),
                 ("some-of-bins-2", (some_of(bins)).clone().into()),
             ],
         )
@@ -408,7 +407,7 @@ fn smart_merge(
                         .map(|d| {
                             crate::i18n::message(
                                 "repo-workflows-unity-smart-merge-a472cbc6",
-                                &[("d", (d).clone().into())],
+                                &[("d", (d).into())],
                             )
                         })
                         .unwrap_or_default())
