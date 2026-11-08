@@ -412,6 +412,7 @@ fn uncertain_cleanup_preserves_workspace_record_and_blocks_apply() -> Result<(),
     drop(ws);
     assert!(dir.is_dir() && artifact.is_file());
     assert!(dir.with_extension("preserved").is_file());
+    assert!(dir.with_extension("uncertain-run.json").is_file());
     // Explicit test-owned cleanup only, after verifying preservation.
     repo.git(&[
         "worktree",
@@ -422,6 +423,7 @@ fn uncertain_cleanup_preserves_workspace_record_and_blocks_apply() -> Result<(),
     ])?;
     std::fs::remove_file(dir.with_extension("preserved")).map_err(|e| e.to_string())?;
     std::fs::remove_file(artifact).map_err(|e| e.to_string())?;
+    std::fs::remove_file(dir.with_extension("uncertain-run.json")).map_err(|e| e.to_string())?;
     Ok(())
 }
 

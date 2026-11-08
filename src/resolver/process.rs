@@ -174,11 +174,11 @@ impl Running {
         self.stop();
         // Holding this lock through join also waits for another stop already under way.
         let mut worker = lock(&self.worker);
-        if let Some(worker) = worker.take() {
-            if worker.join().is_err() {
-                lock(&self.feed).exit = None;
-                return false;
-            }
+        if let Some(worker) = worker.take()
+            && worker.join().is_err()
+        {
+            lock(&self.feed).exit = None;
+            return false;
         }
         self.with_feed(|f| f.exit.as_ref().is_some_and(|e| e.safe_to_inspect))
     }

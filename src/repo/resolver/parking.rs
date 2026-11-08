@@ -134,6 +134,10 @@ fn keep(
 
 /// Save diagnostics without reading/copying files that may still be written by an agent.
 pub(super) fn preserve_uncertain(run: &Run, ws: &Workspace) {
+    // The process service itself may be unavailable: preserve a record without invoking Git.
+    if let Ok(record) = serde_json::to_vec_pretty(&RunRecord::of(run)) {
+        let _ = std::fs::write(ws.dir().with_extension("uncertain-run.json"), record);
+    }
     if let Ok(dir) = kept_dir(ws.dir(), &run.id) {
         let _ = std::fs::create_dir_all(&dir);
         if let Ok(record) = serde_json::to_vec_pretty(&RunRecord::of(run)) {
