@@ -303,7 +303,9 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
             }
             "tree" | "tag" => (),
             _ => {
-                return Err(crate::i18n::text("backend-unsupported-object-scan-type-9f8f3f").into());
+                return Err(
+                    crate::i18n::text("backend-unsupported-object-scan-type-9f8f3f").into(),
+                );
             }
         }
     }

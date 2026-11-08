@@ -1255,6 +1255,30 @@ backend-refs-committed-index-release-needs-attention-and-no-rollback-was-f6b682 
 backend-refs-moved-while-exporting-or-the-range-excludes-a-selected-ref-n-a6c9b9 = Referenzen wurden beim Export verschoben oder der Bereich schließt eine ausgewählte Referenz aus; kein Bundle gespeichert. Den Exportdialog erneut öffnen.
 backend-refused-remote-reads-require-python3-and-descriptor-no-follow-non-0f288a = { $refused }. Entferntes Lesen erfordert python3 und Unterstützung für Deskriptoren ohne Linkverfolgung und ohne Blockieren.
 backend-regular-no-follow-file-required-63382e = Reguläre Datei ohne Linkverfolgung erforderlich
+backend-relative-days = { $count ->
+        [one] vor { $count } Tag
+       *[other] vor { $count } Tagen
+    }
+backend-relative-hours = { $count ->
+        [one] vor { $count } Stunde
+       *[other] vor { $count } Stunden
+    }
+backend-relative-minutes = { $count ->
+        [one] vor { $count } Minute
+       *[other] vor { $count } Minuten
+    }
+backend-relative-months = { $count ->
+        [one] vor { $count } Monat
+       *[other] vor { $count } Monaten
+    }
+backend-relative-weeks = { $count ->
+        [one] vor { $count } Woche
+       *[other] vor { $count } Wochen
+    }
+backend-relative-years = { $count ->
+        [one] vor { $count } Jahr
+       *[other] vor { $count } Jahren
+    }
 backend-release-history-is-not-utf-8-8f357f = Der Release-Verlauf ist nicht UTF-8.
 backend-release-history-returned-incomplete-metadata-669952 = Der Release-Verlauf hat unvollständige Metadaten zurückgegeben.
 backend-release-history-returned-invalid-commit-ids-2acae8 = Der Release-Verlauf hat ungültige Commit-IDs zurückgegeben.

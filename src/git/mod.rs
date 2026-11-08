@@ -363,16 +363,16 @@ pub fn identity(repo: &Path) -> Identity {
 /// "3 minutes ago", "2 days ago"… for `time` seen from `now` (both Unix seconds).
 pub fn relative_time(time: i64, now: i64) -> String {
     let secs = now.saturating_sub(time).max(0);
-    let (n, unit) = match secs {
+    let (count, id) = match secs {
         0..60 => return crate::i18n::text("backend-just-now-7ddb44").to_owned(),
-        60..3_600 => (secs / 60, "minute"),
-        3_600..86_400 => (secs / 3_600, "hour"),
-        86_400..604_800 => (secs / 86_400, "day"),
-        604_800..2_629_800 => (secs / 604_800, "week"),
-        2_629_800..31_557_600 => (secs / 2_629_800, "month"),
-        _ => (secs / 31_557_600, "year"),
+        60..3_600 => (secs / 60, "backend-relative-minutes"),
+        3_600..86_400 => (secs / 3_600, "backend-relative-hours"),
+        86_400..604_800 => (secs / 86_400, "backend-relative-days"),
+        604_800..2_629_800 => (secs / 604_800, "backend-relative-weeks"),
+        2_629_800..31_557_600 => (secs / 2_629_800, "backend-relative-months"),
+        _ => (secs / 31_557_600, "backend-relative-years"),
     };
-    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+    crate::i18n::message(id, &[("count", count.into())])
 }
 
 pub fn now() -> i64 {
@@ -418,3 +418,67 @@ pub(crate) use bundles::bundle_git_path;
 pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};
 
 pub(crate) mod prompt_session;
+
+#[cfg(test)]
+mod backend_relative_time_tests {
+    #[test]
+    fn backend_fluent_relative_time_uses_numeric_plurals_and_preserves_time_boundaries() {
+        let units = [60, 3_600, 86_400, 604_800, 2_629_800, 31_557_600];
+        for (locale, singular, plural) in [
+            (
+                "en-US",
+                [
+                    "1 minute ago",
+                    "1 hour ago",
+                    "1 day ago",
+                    "1 week ago",
+                    "1 month ago",
+                    "1 year ago",
+                ],
+                [
+                    "2 minutes ago",
+                    "2 hours ago",
+                    "2 days ago",
+                    "2 weeks ago",
+                    "2 months ago",
+                    "2 years ago",
+                ],
+            ),
+            (
+                "de",
+                [
+                    "vor 1 Minute",
+                    "vor 1 Stunde",
+                    "vor 1 Tag",
+                    "vor 1 Woche",
+                    "vor 1 Monat",
+                    "vor 1 Jahr",
+                ],
+                [
+                    "vor 2 Minuten",
+                    "vor 2 Stunden",
+                    "vor 2 Tagen",
+                    "vor 2 Wochen",
+                    "vor 2 Monaten",
+                    "vor 2 Jahren",
+                ],
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            for (i, seconds) in units.into_iter().enumerate() {
+                assert_eq!(super::relative_time(0, seconds), singular[i]);
+                assert_eq!(super::relative_time(0, 2 * seconds), plural[i]);
+            }
+            let just_now = if locale == "de" {
+                "Gerade eben"
+            } else {
+                "just now"
+            };
+            assert_eq!(super::relative_time(0, 59), just_now);
+            assert_eq!(super::relative_time(100, 0), just_now);
+            assert_eq!(super::relative_time(i64::MAX, i64::MIN), just_now);
+            assert!(!super::relative_time(i64::MIN, i64::MAX).is_empty());
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

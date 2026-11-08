@@ -1255,6 +1255,30 @@ backend-refs-committed-index-release-needs-attention-and-no-rollback-was-f6b682 
 backend-refs-moved-while-exporting-or-the-range-excludes-a-selected-ref-n-a6c9b9 = Refs moved while exporting, or the range excludes a selected ref; no bundle saved. Reopen the export dialog.
 backend-refused-remote-reads-require-python3-and-descriptor-no-follow-non-0f288a = { $refused }. Remote reads require python3 and descriptor no-follow/nonblocking support
 backend-regular-no-follow-file-required-63382e = Regular no-follow file required
+backend-relative-days = { $count ->
+        [one] { $count } day ago
+       *[other] { $count } days ago
+    }
+backend-relative-hours = { $count ->
+        [one] { $count } hour ago
+       *[other] { $count } hours ago
+    }
+backend-relative-minutes = { $count ->
+        [one] { $count } minute ago
+       *[other] { $count } minutes ago
+    }
+backend-relative-months = { $count ->
+        [one] { $count } month ago
+       *[other] { $count } months ago
+    }
+backend-relative-weeks = { $count ->
+        [one] { $count } week ago
+       *[other] { $count } weeks ago
+    }
+backend-relative-years = { $count ->
+        [one] { $count } year ago
+       *[other] { $count } years ago
+    }
 backend-release-history-is-not-utf-8-8f357f = Release history is not UTF-8
 backend-release-history-returned-incomplete-metadata-669952 = Release history returned incomplete metadata
 backend-release-history-returned-invalid-commit-ids-2acae8 = Release history returned invalid commit IDs
