@@ -337,6 +337,30 @@ fn the_working_tree_is_mapped_when_its_edits_predate_a_report_of_head() -> Resul
     Ok(())
 }
 
+/// A report written beside the code and not ignored is untracked, as is its `.sha`: neither
+/// is part of the change, nor makes the report look older than the edits.
+#[test]
+fn an_untracked_report_and_its_sha_are_not_changes_of_the_working_tree() -> Result<(), String> {
+    let repo = crate::git::fixture::Repo::new("coverage-untracked-report")?;
+    let head = repo.commit("one", &[("a.rs", Some("fn a() {}\n"))])?;
+    write(&repo.path().join("a.rs"), "fn a() {}\nfn b() {}\n")?;
+    age(&repo.path().join("a.rs"), Duration::from_secs(600))?;
+    write(
+        &repo.path().join("lcov.info"),
+        "SF:a.rs\nDA:1,1\nDA:2,4\nend_of_record\n",
+    )?;
+    age(&repo.path().join("lcov.info"), Duration::from_secs(300))?;
+    // The sidecar, written after the report.
+    write(&repo.path().join("lcov.info.sha"), &head)?;
+    let cov = analyze(repo.path(), &Ask::WorkTree, None)?;
+    let paths: Vec<&str> = cov.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["a.rs"]);
+    let report = cov.report.as_ref().ok_or("no report")?;
+    assert_eq!(report.freshness.evidence, Evidence::Inferred);
+    assert_eq!(cov.counts().covered, 1);
+    Ok(())
+}
+
 #[test]
 fn without_a_report_every_changed_line_is_unknown_and_where_it_looked_is_said() -> Result<(), String>
 {

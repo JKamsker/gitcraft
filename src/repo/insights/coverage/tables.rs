@@ -6,6 +6,7 @@ use egui::Ui;
 
 use super::picture::{self, NodeRef};
 use super::{open_hunk, open_node};
+use crate::insights::Evidence;
 use crate::insights::coverage::Coverage;
 use crate::repo::Action;
 use crate::repo::insights::common;
@@ -116,7 +117,12 @@ pub(super) fn show(ui: &mut Ui, data: &Coverage, test: Option<usize>, acts: &mut
             }
         });
 
-    if data.report.as_ref().is_some_and(|r| r.per_test) {
+    // Which test ran which line is taken only from a report trusted for the revision.
+    let trusted = data
+        .report
+        .as_ref()
+        .is_some_and(|r| r.per_test && r.freshness.evidence != Evidence::Unknown);
+    if trusted {
         common::heading(ui, &format!("Tests the report names ({})", tests.len()));
         for (ti, name) in tests.iter().enumerate() {
             let ran = hunks_of(data, ti);

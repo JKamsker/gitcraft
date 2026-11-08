@@ -470,14 +470,29 @@ fn modified(path: &Path) -> Option<i64> {
     i64::try_from(secs).ok()
 }
 
-/// Where a report named `name` (relative to the repository, or absolute) is.
+/// Where a report named `name` (relative to the repository, or absolute on the machine the
+/// repository is on) is.
 fn report_path(repo: &Path, name: &str) -> PathBuf {
-    let absolute = Path::new(name).is_absolute() && !crate::remote::is_remote(repo);
-    if absolute {
+    if crate::remote::is_remote(repo) {
+        crate::remote::resolve(repo, name)
+    } else if Path::new(name).is_absolute() {
         PathBuf::from(name)
     } else {
-        crate::remote::join(repo, name)
+        repo.join(name)
     }
+}
+
+/// An untracked file to count the lines of: a file here (not a link) no bigger than this.
+const MAX_UNTRACKED_BYTES: u64 = 4 << 20;
+
+/// Whether the untracked file at `path` is read: on another machine it is, here only a file
+/// that isn't a link and isn't too big.
+fn readable_untracked(repo: &Path, path: &Path) -> bool {
+    if crate::remote::is_remote(repo) {
+        return true;
+    }
+    std::fs::symlink_metadata(path)
+        .is_ok_and(|m| m.file_type().is_file() && m.len() <= MAX_UNTRACKED_BYTES)
 }
 
 /// The reports in the conventional places, in order.
@@ -540,7 +555,11 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
                 ));
             }
             for path in untracked.into_iter().take(MAX_UNTRACKED) {
-                let Ok(bytes) = crate::remote::read(&crate::remote::join(repo, path)) else {
+                let at = crate::remote::join(repo, path);
+                if !readable_untracked(repo, &at) {
+                    continue;
+                }
+                let Ok(bytes) = crate::remote::read(&at) else {
                     continue;
                 };
                 if bytes.contains(&0) {
@@ -591,7 +610,15 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
             )
         }
     };
-    files.retain(|f| !f.binary);
+    let found = find_reports(repo);
+    let name = chosen.map(str::to_owned).or_else(|| found.first().cloned());
+    // The reports and their `.sha` files aren't the change being looked at.
+    let reports: HashSet<String> = found
+        .iter()
+        .chain(name.iter())
+        .flat_map(|r| [r.clone(), format!("{r}{SIDECAR}")])
+        .collect();
+    files.retain(|f| !f.binary && !reports.contains(&f.path));
     if files.len() > MAX_FILES {
         partial.push(format!(
             "only {MAX_FILES} of {} changed files are mapped",
@@ -600,8 +627,6 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
         files.truncate(MAX_FILES);
     }
 
-    let found = find_reports(repo);
-    let name = chosen.map(str::to_owned).or_else(|| found.first().cloned());
     let searched = if name.is_none() {
         let mut s: Vec<String> = CONVENTIONAL.iter().map(|n| (*n).to_owned()).collect();
         s.push("*.lcov".to_owned());
@@ -626,9 +651,16 @@ pub fn analyze(repo: &Path, ask: &Ask, chosen: Option<&str>) -> Result<Coverage,
     let mut found_report = None;
     if let Some(name) = &name {
         let path = report_path(repo, name);
+        let too_big = |len: u64| format!("{name} is bigger than {} MB", MAX_REPORT >> 20);
+        if !crate::remote::is_remote(repo)
+            && let Ok(meta) = std::fs::metadata(&path)
+            && meta.len() > MAX_REPORT
+        {
+            return Err(too_big(meta.len()));
+        }
         let bytes = crate::remote::read(&path).map_err(|e| format!("{name}: {e}"))?;
         if bytes.len() as u64 > MAX_REPORT {
-            return Err(format!("{name} is bigger than {} MB", MAX_REPORT >> 20));
+            return Err(too_big(bytes.len() as u64));
         }
         let parsed =
             parse(name, &String::from_utf8_lossy(&bytes)).map_err(|e| format!("{name}: {e}"))?;
