@@ -177,3 +177,43 @@ fn symlink_and_hardlink_metadata_cannot_be_detached() -> Result<(), String> {
     assert!(saved.exists());
     Ok(())
 }
+
+// Owned-Git regression compiled, held from execution with the runtime fixtures.
+#[test]
+fn diamond_donors_remain_visible_and_allow_independence() -> Result<(), String> {
+    let a = Repo::new("diamond-a")?;
+    a.commit("a", &[])?;
+    let b = Repo::new("diamond-b")?;
+    b.commit("b", &[])?;
+    let c = Repo::new("diamond-c")?;
+    c.commit("c", &[])?;
+    let d = Repo::new("diamond-d")?;
+    let borrowed = d.commit("borrowed", &[])?;
+    for (repo, donors) in [
+        (a.path(), vec![b.path(), c.path()]),
+        (b.path(), vec![d.path()]),
+        (c.path(), vec![d.path()]),
+    ] {
+        let info = repo.join(".git/objects/info");
+        std::fs::create_dir_all(&info).map_err(|e| e.to_string())?;
+        let bytes = donors
+            .iter()
+            .map(|p| format!("{}\n", p.join(".git/objects").display()))
+            .collect::<String>();
+        std::fs::write(info.join("alternates"), bytes).map_err(|e| e.to_string())?;
+    }
+    a.git(&["update-ref", "refs/gitcraft/borrowed", &borrowed])?;
+    let model = inspect(a.path())?;
+    assert_eq!(model.topology.stores.len(), 4);
+    assert_eq!(model.topology.edges.len(), 4);
+    assert!(model.topology.warnings.is_empty());
+    assert!(model.blocked.is_none(), "{:?}", model.blocked);
+    let control = git::OpControl::new(|| {});
+    independent(
+        &runner(a.path(), &control),
+        model.plan.as_ref().ok_or("No plan")?,
+    )?;
+    assert_eq!(inspect(a.path())?.topology.stores.len(), 1);
+    a.git(&["cat-file", "-e", &borrowed])?;
+    Ok(())
+}

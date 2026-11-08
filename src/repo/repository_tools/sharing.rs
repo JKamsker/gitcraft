@@ -28,12 +28,20 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             for store in &model.topology.stores {
                 ui.group(|ui| {
                     ui.monospace(crate::remote::display(&store.path));
-                    ui.label(match &store.donor_of {
-                        Some(parent) => {
-                            format!("Lends objects to {}", crate::remote::display(parent))
+                    let borrowers: Vec<_> = model
+                        .topology
+                        .edges
+                        .iter()
+                        .filter(|(_, donor)| donor == &store.path)
+                        .map(|(borrower, _)| crate::remote::display(borrower))
+                        .collect();
+                    if borrowers.is_empty() {
+                        ui.label("This repository's primary store");
+                    } else {
+                        for borrower in borrowers {
+                            ui.label(format!("Lends objects to {borrower}"));
                         }
-                        None => "This repository's primary store".into(),
-                    });
+                    }
                     if !store.available {
                         ui.colored_label(egui::Color32::RED, "Missing donor directory");
                     }
