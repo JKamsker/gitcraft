@@ -63,15 +63,12 @@ impl RepoTab {
     fn run_status(&self, ui: &mut Ui, run: &LaneRun, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         if let Some(Err(e)) = &run.ended {
-            let said = crate::i18n::message(
-                "repo-workflows-test_lane-run-status-8db20e37",
-                &[
-                    ("run-range-1", (run.range).clone().into()),
-                    ("e", (e).clone().into()),
-                ],
-            );
+            let said = super::display_ended_message(&run.range, &Err(e.clone())).0;
             ui.add(egui::Label::new(RichText::new(&said).color(t.danger)).truncate())
-                .on_hover_text(said);
+                .on_hover_text(run.ended.as_ref().map_or_else(
+                    || said.clone(),
+                    |result| super::display_ended_message(&run.range, result).0,
+                ));
             return;
         }
         if let Some((_, commit)) = &run.first_bad {
@@ -92,7 +89,10 @@ impl RepoTab {
         }
         let said = progress_text(run);
         ui.add(egui::Label::new(RichText::new(&said).color(t.text_dim)).truncate())
-            .on_hover_text(said);
+            .on_hover_text(run.ended.as_ref().map_or_else(
+                || said.clone(),
+                |result| super::display_ended_message(&run.range, result).0,
+            ));
     }
 }
 

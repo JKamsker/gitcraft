@@ -7339,3 +7339,26 @@ repo-workflows-deferred-replay-progress = { $title } · { $done } / { $total } r
        *[no] { "" }
     }
 
+repo-workflows-test-lane-ended-display = { $stopped ->
+        [yes] Testing { $range } stopped after { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        }
+       *[no] Tested { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        } of { $range }
+    }{ $known ->
+        [0] { "" }
+       *[other] { " (" }{ $known } had a result already)
+    }: { $good } passed{ $bad ->
+        [0] { "" }
+       *[other] { ", " }{ $bad } failed
+    }{ $unavailable ->
+        [0] { "" }
+       *[other] { ", " }{ $unavailable } could not be tested
+    }{ $cleanup ->
+        [yes] . Could not remove a scratch worktree: { $detail }
+       *[no] { "" }
+    }
+

@@ -7337,3 +7337,26 @@ repo-workflows-deferred-replay-progress = { $title } · { $done } / { $total } e
        *[no] { "" }
     }
 
+repo-workflows-test-lane-ended-display = { $stopped ->
+        [yes] Testen von { $range } nach { $count ->
+            [one] einem Commit
+           *[other] { $count } Commits
+        } angehalten
+       *[no] { $count ->
+            [one] Ein Commit
+           *[other] { $count } Commits
+        } aus { $range } getestet
+    }{ $known ->
+        [0] { "" }
+       *[other] { " (für " }{ $known } lag bereits ein Ergebnis vor)
+    }: { $good } bestanden{ $bad ->
+        [0] { "" }
+       *[other] { ", " }{ $bad } fehlgeschlagen
+    }{ $unavailable ->
+        [0] { "" }
+       *[other] { ", " }{ $unavailable } konnten nicht getestet werden
+    }{ $cleanup ->
+        [yes] . Ein temporärer Worktree konnte nicht entfernt werden: { $detail }
+       *[no] { "" }
+    }
+
