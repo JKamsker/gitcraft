@@ -176,6 +176,11 @@ impl Drop for ResolverState {
             if let Some(agent) = run.agent.take() {
                 agent.stop_now();
             }
+            // The agent's work kept with a merge still put aside stays with it: the next
+            // session shows it again (see `parking`). Only what is this session's goes.
+            if run.parked.is_some() && run.workspace.as_ref().is_some_and(|w| w.is_kept()) {
+                run.workspace = None;
+            }
             clean_up(run);
         }
     }

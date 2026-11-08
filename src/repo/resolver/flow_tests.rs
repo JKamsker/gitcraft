@@ -147,6 +147,25 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
     let kept = crate::agent::repo_file(&dir, &format!("resolver/{id}"))?;
     assert!(kept.join("run.json").is_file() && kept.join("resolved/a.txt").is_file());
 
+    // gitcraft is closed and opened again: the merge is still put aside, the agent's work
+    // with it, and the run comes back to bring it back.
+    drop(h);
+    assert!(
+        kept.join("run.json").is_file(),
+        "closing gitcraft keeps the agent's work"
+    );
+    let mut h = harness(dir.clone());
+    assert!(
+        wait(&mut h, |t| t
+            .resolver
+            .run
+            .as_ref()
+            .is_some_and(|r| r.id == id
+                && r.parked.is_some()
+                && r.phase == Phase::Ready)),
+        "the run comes back in the next session"
+    );
+
     // Bring it back: its branch, its merge as it was, and the review opened.
     act(&mut h, ResolverAct::BringBack(id.clone()));
     assert!(

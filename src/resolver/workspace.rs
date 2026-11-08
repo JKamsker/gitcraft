@@ -302,6 +302,12 @@ impl Workspace {
         })
     }
 
+    /// Whether this is the agent's work kept (see [`Workspace::keep`]), not its scratch
+    /// worktree.
+    pub fn is_kept(&self) -> bool {
+        self.kept.is_some()
+    }
+
     /// The folder the agent works in (or its work is kept in).
     pub fn dir(&self) -> &Path {
         &self.dir
