@@ -285,11 +285,9 @@ impl RepoTab {
         };
         self.parallel.handle = None;
         let long = view.started.elapsed() > LONG_RUN;
-        let painted = match &outcome {
-            Outcome::Failed(raw) => Outcome::Failed(self.parallel.paint.error(raw)),
-            other => other.clone(),
-        };
-        let (message, failed) = outcome_message(&painted, &view.machine);
+        // These foreign caches still carry raw status/notification identities. Their
+        // owners must retain the typed outcome/receipt and resolve at final paint.
+        let (message, failed) = outcome_message(&outcome, &view.machine);
         if long {
             self.finished
                 .push((format!("{} · {message}", self.name), failed));
@@ -491,9 +489,16 @@ mod execution_bridge_tests {
         assert!(
             matches!(state.take(pb::done_with_presentation(Outcome::Failed(raw.clone()), receipt.clone())), Event::Done(Outcome::Failed(ref value)) if value == &raw)
         );
+        // Foreign generic caches retain their raw identity. Their typed final-paint
+        // integration remains a root-owned seam; this test exercises banner paint.
+        let cached_status = outcome_message(&Outcome::Failed(raw.clone()), "opaque machine");
         let mut paints = Vec::new();
         for locale in ["en-US", "de", "en-US"] {
             crate::i18n::set_language(locale);
+            assert_eq!(
+                outcome_message(&Outcome::Failed(raw.clone()), "opaque machine"),
+                cached_status
+            );
             let painted = state.error(&raw);
             assert!(painted.contains(primary) && painted.contains(cleanup));
             if locale == "de" {
