@@ -34,6 +34,8 @@ Backlink navigation retains its scoped source PASS and is unchanged.
 Source-audited executable gates are limited to pure byte readers/matchers and
 fixed-command recordings. The new owned regular/missing/oversized/link/FIFO
 fixture and previous real Git/filter-repo/backlink fixtures are compile-only.
+The authored FIFO fixture block requires Linux (`rustix::mkfifoat` is unavailable
+on Apple); it is neither compiled nor executed by this macOS target.
 No runtime clearance, CI, PR, external publication, supervisor change, shared
 credential-policy fork or publisher is part of this delta. All generated evidence
 stays outside the repository; a later plain JSON receipt binds gates and source

@@ -222,14 +222,18 @@ mod runtime_held_tests {
             let link = root.join("link");
             std::os::unix::fs::symlink(&file, &link).map_err(|e| e.to_string())?;
             assert!(read(&link).is_err());
-            let fifo = root.join("fifo");
-            rustix::fs::mkfifoat(
-                rustix::fs::CWD,
-                &fifo,
-                rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
-            )
-            .map_err(|e| e.to_string())?;
-            assert!(read(&fifo).is_err());
+            // rustix does not expose mkfifoat on Apple platforms.
+            #[cfg(target_os = "linux")]
+            {
+                let fifo = root.join("fifo");
+                rustix::fs::mkfifoat(
+                    rustix::fs::CWD,
+                    &fifo,
+                    rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+                )
+                .map_err(|e| e.to_string())?;
+                assert!(read(&fifo).is_err());
+            }
             Ok(())
         })();
         // Only this exclusive owned directory, never a process selector.
