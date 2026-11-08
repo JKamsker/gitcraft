@@ -1,8 +1,11 @@
 //! New versions of gitcraft, from its GitHub releases: looked for on every start, downloaded in
 //! the background and parked on disk, then put in place of this build with a restart.
 
+pub(crate) mod display;
 mod install;
 mod previous;
+mod witness;
+pub use witness::{DownloadFailure, Failure, PlacementFailure};
 
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -10,7 +13,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-pub use install::{clean_up, go_back, install, previous, relaunch, relaunch_after_exit};
+pub use install::{
+    clean_up, go_back, go_back_witnessed, install, install_witnessed, previous, relaunch,
+    relaunch_after_exit,
+};
 pub use previous::{PIN_THIS, Previous, settle_pin};
 
 /// This build's version.

@@ -1,0 +1,69 @@
+{
+  "source_root": "a9c32d99ed564bcd605e231bffffa8ae36881abd",
+  "accepted_witness": "a7d446647e066862b933f627295339adf0559888",
+  "accepted_helper": "72051c6f286e22bb44241287ec22a661c7f59377",
+  "application_parent": "37ae1aa055f09b2c318f035d7c08f49bc209cdc1",
+  "paths": {
+    "src/update/display.rs": {
+      "source_blob": "7b73074cdda459d364d7c8de88bbc5bb32517d72",
+      "source_sha256": "327261d91a0ebb6db7fab0769c9fdbf4e65afe9cd27c6750726ccf749b9f0c0d",
+      "adopted_sha256": "327261d91a0ebb6db7fab0769c9fdbf4e65afe9cd27c6750726ccf749b9f0c0d"
+    },
+    "src/update/display/tests.rs": {
+      "source_blob": "17eac65035836e629f894ff7aaad311115c2d9a6",
+      "source_sha256": "ca3d6b22b1183bf1e1e0d7e9846bcf22eff7815e2b7e9a36dd2ef1e4b5b17a9f",
+      "adopted_sha256": "1fd28c5e84c258783cdf3e5f5beef81c587012123b0b26238d40076dfe905555"
+    },
+    "src/update/install.rs": {
+      "source_blob": "5fb537a0585b4c2d067e916ef697076580849d4c",
+      "source_sha256": "a4538c0e274d3ac5977ed4d9c970cf9717946feadc373e675b2a78d374611ef4",
+      "adopted_sha256": "a4538c0e274d3ac5977ed4d9c970cf9717946feadc373e675b2a78d374611ef4"
+    },
+    "src/update/install/witness_tests.rs": {
+      "source_blob": "7ffa11d58dfc2160b6eac1f7ec97336e77dadabe",
+      "source_sha256": "c1aa7d89556a8147831947b21ad8af699f5b083a144e6840130fef76316a04de",
+      "adopted_sha256": "c1aa7d89556a8147831947b21ad8af699f5b083a144e6840130fef76316a04de"
+    },
+    "src/update/mod.rs": {
+      "source_blob": "370e6fd672f4c0236294a0e90144d9864bee530d",
+      "source_sha256": "d288b484449b3b7d01ac069d4ef9f3ae70f4fb905c71c2e6c292fc45a9e37600",
+      "adopted_sha256": "0f6d833edc94f54d3119506513e1fadd9da0bd1453717649ffd1bcfdfc8b78aa"
+    },
+    "src/update/previous.rs": {
+      "source_blob": "22e3329c0439685b7c23b58ae894716134916554",
+      "source_sha256": "14b40362bafb76eace00cf2611d36570dedb072b0e5c1b969009b9514c3edb45",
+      "adopted_sha256": "14b40362bafb76eace00cf2611d36570dedb072b0e5c1b969009b9514c3edb45"
+    },
+    "src/update/previous/tests.rs": {
+      "source_blob": "7a83f0997ba947733bea4d8ef2f4e5c959991f66",
+      "source_sha256": "cebc4160b1462b63033a2bf1d2b7248b1f8d524f1867458e0fceb1b1b366c02c",
+      "adopted_sha256": "cebc4160b1462b63033a2bf1d2b7248b1f8d524f1867458e0fceb1b1b366c02c"
+    },
+    "src/update/previous/witness_tests.rs": {
+      "source_blob": "9aede762783cd28413e9d0e0a5205db8da0b554a",
+      "source_sha256": "0e705c8bd955d49a3e84749fe8698cf02b392368a9617df6843c4a38d0de596a",
+      "adopted_sha256": "0e705c8bd955d49a3e84749fe8698cf02b392368a9617df6843c4a38d0de596a"
+    },
+    "src/update/witness.rs": {
+      "source_blob": "f1d1ce3706ced495dbdcf501da84f2ff912db41e",
+      "source_sha256": "903653d62f5a17c505c7b5497a2359253293d3eb3cf633f075431c047ec329f9",
+      "adopted_sha256": "903653d62f5a17c505c7b5497a2359253293d3eb3cf633f075431c047ec329f9"
+    },
+    "locales/en-US/interaction-package-update.ftl": {
+      "source_blob": "1ed983a2e591bded94a26c485fec128f68bd4fff",
+      "source_sha256": "8507285453035fcc7705d943fedd766a76eadfb61158dff3bb906e31c6514837",
+      "adopted_sha256": "8507285453035fcc7705d943fedd766a76eadfb61158dff3bb906e31c6514837"
+    },
+    "locales/de/interaction-package-update.ftl": {
+      "source_blob": "d3a0435a115b7309d11eec9dcb337f1a765258e0",
+      "source_sha256": "a590b9a73f98f0c7b974838db47b4035edbdb08bfb70b26d7c35cde4e545c280",
+      "adopted_sha256": "a590b9a73f98f0c7b974838db47b4035edbdb08bfb70b26d7c35cde4e545c280"
+    }
+  },
+  "exceptions": {
+    "src/update/mod.rs": "Retain existing newer Channel::label exact method from own application parent.",
+    "src/update/display/tests.rs": "Only two label assertions adapt old English expectation to retained localized Channel::label contract."
+  },
+  "excluded": "all package production source and all other root paths",
+  "runtime": false
+}
