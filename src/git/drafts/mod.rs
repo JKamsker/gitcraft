@@ -1,6 +1,7 @@
 //! Opt-in local history of working changes. Roots are trees (not WIP commits); separate
 //! index/work trees keep staged contents distinct and make every saved blob GC-reachable.
 mod context;
+pub mod lists;
 mod permissions;
 mod restore;
 #[cfg(test)]

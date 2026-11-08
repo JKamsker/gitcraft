@@ -17,6 +17,7 @@ mod native {
         before: Option<Vec<u8>>,
         after: Option<Vec<u8>>,
         after_id: Option<(u64, u64)>,
+        before_id: Option<(u64, u64)>,
         applied: bool,
     }
     fn read(dir: &File, name: &str) -> Result<Option<(File, Vec<u8>)>, String> {
@@ -57,6 +58,17 @@ mod native {
                 _ => false,
             })
         }
+        fn spare_matches(
+            &self,
+            token: Option<(u64, u64)>,
+            bytes: Option<&Vec<u8>>,
+        ) -> Result<bool, String> {
+            Ok(match (read(&self.dir, &self.spare)?, token, bytes) {
+                (Some((f, b)), Some(want), Some(bytes)) => id(&f)? == want && b == *bytes,
+                (None, None, None) => true,
+                _ => false,
+            })
+        }
         fn rollback(&mut self) -> Result<(), String> {
             if !self.applied {
                 return Ok(());
@@ -67,6 +79,8 @@ mod native {
                     self.name, self.spare
                 ));
             }
+            // The displaced file itself is the rollback payload, including a racing
+            // writer's bytes. Never remove or replace it during rollback.
             match (&self.before, &self.after) {
                 (Some(_), Some(_)) => renameat_with(
                     &self.dir,
@@ -96,11 +110,24 @@ mod native {
             Ok(())
         }
     }
+    impl Drop for Item {
+        fn drop(&mut self) {
+            if !self.applied
+                && self
+                    .spare_matches(self.after_id, self.after.as_ref())
+                    .unwrap_or(false)
+            {
+                let _ = unlinkat(&self.dir, self.spare.as_str(), AtFlags::empty());
+            }
+        }
+    }
     pub(super) fn apply(
         repo: &Path,
         before: &Contents,
         after: &Contents,
         check: &dyn Fn() -> Result<(), String>,
+        commit: &dyn Fn() -> Result<(), String>,
+        permissions: Option<&BTreeMap<String, u32>>,
         active: &dyn Fn() -> bool,
     ) -> Result<(), String> {
         let identity = crate::git::recovery::pinned_worktree(repo, active)?;
@@ -146,8 +173,19 @@ mod native {
                 )
                 .map_err(|e| e.to_string())?;
                 let mut file = File::from(fd);
-                let permissions = if let Some((f, _)) = &old {
-                    f.metadata().map_err(|e| e.to_string())?.permissions()
+                let permissions = if let Some(bits) = permissions.and_then(|p| p.get(path)) {
+                    std::fs::Permissions::from_mode(bits & 0o777)
+                } else if let Some((f, _)) = &old {
+                    let mut permissions = f.metadata().map_err(|e| e.to_string())?.permissions();
+                    if expected.as_ref().is_some_and(|(old, _)| old != mode) {
+                        let bits = permissions.mode() & 0o777;
+                        permissions = std::fs::Permissions::from_mode(if mode == "100755" {
+                            bits | ((bits & 0o444) >> 2)
+                        } else {
+                            bits & !0o111
+                        });
+                    }
+                    permissions
                 } else {
                     std::fs::Permissions::from_mode(if mode == "100755" { 0o700 } else { 0o600 })
                 };
@@ -164,6 +202,7 @@ mod native {
                 before: expected.as_ref().map(|(_, b)| b.clone()),
                 after: target.as_ref().map(|(_, b)| b.clone()),
                 after_id,
+                before_id: old.as_ref().map(|(f, _)| id(f)).transpose()?,
                 applied: false,
             });
         }
@@ -199,8 +238,7 @@ mod native {
                 .map_err(|e| e.to_string())?;
                 item.applied = true;
                 if item.before.is_some()
-                    && read(&item.dir, &item.spare)?.as_ref().map(|(_, b)| b)
-                        != item.before.as_ref()
+                    && !item.spare_matches(item.before_id, item.before.as_ref())?
                 {
                     return Err("File changed at the exchange boundary".into());
                 }
@@ -209,6 +247,7 @@ mod native {
                 }
             }
             check()?;
+            commit()?;
             Ok(())
         })();
         if let Err(error) = result {
@@ -217,11 +256,7 @@ mod native {
                 .rev()
                 .filter_map(|i| i.rollback().err())
                 .collect::<Vec<_>>();
-            for i in &items {
-                if !i.applied {
-                    let _ = unlinkat(&i.dir, i.spare.as_str(), AtFlags::empty());
-                }
-            }
+
             return Err(format!(
                 "{error}. {}",
                 if failures.is_empty() {
@@ -233,6 +268,12 @@ mod native {
         }
         for i in &items {
             if i.before.is_some() {
+                if !i.spare_matches(i.before_id, i.before.as_ref())? {
+                    return Err(format!(
+                        "Applied; backup {} changed concurrently and was retained",
+                        i.spare
+                    ));
+                }
                 unlinkat(&i.dir, i.spare.as_str(), AtFlags::empty())
                     .map_err(|e| format!("Applied; owned backup {} retained: {e}", i.spare))?;
             }
@@ -249,7 +290,7 @@ pub(super) fn apply(
 ) -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
-        native::apply(repo, before, after, check, active)
+        native::apply(repo, before, after, check, &|| Ok(()), None, active)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
@@ -258,5 +299,25 @@ pub(super) fn apply(
             "Atomic working-folder exchange is unavailable on this platform; no files changed"
                 .into(),
         )
+    }
+}
+
+pub(super) fn apply_with_commit(
+    repo: &Path,
+    before: &Contents,
+    after: &Contents,
+    check: &dyn Fn() -> Result<(), String>,
+    commit: &dyn Fn() -> Result<(), String>,
+    permissions: Option<&BTreeMap<String, u32>>,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        native::apply(repo, before, after, check, commit, permissions, active)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (repo, before, after, check, commit, permissions, active);
+        Err("Native atomic working-folder exchange is unavailable; no files changed".into())
     }
 }

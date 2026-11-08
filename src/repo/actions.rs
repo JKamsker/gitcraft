@@ -697,6 +697,11 @@ impl RepoTab {
                 Action::SelectStaleBranches,
             ),
             (
+                "Named changelists: messages, commit and shelve…".into(),
+                "Working changes".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Lists),
+            ),
+            (
                 "Push outbox: queue exact commit or send selected entries…".into(),
                 "Offline publication".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Outbox),

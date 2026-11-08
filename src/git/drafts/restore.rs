@@ -309,7 +309,7 @@ pub fn restore(
     Ok(backup.id)
 }
 
-fn included(
+pub(super) fn included(
     ctx: &Context,
     now: &Source,
     path: &str,

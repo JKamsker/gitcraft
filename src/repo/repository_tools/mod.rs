@@ -1,3 +1,4 @@
+mod lists;
 mod outbox;
 mod sharing;
 mod turns;
@@ -31,10 +32,18 @@ enum Tool {
     Sharing,
     Outbox,
     Turn,
+    Lists,
 }
 static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
+    Lists,
+    EditList(
+        Box<crate::git::drafts::lists::View>,
+        crate::git::drafts::lists::Edit,
+    ),
+    CommitList(Box<crate::git::drafts::lists::View>, String),
+    ShelveList(Box<crate::git::drafts::lists::View>, String, bool),
     Turn(String, String, String),
     MarkTurn(Box<crate::git::drafts::turn::Review>, Vec<usize>),
     PreviewInverse(Box<crate::git::drafts::turn::Review>),
@@ -75,6 +84,7 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Lists(crate::git::drafts::lists::View),
     Turn(crate::git::drafts::turn::Review),
     Inverse(Box<crate::git::drafts::turn::Inverse>),
     Outbox(crate::git::repository_tools::outbox::View),
@@ -104,6 +114,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match lists::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match turns::act(self, act, ctx) {
             Some(act) => act,
             None => return,
@@ -229,6 +243,8 @@ impl RepoTab {
             act => act,
         };
         let (query, tool) = match act {
+            Act::Lists => (String::new(), Tool::Lists),
+            Act::EditList(..) | Act::CommitList(..) | Act::ShelveList(..) => return,
             Act::Turn(parent, turn, session) => {
                 (format!("{parent}\0{turn}\0{session}"), Tool::Turn)
             }
@@ -287,6 +303,10 @@ impl RepoTab {
                     !crate::tasks::cancellation().is_cancelled()
                 })
                 .map(Data::Object),
+                Tool::Lists => crate::git::drafts::lists::read(&path, &|| {
+                    !crate::tasks::cancellation().is_cancelled()
+                })
+                .map(Data::Lists),
                 Tool::Turn => {
                     let parts = query.splitn(3, '\0').collect::<Vec<_>>();
                     if parts.len() != 3 {
@@ -384,6 +404,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Lists {
+        lists::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::Turn {
         turns::show(ui, state, acts);
         return;
