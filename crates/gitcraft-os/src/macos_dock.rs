@@ -2,6 +2,7 @@
 //! existing delegate; each item retains its action target as representedObject as well.
 use crate::{Link, Progress, dock::Presentation};
 use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
 use objc2::{DefinedClass, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{
     NSApplication, NSImageView, NSMenu, NSMenuItem, NSProgressIndicator, NSProgressIndicatorStyle,
@@ -14,14 +15,12 @@ use std::cell::RefCell;
 
 #[derive(Default)]
 struct Actions {
-    arguments: Vec<Vec<String>>,
+    /// Literal arguments of this item's retained target; no sender or menu index is needed.
+    arguments: Vec<String>,
 }
 impl Actions {
-    fn arguments_for_tag(&self, tag: isize) -> Option<Vec<String>> {
-        usize::try_from(tag)
-            .ok()
-            .and_then(|index| self.arguments.get(index))
-            .cloned()
+    fn activate(&self, _sender: Option<&AnyObject>) {
+        crate::dock::activate(self.arguments.clone());
     }
 }
 define_class!(
@@ -34,26 +33,27 @@ define_class!(
     unsafe impl NSObjectProtocol for GitcraftDockActions {}
     impl GitcraftDockActions {
         #[unsafe(method(activateDockItem:))]
-        fn activate(&self, sender: &NSMenuItem) {
-            if let Some(args) = self.ivars().arguments_for_tag(sender.tag()) {
-                crate::dock::activate(args);
-            }
+        fn activate(&self, sender: Option<&AnyObject>) {
+            // AppKit's documented Dock dispatch uses a nil sender.
+            self.ivars().activate(sender);
         }
     }
 );
 
 pub fn set_menu(recent: &[Link], tasks: &[Link]) -> Result<(), String> {
     let mtm = MainThreadMarker::new().ok_or("Dock menus require the application thread")?;
-    let arguments = recent.iter().chain(tasks).map(|i| i.args.clone()).collect();
-    // SAFETY: this no-requirement NSObject subclass has fully initialized Rust ivars.
-    let target = GitcraftDockActions::alloc(mtm).set_ivars(Actions { arguments });
-    let target: Retained<GitcraftDockActions> = unsafe { msg_send![super(target), init] };
     let menu = NSMenu::new(mtm);
     menu.setAutoenablesItems(false);
     for (index, link) in recent.iter().chain(tasks).enumerate() {
         if index == recent.len() && index != 0 {
             menu.addItem(&NSMenuItem::separatorItem(mtm));
         }
+        // Each item has a distinct retained target: Dock dispatch does not supply its sender.
+        // SAFETY: this no-requirement NSObject subclass has fully initialized Rust ivars.
+        let target = GitcraftDockActions::alloc(mtm).set_ivars(Actions {
+            arguments: link.args.clone(),
+        });
+        let target: Retained<GitcraftDockActions> = unsafe { msg_send![super(target), init] };
         // SAFETY: target implements the exact action selector, and remains retained by each
         // item's representedObject for as long as AppKit or winit holds that menu item.
         let item = unsafe {
@@ -64,7 +64,6 @@ pub fn set_menu(recent: &[Link], tasks: &[Link]) -> Result<(), String> {
                 &NSString::from_str(""),
             )
         };
-        item.setTag(index as isize);
         item.setToolTip(Some(&NSString::from_str(&link.tooltip)));
         unsafe {
             item.setTarget(Some(&target));
@@ -140,19 +139,32 @@ pub fn refresh() {
 mod tests {
     use super::Actions;
     #[test]
-    fn native_menu_tag_mapping_preserves_recent_clone_open_argv_without_native_objects() {
+    fn nil_sender_callbacks_dispatch_each_targets_literal_argv_without_native_objects() {
         let entries = vec![
             vec!["/Users/a/repo with spaces;$(literal)".into()],
             vec!["--clone".into()],
             vec!["--open".into()],
         ];
-        let model = Actions {
-            arguments: entries.clone(),
-        };
-        for (i, expected) in entries.into_iter().enumerate() {
-            assert_eq!(model.arguments_for_tag(i as isize), Some(expected));
+        let targets: Vec<_> = entries
+            .iter()
+            .cloned()
+            .map(|arguments| Actions { arguments })
+            .collect();
+        assert!(crate::take_native_dock_requests().is_empty());
+        for target in &targets {
+            // Same Rust callback reached by the nullable Objective-C selector. No NSMenuItem,
+            // Foundation allocation, NSApplication or event-loop/native dispatch is involved.
+            target.activate(None);
         }
-        assert_eq!(model.arguments_for_tag(-1), None);
-        assert_eq!(model.arguments_for_tag(3), None);
+        assert_eq!(
+            crate::take_native_dock_requests(),
+            entries.into_iter().map(Ok).collect::<Vec<_>>()
+        );
+        // An old target retains its own action after other targets/menu generations exist.
+        targets[0].activate(None);
+        assert_eq!(
+            crate::take_native_dock_requests(),
+            [Ok(targets[0].arguments.clone())]
+        );
     }
 }

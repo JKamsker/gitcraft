@@ -1,0 +1,7 @@
+# MACDOCK-R1-1: nullable Dock sender
+
+Apple's [applicationDockMenu contract](https://developer.apple.com/documentation/appkit/nsapplicationdelegate/applicationdockmenu(_:)) dispatches an item's target/action with a nil sender. The native selector now accepts `Option<&AnyObject>` and ignores the sender. Each item has its own target containing its literal argument vector; representedObject retains that target for the menu item's lifetime. Dispatch no longer depends on a sender, tag or mutable menu index. The existing delegate hook and URL/progress adapters are unchanged.
+
+The pure callback regression calls the same ivars callback with nil for recent-path, Clone and Open targets and asserts actual queued argv. A separate external inert adapter byte-extracts the exact nullable selector and ivars implementation, executes the selector body on supplied fake ivars and records those three argv vectors. It does not allocate Objective-C objects or call native dispatch.
+
+Exact application source hashes, selector hashes, commands and plain-text logs remain outside the repository in `/tmp/gitcraft-interaction-dock-nullable-validation.json` and its linked inert receipt. Native macOS source is build-checked. Dock/AppKit dispatch and ownership runtime acceptance remain held; neither the fake receiver nor Rust target values establish native lifetime/delivery acceptance. No Git/helper/process/network/native fixture, full suite, CI or PR is executed.
