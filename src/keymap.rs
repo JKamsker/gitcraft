@@ -5,6 +5,8 @@
 mod config;
 pub(crate) mod editor;
 mod resolver;
+mod selection;
+pub(crate) use selection::copy_requested;
 
 pub(crate) use config::{Overrides, Stroke};
 use egui::{Key, Modifiers};
@@ -72,6 +74,11 @@ pub(crate) enum Command {
     SettingsSearch,
     SettingsPrevious,
     SettingsNext,
+    FindNext,
+    FindPrevious,
+    SelectionCopy,
+    SelectionAll,
+    SelectionHistory,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
@@ -85,6 +92,8 @@ pub(crate) enum Scope {
     Graph,
     Rebase,
     Settings,
+    Find,
+    Selection,
 }
 
 impl Scope {
@@ -92,8 +101,24 @@ impl Scope {
         match (self, other) {
             (Self::Window, _) | (_, Self::Window) => true,
             (Self::Settings, scope) | (scope, Self::Settings) => scope == Self::Settings,
-            (Self::Rebase, Self::Files | Self::Diff | Self::Changes | Self::Graph)
-            | (Self::Files | Self::Diff | Self::Changes | Self::Graph, Self::Rebase)
+            (
+                Self::Rebase,
+                Self::Files
+                | Self::Diff
+                | Self::Changes
+                | Self::Graph
+                | Self::Find
+                | Self::Selection,
+            )
+            | (
+                Self::Files
+                | Self::Diff
+                | Self::Changes
+                | Self::Graph
+                | Self::Find
+                | Self::Selection,
+                Self::Rebase,
+            )
             | (Self::Files, Self::Diff | Self::Graph)
             | (Self::Diff | Self::Graph, Self::Files) => false,
             _ => true,
@@ -104,6 +129,10 @@ impl Scope {
 impl Command {
     pub(crate) fn scope(self) -> Scope {
         match self {
+            Command::FindNext | Command::FindPrevious => Scope::Find,
+            Command::SelectionCopy | Command::SelectionAll | Command::SelectionHistory => {
+                Scope::Selection
+            }
             Command::GraphPrevious
             | Command::GraphNext
             | Command::GraphLeft
@@ -164,6 +193,11 @@ impl Command {
     /// Stable IDs are persisted independently of translated labels.
     pub(crate) fn id(self) -> &'static str {
         match self {
+            Self::FindNext => "find_next",
+            Self::FindPrevious => "find_previous",
+            Self::SelectionCopy => "selection_copy",
+            Self::SelectionAll => "selection_all",
+            Self::SelectionHistory => "selection_history",
             Self::Undo => "undo",
             Self::Redo => "redo",
             Self::Timeline => "timeline",
@@ -265,6 +299,8 @@ impl Command {
                 | Command::RebaseMoveDown
                 | Command::SettingsPrevious
                 | Command::SettingsNext
+                | Command::FindNext
+                | Command::FindPrevious
         )
     }
 }
@@ -358,7 +394,14 @@ pub(crate) const BINDINGS: &[Binding] = &[
     bind(Command::SettingsSearch, CMD, Key::F),
     bind(Command::SettingsPrevious, Modifiers::ALT, Key::ArrowUp),
     bind(Command::SettingsNext, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::FindNext, NONE, Key::F3),
+    bind(Command::FindPrevious, Modifiers::SHIFT, Key::F3),
+    bind(Command::SelectionCopy, CMD, Key::C),
+    bind(Command::SelectionAll, CMD, Key::A),
 ];
+
+/// Optional actions appear in the same editor/manual registry and start unbound.
+pub(crate) const UNBOUND_COMMANDS: &[Command] = &[Command::SelectionHistory];
 
 /// The command `key` with `modifiers` held does, if any.
 #[cfg(test)]
@@ -517,6 +560,11 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
 ];
 
 pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(&[Command::FindNext], "Find: next match"),
+    row(&[Command::FindPrevious], "Find: previous match"),
+    row(&[Command::SelectionCopy], "Copy selected lines"),
+    row(&[Command::SelectionAll], "Select all shown lines"),
+    row(&[Command::SelectionHistory], "History of selected lines"),
     row(&[Command::GraphPrevious], "Graph: previous commit"),
     row(&[Command::GraphNext], "Graph: next commit"),
     row(&[Command::GraphLeft], "Graph lane walk: jump to tip"),

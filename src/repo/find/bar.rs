@@ -57,11 +57,20 @@ impl Find {
         if icons::small_button(ui, "x", "Close (Esc)").clicked() {
             self.close();
         }
-        if icons::small_button(ui, "chevron-down", "Next match (Enter, F3)").clicked() {
+        let next = crate::keymap::tip(
+            ui.ctx(),
+            "Next match; Enter in the find field",
+            crate::keymap::Command::FindNext,
+        );
+        if icons::small_button(ui, "chevron-down", &next).clicked() {
             self.step(1);
         }
-        if icons::small_button(ui, "chevron-up", "Previous match (Shift+Enter, Shift+F3)").clicked()
-        {
+        let previous = crate::keymap::tip(
+            ui.ctx(),
+            "Previous match; Shift+Enter in the find field",
+            crate::keymap::Command::FindPrevious,
+        );
+        if icons::small_button(ui, "chevron-up", &previous).clicked() {
             self.step(-1);
         }
     }

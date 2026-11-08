@@ -118,7 +118,16 @@ impl RepoTab {
         {
             scopes.push(Scope::Changes);
         }
+        if self.find.open
+            && self.find_in().is_some()
+            && self.main_keys(ctx, super::popout::Panel::Diff)
+        {
+            scopes.push(Scope::Find);
+        }
         if available(self, ctx) {
+            if self.find_in().is_some() && self.main_keys(ctx, super::popout::Panel::Diff) {
+                scopes.push(Scope::Selection);
+            }
             if self.rebase.is_some() {
                 scopes.push(Scope::Rebase);
                 return scopes;

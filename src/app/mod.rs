@@ -624,6 +624,9 @@ impl App {
                 && repo.search_shortcut_exception(ctx)
             {
                 allowed.push(keymap::Command::Search);
+                if repo.find_shortcut_exception(ctx) {
+                    allowed.extend([keymap::Command::FindNext, keymap::Command::FindPrevious]);
+                }
             }
             if self.palette.is_none()
                 && !self.manual_open

@@ -255,12 +255,25 @@ impl<'a> Rows<'a> {
         );
 
         // Select from where the drag started to the pointer, on the side it started on.
-        let sel = drag_selection(
+        let mut sel = drag_selection(
             self.text_sel,
             &text_drag,
             self.press_hit,
             &self.pointer_hits,
         );
+        if !crate::a11y::keyboard_taken(ui.ctx())
+            && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionAll)
+        {
+            let side = if !split {
+                Side::Unified
+            } else if sel.is_some_and(|s| s.side == Side::Old) {
+                Side::Old
+            } else {
+                Side::New
+            };
+            sel = TextSel::all(&data.lines, side);
+            ui.ctx().request_repaint();
+        }
         if self.text_hover || text_drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
@@ -758,6 +771,103 @@ mod accessibility_tests {
             "the text drag hit shield must not take keyboard focus"
         );
     }
+    #[test]
+    fn selection_registry_runs_actual_diff_rows_and_history_action() {
+        use super::super::DiffLine;
+        use crate::keymap::{self, Command, Scope, Stroke};
+        use egui::{Event, Key, Modifiers};
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut settings = crate::settings::Settings::default();
+        for (command, key) in [
+            (Command::SelectionAll, Key::F8),
+            (Command::SelectionCopy, Key::F9),
+            (Command::SelectionHistory, Key::F10),
+        ] {
+            settings
+                .key_bindings
+                .insert(command.id().into(), vec![Stroke::new(key, Modifiers::NONE)]);
+        }
+        settings.put_for_test(&ctx);
+        let mut view = DiffView::new(DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file.txt".into(),
+        });
+        let data = DiffData {
+            lines: vec![
+                DiffLine {
+                    kind: Kind::Context,
+                    old: Some(1),
+                    new: Some(1),
+                    text: "one".into(),
+                    raw: " one".into(),
+                },
+                DiffLine {
+                    kind: Kind::Add,
+                    old: None,
+                    new: Some(2),
+                    text: "two".into(),
+                    raw: "+two".into(),
+                },
+            ],
+            spans: vec![None; 2],
+            changed: vec![None; 2],
+            ..Default::default()
+        };
+        for key in [None, Some(Key::F8), Some(Key::F9), Some(Key::F10)] {
+            let mut acts = Vec::new();
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    events: key
+                        .into_iter()
+                        .flat_map(|key| {
+                            [true, false].map(|pressed| Event::Key {
+                                key,
+                                physical_key: None,
+                                pressed,
+                                repeat: false,
+                                modifiers: Modifiers::NONE,
+                            })
+                        })
+                        .collect(),
+                    ..Default::default()
+                },
+                |ui| {
+                    keymap::active(
+                        &ctx,
+                        vec![Scope::Window, Scope::Repository, Scope::Selection],
+                    );
+                    let mut rows = Rows::new(ui, &view, &data, None, false, false);
+                    let selection = rows.show(ui, "file.txt", &mut acts);
+                    drop(rows);
+                    view.text_sel = selection;
+                },
+            );
+            if key == Some(Key::F8) {
+                assert_eq!(
+                    view.text_sel
+                        .map(|s| s.text(&data.lines, &data.uncut))
+                        .as_deref(),
+                    Some("one\ntwo")
+                );
+            }
+            if key == Some(Key::F9) {
+                assert!(
+                    out.platform_output
+                        .commands
+                        .iter()
+                        .any(|c| matches!(c, egui::OutputCommand::CopyText(t) if t == "one\ntwo"))
+                );
+            }
+            if key == Some(Key::F10) {
+                assert!(
+                    matches!(acts.as_slice(), [Action::LineHistory { path, at, range: (1, 2) }] if path == "file.txt" && *at == crate::git::LinesAt::Rev("recorded".into()))
+                );
+            }
+            out.drop_without_applying_deltas();
+        }
+    }
+
     #[test]
     fn change_map_keys_scroll_and_clamp_and_leave_modified_keys_alone() {
         use egui::{Key, Modifiers};

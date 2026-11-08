@@ -182,7 +182,22 @@ pub(crate) fn show(
     }
     let pick_id = egui::Id::new(("file_text_pick", &id));
     let mut pick: Option<LinePick> = ui.data(|d| d.get_temp(pick_id)).flatten();
-    let mut asked = None;
+    let free = !crate::a11y::keyboard_taken(ui.ctx());
+    if free && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionAll) {
+        pick = Some(LinePick {
+            anchor: 0,
+            cursor: data.lines.len() - 1,
+        });
+        ui.ctx().request_repaint();
+    }
+    let mut asked = if free
+        && history.is_ok()
+        && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionHistory)
+    {
+        pick.map(LinePick::numbers)
+    } else {
+        None
+    };
     let extend = ui.input(|i| i.modifiers.shift);
     let drag_id = pick_id.with("drag");
     let (down, pointer_y) = ui.input(|i| {
@@ -290,10 +305,9 @@ pub(crate) fn show(
         text_w: out.inner_rect.width() - NUM_W - 10.0,
         line_h: LINE_H,
     });
-    // Ctrl+C copies the lines picked.
-    let copy = !ui.ctx().egui_wants_keyboard_input()
-        && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-    if copy && let Some(picked) = pick {
+    if crate::keymap::copy_requested(ui.ctx())
+        && let Some(picked) = pick
+    {
         ui.ctx().copy_text(picked_text(data, picked));
     }
     ui.data_mut(|d| {
@@ -332,6 +346,7 @@ fn lines_menu(
             };
             if crate::menu_item::MenuItem::new("Copy")
                 .icon("copy")
+                .keys(crate::keymap::Command::SelectionCopy)
                 .show(ui)
                 .clicked()
             {
@@ -344,6 +359,7 @@ fn lines_menu(
                 Ok(()) => {
                     let b = crate::menu_item::MenuItem::new("History of these lines")
                         .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
                         .show(ui)
                         .on_hover_text(format!(
                             "Every commit up to this version that changed {which}, followed back \
@@ -356,6 +372,7 @@ fn lines_menu(
                 Err(why) => {
                     crate::menu_item::MenuItem::new("History of these lines")
                         .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
                         .refused(Some(why))
                         .show(ui)
                         .on_disabled_hover_text(why);
@@ -397,6 +414,97 @@ pub(crate) fn line_galley(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selection_registry_runs_actual_file_view_and_preserves_text_ownership() {
+        use crate::keymap::{self, Command, Scope, Stroke};
+        use egui::{Event, Key, Modifiers};
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut settings = crate::settings::Settings::default();
+        for (command, key) in [
+            (Command::SelectionAll, Key::F8),
+            (Command::SelectionCopy, Key::F9),
+            (Command::SelectionHistory, Key::F10),
+        ] {
+            settings
+                .key_bindings
+                .insert(command.id().into(), vec![Stroke::new(key, Modifiers::NONE)]);
+        }
+        settings.put_for_test(&ctx);
+        let data = Ok(FileText::new(
+            "one\n日本語\nthree\n".as_bytes(),
+            "test.txt",
+            true,
+        ));
+        let mut find = Find::default();
+        let source_calls = std::cell::Cell::new(0);
+        let mut frame = |key: Option<Key>, text_owned, history| {
+            let mut asked = None;
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    events: key
+                        .into_iter()
+                        .flat_map(|key| {
+                            [true, false].map(|pressed| Event::Key {
+                                key,
+                                physical_key: None,
+                                pressed,
+                                repeat: false,
+                                modifiers: Modifiers::NONE,
+                            })
+                        })
+                        .collect(),
+                    ..Default::default()
+                },
+                |ui| {
+                    keymap::active(
+                        &ctx,
+                        vec![Scope::Window, Scope::Repository, Scope::Selection],
+                    );
+                    if text_owned {
+                        ui.text_edit_singleline(&mut String::new()).request_focus();
+                    }
+                    asked = show(
+                        ui,
+                        "registry-file",
+                        Some(&data),
+                        &mut find,
+                        || {
+                            source_calls.set(source_calls.get() + 1);
+                            Source::DiffFile("recorded".into())
+                        },
+                        history,
+                        None,
+                    );
+                },
+            );
+            let copied: Vec<_> = out
+                .platform_output
+                .commands
+                .iter()
+                .filter_map(|c| match c {
+                    egui::OutputCommand::CopyText(text) => Some(text.clone()),
+                    _ => None,
+                })
+                .collect();
+            out.drop_without_applying_deltas();
+            (asked, copied)
+        };
+        frame(None, false, Ok(()));
+        frame(Some(Key::F8), false, Ok(()));
+        assert_eq!(
+            frame(Some(Key::F9), false, Ok(())).1,
+            ["one\n日本語\nthree"]
+        );
+        assert_eq!(frame(Some(Key::F10), false, Ok(())).0, Some((1, 3)));
+        assert_eq!(
+            frame(Some(Key::F10), false, Err("No committed version")).0,
+            None
+        );
+        assert!(frame(Some(Key::F9), true, Ok(())).1.is_empty());
+        assert_eq!(source_calls.get(), 0);
+    }
 
     #[test]
     fn lines_are_picked_by_click_and_shift_click() {

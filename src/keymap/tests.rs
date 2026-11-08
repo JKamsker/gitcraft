@@ -61,6 +61,11 @@ fn no_binding_takes_a_key_a_view_already_uses() {
 fn every_command_has_one_key_and_finds_its_way_back() {
     for command in config::commands() {
         let bindings: Vec<_> = BINDINGS.iter().filter(|b| b.command == command).collect();
+        if UNBOUND_COMMANDS.contains(&command) {
+            assert!(bindings.is_empty());
+            assert!(label(&egui::Context::default(), command).is_empty());
+            continue;
+        }
         assert_eq!(bindings.len(), 1, "{command:?}");
         let b = bindings[0];
         assert_eq!(

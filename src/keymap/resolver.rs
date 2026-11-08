@@ -160,6 +160,13 @@ pub(crate) fn queued(ctx: &Context, command: Command) -> bool {
         .is_some_and(|r| r.commands.contains(&command))
 }
 
+/// Whether a native semantic event may use an already resolved command context.
+/// Native Copy has no Key event on some platforms and must respect the same modal gate.
+pub(super) fn permitted(ctx: &Context, command: Command) -> bool {
+    ctx.data(|d| d.get_temp::<Resolver>(id(ctx, command.scope())))
+        .is_some_and(|r| r.eligible(command))
+}
+
 /// Consume one contextual command without draining unrelated keys for the same list.
 pub(crate) fn take(ctx: &Context, command: Command) -> bool {
     let key = id(ctx, command.scope());

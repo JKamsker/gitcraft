@@ -62,7 +62,10 @@ impl Stroke {
 }
 
 pub(crate) fn commands() -> impl Iterator<Item = Command> {
-    BINDINGS.iter().map(|b| b.command)
+    BINDINGS
+        .iter()
+        .map(|b| b.command)
+        .chain(super::UNBOUND_COMMANDS.iter().copied())
 }
 
 pub(crate) fn effective(overrides: &Overrides, command: Command) -> Vec<Stroke> {
