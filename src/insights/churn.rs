@@ -80,6 +80,7 @@ pub struct PlanRow {
 }
 
 impl PlanRow {
+    #[cfg(test)]
     pub fn shown(&self) -> &str {
         if self.name.is_empty() {
             "(root)"

@@ -147,3 +147,37 @@ fn a_real_commit_is_drawn_and_its_nodes_open_at_its_revision() -> Result<(), Str
     both_ways(&mut tab, &ctx);
     Ok(())
 }
+
+/// Opened over a pull request's page, the graph is first about that pull request.
+#[test]
+fn the_pull_request_the_page_was_opened_over_is_the_default_change() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/insights-impact-pr".into(), &ctx);
+    tab.prs = vec![crate::forge::PullRequest {
+        number: 7,
+        title: "Seven".to_owned(),
+        branch: "topic".to_owned(),
+        base: "main".to_owned(),
+        from_fork: false,
+        sha: "abc1234".to_owned(),
+        author: String::new(),
+        url: String::new(),
+        draft: false,
+    }];
+    tab.apply(Action::Insights(InsightsAct::Open(Kind::Impact)), &ctx);
+    assert!(!matches!(
+        tab.impact_default_ask(),
+        crate::insights::impact::Ask::Pr { .. }
+    ));
+    if let Some(view) = &mut tab.insights {
+        view.pr = Some(7);
+    }
+    assert_eq!(
+        tab.impact_default_ask(),
+        crate::insights::impact::Ask::Pr {
+            number: 7,
+            head: "abc1234".to_owned(),
+            base: "main".to_owned(),
+        }
+    );
+}

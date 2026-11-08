@@ -93,9 +93,17 @@ fn file_diff(data: &Impact, path: &str) -> Action {
 }
 
 impl RepoTab {
-    /// What the graph is about unless something else is picked: the selected commit, else the
-    /// checked-out branch.
+    /// What the graph is about unless something else is picked: the pull request the page was
+    /// opened over, else the selected commit, else the checked-out branch.
     fn impact_default_ask(&self) -> Ask {
+        let opened_over = self.insights.as_ref().and_then(|v| v.pr);
+        if let Some(pr) = opened_over.and_then(|n| self.prs.iter().find(|p| p.number == n)) {
+            return Ask::Pr {
+                number: pr.number,
+                head: pr.sha.clone(),
+                base: pr.base.clone(),
+            };
+        }
         match self.detail_hash.as_deref() {
             Some(hash) if hash != WIP_HASH => Ask::Commit(hash.to_owned()),
             _ => Ask::Branch {

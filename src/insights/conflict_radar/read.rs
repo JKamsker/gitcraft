@@ -5,8 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{
     Cache, Candidate, Hunk, MAX_PATHS, PairResult, Radar, assemble, overlap, parse_hunks, select,

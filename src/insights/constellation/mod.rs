@@ -140,10 +140,6 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub fn column(self) -> usize {
-        self as usize
-    }
-
     pub fn label(self) -> &'static str {
         match self {
             Kind::Branch => "branch",

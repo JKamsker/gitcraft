@@ -144,12 +144,9 @@ impl Cache {
         self.pairs.insert(key(a, b), result);
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.pairs.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.pairs.is_empty()
     }
 
     /// The pairs (by place in `tips`) not worked out at those tips yet.
@@ -229,6 +226,7 @@ impl Radar {
     }
 
     /// The edge of nodes `a` and `b`, if there is one.
+    #[cfg(test)]
     pub fn edge(&self, a: usize, b: usize) -> Option<&Edge> {
         self.edges
             .iter()

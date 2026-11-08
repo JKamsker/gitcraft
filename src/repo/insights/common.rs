@@ -428,11 +428,6 @@ pub(crate) fn table_row(
     resp
 }
 
-/// A view not built yet.
-pub(crate) fn not_built(ui: &mut Ui) {
-    unavailable(ui, "Not built yet", "This view is still being written.");
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

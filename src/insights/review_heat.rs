@@ -238,6 +238,7 @@ pub struct Heat {
 
 impl Heat {
     /// The tip of the version seen, if one was.
+    #[cfg(test)]
     pub fn seen_tip(&self) -> Option<&str> {
         match &self.seen {
             Some(Seen::Fresh { tip, .. } | Seen::Stale { tip, .. }) => Some(tip),

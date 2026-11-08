@@ -185,6 +185,7 @@ impl RepoTab {
     }
 
     /// Selects sample `k` of row `row`: the commits of its window are listed.
+    #[cfg(test)]
     pub(super) fn churn_select(&mut self, row: usize, k: usize) -> bool {
         let Some(state) = self.churn_state() else {
             return false;

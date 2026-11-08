@@ -609,6 +609,7 @@ pub fn read(
 
 /// How a pair of commits joined by a ribbon differ, as range-diff prints it: range-diff's own
 /// body for a pair it made, else [`alone_patch`].
+#[cfg(test)]
 pub fn ribbon_patch(repo: &Path, ribbons: &Ribbons, at: usize) -> Result<Vec<String>, String> {
     let r = ribbons.ribbons.get(at).ok_or("no such ribbon")?;
     if let Some(pair) = r.pair.and_then(|p| ribbons.diff.pairs.get(p)) {

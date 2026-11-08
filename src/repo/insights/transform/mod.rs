@@ -143,6 +143,15 @@ impl RepoTab {
 
     /// Reads what the view shows (again).
     pub(super) fn transform_load(&mut self, ctx: &egui::Context) {
+        // Opened over a pull request, the edits are first those of that pull request.
+        let opened_over = self.insights.as_ref().and_then(|v| v.pr);
+        let listed = opened_over.filter(|n| self.prs.iter().any(|p| p.number == *n));
+        if let Some(view) = self.insights.as_mut()
+            && let Some(number) = listed
+            && view.transform.asked.is_none()
+        {
+            view.transform.of = Of::Pr(number);
+        }
         let Some(of) = self.insights.as_ref().map(|v| v.transform.of) else {
             return;
         };

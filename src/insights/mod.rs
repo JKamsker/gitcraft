@@ -4,9 +4,6 @@
 //!
 //! Every analysis here is read-only: none changes the repository, the forge or the CI.
 
-// Shared parts land before the views using them; dropped once every view is in (#175).
-#![allow(dead_code)]
-
 pub mod churn;
 pub mod ci_path;
 pub mod conflict_radar;

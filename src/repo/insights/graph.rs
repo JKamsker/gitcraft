@@ -90,7 +90,6 @@ pub(crate) struct Graph {
 pub(crate) enum Arrange {
     /// By each node's column, left to right, in the order they come in each column.
     Columns,
-    Circle,
     /// Connected nodes pulled together, others pushed apart (worked out once; give it a
     /// background thread for a large graph).
     Force,
@@ -98,7 +97,6 @@ pub(crate) enum Arrange {
 
 /// Where each node goes, in a unit square (0 to 1 both ways).
 pub(crate) fn arrange(graph: &Graph, how: Arrange) -> Vec<Pos2> {
-    let n = graph.nodes.len();
     match how {
         Arrange::Columns => {
             let columns = graph
@@ -126,7 +124,6 @@ pub(crate) fn arrange(graph: &Graph, how: Arrange) -> Vec<Pos2> {
                 })
                 .collect()
         }
-        Arrange::Circle => circle(n),
         Arrange::Force => force(graph),
     }
 }
@@ -605,7 +602,7 @@ mod tests {
     #[test]
     fn every_layout_stays_in_the_unit_square() {
         let g = graph(12, &[(0, 1), (1, 2), (2, 3), (5, 9), (9, 11)]);
-        for how in [Arrange::Columns, Arrange::Circle, Arrange::Force] {
+        for how in [Arrange::Columns, Arrange::Force] {
             let pos = arrange(&g, how);
             assert_eq!(pos.len(), 12);
             for p in pos {

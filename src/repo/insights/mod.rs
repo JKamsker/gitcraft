@@ -4,9 +4,6 @@
 //! is, has a table beside its picture, and opens the commit, diff, file, pull request, run or
 //! worktree behind what is clicked. None changes anything.
 
-// Shared parts land before the views using them; dropped once every view is in (#175).
-#![allow(dead_code)]
-
 pub(crate) mod common;
 pub(crate) mod graph;
 pub(crate) mod heat_grid;
