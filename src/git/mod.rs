@@ -10,9 +10,11 @@ mod backlinks;
 mod behaviour;
 pub(crate) use behaviour::{BehaviourCommit, behaviour_commits};
 mod bisect;
+pub mod blobs;
 mod branch_health;
 pub(crate) mod bundle_helper;
 mod bundles;
+pub mod changed_lines;
 pub(crate) mod cleanup;
 mod clone_options;
 #[cfg(test)]

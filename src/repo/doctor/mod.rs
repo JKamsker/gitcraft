@@ -189,6 +189,7 @@ impl RepoTab {
         self.ci_view = None;
         self.close_pr();
         self.tour = None;
+        self.insights = None;
         let doctor = self.doctor.get_or_insert_with(|| {
             Box::new(DoctorView {
                 section,

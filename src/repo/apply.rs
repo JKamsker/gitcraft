@@ -193,6 +193,7 @@ impl RepoTab {
             Action::ReloadPr => self.load_pr(ctx),
             Action::Pr(act) => self.pr_act(act, ctx),
             Action::Versions(act) => self.versions_act(act, ctx),
+            Action::Insights(act) => self.insights_act(act, ctx),
             Action::OpenCi { sha, run } => {
                 self.bakeoff.view = None;
                 self.open_ci(sha, run, ctx);

@@ -30,6 +30,8 @@ pub(crate) enum View {
     Pr(u64),
     /// The builds of a commit.
     Ci(String),
+    /// A view of the insights page.
+    Insights(super::insights::Kind),
 }
 
 impl View {
@@ -90,6 +92,7 @@ impl View {
             View::Ci(sha) => {
                 crate::i18n::message("repo-core-2910", &[("sha", short(sha).to_string().into())])
             }
+            View::Insights(kind) => format!("insights: {}", kind.title().to_lowercase()),
         }
     }
 }
@@ -239,6 +242,9 @@ impl RepoTab {
         if let Some(pr) = &self.pr_view {
             return Some(View::Pr(pr.number));
         }
+        if let Some(insights) = &self.insights {
+            return Some(View::Insights(insights.kind));
+        }
         Some(View::Graph {
             selected: self.selected_hash(),
         })
@@ -345,6 +351,7 @@ impl RepoTab {
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);
+                self.insights = None;
                 if self.diff.is_some() {
                     self.apply(Action::CloseDiff, ctx);
                 }
@@ -401,6 +408,16 @@ impl RepoTab {
                         ctx,
                     );
                 }
+            }
+            View::Insights(kind) => {
+                self.close_pages(true, ctx);
+                if self.diff.is_some() {
+                    self.apply(Action::CloseDiff, ctx);
+                }
+                self.apply(
+                    Action::Insights(super::insights::InsightsAct::Open(*kind)),
+                    ctx,
+                );
             }
         }
     }

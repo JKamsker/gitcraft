@@ -27,6 +27,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "book-open",
     "brush",
     "bot",
+    "chart-column",
     "check",
     "chevron-down",
     "chevron-right",
@@ -107,6 +108,12 @@ fn white_icons() -> &'static HashMap<&'static str, Arc<[u8]>> {
             })
             .collect()
     })
+}
+
+/// Whether an icon of that name is embedded.
+#[cfg(test)]
+pub fn known(name: &str) -> bool {
+    white_icons().contains_key(name)
 }
 
 /// An egui image for an icon, tinted. Unknown names give an empty image.

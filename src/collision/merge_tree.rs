@@ -35,6 +35,20 @@ pub fn parse(out: &str) -> Pair {
 
 /// Merges `a` and `b` in memory and says what conflicts.
 pub fn simulate(repo: &Path, a: &str, b: &str) -> Result<Pair, String> {
+    simulate_with(repo, a, b, &[])
+}
+
+/// [`simulate`] without fetching what a partial clone lacks: such a merge fails instead.
+pub fn simulate_offline(repo: &Path, a: &str, b: &str) -> Result<Pair, String> {
+    simulate_with(repo, a, b, &[("GIT_NO_LAZY_FETCH", "1")])
+}
+
+fn simulate_with(
+    repo: &Path,
+    a: &str,
+    b: &str,
+    env: &[(&'static str, &str)],
+) -> Result<Pair, String> {
     for rev in [a, b] {
         if rev.starts_with('-') {
             return Err(format!("{rev} is not a branch"));
@@ -52,8 +66,8 @@ pub fn simulate(repo: &Path, a: &str, b: &str) -> Result<Pair, String> {
         b,
     ];
     // 1: it conflicts, and says where; or a revision isn't there (nothing printed then).
-    let out =
-        crate::git::run_ok_codes(Some(repo), &args, &[0, 1]).map_err(|e| explain(&e, a, b))?;
+    let out = crate::git::run_env_codes(Some(repo), &args, env, &[0, 1])
+        .map_err(|e| explain(&e, a, b))?;
     if out.trim().is_empty() {
         return Err(format!(
             "Could not merge {a} with {b} in memory: one of them is not a branch or commit"

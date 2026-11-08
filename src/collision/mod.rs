@@ -11,7 +11,7 @@ mod order;
 #[cfg(test)]
 mod tests;
 
-pub use matrix::{Branch, Cell, Matrix, STOPPED, compute, merges};
+pub use matrix::{Branch, Cell, Matrix, STOPPED, compute, merge_offline, merges};
 #[cfg(test)]
 pub use merge_tree::{Pair, simulate};
 pub use order::{Step, landing_order};

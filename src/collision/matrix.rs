@@ -154,3 +154,9 @@ pub fn compute(
 fn merge(repo: &Path, a: &Branch, b: &Branch) -> Cell {
     simulate(repo, &a.git, &b.git).map_err(|e| e.replace(&a.git, &a.name).replace(&b.git, &b.name))
 }
+
+/// [`merge`] without fetching what a partial clone lacks (for a view that only reads).
+pub fn merge_offline(repo: &Path, a: &Branch, b: &Branch) -> Cell {
+    super::merge_tree::simulate_offline(repo, &a.git, &b.git)
+        .map_err(|e| e.replace(&a.git, &a.name).replace(&b.git, &b.name))
+}

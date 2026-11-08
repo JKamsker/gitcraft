@@ -131,6 +131,9 @@ pub(super) fn git_cmd() -> Command {
     for (name, value) in GIT_ENV {
         cmd.env(name, value);
     }
+    if let Some((name, value)) = offline_env() {
+        cmd.env(name, value);
+    }
     for name in GIT_ENV_REMOVED {
         cmd.env_remove(name);
     }
@@ -196,6 +199,32 @@ pub(in crate::git) use watched::run_watched_extra_recorded;
 
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
 const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
+
+thread_local! {
+    /// Git runs on this thread are reads that mustn't fetch (see [`offline`]).
+    static OFFLINE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `work` with every git it starts on this thread kept from fetching what a partial
+/// clone lacks (`GIT_NO_LAZY_FETCH`): for views that only read, a missing object is an error
+/// rather than a download written into the repository.
+pub fn offline<T>(work: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            OFFLINE.with(|o| o.set(self.0));
+        }
+    }
+    let _restore = Restore(OFFLINE.with(|o| o.replace(true)));
+    work()
+}
+
+/// What every git started on this thread gets in its environment within [`offline`].
+fn offline_env() -> Option<(&'static str, &'static str)> {
+    OFFLINE
+        .with(std::cell::Cell::get)
+        .then_some(("GIT_NO_LAZY_FETCH", "1"))
+}
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
@@ -370,6 +399,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
                 super::clone_options::download_environment(args).to_owned(),
             )))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
+            .chain(offline_env().map(|(n, v)| (n.to_owned(), v.to_owned())))
             .collect(),
         unset: GIT_ENV_REMOVED
             .iter()
@@ -634,6 +664,21 @@ pub fn run_env(
             stderr
         })
     }
+}
+
+/// [`run_env`], taking the exit codes `ok` as success.
+pub fn run_env_codes(
+    dir: Option<&Path>,
+    args: &[&str],
+    env: &[(&'static str, &str)],
+    ok: &[i32],
+) -> Result<String, String> {
+    let extra = Extra {
+        pre: Vec::new(),
+        env: env.iter().map(|(n, v)| (*n, (*v).to_owned())).collect(),
+        ..Extra::default()
+    };
+    finish(execute(dir, &extra, args)?, args, ok)
 }
 
 /// Runs git and returns stdout as raw bytes (file contents: images…).

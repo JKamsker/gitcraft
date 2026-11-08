@@ -461,6 +461,8 @@ pub(crate) enum Action {
     OpenCollisions,
     /// Something about comparing two versions of a series of commits.
     Versions(versions::VersionsAct),
+    /// Something done on the insights page (opening it at a view, in a view).
+    Insights(super::insights::InsightsAct),
     /// The check of the CODEOWNERS file.
     Owners(super::owners::OwnersAct),
     /// Open the agent fence's window.
@@ -918,6 +920,7 @@ impl RepoTab {
             ));
         }
         items.extend(self.versions_palette_item());
+        items.extend(self.insights_palette_items());
         if self.owners.file().is_some() {
             items.push((
                 "Check CODEOWNERS".into(),
