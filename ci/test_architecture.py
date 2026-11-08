@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from architecture import history, mask, named_fields, source_metrics, sources_at
+from architecture import history, mask, named_fields, report, source_metrics, sources_at
 
 
 class MetricsTests(unittest.TestCase):
@@ -105,6 +105,36 @@ class GitMetricsTests(unittest.TestCase):
         self.assertEqual(result["src/hidden.rs"], "fn hidden() {}\n")
         self.assertIn("$Format:%H$", result["src/subst.rs"])
         self.assertEqual(result["src/spaces ü.rs"], "fn spaced() {}\n")
+
+    def test_report_selects_action_by_name_after_another_enum(self):
+        repo = self.root / "src/repo"
+        repo.mkdir(parents=True)
+        (repo / "mod.rs").write_text('''
+pub struct RepoTab {
+    path: String,
+}
+impl RepoTab {
+    pub fn new_deferred() -> Self { Self { path: String::new() } }
+}
+''')
+        (repo / "apply.rs").write_text("impl RepoTab { fn apply(&mut self) {} }\n")
+        (repo / "actions.rs").write_text('''
+enum Earlier {
+    Decoy,
+}
+pub(crate) enum Action {
+    Select(usize),
+    Reload,
+}
+enum Later {
+    AnotherDecoy,
+}
+''')
+        self.commit()
+        with patch("architecture.git", side_effect=self.git):
+            result = report("HEAD", 1)
+        self.assertEqual(result["root_action_variants"], ["Select", "Reload"])
+        self.assertEqual(result["summary"]["root_action_variants"], 2)
 
 
 if __name__ == "__main__":

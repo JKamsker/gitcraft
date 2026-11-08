@@ -180,7 +180,8 @@ def report(revision, count):
     fields = tab["fields"]
     constructor = next(f for f in functions if f["path"] == "src/repo/mod.rs" and f["name"] == "new_deferred")
     dispatch = next(f for f in functions if f["path"] == "src/repo/apply.rs" and f["name"] == "apply")
-    action_code = next(declarations(codes["src/repo/actions.rs"], "enum"))["body"]
+    action_code = next(decl for decl in declarations(codes["src/repo/actions.rs"], "enum")
+                       if decl["name"] == "Action")["body"]
     action_variants = re.findall(r"^    (\w+)(?:\s*[,({])", action_code, re.M)
     # References identify collaborators for a manual writes/invariants audit; they aren't writes.
     references = {field: {} for field in fields}
