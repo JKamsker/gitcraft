@@ -60,9 +60,12 @@ impl CredentialScope {
         if authority.contains(['?', '#', '\\']) {
             return Err("Invalid credential URL authority".into());
         }
-        let authority = authority
-            .rsplit_once('@')
-            .map_or(authority, |(_, host)| host);
+        let authority = if let Some((userinfo, host)) = authority.rsplit_once('@') {
+            if userinfo.contains(':') || decode(userinfo)? != account {
+                return Err("The URL account does not match the selected account, or embeds a password. Use a credential-free URL and sign in explicitly".into());
+            }
+            host
+        } else { authority };
         let (host, port) = if let Some(ipv6) = authority.strip_prefix('[') {
             let (ip, tail) = ipv6.split_once(']').ok_or("Invalid IPv6 credential host")?;
             ip.parse::<std::net::Ipv6Addr>()
@@ -106,7 +109,7 @@ impl CredentialScope {
             } else {
                 String::new()
             },
-            path: decode(path)?,
+            path: decode(path.trim_start_matches('/'))?.trim_end_matches('/').into(),
             account: account.into(),
         })
     }
@@ -194,6 +197,9 @@ mod tests {
         ] {
             assert!(!scope.matches_url(url), "{url}");
         }
+        for url in ["https://host-a.invalid/team/repo.git/", "https://host-a.invalid//team/repo.git", "https://host-a.invalid/team/repo.git%2F"] { assert!(scope.matches_url(url), "{url}"); }
+        assert!(CredentialScope::for_url("https://bob@host-a.invalid/team/repo.git", "alice").is_err());
+        assert!(CredentialScope::for_url("https://alice:embedded@host-a.invalid/team/repo.git", "alice").is_err());
         assert_ne!(
             scope,
             CredentialScope::for_url("https://host-a.invalid/team/repo.git", "bob")?

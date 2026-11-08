@@ -60,6 +60,8 @@ use crate::remote::{self, Target};
 
 mod connection;
 mod endpoints;
+mod credential_policy;
+pub(crate) use credential_policy::*;
 pub(crate) use endpoints::*;
 mod setup;
 pub(crate) use connection::*;
@@ -130,6 +132,7 @@ pub(super) struct Extra {
     output_limit: Option<usize>,
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
+    owned_pre: Vec<String>,
     env: Vec<(&'static str, String)>,
     /// What git reads on its input; nothing when `None`.
     stdin: Option<Vec<u8>>,
@@ -201,7 +204,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
     let mut cmd = repository_command(dir, args);
-    cmd.args(&extra.pre);
+    cmd.args(&extra.pre).args(&extra.owned_pre);
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
@@ -247,6 +250,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         .pre
         .iter()
         .copied()
+        .chain(extra.owned_pre.iter().map(String::as_str))
         .chain(args.iter().copied())
         .map(remote::sh_quote)
         .collect();
@@ -785,7 +789,7 @@ fn unattended_extra(unix: bool) -> Extra {
 /// Sets `cmd` to open no sign-in window (see [`unattended_extra`]).
 fn unattended(cmd: &mut Command) {
     let extra = unattended_extra(cfg!(unix));
-    cmd.args(&extra.pre);
+    cmd.args(&extra.pre).args(&extra.owned_pre);
     for (name, value) in extra.env {
         cmd.env(name, value);
     }
@@ -821,10 +825,9 @@ fn extra_for(
         Extra::default()
     };
     if let Some(c) = creds {
-        extra
-            .pre
-            .extend(["-c", "credential.useHttpPath=true", "-c", ENV_HELPER]);
-        extra.env.extend(c.helper_environment()?);
+        let policy = credential_command_policy(dir, c)?;
+        extra.owned_pre.extend(policy.arguments);
+        extra.env.extend(policy.environment);
     }
     Ok(extra)
 }
@@ -851,6 +854,7 @@ fn run_extra(
 ) -> Result<String, String> {
     let credentials = extra_for(dir, creds, false)?;
     extra.pre.extend(credentials.pre);
+    extra.owned_pre.extend(credentials.owned_pre);
     extra.env.extend(credentials.env);
     finish(execute(dir, &extra, args)?, args, ok)
 }

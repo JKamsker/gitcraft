@@ -131,8 +131,7 @@ pub(super) fn credentials(
     ui.add_space(4.0);
     ui.label(
         RichText::new(
-            "Used only for this endpoint and account until you close the tab. If git has a credential helper (such as Git \
-             Credential Manager), it saves them once they work.",
+            "Used only for this endpoint and account until you close the tab. This explicit sign-in bypasses stored accounts and is not automatically saved to a credential manager.",
         )
         .color(t.text_faint)
         .small(),
