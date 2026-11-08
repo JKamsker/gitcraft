@@ -2,17 +2,21 @@
 //! Collaborators add a completed launch or ask for a selection; they cannot bypass
 //! the transitions that keep those values consistent. Hiding preserves the shells.
 
+mod tabs;
+
 use std::path::{Path, PathBuf};
 
 use egui::Ui;
 
-use super::{Action, PaletteItem, RepoTab, widgets};
+use super::{Action, PaletteItem, RepoTab};
 use crate::terminal::{ShellSpec, Terminal};
 use crate::theme::Tokens;
 
 /// One explicit route through the root dispatcher; local actions stay here.
 pub(crate) enum TerminalAct {
     Toggle,
+    /// The panel's hide button expresses an intent, even if another event already hid it.
+    Hide,
     New {
         shell: Option<ShellSpec>,
         cwd: Option<PathBuf>,
@@ -118,6 +122,7 @@ impl Terminals {
     pub(super) fn apply(&mut self, action: TerminalAct, repo: &Path, ctx: &egui::Context) {
         match action {
             TerminalAct::Toggle => self.toggle(repo, ctx),
+            TerminalAct::Hide => self.hide(),
             TerminalAct::New { shell, cwd } => self.start(repo, shell, cwd, ctx),
             TerminalAct::Close(index) => self.close(index),
             TerminalAct::Select(index) => self.select(index),
@@ -189,7 +194,7 @@ impl Terminals {
 
     pub(super) fn panel(&mut self, ui: &mut Ui, popped: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::terminal_tabs(ui, &self.shells, self.active, popped, acts);
+        tabs::terminal_tabs(ui, &self.shells, self.active, popped, acts);
         if let Some(err) = self.error() {
             ui.add_space(8.0);
             ui.horizontal(|ui| {

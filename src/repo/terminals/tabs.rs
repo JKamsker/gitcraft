@@ -3,9 +3,9 @@
 use crate::repo::terminals::TerminalAct;
 use egui::{Rect, Sense, Ui, pos2, vec2};
 
-use super::top_rounded;
 use crate::icons;
 use crate::repo::Action;
+use crate::repo::widgets::{self, top_rounded};
 use crate::terminal::Terminal;
 use crate::theme::{self, Tokens};
 
@@ -54,7 +54,7 @@ pub fn terminal_tabs(
                 acts.push(Action::Popout(Request::Close(Panel::Terminal)));
             }
         } else if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
-            acts.push(Action::Terminal(TerminalAct::Toggle));
+            acts.push(Action::Terminal(TerminalAct::Hide));
         }
         crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
     });
@@ -79,7 +79,7 @@ fn terminal_tab(
         ui.painter()
             .layout_no_wrap(label, font, if selected { t.text } else { t.text_dim });
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 44.0, 26.0), Sense::click());
-    super::a11y_selected(&resp, || format!("Terminal {}", galley.text()), selected);
+    widgets::a11y_selected(&resp, || format!("Terminal {}", galley.text()), selected);
     let shape = top_rounded(t.radius as u8);
     if selected {
         ui.painter().rect_filled(rect, shape, t.card);
@@ -103,7 +103,7 @@ fn terminal_tab(
     let x = ui
         .interact(x_rect, resp.id.with("close"), Sense::click())
         .on_hover_text("Close (ends the shell)");
-    super::a11y(
+    widgets::a11y(
         &x,
         egui::WidgetType::Button,
         "Close terminal (ends the shell)",

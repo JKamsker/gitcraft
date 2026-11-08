@@ -96,6 +96,19 @@ fn hiding_and_failed_launches_preserve_owned_sessions_until_close_or_drop() {
 }
 
 #[test]
+fn repeated_hide_actions_do_not_reopen_or_start_a_shell() {
+    let ctx = egui::Context::default();
+    let mut panel = Terminals::default();
+    panel.opened(Err("no shell installed".into()));
+    for _ in 0..2 {
+        panel.apply(TerminalAct::Hide, std::path::Path::new("/unused"), &ctx);
+        assert!(!panel.is_open());
+        assert!(panel.is_empty());
+        assert_eq!(panel.error(), Some("no shell installed"));
+    }
+}
+
+#[test]
 fn terminal_palette_labels_hints_and_routes_stay_compatible() {
     let (label, hint, action) = toggle_palette_item();
     assert_eq!(label, "Toggle terminal");
