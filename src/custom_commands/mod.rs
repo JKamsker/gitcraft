@@ -12,7 +12,8 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 pub use program::{
-    Scope, captured_program, display_toast_text, terminal_program, toast_text, variables,
+    CapturedToast, Scope, captured_program, display_toast_text, terminal_program, toast_text,
+    variables,
 };
 pub use repo_file::{
     FILE as REPO_FILE, MAX_BYTES as REPO_FILE_MAX, RepoFile, TrustedFile, is_trusted, trust,

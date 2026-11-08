@@ -70,56 +70,73 @@ const TOAST_CHARS: usize = 600;
 
 /// The toast for a command that ended with `code`: (text, failed). The end of what it printed
 /// (both outputs), without colours or progress lines rewritten in place.
-pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
-    let failed = code != 0;
-    let out = clean(&String::from_utf8_lossy(stdout));
-    let err = clean(&String::from_utf8_lossy(stderr));
-    let printed = match (out.is_empty(), err.is_empty()) {
-        (_, true) => out,
-        (true, false) => err,
-        // stderr last: a failure's reason, which the end of the toast keeps.
-        (false, false) => format!("{out}\n{err}"),
-    };
-    let head = if failed {
-        format!("{name} failed (exit status {code})")
-    } else {
-        format!("{name} finished")
-    };
-    let tail = tail(&printed);
-    let text = if tail.is_empty() {
-        head
-    } else {
-        format!("{head}\n{tail}")
-    };
-    (text, failed)
+#[derive(Clone, Debug)]
+pub struct CapturedToast {
+    name: String,
+    code: i32,
+    // Only the already cleaned, bounded tail travels through status/toast queues.
+    tail: String,
 }
 
-/// Opt-in presentation from the actual outcome. The raw toast producer stays stable.
-/// This resolves the emission locale; retain these input fields and call at paint when
-/// a longer-lived result must follow subsequent language changes.
+impl CapturedToast {
+    pub fn capture(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> Self {
+        let out = clean(&String::from_utf8_lossy(stdout));
+        let err = clean(&String::from_utf8_lossy(stderr));
+        let printed = match (out.is_empty(), err.is_empty()) {
+            (_, true) => out,
+            (true, false) => err,
+            (false, false) => format!("{out}\n{err}"),
+        };
+        Self {
+            name: name.to_owned(),
+            code,
+            tail: tail(&printed),
+        }
+    }
+
+    pub fn raw(&self) -> (String, bool) {
+        let head = if self.code != 0 {
+            format!("{} failed (exit status {})", self.name, self.code)
+        } else {
+            format!("{} finished", self.name)
+        };
+        (self.with_tail(head), self.code != 0)
+    }
+
+    pub fn display(&self) -> (String, bool) {
+        let head = if self.code != 0 {
+            crate::i18n::message(
+                "interaction-custom-display-failed",
+                &[
+                    ("name", self.name.as_str().into()),
+                    ("code", self.code.into()),
+                ],
+            )
+        } else {
+            crate::i18n::message(
+                "interaction-custom-display-finished",
+                &[("name", self.name.as_str().into())],
+            )
+        };
+        (self.with_tail(head), self.code != 0)
+    }
+
+    fn with_tail(&self, head: String) -> String {
+        if self.tail.is_empty() {
+            head
+        } else {
+            format!("{head}\n{}", self.tail)
+        }
+    }
+}
+
+pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    CapturedToast::capture(name, code, stdout, stderr).raw()
+}
+
+/// Opt-in presentation from actual source fields; legacy callers retain their API.
 pub fn display_toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
-    let (raw, failed) = toast_text(name, code, stdout, stderr);
-    let raw_head = if failed {
-        format!("{name} failed (exit status {code})")
-    } else {
-        format!("{name} finished")
-    };
-    let head = if failed {
-        crate::i18n::message(
-            "interaction-custom-display-failed",
-            &[("name", name.into()), ("code", code.into())],
-        )
-    } else {
-        crate::i18n::message(
-            "interaction-custom-display-finished",
-            &[("name", name.into())],
-        )
-    };
-    // The prefix is constructed from the same typed outcome; output is never reparsed.
-    (
-        head + raw.strip_prefix(&raw_head).unwrap_or_default(),
-        failed,
-    )
+    CapturedToast::capture(name, code, stdout, stderr).display()
 }
 
 /// The last [`TOAST_LINES`] lines of `text`, no more than [`TOAST_CHARS`] characters.

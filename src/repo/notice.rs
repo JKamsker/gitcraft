@@ -21,6 +21,12 @@ enum Presentation {
         figures: Figures,
     },
     Parallel(parallel::Summary),
+    Custom(crate::custom_commands::CapturedToast),
+    CustomStarted(String),
+    CustomStartFailed {
+        name: String,
+        error: String,
+    },
     Repository {
         name: String,
         source: Arc<Presentation>,
@@ -52,6 +58,28 @@ impl Notice {
             presentation: Some(Arc::new(Presentation::Parallel(
                 parallel::Summary::capture(outcome, machine, receipt),
             ))),
+        }
+    }
+
+    pub(super) fn custom_completed(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> Self {
+        let source = crate::custom_commands::CapturedToast::capture(name, code, stdout, stderr);
+        Self {
+            raw: source.raw(),
+            presentation: Some(Arc::new(Presentation::Custom(source))),
+        }
+    }
+
+    pub(super) fn custom_started(name: String) -> Self {
+        Self {
+            raw: (format!("Running {name}…"), false),
+            presentation: Some(Arc::new(Presentation::CustomStarted(name))),
+        }
+    }
+
+    pub(super) fn custom_start_failed(name: String, error: String) -> Self {
+        Self {
+            raw: (format!("{name} couldn't be run: {error}"), true),
+            presentation: Some(Arc::new(Presentation::CustomStartFailed { name, error })),
         }
     }
 
@@ -92,6 +120,15 @@ impl Presentation {
         match self {
             Self::Authorship { branch, figures } => figures.display_headline(branch),
             Self::Parallel(summary) => summary.display(),
+            Self::Custom(source) => source.display().0,
+            Self::CustomStarted(name) => crate::i18n::message(
+                "repo-workflows-custom_commands-run-custom-captured-5215b5ab",
+                &[("name", name.as_str().into())],
+            ),
+            Self::CustomStartFailed { name, error } => crate::i18n::message(
+                "repo-workflows-custom_commands-run-custom-captured-471b45de",
+                &[("name", name.as_str().into()), ("e", error.as_str().into())],
+            ),
             Self::Repository { name, source } => format!("{name} · {}", source.display()),
         }
     }
@@ -219,5 +256,64 @@ mod refusal_tests {
         assert!(status.as_ref().is_some_and(|n| n.1));
         assert!(status.as_ref().and_then(Notice::projected).is_none());
         assert!(status.as_ref().is_some_and(|n| n.0.contains("--orphan=x")));
+    }
+}
+
+#[cfg(test)]
+mod custom_tests {
+    use super::*;
+    #[test]
+    fn captured_completion_repaints_bounded_opaque_tail_after_queue_transfer() {
+        let name = "custom failed\n$(opaque)";
+        let output = "discarded\n".repeat(20000) + "\x1b[31mprovider finished\x1b[0m\n";
+        for code in [0, 7] {
+            let source = Notice::custom_completed(name, code, output.as_bytes(), b"last error\n");
+            let raw = source.raw().clone();
+            assert_eq!(
+                raw,
+                crate::custom_commands::toast_text(name, code, output.as_bytes(), b"last error\n")
+            );
+            assert!(raw.0.ends_with("provider finished\nlast error"));
+            assert!(format!("{source:?}").len() < 2000);
+            let mut queue = vec![source];
+            let retained = queue.remove(0);
+            for language in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(language);
+                let shown = retained.projected().unwrap_or_default();
+                assert!(shown.starts_with(name));
+                assert!(shown.ends_with("provider finished\nlast error"));
+                if language == "en-US" {
+                    assert_eq!(shown, raw.0);
+                } else {
+                    assert!(shown.contains(if code == 0 {
+                        "abgeschlossen"
+                    } else {
+                        "fehlgeschlagen"
+                    }));
+                }
+                assert_eq!(retained.raw(), &raw);
+            }
+            assert_eq!(Notice::plain(raw).projected(), None);
+        }
+    }
+    #[test]
+    fn custom_launch_sources_keep_original_raw_envelopes_and_opaque_detail() {
+        let started = Notice::custom_started("lookalike\nname".into());
+        let failed = Notice::custom_start_failed(
+            "lookalike\nname".into(),
+            "Running external…\nprovider couldn't be run: opaque".into(),
+        );
+        assert_eq!(started.raw(), &("Running lookalike\nname…".into(), false));
+        let raw = failed.raw().clone();
+        assert_eq!(raw, ("lookalike\nname couldn't be run: Running external…\nprovider couldn't be run: opaque".into(), true));
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            let shown = failed.projected().unwrap_or_default();
+            assert!(shown.ends_with("Running external…\nprovider couldn't be run: opaque"));
+            if language == "en-US" {
+                assert_eq!(shown, raw.0);
+            }
+            assert_eq!(failed.raw(), &raw);
+        }
     }
 }

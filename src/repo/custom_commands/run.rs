@@ -56,28 +56,22 @@ impl RepoTab {
     ) {
         let script = cc::captured_program(vars, command);
         let repo = self.path.clone();
-        self.finished.push(crate::repo::Notice::plain((
-            crate::i18n::message(
-                "repo-workflows-custom_commands-run-custom-captured-5215b5ab",
-                &[("name", (name).clone().into())],
-            ),
-            false,
-        )));
+        self.finished
+            .push(crate::repo::Notice::custom_started(name.clone()));
         self.then(
             ctx,
             move || crate::git::run_shell(&repo, &script),
             move |tab, ran, _| {
-                let toast = match ran {
-                    Ok(out) => cc::toast_text(&name, out.code, &out.stdout, &out.stderr),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-workflows-custom_commands-run-custom-captured-471b45de",
-                            &[("name", (name).clone().into()), ("e", (e).clone().into())],
-                        ),
-                        true,
+                let notice = match ran {
+                    Ok(out) => crate::repo::Notice::custom_completed(
+                        &name,
+                        out.code,
+                        &out.stdout,
+                        &out.stderr,
                     ),
+                    Err(e) => crate::repo::Notice::custom_start_failed(name, e),
                 };
-                tab.finished.push(crate::repo::Notice::plain(toast));
+                tab.finished.push(notice);
             },
         );
     }
