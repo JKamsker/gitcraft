@@ -341,8 +341,17 @@ pub(in crate::repo) fn display_workflow_error(error: &str) -> String {
         "File history cancelled" => {
             crate::i18n::text("repo-workflows-atlas-new-70ba4563").to_owned()
         }
+        "History read cancelled" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-dc101692").to_owned()
+        }
         "History summary cancelled or exceeded its output limit" => {
             crate::i18n::text("repo-workflows-line_dossier-run-a9f1b338").to_owned()
+        }
+        "History worker panicked" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-33647b3e").to_owned()
+        }
+        "History worker stopped" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-da12ac51").to_owned()
         }
         "Moved-code analysis cancelled or exceeded 40 seconds" => {
             crate::i18n::text("repo-workflows-file_comparison-read-431f5828").to_owned()

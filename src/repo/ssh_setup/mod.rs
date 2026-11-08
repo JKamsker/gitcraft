@@ -134,9 +134,7 @@ impl State {
             active: None,
             command: None,
             jobs: crate::tasks::Scope(repo.tx.cancel.child()),
-            status:
-                "No key, agent, account or network action has run. Choose each step explicitly."
-                    .into(),
+            status: crate::i18n::text("repo-workflows-ssh_setup-new-8633c172").into(),
         })
     }
     pub fn running(&self) -> bool {
@@ -179,7 +177,10 @@ impl State {
                 Box::new(move || {
                     let live = || active.load(Ordering::Acquire);
                     let result = if crate::practice::is_repository(&repo) {
-                        Err("SSH setup is unavailable in Practice repositories.".into())
+                        Err(
+                            crate::i18n::text("repo-workflows-ssh_setup-background-eeca6d22")
+                                .into(),
+                        )
                     } else {
                         job(&live)
                     };
@@ -232,9 +233,10 @@ impl State {
             .and_then(|receive| match receive.try_recv() {
                 Ok(value) => Some(value),
                 Err(mpsc::TryRecvError::Empty) => None,
-                Err(_) => Some(Err(
-                    "Setup worker stopped; no later result will be applied.".into(),
-                )),
+                Err(_) => Some(Err(crate::i18n::text(
+                    "repo-workflows-ssh_setup-poll-380743c6",
+                )
+                .into())),
             });
         if let Some(ready) = ready {
             self.cancel_worker();
@@ -308,15 +310,16 @@ impl State {
                 ),
             };
             if !live() {
-                return Err("Setup cancelled before command launch.".into());
+                return Err(
+                    crate::i18n::text("repo-workflows-ssh_setup-prepare-command-31585a34").into(),
+                );
             }
             if let Some(folder) = &invocation.reserve_folder {
                 reserve_folder(folder)?;
             }
             if !live() {
                 return Err(
-                    "Setup cancelled before command launch. Any new empty folder is retained."
-                        .into(),
+                    crate::i18n::text("repo-workflows-ssh_setup-prepare-command-78845053").into(),
                 );
             }
             Ok(Ready::Command {
@@ -341,34 +344,71 @@ impl State {
         })
     }
     fn fields(&mut self, ui: &mut Ui) {
-        ui.label(RichText::new(format!("Operations run on {}", self.machine.label())).strong());
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-workflows-ssh_setup-fields-4405a792",
+                &[(
+                    "self-machine-label-1",
+                    (self.machine.label()).clone().into(),
+                )],
+            ))
+            .strong(),
+        );
         if !self.machine.is_local() {
-            ui.label("Keys, agent, tools and forge login belong to that SSH/WSL machine. This computer's profile credentials and key files are never copied there.");
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-69608cb8",
+            ));
         }
-        ui.label("Each button runs only its named step. Passphrases belong in the terminal's OpenSSH prompt; the app has no passphrase field.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-ssh_setup-fields-a7b7ae57",
+        ));
         ui.horizontal(|ui| {
-            ui.label("New key folder");
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-08b5218c",
+            ));
             ui.text_edit_singleline(&mut self.folder);
         });
-        ui.label("Choose a new folder under an existing parent. Existing folders are refused. A cancelled/failed creation can leave its new folder for you to inspect.");
-        if ui.button("1. Create ed25519 key…").clicked() {
+        ui.label(crate::i18n::text(
+            "repo-workflows-ssh_setup-fields-25f08261",
+        ));
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-e67b66d2",
+            ))
+            .clicked()
+        {
             self.prepare_command(ui.ctx(), Step::Generate);
         }
         ui.horizontal(|ui| {
-            ui.label("Selected private-key path");
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-a8ff2446",
+            ));
             ui.text_edit_singleline(&mut self.key);
             if self.machine.is_local()
-                && ui.button("Use existing key…").clicked()
+                && ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-ssh_setup-fields-42ad2d5a",
+                    ))
+                    .clicked()
                 && let Some(path) = rfd::FileDialog::new().pick_file()
             {
                 self.key = path.to_string_lossy().into_owned();
             }
         });
-        ui.label("Existing keys are used in place, without copying private bytes. Upload reads only the .pub companion; comments and malformed/private input are excluded.");
-        if ui.button("2. Add selected key to agent…").clicked() {
+        ui.label(crate::i18n::text(
+            "repo-workflows-ssh_setup-fields-a6faa7c0",
+        ));
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-1cb4035b",
+            ))
+            .clicked()
+        {
             self.prepare_command(ui.ctx(), Step::Agent);
         }
-        ui.label("An agent must already be available on that machine; gitcraft does not start a daemon or alter its global SSH configuration. Windows uses its OpenSSH agent and WSL its configured agent. SSH setup connections disable forwarding of this computer's agent; have an agent available on the repository machine.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-ssh_setup-fields-75c9835b",
+        ));
         ui.separator();
         let old = (self.forge, self.host.clone(), self.account_name.clone());
         ui.horizontal(|ui| {
@@ -380,22 +420,28 @@ impl State {
                     }
                 });
             if self.machine.is_local() || self.forge == Forge::GitHub {
-                ui.label("HTTPS server");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-ssh_setup-fields-467c73ec",
+                ));
                 ui.text_edit_singleline(&mut self.host);
             } else {
-                ui.label("Server comes from the selected tea login; verify its URL before upload.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-ssh_setup-fields-2fc162ec",
+                ));
             }
         });
         ui.horizontal(|ui| {
             ui.label(if self.forge == Forge::GitHub {
-                "Existing gh username"
+                crate::i18n::text("repo-workflows-ssh_setup-fields-fa174850")
             } else {
-                "Existing tea login alias"
+                crate::i18n::text("repo-workflows-ssh_setup-fields-9c3b602e")
             });
             ui.text_edit_singleline(&mut self.account_name);
         });
         ui.horizontal(|ui| {
-            ui.label("Public key title");
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-2b81b1a8",
+            ));
             ui.text_edit_singleline(&mut self.title);
         });
         if old != (self.forge, self.host.clone(), self.account_name.clone()) {
@@ -403,7 +449,12 @@ impl State {
         }
         if self.machine.is_local() {
             ui.horizontal(|ui| {
-                if ui.button("Check account").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-ssh_setup-fields-9487c9a7",
+                    ))
+                    .clicked()
+                {
                     match self.hosting() {
                         Ok(hosting) => {
                             let name = self.account_name.clone();
@@ -417,7 +468,9 @@ impl State {
                 if ui
                     .add_enabled(
                         self.account.is_some(),
-                        egui::Button::new("3. Upload public key"),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-ssh_setup-fields-71b7ffa7",
+                        )),
                     )
                     .clicked()
                     && let Some(account) = self.account.take()
@@ -434,38 +487,64 @@ impl State {
                 }
             });
             if let Some(account) = &self.account {
-                ui.label(format!(
-                    "Upload target: {} on {}",
-                    account.owner(),
-                    self.host
+                ui.label(crate::i18n::message(
+                    "repo-workflows-ssh_setup-fields-0aaeaa7d",
+                    &[
+                        ("account-owner-1", (account.owner()).clone().into()),
+                        ("self-host-2", (self.host).clone().into()),
+                    ],
                 ));
             }
         } else {
-            ui.label("GitHub uses the named gh login there without switching its global account. Forgejo/Gitea requires tea0.16+: its selected login URL/account is shown in the terminal and confirmed before upload.");
-            if ui.button("3. Register public key there…").clicked() {
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-c362f511",
+            ));
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-ssh_setup-fields-005427d8",
+                ))
+                .clicked()
+            {
                 self.prepare_command(ui.ctx(), Step::Register);
             }
         }
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label("SSH destination (user@host[:port])");
+            ui.label(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-76f62ede",
+            ));
             ui.text_edit_singleline(&mut self.destination);
         });
-        ui.label("The direct test uses only this key, ignoring other SSH IdentityFile/agent identities and host aliases/proxy settings. Keep host-key checking enabled; review any first-connection fingerprint in the terminal.");
-        if ui.button("4. Test with ssh -T…").clicked() {
+        ui.label(crate::i18n::text(
+            "repo-workflows-ssh_setup-fields-391d0d15",
+        ));
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-ssh_setup-fields-4a4bcca6",
+            ))
+            .clicked()
+        {
             self.prepare_command(ui.ctx(), Step::Test);
         }
-        if self.machine.is_local() && ui.button("Use selected key for this profile").clicked() {
+        if self.machine.is_local()
+            && ui
+                .button(crate::i18n::text(
+                    "repo-workflows-ssh_setup-fields-c62cdf9c",
+                ))
+                .clicked()
+        {
             let path = PathBuf::from(self.key.clone());
             let machine = self.machine.clone();
             let key = self.key.clone();
             self.background(ui.ctx(), move |_| {
                 machine.validate_path(&key)?;
                 let meta = std::fs::metadata(&path).map_err(|_| {
-                    "The selected local private-key file does not exist.".to_owned()
+                    crate::i18n::text("repo-workflows-ssh_setup-fields-fdfcad0a").to_owned()
                 })?;
                 if !meta.is_file() {
-                    return Err("Choose a local key file.".into());
+                    return Err(
+                        crate::i18n::text("repo-workflows-ssh_setup-fields-c37c192f").into(),
+                    );
                 }
                 Ok(Ready::Adopt(path))
             });
@@ -481,7 +560,7 @@ impl Drop for State {
 fn public_companion(machine: &Machine, key: &str) -> Result<PathBuf, String> {
     machine.validate_path(key)?;
     if !machine.is_local() {
-        return Err("Remote public keys must stay on their repository machine.".into());
+        return Err(crate::i18n::text("repo-workflows-ssh_setup-public-companion-b3c70a23").into());
     }
     Ok(PathBuf::from(format!("{key}.pub")))
 }
@@ -496,7 +575,9 @@ fn reserve_folder(folder: &std::path::Path) -> Result<(), String> {
     };
     #[cfg(not(unix))]
     let create = std::fs::DirBuilder::new();
-    create.create(folder).map_err(|_|"Could not exclusively create the new key folder. Choose a new folder under an existing parent; existing files/folders are never reused or overwritten.".into())
+    create
+        .create(folder)
+        .map_err(|_| crate::i18n::text("repo-workflows-ssh_setup-reserve-folder-2ab0aef7").into())
 }
 
 impl RepoTab {
@@ -525,21 +606,34 @@ impl RepoTab {
             150.0
         };
         let fields_height = (height - reserved).clamp(60.0, 430.0);
-        egui::Window::new("Set up SSH")
-            .id(egui::Id::new(("ssh_setup",&self.path)))
-            .open(&mut open)
-            .default_width(760.0)
-            .max_height((height-16.0).max(100.0))
-            .vscroll(true)
-            .show(ctx,|ui|{
-                egui::ScrollArea::vertical().id_salt("ssh_setup_fields").max_height(fields_height).show(ui,|ui|ui.add_enabled_ui(!busy,|ui|state.fields(ui)));
-                ui.separator();
-                ui.label(&state.status);
-                if busy {ui.label("Closing stops this view/terminal connection. An already submitted remote or API action may still complete; key files are retained.");}
-                if let Some(run)=&mut state.command {
-                    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),terminal_height),egui::Layout::top_down(egui::Align::Min),|ui|run.terminal.ui(ui));
-                }
-            });
+        egui::Window::new(crate::i18n::text(
+            "repo-workflows-ssh_setup-ssh-setup-window-74073cb8",
+        ))
+        .id(egui::Id::new(("ssh_setup", &self.path)))
+        .open(&mut open)
+        .default_width(760.0)
+        .max_height((height - 16.0).max(100.0))
+        .vscroll(true)
+        .show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("ssh_setup_fields")
+                .max_height(fields_height)
+                .show(ui, |ui| ui.add_enabled_ui(!busy, |ui| state.fields(ui)));
+            ui.separator();
+            ui.label(crate::repo::messages::display_status(&state.status));
+            if busy {
+                ui.label(crate::i18n::text(
+                    "repo-workflows-ssh_setup-ssh-setup-window-72a17b9c",
+                ));
+            }
+            if let Some(run) = &mut state.command {
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), terminal_height),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| run.terminal.ui(ui),
+                );
+            }
+        });
 
         if open {
             self.ssh_setup = Some(state);

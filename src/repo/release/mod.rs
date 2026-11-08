@@ -111,7 +111,9 @@ impl RepoTab {
                     return;
                 };
                 if let Some(files) = rfd::FileDialog::new()
-                    .set_title("Files to attach to the release")
+                    .set_title(crate::i18n::text(
+                        "repo-workflows-release-release-act-2aead8f8",
+                    ))
                     .pick_files()
                 {
                     for f in files {
@@ -217,7 +219,12 @@ impl RepoTab {
         let label = view
             .run
             .as_ref()
-            .map(|r| format!("Cut release {}", r.plan.tag))
+            .map(|r| {
+                crate::i18n::message(
+                    "repo-workflows-release-run-release-fbe3bbf7",
+                    &[("r-plan-tag-1", (r.plan.tag).clone().into())],
+                )
+            })
             .unwrap_or_default();
         self.busy_op = Some(label);
         self.op_started = Some(std::time::Instant::now());
@@ -271,7 +278,12 @@ impl RepoTab {
                         hosting.as_ref(),
                     )
                 }))
-                .unwrap_or_else(|_| Err("Internal error".to_owned()));
+                .unwrap_or_else(|_| {
+                    Err(
+                        crate::i18n::text("repo-workflows-release-next-release-step-1dac8dea")
+                            .to_owned(),
+                    )
+                });
                 (result, done)
             },
             move |tab, (result, done), ctx| {
@@ -314,7 +326,10 @@ impl RepoTab {
         let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
             return;
         };
-        let label = format!("Cut release {}", run.plan.tag);
+        let label = crate::i18n::message(
+            "repo-workflows-release-release-stopped-fbe3bbf7",
+            &[("run-plan-tag-1", (run.plan.tag).clone().into())],
+        );
         let local_done = run.done.bump_commit.is_some() || run.done.tag_object.is_some();
         if local_done {
             let (undo, redo) = undo(&run.plan, &run.done);
@@ -446,10 +461,9 @@ fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<Strin
             .as_ref()
             != Some(commit)
     {
-        return Some(format!(
-            "{} isn't the tag the release made any more (undone?): close this and cut the \
-             release again",
-            plan.tag
+        return Some(crate::i18n::message(
+            "repo-workflows-release-still-there-a632e5ba",
+            &[("plan-tag-1", (plan.tag).clone().into())],
         ));
     }
     if let (Some(bump), Some(commit)) = (&plan.bump, &done.bump_commit)
@@ -464,10 +478,9 @@ fn still_there(repo: &std::path::Path, plan: &Plan, done: &Done) -> Option<Strin
         )
         .is_err()
     {
-        return Some(format!(
-            "The version commit isn't on {} any more (undone?): close this and cut the \
-             release again",
-            bump.branch
+        return Some(crate::i18n::message(
+            "repo-workflows-release-still-there-46993d84",
+            &[("bump-branch-1", (bump.branch).clone().into())],
         ));
     }
     None

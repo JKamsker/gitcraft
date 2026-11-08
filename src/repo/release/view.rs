@@ -46,7 +46,12 @@ fn contents(
     acts: &mut Vec<Action>,
 ) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Cut release").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-release-contents-0aca2ca2",
+        ))
+        .font(theme::semibold(15.0)),
+    );
     let draft = match &view.draft {
         None => {
             ui.add_space(10.0);
@@ -55,22 +60,40 @@ fn contents(
             return;
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, format!("Couldn't read the history: {e}"));
+            ui.colored_label(
+                t.danger,
+                crate::i18n::message(
+                    "repo-workflows-release-contents-5a8565a0",
+                    &[("e", (e).clone().into())],
+                ),
+            );
             close_button(ui, acts, true);
             return;
         }
         Some(Ok(draft)) => draft.clone(),
     };
     let since = match &draft.last_tag {
-        Some(tag) => format!(
-            "{} change{} since {tag}",
-            draft.changes.len(),
-            if draft.changes.len() == 1 { "" } else { "s" }
+        Some(tag) => crate::i18n::message(
+            "repo-workflows-release-changes-since",
+            &[
+                ("count", (draft.changes.len()).into()),
+                ("tag", (tag.as_str()).into()),
+            ],
         ),
-        None => "No release before it: every commit up to it".to_owned(),
+        None => crate::i18n::text("repo-workflows-release-contents-917ec9b5").to_owned(),
     };
     ui.label(
-        RichText::new(format!("Release of {} · {since}", short(&draft.commit))).color(t.text_dim),
+        RichText::new(crate::i18n::message(
+            "repo-workflows-release-contents-1effa1c5",
+            &[
+                (
+                    "short-draft-commit-1",
+                    (short(&draft.commit)).clone().into(),
+                ),
+                ("since", (since).clone().into()),
+            ],
+        ))
+        .color(t.text_dim),
     );
     ui.add_space(8.0);
     let started = view.run.is_some();
@@ -78,7 +101,7 @@ fn contents(
     let problem = release::tag_problem(&plan.tag, &draft.tags).or_else(|| {
         (plan.bump.as_ref().is_some_and(|b| !b.manifests.is_empty())
             && release::version::Version::parse(&plan.tag).is_none())
-        .then(|| "Moving the version in the files needs a version like v1.3.0".to_owned())
+        .then(|| crate::i18n::text("repo-workflows-release-contents-08a090b7").to_owned())
     });
     egui::ScrollArea::vertical()
         .max_height(room)
@@ -98,7 +121,14 @@ fn contents(
                 ui.colored_label(t.warning, p);
             }
             ui.horizontal(|ui| {
-                if widgets::primary_button(ui, "Cut release", problem.is_none(), 110.0).clicked() {
+                if widgets::primary_button(
+                    ui,
+                    crate::i18n::text("repo-workflows-release-contents-0aca2ca2"),
+                    problem.is_none(),
+                    110.0,
+                )
+                .clicked()
+                {
                     acts.push(Action::Release(ReleaseAct::Run));
                 }
                 close_button(ui, acts, false);
@@ -112,19 +142,30 @@ fn contents(
                 .any(|(_, s)| matches!(s, Status::Failed(_)));
             ui.horizontal(|ui| {
                 if failed
-                    && widgets::primary_button(ui, "Resume", !running, 90.0)
-                        .on_hover_text("Goes on from the step that failed")
-                        .clicked()
+                    && widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-release-contents-d640c742"),
+                        !running,
+                        90.0,
+                    )
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-release-contents-1b129f4d",
+                    ))
+                    .clicked()
                 {
                     acts.push(Action::Release(ReleaseAct::Run));
                 }
                 if failed
                     && ui
-                        .add_enabled(!running, egui::Button::new("Skip this step"))
-                        .on_hover_text(
-                            "Goes on without it (done by hand, or not wanted): Resume then runs \
-                             the steps after it",
+                        .add_enabled(
+                            !running,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-release-contents-9af278eb",
+                            )),
                         )
+                        .on_hover_text(crate::i18n::text(
+                            "repo-workflows-release-contents-adc3fa2f",
+                        ))
                         .clicked()
                 {
                     acts.push(Action::Release(ReleaseAct::Skip));
@@ -141,24 +182,27 @@ fn contents(
 /// What the release will do, before it runs.
 fn preview(ui: &mut Ui, plan: &release::Plan, forge: Option<Forge>) {
     let t = Tokens::get(ui.ctx());
-    heading(ui, "WHAT IT WILL DO");
+    heading(
+        ui,
+        crate::i18n::text("repo-workflows-release-preview-3d5a5069"),
+    );
     for (i, (_, text)) in plan.preview(forge).iter().enumerate() {
         ui.add(egui::Label::new(format!("{}. {text}", i + 1)).wrap());
     }
     ui.label(
-        RichText::new(
-            "Ctrl+Z takes the version commit and the tag back off here; what was pushed and the \
-             release on the forge stay (delete them there).",
-        )
-        .color(t.text_faint)
-        .small(),
+        RichText::new(crate::i18n::text("repo-workflows-release-preview-f9709725"))
+            .color(t.text_faint)
+            .small(),
     );
 }
 
 /// The steps as they went.
 fn steps(ui: &mut Ui, run: &Run) {
     let t = Tokens::get(ui.ctx());
-    heading(ui, "STEPS");
+    heading(
+        ui,
+        crate::i18n::text("repo-workflows-release-steps-979cfabc"),
+    );
     for (step, status) in &run.steps {
         let (mark, color) = match status {
             Status::Waiting => ("·", t.text_faint),
@@ -171,7 +215,11 @@ fn steps(ui: &mut Ui, run: &Run) {
             ui.label(RichText::new(mark).color(color));
             ui.label(step.label());
             if *status == Status::Skipped {
-                ui.label(RichText::new("skipped").color(t.text_faint).small());
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-release-steps-389595a4"))
+                        .color(t.text_faint)
+                        .small(),
+                );
             }
         });
         if let Status::Failed(e) = status {
@@ -184,7 +232,13 @@ fn steps(ui: &mut Ui, run: &Run) {
         }
     }
     if let Some(url) = &run.done.url {
-        ui.hyperlink_to(format!("The release: {url}"), url);
+        ui.hyperlink_to(
+            crate::i18n::message(
+                "repo-workflows-release-steps-47f6d38f",
+                &[("url", (url).clone().into())],
+            ),
+            url,
+        );
     }
 }
 
@@ -196,22 +250,32 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, forge: Option<Forge>, acts:
         form.prerelease = false;
     }
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Version").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-release-form-dd167905"))
+                .color(t.text_dim),
+        );
         ui.add(egui::TextEdit::singleline(&mut form.tag).desired_width(140.0))
-            .on_hover_text("The tag; suggested from the Conventional Commits since the last one");
+            .on_hover_text(crate::i18n::text("repo-workflows-release-form-78f0c939"));
         ui.add_enabled(
             !gitlab && form.publish,
-            egui::Checkbox::new(&mut form.prerelease, "Pre-release"),
+            egui::Checkbox::new(
+                &mut form.prerelease,
+                crate::i18n::text("repo-workflows-release-form-a90d2f73"),
+            ),
         )
-        .on_hover_text("The forge's release is marked a pre-release")
+        .on_hover_text(crate::i18n::text("repo-workflows-release-form-83f72bcc"))
         .on_disabled_hover_text(if gitlab {
-            "GitLab has no pre-releases"
+            crate::i18n::text("repo-workflows-release-form-1dff93e4")
         } else {
-            "For the forge's release: tick Make the release on the forge"
+            crate::i18n::text("repo-workflows-release-form-1252d7c7")
         });
     });
     ui.add_space(4.0);
-    ui.label(RichText::new("Notes (Markdown)").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-release-form-05c6a12b"))
+            .color(t.text_dim)
+            .small(),
+    );
     egui::ScrollArea::vertical()
         .id_salt("release-notes")
         .max_height(180.0)
@@ -228,36 +292,51 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, forge: Option<Forge>, acts:
     if !files.is_empty() {
         ui.checkbox(
             &mut form.bump,
-            format!("Move the version in {}", files.join(", ")),
+            crate::i18n::message(
+                "repo-workflows-release-form-bde96a2d",
+                &[("files-join-1", (files.join(", ")).clone().into())],
+            ),
         )
-        .on_hover_text("And in their lock files: one commit, “chore(release): …”");
+        .on_hover_text(crate::i18n::text("repo-workflows-release-form-4951860a"));
     }
     if draft.changelog {
         ui.add_enabled(
             draft.manifest_note.is_none() && draft.branch.is_some(),
-            egui::Checkbox::new(&mut form.changelog, "Add the notes to CHANGELOG.md"),
+            egui::Checkbox::new(
+                &mut form.changelog,
+                crate::i18n::text("repo-workflows-release-form-b42f9849"),
+            ),
         );
     }
     if let Some(note) = &draft.manifest_note {
         ui.label(RichText::new(note).color(t.text_faint).small());
     }
-    ui.checkbox(&mut form.sign, "Sign the tag")
-        .on_hover_text("git tag -s, with your signing key; otherwise annotated (git tag -a)");
+    ui.checkbox(
+        &mut form.sign,
+        crate::i18n::text("repo-workflows-release-form-81677780"),
+    )
+    .on_hover_text(crate::i18n::text("repo-workflows-release-form-2cf49623"));
     let push = match &draft.remote {
-        Some(remote) => format!("Push to {remote}"),
-        None => "Push (this repository has no remote)".to_owned(),
+        Some(remote) => crate::i18n::message(
+            "repo-workflows-release-form-bac3cf56",
+            &[("remote", (remote).clone().into())],
+        ),
+        None => crate::i18n::text("repo-workflows-release-form-c5ecd20d").to_owned(),
     };
     ui.add_enabled(
         draft.remote.is_some(),
         egui::Checkbox::new(&mut form.push, push),
     );
     let publish = match (forge, form.push) {
-        (None, _) => {
-            "Make the release on the forge (gitcraft doesn't know this repository's forge)"
-                .to_owned()
-        }
-        (Some(f), false) => format!("Make the release on {} (needs the push)", f.name()),
-        (Some(f), true) => format!("Make the release on {}", f.name()),
+        (None, _) => crate::i18n::text("repo-workflows-release-form-4ffa3ce1").to_owned(),
+        (Some(f), false) => crate::i18n::message(
+            "repo-workflows-release-form-2f3dc697",
+            &[("f-name-1", (f.name()).clone().into())],
+        ),
+        (Some(f), true) => crate::i18n::message(
+            "repo-workflows-release-form-e81f07e0",
+            &[("f-name-1", (f.name()).clone().into())],
+        ),
     };
     ui.add_enabled(
         form.push && forge.is_some(),
@@ -275,15 +354,18 @@ fn form(ui: &mut Ui, draft: &Draft, form: &mut Form, forge: Option<Forge>, acts:
                 }
                 if ui
                     .button(format!("{name} ✖"))
-                    .on_hover_text(format!("{}\nClick to leave it out", file.display()))
+                    .on_hover_text(crate::i18n::message(
+                        "repo-workflows-release-form-c97b11c5",
+                        &[("file-display-1", (file.display()).to_string().into())],
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Release(ReleaseAct::RemoveAsset(i)));
                 }
             }
             if ui
-                .button("Attach files…")
-                .on_hover_text("Files of this computer")
+                .button(crate::i18n::text("repo-workflows-release-form-dc106d28"))
+                .on_hover_text(crate::i18n::text("repo-workflows-release-form-9e86c805"))
                 .clicked()
             {
                 acts.push(Action::Release(ReleaseAct::AddAssets));

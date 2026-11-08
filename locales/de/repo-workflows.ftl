@@ -4287,6 +4287,128 @@ repo-workflows-rehearse-tested-line-ff964b6a = `{ $command }` besteht (gespeiche
 
 repo-workflows-release-close-button-7d9eb7ac = Schließen
 
+repo-workflows-release-contents-08a090b7 = Zum Ändern der Version in den Dateien ist eine Version wie v1.3.0 erforderlich
+
+repo-workflows-release-contents-0aca2ca2 = Version veröffentlichen
+
+repo-workflows-release-contents-1b129f4d = Fährt mit dem fehlgeschlagenen Schritt fort
+
+repo-workflows-release-contents-1effa1c5 = Veröffentlichung von { $short-draft-commit-1 } · { $since }
+
+repo-workflows-release-contents-5a8565a0 = Verlauf konnte nicht gelesen werden: { $e }
+
+repo-workflows-release-contents-917ec9b5 = Keine frühere Veröffentlichung: alle Commits bis hierher
+
+repo-workflows-release-contents-9af278eb = Diesen Schritt überspringen
+
+repo-workflows-release-contents-adc3fa2f = Fährt ohne diesen Schritt fort (bereits manuell erledigt oder nicht gewünscht): „Fortsetzen“ führt anschließend die folgenden Schritte aus
+
+repo-workflows-release-contents-d640c742 = Fortsetzen
+
+repo-workflows-release-form-05c6a12b = Versionshinweise (Markdown)
+
+repo-workflows-release-form-1252d7c7 = Für die Veröffentlichung auf der Plattform: „Auf der Plattform veröffentlichen“ aktivieren
+
+repo-workflows-release-form-1dff93e4 = GitLab unterstützt keine Vorabversionen
+
+repo-workflows-release-form-2cf49623 = git tag -s mit Ihrem Signierschlüssel; andernfalls annotiert (git tag -a)
+
+repo-workflows-release-form-2f3dc697 = Auf { $f-name-1 } veröffentlichen (erfordert den Push)
+
+repo-workflows-release-form-4951860a = Auch in deren Sperrdateien: ein Commit, „chore(release): …“
+
+repo-workflows-release-form-4ffa3ce1 = Auf der Plattform veröffentlichen (gitcraft kennt die Plattform dieses Repositorys nicht)
+
+repo-workflows-release-form-78f0c939 = Das Tag; vorgeschlagen anhand der Conventional Commits seit der letzten Veröffentlichung
+
+repo-workflows-release-form-81677780 = Tag signieren
+
+repo-workflows-release-form-83f72bcc = Die Veröffentlichung auf der Plattform wird als Vorabversion markiert
+
+repo-workflows-release-form-9e86c805 = Dateien dieses Computers
+
+repo-workflows-release-form-a90d2f73 = Vorabversion
+
+repo-workflows-release-form-b42f9849 = Versionshinweise zu CHANGELOG.md hinzufügen
+
+repo-workflows-release-form-bac3cf56 = Nach { $remote } pushen
+
+repo-workflows-release-form-bde96a2d = Version in { $files-join-1 } ändern
+
+repo-workflows-release-form-c5ecd20d = Pushen (dieses Repository hat kein Remote)
+
+repo-workflows-release-form-c97b11c5 = { $file-display-1 }
+    Klicken, um die Datei wegzulassen
+
+repo-workflows-release-form-dc106d28 = Dateien anhängen…
+
+repo-workflows-release-form-dd167905 = Version
+
+repo-workflows-release-form-e81f07e0 = Auf { $f-name-1 } veröffentlichen
+
+repo-workflows-release-next-release-step-1dac8dea = Interner Fehler
+
+repo-workflows-release-preview-3d5a5069 = GEPLANTE SCHRITTE
+
+repo-workflows-release-preview-f9709725 = Strg+Z entfernt den Versions-Commit und das Tag hier wieder; Gepushtes und die Veröffentlichung auf der Plattform bleiben bestehen (dort löschen).
+
+repo-workflows-release-release-act-2aead8f8 = An die Veröffentlichung anzuhängende Dateien
+
+repo-workflows-release-release-stopped-1904d12e = { $run-plan-tag-1 } veröffentlicht
+
+repo-workflows-release-release-stopped-328c7ab5 = { $label }: angehalten
+
+repo-workflows-release-release-stopped-a4afd9be = { $label }: { $step-label-1 } fehlgeschlagen: { $e }
+
+repo-workflows-release-release-stopped-fbe3bbf7 = Version { $run-plan-tag-1 } veröffentlichen
+
+repo-workflows-release-run-release-d9523bf2 = Warten Sie, bis der laufende Vorgang beendet ist
+
+repo-workflows-release-run-release-fbe3bbf7 = Version { $r-plan-tag-1 } veröffentlichen
+
+repo-workflows-release-steps-389595a4 = übersprungen
+
+repo-workflows-release-steps-47f6d38f = Die Veröffentlichung: { $url }
+
+repo-workflows-release-steps-979cfabc = SCHRITTE
+
+repo-workflows-release-still-there-46993d84 = Der Versions-Commit befindet sich nicht mehr auf { $bump-branch-1 } (rückgängig gemacht?): Schließen Sie dies und veröffentlichen Sie die Version erneut
+
+repo-workflows-release-still-there-a632e5ba = { $plan-tag-1 } ist nicht mehr das bei der Veröffentlichung erstellte Tag (rückgängig gemacht?): Schließen Sie dies und veröffentlichen Sie die Version erneut
+
+repo-workflows-remerge-clean-state-464ccc62 = Ein konfliktfreier Merge
+
+repo-workflows-remerge-clean-state-7c8676b8 = Der aufgezeichnete Merge entspricht genau dem, den Git aus seinen Eltern erstellt: Es gab keine Konflikte aufzulösen und keine weiteren Änderungen.
+
+repo-workflows-remerge-guarded-fff34faf = Interner Fehler beim Wiederholen des Merges
+
+repo-workflows-remerge-labels-1fb9f409 = bearbeitet
+
+repo-workflows-remerge-labels-25495f2e = aufgelöst +
+
+repo-workflows-remerge-labels-2a19abbf = aufgelöst + bearbeitet
+
+repo-workflows-remerge-labels-dc676b42 = aufgelöst
+
+repo-workflows-remerge-remerge-files-49308b91 = Merge wird wiederholt…
+
+repo-workflows-remerge-remerge-files-660cc0ae = gegenüber Gits eigenem Merge
+
+repo-workflows-remerge-remerge-toggle-92585756 = Nur die Unterschiede zu dem Merge, den Git heute aus den Eltern erstellt: aufgelöste Konflikte und weitere Änderungen (manuell oder durch einen Merge mit anderen Optionen). Ersetzt die Liste der geänderten Dateien.
+
+repo-workflows-remerge-remerge-toggle-fccdade2 = Was dieser Merge aufgelöst hat
+
+repo-workflows-remerge-sections-8186a4e8 = Über den Merge hinaus bearbeitet
+
+repo-workflows-remerge-sections-fc5f035f = Aufgelöste Konflikte
+
+repo-workflows-remerge-tooltip-01dbfcf2 = Dieser Merge unterscheidet sich von dem, den Git aus seinen Eltern erstellt: { $parts-join-1 }.
+    Klicken Sie, um die aufgelösten Konflikte zu sehen.
+
+repo-workflows-remerge-tooltip-104a12d6 = { $files-self-edits-1 } darüber hinaus geändert (manuell oder durch einen Merge mit anderen Optionen)
+
+repo-workflows-remerge-tooltip-c248bc39 = Konflikte aufgelöst in { $files-self-conflicts-1 }
+
 repo-workflows-repository_tools-act-08cd49af = Isolierten Vorschlag schließen
 
 repo-workflows-repository_tools-act-27cc6eb8 = Die Subtree-Vorbereitung verwendete ein vorheriges Profil oder eine andere Anmeldung. Erneut vorbereiten.
@@ -4984,6 +5106,190 @@ repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Schließen
 
 repo-workflows-review_workflow-show-c3812fc4 = Entfernen
 
+repo-workflows-saved_views-poll-33647b3e = Verlaufsprozess abgestürzt
+
+repo-workflows-saved_views-poll-da12ac51 = Verlaufsprozess angehalten
+
+repo-workflows-saved_views-poll-dc101692 = Lesen des Verlaufs abgebrochen
+
+repo-workflows-saved_views-saved-graph-header-0b3db67d = Gesamter Verlauf
+
+repo-workflows-saved_views-saved-graph-header-0db174ee = Älteren Kontext laden
+
+repo-workflows-saved_views-saved-graph-header-112b4ddb = Ansicht aktualisieren
+
+repo-workflows-saved_views-saved-graph-header-153e68ba = { " " }· teilweise: Grenze von 30000 Commits
+
+repo-workflows-saved_views-saved-graph-header-1697aaa3 = Nachfolger des ausgewählten Commits
+
+repo-workflows-saved_views-saved-graph-header-21153875 = Ansicht speichern
+
+repo-workflows-saved_views-saved-graph-header-361c4911 = Nur Merges nach…
+
+repo-workflows-saved_views-saved-graph-header-5f0d0c04 = Meine ungepushten Änderungen
+
+repo-workflows-saved_views-saved-graph-header-6009d6cf = Abschnitte einklappen
+
+repo-workflows-saved_views-saved-graph-header-8e137b60 = Lesen der Ansicht abbrechen
+
+repo-workflows-saved_views-saved-graph-header-927f719d = Eine begrenzte Seite an den fixierten Spitzen der Ansicht lesen, ohne Objekte herunterzuladen
+
+repo-workflows-saved_views-saved-graph-header-a5d2f076 = Meine letzten Änderungen + Abhängigkeiten
+
+repo-workflows-saved_views-saved-graph-header-b30e33e8 = Ansicht wird aus dem fixierten Verlauf berechnet; geladener Kontext wird angezeigt…
+
+repo-workflows-saved_views-saved-graph-header-b5bc2926 = Nur Merges nach { $b-name-1 }
+
+repo-workflows-saved_views-saved-graph-header-d2cb0f94 = Nachfolger von { $super-super-short-anchor-1 }
+
+repo-workflows-saved_views-saved-graph-header-e08c0aa8 = Tage
+
+repo-workflows-saved_views-saved-graph-header-e6fdb6c7 = Diese Ansicht benennen
+
+repo-workflows-saved_views-saved-graph-header-eb6259f8 = Gespeicherte Ansicht löschen
+
+repo-workflows-saved_views-saved-graph-header-ebd44c07 = Geladener Kontext wird angezeigt, bis eine Ansicht berechnet werden kann.
+
+repo-workflows-ssh_setup-background-e4e2ef57 = Auf dem ausgewählten Rechner wird gearbeitet…
+
+repo-workflows-ssh_setup-background-eeca6d22 = Die SSH-Einrichtung ist in Übungs-Repositorys nicht verfügbar.
+
+repo-workflows-ssh_setup-direct-0b8ceab7 = Dieser Befehl muss auf dem Repository-Rechner erstellt werden.
+
+repo-workflows-ssh_setup-fields-005427d8 = 3. Öffentlichen Schlüssel dort registrieren…
+
+repo-workflows-ssh_setup-fields-08b5218c = Neuer Schlüsselordner
+
+repo-workflows-ssh_setup-fields-0aaeaa7d = Upload-Ziel: { $account-owner-1 } auf { $self-host-2 }
+
+repo-workflows-ssh_setup-fields-1cb4035b = 2. Ausgewählten Schlüssel zum Agenten hinzufügen…
+
+repo-workflows-ssh_setup-fields-25f08261 = Wählen Sie einen neuen Ordner unter einem bestehenden übergeordneten Ordner. Bestehende Ordner werden abgelehnt. Bei Abbruch oder Fehler kann der neue Ordner zur Prüfung erhalten bleiben.
+
+repo-workflows-ssh_setup-fields-2b81b1a8 = Titel des öffentlichen Schlüssels
+
+repo-workflows-ssh_setup-fields-2fc162ec = Der Server stammt aus der ausgewählten tea-Anmeldung. Prüfen Sie seine URL vor dem Hochladen.
+
+repo-workflows-ssh_setup-fields-391d0d15 = Der direkte Test verwendet ausschließlich diesen Schlüssel und ignoriert andere SSH-IdentityFile-/Agentenidentitäten sowie Host-Aliase und Proxy-Einstellungen. Lassen Sie die Hostschlüsselprüfung aktiviert und prüfen Sie den Fingerabdruck der ersten Verbindung im Terminal.
+
+repo-workflows-ssh_setup-fields-42ad2d5a = Vorhandenen Schlüssel verwenden…
+
+repo-workflows-ssh_setup-fields-4405a792 = Aktionen werden auf { $self-machine-label-1 } ausgeführt
+
+repo-workflows-ssh_setup-fields-467c73ec = HTTPS-Server
+
+repo-workflows-ssh_setup-fields-4a4bcca6 = 4. Mit ssh -T testen…
+
+repo-workflows-ssh_setup-fields-69608cb8 = Schlüssel, Agent, Werkzeuge und Plattformanmeldung gehören zu diesem SSH/WSL-Rechner. Die Profilzugangsdaten und Schlüsseldateien dieses Computers werden niemals dorthin kopiert.
+
+repo-workflows-ssh_setup-fields-71b7ffa7 = 3. Öffentlichen Schlüssel hochladen
+
+repo-workflows-ssh_setup-fields-75c9835b = Auf diesem Rechner muss bereits ein Agent verfügbar sein. gitcraft startet keinen Dienst und ändert keine globale SSH-Konfiguration. Windows verwendet seinen OpenSSH-Agenten, WSL den dort konfigurierten Agenten. Bei Verbindungen zur SSH-Einrichtung wird der Agent dieses Computers nicht weitergeleitet. Auf dem Repository-Rechner muss ein Agent verfügbar sein.
+
+repo-workflows-ssh_setup-fields-76f62ede = SSH-Ziel (user@host[:port])
+
+repo-workflows-ssh_setup-fields-9487c9a7 = Konto prüfen
+
+repo-workflows-ssh_setup-fields-9c3b602e = Alias einer vorhandenen tea-Anmeldung
+
+repo-workflows-ssh_setup-fields-a6faa7c0 = Vorhandene Schlüssel werden an ihrem Speicherort verwendet, ohne private Daten zu kopieren. Zum Hochladen wird ausschließlich die zugehörige .pub-Datei gelesen; Kommentare sowie ungültige oder private Eingaben werden ausgeschlossen.
+
+repo-workflows-ssh_setup-fields-a7b7ae57 = Jede Schaltfläche führt ausschließlich den benannten Schritt aus. Passphrasen gehören in die OpenSSH-Eingabe im Terminal. Die Anwendung hat kein Passphrasenfeld.
+
+repo-workflows-ssh_setup-fields-a8ff2446 = Pfad des ausgewählten privaten Schlüssels
+
+repo-workflows-ssh_setup-fields-c362f511 = GitHub verwendet dort die benannte gh-Anmeldung, ohne das globale Konto zu wechseln. Forgejo/Gitea benötigt tea 0.16 oder neuer: URL und Konto der ausgewählten Anmeldung werden im Terminal angezeigt und vor dem Hochladen bestätigt.
+
+repo-workflows-ssh_setup-fields-c37c192f = Wählen Sie eine lokale Schlüsseldatei.
+
+repo-workflows-ssh_setup-fields-c62cdf9c = Ausgewählten Schlüssel für dieses Profil verwenden
+
+repo-workflows-ssh_setup-fields-e67b66d2 = 1. ed25519-Schlüssel erstellen…
+
+repo-workflows-ssh_setup-fields-fa174850 = Vorhandener gh-Benutzername
+
+repo-workflows-ssh_setup-fields-fdfcad0a = Die ausgewählte lokale private Schlüsseldatei existiert nicht.
+
+repo-workflows-ssh_setup-generate-60bb12f0 = Wählen Sie einen neuen Schlüsselordner unter einem bestehenden Ordner. Bestehende Ordner werden niemals wiederverwendet.
+
+repo-workflows-ssh_setup-generate-b9e8c614 = Schlüsseltitel
+
+repo-workflows-ssh_setup-label-03ff732f = Öffentlichen Schlüssel registrieren
+
+repo-workflows-ssh_setup-label-1db4242b = Zum Agenten hinzufügen
+
+repo-workflows-ssh_setup-label-27d86821 = Dieser Computer · OpenSSH
+
+repo-workflows-ssh_setup-label-53ce73c6 = Dieser Windows-Computer · OpenSSH
+
+repo-workflows-ssh_setup-label-60083f45 = SSH testen
+
+repo-workflows-ssh_setup-label-b6cde903 = Schlüssel erstellen
+
+repo-workflows-ssh_setup-launch-0690e36b = Terminal oder Werkzeug auf dem ausgewählten Rechner konnte nicht gestartet werden. Prüfen Sie, ob OpenSSH/WSL installiert ist. Ein gegebenenfalls reservierter neuer Ordner bleibt erhalten; bestehende Dateien wurden nicht überschrieben.
+
+repo-workflows-ssh_setup-launch-2a66f8c5 = { $step-label-1 } läuft. Geben Sie eine Passphrase ausschließlich unten im Terminal ein.
+
+repo-workflows-ssh_setup-new-8633c172 = Es wurde keine Schlüssel-, Agenten-, Konto- oder Netzwerkaktion ausgeführt. Wählen Sie jeden Schritt ausdrücklich aus.
+
+repo-workflows-ssh_setup-open-ssh-setup-0e2de7fb = Die SSH-Einrichtung ist in Übungs-Repositorys nicht verfügbar. Öffnen Sie ein echtes Repository, um Konto- und Schlüsselaktionen auszuwählen.
+
+repo-workflows-ssh_setup-poll-380743c6 = Einrichtungsprozess angehalten; spätere Ergebnisse werden nicht übernommen.
+
+repo-workflows-ssh_setup-poll-59faaa41 = Geprüftes Konto: { $account-owner-1 } auf { $self-host-2 }. Das Hochladen ist eine separate Aktion.
+
+repo-workflows-ssh_setup-poll-77510276 = Dieses Profil verwendet jetzt den lokalen SSH-Schlüssel. Die bisherige Rangfolge von Autor-, Signatur- und Repository-lokalen SSH-Einstellungen bleibt erhalten.
+
+repo-workflows-ssh_setup-poll-acae7792 = SSH-Test mit Code { $code } beendet. Lesen Sie unten die Serverbegrüßung: Plattformen geben nach erfolgreicher Anmeldung häufig 1 zurück, weil der Shell-Zugriff deaktiviert ist.
+
+repo-workflows-ssh_setup-poll-b3badea2 = Der Befehl „{ $run-step-label-1 }“ wurde erfolgreich abgeschlossen. Schlüsseldateien bleiben erhalten. Fahren Sie mit dem nächsten ausdrücklich ausgewählten Schritt fort.
+
+repo-workflows-ssh_setup-poll-b5bb4cca = „{ $run-step-label-1 }“ wurde mit Code { $code } beendet. Lesen Sie die Erklärung im Terminal. Beim Erstellen wurde kein vorhandener Schlüssel überschrieben. Fehlende Agenten, Werkzeuge oder Berechtigungen müssen auf diesem Rechner eingerichtet werden.
+
+repo-workflows-ssh_setup-poll-b927d5a6 = Das aktive Profil oder seine Verbindungseinstellungen wurden geändert. Prüfen Sie das gewünschte Konto vor dem Hochladen erneut.
+
+repo-workflows-ssh_setup-poll-cf037753 = Der ausgewählte öffentliche Schlüssel wurde registriert. Dies aktiviert weder die Commit-Signatur noch ändert es ein globales Konto.
+
+repo-workflows-ssh_setup-prepare-command-31585a34 = Einrichtung vor dem Befehlsstart abgebrochen.
+
+repo-workflows-ssh_setup-prepare-command-78845053 = Einrichtung vor dem Befehlsstart abgebrochen. Ein neuer leerer Ordner bleibt erhalten.
+
+repo-workflows-ssh_setup-public-companion-b3c70a23 = Entfernte öffentliche Schlüssel müssen auf ihrem Repository-Rechner bleiben.
+
+repo-workflows-ssh_setup-remote-registration-09f739fd = Wählen Sie den Alias einer bestehenden tea-Anmeldung auf dem Repository-Rechner.
+
+repo-workflows-ssh_setup-remote-registration-6fbacbe7 = Wählen Sie den vorhandenen gh-Benutzernamen auf dem Repository-Rechner.
+
+repo-workflows-ssh_setup-remote-registration-af72205a = Alias der tea-Anmeldung
+
+repo-workflows-ssh_setup-remote-registration-b9e8c614 = Schlüsseltitel
+
+repo-workflows-ssh_setup-remote-registration-bcf7fa5e = Für die lokale Registrierung öffentlicher Schlüssel muss die Kontohilfe des erfassten Profils verwendet werden.
+
+repo-workflows-ssh_setup-remote-registration-d31abaa5 = Wählen Sie GitHub oder eine Forgejo/Gitea-tea-Anmeldung.
+
+repo-workflows-ssh_setup-reserve-folder-2ab0aef7 = Der neue Schlüsselordner konnte nicht exklusiv erstellt werden. Wählen Sie einen neuen Ordner unter einem bestehenden übergeordneten Ordner. Bestehende Dateien oder Ordner werden niemals wiederverwendet oder überschrieben.
+
+repo-workflows-ssh_setup-script-29797f05 = Wählen Sie einen gültigen SSH-Repository-Host.
+
+repo-workflows-ssh_setup-script-414dd974 = Wählen Sie eine gültige WSL-Distribution.
+
+repo-workflows-ssh_setup-script-6a56625c = Skripte zur entfernten Einrichtung können nicht für einen lokalen Schlüssel ausgeführt werden.
+
+repo-workflows-ssh_setup-ssh-setup-window-72a17b9c = Beim Schließen wird die Verbindung dieser Ansicht bzw. dieses Terminals beendet. Eine bereits übermittelte entfernte Aktion oder API-Aktion kann noch abgeschlossen werden. Schlüsseldateien bleiben erhalten.
+
+repo-workflows-ssh_setup-ssh-setup-window-74073cb8 = SSH einrichten
+
+repo-workflows-ssh_setup-test-2984ed5d = Wählen Sie ein SSH-Ziel wie git@github.com oder git@forge.example:2222.
+
+repo-workflows-ssh_setup-text-c18fcabe = { $label } darf keine Steuerzeichen enthalten und muss in 512 Bytes passen.
+
+repo-workflows-ssh_setup-unparsed-634afcd2 = Der Repository-Rechner ist ungültig oder wird nicht unterstützt. Öffnen Sie vor der Schlüsseleinrichtung das richtige lokale/SSH/WSL-Repository erneut.
+
+repo-workflows-ssh_setup-validate-path-371cfd2c = Wählen Sie den Namen der privaten Schlüsseldatei statt ihrer .pub-Datei oder eines Ordners. Zum Hochladen wird ausschließlich die zugehörige öffentliche Datei gelesen.
+
+repo-workflows-ssh_setup-validate-path-e922aa6d = Wählen Sie auf dem angegebenen Rechner einen absoluten Schlüsselpfad (auf SSH/WSL wird auch ~/ unterstützt).
+
 repo-workflows-stack-publish-dialog-19766ed6 = Abbrechen
 
 repo-workflows-stack-restack-dialog-19766ed6 = Abbrechen
@@ -5264,4 +5570,24 @@ repo-workflows-push-force-body = Ein Force-Push ersetzt { $remote } durch Ihren 
     }
 
     Wenn sich { $remote } seit der Prüfung von { $remote-commit } oder Ihr Branch { $branch } von { $local } wegbewegt hat, wird nichts gepusht (--force-with-lease).
+
+repo-workflows-release-changes-since = { $count ->
+        [one] Eine Änderung seit { $tag }
+       *[other] { $count } Änderungen seit { $tag }
+    }
+
+repo-workflows-remerge-conflicts = { $count ->
+        [one] Konflikte in einer Datei aufgelöst
+       *[other] Konflikte in { $count } Dateien aufgelöst
+    }
+
+repo-workflows-remerge-edits = { $count ->
+        [one] eine Datei darüber hinaus geändert (manuell oder durch einen Merge mit anderen Optionen)
+       *[other] { $count } Dateien darüber hinaus geändert (manuell oder durch einen Merge mit anderen Optionen)
+    }
+
+repo-workflows-saved-view-summary = { $loaded } geladene Treffer / { $selected } ausgewählt · { $explanation }{ $limited ->
+        [yes] { " · teilweise: Grenze von " }{ $budget } Commits
+       *[no] { "" }
+    } · Arbeitsänderungen, Stashes und Auswahl bleiben als Kontext erhalten
 

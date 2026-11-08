@@ -75,7 +75,10 @@ impl<T: Send + 'static> Reader<T> {
                 }
                 Err(TryRecvError::Disconnected) => {
                     if running.id == self.generation {
-                        answer = Some(Err("History worker stopped".into()));
+                        answer = Some(Err(crate::i18n::text(
+                            "repo-workflows-saved_views-poll-da12ac51",
+                        )
+                        .into()));
                     }
                     self.running = None;
                 }
@@ -98,14 +101,22 @@ impl<T: Send + 'static> Reader<T> {
                     Priority::Background,
                     job.key,
                     Some(Box::new(move || {
-                        let _ = cancelled_tx.send(Err("History read cancelled".into()));
+                        let _ = cancelled_tx.send(Err(crate::i18n::text(
+                            "repo-workflows-saved_views-poll-dc101692",
+                        )
+                        .into()));
                         cancel_repaint.request_repaint();
                     })),
                     Box::new(move || {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             (job.read)(&|| !token.is_cancelled())
                         }))
-                        .unwrap_or_else(|_| Err("History worker panicked".into()));
+                        .unwrap_or_else(|_| {
+                            Err(
+                                crate::i18n::text("repo-workflows-saved_views-poll-33647b3e")
+                                    .into(),
+                            )
+                        });
                         let _ = tx.send(result);
                         repaint.request_repaint();
                     }),

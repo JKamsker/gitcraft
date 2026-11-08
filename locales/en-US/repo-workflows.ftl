@@ -4287,6 +4287,128 @@ repo-workflows-rehearse-tested-line-ff964b6a = `{ $command }` passes (a stored r
 
 repo-workflows-release-close-button-7d9eb7ac = Close
 
+repo-workflows-release-contents-08a090b7 = Moving the version in the files needs a version like v1.3.0
+
+repo-workflows-release-contents-0aca2ca2 = Cut release
+
+repo-workflows-release-contents-1b129f4d = Goes on from the step that failed
+
+repo-workflows-release-contents-1effa1c5 = Release of { $short-draft-commit-1 } · { $since }
+
+repo-workflows-release-contents-5a8565a0 = Couldn't read the history: { $e }
+
+repo-workflows-release-contents-917ec9b5 = No release before it: every commit up to it
+
+repo-workflows-release-contents-9af278eb = Skip this step
+
+repo-workflows-release-contents-adc3fa2f = Goes on without it (done by hand, or not wanted): Resume then runs the steps after it
+
+repo-workflows-release-contents-d640c742 = Resume
+
+repo-workflows-release-form-05c6a12b = Notes (Markdown)
+
+repo-workflows-release-form-1252d7c7 = For the forge's release: tick Make the release on the forge
+
+repo-workflows-release-form-1dff93e4 = GitLab has no pre-releases
+
+repo-workflows-release-form-2cf49623 = git tag -s, with your signing key; otherwise annotated (git tag -a)
+
+repo-workflows-release-form-2f3dc697 = Make the release on { $f-name-1 } (needs the push)
+
+repo-workflows-release-form-4951860a = And in their lock files: one commit, “chore(release): …”
+
+repo-workflows-release-form-4ffa3ce1 = Make the release on the forge (gitcraft doesn't know this repository's forge)
+
+repo-workflows-release-form-78f0c939 = The tag; suggested from the Conventional Commits since the last one
+
+repo-workflows-release-form-81677780 = Sign the tag
+
+repo-workflows-release-form-83f72bcc = The forge's release is marked a pre-release
+
+repo-workflows-release-form-9e86c805 = Files of this computer
+
+repo-workflows-release-form-a90d2f73 = Pre-release
+
+repo-workflows-release-form-b42f9849 = Add the notes to CHANGELOG.md
+
+repo-workflows-release-form-bac3cf56 = Push to { $remote }
+
+repo-workflows-release-form-bde96a2d = Move the version in { $files-join-1 }
+
+repo-workflows-release-form-c5ecd20d = Push (this repository has no remote)
+
+repo-workflows-release-form-c97b11c5 = { $file-display-1 }
+    Click to leave it out
+
+repo-workflows-release-form-dc106d28 = Attach files…
+
+repo-workflows-release-form-dd167905 = Version
+
+repo-workflows-release-form-e81f07e0 = Make the release on { $f-name-1 }
+
+repo-workflows-release-next-release-step-1dac8dea = Internal error
+
+repo-workflows-release-preview-3d5a5069 = WHAT IT WILL DO
+
+repo-workflows-release-preview-f9709725 = Ctrl+Z takes the version commit and the tag back off here; what was pushed and the release on the forge stay (delete them there).
+
+repo-workflows-release-release-act-2aead8f8 = Files to attach to the release
+
+repo-workflows-release-release-stopped-1904d12e = Released { $run-plan-tag-1 }
+
+repo-workflows-release-release-stopped-328c7ab5 = { $label }: stopped
+
+repo-workflows-release-release-stopped-a4afd9be = { $label }: { $step-label-1 } failed: { $e }
+
+repo-workflows-release-release-stopped-fbe3bbf7 = Cut release { $run-plan-tag-1 }
+
+repo-workflows-release-run-release-d9523bf2 = Wait for the operation running to end
+
+repo-workflows-release-run-release-fbe3bbf7 = Cut release { $r-plan-tag-1 }
+
+repo-workflows-release-steps-389595a4 = skipped
+
+repo-workflows-release-steps-47f6d38f = The release: { $url }
+
+repo-workflows-release-steps-979cfabc = STEPS
+
+repo-workflows-release-still-there-46993d84 = The version commit isn't on { $bump-branch-1 } any more (undone?): close this and cut the release again
+
+repo-workflows-release-still-there-a632e5ba = { $plan-tag-1 } isn't the tag the release made any more (undone?): close this and cut the release again
+
+repo-workflows-remerge-clean-state-464ccc62 = A clean merge
+
+repo-workflows-remerge-clean-state-7c8676b8 = The recorded merge is exactly the one git makes of its parents: it had no conflicts to resolve and nothing else was changed.
+
+repo-workflows-remerge-guarded-fff34faf = Internal error while redoing the merge
+
+repo-workflows-remerge-labels-1fb9f409 = edited
+
+repo-workflows-remerge-labels-25495f2e = resolved +
+
+repo-workflows-remerge-labels-2a19abbf = resolved + edited
+
+repo-workflows-remerge-labels-dc676b42 = resolved
+
+repo-workflows-remerge-remerge-files-49308b91 = Redoing the merge…
+
+repo-workflows-remerge-remerge-files-660cc0ae = vs. git's own merge
+
+repo-workflows-remerge-remerge-toggle-92585756 = Only what differs from the merge git makes of the parents today: how its conflicts were resolved, and anything changed beyond that (by hand, or by a merge made with other options). Replaces the list of files it changed.
+
+repo-workflows-remerge-remerge-toggle-fccdade2 = What this merge resolved
+
+repo-workflows-remerge-sections-8186a4e8 = Edited beyond the merge
+
+repo-workflows-remerge-sections-fc5f035f = Conflicts resolved
+
+repo-workflows-remerge-tooltip-01dbfcf2 = This merge differs from the one git makes of its parents: { $parts-join-1 }.
+    Click to see what it resolved.
+
+repo-workflows-remerge-tooltip-104a12d6 = { $files-self-edits-1 } changed beyond that (by hand, or a merge made with other options)
+
+repo-workflows-remerge-tooltip-c248bc39 = conflicts resolved in { $files-self-conflicts-1 }
+
 repo-workflows-repository_tools-act-08cd49af = Close isolated proposal
 
 repo-workflows-repository_tools-act-27cc6eb8 = Subtree preparation used a previous profile/sign-in; prepare again
@@ -4984,6 +5106,190 @@ repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Close
 
 repo-workflows-review_workflow-show-c3812fc4 = Remove
 
+repo-workflows-saved_views-poll-33647b3e = History worker panicked
+
+repo-workflows-saved_views-poll-da12ac51 = History worker stopped
+
+repo-workflows-saved_views-poll-dc101692 = History read cancelled
+
+repo-workflows-saved_views-saved-graph-header-0b3db67d = All history
+
+repo-workflows-saved_views-saved-graph-header-0db174ee = Load older context
+
+repo-workflows-saved_views-saved-graph-header-112b4ddb = Refresh view
+
+repo-workflows-saved_views-saved-graph-header-153e68ba = { " " }· partial: 30000-commit budget
+
+repo-workflows-saved_views-saved-graph-header-1697aaa3 = Descendants of selected commit
+
+repo-workflows-saved_views-saved-graph-header-21153875 = Save view
+
+repo-workflows-saved_views-saved-graph-header-361c4911 = Only merges into…
+
+repo-workflows-saved_views-saved-graph-header-5f0d0c04 = My unpushed work
+
+repo-workflows-saved_views-saved-graph-header-6009d6cf = Collapse spans
+
+repo-workflows-saved_views-saved-graph-header-8e137b60 = Cancel view read
+
+repo-workflows-saved_views-saved-graph-header-927f719d = Read one bounded page at the view's pinned tips, without downloading objects
+
+repo-workflows-saved_views-saved-graph-header-a5d2f076 = My recent changes + dependencies
+
+repo-workflows-saved_views-saved-graph-header-b30e33e8 = Computing view from pinned history; showing loaded context…
+
+repo-workflows-saved_views-saved-graph-header-b5bc2926 = Only merges into { $b-name-1 }
+
+repo-workflows-saved_views-saved-graph-header-d2cb0f94 = Descendants of { $super-super-short-anchor-1 }
+
+repo-workflows-saved_views-saved-graph-header-e08c0aa8 = Days
+
+repo-workflows-saved_views-saved-graph-header-e6fdb6c7 = Name this view
+
+repo-workflows-saved_views-saved-graph-header-eb6259f8 = Delete saved
+
+repo-workflows-saved_views-saved-graph-header-ebd44c07 = Showing loaded context until a view can be computed.
+
+repo-workflows-ssh_setup-background-e4e2ef57 = Working on the selected machine…
+
+repo-workflows-ssh_setup-background-eeca6d22 = SSH setup is unavailable in Practice repositories.
+
+repo-workflows-ssh_setup-direct-0b8ceab7 = This command must be constructed on the repository machine.
+
+repo-workflows-ssh_setup-fields-005427d8 = 3. Register public key there…
+
+repo-workflows-ssh_setup-fields-08b5218c = New key folder
+
+repo-workflows-ssh_setup-fields-0aaeaa7d = Upload target: { $account-owner-1 } on { $self-host-2 }
+
+repo-workflows-ssh_setup-fields-1cb4035b = 2. Add selected key to agent…
+
+repo-workflows-ssh_setup-fields-25f08261 = Choose a new folder under an existing parent. Existing folders are refused. A cancelled/failed creation can leave its new folder for you to inspect.
+
+repo-workflows-ssh_setup-fields-2b81b1a8 = Public key title
+
+repo-workflows-ssh_setup-fields-2fc162ec = Server comes from the selected tea login; verify its URL before upload.
+
+repo-workflows-ssh_setup-fields-391d0d15 = The direct test uses only this key, ignoring other SSH IdentityFile/agent identities and host aliases/proxy settings. Keep host-key checking enabled; review any first-connection fingerprint in the terminal.
+
+repo-workflows-ssh_setup-fields-42ad2d5a = Use existing key…
+
+repo-workflows-ssh_setup-fields-4405a792 = Operations run on { $self-machine-label-1 }
+
+repo-workflows-ssh_setup-fields-467c73ec = HTTPS server
+
+repo-workflows-ssh_setup-fields-4a4bcca6 = 4. Test with ssh -T…
+
+repo-workflows-ssh_setup-fields-69608cb8 = Keys, agent, tools and forge login belong to that SSH/WSL machine. This computer's profile credentials and key files are never copied there.
+
+repo-workflows-ssh_setup-fields-71b7ffa7 = 3. Upload public key
+
+repo-workflows-ssh_setup-fields-75c9835b = An agent must already be available on that machine; gitcraft does not start a daemon or alter its global SSH configuration. Windows uses its OpenSSH agent and WSL its configured agent. SSH setup connections disable forwarding of this computer's agent; have an agent available on the repository machine.
+
+repo-workflows-ssh_setup-fields-76f62ede = SSH destination (user@host[:port])
+
+repo-workflows-ssh_setup-fields-9487c9a7 = Check account
+
+repo-workflows-ssh_setup-fields-9c3b602e = Existing tea login alias
+
+repo-workflows-ssh_setup-fields-a6faa7c0 = Existing keys are used in place, without copying private bytes. Upload reads only the .pub companion; comments and malformed/private input are excluded.
+
+repo-workflows-ssh_setup-fields-a7b7ae57 = Each button runs only its named step. Passphrases belong in the terminal's OpenSSH prompt; the app has no passphrase field.
+
+repo-workflows-ssh_setup-fields-a8ff2446 = Selected private-key path
+
+repo-workflows-ssh_setup-fields-c362f511 = GitHub uses the named gh login there without switching its global account. Forgejo/Gitea requires tea0.16+: its selected login URL/account is shown in the terminal and confirmed before upload.
+
+repo-workflows-ssh_setup-fields-c37c192f = Choose a local key file.
+
+repo-workflows-ssh_setup-fields-c62cdf9c = Use selected key for this profile
+
+repo-workflows-ssh_setup-fields-e67b66d2 = 1. Create ed25519 key…
+
+repo-workflows-ssh_setup-fields-fa174850 = Existing gh username
+
+repo-workflows-ssh_setup-fields-fdfcad0a = The selected local private-key file does not exist.
+
+repo-workflows-ssh_setup-generate-60bb12f0 = Choose a new key folder beneath an existing folder. Existing folders are never reused.
+
+repo-workflows-ssh_setup-generate-b9e8c614 = key title
+
+repo-workflows-ssh_setup-label-03ff732f = Register public key
+
+repo-workflows-ssh_setup-label-1db4242b = Add to agent
+
+repo-workflows-ssh_setup-label-27d86821 = This computer · OpenSSH
+
+repo-workflows-ssh_setup-label-53ce73c6 = This Windows computer · OpenSSH
+
+repo-workflows-ssh_setup-label-60083f45 = Test SSH
+
+repo-workflows-ssh_setup-label-b6cde903 = Create key
+
+repo-workflows-ssh_setup-launch-0690e36b = Could not start the selected machine's terminal/tool. Check that OpenSSH/WSL is installed. A reserved new folder, if any, is retained; existing files were not overwritten.
+
+repo-workflows-ssh_setup-launch-2a66f8c5 = { $step-label-1 } is running. Enter any passphrase only in the terminal below.
+
+repo-workflows-ssh_setup-new-8633c172 = No key, agent, account or network action has run. Choose each step explicitly.
+
+repo-workflows-ssh_setup-open-ssh-setup-0e2de7fb = SSH setup is unavailable in Practice repositories; open a real repository to choose account/key actions.
+
+repo-workflows-ssh_setup-poll-380743c6 = Setup worker stopped; no later result will be applied.
+
+repo-workflows-ssh_setup-poll-59faaa41 = Checked account: { $account-owner-1 } on { $self-host-2 }. Upload is a separate action.
+
+repo-workflows-ssh_setup-poll-77510276 = This profile now selects that local SSH key. Author/signing and repository-local SSH overrides retain their existing precedence.
+
+repo-workflows-ssh_setup-poll-acae7792 = SSH test exited { $code }. Read the server greeting below: forges often return1 after successful authentication because shell access is disabled.
+
+repo-workflows-ssh_setup-poll-b3badea2 = { $run-step-label-1 } command completed successfully. Key files are retained; continue with the next explicit step.
+
+repo-workflows-ssh_setup-poll-b5bb4cca = { $run-step-label-1 } exited { $code }. Read the terminal's explanation. No existing key was overwritten by generation; missing agent/tool/permission must be fixed on this machine.
+
+repo-workflows-ssh_setup-poll-b927d5a6 = The active profile or its connection choices changed. Check the intended account again before uploading.
+
+repo-workflows-ssh_setup-poll-cf037753 = The selected public key was registered. This does not enable commit signing or change a global account.
+
+repo-workflows-ssh_setup-prepare-command-31585a34 = Setup cancelled before command launch.
+
+repo-workflows-ssh_setup-prepare-command-78845053 = Setup cancelled before command launch. Any new empty folder is retained.
+
+repo-workflows-ssh_setup-public-companion-b3c70a23 = Remote public keys must stay on their repository machine.
+
+repo-workflows-ssh_setup-remote-registration-09f739fd = Choose an existing tea login alias on the repository machine.
+
+repo-workflows-ssh_setup-remote-registration-6fbacbe7 = Choose the existing gh username on the repository machine.
+
+repo-workflows-ssh_setup-remote-registration-af72205a = tea login alias
+
+repo-workflows-ssh_setup-remote-registration-b9e8c614 = key title
+
+repo-workflows-ssh_setup-remote-registration-bcf7fa5e = Local public-key registration must use the captured profile's account helper.
+
+repo-workflows-ssh_setup-remote-registration-d31abaa5 = Choose GitHub or a Forgejo/Gitea tea login.
+
+repo-workflows-ssh_setup-reserve-folder-2ab0aef7 = Could not exclusively create the new key folder. Choose a new folder under an existing parent; existing files/folders are never reused or overwritten.
+
+repo-workflows-ssh_setup-script-29797f05 = Choose a valid SSH repository host.
+
+repo-workflows-ssh_setup-script-414dd974 = Choose a valid WSL distribution.
+
+repo-workflows-ssh_setup-script-6a56625c = Remote setup scripts cannot run against a local key.
+
+repo-workflows-ssh_setup-ssh-setup-window-72a17b9c = Closing stops this view/terminal connection. An already submitted remote or API action may still complete; key files are retained.
+
+repo-workflows-ssh_setup-ssh-setup-window-74073cb8 = Set up SSH
+
+repo-workflows-ssh_setup-test-2984ed5d = Choose an SSH destination such as git@github.com or git@forge.example:2222.
+
+repo-workflows-ssh_setup-text-c18fcabe = The { $label } cannot contain control characters and must fit within 512 bytes.
+
+repo-workflows-ssh_setup-unparsed-634afcd2 = The repository machine is invalid or unsupported. Reopen the correct local/SSH/WSL repository before setting up its keys.
+
+repo-workflows-ssh_setup-validate-path-371cfd2c = Choose the private-key filename, rather than its .pub file or a folder. Only its public companion is read for upload.
+
+repo-workflows-ssh_setup-validate-path-e922aa6d = Choose an absolute key path on the indicated machine (~/ is also supported on SSH/WSL).
+
 repo-workflows-stack-publish-dialog-19766ed6 = Cancel
 
 repo-workflows-stack-restack-dialog-19766ed6 = Cancel
@@ -5266,4 +5572,24 @@ repo-workflows-push-force-body = Force pushing will replace { $remote } with you
     }
 
     If { $remote } has moved from { $remote-commit } since it was checked, or your { $branch } from { $local }, nothing is pushed (--force-with-lease).
+
+repo-workflows-release-changes-since = { $count ->
+        [one] One change since { $tag }
+       *[other] { $count } changes since { $tag }
+    }
+
+repo-workflows-remerge-conflicts = { $count ->
+        [one] conflicts resolved in one file
+       *[other] conflicts resolved in { $count } files
+    }
+
+repo-workflows-remerge-edits = { $count ->
+        [one] one file changed beyond that (by hand, or a merge made with other options)
+       *[other] { $count } files changed beyond that (by hand, or a merge made with other options)
+    }
+
+repo-workflows-saved-view-summary = { $loaded } loaded matches / { $selected } selected · { $explanation }{ $limited ->
+        [yes] { " · partial: " }{ $budget }-commit budget
+       *[no] { "" }
+    } · working changes, stashes and selection kept as context
 

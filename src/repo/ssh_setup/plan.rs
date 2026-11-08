@@ -30,14 +30,18 @@ impl Machine {
                 .split_once("://")
                 .is_some_and(|(scheme, _)| !scheme.contains(['/', '\\']))
         {
-            return Err("The repository machine is invalid or unsupported. Reopen the correct local/SSH/WSL repository before setting up its keys.".into());
+            return Err(crate::i18n::text("repo-workflows-ssh_setup-unparsed-634afcd2").into());
         }
         Ok(Self::Local { windows })
     }
     pub fn label(&self) -> String {
         match self {
-            Self::Local { windows: true } => "This Windows computer · OpenSSH".into(),
-            Self::Local { windows: false } => "This computer · OpenSSH".into(),
+            Self::Local { windows: true } => {
+                crate::i18n::text("repo-workflows-ssh_setup-label-53ce73c6").into()
+            }
+            Self::Local { windows: false } => {
+                crate::i18n::text("repo-workflows-ssh_setup-label-27d86821").into()
+            }
             Self::Remote(target) => target.host.label(),
         }
     }
@@ -58,10 +62,14 @@ impl Machine {
             Self::Remote(_) => path.starts_with('/') || path.starts_with("~/"),
         };
         if !absolute || path.chars().any(char::is_control) || path.len() > 4096 {
-            return Err("Choose an absolute key path on the indicated machine (~/ is also supported on SSH/WSL).".into());
+            return Err(
+                crate::i18n::text("repo-workflows-ssh_setup-validate-path-e922aa6d").into(),
+            );
         }
         if path.ends_with(['/', '\\']) || path.ends_with(".pub") {
-            return Err("Choose the private-key filename, rather than its .pub file or a folder. Only its public companion is read for upload.".into());
+            return Err(
+                crate::i18n::text("repo-workflows-ssh_setup-validate-path-371cfd2c").into(),
+            );
         }
         Ok(())
     }
@@ -76,7 +84,7 @@ impl Machine {
                 reserve_folder: None,
             }),
             Self::Remote(_) => {
-                Err("This command must be constructed on the repository machine.".into())
+                Err(crate::i18n::text("repo-workflows-ssh_setup-direct-0b8ceab7").into())
             }
         }
     }
@@ -87,7 +95,9 @@ impl Machine {
                 ..
             }) => {
                 if !crate::remote::valid_ssh_host(host) {
-                    return Err("Choose a valid SSH repository host.".into());
+                    return Err(
+                        crate::i18n::text("repo-workflows-ssh_setup-script-29797f05").into(),
+                    );
                 }
                 // The login shell sees only portable quoted words and base64 data. The
                 // fixed POSIX shell decodes the script; no user shell interpolation occurs.
@@ -111,7 +121,9 @@ impl Machine {
                 ..
             }) => {
                 if !crate::remote::valid_distro(distro) {
-                    return Err("Choose a valid WSL distribution.".into());
+                    return Err(
+                        crate::i18n::text("repo-workflows-ssh_setup-script-414dd974").into(),
+                    );
                 }
                 ShellSpec {
                     program: "wsl.exe".into(),
@@ -127,7 +139,7 @@ impl Machine {
                 }
             }
             Self::Local { .. } => {
-                return Err("Remote setup scripts cannot run against a local key.".into());
+                return Err(crate::i18n::text("repo-workflows-ssh_setup-script-6a56625c").into());
             }
         };
         Ok(Invocation {
@@ -168,7 +180,7 @@ pub(super) fn generate(
         || folder.ends_with("/..")
         || folder.ends_with("/.")
     {
-        return Err("Choose a new key folder beneath an existing folder. Existing folders are never reused.".into());
+        return Err(crate::i18n::text("repo-workflows-ssh_setup-generate-60bb12f0").into());
     }
     let separator = if matches!(machine, Machine::Local { windows: true }) {
         '\\'
@@ -177,7 +189,10 @@ pub(super) fn generate(
     };
     let key = format!("{folder}{separator}id_ed25519");
     machine.validate_path(&key)?;
-    text(title, "key title")?;
+    text(
+        title,
+        crate::i18n::text("repo-workflows-ssh_setup-generate-b9e8c614"),
+    )?;
     let mut plan = if machine.is_local() {
         machine.direct(
             "ssh-keygen",
@@ -224,9 +239,7 @@ pub(super) fn agent(machine: &Machine, key: &str) -> Result<Invocation, String> 
 pub(super) fn test(machine: &Machine, key: &str, destination: &str) -> Result<Invocation, String> {
     machine.validate_path(key)?;
     if !crate::remote::valid_ssh_host(destination) {
-        return Err(
-            "Choose an SSH destination such as git@github.com or git@forge.example:2222.".into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-ssh_setup-test-2984ed5d").into());
     }
     let dest = crate::remote::ssh_destination(destination);
     // Ignore configured additive IdentityFile/agent identities so this tests the chosen
@@ -260,10 +273,13 @@ pub(super) fn remote_registration(
     title: &str,
 ) -> Result<Invocation, String> {
     machine.validate_path(key)?;
-    text(title, "key title")?;
+    text(
+        title,
+        crate::i18n::text("repo-workflows-ssh_setup-remote-registration-b9e8c614"),
+    )?;
     if machine.is_local() {
         return Err(
-            "Local public-key registration must use the captured profile's account helper.".into(),
+            crate::i18n::text("repo-workflows-ssh_setup-remote-registration-bcf7fa5e").into(),
         );
     }
     let script = if let Some(user) = github_user {
@@ -274,7 +290,9 @@ pub(super) fn remote_registration(
         };
         account.validate()?;
         if !account.selected() {
-            return Err("Choose the existing gh username on the repository machine.".into());
+            return Err(
+                crate::i18n::text("repo-workflows-ssh_setup-remote-registration-6fbacbe7").into(),
+            );
         }
         // A named remote account overrides ambient tokens without changing global login.
         // The transient token travels only through a shell variable and command environment.
@@ -286,9 +304,14 @@ pub(super) fn remote_registration(
             sh_quote(&format!("title={title}"))
         )
     } else if let Some(login) = tea_login {
-        text(login, "tea login alias")?;
+        text(
+            login,
+            crate::i18n::text("repo-workflows-ssh_setup-remote-registration-af72205a"),
+        )?;
         if login.is_empty() || login.starts_with('-') {
-            return Err("Choose an existing tea login alias on the repository machine.".into());
+            return Err(
+                crate::i18n::text("repo-workflows-ssh_setup-remote-registration-09f739fd").into(),
+            );
         }
         // tea0.16+ exposes this explicit-login command. Its preview contains metadata
         // only; the user confirms that this alias's URL/account is the intended server.
@@ -301,7 +324,9 @@ pub(super) fn remote_registration(
             sh_quote(title)
         )
     } else {
-        return Err("Choose GitHub or a Forgejo/Gitea tea login.".into());
+        return Err(
+            crate::i18n::text("repo-workflows-ssh_setup-remote-registration-d31abaa5").into(),
+        );
     };
     machine.script(&script, "Register public SSH key there")
 }
@@ -318,8 +343,9 @@ printf '%s\n' "$public" | ssh-keygen -l -f /dev/stdin >/dev/null 2>&1 || { print
 
 pub(super) fn text(value: &str, label: &str) -> Result<(), String> {
     if value.chars().any(char::is_control) || value.len() > 512 {
-        Err(format!(
-            "The {label} cannot contain control characters and must fit within 512 bytes."
+        Err(crate::i18n::message(
+            "repo-workflows-ssh_setup-text-c18fcabe",
+            &[("label", (label).clone().into())],
         ))
     } else {
         Ok(())
@@ -459,6 +485,53 @@ mod tests {
             assert!(
                 matches!(Machine::of(Path::new(path))?, Machine::Remote(Target { host: Host::Wsl(distro), path }) if distro=="Ubuntu" && path=="/home/me/repo")
             );
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fluent_plan_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_ssh_plan_localizes_validation_without_changing_argv() -> Result<(), String>
+    {
+        let machine = Machine::Local { windows: false };
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let (plan, key) = generate(&machine, "/inert/ß key", "Customer's title")?;
+            assert_eq!(key, "/inert/ß key/id_ed25519");
+            assert_eq!(plan.shell.program, "ssh-keygen");
+            assert_eq!(
+                plan.shell.args,
+                [
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    "/inert/ß key/id_ed25519",
+                    "-C",
+                    "Customer's title"
+                ]
+            );
+            assert_eq!(plan.shell.label, "Create SSH key");
+            assert_eq!(plan.reserve_folder, Some(PathBuf::from("/inert/ß key")));
+            assert_eq!(
+                machine.label(),
+                if lang == "de" {
+                    "Dieser Computer · OpenSSH"
+                } else {
+                    "This computer · OpenSSH"
+                }
+            );
+            let error = machine
+                .validate_path("relative.pub")
+                .err()
+                .ok_or("validation accepted relative path")?;
+            assert!(error.contains(if lang == "de" {
+                "absoluten Schlüsselpfad"
+            } else {
+                "absolute key path"
+            }));
         }
         Ok(())
     }

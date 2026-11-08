@@ -67,14 +67,14 @@ impl RepoTab {
                 let resp = ui
                     .add_enabled(
                         available,
-                        egui::Checkbox::new(&mut on, "What this merge resolved"),
+                        egui::Checkbox::new(
+                            &mut on,
+                            crate::i18n::text("repo-workflows-remerge-remerge-toggle-fccdade2"),
+                        ),
                     )
-                    .on_hover_text(
-                        "Only what differs from the merge git makes of the parents today: how \
-                         its conflicts were resolved, and anything changed beyond that (by \
-                         hand, or by a merge made with other options). Replaces the list of \
-                         files it changed.",
-                    );
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-remerge-remerge-toggle-92585756",
+                    ));
                 if resp.changed() {
                     acts.push(Action::ShowRemerge(on));
                 }
@@ -103,7 +103,12 @@ impl RepoTab {
                 ui.add_space(12.0);
                 ui.vertical_centered(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label(RichText::new("Redoing the merge…").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-remerge-remerge-files-49308b91",
+                        ))
+                        .color(t.text_faint),
+                    );
                 });
                 return;
             }
@@ -113,7 +118,13 @@ impl RepoTab {
             return;
         }
         let all: Vec<ChangedFile> = remerge.files.iter().map(changed_file).collect();
-        files_header(ui, &all, Some("vs. git's own merge"));
+        files_header(
+            ui,
+            &all,
+            Some(crate::i18n::text(
+                "repo-workflows-remerge-remerge-files-660cc0ae",
+            )),
+        );
         let by_path: HashMap<&str, &RemergeFile> =
             remerge.files.iter().map(|f| (f.path.as_str(), f)).collect();
         let key = |path: &str| {
@@ -140,12 +151,12 @@ fn sections(remerge: &Remerge) -> [(&'static str, &'static str, Vec<ChangedFile>
     [
         (
             "remerge-conflicts",
-            "Conflicts resolved",
+            crate::i18n::text("repo-workflows-remerge-sections-fc5f035f"),
             remerge.conflicted().map(changed_file).collect(),
         ),
         (
             "remerge-edits",
-            "Edited beyond the merge",
+            crate::i18n::text("repo-workflows-remerge-sections-8186a4e8"),
             remerge.edited().map(changed_file).collect(),
         ),
     ]
@@ -187,14 +198,18 @@ fn clean_state(ui: &mut Ui) {
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(14, 12))
         .show(ui, |ui| {
-            ui.label(RichText::new("A clean merge").font(theme::medium(13.0)));
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-remerge-clean-state-464ccc62",
+                ))
+                .font(theme::medium(13.0)),
+            );
             ui.add_space(2.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(
-                        "The recorded merge is exactly the one git makes of its parents: it \
-                         had no conflicts to resolve and nothing else was changed.",
-                    )
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-remerge-clean-state-7c8676b8",
+                    ))
                     .color(t.text_dim),
                 )
                 .wrap(),
