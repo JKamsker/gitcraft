@@ -23,7 +23,7 @@ fn canonical_commit(
     oid: &str,
     mut run: impl FnMut(&[&str]) -> Result<String, String>,
 ) -> Result<String, String> {
-    if !super::object::valid_oid(&oid) {
+    if !super::object::valid_oid(oid) {
         return Err("Use a full immutable submodule commit or tag object ID".into());
     }
     let commit = run(&[
@@ -151,7 +151,7 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
             && contains(&budget, None, &child, &theirs, &oid)?
         {
             candidates.push(Candidate {
-                oid: oid.into(),
+                oid,
                 label: label.into(),
             });
         }
@@ -370,12 +370,15 @@ mod canonical_pure {
             Ok(format!("{commit}\n"))
         })?;
         assert_eq!(resolved, commit);
+        let mut called = false;
         assert!(
-            canonical_commit("HEAD", |_| panic!(
-                "invalid immutable input must not execute"
-            ))
+            canonical_commit("HEAD", |_| {
+                called = true;
+                Err("Unexpected command".into())
+            })
             .is_err()
         );
+        assert!(!called);
         assert!(canonical_commit(&tag, |_| Ok("not-a-commit".into())).is_err());
         Ok(())
     }

@@ -168,8 +168,11 @@ mod scoped_read_recording {
             stdout: b"selected".to_vec(),
             stderr: b"failure".to_vec(),
         };
-        assert_eq!(output(Some(1)).checked(&[0, 1]).unwrap(), b"selected");
-        assert_eq!(output(Some(129)).checked(&[0, 129]).unwrap(), b"selected");
+        assert_eq!(output(Some(1)).checked(&[0, 1]), Ok(b"selected".to_vec()));
+        assert_eq!(
+            output(Some(129)).checked(&[0, 129]),
+            Ok(b"selected".to_vec())
+        );
         assert!(output(Some(128)).checked(&[0, 1]).is_err());
         assert!(output(None).checked(&[0, 1]).is_err());
     }

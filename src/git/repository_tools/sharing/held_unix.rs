@@ -374,6 +374,6 @@ mod pack_cleanup_recording {
             }
         });
         assert_eq!(names, ["pack", "idx"]);
-        assert!(result.unwrap_err().contains("recorded failure"));
+        assert!(result.err().is_some_and(|e| e.contains("recorded failure")));
     }
 }

@@ -165,6 +165,62 @@ pub(crate) fn publish(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Compiled only under the runtime hold. The literal path "origin" must not
+    // be interpreted as the configured remote of the same name, on either URL.
+    #[test]
+    fn multiple_urls_include_literal_remote_names_without_reinterpretation() -> Result<(), String> {
+        let r = crate::git::fixture::Repo::new("publication-literal-source")?;
+        let commit = r.commit("one", &[])?;
+        let a = r.path().join("origin");
+        let b = r.path().join("second.git");
+        let decoy = r.path().join("decoy.git");
+        for path in [&a, &b, &decoy] {
+            std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+            crate::git::run(Some(path), &["init", "--bare"])?;
+        }
+        r.git(&["remote", "add", "origin", &decoy.to_string_lossy()])?;
+        r.git(&["remote", "add", "configured", "origin"])?;
+        r.git(&["config", "--add", "remote.configured.pushurl", "origin"])?;
+        r.git(&[
+            "config",
+            "--add",
+            "remote.configured.pushurl",
+            &b.to_string_lossy(),
+        ])?;
+        let control = crate::git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        let mut manager = read(r.path(), "hosts")?;
+        manager.selected = vec!["configured".into()];
+        save_group(&runner, &manager)?;
+        let manager = prepare(r.path(), read(r.path(), "hosts")?)?;
+        assert_eq!(
+            manager.plan.as_ref().ok_or("No plan")?.destinations.len(),
+            2
+        );
+        let result = publish(&runner, manager, false)?;
+        assert!(
+            result
+                .plan
+                .ok_or("No plan")?
+                .destinations
+                .iter()
+                .all(|d| matches!(d.result, Some(Ok(_))))
+        );
+        for path in [&a, &b] {
+            assert_eq!(
+                crate::git::run(Some(path), &["rev-parse", "refs/heads/main"])?.trim(),
+                commit
+            );
+        }
+        assert!(
+            crate::git::run(Some(&decoy), &["rev-parse", "--verify", "refs/heads/main"]).is_err()
+        );
+        Ok(())
+    }
     // Owned-Git regression: compiled under the runtime hold, not executed.
     #[test]
     fn chained_push_rewrites_cannot_redirect_a_reviewed_publication() -> Result<(), String> {

@@ -705,7 +705,7 @@ mod tests {
 mod cleanup_recording {
     use super::*;
     #[test]
-    fn canceled_fetch_still_cleans_exact_refs_and_retains_both_failures() {
+    fn canceled_fetch_still_cleans_exact_refs_and_retains_both_failures() -> Result<(), String> {
         let name = "refs/gitcraft/dependency-check/owned/0";
         let oid = "a".repeat(40);
         let owned = Advertisement {
@@ -727,12 +727,13 @@ mod cleanup_recording {
         assert!(
             owned
                 .finish(Err("cancelled after creation".into()), cleanup)
-                .unwrap_err()
+                .err()
+                .ok_or("Expected operation failure")?
                 .contains("cancelled after creation")
         );
         assert_eq!(calls.len(), 2);
         assert_eq!(
-            String::from_utf8(calls[1].1.clone()).unwrap(),
+            String::from_utf8(calls[1].1.clone()).map_err(|e| e.to_string())?,
             format!("delete {name} {oid}\n")
         );
         let empty = owned.cleanup(|_, _| Ok(String::new()));
@@ -744,7 +745,8 @@ mod cleanup_recording {
         let listing = owned.cleanup(|_, _| Err("listing failure".into()));
         let error = owned
             .finish(Err("fetch failed".into()), listing)
-            .unwrap_err();
+            .err()
+            .ok_or("Expected operation failure")?;
         assert!(
             error.contains("fetch failed")
                 && error.contains("listing failure")
@@ -774,8 +776,10 @@ mod cleanup_recording {
         assert!(
             owned
                 .finish(Ok(String::new()), cleanup)
-                .unwrap_err()
+                .err()
+                .ok_or("Expected operation failure")?
                 .contains("delete failure")
         );
+        Ok(())
     }
 }

@@ -223,8 +223,8 @@ fn bounded_bytes(
 mod bounded_metadata_pure {
     use super::*;
     #[test]
-    fn bounds_and_cancellation_apply_between_chunks() {
-        assert_eq!(bounded_bytes(&b"abcd"[..], 4, &|| true).unwrap(), b"abcd");
+    fn bounds_and_cancellation_apply_between_chunks() -> Result<(), String> {
+        assert_eq!(bounded_bytes(&b"abcd"[..], 4, &|| true)?, b"abcd");
         assert!(bounded_bytes(&b"abcde"[..], 4, &|| true).is_err());
         let checks = std::cell::Cell::new(0);
         assert!(
@@ -235,5 +235,6 @@ mod bounded_metadata_pure {
             .is_err()
         );
         assert_eq!(checks.get(), 2);
+        Ok(())
     }
 }
