@@ -1065,7 +1065,7 @@ mod fluent_presentation_tests {
             assert_eq!(
                 display_operation("Remove unused fork remotes (1234)"),
                 if german {
-                    "Ungenutzte Fork-Remotes entfernen (1.234)"
+                    "Unbenutzte Fork-Remotes entfernen (1.234)"
                 } else {
                     "Remove unused fork remotes (1,234)"
                 }
