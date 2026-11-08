@@ -7,6 +7,7 @@
 // Shared parts land before the views using them; dropped once every view is in (#175).
 #![allow(dead_code)]
 
+pub mod churn;
 pub mod evolution;
 pub mod history;
 
