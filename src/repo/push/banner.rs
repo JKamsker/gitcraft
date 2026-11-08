@@ -46,7 +46,7 @@ fn display_headline(r: &Rejection) -> String {
     )
 }
 
-/// `one` for a single commit, `many` for several.///
+/// `one` for a single commit, `many` for several.
 /// How the branch stands, after the headline.
 pub(super) fn explanation(r: &Rejection) -> String {
     crate::i18n::message(
