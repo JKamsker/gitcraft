@@ -1,0 +1,22 @@
+{
+  "base": "7f535b61ce04945b8189caa38688df64f3685ad0",
+  "protected_files": {
+    "crates/gitcraft-os/src/dock.rs": "f1f18638b877409ab69d56d0e6be517e599011461649a89f8b8f7c4fdc531e69",
+    "crates/gitcraft-os/src/macos_dock.rs": "fc67979be6aba6a00d6b26014d4ba014d7adc7e84e1cf96791ef9dda6e442b44",
+    "crates/gitcraft-os/src/macos_urls.rs": "6f6cda53b81cfd34488ddc5b66dd0605d61465f2eb2ec95fab04ab754bfb302a",
+    "crates/gitcraft-os/src/native_urls.rs": "1afacb51a0eea6ef0c6c523426008e08a6d88d9fec5c879376b65142543e6c45",
+    "src/app/handoff.rs": "522197e8cb6ed8f9158de66de43617b00062ea8fce59a9536bee78643434039b",
+    "src/app/startup_language.rs": "86c0d8c8db22c6b16d363c67382cf2d7fb9bed659657de4884d7e8539359e381",
+    "src/instance/client.rs": "39e0ee9a2af1b921e31aeaf415c9382aaad8397b1806f01a7b8ffa631821153e",
+    "src/instance/discovery.rs": "f64e5b5859605b24371c0f0738868e0a8d1c0c58d731402eaa418253dcbbe242",
+    "src/instance/lock.rs": "39efa50ce5ef92c0add43fb1443bab0f2f51e1f18d2cd5f38d14d53cd6e4a44c",
+    "src/instance/message.rs": "6cafb2da80f3c8f1be739e95c00505f87972038b4e5f1b8a590dad83d8379794",
+    "src/instance/mod.rs": "554752d4abcaeec9fce38ba1c773ee07497883ccdd8247fad8e0c6b3a930a87a",
+    "src/instance/server.rs": "454a185b6abfb46eeb013f0035f61dac01681ea145a977f383c483048b80b000",
+    "src/instance/tests.rs": "f4f40deebfec8599341fe27f298fb421e5325dc6a02c605481900510d964371b",
+    "src/launch/args.rs": "f5df4c20ea7a317a487aee785fe9967dccd2f80842c97fcbffdcf68d5bba7b2b",
+    "src/launch/mod.rs": "b97c9a09146013c5eed0ecebbe7771509ef0e27d42d16d29a01688c33472dbec"
+  },
+  "portable_without_display_helper_sha256": "7d110d2dab779e0411d84860378f9f2ec787deeab15c28ef72122550a2d1e729",
+  "main_without_native_install_error_paint_sha256": "d56bbd95cb7dc64fc61278c2f073b530aec631b0695f1b2f00dc6b8991daff61"
+}

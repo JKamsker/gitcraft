@@ -169,6 +169,21 @@ pub(crate) fn detect(dir: &Path) -> Mode {
 const TRANSLOCATED: &str = "Portable mode is off: macOS runs this downloaded copy from a \
     temporary folder. Run xattr -dr com.apple.quarantine on gitcraft.app, then start it again.";
 
+/// Finite warning paint; portable detection/probing and raw cached Mode stay unchanged.
+pub fn display_message(raw: &str) -> Option<String> {
+    if raw == TRANSLOCATED {
+        return Some(crate::i18n::text("interaction-start-error-portable-translocated").to_owned());
+    }
+    raw.strip_prefix("Portable mode is off: gitcraft can't write to ")
+        .and_then(|s| s.strip_suffix(". Settings are kept in your user's app data this time."))
+        .map(|detail| {
+            crate::i18n::message(
+                "interaction-start-error-portable-write",
+                &[("detail", detail.into())],
+            )
+        })
+}
+
 /// A `data` folder that is gitcraft's: empty, or holding the window's saved state.
 fn is_portable_data(data: &Path) -> bool {
     if !data.is_dir() {

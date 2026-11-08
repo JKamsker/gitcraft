@@ -127,8 +127,9 @@ fn main() -> eframe::Result {
     // before constructing/running the event loop; retain until it exits. The pinned winit
     // backend does not install a GetURL handler or replace this Foundation registration.
     #[cfg(target_os = "macos")]
-    let _native_urls = gitcraft_os::NativeUrlHandler::install()
-        .map_err(|message| eframe::Error::AppCreation(message.into()))?;
+    let _native_urls = gitcraft_os::NativeUrlHandler::install().map_err(|message| {
+        eframe::Error::AppCreation(app::display_start_message(&message).into())
+    })?;
 
     app::install_panic_log();
     app::warm_up();

@@ -13,7 +13,11 @@ impl Settings {
         let t = Tokens::get(ui.ctx());
         let (text, color, hint) = match portable::mode() {
             Mode::Installed => return,
-            Mode::Unusable(why) => (why.clone(), t.danger, None),
+            Mode::Unusable(why) => (
+                portable::display_message(why).unwrap_or_else(|| crate::git::display_error(why)),
+                t.danger,
+                None,
+            ),
             Mode::Portable(dir) => (
                 dir.display().to_string(),
                 t.text_dim,

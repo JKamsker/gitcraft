@@ -25,6 +25,7 @@ mod resident;
 pub(crate) use resident::notification_body as resident_notification_body;
 mod repo_scan;
 mod setup;
+mod startup_display;
 mod startup_language;
 pub use startup_language::initialize_language;
 mod tab_strip;
@@ -1076,6 +1077,11 @@ pub fn single_instance(
     }
 }
 
+/// Selected-language human presentation; does not execute startup or native actions.
+pub fn display_start_message(message: &str) -> String {
+    panels::display_app_message(message)
+}
+
 /// Tells the user why this start ends without a window: in a dialog, and on stderr for a start
 /// from a terminal.
 /// What the command line asked to be told (`--help`, a mistake in it): on the terminal it was
@@ -1083,13 +1089,13 @@ pub fn single_instance(
 /// menu or a file manager starts gitcraft without one).
 pub fn tell(message: &str, error: bool) {
     use std::io::IsTerminal;
-    let display = panels::display_app_message(message);
+    let display = display_start_message(message);
     let message = display.as_str();
     let terminal = !cfg!(all(windows, not(debug_assertions))) && std::io::stderr().is_terminal();
     match (terminal, error) {
         (true, true) => eprintln!("gitcraft: {message}"),
         (true, false) => println!("{message}"),
-        (false, true) => report_failed_start(message),
+        (false, true) => report_displayed_start(message),
         (false, false) => {
             let _ = rfd::MessageDialog::new()
                 .set_level(rfd::MessageLevel::Info)
@@ -1102,8 +1108,11 @@ pub fn tell(message: &str, error: bool) {
 }
 
 pub fn report_failed_start(message: &str) {
-    let display = panels::display_app_message(message);
-    let message = display.as_str();
+    let display = display_start_message(message);
+    report_displayed_start(&display);
+}
+
+fn report_displayed_start(message: &str) {
     eprintln!("gitcraft: {message}");
     // rfd's dialogs are zenity's on Linux; without it (KDE, minimal installs) a start from the
     // menu would end with nothing shown: a desktop notification says it instead.
