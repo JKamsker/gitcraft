@@ -1,6 +1,13 @@
 //! Opt-in native Git/libcurl/netrc/PPID integration, deliberately separate from setup tests.
 //! Runtime prerequisites must be supplied as absolute paths; absence is an error, never a pass.
-#![deny(dead_code, clippy::all)]
+#![deny(
+    warnings,
+    dead_code,
+    clippy::all,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic
+)]
 use super::{Credentials, credential_command_policy};
 use crate::processes::{Options, Output, Service};
 use crate::tasks::Cancellation;
@@ -327,7 +334,7 @@ fn run_fixture(root: &Path, git: &Path, python: &Path, openssl: &Path) -> Result
     }));
     let ticket = service.submit(command, server_options)?;
     // Always stop and collect this exact owned ticket, including startup/case errors.
-    let result = (|| {
+    let result: Result<u16, String> = (|| {
         let ports = receive
             .recv_timeout(Duration::from_secs(5))
             .map_err(|e| format!("TLS startup unconfirmed: {e}"))??;

@@ -19,6 +19,10 @@ cargo +1.95.0 test --offline --locked -p gitcraft --lib git::command::native_htt
 
 Expect exactly one selected ignored test. The ordinary recording-plan test only
 constructs commands with `/recording/...` paths; it starts no tool or service.
+The fixture module explicitly denies warnings, dead code, all standard Clippy
+lints and the repository's unwrap/expect/panic restriction lints. This permits
+strict scoped linting with unrelated baseline lints allowed at the command line;
+it is not a claim that the entire application passes unqualified strict lint.
 
 The six related cases use synthetic credentials exclusively:
 
