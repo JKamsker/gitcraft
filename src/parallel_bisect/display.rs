@@ -509,6 +509,9 @@ const DETAIL: &[(&str, &str, &str, &str, &str)] = &[
 /// Only pass application-generated diagnostics from this partition, at paint time.
 /// stdout/stderr, custom-command output and arbitrary provider text must bypass this API.
 /// Nested detail captures are intentionally opaque; no recursive search/replacement.
+/// A Result<String> from bundle/observe does not prove cleanup-combinator ownership.
+/// Use cleanup_diagnostic only with separately retained source-bound fields; raw strings
+/// alone cannot select that seam. This function leaves unknown cleanup/keep lookalikes raw.
 pub(crate) fn diagnostic(raw: &str) -> String {
     let exact = raw.strip_suffix('\n').unwrap_or(raw);
     let shown = raw;
@@ -751,8 +754,8 @@ fn observation_detail(raw: &str) -> String {
     i18n::text(id).to_owned()
 }
 
-// Trailing forms have less provenance than anchored app prefixes. Only try them after
-// those prefixes have captured their entire opaque detail, including lookalike phrases.
+// This source-owned repository-path form is separate from cleanup-combinator metadata.
+// Cleanup/keep suffixes are never inferred here: lower-level errors can contain them.
 fn trailing_envelope(raw: &str) -> Option<String> {
     let message = |id, args: &[(&str, i18n::Value<'_>)]| Some(i18n::message(id, args));
     if let Some(rest) = raw.strip_suffix(" is not a git repository")
@@ -766,38 +769,74 @@ fn trailing_envelope(raw: &str) -> Option<String> {
             ],
         );
     }
-    // These suffixes are produced only by the listed app-owned cleanup combinators.
-    for (separator, id) in [
-        (
-            "; quarantine cleanup failed: ",
-            "interaction-bisect-quarantine-cleanup",
-        ),
-        (
-            "; transfer cleanup: ",
-            "interaction-bisect-transfer-cleanup",
-        ),
-        (
-            "; workspace cleanup: ",
-            "interaction-bisect-workspace-cleanup-pair",
-        ),
-        ("; lease release: ", "interaction-bisect-lease-release"),
-    ] {
-        if let Some((detail, cleanup)) = raw.rsplit_once(separator) {
-            return message(
-                id,
-                &[("detail", detail.into()), ("cleanup", cleanup.into())],
-            );
-        }
-    }
-    if let Some(rest) = raw.strip_suffix(".keep retained")
-        && let Some((detail, hash)) = rest.rsplit_once("; owned pack-")
-    {
-        return message(
-            "interaction-bisect-keep-retained",
-            &[("detail", detail.into()), ("hash", hash.into())],
-        );
-    }
     None
+}
+
+/// Separately supplied presentation context from the named producer's exact error arm.
+/// These fields must be retained BEFORE the producer flattens its error. They must not
+/// be recovered by splitting its Result<String>, or selected from provider text.
+/// This is optional paint metadata only; the raw Result/worker/control state stays raw.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum CleanupContext<'a> {
+    /// bundle::completed: (Err(primary), Err(cleanup)).
+    BundleCompleted { primary: &'a str, cleanup: &'a str },
+    /// observe::finish: (Err(primary), Err(cleanup)).
+    ObservationFinish { primary: &'a str, cleanup: &'a str },
+    /// Workspace::fetch: (Err(primary), Err(cleanup)) after transfer removal.
+    WorkspaceTransfer { primary: &'a str, cleanup: &'a str },
+    /// Workspace::close: (Err(primary), Err(release)).
+    WorkspaceLeaseRelease { primary: &'a str, release: &'a str },
+    /// bundle::pipeline: failed publication/object check with an owned keep hash.
+    BundleKeepRetained { primary: &'a str, hash: &'a str },
+}
+
+/// Render only the supplied outer cleanup/keep statement, retaining both details verbatim.
+/// `raw` stays caller-owned for control, diagnostics and recovery. A mismatch returns it
+/// unchanged, so stale/wrong presentation metadata cannot replace the actual error.
+/// No producer currently retains these fields for its foreign UI consumer. Root must
+/// carry explicit context separately before using this seam; diagnostic(raw) cannot do it.
+pub(crate) fn cleanup_diagnostic(raw: &str, context: CleanupContext<'_>) -> String {
+    let (expected, id, primary, name, detail) = match context {
+        CleanupContext::BundleCompleted { primary, cleanup } => (
+            format!("{primary}; quarantine cleanup failed: {cleanup}"),
+            "interaction-bisect-quarantine-cleanup",
+            primary,
+            "cleanup",
+            cleanup,
+        ),
+        CleanupContext::ObservationFinish { primary, cleanup } => (
+            format!("{primary}; workspace cleanup: {cleanup}"),
+            "interaction-bisect-workspace-cleanup-pair",
+            primary,
+            "cleanup",
+            cleanup,
+        ),
+        CleanupContext::WorkspaceTransfer { primary, cleanup } => (
+            format!("{primary}; transfer cleanup: {cleanup}"),
+            "interaction-bisect-transfer-cleanup",
+            primary,
+            "cleanup",
+            cleanup,
+        ),
+        CleanupContext::WorkspaceLeaseRelease { primary, release } => (
+            format!("{primary}; lease release: {release}"),
+            "interaction-bisect-lease-release",
+            primary,
+            "cleanup",
+            release,
+        ),
+        CleanupContext::BundleKeepRetained { primary, hash } => (
+            format!("{primary}; owned pack-{hash}.keep retained"),
+            "interaction-bisect-keep-retained",
+            primary,
+            "hash",
+            hash,
+        ),
+    };
+    if expected != raw {
+        return raw.to_owned();
+    }
+    i18n::message(id, &[("detail", primary.into()), (name, detail.into())])
 }
 
 fn known_observation_detail(raw: &str) -> bool {
@@ -929,7 +968,6 @@ mod execution_fluent_tests {
             format!("Contained Git failed (no exit code): {detail}"),
             format!("Ref publication completed, but quarantine cleanup failed: {detail}"),
             format!("Verification completed, but quarantine cleanup failed: {detail}"),
-            format!("{detail}; owned pack-01234567.keep retained"),
         ];
         for raw in cases {
             let shown = diagnostic(&raw);
@@ -937,6 +975,17 @@ mod execution_fluent_tests {
             assert_ne!(shown, raw);
             assert!(!shown.contains("interaction-bisect-"));
         }
+        let raw = format!("{detail}; owned pack-01234567.keep retained");
+        let shown = cleanup_diagnostic(
+            &raw,
+            CleanupContext::BundleKeepRetained {
+                primary: detail,
+                hash: "01234567",
+            },
+        );
+        assert!(shown.contains(detail), "{shown}");
+        assert_ne!(shown, raw);
+        assert!(!shown.contains("interaction-bisect-"));
         for raw in [
             "The test of 01234567 ended with exit code 2345 (a crash or a signal): it counts as skipped.",
             "ended its test with exit code 2345; 128 and more (a crash or a signal) stops a bisect, as with git bisect run",
@@ -1023,6 +1072,113 @@ mod execution_fluent_payload_tests {
             )),
             format!("Der PNG-Frame konnte nicht dekodiert werden (maximal 1024×1024): {decoder}")
         );
+        i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod execution_fluent_r1_tests {
+    use super::*;
+
+    #[test]
+    fn unwrapped_unknown_cleanup_and_keep_lookalikes_remain_opaque_in_both_languages() {
+        for locale in ["en-US", "de"] {
+            i18n::set_language(locale);
+            for raw in [
+                "provider text; workspace cleanup: provider detail",
+                "provider text; quarantine cleanup failed: provider detail",
+                "provider text; transfer cleanup: provider detail",
+                "provider text; lease release: provider detail",
+                "provider text; owned pack-01234567.keep retained",
+                "provider text; owned pack-01234567.keep retained\n",
+                "provider text; workspace cleanup: first; workspace cleanup: second (exit 7); stderr: raw $HOME {detail}\n",
+            ] {
+                assert_eq!(diagnostic(raw), raw);
+                let prefixed = format!("01234567: {raw}");
+                assert_eq!(warning(&prefixed), prefixed);
+            }
+        }
+        i18n::set_language("en-US");
+    }
+
+    #[test]
+    fn supplied_source_context_keeps_delimiters_framing_and_hashes_opaque() {
+        let primary = "provider; transfer cleanup: inner; owned pack-opaque.keep retained\n(exit 7); stderr: $HOME {cleanup}";
+        let cleanup = "provider; lease release: inner; workspace cleanup: nested\n";
+        let hash = "0123456789012345678901234567890123456789";
+        for (locale, transfer, lease, retained) in [
+            ("en-US", "transfer cleanup", "lease release", "owned pack-"),
+            (
+                "de",
+                "Bereinigung der Übertragung",
+                "Freigabe der Besitzreservierung",
+                "die eigene Schutzmarkierung pack-",
+            ),
+        ] {
+            i18n::set_language(locale);
+            let raw_transfer = format!("{primary}; transfer cleanup: {cleanup}");
+            let transfer_shown = cleanup_diagnostic(
+                &raw_transfer,
+                CleanupContext::WorkspaceTransfer { primary, cleanup },
+            );
+            assert_eq!(transfer_shown, format!("{primary}; {transfer}: {cleanup}"));
+            let raw_lease = format!("{primary}; lease release: {cleanup}");
+            let lease_shown = cleanup_diagnostic(
+                &raw_lease,
+                CleanupContext::WorkspaceLeaseRelease {
+                    primary,
+                    release: cleanup,
+                },
+            );
+            assert_eq!(lease_shown, format!("{primary}; {lease}: {cleanup}"));
+            let raw_keep = format!("{primary}; owned pack-{hash}.keep retained");
+            let keep_shown = cleanup_diagnostic(
+                &raw_keep,
+                CleanupContext::BundleKeepRetained { primary, hash },
+            );
+            let suffix = if locale == "de" {
+                ".keep wurde aufbewahrt."
+            } else {
+                ".keep retained."
+            };
+            assert_eq!(keep_shown, format!("{primary}; {retained}{hash}{suffix}"));
+            assert_eq!(diagnostic(&raw_transfer), raw_transfer);
+            assert_eq!(diagnostic(&raw_lease), raw_lease);
+            assert_eq!(diagnostic(&raw_keep), raw_keep);
+        }
+        i18n::set_language("en-US");
+    }
+
+    #[test]
+    fn stale_supplied_context_cannot_replace_the_original_raw_error() {
+        for locale in ["en-US", "de"] {
+            i18n::set_language(locale);
+            let raw = "original provider error; workspace cleanup: provider detail\n";
+            for context in [
+                CleanupContext::BundleCompleted {
+                    primary: "other",
+                    cleanup: "other",
+                },
+                CleanupContext::ObservationFinish {
+                    primary: "other",
+                    cleanup: "other",
+                },
+                CleanupContext::WorkspaceTransfer {
+                    primary: "other",
+                    cleanup: "other",
+                },
+                CleanupContext::WorkspaceLeaseRelease {
+                    primary: "other",
+                    release: "other",
+                },
+                CleanupContext::BundleKeepRetained {
+                    primary: "other",
+                    hash: "other",
+                },
+            ] {
+                assert_eq!(cleanup_diagnostic(raw, context), raw);
+            }
+        }
         i18n::set_language("en-US");
     }
 }

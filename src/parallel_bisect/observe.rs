@@ -408,3 +408,58 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod execution_fluent_r1_tests {
+    use super::{Observation, finish};
+    use crate::parallel_bisect::display::{CleanupContext, cleanup_diagnostic, diagnostic};
+
+    #[test]
+    fn actual_finish_results_need_separate_cleanup_context_for_presentation() -> Result<(), String>
+    {
+        // Supplied Result states only: no parse/run/workspace, sample discovery or cleanup.
+        for (locale, statement) in [
+            ("en-US", "workspace cleanup"),
+            ("de", "Bereinigung des Arbeitsbereichs"),
+        ] {
+            crate::i18n::set_language(locale);
+            for primary in [
+                "Observation checkout failed: object denied",
+                "Observation checkout failed: object denied; workspace cleanup: provider detail (exit 7); stderr: raw\n",
+            ] {
+                let cleanup = "cleanup denied; workspace cleanup: provider detail\n$HOME {detail}";
+                let raw = finish(Err(primary.into()), Err(cleanup.into()))
+                    .err()
+                    .ok_or("expected combined failure")?;
+                assert_eq!(raw, format!("{primary}; workspace cleanup: {cleanup}"));
+                let shown = cleanup_diagnostic(
+                    &raw,
+                    CleanupContext::ObservationFinish { primary, cleanup },
+                );
+                assert_eq!(shown, format!("{primary}; {statement}: {cleanup}"));
+                assert!(shown.contains(primary) && shown.contains(cleanup));
+                assert_eq!(raw, format!("{primary}; workspace cleanup: {cleanup}"));
+            }
+            for unknown in [
+                "provider text; quarantine cleanup failed: provider detail",
+                "provider text; workspace cleanup: provider detail",
+                "provider text; owned pack-01234567.keep retained",
+            ] {
+                for result in [Err(unknown.into()), Ok(Observation::Inconsistent)] {
+                    let cleanup = if result.is_ok() {
+                        Err(unknown.into())
+                    } else {
+                        Ok(())
+                    };
+                    let raw = finish(result, cleanup)
+                        .err()
+                        .ok_or("expected propagated detail")?;
+                    assert_eq!(raw, unknown);
+                    assert_eq!(diagnostic(&raw), unknown);
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
+    }
+}
