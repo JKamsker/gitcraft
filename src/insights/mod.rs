@@ -9,6 +9,7 @@
 
 pub mod coupling;
 pub mod history;
+pub mod transform;
 
 /// Where what a view shows came from, and how far it can be trusted: shown above every view.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
