@@ -477,8 +477,22 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
         Some(2),
         "hover must not change the selected commit"
     );
-    // Let the old tooltip close, then send an ordinary press/release across frames.
-    frame(&ctx, &mut tab, size, vec![], 3.6);
+    // Leave the scrollable popup before clicking its anchor: in this short viewport
+    // the popup can cover the row. Re-enter and click before its hover delay elapses.
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(Pos2::new(1.0, 1.0))],
+        3.3,
+    );
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(first_point)],
+        3.6,
+    );
     frame(
         &ctx,
         &mut tab,
