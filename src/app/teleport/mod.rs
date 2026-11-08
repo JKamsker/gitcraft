@@ -1,7 +1,9 @@
 //! Teleport (a tab's menu, or the palette): the dialog that picks a machine and where the work
 //! goes there, and the teleport itself, run on a thread of its own (see `crate::teleport`).
 
+mod drag;
 mod view;
+pub(super) use drag::DragTargets;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -88,6 +90,8 @@ pub(super) struct TeleportForm {
     /// Folders known on any machine (recent and open repositories), where clones are looked for.
     known: Vec<PathBuf>,
     machine: Option<Machine>,
+    /// A drop waits for source remotes before destination discovery.
+    pick_after_read: Option<Machine>,
     /// The picked machine's home folder, where a clone or a new repository goes by default.
     home: Loading<String>,
     /// The clones of the project found on `machine`.
@@ -126,6 +130,7 @@ impl TeleportForm {
             typed_host: String::new(),
             known,
             machine: None,
+            pick_after_read: None,
             home: Loading::Ready(String::new()),
             clones: Loading::Ready(Vec::new()),
             place: Place::Create,
@@ -143,7 +148,7 @@ impl TeleportForm {
 
     /// Takes in what the background answered: the source, the distributions, the machine's
     /// home, the clones.
-    fn poll(&mut self) {
+    fn poll(&mut self, ctx: &egui::Context) {
         let was_waiting = matches!(self.info, Loading::Waiting(_));
         self.info.poll();
         if was_waiting && let Some(info) = self.info.ready() {
@@ -155,6 +160,11 @@ impl TeleportForm {
                 .or(info.remotes.first())
                 .map(|(_, url)| url.clone())
                 .unwrap_or_default();
+        }
+        if self.info.ready().is_some()
+            && let Some(machine) = self.pick_after_read.take()
+        {
+            self.pick(machine, ctx);
         }
         if let Some(rx) = &self.distros
             && let Ok(distros) = rx.try_recv()
@@ -413,7 +423,7 @@ impl App {
         let Some(form) = &mut self.teleport else {
             return;
         };
-        form.poll();
+        form.poll(ctx);
         let ended = form.running.as_ref().and_then(|r| match r.rx.try_recv() {
             Ok(result) => Some((result, r.machine.clone())),
             Err(TryRecvError::Disconnected) => Some((Err(stopped()), r.machine.clone())),

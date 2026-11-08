@@ -136,6 +136,7 @@ pub struct App {
     connecting: Vec<Connecting>,
     /// The teleport dialog, and the teleport it runs.
     teleport: Option<teleport::TeleportForm>,
+    teleport_drag: Option<teleport::DragTargets>,
     /// ssh's question being answered (a password, a new host key).
     askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
@@ -290,6 +291,7 @@ impl App {
             remote_form: None,
             connecting: Vec::new(),
             teleport: None,
+            teleport_drag: None,
             askpass: Default::default(),
             update: None,
             update_rx: None,
