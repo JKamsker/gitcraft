@@ -14,6 +14,8 @@ mod deadline_io;
 mod discover;
 mod fs;
 pub(crate) mod native_owner;
+#[cfg(all(test, unix))]
+mod owned_runtime;
 mod pool;
 mod private_marker;
 mod session;

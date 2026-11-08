@@ -537,6 +537,11 @@ impl Drop for Service {
     }
 }
 
+#[cfg(all(test, unix))]
+pub(crate) fn owned_fixture_service() -> io::Result<Service> {
+    Service::new(6, 16)
+}
+
 static SERVICE: OnceLock<Result<Service, String>> = OnceLock::new();
 static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
 static LEASES: OnceLock<Result<Service, String>> = OnceLock::new();
