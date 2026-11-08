@@ -12,12 +12,23 @@ readme = "README.md"
 [features]
 # Oniguruma is substantially faster for the syntax grammars used while opening diffs.
 # `--no-default-features` retains the pure-Rust regex backend for builds without a C compiler.
-default = ["native-highlighting", "native-git"]
+default = ["native-highlighting", "native-git", "symbol-history"]
 # Local read operations use gitoxide; all unsupported operations retain the installed Git.
 native-git = ["dep:gix"]
 native-highlighting = ["syntect/default-onig", "two-face/syntect-default-onig"]
 
+# Structural biography parsing uses bundled grammars; optional so minimal builds need no C compiler.
+symbol-history = ["dep:tree-sitter", "dep:tree-sitter-rust", "dep:tree-sitter-python", "dep:tree-sitter-javascript", "dep:tree-sitter-typescript", "dep:tree-sitter-go", "dep:tree-sitter-c", "dep:tree-sitter-cpp"]
+
 [dependencies]
+tree-sitter = { version = "0.25", optional = true }
+tree-sitter-rust = { version = "0.24.2", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23.2", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
+tree-sitter-c = { version = "0.24", optional = true }
+tree-sitter-cpp = { version = "0.23.4", optional = true }
 gix = { version = "0.90", optional = true, default-features = false, features = ["revision", "sha1", "sha256"] }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "persistence", "links"] }
 egui = { version = "0.36", features = ["bytemuck"] }

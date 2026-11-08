@@ -920,6 +920,7 @@ mod tests {
     }
 }
 
+pub(crate) mod history;
 pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
 
 pub(crate) use http::environment_proxy;

@@ -18,6 +18,7 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         widgets::panel_header(ui, "Changes", branch_tree::files_toggle);
 
+        if ui.button("Earlier versions…").on_hover_text("Opt in to working-tree drafts and recover selected hunks from earlier working or staged versions").clicked() { acts.push(Action::EarlierVersions); }
         // The commit box stays at the bottom.
         egui::Panel::bottom("commit_box")
             .frame(
@@ -45,6 +46,7 @@ impl RepoTab {
                 self.agent_turns(ui, acts);
                 self.unstaged_list(ui, acts);
                 self.staged_list(ui, acts);
+                self.cochange_hints(ui, acts);
             });
     }
 

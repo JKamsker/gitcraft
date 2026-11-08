@@ -69,5 +69,6 @@ mod weakened;
 
 mod audio;
 mod connection_doctor;
+pub(crate) mod push_preflight;
 
 mod portability;

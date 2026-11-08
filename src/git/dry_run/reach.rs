@@ -69,6 +69,27 @@ pub fn unreachable(
     moved: &[String],
     limit: usize,
 ) -> Result<Vec<String>, String> {
+    let args = unreachable_args(old, new, moved, limit)?;
+    if old.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(run(
+        Some(repo),
+        &args.iter().map(String::as_str).collect::<Vec<_>>(),
+    )?
+    .lines()
+    .map(str::trim)
+    .filter(|s| !s.is_empty())
+    .map(str::to_owned)
+    .collect())
+}
+
+fn unreachable_args(
+    old: &[String],
+    new: &[String],
+    moved: &[String],
+    limit: usize,
+) -> Result<Vec<String>, String> {
     if let Some(bad) = old.iter().chain(new).find(|h| !is_oid(h)) {
         return Err(format!("{bad} is not a commit id"));
     }
@@ -86,11 +107,36 @@ pub fn unreachable(
     args.extend(["--all", "--not", END_OPTS]);
     args.extend(old.iter().map(String::as_str));
     args.extend(negated.iter().map(String::as_str));
-    Ok(run(Some(repo), &args)?
+    Ok(args.into_iter().map(str::to_owned).collect())
+}
+
+pub(crate) fn unreachable_bounded(
+    reader: &super::super::investigations::Reader<'_>,
+    old: &[String],
+    new: &[String],
+    moved: &[String],
+    limit: usize,
+) -> Result<Vec<String>, String> {
+    let args = unreachable_args(old, new, moved, limit)?;
+    if args.is_empty() {
+        return Ok(Vec::new());
+    }
+    let bytes = reader.run(
+        &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec![],
+        &[0],
+    )?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| "Invalid local reachability output")?;
+    let hashes: Vec<_> = text
         .lines()
-        .map(|l| l.trim().to_owned())
-        .filter(|l| !l.is_empty())
-        .collect())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if hashes.len() > limit || hashes.iter().any(|s| !is_oid(s)) {
+        return Err("Invalid local reachability output".into());
+    }
+    Ok(hashes)
 }
 
 /// The commits `old` has that `new` hasn't (`git rev-list old --not new`), newest first, at

@@ -4,6 +4,8 @@
 //! it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
 
 mod rows;
+mod weather;
+mod weather_git;
 
 use std::path::{Path, PathBuf};
 
@@ -39,7 +41,7 @@ impl Step {
         Step::Drop,
     ];
 
-    fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Step::Pick => "Pick",
             Step::Reword => "Reword",
@@ -70,7 +72,6 @@ pub(crate) struct Entry {
     pub message: String,
 }
 
-#[derive(Clone)]
 pub(crate) struct RebaseEditor {
     /// What the commits are replayed onto (a commit or a branch); empty to rewrite from the
     /// root commit on (`--root`).
@@ -102,6 +103,42 @@ pub(crate) struct RebaseEditor {
     /// Move the branches on the commits rewritten along with them (`--update-refs`): the lower
     /// layers of a stack rebased from its top.
     pub update_refs: bool,
+    /// Captured when the editor is opened; approval never rebinds it to a later
+    /// branch at the same commit. None keeps non-UI command builders compatible.
+    pub branch_guard: Option<Vec<String>>,
+    approval: Option<Approval>,
+    weather: weather::Weather,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct Approval {
+    branch: Vec<String>,
+    head: String,
+    onto: String,
+    no_ff: bool,
+    update_refs: bool,
+    entries: Vec<(String, Step, String)>,
+}
+
+impl Clone for RebaseEditor {
+    fn clone(&self) -> Self {
+        Self {
+            onto: self.onto.clone(),
+            onto_label: self.onto_label.clone(),
+            entries: self.entries.clone(),
+            head: self.head.clone(),
+            id: self.id,
+            starting: self.starting,
+            selected: self.selected,
+            heights: self.heights.clone(),
+            typing: self.typing,
+            no_ff: self.no_ff,
+            update_refs: self.update_refs,
+            branch_guard: self.branch_guard.clone(),
+            approval: self.approval.clone(),
+            weather: weather::Weather::default(),
+        }
+    }
 }
 
 impl RebaseEditor {
@@ -131,7 +168,51 @@ impl RebaseEditor {
             typing: false,
             no_ff: false,
             update_refs: false,
+            branch_guard: None,
+            approval: None,
+            weather: weather::Weather::default(),
         }
+    }
+
+    fn approval_key(&self, branch: &[String]) -> Approval {
+        Approval {
+            branch: branch.to_vec(),
+            head: self.head.clone(),
+            onto: self.onto.clone(),
+            no_ff: self.no_ff,
+            update_refs: self.update_refs,
+            entries: self
+                .entries
+                .iter()
+                .map(|e| (e.commit.hash.clone(), e.step, e.message.clone()))
+                .collect(),
+        }
+    }
+    pub fn approve(&mut self, branch: &[String]) -> Result<(), String> {
+        if self
+            .branch_guard
+            .as_ref()
+            .is_some_and(|original| original != branch)
+        {
+            return Err(
+                "The checked-out branch changed since this editor opened. Cancel and start again."
+                    .into(),
+            );
+        }
+        self.branch_guard = Some(branch.to_vec());
+        self.approval = Some(self.approval_key(branch));
+        Ok(())
+    }
+    pub fn approved(&self, branch: &[String], head: &str) -> bool {
+        self.head == head
+            && self.branch_guard.as_deref() == Some(branch)
+            && self
+                .approval
+                .as_ref()
+                .is_some_and(|key| key == &self.approval_key(branch))
+    }
+    pub fn has_approval(&self) -> bool {
+        self.approval.is_some()
     }
 
     /// Why the commits listed are no longer the branch's, when HEAD is at `head` now.
@@ -398,6 +479,7 @@ fn short(hash: &str) -> &str {
 
 impl RepoTab {
     pub(super) fn rebase_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.poll_rebase_weather(ui.ctx());
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let branch = self
@@ -429,6 +511,10 @@ impl RepoTab {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::small_button(ui, "x", "Cancel (Esc)").clicked() {
                             acts.push(Action::CloseRebase);
+                        }
+                        if icons::small_button(ui, "refresh-cw", "Recheck rebase weather").clicked()
+                        {
+                            editor.weather.refresh(ui.ctx());
                         }
                     });
                 });
@@ -494,6 +580,7 @@ impl RepoTab {
         // The row keys act on this frame, unless something else has the keyboard.
         let keys = editor.keys(ui, keys_free);
         editor.list(ui, keys);
+        editor.weather.observe(&editor.entries, ui.ctx());
         editor.typing = ui.ctx().memory(|m| m.focused().is_some());
     }
 }

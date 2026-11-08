@@ -17,6 +17,17 @@ impl RepoTab {
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::ShowActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+        ) {
+            self.dossier.close();
+            self.symbols.close();
+        }
         let plain = OpKind::plain();
         // Fetch, Pull and Push asked for while something runs start once it is done.
         if self.busy_op.is_some()
@@ -38,6 +49,10 @@ impl RepoTab {
             self.file_comparison = None;
         }
         match action {
+            Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
+            Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
+            Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
+            Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
             Action::DvcPull => {
                 self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
             }
@@ -117,6 +132,46 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::OpenLineDossier(seed) => {
+                self.symbols.close();
+                self.open_line_dossier(seed, ctx)
+            }
+            Action::OpenSymbolBiography(seed) => self.open_symbol_biography(seed, ctx),
+            Action::CloseSymbolBiography => self.symbols.close(),
+            Action::CloseLineDossier => self.dossier.close(),
+            Action::OpenPinnedFileLine(seed) => {
+                if !git::investigations::oid(&seed.commit) || seed.line == 0 {
+                    return;
+                }
+                super::file_text::focus(
+                    ctx,
+                    ("file_view", &seed.path, Some(&seed.commit)),
+                    seed.line,
+                );
+                self.apply(
+                    Action::FileView {
+                        path: seed.path,
+                        rev: Some(seed.commit),
+                        tab: super::file_view::FileTab::File,
+                    },
+                    ctx,
+                );
+            }
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
+            Action::DraftSnapshot => self.save_working_draft(false, ctx),
+            Action::DraftUndo => self.undo_working_draft(ctx),
+            Action::DraftPreview { id, path, index } => {
+                self.preview_working_draft(id, path, index, ctx)
+            }
+            Action::DraftRecover { preview, hunks } => {
+                self.recover_working_draft(*preview, hunks, ctx)
+            }
+            Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
+            Action::ContentSearch(query) => self.content_search(query, ctx),
+            Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
+            Action::ContentPrepare(target) => self.content_prepare(target, ctx),
+            Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
             Action::LocalCi(act) => self.local_ci_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
@@ -408,7 +463,11 @@ impl RepoTab {
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
-            Action::RunRebase => self.run_rebase(ctx),
+            Action::RunRebase => self.ask_run_rebase(ctx),
+            Action::ConfirmedRebase(id) => {
+                self.confirmed_rebase(id, ctx);
+            }
+            Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
             Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::AbortFold => self.abort_fold(ctx),

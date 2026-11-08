@@ -144,6 +144,10 @@ impl LinePick {
 /// and the lines picked in it (click, Shift+click or drag over them). `history`: why the lines
 /// picked can have no history, if they can't. Returns the lines (from 1) whose history was
 /// asked for from their right-click menu.
+pub(crate) fn focus(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug, line: usize) {
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(("file-text-focus", id)), line));
+}
+
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
@@ -215,9 +219,13 @@ pub(crate) fn show(
             Layout::Lines,
         );
     }
+    let reveal = ui.data_mut(|d| d.remove_temp::<usize>(egui::Id::new(("file-text-focus", &id))));
     let mut scroll = egui::ScrollArea::both()
         .id_salt(("file_text", id))
         .auto_shrink(false);
+    if let Some(line) = reveal {
+        scroll = scroll.vertical_scroll_offset(line.saturating_sub(3) as f32 * LINE_H);
+    }
     if let Some(hit) = find.take_reveal() {
         scroll = find.scroll_to(
             scroll,

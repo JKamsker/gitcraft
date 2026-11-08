@@ -109,6 +109,59 @@ impl Api {
         self.send("GET", endpoint, None)
     }
 
+    /// Read-only history/summary metadata with a strict body cap, no redirects and
+    /// generic errors. The caller retains ownership until the HTTP request returns.
+    pub(super) fn history_get(
+        &self,
+        endpoint: &str,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Value, String> {
+        use std::io::Read;
+        if !active() {
+            return Err("History lookup cancelled".into());
+        }
+        if endpoint.starts_with(['/', '-'])
+            || endpoint.contains("://")
+            || endpoint.chars().any(char::is_control)
+        {
+            return Err("Invalid history API endpoint".into());
+        }
+        let url = format!("{}/{}", self.base, endpoint);
+        let mut request = self
+            .agent
+            .get(&url)
+            .timeout(Duration::from_secs(15))
+            .set("Accept", "application/json");
+        if let Some(login) = &self.login {
+            request = request.set("Authorization", &login.header());
+        }
+        let response =
+            match request.call() {
+                Ok(response) if !(300..400).contains(&response.status()) => response,
+                Err(ureq::Error::Status(401, _)) => {
+                    if let Some(forget) = self.on_refused {
+                        forget(self.refused_key.as_deref().unwrap_or(&self.web));
+                    }
+                    return Err("Selected forge account was refused".into());
+                }
+                _ => return Err(
+                    "Forge history request failed; check server support and the selected account"
+                        .into(),
+                ),
+            };
+        let mut bytes = Vec::new();
+        response
+            .into_reader()
+            .take(2 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "Forge history response could not be read")?;
+        if bytes.len() > 2 * 1024 * 1024 || !active() {
+            return Err("Forge history response exceeded its budget or was cancelled".into());
+        }
+        serde_json::from_slice(&bytes)
+            .map_err(|_| "Forge history response is malformed JSON".into())
+    }
+
     /// Every item of a list the API gives page by page, up to `max`.
     pub fn get_all(&self, endpoint: &str, max: usize) -> Result<Vec<Value>, Failure> {
         self.get_all_kept(endpoint, max, |_| true)

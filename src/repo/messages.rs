@@ -382,6 +382,7 @@ impl RepoTab {
         // that work starts covers what it wrote itself (see `reload`).
         if let Some(rx) = &self.fs_rx {
             while let Ok(change) = rx.try_recv() {
+                self.working_drafts.observe();
                 let was = self.fs_pending.map(|(c, _)| c);
                 self.fs_pending = Some((was.max(Some(change)).unwrap_or(change), Instant::now()));
             }
@@ -399,6 +400,12 @@ impl RepoTab {
         }
         self.agent_step(ctx);
         // A tab not read yet, or suspended, neither fetches nor follows builds.
+        self.poll_saved_views(ctx);
+        self.poll_content_recovery(ctx);
+        self.poll_line_dossier(ctx);
+        self.poll_symbol_biography(ctx);
+        self.poll_cochanges(ctx);
+        self.poll_working_drafts(ctx);
         if !shown || self.sleeping() {
             return;
         }
@@ -481,7 +488,10 @@ impl RepoTab {
                 }
                 self.conflict_saved(path, saved, ctx)
             }
-            Msg::Identity(identity) => self.identity = identity,
+            Msg::Identity(identity) => {
+                self.identity = identity;
+                self.saved_views.dirty = true;
+            }
             // One asked for before the tab was suspended (or watched again) sends to a channel
             // no longer read: dropped, not kept.
             Msg::Watcher(watch, watcher) => {

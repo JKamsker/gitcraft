@@ -264,6 +264,44 @@ pub fn run_watched_recorded(
     (Err(e), recorded)
 }
 
+/// Reviewed target/options use the same progress, cancellation and owned transport as normal pushes.
+pub(super) fn reviewed(
+    dir: &Path,
+    extra: &Extra,
+    args: &[&str],
+    control: &Arc<OpControl>,
+) -> Result<super::Ran, String> {
+    let started = Instant::now();
+    if control.is_cancelled() {
+        return Err(CANCELLED.into());
+    }
+    let words = with_progress(args);
+    let words = words.iter().map(String::as_str).collect::<Vec<_>>();
+    let target = remote::parse(dir);
+    let ended = follow_command(Some(dir), extra, &words, target.as_ref(), control)?;
+    control.record(Recorded::new(
+        &words,
+        ended.code,
+        if ended.code == Some(0) {
+            "Reviewed push completed"
+        } else {
+            "Reviewed push failed; server diagnostics withheld"
+        },
+        None,
+        started,
+    ));
+    if let Some(reason) = ended.stopped {
+        return Err(reason);
+    }
+    Ok(super::Ran {
+        code: ended.code,
+        status: ended.status,
+        stdout: ended.stdout.into_bytes(),
+        stderr: ended.stderr.into_bytes(),
+        failed_hook: None,
+    })
+}
+
 /// Drains both pipes and writes input on the process service's single event loop. Only
 /// the existing synchronous caller waits, on a bounded background worker.
 fn follow_command(
