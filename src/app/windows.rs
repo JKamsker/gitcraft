@@ -321,25 +321,22 @@ impl DesktopApp {
             }
             app.tick_model(ctx, frame);
         } else {
-            if ctx.viewport_id() == ViewportId::ROOT
-                && ctx.input(|i| i.viewport().close_requested())
-            {
-                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                self.deferred_close = true;
-            }
+            Self::defer_close(ctx, &mut self.deferred_close);
             ctx.request_repaint_after(Duration::from_millis(50));
         }
     }
-}
 
-impl eframe::App for DesktopApp {
-    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.logic_tick(ctx, Some(frame));
+    fn defer_close(ctx: &egui::Context, pending: &mut bool) {
+        if ctx.viewport_id() == ViewportId::ROOT && ctx.input(|i| i.viewport().close_requested()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            *pending = true;
+        }
     }
 
-    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+    fn ui_tick(&mut self, ui: &mut Ui, frame: Option<&mut eframe::Frame>) {
         {
             let Ok(mut app) = self.app.try_lock() else {
+                Self::defer_close(ui.ctx(), &mut self.deferred_close);
                 Self::children(&self.app, &self.cache, ui.ctx());
                 ui.ctx().request_repaint_after(Duration::from_millis(50));
                 return;
@@ -349,9 +346,19 @@ impl eframe::App for DesktopApp {
                     app.tabs.append(&mut window.tabs);
                 }
             }
-            app.window_ui(ui, Some(frame));
+            app.window_ui(ui, frame);
         }
         Self::children(&self.app, &self.cache, ui.ctx());
+    }
+}
+
+impl eframe::App for DesktopApp {
+    fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.logic_tick(ctx, Some(frame));
+    }
+
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
+        self.ui_tick(ui, Some(frame));
     }
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if let Ok(mut app) = self.app.lock() {
@@ -1584,6 +1591,50 @@ mod tests {
                     .contains_key(&child)
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn contended_root_ui_uses_the_same_deferred_close_policy() -> Result<(), String> {
+        let mut h = harness();
+        let ctx = h.ctx.clone();
+        let owner = h.state().app.clone();
+        let child = ViewportId::from_hash_of("kept-during-ui-contention");
+        let mut held = owner.lock().map_err(|e| e.to_string())?;
+        held.windows
+            .parked
+            .insert(child, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+        let mut raw = egui::RawInput::default();
+        raw.viewports
+            .entry(ViewportId::ROOT)
+            .or_default()
+            .events
+            .push(egui::ViewportEvent::Close);
+        let output = ctx.run_ui(raw, |ui| h.state_mut().ui_tick(ui, None));
+        assert!(
+            output.viewport_output[&ViewportId::ROOT]
+                .commands
+                .contains(&egui::ViewportCommand::CancelClose)
+        );
+        assert!(h.state().deferred_close);
+        output.drop_without_applying_deltas();
+        drop(held);
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            h.state_mut().logic_tick(ctx, None)
+        });
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::CancelClose)
+        );
+        assert!(
+            owner
+                .lock()
+                .map_err(|e| e.to_string())?
+                .windows
+                .parked
+                .contains_key(&child)
+        );
+        assert!(!h.state().deferred_close);
         Ok(())
     }
 }
