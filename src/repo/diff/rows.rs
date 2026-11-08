@@ -385,6 +385,57 @@ impl<'a> Rows<'a> {
             right = self.hunk_buttons(ui, rect, i, acts) - 8.0;
         }
         if kind == Some(Kind::Hunk)
+            && let DiffKey::Commit { hash, path } = &self.view.key
+        {
+            let next = data.lines[i + 1..]
+                .iter()
+                .take_while(|l| l.kind != Kind::Hunk)
+                .collect::<Vec<_>>();
+            let new = next
+                .iter()
+                .filter(|l| l.kind == Kind::Add)
+                .filter_map(|l| l.new)
+                .collect::<Vec<_>>();
+            let old = next
+                .iter()
+                .filter(|l| l.kind == Kind::Del)
+                .filter_map(|l| l.old)
+                .collect::<Vec<_>>();
+            let alternate = if !new.is_empty() && !old.is_empty() {
+                Some((*old.first().unwrap(), *old.last().unwrap()))
+            } else {
+                None
+            };
+            let (numbers, is_old) = if new.is_empty() {
+                (old, true)
+            } else {
+                (new, false)
+            };
+            if let (Some(first), Some(last)) = (numbers.first(), numbers.last()) {
+                let (button, left) = text_button(
+                    ui,
+                    right,
+                    rect.center().y,
+                    "Prompt step",
+                    self.t.accent,
+                    ui.id().with(("prompt-hunk", i)),
+                );
+                if button
+                    .on_hover_text("Read local recorded edits matching this immutable commit hunk")
+                    .clicked()
+                {
+                    acts.push(Action::ShowPromptHunk(crate::repo::prompt_session::Hunk {
+                        commit: hash.clone(),
+                        path: path.clone(),
+                        range: (*first, *last),
+                        old: is_old,
+                        alternate,
+                    }));
+                }
+                right = left - 8.0;
+            }
+        }
+        if kind == Some(Kind::Hunk)
             && let Some(tip) = data.weakened.get(&i)
         {
             super::weakened::badge(ui, right, rect.center().y, tip, i);

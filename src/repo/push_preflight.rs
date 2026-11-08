@@ -291,6 +291,12 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         .show(ui, |ui| {
             for (kind, title, fix, label) in [
                 (
+                    Kind::Transcript,
+                    "Checkpoint / transcript publication",
+                    "",
+                    "",
+                ),
+                (
                     Kind::Identity,
                     "Author matches this profile's host policy",
                     "author",
@@ -340,6 +346,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
                         }
                     ));
                     if !found.is_empty()
+                        && !fix.is_empty()
                         && plan.is_current_branch()
                         && ui.small_button(label).clicked()
                     {

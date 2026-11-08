@@ -28,6 +28,7 @@ pub(crate) enum Kind {
     Secret,
     Large,
     RemoteHistory,
+    Transcript,
 }
 
 #[derive(Clone, Debug)]
@@ -658,6 +659,34 @@ pub(crate) fn scan(
         || config(repo, "commit.gpgSign", active)?.eq_ignore_ascii_case("true");
     let mut commits = Vec::new();
     let mut findings = Vec::new();
+    if !deleting {
+        let names = read(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+                "refs/heads/entire/checkpoints/",
+                "refs/entire/checkpoints/",
+                "refs/gitcraft/agent/",
+            ],
+            active,
+        )?;
+        if names.len() > 1024 * 1024 {
+            return Err(
+                "Checkpoint reference list exceeds 1 MiB; narrow publication before pushing".into(),
+            );
+        }
+        if crate::git::prompt_session::checkpoint_publication(
+            &source,
+            &destination,
+            &push_oid,
+            &head,
+            &names,
+        ) {
+            findings.push(Finding { kind: Kind::Transcript, commit: push_oid.clone(), path: String::new(), detail: "Checkpoint publication may disclose prompts, local paths, assistant summaries and tool activity. This exact object or route contains agent checkpoint history. Review its contents and recipients explicitly before sending; local prompt/session viewing itself never publishes transcripts.".into() });
+        }
+    }
+
     if !deleting && push_oid != head {
         let tag = read(repo, &["cat-file", "tag", &push_oid], active)?;
         if secret_lines(tag.split_once("\n\n").map_or("", |x| x.1))

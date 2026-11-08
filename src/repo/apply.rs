@@ -103,6 +103,8 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::LoadPromptSession(hash) => self.load_prompt_session(hash, ctx),
+            Action::ShowPromptHunk(seed) => self.show_prompt_hunk(seed, ctx),
             Action::OpenLineDossier(seed) => {
                 self.symbols.close();
                 self.open_line_dossier(seed, ctx)

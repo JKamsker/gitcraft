@@ -15,6 +15,8 @@ use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    LoadPromptSession(String),
+    ShowPromptHunk(super::prompt_session::Hunk),
     OpenLineDossier(Option<git::investigations::dossier::Seed>),
     CloseLineDossier,
     OpenSymbolBiography(Option<git::investigations::dossier::Seed>),

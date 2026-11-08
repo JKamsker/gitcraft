@@ -29,6 +29,16 @@ impl RepoTab {
             }
             branch_tree::files_toggle(ui);
         });
+        if stash.is_none() && self.detail_hash.is_some() {
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.prompt_session.open, false, "Commit");
+                ui.selectable_value(&mut self.prompt_session.open, true, "Prompt & session");
+            });
+            if self.prompt_session.open {
+                self.prompt_session_panel(ui, acts);
+                return;
+            }
+        }
         if let Some(stash) = &stash {
             stash_banner(ui, acts, stash, idle);
         }
