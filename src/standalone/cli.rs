@@ -3,6 +3,11 @@ use std::path::PathBuf;
 
 pub const USAGE: &str = "Usage:\n  gitcraft [REPOSITORY]\n  gitcraft --diff [--] BEFORE AFTER\n  gitcraft --merge [--] BASE LOCAL REMOTE MERGED\n  gitcraft --mergetool [--] BASE LOCAL REMOTE MERGED\n\nFile tools open their own window and never discover a repository.\nDiff is read-only. Merge writes MERGED only after Save and finish.\nExit: 0 completed, 1 cancelled, 2 usage/read/save failure.\nUse -- before a repository name beginning with -.\n";
 
+/// Selected-language usage text. The raw USAGE constant remains for compatibility.
+pub fn usage() -> &'static str {
+    crate::i18n::text("interaction-standalone-usage")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Invocation {
     Repository(Option<PathBuf>),
@@ -27,11 +32,18 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Str
             let [path] = paths_exact(args)?;
             Ok(Invocation::Repository(Some(path)))
         }
-        _ if first.as_encoded_bytes().first() == Some(&b'-') => {
-            Err(format!("Unknown option: {first:?}\n{USAGE}"))
-        }
+        _ if first.as_encoded_bytes().first() == Some(&b'-') => Err(crate::i18n::message(
+            "interaction-standalone-error-unknown-option",
+            &[
+                ("option", (format!("{first:?}")).into()),
+                ("usage", (usage()).into()),
+            ],
+        )),
         _ if args.is_empty() => Ok(Invocation::Repository(Some(first.into()))),
-        _ => Err(format!("Expected one repository path\n{USAGE}")),
+        _ => Err(crate::i18n::message(
+            "interaction-standalone-error-repository-arity",
+            &[("usage", (usage()).into())],
+        )),
     }
 }
 
@@ -43,9 +55,12 @@ fn paths<const N: usize>(mut args: Vec<OsString>) -> Result<[PathBuf; N], String
 }
 fn paths_exact<const N: usize>(args: Vec<OsString>) -> Result<[PathBuf; N], String> {
     let paths: Vec<_> = args.into_iter().map(PathBuf::from).collect();
-    paths
-        .try_into()
-        .map_err(|_| format!("Expected {N} file path(s)\n{USAGE}"))
+    paths.try_into().map_err(|_| {
+        crate::i18n::message(
+            "interaction-standalone-error-file-arity",
+            &[("count", (N).into()), ("usage", (usage()).into())],
+        )
+    })
 }
 
 #[cfg(test)]
@@ -91,6 +106,55 @@ mod tests {
             parse(["--diff".into(), a.clone(), b.clone()])?,
             Invocation::Diff([a.into(), b.into()])
         );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn actual_parser_keeps_native_paths_and_localizes_usage_and_arity() -> Result<(), String> {
+        for (locale, unknown, expected) in [
+            ("en-US", "Unknown option: ", "Expected 2 file paths\n"),
+            (
+                "de",
+                "Unbekannte Option: ",
+                "Genau 2 Dateipfade werden erwartet\n",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let hostile = OsString::from("--unknown ' $() & ü\n{}");
+            let error = parse([hostile.clone()])
+                .err()
+                .ok_or("missing usage error")?;
+            assert!(error.starts_with(&format!("{unknown}{hostile:?}\n")));
+            assert!(error.ends_with(usage()));
+            for command in [
+                "gitcraft [REPOSITORY]",
+                "gitcraft --diff [--] BEFORE AFTER",
+                "gitcraft --merge [--] BASE LOCAL REMOTE MERGED",
+                "gitcraft --mergetool [--] BASE LOCAL REMOTE MERGED",
+            ] {
+                assert!(usage().contains(command));
+            }
+            let error = parse([OsString::from("--diff"), OsString::from("one")])
+                .err()
+                .ok_or("missing arity error")?;
+            assert!(error.starts_with(expected), "{error}");
+            assert_eq!(
+                parse([
+                    OsString::from("--diff"),
+                    OsString::from("--"),
+                    OsString::from("--help"),
+                    OsString::from("native ' $() & ü\npath"),
+                ])?,
+                Invocation::Diff(["--help".into(), "native ' $() & ü\npath".into()])
+            );
+        }
+        crate::i18n::set_language("en-US");
+        assert_eq!(usage(), USAGE);
         Ok(())
     }
 }

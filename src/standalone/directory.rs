@@ -30,7 +30,9 @@ impl Directory {
             .open(self.path.join(name))?;
         let meta = file.metadata()?;
         if !meta.is_file() || meta.file_attributes() & 0x400 != 0 {
-            return Err(io::Error::other("The output changed type"));
+            return Err(io::Error::other(crate::i18n::text(
+                "interaction-standalone-error-output-type",
+            )));
         }
         Ok(file)
     }
@@ -68,13 +70,17 @@ impl Directory {
                 .as_ref()
                 .is_some_and(|h| h.as_ref() == &handle)
         {
-            return Err(io::Error::other("Unsafe replacement file identity"));
+            return Err(io::Error::other(crate::i18n::text(
+                "interaction-standalone-error-replacement-identity",
+            )));
         }
         #[cfg(windows)]
         {
             use std::os::windows::fs::MetadataExt;
             if file.metadata()?.file_attributes() & 0x400 != 0 {
-                return Err(io::Error::other("Replacement is a reparse point"));
+                return Err(io::Error::other(crate::i18n::text(
+                    "interaction-standalone-error-replacement-reparse",
+                )));
             }
         }
         file.set_len(0)?;
@@ -109,15 +115,17 @@ impl Directory {
                     .open(&at)?;
                 let meta = file.metadata()?;
                 if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
-                    return Err(io::Error::other(
-                        "The output parent contains a link or is not a directory",
-                    ));
+                    return Err(io::Error::other(crate::i18n::text(
+                        "interaction-standalone-error-parent-type",
+                    )));
                 }
                 held.push(file);
             }
-            let file = held
-                .pop()
-                .ok_or_else(|| io::Error::other("No output parent directory"))?;
+            let file = held.pop().ok_or_else(|| {
+                io::Error::other(crate::i18n::text(
+                    "interaction-standalone-error-no-output-parent",
+                ))
+            })?;
             (file, held)
         };
         #[cfg(not(any(unix, windows)))]
@@ -190,7 +198,9 @@ impl Directory {
             {
                 use std::os::windows::fs::MetadataExt;
                 if file.metadata()?.file_attributes() & 0x400 != 0 {
-                    return Err(io::Error::other("The merge output is a link/reparse point"));
+                    return Err(io::Error::other(crate::i18n::text(
+                        "interaction-standalone-error-output-link",
+                    )));
                 }
             }
             Ok(file)
@@ -292,6 +302,8 @@ fn check_name(name: &OsStr) -> io::Result<()> {
     if matches!(components.next(), Some(Component::Normal(_))) && components.next().is_none() {
         Ok(())
     } else {
-        Err(io::Error::other("Expected one native file basename"))
+        Err(io::Error::other(crate::i18n::text(
+            "interaction-standalone-error-native-basename",
+        )))
     }
 }

@@ -99,12 +99,13 @@ fn command(program: &Path, source: &Path, target: &Path) -> Command {
 }
 #[cfg(windows)]
 fn execute(source: &Path, target: Option<&Path>) -> Result<Vec<u8>, String> {
-    let system = std::env::var_os("SystemRoot")
-        .ok_or("SystemRoot is unavailable; cannot safely preserve output access rules")?;
+    let system = std::env::var_os("SystemRoot").ok_or(crate::i18n::text(
+        "interaction-standalone-error-system-root-unavailable",
+    ))?;
     let program =
         std::path::PathBuf::from(system).join("System32/WindowsPowerShell/v1.0/powershell.exe");
     if !program.is_absolute() {
-        return Err("SystemRoot must be an absolute native path".into());
+        return Err(crate::i18n::text("interaction-standalone-error-system-root-absolute").into());
     }
     let mut command = command(&program, source, target.unwrap_or(Path::new("")));
     if target.is_none() {
@@ -121,12 +122,16 @@ fn execute(source: &Path, target: Option<&Path>) -> Result<Vec<u8>, String> {
     )?
     .complete()?;
     if !out.status.success() {
-        return Err(format!(
-            "Windows access metadata could not be preserved; original unchanged: {}",
-            String::from_utf8_lossy(&out.stderr)
-                .chars()
-                .take(4096)
-                .collect::<String>()
+        return Err(crate::i18n::message(
+            "interaction-standalone-error-windows-metadata",
+            &[(
+                "detail",
+                (String::from_utf8_lossy(&out.stderr)
+                    .chars()
+                    .take(4096)
+                    .collect::<String>())
+                .into(),
+            )],
         ));
     }
     Ok(out.stdout)
@@ -134,7 +139,7 @@ fn execute(source: &Path, target: Option<&Path>) -> Result<Vec<u8>, String> {
 #[cfg(windows)]
 pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
     if String::from_utf8_lossy(&execute(source, Some(target))?).trim() != "gitcraft-acl-v1-ok" {
-        return Err("Unexpected Windows metadata-copy response".into());
+        return Err(crate::i18n::text("interaction-standalone-error-windows-copy-response").into());
     }
     Ok(())
 }
@@ -142,13 +147,13 @@ pub(super) fn prepare(source: &Path, target: &Path) -> Result<(), String> {
 pub(super) fn snapshot(source: &Path) -> Result<Vec<u8>, String> {
     let out = execute(source, None)?;
     let encoded = std::str::from_utf8(&out)
-        .map_err(|_| "Invalid access descriptor response")?
+        .map_err(|_| crate::i18n::text("interaction-standalone-error-descriptor-response"))?
         .trim();
     let descriptor = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .map_err(|e| e.to_string())?;
     if descriptor.len() > 1024 * 1024 {
-        return Err("Output access metadata exceeds 1 MiB".into());
+        return Err(crate::i18n::text("interaction-standalone-error-access-limit").into());
     }
     Ok(descriptor)
 }

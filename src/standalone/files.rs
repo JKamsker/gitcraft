@@ -85,7 +85,9 @@ pub(super) struct Snapshot {
 impl Snapshot {
     pub fn read(path: &Path, active: &dyn Fn() -> bool) -> Result<Self, String> {
         if !active() {
-            return Err("File comparison cancelled".into());
+            return Err(
+                crate::i18n::text("interaction-standalone-error-comparison-cancelled").into(),
+            );
         }
         if null_input(path) {
             return Ok(Self {
@@ -96,7 +98,15 @@ impl Snapshot {
                 access: None,
             });
         }
-        let file = open_input(path).map_err(|e| format!("Could not open {}: {e}", label(path)))?;
+        let file = open_input(path).map_err(|e| {
+            crate::i18n::message(
+                "interaction-standalone-error-open-file",
+                &[
+                    ("path", (label(path)).into()),
+                    ("detail", (e.to_string()).into()),
+                ],
+            )
+        })?;
         Self::from_file(path, file, active)
     }
     pub fn from_file(
@@ -106,9 +116,9 @@ impl Snapshot {
     ) -> Result<Self, String> {
         let before = file.metadata().map_err(|e| e.to_string())?;
         if !before.is_file() || before.len() > FILE_LIMIT {
-            return Err(format!(
-                "{} must be a regular file within 2 MiB",
-                label(path)
+            return Err(crate::i18n::message(
+                "interaction-standalone-error-regular-file",
+                &[("path", (label(path)).into())],
             ));
         }
         let stamp = Stamp::new(&before);
@@ -116,23 +126,27 @@ impl Snapshot {
         let mut block = [0u8; 32 * 1024];
         loop {
             if !active() {
-                return Err("File comparison cancelled".into());
+                return Err(
+                    crate::i18n::text("interaction-standalone-error-comparison-cancelled").into(),
+                );
             }
             let count = file.read(&mut block).map_err(|e| e.to_string())?;
             if count == 0 {
                 break;
             }
             if bytes.len() + count > FILE_LIMIT as usize {
-                return Err("File comparison is limited to 2 MiB per file".into());
+                return Err(
+                    crate::i18n::text("interaction-standalone-error-comparison-limit").into(),
+                );
             }
             bytes.extend_from_slice(&block[..count]);
         }
         if Stamp::new(&file.metadata().map_err(|e| e.to_string())?) != stamp
             || bytes.len() as u64 != stamp.len
         {
-            return Err(format!(
-                "{} changed while reading; reopen the file tool",
-                label(path)
+            return Err(crate::i18n::message(
+                "interaction-standalone-error-file-read-changed",
+                &[("path", (label(path)).into())],
             ));
         }
         Ok(Self {
@@ -148,7 +162,9 @@ impl Snapshot {
     pub fn output(path: &Path, file: File) -> Result<Self, String> {
         let before = super::access::read(&file, path)?;
         let mut snapshot = Self::from_file(path, file, &|| true)?;
-        let handle = snapshot.handle.as_ref().ok_or("No output identity")?;
+        let handle = snapshot.handle.as_ref().ok_or(crate::i18n::text(
+            "interaction-standalone-error-no-output-identity",
+        ))?;
         let after = super::access::read(handle.as_file(), path)?;
         if before != after
             || snapshot.stamp.as_ref()
@@ -157,7 +173,7 @@ impl Snapshot {
                 ))
         {
             return Err(
-                "Output access metadata changed while reading; reopen before saving".into(),
+                crate::i18n::text("interaction-standalone-error-access-read-changed").into(),
             );
         }
         snapshot.access = Some(after);

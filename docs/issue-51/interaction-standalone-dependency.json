@@ -1,0 +1,21 @@
+{
+  "source_commit": "f1c347a15c933481c3944a21f134141d9e86c736",
+  "source_base": "383001b15d3c876d45a33bdae46a88ca6a8407b6",
+  "source_branch": "t3/standalone-fluent-migration",
+  "scope": "Exact immutable standalone source/catalog dependency for main usage/window_title integration; no owner source edited. Independent review pending Windows script diagnostic correction; not acceptance or runtime evidence. Canonical owner correction wins assembly.",
+  "sha256": {
+    "locales/de/interaction-standalone.ftl": "af96c05a19d3662b291d931a12382af94c4fb6c41fd7becaf346354ddc72dbf5",
+    "locales/en-US/interaction-standalone.ftl": "895520625c490a11173a6b49fc15a0f18aff311a8b5fe80e4614f8ac03191fa2",
+    "src/standalone/access.rs": "da0c69e6bd6a60dd702f83e62963ae39f3b4af99a0e4f9e7445e9ab39abc5b92",
+    "src/standalone/cli.rs": "c925212ad10b3dcbd94c159056520d4a0f555d08e0aff7572599a9bea799f325",
+    "src/standalone/directory.rs": "39edaf1e863a56dfcbbf169bfa484666c9a20e4dde04c9aeadee031765d48b15",
+    "src/standalone/files.rs": "f8a04d5fa8a08717657c65a28623dfc7fcfee88b9147fb3b907915a7eaf6b055",
+    "src/standalone/mod.rs": "7a822cd764d50c6a8069155c0e2ff477ad3f43de921631337cd486e30cab5890",
+    "src/standalone/model.rs": "3b8741406d9f75bab4d5a65ce61d8614674e0ccc1cf84cdea6cbcf65beff65d6",
+    "src/standalone/permissions.rs": "4ef0cad106d221b9240c1cb972d6c7382d99a524131eed51350c3de7fa856c1d",
+    "src/standalone/registration.rs": "2b856b745ce9d353c394a880d1516477f6d2b21c6fdbc32fba9e304d78f56bb0",
+    "src/standalone/save.rs": "b49598357a25e70316fae8e4b0a12359a3c3e03214b0b013eea67e0860a28fd5",
+    "src/standalone/ui.rs": "a407cbf4545dfec85ce83b34e0d50015da3c206493c0240a7925ccb731e6c0a4",
+    "src/standalone/windows_metadata.rs": "7d65387546c1ca97c99c98608777d6f29c447a1957c52277f3998cb8c3a2e6c4"
+  }
+}
